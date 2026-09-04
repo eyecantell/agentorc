@@ -27,7 +27,8 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
 
 1. **One view** of every session across hosts and repos with a trustworthy state:
    `working` / `needs-you` (waiting on a prompt, permission, or question) / `limited` (hit a
-   usage or token cap, waiting on a reset) / `stalled?` / `idle` / `exited` / `done`, plus
+   usage or token cap, waiting on a reset) / `stalled?` / `idle` / `exited` / `closed` /
+   `unreachable`, plus
    last-activity age and the pending question or reset time when there is one.
 2. **Read and drive a session in place**: full conversation in an embedded terminal, type
    prompts, answer menus, attach files.
@@ -48,10 +49,18 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
 10. **Phone triage**: the Herd view works on a phone over Tailscale — state, pending question, one-tap
     answers — so a blocked session can be unblocked from anywhere. The embedded terminal is a
     desktop feature.
-11. **Done, not just exited**: a per-repo checklist (PR merged, branch pushed, tree clean, no
-    subagents or background tasks running, ledger/attention board updated) decides whether a
-    finished session is `done`; an exit that fails it is shown as `exited, not done` with the
-    failing items.
+11. **Ready to close, decided by the person**: a per-repo checklist (PR merged, branch pushed,
+    tree clean, no subagents or background tasks running, ledger/attention board updated) says
+    when a session is *ready* to close; only the person closes it (**Close** kills the session,
+    reaps the worktree, and moves the card to `closed`). An exit that fails the checklist is
+    shown as `exited` with the failing items. The tool never declares work done.
+12. **Dark mode**: CSS tokens, `prefers-color-scheme` default plus a manual toggle. The
+    terminal panes are dark regardless, so light chrome is the jarring case at night.
+13. **Local and volatile hosts**: the person's own laptop is a host too (transport `local`,
+    no ssh). A host marked `volatile: true` sleeps with the lid; its sessions show
+    `unreachable` (not `stalled?`) when the agent stops answering, its VS Code links use the
+    local `vscode://file/<path>` form, and unattended policies refuse to start workers there
+    unless overridden.
 
 Non-goals (for now): multi-user access control, a kanban/task-board model of work (see §11 prior
 art), replacing Claude Code's own `/resume`, mobile-first UI.
@@ -121,20 +130,24 @@ State transitions (Claude Code adapter):
 | `Stop` | `idle` |
 | adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time |
 | `SessionEnd`, or tmux session gone | `exited` |
-| `exited` + the repo's `done_when` checklist passes | `done` |
+| person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable |
+| host agent unreachable on a `volatile` host | `unreachable` |
 
 `limited` is distinct from `needs-you` because nothing the person does unblocks it, and from
 `stalled?` because it is explained. The card shows the reset time and offers **Switch
 profile** (below) or **Wait**. For Claude Code the reset time comes from the usage endpoint
 tdgrind already polls; the pane's limit message is the scraped fallback.
 
-`done_when` is evaluated by the host agent when a session goes `idle` or `exited`:
+`ready_when` (the **Ready to close** checklist) is evaluated by the host agent when a session
+goes `idle` or `exited`:
 `git status --porcelain` empty, branch pushed, `gh pr view --json state` merged (when the branch
 has a PR), no live subagents (Claude Code: `SubagentStop` balances `SubagentStart`; other
 adapters: nothing running under the pane), and the ledger/attention board touched since the
 session started (dev-cadence repos). Each item is a named check in `.sessionherd.yml` so other
-repos can pick their own subset. The Focus view shows the checklist live; the Herd view shows
-failing items on an `exited` row. This is the stranded-work audit with teeth.
+repos can pick their own subset. The Focus view shows the checklist live with a **Close** button
+that enables when it passes; an idle card that passes shows "ready to close ✓" and a one-click
+Close; an `exited` card shows the failing items. Closing is always the person's act: the
+checklist is a readiness signal, never a verdict. This is the stranded-work audit with teeth.
 
 Adapters without a usable hook set get a **pane classifier** (regex over the last N lines) and
 `"confidence": "scraped"`. The UI shows the badge so a guessed state is never mistaken for a
@@ -214,7 +227,7 @@ Screens:
    last output lines; buttons Focus / VS Code / git / more. A scraped state shows as a dashed
    pill outline; there is no separate source column (it follows from the tool). Two sort
    modes, remembered per browser: **attention** (`needs-you` → `limited` → `stalled?` →
-   `working` → `idle` → `exited` → `done`) and **pinned** (cards stay where the person
+   `working` → `idle` → `exited` → `closed`) and **pinned** (cards stay where the person
    dragged them, needs-you cards are highlighted and counted in the top bar — for people who
    run a standard set of sessions). A second tab lists **resumable** inactive sessions from
    each adapter's transcript locator (Claude: `list_sessions.py`-style index) with a Resume
@@ -251,7 +264,9 @@ itself (§9 invariant 1).
 
 ## 5. Configuration
 
-- Hosts: `~/.sessionherd/hosts.yml` on the UI host (`name`, `ssh`, `repos_registry` path).
+- Hosts: `~/.sessionherd/hosts.yml` on the UI host (`name`, `transport: ssh|local`, `ssh`
+  target, `volatile: true|false`, `repos_registry` path). The UI process itself may run on a
+  laptop; only the session hosts need to stay awake.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
   duplicated. A repo without dev-cadence can still be listed there.
 - Per repo: `.sessionherd.yml` (checked in):
@@ -267,7 +282,7 @@ unattended:
   usage_gate: {five_hour_pct: 70, weekly_pct: 70}
   wrapup_minutes: 15
   creds_min_hours: 0.25
-done_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
+ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - name: test        ; run: pdm run test
   - name: cluster     ; run: ./scripts/cluster-status.sh
@@ -339,8 +354,9 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 - [x] Herd view: table vs card grid → card grid (2026-09-04), with attention/pinned sort modes.
 - [ ] Pinned layout: stored per browser (localStorage) or per person on the UI host? Per host
       survives a new browser; per browser needs no identity. Recommendation: per browser first.
-- [x] "Done when" → Focus side panel only (2026-09-04); a card shows just the failing items on
-      an `exited` session.
+- [x] "Done when" → renamed **Ready to close** (2026-09-04): Focus side panel with a Close
+      button; a card shows "ready to close ✓" or the failing items. `done` state → `closed`,
+      reached only by the person's Close.
 - [x] Name → `sessionherd` (2026-09-04); "s-herd" / "essherd" are the spoken short forms, not
       commands.
 - [ ] Does the PoC embed ttyd or use xterm.js + a Python pty bridge in the UI process? ttyd is

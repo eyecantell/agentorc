@@ -88,7 +88,7 @@ ICON = {
 BAR = {'needs': '#f59e0b', 'limited': '#7c3aed', 'stalled': '#dc2626', 'working': '#2563eb', 'idle': '#9ca3af', 'exited': '#9ca3af', 'done': '#059669'}
 
 def pill(state, label=None, scraped=False):
-    names = {"working": "working", "needs": "needs you", "idle": "idle", "stalled": "stalled?", "exited": "exited", "done": "done", "limited": "limited"}
+    names = {"working": "working", "needs": "needs you", "idle": "idle", "stalled": "stalled?", "exited": "exited", "done": "closed", "limited": "limited"}
     return f'<span class="pill s-{state}{" scraped" if scraped else ""}"><span class="dot"></span>{label or names[state]}</span>'
 
 def head(title):
@@ -103,7 +103,7 @@ def topbar(active="Herd", width_extra=""):
   <div style="display: flex; gap: 2px;">{tabs}</div>
   <div style="flex-grow: 1;"></div>
   <span class="mono" style="font-size: 11px; color: #aab3bf;">usage 5h 41% · wk 58%</span>
-  <span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ●</span>
+  <span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● laptop ◐</span>
   <span class="btn primary" style="height: 26px;">{ICON["plus"]}New session</span>
 </div>'''
 
@@ -118,12 +118,12 @@ SESS = [
         ("cmd-test", "shell · pdm run test", "exited", "1h", "wt/tdgrind-1", "", "scraped", "exit 0 · 412 passed", ""),
     ]),
     ("kmaster", "contractmatch", "/home/kmaster/contractmatch", [
-        ("main", "claude-code · paul (max) · opus", "idle", "22m", "main", "", "hook", "", ""),
+        ("main", "claude-code · paul (max) · opus", "idle", "22m", "main", "", "hook", "ready to close ✓ · tree clean, nothing open", ""),
     ]),
     ("vps", "dev-cadence", "/home/paul/dev-cadence", [
         ("attention-fix", "gemini-cli · paul · 2.5-pro", "working", "1m", "wt/attention-fix", "", "hook", "", ""),
         ("td-7", "claude-code · paul (max) · opus", "exited", "2d", "wt/td-7 → td-7-hook-fetch", "PR #12 open", "hook", "not done: PR not merged", ""),
-        ("td-5", "claude-code · paul (max) · opus", "done", "3d", "wt/td-5 (reaped)", "", "hook", "PR #11 merged · worktree reaped", ""),
+        ("td-5", "claude-code · paul (max) · opus", "done", "3d", "wt/td-5 (reaped)", "", "hook", "closed by you · PR #11 merged", ""),
     ]),
 ]
 
@@ -159,6 +159,8 @@ def herd_desktop():
             slot = f'<div class="status ok">{pending}</div>'
         elif state == "exited":
             slot = f'<div class="status {"bad" if pending.startswith("not done") else ""}">{pending}</div>'
+        elif pending.startswith("ready"):
+            slot = f'<div class="status ok">{pending}</div><div style="display: flex; gap: 6px;"><span class="btn sm">Close session</span></div>'
         else:
             slot = f'<div class="status">last: ⏺ Edit(scripts/recover_stuck_notices.py)</div>'
         border = "#f59e0b" if state == "needs" else "#dfe3e8"
@@ -193,7 +195,7 @@ def herd_desktop():
     <span style="display: inline-flex; border: 1px solid #cbd0d6; border-radius: 4px; overflow: hidden;"><span class="btn" style="border: 0; border-radius: 0; background: #e5e7eb; color: #111418;">Attention</span><span class="btn" style="border: 0; border-radius: 0;">Pinned</span></span>
   </div>
   <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;">{cards}</div>
-  <div class="note"><b>Attention</b> sort: needs you → limited → stalled? → working → idle → exited → done. <b>Pinned</b> keeps every card where you dragged it and highlights the ones that need you instead. A dashed outline on a state pill means the state was guessed from the screen (tool without hooks), not reported.</div>
+  <div class="note"><b>Attention</b> sort: needs you → limited → stalled? → working → idle → exited → closed. <b>Pinned</b> keeps every card where you dragged it and highlights the ones that need you instead. A dashed outline on a state pill means the state was guessed from the screen (tool without hooks), not reported.</div>
 </div>
 </div>
 ''' + TAIL
@@ -298,7 +300,7 @@ def focus():
       <div style="display: flex; gap: 6px; margin-top: 10px;"><span class="btn" style="height: 24px; font-size: 11px;">diff</span><span class="btn" style="height: 24px; font-size: 11px;">log</span><span class="btn" style="height: 24px; font-size: 11px;">PRs</span></div>
     </div>
     <div class="card" style="padding: 12px;">
-      <div style="font-weight: 600; margin-bottom: 8px;">Done when</div>
+      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm" style="opacity: .5;">Close</span></div>
       <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
         <div><span style="color: #065f46;">✓</span> tree clean</div>
         <div><span style="color: #991b1b;">✗</span> branch pushed</div>
@@ -356,8 +358,8 @@ def legend():
         ("limited", "Hit a usage or token cap and is waiting on a reset. Reset time shown. Nothing you do unblocks it except switching the profile (account/model)."),
         ("idle", "Turn finished (Stop hook), nothing pending. Flagged if the tree is dirty or unpushed."),
         ("stalled", "Reported working, but no output for longer than the adapter's stall_after. How a credential lapse shows up."),
-        ("exited", "Process ended or tmux session gone. Run log kept. Shows which done-criteria failed."),
-        ("done", "Exited and the repo's done checklist passed: pushed, PR merged, no subagents, ledger updated."),
+        ("exited", "Process ended or tmux session gone. Run log kept. Shows which ready-to-close checks failed."),
+        ("done", "You clicked Close: session killed, worktree reaped, card kept a day then filed under Resumable. Only you close a session; the checklist just says when it is ready."),
     ]
     body = "".join(f'<tr><td style="width: 120px;">{pill(s)}</td><td>{d}</td></tr>' for s, d in rows)
     return head("Legend") + f'''<div style="width: 760px; min-height: 640px; background: #f4f5f7; padding: 20px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
@@ -394,8 +396,26 @@ def direction_b():
 </div>
 ''' + TAIL
 
+DARK = [
+ ("background: #f4f5f7; color: #1c2128;", "background: #0e1116; color: #d7dce3;"),
+ ("#f4f5f7", "#0e1116"), ("background: #fff;", "background: #171b22;"), ("#dfe3e8", "#2a313b"), ("#eceef1", "#242a33"),
+ ("#111418", "#f1f3f6"), ("#1c2128", "#e6e9ee"), ("#374151", "#c3c9d2"), ("#4b5563", "#9aa3b0"), ("#6b7280", "#7d8794"), ("#cbd0d6", "#3a424d"),
+ (".topbar { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 20px; background: #e6e9ee;", ".topbar { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 20px; background: #05070a;"),
+ (".btn.primary { background: #e6e9ee; color: #fff; border-color: #e6e9ee; }", ".btn.primary { background: #e6e9ee; color: #0e1116; border-color: #e6e9ee; }"),
+ (".tab.on { background: #2b323b; color: #fff; }", ".tab.on { background: #2b323b; color: #fff; }"),
+ ("#fffbeb", "#2a2410"), ("#fde68a", "#6b4d00"), ("#f5f3ff", "#221a33"), ("#ddd6fe", "#4c3a80"),
+ ("#dbeafe", "#172554"), ("#1e40af", "#93c5fd"), ("#e5e7eb", "#2a313b"), ("#fecaca", "#4a1414"), ("#991b1b", "#fca5a5"), ("#d1fae5", "#0b3b2a"), ("#065f46", "#6ee7b7"), ("#ede9fe", "#2e1f5c"), ("#5b21b6", "#c4b5fd"), ("#7c3d00", "#fcd34d"),
+ ("background: #0f1419;", "background: #05070a;"),
+ ("background: #e5e7eb; color: #f1f3f6;", "background: #3a424d; color: #f1f3f6;"),
+]
+def darken(html):
+    for a, b in DARK:
+        html = html.replace(a, b)
+    return html
+
 files = {
     "Main.dc.html": herd_desktop(),
+    "MainDark.dc.html": darken(herd_desktop()),
     "Phone.dc.html": herd_phone(),
     "Focus.dc.html": focus(),
     "NewSession.dc.html": new_session(),
@@ -408,12 +428,13 @@ canvas = {
     "artboards": [
         {"file": "Main.dc.html", "title": "Herd — desktop", "x": 0, "y": 0, "w": 1440, "h": 1060},
         {"file": "Phone.dc.html", "title": "Herd — phone", "x": 1540, "y": 0, "w": 390, "h": 1220},
+        {"file": "MainDark.dc.html", "title": "Herd — dark", "x": 2040, "y": 0, "w": 1440, "h": 1060},
         {"file": "Focus.dc.html", "title": "Focus — session", "x": 0, "y": 1200, "w": 1440, "h": 900},
         {"file": "NewSession.dc.html", "title": "New session", "x": 1540, "y": 1400, "w": 720, "h": 860},
         {"file": "Legend.dc.html", "title": "States & badges", "x": 0, "y": 2240, "w": 760, "h": 640},
     ],
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "sessionherd mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nStill open: is 'Done when' a side panel only (Focus) or also on the card?"},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "sessionherd mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐)."},
     ],
     "launch": {"view": "canvas"},
 }
