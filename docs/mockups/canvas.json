@@ -1,0 +1,56 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "title": "Herd \u2014 desktop",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 1060
+    },
+    {
+      "file": "Phone.dc.html",
+      "title": "Herd \u2014 phone",
+      "x": 1540,
+      "y": 0,
+      "w": 390,
+      "h": 1220
+    },
+    {
+      "file": "Focus.dc.html",
+      "title": "Focus \u2014 session",
+      "x": 0,
+      "y": 1200,
+      "w": 1440,
+      "h": 900
+    },
+    {
+      "file": "NewSession.dc.html",
+      "title": "New session",
+      "x": 1540,
+      "y": 1400,
+      "w": 720,
+      "h": 860
+    },
+    {
+      "file": "Legend.dc.html",
+      "title": "States & badges",
+      "x": 0,
+      "y": 2240,
+      "w": 760,
+      "h": 640
+    }
+  ],
+  "annotations": [
+    {
+      "id": "brief",
+      "x": 0,
+      "y": -150,
+      "w": 520,
+      "text": "sessionherd mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nStill open: is 'Done when' a side panel only (Focus) or also on the card?"
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}

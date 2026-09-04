@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  body { margin: 0; background: #f4f5f7; color: #1c2128; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 13px; line-height: 1.4; }
+  a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-decoration: underline; }
+  .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
+  .pill .dot { display: none; } .pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .s-working { background: #dbeafe; color: #1e40af; }
+  .s-needs { background: #fde68a; color: #7c3d00; }
+  .s-idle { background: #e5e7eb; color: #4b5563; }
+  .s-stalled { background: #fecaca; color: #991b1b; }
+  .s-exited { background: #e5e7eb; color: #6b7280; }
+  .s-done { background: #d1fae5; color: #065f46; }
+  .s-limited { background: #ede9fe; color: #5b21b6; }
+  .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
+  .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
+  .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .btn.primary { background: #1c2128; color: #fff; border-color: #1c2128; }
+  .btn.danger { color: #991b1b; border-color: #e5b4b4; }
+  .btn.ghost { border-color: transparent; background: transparent; color: #4b5563; }
+  .btn.ghost:hover { background: #eef0f3; }
+  .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
+  .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+  .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
+  svg { width: 14px; height: 14px; }
+  .flag { display: inline-flex; align-items: center; gap: 4px; color: #991b1b; font-size: 11px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+  .card { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
+  .sc { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; position: relative; }
+  .sc-body { display: flex; flex-direction: column; gap: 8px; }
+  .sc-slot { height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
+  .sc-foot { display: flex; gap: 6px; align-items: center; }
+  .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
+  .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+  .btn.sm { height: 24px; font-size: 11px; padding: 0 8px; }
+  .btn.sm svg { width: 12px; height: 12px; }
+  .term.tail { height: 100%; box-sizing: border-box; font-size: 11px; line-height: 1.55; padding: 6px 9px; color: #aab3bf; border-radius: 4px; }
+  .topbar { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 20px; background: #1c2128; color: #e6e9ee; }
+  .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 15px; letter-spacing: -.01em; }
+  .wordmark b { color: #9ec5ff; font-weight: 500; }
+  .tab { padding: 6px 10px; border-radius: 4px; color: #aab3bf; font-weight: 500; }
+  .tab.on { background: #2b323b; color: #fff; }
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #dfe3e8; }
+  td { padding: 9px 10px; border-bottom: 1px solid #eceef1; vertical-align: middle; }
+  tr.needs td { background: #fffbeb; }
+  .grp { display: flex; align-items: center; gap: 10px; padding: 10px 10px 6px; font-weight: 600; font-size: 12px; color: #374151; }
+  .grp .path { font-weight: 400; color: #6b7280; }
+  .muted { color: #6b7280; }
+  .kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: 12px; }
+  .kv dt { color: #6b7280; } .kv dd { margin: 0; }
+  .term { background: #0f1419; color: #d5dbe3; font-family: "JetBrains Mono", monospace; font-size: 12px; line-height: 1.5; padding: 14px 16px; border-radius: 6px; white-space: pre; overflow: hidden; }
+  .term .p { color: #9ec5ff; } .term .q { color: #fde68a; } .term .g { color: #86efac; } .term .d { color: #7d8794; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 11px; font-weight: 600; color: #4b5563; text-transform: uppercase; letter-spacing: .04em; }
+  .input { height: 32px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .radio { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #dfe3e8; border-radius: 4px; background: #fff; }
+  .radio.on { border-color: #1c2128; box-shadow: inset 0 0 0 1px #1c2128; }
+  .rb { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #6b7280; box-sizing: border-box; }
+  .radio.on .rb { border: 4.5px solid #1c2128; }
+  .note { font-size: 12px; color: #6b7280; }
+  .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
+</style>
+</helmet>
+<div style="width: 720px; min-height: 860px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div class="topbar">
+  <span class="wordmark">session<b>herd</b></span>
+  <div style="display: flex; gap: 2px;"><span class="tab on">Herd</span><span class="tab">Resumable</span><span class="tab">Commands</span><span class="tab">Attention</span></div>
+  <div style="flex-grow: 1;"></div>
+  <span class="mono" style="font-size: 11px; color: #aab3bf;">usage 5h 41% · wk 58%</span>
+  <span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ●</span>
+  <span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
+</div>
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
+  <div style="font-size: 16px; font-weight: 600;">New session</div>
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
+    <div class="field"><label>Host</label><span class="input">kmaster<span class="muted">▾</span></span></div>
+    <div class="field"><label>Repo</label><span class="input">samscrape<span class="muted">▾</span></span></div>
+    <div class="field"><label>Adapter</label><span class="input">claude-code <span class="badge">state: hook</span></span></div>
+    <div class="field"><label>Name</label><span class="input mono">td-302</span></div>
+  </div>
+  <div class="field"><label>Where</label>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div class="radio" style="opacity: .55;"><span class="rb"></span><span>Main checkout</span><span class="mono muted" style="font-size: 11px;">/home/kmaster/samscrape</span><span style="flex-grow: 1;"></span><span class="pill s-needs">in use by main</span></div>
+      <div class="radio on"><span class="rb"></span><span>New worktree</span><span class="mono muted" style="font-size: 11px;">.claude/worktrees/td-302 from origin/main</span></div>
+      <div class="radio"><span class="rb"></span><span>Existing worktree</span><span class="mono muted" style="font-size: 11px;">errors-alerts (idle, dirty)</span></div>
+    </div>
+    <div class="warn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg><span>One session per main checkout (dev-cadence §1). The main checkout already hosts <b>main</b>, so a second session there is refused, not warned about.</span></div>
+  </div>
+  <div class="field"><label>Start</label>
+    <div style="display: flex; flex-direction: column; gap: 6px;">
+      <div class="radio on"><span class="rb"></span><span>Fresh</span></div>
+      <div class="radio"><span class="rb"></span><span>Resume</span><span class="mono muted" style="font-size: 11px;">pick from Resumable (24 transcripts on kmaster/samscrape)</span></div>
+    </div>
+  </div>
+  <div class="field"><label>Opening prompt (optional)</label><span class="input" style="height: 72px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Paste the brief, or leave empty to start at the prompt.</span></div>
+  <div class="field"><label>Mode</label>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;">
+      <div class="radio on"><span class="rb"></span><div><div>Interactive</div><div class="note">never paused, nudged, or killed by a policy</div></div></div>
+      <div class="radio"><span class="rb"></span><div><div>Unattended</div><div class="note">run window + usage gate apply; brief file required</div></div></div>
+    </div>
+  </div>
+  <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px;"><span class="btn">Cancel</span><span class="btn primary">Start session</span></div>
+</div>
+</div>
+</x-dc>
+</body>
+</html>
