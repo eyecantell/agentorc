@@ -339,8 +339,10 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 - [x] Herd view: table vs card grid → card grid (2026-09-04), with attention/pinned sort modes.
 - [ ] Pinned layout: stored per browser (localStorage) or per person on the UI host? Per host
       survives a new browser; per browser needs no identity. Recommendation: per browser first.
-- [ ] "Done when" in the Focus side panel only, or also a column in the Herd table.
-- [ ] Name: `sessionherd` (current) vs `essherd`. Rename is cheap until code exists.
+- [x] "Done when" → Focus side panel only (2026-09-04); a card shows just the failing items on
+      an `exited` session.
+- [x] Name → `sessionherd` (2026-09-04); "s-herd" / "essherd" are the spoken short forms, not
+      commands.
 - [ ] Does the PoC embed ttyd or use xterm.js + a Python pty bridge in the UI process? ttyd is
       less code; a Python bridge is one fewer binary for other devs to install. Recommendation:
       ttyd for the PoC, revisit at phase 5.

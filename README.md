@@ -1,5 +1,7 @@
 # sessionherd
 
+*Say it "s-herd" or "essherd" — the package and command stay `sessionherd`.*
+
 A self-hosted web dashboard that herds interactive AI coding-agent sessions (Claude Code first;
 Gemini CLI, Codex CLI, and on-prem harnesses via adapters) running in tmux across one or more
 hosts. One view of every session and whether it is **working**, **needs you**, **idle**, or
