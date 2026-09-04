@@ -26,8 +26,9 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
 ## 2. Goals
 
 1. **One view** of every session across hosts and repos with a trustworthy state:
-   `working` / `needs-you` (waiting on a prompt, permission, or question) / `idle` / `exited`,
-   plus last-activity age and the pending question text when there is one.
+   `working` / `needs-you` (waiting on a prompt, permission, or question) / `limited` (hit a
+   usage or token cap, waiting on a reset) / `stalled?` / `idle` / `exited` / `done`, plus
+   last-activity age and the pending question or reset time when there is one.
 2. **Read and drive a session in place**: full conversation in an embedded terminal, type
    prompts, answer menus, attach files.
 3. **Lifecycle from the UI**: start a new session (fresh or resumed), close one out, kill one.
@@ -118,8 +119,14 @@ State transitions (Claude Code adapter):
 | `SessionStart`, `UserPromptSubmit`, `PreToolUse` | `working` |
 | `Notification` (permission / question / idle prompt), `PermissionRequest` | `needs-you` + pending text |
 | `Stop` | `idle` |
+| adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time |
 | `SessionEnd`, or tmux session gone | `exited` |
 | `exited` + the repo's `done_when` checklist passes | `done` |
+
+`limited` is distinct from `needs-you` because nothing the person does unblocks it, and from
+`stalled?` because it is explained. The card shows the reset time and offers **Switch
+profile** (below) or **Wait**. For Claude Code the reset time comes from the usage endpoint
+tdgrind already polls; the pane's limit message is the scraped fallback.
 
 `done_when` is evaluated by the host agent when a session goes `idle` or `exited`:
 `git status --porcelain` empty, branch pushed, `gh pr view --json state` merged (when the branch
@@ -137,6 +144,17 @@ Liveness cross-check: the agent also watches the pipe-pane log's mtime; a `worki
 output for longer than the adapter's `stall_after` is shown as `stalled?`, which is how a
 credential lapse surfaces without a 401 regex.
 
+### 4.2a Profiles: tool · account · model
+
+People run more than one account of one tool, and more than one tool. A **profile** is
+`(adapter, account, model)`, e.g. `claude-code · paul (max) · opus` and
+`claude-code · grind (pro) · sonnet`. Every session carries one; the card shows it as a line.
+Commands, policies, and the usage gate key on the profile, so two accounts of one tool are
+gated and reported separately, and a `limited` session can be re-launched under another
+profile. For Claude Code the adapter maps an account to its own config directory
+(`CLAUDE_CONFIG_DIR`) and a model to the `--model` flag; other adapters map their own
+equivalents. Profiles are declared once per host in `~/.sessionherd/profiles.yml`.
+
 ### 4.3 Adapter contract
 
 One package per tool under `sessionherd/adapters/<tool>/`. Core never imports tool-specific
@@ -145,14 +163,14 @@ names outside the adapter.
 ```python
 class Adapter(Protocol):
     name: str                         # "claude-code"
-    def launch_cmd(self, *, resume: str | None, prompt_file: Path | None, unattended: bool) -> list[str]
+    def launch_cmd(self, *, profile: Profile, resume: str | None, prompt_file: Path | None, unattended: bool) -> list[str]
     def install_hooks(self, repo: Path) -> None      # writes/merges the tool's hook config
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
     def quirks(self) -> Quirks                      # first-run dialogs, settings pre-seed
-    def usage(self) -> Usage | None                 # subscription/quota if the tool exposes it
-    def credentials_ok(self) -> bool | None
+    def usage(self, profile: Profile) -> Usage | None     # quota + reset time, per account
+    def credentials_ok(self, profile: Profile) -> bool | None
 ```
 
 Prompt injection and menu answering are **core**, not adapter: `tmux send-keys` (`C-u`, literal
@@ -189,11 +207,18 @@ forwarded port. Adding a host is `sessionherd host add vps user@vps` + installin
 
 Screens:
 
-1. **Herd** (home): sessions grouped by host → repo. Columns: name, state pill + confidence
-   badge, since, branch, dirty/unpushed flag, pending question (one line), buttons
-   (focus / VS Code / nudge / wrap up / kill). Sort: `needs-you` first, then `stalled?`, then
-   by age. A second tab lists **resumable** inactive sessions from each adapter's transcript
-   locator (Claude: `list_sessions.py`-style index) with a Resume button.
+1. **Herd** (home): a **card grid** (decision 2026-09-04, over a table — keeps each session's
+   facts grouped and shows a live tail). Each card: host/repo, name, age, state pill, profile
+   line, where (checkout or worktree → branch), dirty/unpushed flag, then either the pending
+   question with Allow / Deny / Answer, the reset time with Switch profile / Wait, or the
+   last output lines; buttons Focus / VS Code / git / more. A scraped state shows as a dashed
+   pill outline; there is no separate source column (it follows from the tool). Two sort
+   modes, remembered per browser: **attention** (`needs-you` → `limited` → `stalled?` →
+   `working` → `idle` → `exited` → `done`) and **pinned** (cards stay where the person
+   dragged them, needs-you cards are highlighted and counted in the top bar — for people who
+   run a standard set of sessions). A second tab lists **resumable** inactive sessions from
+   each adapter's transcript locator (Claude: `list_sessions.py`-style index) with a Resume
+   button.
 2. **Focus**: embedded terminal (full conversation, keyboard passes through, so permissions and
    menus are answered exactly as in VS Code), prompt box with attachment upload, git status side
    panel, run-log download, "open in VS Code" link
@@ -255,8 +280,9 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 (interactive sessions are exempt from gates):
 
 - **Run window**: start missing workers inside the window; wrap-up-then-kill outside.
-- **Usage gate**: pause above the 5-hour / weekly thresholds; resume when usage drops; a fetch
-  failure never pauses.
+- **Usage gate** (per profile): pause unattended sessions on a profile above its 5-hour /
+  weekly thresholds; resume when usage drops; a fetch failure never pauses. Interactive
+  sessions on a capped profile are shown `limited`, never paused.
 - **Credential lapse**: adapter `credentials_ok()` false → don't start; running workers get a
   nudge when fresh credentials land (tdgrind's `.nudged` marker).
 - **Stall**: `working` with no output past `stall_after` → flag `stalled?`, nudge once, then
@@ -310,7 +336,9 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 - [ ] Where does the UI process run: kmaster (simplest, LAN) or the VPS (reachable anywhere via
       Tailscale)? Affects nothing in the design, only the install order.
 - [x] Password vs Tailscale-only for the UI in phase 1 → Tailscale only (2026-09-04).
-- [ ] Herd view: table (Main mockup) vs card grid with live tail (alternate mockup).
+- [x] Herd view: table vs card grid → card grid (2026-09-04), with attention/pinned sort modes.
+- [ ] Pinned layout: stored per browser (localStorage) or per person on the UI host? Per host
+      survives a new browser; per browser needs no identity. Recommendation: per browser first.
 - [ ] "Done when" in the Focus side panel only, or also a column in the Herd table.
 - [ ] Name: `sessionherd` (current) vs `essherd`. Rename is cheap until code exists.
 - [ ] Does the PoC embed ttyd or use xterm.js + a Python pty bridge in the UI process? ttyd is
