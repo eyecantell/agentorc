@@ -44,6 +44,14 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
    Code is the first adapter; Gemini CLI, Codex CLI, and on-prem harnesses are later adapters.
    Share with other devs once it proves useful.
 
+10. **Phone triage**: the Herd view works on a phone over Tailscale — state, pending question, one-tap
+    answers — so a blocked session can be unblocked from anywhere. The embedded terminal is a
+    desktop feature.
+11. **Done, not just exited**: a per-repo checklist (PR merged, branch pushed, tree clean, no
+    subagents or background tasks running, ledger/attention board updated) decides whether a
+    finished session is `done`; an exit that fails it is shown as `exited, not done` with the
+    failing items.
+
 Non-goals (for now): multi-user access control, a kanban/task-board model of work (see §11 prior
 art), replacing Claude Code's own `/resume`, mobile-first UI.
 
@@ -111,6 +119,15 @@ State transitions (Claude Code adapter):
 | `Notification` (permission / question / idle prompt), `PermissionRequest` | `needs-you` + pending text |
 | `Stop` | `idle` |
 | `SessionEnd`, or tmux session gone | `exited` |
+| `exited` + the repo's `done_when` checklist passes | `done` |
+
+`done_when` is evaluated by the host agent when a session goes `idle` or `exited`:
+`git status --porcelain` empty, branch pushed, `gh pr view --json state` merged (when the branch
+has a PR), no live subagents (Claude Code: `SubagentStop` balances `SubagentStart`; other
+adapters: nothing running under the pane), and the ledger/attention board touched since the
+session started (dev-cadence repos). Each item is a named check in `.sessionherd.yml` so other
+repos can pick their own subset. The Focus view shows the checklist live; the Herd view shows
+failing items on an `exited` row. This is the stranded-work audit with teeth.
 
 Adapters without a usable hook set get a **pane classifier** (regex over the last N lines) and
 `"confidence": "scraped"`. The UI shows the badge so a guessed state is never mistaken for a
@@ -190,9 +207,13 @@ Screens:
 5. **Attention**: the dev-cadence `/attention` report as a panel — "sessions waiting on me" and
    "board items due" are one question from the person's side.
 
-Security: the UI can type into a shell as you, so it is root-equivalent. Bind to LAN/Tailscale
-only, one shared password or a local OIDC later, never a public tunnel. Host ssh keys are the
-only credential the UI holds.
+Security: the UI can type into a shell as you, so it is root-equivalent. **Decision
+2026-09-04: Tailscale only** — the UI binds to the tailnet address, the phone joins the tailnet,
+no public port and no password to manage. Host ssh keys are the only credential the UI holds.
+
+Phone layout: the Herd view collapses to cards sorted `needs-you` first with Allow / Deny on a
+pending permission and a Focus button; the terminal, git panel, and New-session form stay
+desktop-width. Mockups (2026-09-04): https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04
 
 ### 4.6 CLI
 
@@ -221,6 +242,7 @@ unattended:
   usage_gate: {five_hour_pct: 70, weekly_pct: 70}
   wrapup_minutes: 15
   creds_min_hours: 0.25
+done_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - name: test        ; run: pdm run test
   - name: cluster     ; run: ./scripts/cluster-status.sh
@@ -287,7 +309,10 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 
 - [ ] Where does the UI process run: kmaster (simplest, LAN) or the VPS (reachable anywhere via
       Tailscale)? Affects nothing in the design, only the install order.
-- [ ] Password vs Tailscale-only for the UI in phase 1.
+- [x] Password vs Tailscale-only for the UI in phase 1 → Tailscale only (2026-09-04).
+- [ ] Herd view: table (Main mockup) vs card grid with live tail (alternate mockup).
+- [ ] "Done when" in the Focus side panel only, or also a column in the Herd table.
+- [ ] Name: `sessionherd` (current) vs `essherd`. Rename is cheap until code exists.
 - [ ] Does the PoC embed ttyd or use xterm.js + a Python pty bridge in the UI process? ttyd is
       less code; a Python bridge is one fewer binary for other devs to install. Recommendation:
       ttyd for the PoC, revisit at phase 5.
