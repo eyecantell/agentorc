@@ -16,6 +16,24 @@ Grew out of [samscrape](https://github.com/eyecantell/samscrape)'s `tdgrind` wor
 and the [dev-cadence](https://github.com/eyecantell/dev-cadence) working-cadence system, whose
 repo registry it depends on.
 
+## Start here (handoff from the 2026-09-04 design session)
+
+Design is settled enough to build. In order:
+
+1. **Evaluate, then install [dev-cadence](https://github.com/eyecantell/dev-cadence)** using the
+   evaluate-first prompt in its README (both directions; file upstream findings as PRs there).
+2. **Write `CLAUDE.md`** for this repo: Python 3.12, `pdm`, ruff at 120, the one-anchor rule,
+   and the design doc as the source of truth.
+3. **Phase 1 of [`docs/design.md`](docs/design.md) §7**: host agent + Claude Code adapter +
+   Herd and Focus pages, kmaster only. The success test is written there.
+4. Open questions still listed in §10 are implementation-level (ttyd vs a Python pty bridge,
+   one package or two, pinned-layout storage) — decide them in the build session and mark them.
+
+Mockups: https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04 (sources and
+regeneration notes in [`docs/mockups/`](docs/mockups/)). The CSS block at the top of
+`docs/mockups/gen.py` is the seed for the app's stylesheet tokens; the dark artboard is a token
+swap of the light one, which is how the real dark mode should work too.
+
 ## CLI
 
 The package installs `sessionherd` and a `herd` alias (`herd status`, `herd new`, ...).
