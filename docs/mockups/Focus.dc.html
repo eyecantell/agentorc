@@ -22,6 +22,10 @@
   .s-exited { background: #e5e7eb; color: #6b7280; }
   .s-done { background: #d1fae5; color: #065f46; }
   .s-limited { background: #ede9fe; color: #5b21b6; }
+  .s-unreachable { background: #e5e7eb; color: #6b7280; }
+  .card.off { opacity: .55; }
+  .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
+  .due + .due { border-top: 1px solid #eceef1; }
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
   .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
@@ -71,17 +75,22 @@
   .rb { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #6b7280; box-sizing: border-box; }
   .radio.on .rb { border: 4.5px solid #1c2128; }
   .note { font-size: 12px; color: #6b7280; }
+  .rs { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #374151; }
+  .rs > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rs-k { display: inline-block; width: 52px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; }
+  .switch { display: inline-flex; align-items: center; width: 34px; height: 20px; border-radius: 10px; background: #cbd0d6; padding: 2px; box-sizing: border-box; flex-shrink: 0; }
+  .switch .knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .switch.on { background: #1c2128; justify-content: flex-end; }
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 1440px; min-height: 900px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
-  <span class="wordmark">session<b>herd</b></span>
+  <span class="wordmark">agent<b>orc</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Herd</span><span class="tab">Resumable</span><span class="tab">Commands</span><span class="tab">Attention</span></div>
   <div style="flex-grow: 1;"></div>
-  <span class="mono" style="font-size: 11px; color: #aab3bf;">usage 5h 41% · wk 58%</span>
-  <span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● laptop ◐</span>
-  <span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
+  <span class="mono" style="font-size: 11px; color: #aab3bf;">usage 5h 41% · wk 58%</span><span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>
+  <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Shell</span><span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
 </div>
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
@@ -89,8 +98,9 @@
       <a href="#" class="muted">← Herd</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
       <span class="pill s-needs"><span class="dot"></span>needs you</span><span class="badge">unattended</span>
+      <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
       <span style="flex-grow: 1;"></span>
-      <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="btn">Wrap up</span><span class="btn danger"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"></path></svg>Kill</span>
+      <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="btn">Wrap up</span><span class="btn danger"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"></path></svg>Kill</span>
     </div>
     <div class="term" style="height: 560px;"><span class="d">● tdgrind-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/tdgrind-1</span>
 
@@ -102,20 +112,14 @@
 <span class="d">⏺</span> Edit(scripts/recover_stuck_notices.py)
 
 <span class="d">⏺</span> Bash(git push -u origin td301-fix)
-<span class="q">┌─ Permission ───────────────────────────────────────────────┐
-│ Bash: git push -u origin td301-fix                            │
-│ ❯ 1. Yes                                                     │
-│   2. Yes, and don't ask again for git push in this session   │
-│   3. No, tell Claude what to do differently                  │
-└──────────────────────────────────────────────────────────────┘</span>
+<span class="q">  ⏳ waiting for permission (agentorc hook · answer above, or the terminal dialog appears in 9m 12s)</span>
 <span class="d">▌</span></div>
     <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-      <div class="input" style="height: 64px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Type a prompt… (Enter sends; the terminal above also takes keys directly)</div>
+      <div class="input" style="height: 64px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt… multi-line, paste-friendly. Drop files or paste a screenshot here; the terminal above takes keys directly for menus and questions.</div>
       <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach file</span>
-        <span class="badge">~/.sessionherd/attachments/tdgrind-1/spec.pdf</span>
+        <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</span>
+        <span class="badge">~/.agentorc/attachments/tdgrind-1/spec.pdf</span><span class="badge">screenshot-1402.png</span>
         <span style="flex-grow: 1;"></span>
-        <span class="btn">Answer 1 · Yes</span><span class="btn">Answer 3 · No</span>
         <span class="btn primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8h10M8.5 3.5L13 8l-4.5 4.5"></path></svg>Send</span>
       </div>
     </div>
@@ -125,8 +129,8 @@
       <div style="font-weight: 600; margin-bottom: 8px;">Session</div>
       <dl class="kv" style="margin: 0;">
         <dt>profile</dt><dd class="mono" style="font-size: 11px;">claude-code · grind (pro) · sonnet</dd>
-        <dt>resume</dt><dd class="mono" style="font-size: 11px;">1c8e…f42a</dd>
-        <dt>tmux</dt><dd class="mono">sh-samscrape-tdgrind-1</dd>
+        <dt>adapter id</dt><dd class="mono" style="font-size: 11px;">1c8e0b2f…f42a</dd>
+        <dt>tmux</dt><dd class="mono">ao-samscrape-tdgrind-1</dd>
         <dt>started</dt><dd>2026-09-04 20:02 MDT · 3h 14m</dd>
         <dt>last output</dt><dd>14 s ago</dd>
         <dt>policy</dt><dd>window 20:00–06:00 · gate 70/70</dd>

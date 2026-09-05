@@ -22,6 +22,10 @@
   .s-exited { background: #e5e7eb; color: #6b7280; }
   .s-done { background: #d1fae5; color: #065f46; }
   .s-limited { background: #ede9fe; color: #5b21b6; }
+  .s-unreachable { background: #e5e7eb; color: #6b7280; }
+  .card.off { opacity: .55; }
+  .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
+  .due + .due { border-top: 1px solid #eceef1; }
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
   .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
@@ -71,19 +75,29 @@
   .rb { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #6b7280; box-sizing: border-box; }
   .radio.on .rb { border: 4.5px solid #1c2128; }
   .note { font-size: 12px; color: #6b7280; }
+  .rs { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #374151; }
+  .rs > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rs-k { display: inline-block; width: 52px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; }
+  .switch { display: inline-flex; align-items: center; width: 34px; height: 20px; border-radius: 10px; background: #cbd0d6; padding: 2px; box-sizing: border-box; flex-shrink: 0; }
+  .switch .knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .switch.on { background: #1c2128; justify-content: flex-end; }
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 390px; min-height: 1220px; background: #f4f5f7; display: flex; flex-direction: column;">
-<div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">session<b>herd</b></span><span style="flex-grow: 1;"></span><span class="mono" style="font-size: 11px; color: #aab3bf;">5h 41%</span><span class="btn primary" style="height: 32px; width: 32px; padding: 0; justify-content: center;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg></span></div>
+<div style="width: 390px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">agent<b>orc</b></span><span style="flex-grow: 1;"></span><span class="mono" style="font-size: 11px; color: #aab3bf;">5h 41%</span><span class="btn primary" style="height: 32px; width: 32px; padding: 0; justify-content: center;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg></span></div>
 <div style="padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 10px;">
-  <div style="display: flex; gap: 6px; overflow: hidden;"><span class="btn" style="height: 32px;">needs you 1</span><span class="btn" style="height: 32px;">stalled 1</span><span class="btn" style="height: 32px;">all 10</span></div>
+  <div style="display: flex; gap: 6px; overflow: hidden;"><span class="btn" style="height: 32px;">needs you 1</span><span class="btn" style="height: 32px;">due 6</span><span class="btn" style="height: 32px;">all 12</span></div>
+  <div class="card" style="display: flex; flex-direction: column;">
+    <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Due</span><span class="muted">4 overdue · 2 today · from the dev-cadence boards</span><span style="flex-grow: 1;"></span><a href="#" style="font-size: 12px;">full board →</a><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
+    <div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill s-stalled">14d overdue</span><span style="font-size: 12px; flex-basis: 100%;">Get the TD-259 keep-half snapshot off this array — it is the only copy.</span><span class="meta">samscrape · tdgrind-1</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div><div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill s-stalled">7d overdue</span><span style="font-size: 12px; flex-basis: 100%;">Decide TD-196 per tool: delete or port.</span><span class="meta">samscrape · tdgrind-2</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div><div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill s-stalled">2d overdue</span><span style="font-size: 12px; flex-basis: 100%;">Decide whether to turn the signup → CM board writer ON.</span><span class="meta">samscrape · 2fb13646</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div><div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill s-stalled">2d overdue</span><span style="font-size: 12px; flex-basis: 100%;">Add --fetch to the SessionStart hook line in the consumer settings.json files.</span><span class="meta">dev-cadence · 3168de4c</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div><div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill s-needs">due today</span><span style="font-size: 12px; flex-basis: 100%;">Deploy TD-296, then un-flag and republish the two DARPA notices.</span><span class="meta">samscrape · tdgrind-2</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div><div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill s-needs">due today</span><span style="font-size: 12px; flex-basis: 100%;">Deploy TD-036 step 2 (merged after the 05:00 UTC rollout, so not live).</span><span class="meta">samscrape · tdgrind-1</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div>
+  </div>
   <div class="card" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
   <div class="sbar" style="background: #f59e0b;"></div>
   <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">main</span><span style="flex-grow: 1;"></span><span class="pill s-needs"><span class="dot"></span>needs you</span></div>
   <div class="meta" style="margin-top: 4px; color: #374151;">kmaster / samscrape · main</div>
   <div class="meta" style="margin-top: 2px;">claude-code · paul (max) · opus · 2m</div>
-  <div class="status" style="border-color: #f59e0b; color: #7c3d00; white-space: normal; margin-top: 8px;">Permission: Bash · git push origin td301-fix</div><div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn primary" style="height: 44px; flex-grow: 1; justify-content: center;">Allow</span><span class="btn" style="height: 44px; flex-grow: 1; justify-content: center;">Deny</span><span class="btn" style="height: 44px; width: 44px; justify-content: center;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg></span></div>
+  <div class="status" style="border-color: #f59e0b; color: #7c3d00; white-space: normal; margin-top: 8px;">Permission: Bash · git push origin td301-fix</div><div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn primary" style="height: 44px; flex-grow: 1; justify-content: center;">Allow</span><span class="btn" style="height: 44px; flex-grow: 1; justify-content: center;">Deny</span><span class="btn" style="height: 44px; width: 44px; justify-content: center;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg></span></div><div class="meta" style="margin-top: 6px;">answered through the hook · 9m 12s before the terminal dialog takes over</div>
 </div><div class="card" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
   <div class="sbar" style="background: #7c3aed;"></div>
   <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">tdgrind-3</span><span style="flex-grow: 1;"></span><span class="pill s-limited"><span class="dot"></span>limited</span></div>
@@ -104,6 +118,15 @@
   <div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span></div>
 </div><div class="card" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
   <div class="sbar" style="background: #2563eb;"></div>
+  <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">pve</span><span style="flex-grow: 1;"></span><span class="pill s-working scraped"><span class="dot"></span>working</span></div>
+  <div class="meta" style="margin-top: 4px; color: #374151;">host1 / ~/proxmox</div>
+  <div class="meta" style="margin-top: 2px;">shell · 3m</div>
+  <div class="status " style="white-space: normal; margin-top: 8px;">$ qm list
+ VMID NAME     STATUS
+ 100  kmaster  running
+▌</div><div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span></div>
+</div><div class="card" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
+  <div class="sbar" style="background: #2563eb;"></div>
   <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">attention-fix</span><span style="flex-grow: 1;"></span><span class="pill s-working"><span class="dot"></span>working</span></div>
   <div class="meta" style="margin-top: 4px; color: #374151;">vps / dev-cadence · wt/attention-fix</div>
   <div class="meta" style="margin-top: 2px;">gemini-cli · paul · 2.5-pro · 1m</div>
@@ -122,10 +145,16 @@
   <div class="status " style="white-space: normal; margin-top: 8px;">ready to close ✓ · tree clean, nothing open</div><div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span></div>
 </div><div class="card" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
   <div class="sbar" style="background: #9ca3af;"></div>
-  <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">cmd-test</span><span style="flex-grow: 1;"></span><span class="pill s-exited scraped"><span class="dot"></span>exited</span></div>
-  <div class="meta" style="margin-top: 4px; color: #374151;">kmaster / samscrape · wt/tdgrind-1</div>
-  <div class="meta" style="margin-top: 2px;">shell · pdm run test · 1h</div>
-  <div class="status " style="white-space: normal; margin-top: 8px;">exit 0 · 412 passed</div><div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span></div>
+  <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">wg</span><span style="flex-grow: 1;"></span><span class="pill s-idle scraped"><span class="dot"></span>idle</span></div>
+  <div class="meta" style="margin-top: 4px; color: #374151;">vpnmaster / /etc/wireguard</div>
+  <div class="meta" style="margin-top: 2px;">shell · 1h</div>
+  <div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span></div>
+</div><div class="card off" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
+  <div class="sbar" style="background: #9ca3af;"></div>
+  <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">journal</span><span style="flex-grow: 1;"></span><span class="pill s-unreachable"><span class="dot"></span>unreachable</span></div>
+  <div class="meta" style="margin-top: 4px; color: #374151;">laptop / notes · main</div>
+  <div class="meta" style="margin-top: 2px;">claude-code · paul (max) · sonnet · 40m</div>
+  <div class="status " style="white-space: normal; margin-top: 8px;">laptop asleep since 14:02 · last state: idle</div><div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span></div>
 </div><div class="card" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
   <div class="sbar" style="background: #9ca3af;"></div>
   <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">td-7</span><span style="flex-grow: 1;"></span><span class="pill s-exited"><span class="dot"></span>exited</span></div>
@@ -136,8 +165,8 @@
   <div class="sbar" style="background: #059669;"></div>
   <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">td-5</span><span style="flex-grow: 1;"></span><span class="pill s-done"><span class="dot"></span>closed</span></div>
   <div class="meta" style="margin-top: 4px; color: #374151;">vps / dev-cadence · wt/td-5 (reaped)</div>
-  <div class="meta" style="margin-top: 2px;">claude-code · paul (max) · opus · 3d</div>
-  <div class="status ok" style="white-space: normal; margin-top: 8px;">closed by you · PR #11 merged</div><div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span></div>
+  <div class="meta" style="margin-top: 2px;">claude-code · paul (max) · opus · 20h</div>
+  <div class="status ok" style="white-space: normal; margin-top: 8px;">closed by you · PR #11 merged · filed under Resumable in 4h</div><div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span></div>
 </div>
 </div>
 </div>

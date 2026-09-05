@@ -6,7 +6,7 @@
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 1060
+      "h": 1360
     },
     {
       "file": "Phone.dc.html",
@@ -14,7 +14,7 @@
       "x": 1540,
       "y": 0,
       "w": 390,
-      "h": 1220
+      "h": 1560
     },
     {
       "file": "MainDark.dc.html",
@@ -22,31 +22,55 @@
       "x": 2040,
       "y": 0,
       "w": 1440,
-      "h": 1060
+      "h": 1360
     },
     {
       "file": "Focus.dc.html",
       "title": "Focus \u2014 session",
       "x": 0,
-      "y": 1200,
+      "y": 1460,
       "w": 1440,
-      "h": 900
+      "h": 980
     },
     {
       "file": "NewSession.dc.html",
       "title": "New session",
       "x": 1540,
-      "y": 1400,
+      "y": 1840,
       "w": 720,
-      "h": 860
+      "h": 960
     },
     {
       "file": "Legend.dc.html",
       "title": "States & badges",
       "x": 0,
-      "y": 2240,
+      "y": 2580,
       "w": 760,
-      "h": 640
+      "h": 820
+    },
+    {
+      "file": "Resumable.dc.html",
+      "title": "Resumable",
+      "x": 0,
+      "y": 3540,
+      "w": 1440,
+      "h": 700
+    },
+    {
+      "file": "Commands.dc.html",
+      "title": "Commands",
+      "x": 1540,
+      "y": 3540,
+      "w": 1440,
+      "h": 820
+    },
+    {
+      "file": "Attention.dc.html",
+      "title": "Attention",
+      "x": 0,
+      "y": 4480,
+      "w": 1440,
+      "h": 860
     }
   ],
   "annotations": [
@@ -55,7 +79,7 @@
       "x": 0,
       "y": -150,
       "w": 520,
-      "text": "sessionherd mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' \u2192 'Ready to close' + user-driven Close \u2192 closed state; dark artboard added; laptop shown as a volatile host (\u25d0)."
+      "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' \u2192 'Ready to close' + user-driven Close \u2192 closed state; dark artboard added; laptop shown as a volatile host (\u25d0).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass \u2014 renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Herd, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions."
     }
   ],
   "launch": {

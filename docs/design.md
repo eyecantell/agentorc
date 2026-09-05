@@ -1,8 +1,9 @@
-# sessionherd — design
+# agentorc — design
 
-Status: **draft for review** (2026-09-04). Nothing is built. This document is the requirements and
-architecture agreed in the 2026-09-04 design session; each open question at the end is a decision
-that changes what gets built.
+Status: **draft for review** (2026-09-04, revised the same evening after the mockup round). Nothing
+is built. This document is the requirements and architecture agreed in the 2026-09-04 design
+session; each open question at the end is a decision that changes what gets built. The project was
+called `sessionherd` for most of that day; see §10 for the rename.
 
 ## 1. Problem
 
@@ -31,12 +32,14 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
    `unreachable`, plus
    last-activity age and the pending question or reset time when there is one.
 2. **Read and drive a session in place**: full conversation in an embedded terminal, type
-   prompts, answer menus, attach files.
+   prompts, answer menus in the terminal, attach files from the laptop (drag and drop, a
+   picker, or a pasted screenshot — this must be effortless, it is how briefs and specs reach a
+   session).
 3. **Lifecycle from the UI**: start a new session (fresh or resumed), close one out, kill one.
 4. **Repo awareness**: git status per checkout/worktree, one-anchor-per-checkout enforcement,
    dirty-or-unpushed flags on idle/exited sessions.
-5. **Configurable buttons**: per-repo commands (cmdorc-style specs) that run as sessions in the
-   same list.
+5. **Configurable buttons**: per-repo commands (cmdorc-style specs) that run as sessions of
+   kind `command` — same substrate, own tab (§4.5).
 6. **Jump out**: "open in VS Code" for the session's directory on its host.
 7. **Survive the laptop closing**: sessions live on the host (kmaster today, a VPS next), never on
    the client.
@@ -61,6 +64,10 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
     `unreachable` (not `stalled?`) when the agent stops answering, its VS Code links use the
     local `vscode://file/<path>` form, and unattended policies refuse to start workers there
     unless overridden.
+14. **A session is a tmux session, with or without a repo, with or without an agent.** A plain
+    shell on `vpnmaster` or `host1` (proxmox) is a first-class card: it has a directory, a run
+    log, a state, and Focus, just no hooks and no worktrees. A repo is optional; an adapter is
+    just what decides where state comes from.
 
 Non-goals (for now): multi-user access control, a kanban/task-board model of work (see §11 prior
 art), replacing Claude Code's own `/resume`, mobile-first UI.
@@ -80,41 +87,59 @@ No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap su
 ## 4. Architecture
 
 ```
-laptop browser ──https──▶ sessionherd UI (one process, runs on a host you choose)
+laptop browser ──https──▶ agentorc UI (one process, runs on a host you choose)
                               │  ssh transport (no public ports on hosts beyond ssh)
               ┌───────────────┼───────────────┐
               ▼               ▼               ▼
         host agent        host agent       host agent
-        (kmaster)         (vps)            (...)
+        (kmaster)         (vps)            (host1, vpnmaster, laptop …)
           │  ├─ tmux server (systemd user unit, linger on)
           │  ├─ ttyd (localhost only; UI proxies the websocket)
-          │  ├─ state dir  ~/.sessionherd/sessions/<id>.json  ◀── adapter hooks write here
-          │  ├─ run logs   ~/.sessionherd/runs/<session>.log  ◀── tmux pipe-pane, continuous
+          │  ├─ state dir  ~/.agentorc/sessions/<id>.json  ◀── adapter hooks write here
+          │  ├─ run logs   ~/.agentorc/runs/<session>.log  ◀── tmux pipe-pane, continuous
           │  └─ policies   (run window, usage gate, reap worktrees, anchor rule)
-          └─ repos from ~/.config/dev-cadence/repos.txt (+ ~/.sessionherd/hosts.yml)
+          └─ repos from ~/.config/dev-cadence/repos.txt (+ ~/.agentorc/hosts.yml)
 ```
 
 ### 4.1 Session substrate: tmux, one session per conversation
 
-- Session name `sh-<repo>-<name>` (prefix lets the agent enumerate its own sessions).
+- Session name `ao-<repo-or-dir>-<name>` (prefix lets the agent enumerate its own sessions).
+- Every session record carries: `name` (what the person called it), `kind`
+  (`interactive` | `command`), `adapter` (`claude-code`, `shell`, …), `profile` (empty for
+  `shell`), `dir`, `repo` (optional), `worktree` (optional), and `adapter_id` once known (Claude
+  Code's session uuid — read from the hook payload; it is what Resumable and the transcript index
+  key on). Resumable shows the name first and the id under it; a session started by hand
+  outside agentorc shows only the id until it is **adopted** (attach to the tmux session, give it
+  a name), which is also how hand-started sessions enter the Herd.
+- A **plain shell is an adapter** (`shell`, scraped: `working` while a foreground process runs,
+  `idle` at the prompt — a shell waiting for you is the normal state, not an alert — `exited`
+  when the pane is gone). Ad-hoc shells are ordinary
+  `interactive` cards; the profile line reads `shell`. Predefined command buttons (§4.5) start
+  `kind: command` sessions, which are hidden from the Herd unless the "show command runs"
+  filter is on and never rank in the urgency sort.
 - Created **only** by the host agent (one writer per shared resource — see §9). The UI, the CLI,
   and the cron reconcile all call the agent.
 - tmux server runs under a user systemd unit with `loginctl enable-linger`, so a reboot restarts
   it rather than a cron tick noticing later.
 - `history-limit` raised at creation; `pipe-pane` streams output to
-  `~/.sessionherd/runs/<session>-<created>.log` continuously (replaces tdgrind's per-tick
+  `~/.agentorc/runs/<session>-<created>.log` continuously (replaces tdgrind's per-tick
   snapshot; a reboot loses nothing that reached the pipe).
-- Directory is the repo checkout or a worktree; the agent records which and refuses a second
-  session on a main checkout (anchor rule, §9).
+- Directory is the repo checkout, a worktree, or — with no repo — any directory the person
+  names (recent directories remembered per host). The anchor rule (§9) is about directories, not
+  checkouts: one *agent* session per directory; a repo's worktrees are just extra directories.
+  Shells and `kind: command` runs are exempt — the rule is scoped to `kind: interactive` sessions
+  with a non-`shell` adapter — because the person is not what the rule protects against, and a
+  shell or a test run next to an agent in the same directory is the common case.
 
 ### 4.2 State feed: hooks first, scraping as a labelled fallback
 
 The three states the person cares about are already emitted by the tools that have hooks. An
 adapter installs a small hook script that writes
-`~/.sessionherd/sessions/<session-id>.json`:
+`~/.agentorc/sessions/<session-id>.json`:
 
 ```json
-{"session_id": "...", "tool": "claude-code", "tmux": "sh-samscrape-tdgrind-1",
+{"session_id": "...", "name": "tdgrind-1", "kind": "interactive", "tool": "claude-code",
+ "tmux": "ao-samscrape-tdgrind-1",
  "cwd": "/home/kmaster/samscrape/.claude/worktrees/tdgrind-1",
  "state": "needs-you", "since": "2026-09-04T15:02:11Z",
  "pending": {"kind": "permission", "text": "Bash: git push origin td-301"},
@@ -131,7 +156,25 @@ State transitions (Claude Code adapter):
 | adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time |
 | `SessionEnd`, or tmux session gone | `exited` |
 | person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable |
-| host agent unreachable on a `volatile` host | `unreachable` |
+| host agent unreachable (a property of the **host**; every card on it flips at once) | `unreachable` — card greyed, last known state kept visible |
+
+`unreachable` is shown at the host level first: the host chip in the top bar goes hollow and one
+banner row in the Herd says "laptop unreachable since 14:02 · 2 sessions". Where it sorts depends
+on whether it is expected: a `volatile` host asleep sorts with `idle` (grey); a non-volatile host
+that stops answering sorts right after `stalled?` (red). No new colour.
+
+**Permissions are answered through the hook, not through keystrokes.** Claude Code's
+`PermissionRequest` hook may return the decision itself. The adapter's hook script asks the host
+agent and blocks; the UI's **Allow** / **Deny** (card, phone) answer the agent, and the dialog
+never appears in the terminal. If nobody answers before the hook timeout the request falls
+through to the normal terminal dialog and the card's buttons collapse to **Focus**, because the
+decision now lives in the terminal. The timeout is per profile (`permission_wait` in
+`profiles.yml`), default 10 minutes for interactive sessions — long enough to reach a phone.
+Unattended workers pre-authorise their tool set in the repo's tool settings (the allowlist tdgrind
+already ships) so they rarely reach the hook at all; when one does, the `needs-you` state with its
+age is the alert, and no extra policy is needed. Questions and multi-option menus always show pending text
+plus **Focus** — never buttons — since the hook does not carry the option list and typing "1"
+into a pane on the assumption that a dialog is still up is a race we refuse to run.
 
 `limited` is distinct from `needs-you` because nothing the person does unblocks it, and from
 `stalled?` because it is explained. The card shows the reset time and offers **Switch
@@ -143,7 +186,7 @@ goes `idle` or `exited`:
 `git status --porcelain` empty, branch pushed, `gh pr view --json state` merged (when the branch
 has a PR), no live subagents (Claude Code: `SubagentStop` balances `SubagentStart`; other
 adapters: nothing running under the pane), and the ledger/attention board touched since the
-session started (dev-cadence repos). Each item is a named check in `.sessionherd.yml` so other
+session started (dev-cadence repos). Each item is a named check in `.agentorc.yml` so other
 repos can pick their own subset. The Focus view shows the checklist live with a **Close** button
 that enables when it passes; an idle card that passes shows "ready to close ✓" and a one-click
 Close; an `exited` card shows the failing items. Closing is always the person's act: the
@@ -166,12 +209,13 @@ Commands, policies, and the usage gate key on the profile, so two accounts of on
 gated and reported separately, and a `limited` session can be re-launched under another
 profile. For Claude Code the adapter maps an account to its own config directory
 (`CLAUDE_CONFIG_DIR`) and a model to the `--model` flag; other adapters map their own
-equivalents. Profiles are declared once per host in `~/.sessionherd/profiles.yml`.
+equivalents. Profiles are declared once per host in `~/.agentorc/profiles.yml`.
 
 ### 4.3 Adapter contract
 
-One package per tool under `sessionherd/adapters/<tool>/`. Core never imports tool-specific
-names outside the adapter.
+One package per tool under `agentorc/adapters/<tool>/`. Core never imports tool-specific
+names outside the adapter. The `shell` adapter is the degenerate case and ships in phase 1
+(it is how repo-less hosts get cards at all).
 
 ```python
 class Adapter(Protocol):
@@ -186,8 +230,10 @@ class Adapter(Protocol):
     def credentials_ok(self, profile: Profile) -> bool | None
 ```
 
-Prompt injection and menu answering are **core**, not adapter: `tmux send-keys` (`C-u`, literal
-text, `C-m`) and arrow/Enter for menus. The embedded terminal makes this the same as typing.
+Prompt injection is **core**, not adapter: `tmux send-keys` (`C-u`, literal text, `C-m`) from the
+composer under the Focus terminal. Menus and questions are answered *in* the terminal (keys pass
+through); permissions go through the hook decision channel (§4.2). The core never types a menu
+choice into a pane.
 
 Adapter status at design time (verify before building each):
 
@@ -196,7 +242,7 @@ Adapter status at design time (verify before building each):
 | Claude Code | full hook set incl. `Notification`, `Stop`, `PermissionRequest`; transcripts in `~/.claude/projects/`; live registry `~/.claude/sessions/`; usage via the OAuth usage endpoint (tdgrind `usage`) | hook-fed — **phase 1** |
 | Gemini CLI | hooks since v0.26 + OSC 9 "action required / complete" notifications | hook-fed (verify) |
 | Codex CLI | experimental hooks (Pre/PostToolUse); a "waiting" event unconfirmed | scraped until verified |
-| Aider / plain shell / cmdorc command | none | scraped: running vs exited by pane + exit marker |
+| `shell` (ad-hoc shell, Aider, a cmdorc command run) | none | scraped: foreground process vs prompt vs pane gone, exit code from the marker — **phase 1** |
 
 ### 4.4 Host agent
 
@@ -208,73 +254,144 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   lists, cached with a short TTL.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
 - Start ttyd bound to localhost for the UI to proxy.
-- Attachment drop: accept an uploaded file into `~/.sessionherd/attachments/<session>/`, return
-  the path for the UI to insert into the prompt (Claude Code takes file paths in prompts).
+- Attachment drop: accept an uploaded file (the UI copies it over ssh) into
+  `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
+  (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file
+  picker, and clipboard paste (screenshots) on desktop; the share sheet on the phone.
+- Permission decisions: the `PermissionRequest` hook script asks the agent over the socket and
+  blocks until the UI answers or the hook times out (§4.2).
+- Board write-back: **Snooze** (edit the `Due:` date) and **Done** (check the item off) on a
+  dev-cadence `user_attention.md` item are one-line edits the agent makes and commits with a
+  fixed message naming the session (`agentorc: snooze <item> to <date> (session <name>)`), so the
+  main checkout never sits dirty and the history is auditable. The agent is the only writer to
+  those files from this system; it never pushes.
 
 ### 4.5 UI
 
 Single web process (FastAPI + websockets; plain server-rendered pages with a small amount of JS
 and xterm.js — no SPA build step, so other devs can run it with one command). Talks to each host
-over ssh: JSON RPC over `ssh host sessionherd-agent rpc` and the ttyd websocket over an ssh-
-forwarded port. Adding a host is `sessionherd host add vps user@vps` + installing the agent there.
+over ssh: JSON RPC over `ssh host agentorc-agent rpc` and the ttyd websocket over an ssh-
+forwarded port. Adding a host is `agentorc host add vps user@vps` + installing the agent there.
 
 Screens:
 
 1. **Herd** (home): a **card grid** (decision 2026-09-04, over a table — keeps each session's
-   facts grouped and shows a live tail). Each card: host/repo, name, age, state pill, profile
-   line, where (checkout or worktree → branch), dirty/unpushed flag, then either the pending
-   question with Allow / Deny / Answer, the reset time with Switch profile / Wait, or the
-   last output lines; buttons Focus / VS Code / git / more. A scraped state shows as a dashed
-   pill outline; there is no separate source column (it follows from the tool). Two sort
-   modes, remembered per browser: **attention** (`needs-you` → `limited` → `stalled?` →
-   `working` → `idle` → `exited` → `closed`) and **pinned** (cards stay where the person
-   dragged them, needs-you cards are highlighted and counted in the top bar — for people who
-   run a standard set of sessions). A second tab lists **resumable** inactive sessions from
-   each adapter's transcript locator (Claude: `list_sessions.py`-style index) with a Resume
-   button.
-2. **Focus**: embedded terminal (full conversation, keyboard passes through, so permissions and
-   menus are answered exactly as in VS Code), prompt box with attachment upload, git status side
-   panel, run-log download, "open in VS Code" link
+   facts grouped and shows a live tail). Each card: host/repo (or host/directory), name, age,
+   state pill, profile line (`shell` for a shell), where (checkout, worktree → branch, or
+   directory), dirty/unpushed flag, then either the pending permission with Allow / Deny (hook
+   channel, §4.2), a pending question with Focus, the reset time with Switch profile / Wait, or
+   the last output lines; buttons Focus / VS Code / more. The **more** menu holds Wrap up, Kill
+   (confirms), Close (enabled only when Ready to close passes; a card that passes also shows it
+   inline, see §4.2), Open shell here, Copy tmux command. A scraped state shows as a dashed pill outline. Two sort modes, remembered per
+   browser: **Urgent first** (`needs-you` → `limited` → `stalled?` → `unreachable` on a
+   non-volatile host → `working` → `idle` / `unreachable` on a volatile host → `exited` →
+   `closed`) and **Pinned** (cards stay where the person dragged them, needs-you cards are
+   highlighted and counted in the top bar). A **Due** strip above the grid lists the
+   dev-cadence board items that are overdue or due today, each with Snooze and Done (agent
+   write-back, §4.4); collapsed to a count when empty. Unreachable hosts get one banner row.
+   Command-kind sessions are hidden unless "show command runs" is on. Two shortcuts next to
+   **New session**: **Shell** (host + directory, nothing else) — and on Focus, **Open shell
+   here** (a shell in the same directory as the session being viewed).
+2. **Focus**: embedded terminal (full conversation, keyboard passes through, so menus and
+   questions are answered exactly as in VS Code — there are no answer buttons under the
+   terminal; a pending permission shows Allow / Deny in the Focus header, same hook channel as
+   the card, because the hook holds the dialog back from the terminal until it times out), a
+   **composer** (multi-line prompt box; Send delivers to the pane; the reason it
+   exists beside the terminal is pastes, composing while the session is busy, and phone typing)
+   with **Attach**, git status side panel, Ready-to-close panel, run-log download, Wrap up
+   (sends the same wrap-up prompt the policy uses — one code path), Kill, "open in VS Code"
    (`vscode://vscode-remote/ssh-remote+<host>/<path>` — handled by the browser on the laptop,
    which is why this is a web UI and not a TUI).
-3. **New session**: pick host → repo → adapter → checkout or new worktree (main refused if it
-   already has a session) → fresh or resume → optional brief file → unattended toggle.
-4. **Commands**: per-repo buttons from `.sessionherd.yml` (cmdorc command specs where cmdorc
-   fits); each press starts a `sh-<repo>-cmd-<name>` session so it shows in the herd with
-   running/exited state and a log.
-5. **Attention**: the dev-cadence `/attention` report as a panel — "sessions waiting on me" and
-   "board items due" are one question from the person's side.
+3. **New session**: pick host → repo *or* directory → adapter → checkout, new worktree, or an
+   existing worktree (only `exited`/`closed` ones are offered; an in-use one is greyed with
+   "in use — resume from the Herd"; main refused if it already has a session) → fresh or
+   resume → optional brief file → **Unattended** switch (off by default; disabled with "no `unattended:` block in
+   `.agentorc.yml`" for repos without one; hidden for directory sessions).
+4. **Resumable**: inactive sessions from each adapter's transcript locator (Claude:
+   `list_sessions.py`-style index over `~/.claude/projects`), grouped by host/repo, name first
+   and adapter id under it, with Resume (prefills New session) or Switch to (a running one), and
+   Adopt for a hand-started session. Closed sessions are filed here after their day on the Herd.
+5. **Commands**: per-repo buttons from `.agentorc.yml` (cmdorc command specs where cmdorc fits);
+   each press starts an `ao-<repo>-cmd-<name>` session of kind `command` with running/exited
+   state, exit code, and a log; a recent-runs list; Focus on a run opens its terminal. The
+   attention report's refresh *is* the repo's `attention` command — there is no second way to
+   run a script.
+6. **Attention**: the full dev-cadence board, every repo, undated items included, with the
+   stale-sweep warning the report prints; clicking an item focuses the session that left it
+   (via `adapter_id`); Snooze and Done as on the Due strip. No sessions column — the Herd is the
+   sessions view.
 
 Security: the UI can type into a shell as you, so it is root-equivalent. **Decision
 2026-09-04: Tailscale only** — the UI binds to the tailnet address, the phone joins the tailnet,
 no public port and no password to manage. Host ssh keys are the only credential the UI holds.
 
 Phone layout: the Herd view collapses to cards sorted `needs-you` first with Allow / Deny on a
-pending permission and a Focus button; the terminal, git panel, and New-session form stay
+pending permission (hook channel) and a Focus button, the Due strip on top; the terminal, git panel, and New-session form stay
 desktop-width. Mockups (2026-09-04): https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04
+
+### 4.5a Controls
+
+Every button in the mockups, what it does, and who executes it (UI → host agent RPC unless
+noted). If a control is not in this table it does not exist.
+
+| Where | Control | Does |
+|---|---|---|
+| top bar | **New session** | opens the New session form |
+| top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
+| Herd | **Urgent first / Pinned** | sort mode, remembered per browser |
+| Herd | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
+| Herd banner | **Retry** | asks the agent on an unreachable host again now instead of on the next tick |
+| card | **Allow / Deny** | answers a pending permission through the hook channel; shown with the time left |
+| card | **Switch profile…** | re-launches a `limited` session under another profile (resume id carried over) |
+| card | **Wait** | dismisses the limited slot until the reset time |
+| card | **Close session** (inline, only when Ready to close passes) | kill + reap worktree → `closed` |
+| card | **Focus** | opens the Focus screen |
+| card | **VS Code** | `vscode://` link for the session's directory on its host (browser-handled) |
+| card | **more ▾** | Wrap up · Kill (confirms) · Close (as above) · Open shell here · Copy tmux command |
+| Due strip / Attention | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
+| Due strip / Attention | **Done** | agent checks the item off and commits |
+| Due strip / Attention | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
+| Due strip / Attention | session link / **Focus session** | opens the session that left the item (by adapter id); a closed one opens in Resumable |
+| Due strip | **full board →** / **▾** | jumps to the Attention tab / collapses the strip to its count |
+| Focus | **Allow / Deny** | same hook channel as the card |
+| Focus | **Open shell here** | a `shell` session in this session's directory |
+| Focus | **Wrap up** | sends the wrap-up prompt (same one the policy uses) |
+| Focus | **Kill** | confirms, then kills the tmux session; worktree kept; state `exited` |
+| Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
+| Focus composer | **Send** | `send-keys` of the composer text |
+| Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
+| New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
+| New session | **Start session / Cancel** | agent creates the session / discards the form |
+| Resumable | **Resume** | New session prefilled (host, repo, directory, worktree, Start = Resume) |
+| Resumable | **Switch to** | the running card in the Herd |
+| Resumable | **Adopt…** | attach to a hand-started tmux session and name it |
+| Commands | **Run / Stop** | start a `kind: command` session / kill it |
+| Commands | **log**, **Focus** | the run log; the run's terminal |
+| Commands | **edit yml** | opens `.agentorc.yml` in VS Code |
 
 ### 4.6 CLI
 
-Package and canonical command: `sessionherd`. The package also registers `herd` as an alias
-(`herd status`, `herd new`, `herd focus <name>`, `herd off --now`) because that is what gets
-typed day to day. Laravel Herd installs a `herd` command on macOS/Windows; the README documents
-the collision and the alias is a separate console-script entry so an affected dev can drop it
-without losing anything. The CLI is a thin client of the host agent RPC — it never touches tmux
+Package and canonical command: `agentorc`. The package also registers `ao` as an alias
+(`ao status`, `ao new`, `ao shell`, `ao focus <name>`, `ao off --now`) because that is what gets
+typed day to day; it is a separate console-script entry so anyone with a colliding `ao` can
+drop it without losing anything. The CLI is a thin client of the host agent RPC — it never touches tmux
 itself (§9 invariant 1).
 
 ## 5. Configuration
 
-- Hosts: `~/.sessionherd/hosts.yml` on the UI host (`name`, `transport: ssh|local`, `ssh`
+- Hosts: `~/.agentorc/hosts.yml` on the UI host (`name`, `transport: ssh|local`, `ssh`
   target, `volatile: true|false`, `repos_registry` path). The UI process itself may run on a
   laptop; only the session hosts need to stay awake.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
-  duplicated. A repo without dev-cadence can still be listed there.
-- Per repo: `.sessionherd.yml` (checked in):
+  duplicated. A repo without dev-cadence can still be listed there. Directories that are not
+  repos are not registered anywhere: New session takes a path, and the agent remembers recent
+  ones per host in `~/.agentorc/recent_dirs`.
+- Per repo: `.agentorc.yml` (checked in):
 
 ```yaml
 adapter: claude-code
 worktrees: .claude/worktrees         # where new-session worktrees go
-anchor: main-checkout-single         # refuse a 2nd session on the main checkout
+anchor: main-checkout-single         # refuse a 2nd agent session on the main checkout (shells exempt)
 unattended:
   workers: 3
   brief: ~/.tdgrind/{name}-prompt.md
@@ -288,6 +405,10 @@ commands:
   - name: cluster     ; run: ./scripts/cluster-status.sh
   - name: attention   ; run: python scripts/nudge_user_attention.py --report
 ```
+
+A repo without the file gets defaults: `adapter: claude-code`, worktrees under
+`.claude/worktrees`, `ready_when: [tree_clean, branch_pushed, no_subagents]`, no commands, no
+unattended mode. A directory session (no repo) reduces to `ready_when: [no_subagents]`.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
@@ -312,17 +433,21 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 
 1. **PoC, kmaster, Claude Code only.** Host agent + Claude Code adapter (hooks, transcript
    locator, usage, creds) + herd page + focus page with ttyd + new-session flow + VS Code link.
+   Includes the `shell` adapter, the Shell button, and the hook-channel permission answer.
    Success test: every session Paul has open on kmaster shows the right state within 5 s of a
    change, and a permission prompt can be answered from the browser.
 2. **Second host.** `hosts.yml`, ssh transport, agent install script, the VPS added and a
    session started there from the UI. Laptop closed for an hour; session still there.
+   Attachment upload over ssh (drag and drop, picker, paste) lands here, since the copy path is
+   the same plumbing.
 3. **tdgrind migration.** Port tdgrind's supervisor into policies (§6) driven by
-   samscrape's `.sessionherd.yml`; run both side by side for one window with tdgrind's cron
+   samscrape's `.agentorc.yml`; run both side by side for one window with tdgrind's cron
    disabled and the agent's policies enabled; compare `tdgrind runs` reports against
-   sessionherd run logs; then delete `tdgrind.sh` from samscrape (ledger a TD there for the
+   agentorc run logs; then delete `tdgrind.sh` from samscrape (ledger a TD there for the
    swap and the cron line in `infra/kmaster/crontab`).
-4. **Commands + attention panel.** `.sessionherd.yml` buttons (cmdorc where it fits), the
-   dev-cadence attention report as a panel, stranded-work flags.
+4. **Commands + board.** `.agentorc.yml` buttons (cmdorc where it fits), command-kind sessions
+   and the Commands tab, the Due strip on the Herd and the Attention tab with Snooze/Done
+   write-back, stranded-work flags.
 5. **Second adapter.** Gemini CLI (hook-fed if the OSC 9 / hooks story verifies) or a scraped
    plain-shell adapter, whichever proves the contract better. Publish to PyPI, write the
    adapter-author guide.
@@ -340,32 +465,62 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 
 ## 9. Invariants
 
-1. Only the host agent creates, kills, or sends keys to a `sh-*` tmux session.
-2. A main checkout has at most one session; worktrees have at most one each.
+1. Only the host agent creates, kills, or sends keys to an `ao-*` tmux session.
+2. A directory has at most one agent session (`kind: interactive`, adapter other than `shell`;
+   main checkout, worktree, or plain directory). Shells and command runs are exempt.
 3. Every session has a run log from its first byte.
 4. A state shown as `hook` came from a hook; `scraped` is visible in the UI.
 5. Interactive sessions are never paused, killed, or nudged by a policy.
+6. The core never types a menu choice into a pane; permissions are answered through the hook,
+   everything else in the terminal.
+7. The agent's edits to a repo's board file are always committed, never left in the tree.
 
 ## 10. Open questions
 
 - [ ] Where does the UI process run: kmaster (simplest, LAN) or the VPS (reachable anywhere via
       Tailscale)? Affects nothing in the design, only the install order.
 - [x] Password vs Tailscale-only for the UI in phase 1 → Tailscale only (2026-09-04).
-- [x] Herd view: table vs card grid → card grid (2026-09-04), with attention/pinned sort modes.
+- [x] Herd view: table vs card grid → card grid (2026-09-04), with urgent-first/pinned sort modes
+      (the sort was called "attention" until it collided with the Attention tab).
 - [ ] Pinned layout: stored per browser (localStorage) or per person on the UI host? Per host
       survives a new browser; per browser needs no identity. Recommendation: per browser first.
 - [x] "Done when" → renamed **Ready to close** (2026-09-04): Focus side panel with a Close
       button; a card shows "ready to close ✓" or the failing items. `done` state → `closed`,
       reached only by the person's Close.
-- [x] Name → `sessionherd` (2026-09-04); "s-herd" / "essherd" are the spoken short forms, not
-      commands.
+- [x] Name → `sessionherd` (2026-09-04 morning) → **`agentorc`** (2026-09-04 evening), to sit
+      beside cmdorc. Free on PyPI; one empty GitHub repo of that name, no dashboards among the
+      neighbours. CLI alias `ao`.
 - [ ] Does the PoC embed ttyd or use xterm.js + a Python pty bridge in the UI process? ttyd is
       less code; a Python bridge is one fewer binary for other devs to install. Recommendation:
       ttyd for the PoC, revisit at phase 5.
-- [ ] `.sessionherd.yml` vs. a section in dev-cadence's per-repo config. Recommendation: its
-      own file; dev-cadence stays the cadence system, sessionherd depends on its registry only.
-- [ ] Repo layout for the eventual PyPI package: `sessionherd` (UI + CLI) and
-      `sessionherd-agent` (host side, minimal deps) as one package with extras, or two.
+- [x] `.agentorc.yml` vs. a section in dev-cadence's per-repo config → its own file
+      (2026-09-04). dev-cadence stays the cadence system; agentorc reads its registry and, via
+      the host agent only, edits and commits board items (Snooze / Done).
+- [x] Repo layout → **one repo, two packages** (2026-09-04): `sessionorc` (below the adapter
+      contract: tmux, ssh, hosts, ttyd, run logs, scraped running/exited, the `shell` adapter)
+      and `agentorc` (above it: hook adapters, profiles, usage gates, unattended policies, Ready
+      to close, the board). `sessionorc` imports nothing from `agentorc`. Split into two repos
+      only when a second consumer appears — cmdorc wanting tmux + multi-host + logs is the
+      trigger. UI/CLI vs host-agent packaging (extras or two dists) stays open.
+- [x] Attention sort vs Attention tab (2026-09-04): sort renamed Urgent first; overdue/due-today
+      board items on a Herd strip with Snooze/Done; the tab keeps the full board and loses its
+      sessions column.
+- [x] Board write-back (2026-09-04): both Snooze and Done, by the host agent, committed with a
+      fixed message naming the session.
+- [x] Repo-less sessions (2026-09-04): allowed; anchor on the directory, one agent session per
+      directory, shells and command runs exempt; worktrees are a repo feature.
+- [x] Shell vs agent (2026-09-04): a shell is an adapter, not a separate concept. Ad-hoc shells
+      are Herd cards (Shell button, Open shell here); predefined command runs are `kind:
+      command` and live on the Commands tab, hidden from the Herd by default.
+- [x] `unreachable` (2026-09-04): host-level chip + banner, greyed cards keep last state; sorts
+      with idle on a volatile host, after stalled? otherwise.
+- [x] Answer buttons under the Focus terminal (2026-09-04): removed — the terminal owns menus
+      and questions; Allow/Deny on cards and phone go through the `PermissionRequest` hook
+      decision; questions get Focus only. Composer + Attach stay.
+- [x] Session identity (2026-09-04): name + adapter id from birth; hand-started sessions show
+      the id until adopted.
+- [x] Existing-worktree picker (2026-09-04): only exited/closed worktrees offered; in-use ones
+      greyed with "resume from the Herd".
 
 ## 11. References
 

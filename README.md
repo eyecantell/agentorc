@@ -1,9 +1,10 @@
-# sessionherd
+# agentorc
 
-*Say it "s-herd" or "essherd" — the package and command stay `sessionherd`.*
+*Was `sessionherd` for the first day of design; renamed 2026-09-04 to sit beside
+[cmdorc](https://github.com/eyecantell/textual-cmdorc).*
 
-A self-hosted web dashboard that herds interactive AI coding-agent sessions (Claude Code first;
-Gemini CLI, Codex CLI, and on-prem harnesses via adapters) running in tmux across one or more
+A self-hosted web dashboard that orchestrates interactive AI coding-agent sessions (Claude Code first;
+Gemini CLI, Codex CLI, and on-prem harnesses via adapters) — and plain shells — running in tmux across one or more
 hosts. One view of every session and whether it is **working**, **needs you**, **idle**, or
 **exited**; read and drive any of them in an embedded terminal; start, resume, and close them;
 see git status per checkout; press configured command buttons; jump to VS Code; and supervise
@@ -22,7 +23,7 @@ Design is settled enough to build. In order:
 
 1. **Evaluate, then install [dev-cadence](https://github.com/eyecantell/dev-cadence)** using the
    evaluate-first prompt in its README (both directions; file upstream findings as PRs there).
-2. **Write `CLAUDE.md`** for this repo: Python 3.12, `pdm`, ruff at 120, the one-anchor rule,
+2. **Write `CLAUDE.md`** for this repo: Python 3.12, `pdm`, ruff at 120, the one-agent-per-directory anchor rule,
    and the design doc as the source of truth.
 3. **Phase 1 of [`docs/design.md`](docs/design.md) §7**: host agent + Claude Code adapter +
    Herd and Focus pages, kmaster only. The success test is written there.
@@ -34,11 +35,16 @@ regeneration notes in [`docs/mockups/`](docs/mockups/)). The CSS block at the to
 `docs/mockups/gen.py` is the seed for the app's stylesheet tokens; the dark artboard is a token
 swap of the light one, which is how the real dark mode should work too.
 
+## Layout
+
+One repo, two packages: `sessionorc` (tmux, hosts, ssh, terminal, run logs, the shell adapter)
+and `agentorc` (hook adapters, profiles, policies, Ready to close, the board) on top of it.
+`sessionorc` never imports `agentorc`; it becomes its own repo only when a second consumer
+appears (docs/design.md §10).
+
 ## CLI
 
-The package installs `sessionherd` and a `herd` alias (`herd status`, `herd new`, ...).
-Laravel Herd also installs a `herd` command on macOS/Windows; if that is you, drop the alias
-(see docs/design.md §4.6) and use `sessionherd`.
+The package installs `agentorc` and an `ao` alias (`ao status`, `ao new`, `ao shell`, ...).
 
 ## License
 

@@ -22,6 +22,10 @@
   .s-exited { background: #e5e7eb; color: #6b7280; }
   .s-done { background: #d1fae5; color: #065f46; }
   .s-limited { background: #ede9fe; color: #5b21b6; }
+  .s-unreachable { background: #e5e7eb; color: #6b7280; }
+  .card.off { opacity: .55; }
+  .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
+  .due + .due { border-top: 1px solid #eceef1; }
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
   .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
@@ -71,33 +75,39 @@
   .rb { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #6b7280; box-sizing: border-box; }
   .radio.on .rb { border: 4.5px solid #1c2128; }
   .note { font-size: 12px; color: #6b7280; }
+  .rs { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #374151; }
+  .rs > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .rs-k { display: inline-block; width: 52px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; }
+  .switch { display: inline-flex; align-items: center; width: 34px; height: 20px; border-radius: 10px; background: #cbd0d6; padding: 2px; box-sizing: border-box; flex-shrink: 0; }
+  .switch .knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
+  .switch.on { background: #1c2128; justify-content: flex-end; }
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 720px; min-height: 860px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 720px; min-height: 960px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
-  <span class="wordmark">session<b>herd</b></span>
+  <span class="wordmark">agent<b>orc</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Herd</span><span class="tab">Resumable</span><span class="tab">Commands</span><span class="tab">Attention</span></div>
   <div style="flex-grow: 1;"></div>
-  <span class="mono" style="font-size: 11px; color: #aab3bf;">usage 5h 41% · wk 58%</span>
-  <span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● laptop ◐</span>
-  <span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
+  
+  <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Shell</span><span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
 </div>
 <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
   <div style="font-size: 16px; font-weight: 600;">New session</div>
   <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
     <div class="field"><label>Host</label><span class="input">kmaster<span class="muted">▾</span></span></div>
-    <div class="field"><label>Repo</label><span class="input">samscrape<span class="muted">▾</span></span></div>
-    <div class="field"><label>Adapter</label><span class="input">claude-code <span class="badge">state: hook</span></span></div>
+    <div class="field"><label>Repo or directory</label><span class="input">samscrape<span class="muted">▾</span></span><span class="note">a registry repo, or type a path (recent: ~/proxmox on host1, /etc/wireguard on vpnmaster)</span></div>
+    <div class="field"><label>Adapter</label><span class="input">claude-code <span class="badge">state: hook</span></span><span class="note">or shell (no hooks, no worktrees)</span></div>
     <div class="field"><label>Name</label><span class="input mono">td-302</span></div>
   </div>
   <div class="field"><label>Where</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
       <div class="radio" style="opacity: .55;"><span class="rb"></span><span>Main checkout</span><span class="mono muted" style="font-size: 11px;">/home/kmaster/samscrape</span><span style="flex-grow: 1;"></span><span class="pill s-needs">in use by main</span></div>
       <div class="radio on"><span class="rb"></span><span>New worktree</span><span class="mono muted" style="font-size: 11px;">.claude/worktrees/td-302 from origin/main</span></div>
-      <div class="radio"><span class="rb"></span><span>Existing worktree</span><span class="mono muted" style="font-size: 11px;">errors-alerts (idle, dirty)</span></div>
+      <div class="radio"><span class="rb"></span><span>Existing worktree</span><span class="mono muted" style="font-size: 11px;">td-7 (exited) · td-5 (closed, reaped — recreated from its branch)</span></div>
+      <div class="radio" style="opacity: .55;"><span class="rb"></span><span>errors-alerts</span><span class="mono muted" style="font-size: 11px;">idle, dirty</span><span style="flex-grow: 1;"></span><span class="pill s-idle">in use — resume from the Herd</span></div>
     </div>
-    <div class="warn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg><span>One session per main checkout (dev-cadence §1). The main checkout already hosts <b>main</b>, so a second session there is refused, not warned about.</span></div>
+    <div class="warn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg><span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
   </div>
   <div class="field"><label>Start</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
@@ -106,11 +116,8 @@
     </div>
   </div>
   <div class="field"><label>Opening prompt (optional)</label><span class="input" style="height: 72px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Paste the brief, or leave empty to start at the prompt.</span></div>
-  <div class="field"><label>Mode</label>
-    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;">
-      <div class="radio on"><span class="rb"></span><div><div>Interactive</div><div class="note">never paused, nudged, or killed by a policy</div></div></div>
-      <div class="radio"><span class="rb"></span><div><div>Unattended</div><div class="note">run window + usage gate apply; brief file required</div></div></div>
-    </div>
+  <div class="field">
+    <div class="radio" style="gap: 12px;"><span class="switch"><span class="knob"></span></span><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: run window + usage gate from .agentorc.yml apply; brief file required. Disabled for repos without an unattended block, hidden for directory sessions.</div></div></div>
   </div>
   <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px;"><span class="btn">Cancel</span><span class="btn primary">Start session</span></div>
 </div>
