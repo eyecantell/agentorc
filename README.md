@@ -23,12 +23,13 @@ Design is settled enough to build. In order:
 
 1. **Evaluate, then install [dev-cadence](https://github.com/eyecantell/dev-cadence)** using the
    evaluate-first prompt in its README (both directions; file upstream findings as PRs there).
-2. **Write `CLAUDE.md`** for this repo: Python 3.12, `pdm`, ruff at 120, the one-agent-per-directory anchor rule,
+2. **Write `CLAUDE.md`** for this repo: Python 3.12+, `pdm`, ruff at 120, the one-agent-per-directory anchor rule,
    and the design doc as the source of truth.
 3. **Phase 1 of [`docs/design.md`](docs/design.md) §7**: host agent + Claude Code adapter +
    Herd and Focus pages, kmaster only. The success test is written there.
-4. Open questions still listed in §10 are implementation-level (ttyd vs a Python pty bridge,
-   one package or two, pinned-layout storage) — decide them in the build session and mark them.
+4. §10 is fully decided as of 2026-09-05: UI on kmaster, pty bridge (no ttyd), one
+   distribution with a `[ui]` extra, pinned layout in `localStorage`. Tailscale on kmaster is a
+   phase 1 prerequisite; until then the UI binds to localhost and is reached over `ssh -L`.
 
 Mockups: https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04 (sources and
 regeneration notes in [`docs/mockups/`](docs/mockups/)). The CSS block at the top of
@@ -37,10 +38,11 @@ swap of the light one, which is how the real dark mode should work too.
 
 ## Layout
 
-One repo, two packages: `sessionorc` (tmux, hosts, ssh, terminal, run logs, the shell adapter)
-and `agentorc` (hook adapters, profiles, policies, Ready to close, the board) on top of it.
-`sessionorc` never imports `agentorc`; it becomes its own repo only when a second consumer
-appears (docs/design.md §10).
+One repo, one distribution (`agentorc`, with an `[ui]` extra for the host that serves the web
+UI), two import packages: `sessionorc` (tmux, hosts, ssh, the pty terminal bridge, run logs, the
+shell adapter) and `agentorc` (hook adapters, profiles, policies, Ready to close, the board) on
+top of it. `sessionorc` never imports `agentorc`; it becomes its own repo only when a second
+consumer appears (docs/design.md §10).
 
 ## CLI
 

@@ -1,6 +1,6 @@
 # agentorc — design
 
-Status: **draft for review** (2026-09-04, revised the same evening after the mockup round). Nothing
+Status: **settled for build** (2026-09-04 design; the last open questions closed 2026-09-05). Nothing
 is built. This document is the requirements and architecture agreed in the 2026-09-04 design
 session; each open question at the end is a decision that changes what gets built. The project was
 called `sessionherd` for most of that day; see §10 for the rename.
@@ -78,7 +78,7 @@ No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap su
 
 | Tool | Shape | Borrow | Gap vs. goals |
 |---|---|---|---|
-| ttyd (MIT) | websocket + xterm.js around any command | **the terminal transport** — embed per host, never write our own pty bridge | terminal only |
+| ttyd (MIT) | websocket + xterm.js around any command | the terminal-transport shape (xterm.js over a websocket around a pty); superseded 2026-09-05 by a bridge inside the UI process, since the pty would wrap `ssh` anyway (§10) | terminal only; a second daemon per host |
 | ccmanager, claude-squad | TUI session managers, tmux + worktrees, many agent CLIs | ccmanager's launch specs as adapter reference | terminal-only, scraped state, single host |
 | Vibe Kanban (Apache-2.0) | web kanban, per-task terminal, 10+ agents | UI ideas for diff review | task-board model, single machine, own execution tracking |
 | agent-dashboard (bjornjee) | tmux orchestrator + PWA for approvals | same idea at PoC scale | maintenance unverified |
@@ -87,14 +87,14 @@ No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap su
 ## 4. Architecture
 
 ```
-laptop browser ──https──▶ agentorc UI (one process, runs on a host you choose)
+laptop browser ──https──▶ agentorc UI (one process, on kmaster; holds a pty per open
+                              │  terminal: `ssh -tt host tmux attach` ↔ xterm.js websocket)
                               │  ssh transport (no public ports on hosts beyond ssh)
               ┌───────────────┼───────────────┐
               ▼               ▼               ▼
         host agent        host agent       host agent
         (kmaster)         (vps)            (host1, vpnmaster, laptop …)
           │  ├─ tmux server (systemd user unit, linger on)
-          │  ├─ ttyd (localhost only; UI proxies the websocket)
           │  ├─ state dir  ~/.agentorc/sessions/<id>.json  ◀── adapter hooks write here
           │  ├─ run logs   ~/.agentorc/runs/<session>.log  ◀── tmux pipe-pane, continuous
           │  └─ policies   (run window, usage gate, reap worktrees, anchor rule)
@@ -253,7 +253,6 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
-- Start ttyd bound to localhost for the UI to proxy.
 - Attachment drop: accept an uploaded file (the UI copies it over ssh) into
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file
@@ -270,8 +269,11 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 
 Single web process (FastAPI + websockets; plain server-rendered pages with a small amount of JS
 and xterm.js — no SPA build step, so other devs can run it with one command). Talks to each host
-over ssh: JSON RPC over `ssh host agentorc-agent rpc` and the ttyd websocket over an ssh-
-forwarded port. Adding a host is `agentorc host add vps user@vps` + installing the agent there.
+over ssh: JSON RPC over `ssh host agentorc-agent rpc`, and one pty per open terminal running
+`ssh -tt host tmux attach -t <session>` (`tmux attach` directly for `transport: local`), bridged
+to xterm.js over a websocket; resize is a `TIOCSWINSZ` on that pty, which ssh forwards. No
+terminal daemon on the hosts. Adding a host is `agentorc host add vps user@vps` + installing the
+agent there.
 
 Screens:
 
@@ -324,6 +326,9 @@ Screens:
 Security: the UI can type into a shell as you, so it is root-equivalent. **Decision
 2026-09-04: Tailscale only** — the UI binds to the tailnet address, the phone joins the tailnet,
 no public port and no password to manage. Host ssh keys are the only credential the UI holds.
+Until Tailscale is installed on kmaster (a phase 1 prerequisite; it is not there as of
+2026-09-05) the UI binds to `127.0.0.1` and the laptop reaches it through `ssh -L`. It never
+binds to the LAN address.
 
 Phone layout: the Herd view collapses to cards sorted `needs-you` first with Allow / Deny on a
 pending permission (hook channel) and a Focus button, the Due strip on top; the terminal, git panel, and New-session form stay
@@ -432,7 +437,7 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 ## 7. Phases
 
 1. **PoC, kmaster, Claude Code only.** Host agent + Claude Code adapter (hooks, transcript
-   locator, usage, creds) + herd page + focus page with ttyd + new-session flow + VS Code link.
+   locator, usage, creds) + herd page + focus page with the pty bridge + new-session flow + VS Code link.
    Includes the `shell` adapter, the Shell button, and the hook-channel permission answer.
    Success test: every session Paul has open on kmaster shows the right state within 5 s of a
    change, and a permission prompt can be answered from the browser.
@@ -477,31 +482,47 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 
 ## 10. Open questions
 
-- [ ] Where does the UI process run: kmaster (simplest, LAN) or the VPS (reachable anywhere via
-      Tailscale)? Affects nothing in the design, only the install order.
+- [x] Where does the UI process run → **kmaster** (2026-09-05). There is no VPS yet (only
+      kworker1/2 in ssh config), kmaster already lingers and holds every session, and the UI is
+      a plain package that can move later without a design change. Tailscale goes on kmaster
+      first (phase 1 prerequisite), the phone joins the tailnet, and the VPS is added as a
+      session host in phase 2 — not as the UI host.
 - [x] Password vs Tailscale-only for the UI in phase 1 → Tailscale only (2026-09-04).
 - [x] Herd view: table vs card grid → card grid (2026-09-04), with urgent-first/pinned sort modes
       (the sort was called "attention" until it collided with the Attention tab).
-- [ ] Pinned layout: stored per browser (localStorage) or per person on the UI host? Per host
-      survives a new browser; per browser needs no identity. Recommendation: per browser first.
+- [x] Pinned layout → **per browser, `localStorage`** (2026-09-05), keyed by session id so a
+      resumed session keeps its slot and a closed one drops out. Same store as the sort mode
+      and the dark-mode toggle. Moves to the UI host only if a second person or a second
+      browser ever makes it hurt.
 - [x] "Done when" → renamed **Ready to close** (2026-09-04): Focus side panel with a Close
       button; a card shows "ready to close ✓" or the failing items. `done` state → `closed`,
       reached only by the person's Close.
 - [x] Name → `sessionherd` (2026-09-04 morning) → **`agentorc`** (2026-09-04 evening), to sit
       beside cmdorc. Free on PyPI; one empty GitHub repo of that name, no dashboards among the
       neighbours. CLI alias `ao`.
-- [ ] Does the PoC embed ttyd or use xterm.js + a Python pty bridge in the UI process? ttyd is
-      less code; a Python bridge is one fewer binary for other devs to install. Recommendation:
-      ttyd for the PoC, revisit at phase 5.
+- [x] ttyd vs a Python pty bridge → **pty bridge in the UI process** (2026-09-05), reversing
+      the earlier lean. The deciding fact: the UI reaches hosts over ssh anyway, so the terminal
+      is a pty around `ssh -tt host tmux attach -t <name>` opened by the UI process and bridged to
+      xterm.js with `asyncio` + `os.openpty` (about 150 lines). ttyd would need a daemon per
+      host, a port forward per host, and a websocket proxy on top — three moving parts to save
+      those lines. The host agent stays the only per-host process. Resize is `TIOCSWINSZ` on the
+      local pty; ssh carries it to tmux. ttyd remains the fallback if the bridge proves flaky
+      on slow links.
 - [x] `.agentorc.yml` vs. a section in dev-cadence's per-repo config → its own file
       (2026-09-04). dev-cadence stays the cadence system; agentorc reads its registry and, via
       the host agent only, edits and commits board items (Snooze / Done).
 - [x] Repo layout → **one repo, two packages** (2026-09-04): `sessionorc` (below the adapter
-      contract: tmux, ssh, hosts, ttyd, run logs, scraped running/exited, the `shell` adapter)
+      contract: tmux, ssh, hosts, the pty bridge, run logs, scraped running/exited, the `shell` adapter)
       and `agentorc` (above it: hook adapters, profiles, usage gates, unattended policies, Ready
       to close, the board). `sessionorc` imports nothing from `agentorc`. Split into two repos
       only when a second consumer appears — cmdorc wanting tmux + multi-host + logs is the
-      trigger. UI/CLI vs host-agent packaging (extras or two dists) stays open.
+      trigger. **Packaging (2026-09-05): one distribution, `agentorc`, with an extra.** The base
+      install is what every host needs — the host agent, the hook scripts, the CLI (`agentorc`,
+      `ao`) — with light dependencies (`pyyaml`, `typer`). `pip install agentorc[ui]` adds
+      FastAPI, uvicorn, websockets for the one host that runs the UI. One version number crosses
+      the RPC boundary, so agent and UI never skew; the agent install script on a new host is
+      `pipx install agentorc`. `sessionorc` and `agentorc` are still two import packages inside
+      that one distribution. `requires-python >= 3.12` (kmaster runs 3.13).
 - [x] Attention sort vs Attention tab (2026-09-04): sort renamed Urgent first; overdue/due-today
       board items on a Herd strip with Snooze/Done; the tab keeps the full board and loses its
       sessions column.
@@ -529,4 +550,4 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 - eyecantell/dev-cadence — registry `~/.config/dev-cadence/repos.txt`, `/attention`
 - eyecantell/textual-cmdorc — command specs for the buttons
 - Claude Code hooks: https://code.claude.com/docs/en/hooks
-- ttyd: https://github.com/tsl0922/ttyd
+- ttyd: https://github.com/tsl0922/ttyd (fallback terminal transport, not used in phase 1)
