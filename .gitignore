@@ -7,3 +7,8 @@ docs/session_index.md
 .claude/settings.local.json
 .claude/worktrees/
 *.code-workspace
+.venv/
+.pdm-python
+__pycache__/
+*.egg-info/
+dist/
