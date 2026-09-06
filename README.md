@@ -19,7 +19,8 @@ repo registry it depends on.
 
 ## Start here (handoff, updated 2026-09-06 evening)
 
-**Phase 1 is built** (PRs #1–#4, all Sonnet-reviewed): host agent, Claude Code adapter, Herd
+**Phase 1 is built** (PRs #1–#4; each was reviewed by a Sonnet subagent in the build session and
+the findings folded into the PR before merge — see the "review fixes" commits): host agent, Claude Code adapter, Herd
 and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, in order:
 
 1. **Use it** against a real repo and note what the flows get wrong (board item, due 2026-09-13).
