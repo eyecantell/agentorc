@@ -238,9 +238,10 @@ class Adapter(Protocol):
     def credentials_ok(self, profile: Profile) -> bool | None
 ```
 
-Prompt injection is **core**, not adapter: `tmux send-keys -l <text>` then `Enter` from the
-composer under the Focus terminal — no blind `C-u`, since what is painted in the pane may not
-be a readline line. **Send is disabled** while a permission or question is pending (the pane
+Prompt injection is **core**, not adapter: the composer text goes in with `tmux load-buffer`
++ `paste-buffer -p` (bracketed paste, so a multi-line brief lands as one prompt instead of
+submitting line by line) followed by `Enter` — no blind `C-u`, since what is painted in the
+pane may not be a readline line. **Send is disabled** while a permission or question is pending (the pane
 owns a dialog) and, for scraped adapters, while a foreground process runs; otherwise it is
 enabled — Claude Code queues input typed while it works. Menus and questions are answered *in* the terminal (keys pass
 through); permissions go through the hook decision channel (§4.2). The core never types a menu
@@ -342,9 +343,41 @@ Until Tailscale is installed on kmaster (a phase 1 prerequisite; it is not there
 2026-09-05) the UI binds to `127.0.0.1` and the laptop reaches it through `ssh -L`. It never
 binds to the LAN address.
 
-Phone layout: the Herd view collapses to cards sorted `needs-you` first with Allow / Deny on a
-pending permission (hook channel) and a Focus button, the Due strip on top; the terminal, git panel, and New-session form stay
-desktop-width. Mockups (2026-09-04): https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04
+Phone layout (lands in phase 2 with Tailscale; until then the UI is reachable only over
+`ssh -L`): the Herd view collapses to cards sorted `needs-you` first with Allow / Deny on a
+pending permission (hook channel) and a Focus button, the Due strip on top. Focus gets a
+**narrow mode** below 720px: header, pending text, the terminal full-width with a soft-key row
+(`↑ ↓ ← → Enter Esc Tab 1–9`) so menus and questions are still answered *through the
+terminal*, the composer under it, side panel collapsed. The git panel and the New-session form
+stay desktop-width.
+
+Browser mechanics (2026-09-06 review):
+
+- **Live state** comes over one `/events` websocket per browser tab, pushing per-session
+  deltas (state, pending, age, tail, ready-to-close) and host reachability; the page patches
+  the DOM by session id. Pages are server-rendered on load and never fully re-rendered after.
+  Reconnect with backoff; on reconnect the page reloads its snapshot once.
+- **Pinned layout**: the client owns card order and position (localStorage, by session id);
+  pushed data only patches card content. New or adopted cards are inserted at the top in
+  Pinned mode; a card whose session drops out of the Herd is removed and its slot forgotten.
+- **Permission countdown**: the delta carries the deadline once; the browser counts down
+  locally. The timeout transition (buttons collapse to Focus) arrives as an ordinary state
+  delta, never from the local clock reaching zero.
+- **Tail hygiene**: the host agent strips ANSI and control bytes and caps the tail (lines and
+  width) before it enters a session record; templates autoescape. Pane output is untrusted
+  text everywhere it is shown outside xterm.js.
+- **Keyboard focus** on Focus: clicking the terminal or the composer gives it focus; after
+  **Send**, focus returns to the terminal so a follow-up menu can be answered at once; `Esc`
+  in the composer moves focus to the terminal; `Tab` inside the terminal passes through to the
+  pane. A pending permission or question shows a hint on the composer ("answer in the terminal
+  above") instead of accepting Send.
+- **Errors**: every RPC-triggered control reports failure the same way — a toast on the Herd,
+  an inline banner in the Focus header — with the agent's error text and a Retry where one
+  makes sense. There is no silent failure path.
+- **VS Code links** need the `hosts.yml` `ssh` target to be an alias in the *person's own*
+  `~/.ssh/config` (that is what Remote-SSH resolves); agentorc's multiplexing config is
+  separate and never edited by hand. `vscode_host` in `hosts.yml` overrides the alias if the
+  two differ. Mockups (2026-09-04): https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04
 
 ### 4.5a Controls
 
@@ -386,6 +419,11 @@ noted). If a control is not in this table it does not exist.
 | Commands | **Run / Stop** | start a `kind: command` session / kill it |
 | Commands | **log**, **Focus** | the run log; the run's terminal |
 | Commands | **edit yml** | opens `.agentorc.yml` in VS Code |
+| Focus header | **VS Code** | same `vscode://` link as the card |
+| Herd top bar | **filter…** text box | matches name, repo, directory, branch; client-side |
+| Resumable | **search transcripts…**, Recent / Closed / With board items, date range | filters over the transcript index — *phase 4 polish; phases 1–3 ship the plain list* |
+| Commands | host / repo filters | client-side filters — *phase 4* |
+| Attention | repo filter, overdue · today · this week · undated | client-side filters — *phase 4* |
 
 ### 4.6 Transport and terminal mechanics (2026-09-05 review)
 
@@ -491,12 +529,14 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
 ## 7. Phases
 
 1. **PoC, kmaster, Claude Code only.** Host agent + Claude Code adapter (hooks, transcript
-   locator, usage, creds) + herd page + focus page with the pty bridge + new-session flow + VS Code link.
+   locator, usage, creds) + herd page with the `/events` websocket + focus page with the pty
+   bridge + new-session flow + VS Code link. Desktop only; no tab filters.
    Includes the `shell` adapter, the Shell button, and the hook-channel permission answer.
    Success test: every session Paul has open on kmaster shows the right state within 5 s of a
    change, and a permission prompt can be answered from the browser.
 2. **Second host.** `hosts.yml`, ssh transport, agent install script, the VPS added and a
    session started there from the UI. Laptop closed for an hour; session still there.
+   Tailscale on the UI host and the phone layout (Herd + narrow Focus) land here.
    Attachment upload over ssh (drag and drop, picker, paste) lands here, since the copy path is
    the same plumbing.
 3. **tdgrind migration.** Port tdgrind's supervisor into policies (§6) driven by
@@ -598,6 +638,15 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
       the id until adopted.
 - [x] Existing-worktree picker (2026-09-04): only exited/closed worktrees offered; in-use ones
       greyed with "resume from the Herd".
+- [ ] **Deny with a reason?** The hook decision can carry a message Claude reads. A one-line
+      "why" next to Deny (optional field, card and Focus) would steer the next attempt better
+      than a bare refusal. Cost: one input box; the phone gets it too.
+- [ ] **"Allow for this session"?** The hook can also update the session's permission rules so
+      the same tool does not ask again. Tempting for `git push` loops, but it is how a permission
+      prompt stops being an alert; if added, it must be a third, smaller button and never the
+      default.
+- [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
+      current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 
 ## 11. References
 
