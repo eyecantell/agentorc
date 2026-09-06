@@ -474,9 +474,10 @@ on the host, the relay sees only what the UI sees today. What changes is where t
 runs and who is trusted to run it, which is a product decision, not an architecture one.
 
 Consequences for what gets built now: the agent's RPC stays a plain JSON-lines stream over any
-byte pipe (already true — `agentorc-agent rpc` is a stdio bridge), the terminal bridge attaches
-through the same pipe rather than a separate port, and nothing in the UI assumes it can reach
-a host by address. `relay` itself is not scheduled; it is a phase after 5, and the first
+byte pipe (already true — `agentorc-agent rpc` is a stdio bridge); the terminal bridge, which
+today spawns `tmux attach` locally under `/term/<id>` (phase 1), **must move onto that same pipe
+in phase 2** rather than gain a port of its own; and nothing in the UI may assume it can reach a
+host by address. `relay` itself is not scheduled; it is a phase after 5, and the first
 hosted version can be a single small VPS running the relay and the UI for a handful of people.
 
 ### 4.6 Transport and terminal mechanics (2026-09-05 review)

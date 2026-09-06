@@ -60,7 +60,7 @@ tmux server survive logout and reboot.
 ```bash
 pdm install -G ui                      # or: pipx install 'agentorc[ui]' once published
 pdm run agentorc-agent serve           # the host agent: tmux, sessions, hooks, run logs
-pdm run ao ui                          # the web UI on http://127.0.0.1:8765 (never the LAN; use ssh -L or Tailscale)
+pdm run ao ui                          # the web UI on http://127.0.0.1:8765 (localhost by default; see below)
 pdm run ao new td-302 -d ~/samscrape   # or the New session form; `ao shell` for a plain shell
 ```
 
