@@ -21,6 +21,7 @@ SHELLS = {"bash", "zsh", "sh", "fish", "dash", "ksh"}
 class LaunchSpec:
     argv: list[str] | None  # None → the person's login shell
     env: dict[str, str] = field(default_factory=dict)
+    adapter_id: str | None = None  # the tool's own session id when the adapter chose it at launch
 
 
 @runtime_checkable
@@ -29,7 +30,7 @@ class Adapter(Protocol):
     state_source: Confidence
 
     def launch(
-        self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path
+        self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""
     ) -> LaunchSpec: ...
 
     def classify(self, pane: PaneInfo | None, tail: list[str]) -> State | None:
@@ -45,7 +46,7 @@ class ShellAdapter:
     state_source: Confidence = "scraped"
 
     def launch(
-        self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path
+        self, *, profile: str, resume: str | None, prompt: str | None, unattended: bool, cwd: Path, name: str = ""
     ) -> LaunchSpec:
         return LaunchSpec(argv=None)
 

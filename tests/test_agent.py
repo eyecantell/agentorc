@@ -45,6 +45,17 @@ async def test_shell_lifecycle(agent, tmp_path):
         s = await c.call("create", name="my shell", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         sid = s["id"]
         assert sid.startswith("ao-") and s["adapter"] == "shell" and s["confidence"] == "scraped"
+        # the session's environment names this agent's home, so hooks inside it reach this socket
+        env = await c.call("tail", id=sid, lines=1)  # warm-up; the real check is below
+        assert env is not None
+        await c.call("send", id=sid, text="echo HOME=$AGENTORC_HOME SESSION=$AGENTORC_SESSION")
+        for _ in range(30):
+            tail = await c.call("tail", id=sid, lines=6)
+            if any(f"HOME={paths.home()} SESSION={sid}" in line for line in tail):
+                break
+            await asyncio.sleep(0.1)
+        else:
+            raise AssertionError(f"env not set in session: {tail}")
         await wait_state(c, sid, "idle")
         await c.call("send", id=sid, text="sleep 1.5")
         await wait_state(c, sid, "working")

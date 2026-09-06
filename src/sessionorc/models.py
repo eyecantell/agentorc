@@ -67,6 +67,7 @@ class Session:
     created: str = field(default_factory=now_iso)
     tail: list[str] = field(default_factory=list)
     exit_code: int | None = None
+    subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
     closed_at: str | None = None

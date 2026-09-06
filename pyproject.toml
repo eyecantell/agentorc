@@ -22,6 +22,10 @@ ui = [
 agentorc = "agentorc.cli:main"
 ao = "agentorc.cli:main"
 agentorc-agent = "sessionorc.agent:main"
+agentorc-hook = "agentorc.adapters.claude_code.hook:main"
+
+[project.entry-points."agentorc.adapters"]
+claude-code = "agentorc.adapters.claude_code:ClaudeCodeAdapter"
 
 [build-system]
 requires = ["pdm-backend"]
