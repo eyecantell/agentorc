@@ -49,7 +49,7 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
    Code is the first adapter; Gemini CLI, Codex CLI, and on-prem harnesses are later adapters.
    Share with other devs once it proves useful.
 
-10. **Phone triage**: the Herd view works on a phone over Tailscale — state, pending question, one-tap
+10. **Phone triage**: the Herd view works on a phone over a private network or an authenticated tunnel (§4.5) — state, pending question, one-tap
     answers — so a blocked session can be unblocked from anywhere. The embedded terminal is a
     desktop feature.
 11. **Ready to close, decided by the person**: a per-repo checklist (PR merged, branch pushed,
@@ -70,8 +70,9 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
     just what decides where state comes from.
 
 Non-goals (for now): multi-user access control, a kanban/task-board model of work (see §11 prior
-art), replacing Claude Code's own `/resume`, mobile-first UI, a hosted (SaaS) UI — the UI is a
-package you install on a server of your choosing (§10).
+art), replacing Claude Code's own `/resume`, mobile-first UI. A hosted service is **not** a
+non-goal any more: it is the `relay` transport in §4.5b, kept compatible from phase 1 and
+scheduled after phase 5.
 
 ## 3. Prior art (surveyed 2026-09-04)
 
@@ -357,13 +358,21 @@ Screens:
    sessions view.
 
 Security: the UI can type into a shell as you, so it is root-equivalent. **Decision
-2026-09-04: Tailscale only** — the UI binds to the tailnet address, the phone joins the tailnet,
-no public port and no password to manage. Host ssh keys are the only credential the UI holds.
-Until Tailscale is installed on kmaster (a phase 1 prerequisite; it is not there as of
-2026-09-05) the UI binds to `127.0.0.1` and the laptop reaches it through `ssh -L`. It never
-binds to the LAN address.
+2026-09-04, generalised 2026-09-06: never a bare public port.** The UI is reached over a private
+network or through an authenticated tunnel, and holds no credential beyond the host ssh keys.
+The concrete options, any of which satisfies the rule (§4.5b has the reasoning):
 
-Phone layout (lands in phase 2 with Tailscale; until then the UI is reachable only over
+- a private network the laptop and phone already join — the existing WireGuard on `vpnmaster`
+  is enough; Tailscale is the same thing with less setup, not a requirement;
+- an authenticated tunnel — Cloudflare Tunnel + Access from `127.0.0.1:8765` (samscrape already
+  runs `cloudflared`), which gives a hostname reachable from anywhere with a login in front and
+  carries the websockets;
+- the LAN address at home only.
+
+Default until one of those is set up: the UI binds to `127.0.0.1` and the laptop reaches it
+through `ssh -L 8765:127.0.0.1:8765 kmaster`.
+
+Phone layout (lands in phase 2 with the phone's route in — WireGuard or the tunnel; until then the UI is reachable only over
 `ssh -L`): the Herd view collapses to cards sorted `needs-you` first with Allow / Deny on a
 pending permission (hook channel) and a Focus button, the Due strip on top. Focus gets a
 **narrow mode** below 720px: header, pending text, the terminal full-width with a soft-key row
@@ -398,6 +407,31 @@ Browser mechanics (2026-09-06 review):
   `~/.ssh/config` (that is what Remote-SSH resolves); agentorc's multiplexing config is
   separate and never edited by hand. `vscode_host` in `hosts.yml` overrides the alias if the
   two differ. Mockups (2026-09-04): https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04
+
+### 4.5b Reachability, and the shape of a hosted service
+
+Why this is not "install Tailscale": for one person the private network is fine, but the
+question that decides the long-term shape is *how would someone who has never opened a port
+use this?* The answer is the one Tailscale and `cloudflared` themselves use — **the host agent
+dials out; nothing on the host listens.** Three transports, one agent:
+
+| transport | who runs the UI | how the agent is reached | who it is for |
+|---|---|---|---|
+| `local` | you, on the same host | Unix socket | phase 1, one machine |
+| `ssh` | you, on a host you choose | `ssh host agentorc-agent rpc` (§4.6) | phases 2+, several hosts you own |
+| `relay` | a service (yours or a hosted one) | the agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
+
+The `relay` transport is the hosted service: `pipx install agentorc && agentorc join <token>`
+on a laptop or a server, log in on a web page, done — no port forward, no VPN client, no ssh
+keys. It keeps every invariant in §9: the agent is still the only writer, sessions still live
+on the host, the relay sees only what the UI sees today. What changes is where the UI process
+runs and who is trusted to run it, which is a product decision, not an architecture one.
+
+Consequences for what gets built now: the agent's RPC stays a plain JSON-lines stream over any
+byte pipe (already true — `agentorc-agent rpc` is a stdio bridge), the terminal bridge attaches
+through the same pipe rather than a separate port, and nothing in the UI assumes it can reach
+a host by address. `relay` itself is not scheduled; it is a phase after 5, and the first
+hosted version can be a single small VPS running the relay and the UI for a handful of people.
 
 ### 4.5a Controls
 
@@ -556,7 +590,8 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
    change, and a permission prompt can be answered from the browser.
 2. **Second host.** `hosts.yml`, ssh transport, agent install script, the VPS added and a
    session started there from the UI. Laptop closed for an hour; session still there.
-   Tailscale on the UI host and the phone layout (Herd + narrow Focus) land here.
+   The phone's route in (WireGuard client, or the Cloudflare tunnel) and the phone layout (Herd
+   + narrow Focus) land here.
    Attachment upload over ssh (drag and drop, picker, paste) lands here, since the copy path is
    the same plumbing.
 3. **tdgrind migration.** Port tdgrind's supervisor into policies (§6) driven by
@@ -596,14 +631,20 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
 
 ## 10. Open questions
 
+- [x] Reachability (2026-09-06): "Tailscale only" generalised to **never a bare public port** —
+      a private network (the existing WireGuard, or Tailscale) or an authenticated tunnel
+      (Cloudflare Tunnel + Access, already in use for samscrape); no VPS needed for that. For
+      non-technical users and a hosted service the answer is an agent-initiated **relay**
+      transport (§4.5b): the host dials out, the service does login and proxies. Kept
+      compatible now, scheduled later.
 - [x] Where does the UI process run → **wherever `agentorc[ui]` is installed; nothing in the
       design assumes a particular host** (2026-09-05). The UI host is configured, not fixed:
       `hosts.yml` lives on it, and it may or may not also be a session host. For Paul it is
       kmaster (no VPS exists yet; kmaster already lingers and holds every session); another
-      person points it at whatever server they have. Tailscale on that host is the phase 1
-      prerequisite; the VPS is added as a session host in phase 2. Offering the UI as a hosted
-      service is a possible later step, out of scope for every phase listed here.
-- [x] Password vs Tailscale-only for the UI in phase 1 → Tailscale only (2026-09-04).
+      person points it at whatever server they have. The VPS, if one appears, is a session
+      host in phase 2. A hosted service is the `relay` transport (§4.5b), after phase 5.
+- [x] Password vs Tailscale-only for the UI in phase 1 → Tailscale only (2026-09-04); superseded
+      2026-09-06 by the reachability decision above (any private network or authenticated tunnel).
 - [x] Herd view: table vs card grid → card grid (2026-09-04), with urgent-first/pinned sort modes
       (the sort was called "attention" until it collided with the Attention tab).
 - [x] Pinned layout → **per browser, `localStorage`** (2026-09-05), keyed by session id so a
