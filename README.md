@@ -24,7 +24,8 @@ the findings folded into the PR before merge — see the "review fixes" commits)
 and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, in order:
 
 1. **Use it** against a real repo and note what the flows get wrong (board item, due 2026-09-13).
-   Until Tailscale is on kmaster, reach the UI with `ssh -L 8765:127.0.0.1:8765 kmaster`.
+   From the laptop, reach the UI with `ssh -L 8765:127.0.0.1:8765 kmaster` (or WireGuard / a
+   Cloudflare tunnel, design §4.5).
 2. **Decisions waiting on Paul**: see [`docs/user_attention.md`](docs/user_attention.md)
    (dev-cadence PRs #82/#83, GitHub merge settings, the two permission-dialog questions).
 3. **Deferred work** is in [`docs/technical_debt.md`](docs/technical_debt.md) (TD-001 `limited`
@@ -59,9 +60,14 @@ tmux server survive logout and reboot.
 ```bash
 pdm install -G ui                      # or: pipx install 'agentorc[ui]' once published
 pdm run agentorc-agent serve           # the host agent: tmux, sessions, hooks, run logs
-pdm run ao ui                          # the web UI on http://127.0.0.1:8765 (never the LAN; use ssh -L or Tailscale)
+pdm run ao ui                          # the web UI on http://127.0.0.1:8765 (localhost by default; see below)
 pdm run ao new td-302 -d ~/samscrape   # or the New session form; `ao shell` for a plain shell
 ```
+
+Reaching the UI from elsewhere: never a bare public port (design §4.5). Use a private network
+you already have (WireGuard, Tailscale) and bind to that address with `ao ui --bind <addr>`, or
+put an authenticated tunnel in front (Cloudflare Tunnel + Access pointed at `127.0.0.1:8765`;
+websockets work through it). A hosted, no-setup version is the `relay` transport in design §4.5b.
 
 State lives under `~/.agentorc/` (`AGENTORC_HOME` overrides it — every session the agent creates
 carries it, so hooks inside find the right agent). Profiles: `~/.agentorc/profiles.yml`
