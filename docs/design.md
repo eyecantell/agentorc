@@ -480,6 +480,31 @@ in phase 2** rather than gain a port of its own; and nothing in the UI may assum
 host by address. `relay` itself is not scheduled; it is a phase after 5, and the first
 hosted version can be a single small VPS running the relay and the UI for a handful of people.
 
+### 4.5c Product direction (2026-09-06, a paragraph, not a plan)
+
+Two products share this architecture and differ only in who owns the host: **bring your own
+machine** (the `relay` transport above: hosted UI, the person's sessions stay on the person's
+host) and **we host your workspace** (a managed host we provision with the agent preinstalled,
+reached the same way). Lead with the first. The person's Claude Max login, their repos, their
+tools, and the cost of what their sessions do stay with them; we hold nothing but what the UI
+shows. A managed host is an add-on for someone with no machine, built when someone asks for it,
+not before. A hosted "run Claude Code for you" is the one thing every model supplier already
+sells with their own login and price, so that is not where the value is.
+
+What no supplier offers, and what this design is for: **one neutral view across tools** (Claude
+Code, Gemini CLI, Codex, plain shells), on machines you own, with policies and a working cadence
+that never strands work. Neutrality is the moat and it only holds while agentorc stays a layer
+over the tools rather than a hosted copy of one.
+
+The later step, and the strongest one, is **automated context management for people who are
+not developers**: every session's work lands as a commit, a branch, a ledger line, and a board
+item without the person knowing what a branch is; they see what changed, what is waiting on
+them, and what would otherwise have been lost. dev-cadence is that system for developers, and
+agentorc's fleet view is where its rules (anchor, ready to close, stranded work, ledger before
+idle) get exercised unattended first. Sequence: self-hosted for developers (now) → relay →
+managed host on demand → cadence-as-a-product. Nothing here changes what phase 2 builds; it
+says why the terminal must ride the agent's pipe and why the adapter contract stays neutral.
+
 ### 4.6 Transport and terminal mechanics (2026-09-05 review)
 
 Decisions taken from a review of the `sessionorc` layer before build:
