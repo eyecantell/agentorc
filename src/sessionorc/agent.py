@@ -110,7 +110,8 @@ class HostAgent:
         ]
         if not due:
             return
-        infos = await asyncio.to_thread(lambda: {s.id: git_info(s.dir) for s in due})
+        results = await asyncio.gather(*(asyncio.to_thread(git_info, s.dir) for s in due), return_exceptions=True)
+        infos = {s.id: (r if not isinstance(r, BaseException) else None) for s, r in zip(due, results, strict=True)}
         for s in due:
             self._git_checked[s.id] = now
             live = self.sessions.get(s.id)

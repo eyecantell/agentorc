@@ -84,8 +84,10 @@
     let delay = 500, reconnected = false;
     function open() {
       const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/events`);
-      ws.onopen = () => { delay = 500; setDown(false); if (reconnected) location.reload(); };
-      ws.onmessage = (m) => onEvent(JSON.parse(m.data));
+      // The handshake succeeds even when the agent is down (the server accepts, then closes), so
+      // "connected" means the first message, not onopen — otherwise a down agent reload-loops.
+      ws.onopen = () => { delay = 500; };
+      ws.onmessage = (m) => { setDown(false); if (reconnected) { location.reload(); return; } onEvent(JSON.parse(m.data)); };
       ws.onclose = () => { setDown(true); reconnected = true; setTimeout(open, delay); delay = Math.min(delay * 2, 10000); };
       ws.onerror = () => ws.close();
     }

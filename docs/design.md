@@ -207,7 +207,8 @@ tdgrind already polls; the pane's limit message is the scraped fallback.
 
 `ready_when` (the **Ready to close** checklist) is evaluated by the host agent when a session
 goes `idle` or `exited`:
-`git status --porcelain` empty, branch pushed, `gh pr view --json state` merged (when the branch
+`git status --porcelain` empty, branch pushed (a branch with no upstream is *not* pushed — that is
+exactly the stranded work the check exists for), `gh pr view --json state` merged (when the branch
 has a PR), no live subagents (Claude Code: `SubagentStop` balances `SubagentStart`; other
 adapters: nothing running under the pane), and the ledger/attention board touched since the
 session started (dev-cadence repos). Each item is a named check in `.agentorc.yml` so other

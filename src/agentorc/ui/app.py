@@ -138,21 +138,36 @@ def create_app() -> FastAPI:
         except AgentError as e:
             raise HTTPException(400, str(e)) from e
 
-    def render_card(request: Request, s: dict[str, Any]) -> str:
-        return templates.get_template("card.html").render(request=request, s=view(s))
+    def render_card(s: dict[str, Any]) -> str:
+        return templates.get_template("card.html").render(s=view(s))
 
     @app.get("/", response_class=HTMLResponse)
     async def herd(request: Request):
-        sessions = await call("list")
+        # An unreachable agent still gets a page: the banner + Retry are the recovery path
+        # (design §4.5 unreachable hosts), never a bare 503.
+        agent_down = False
+        try:
+            sessions = await call("list")
+        except HTTPException as e:
+            if e.status_code != 503:
+                raise
+            sessions, agent_down = [], True
         vs = sorted((view(s) for s in sessions), key=lambda v: (v["rank"], v["name"]))
         counts = {k: sum(1 for v in vs if v["state"] == k) for k in ("needs-you", "limited", "stalled?")}
         return templates.TemplateResponse(
-            request, "herd.html", {"sessions": vs, "counts": counts, "host": host_name(), "active": "Herd"}
+            request,
+            "herd.html",
+            {"sessions": vs, "counts": counts, "host": host_name(), "active": "Herd", "agent_down": agent_down},
         )
 
     @app.get("/focus/{sid}", response_class=HTMLResponse)
     async def focus(request: Request, sid: str):
-        s = await call("get", id=sid)
+        try:
+            s = await call("get", id=sid)
+        except HTTPException as e:
+            if e.status_code == 503:
+                return RedirectResponse("/", status_code=303)  # the Herd shows the down banner
+            raise
         return templates.TemplateResponse(request, "focus.html", {"s": view(s), "host": host_name(), "active": "Herd"})
 
     @app.get("/new", response_class=HTMLResponse)
@@ -255,7 +270,7 @@ def create_app() -> FastAPI:
                                     "id": s["id"],
                                     "state": s["state"],
                                     "rank": STATE_RANK.get(s["state"], 9),
-                                    "html": render_card(ws, s),
+                                    "html": render_card(s),
                                     "session": view(s),
                                 }  # noqa: E501
                             )
@@ -282,16 +297,18 @@ def create_app() -> FastAPI:
             await ws.send_bytes(f"\r\n[agentorc] {e.detail}\r\n".encode())
             await ws.close()
             return
-        pty = PtySession(attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET")), cols=cols, rows=rows)
+        try:
+            pty = PtySession(attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET")), cols=cols, rows=rows)
+        except Exception as e:  # noqa: BLE001 — no silent failure path (design §4.5)
+            await ws.send_bytes(f"\r\n[agentorc] could not attach a terminal: {type(e).__name__}: {e}\r\n".encode())
+            await ws.close()
+            return
 
         async def send(data: bytes) -> None:
             await ws.send_bytes(data)
 
         async def recv() -> Any:
-            try:
-                msg = await ws.receive()
-            except WebSocketDisconnect:
-                return None
+            msg = await ws.receive()  # a disconnect arrives as a message, never as an exception here
             if msg.get("type") == "websocket.disconnect":
                 return None
             if msg.get("bytes") is not None:

@@ -18,7 +18,7 @@
       <button class="btn" data-sort="pinned">Pinned</button>
     </span>
   </div>
-  <div class="warn hidden" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
   <div class="grid" id="grid">
     {% for s in sessions %}{% include "card.html" %}{% endfor %}
   </div>

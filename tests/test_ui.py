@@ -20,15 +20,13 @@ SOCK = f"ao-test-{uuid.uuid4().hex[:8]}"
 
 @pytest.fixture(scope="module")
 def agent_thread(tmp_path_factory):
-    """One agent for the module, on its own loop in a thread, so the sync TestClient can talk to it."""
-    import os
-
+    """One agent for the module, on its own loop in a thread, so the sync TestClient can talk to it.
+    Module-scoped monkeypatch: env and tick restored at teardown, whatever the test order."""
+    mp = pytest.MonkeyPatch()
     home = tmp_path_factory.mktemp("home")
-    os.environ["AGENTORC_HOME"] = str(home)
-    os.environ["AGENTORC_TMUX_SOCKET"] = SOCK
-    import sessionorc.agent as agent_mod
-
-    agent_mod.TICK_SECONDS = 0.3
+    mp.setenv("AGENTORC_HOME", str(home))
+    mp.setenv("AGENTORC_TMUX_SOCKET", SOCK)
+    mp.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
     tmux = Tmux(socket_name=SOCK)
     loop = asyncio.new_event_loop()
     a = HostAgent(tmux=tmux)
@@ -47,10 +45,17 @@ def agent_thread(tmp_path_factory):
             break
         time.sleep(0.05)
     yield a
-    loop.call_soon_threadsafe(task_holder["t"].cancel)
+
+    async def shutdown():
+        task_holder["t"].cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task_holder["t"]
+
+    asyncio.run_coroutine_threadsafe(shutdown(), loop).result(timeout=5)
     loop.call_soon_threadsafe(loop.stop)
     th.join(timeout=5)
     tmux.kill_server()
+    mp.undo()
 
 
 @pytest.fixture
@@ -186,3 +191,22 @@ def test_terminal_bridge(client, tmp_path):
 def test_term_unknown_session(client):
     with client.websocket_connect("/term/ao-none") as ws:
         assert b"no session" in ws.receive_bytes()
+
+
+def test_herd_renders_with_agent_down(tmp_path, monkeypatch):
+    """No bare 503: the Herd shows the down banner and Retry when the agent socket is absent."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "nohome"))
+    from agentorc.ui.app import create_app
+
+    with TestClient(create_app()) as c:
+        r = c.get("/")
+        assert (
+            r.status_code == 200
+            and 'id="agentdown"' in r.text
+            and "hidden" not in r.text.split('id="agentdown"')[0][-60:]
+        )
+        assert "host agent unreachable" in r.text
+        r = c.get("/focus/ao-x", follow_redirects=False)
+        assert r.status_code == 303 and r.headers["location"] == "/"
+        r = c.post("/api/sessions/ao-x/kill")
+        assert r.status_code == 503

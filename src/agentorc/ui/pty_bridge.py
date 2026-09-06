@@ -67,8 +67,11 @@ async def pump(pty: PtySession, send: Callable[[bytes], object], recv: Callable[
     with `resize: [cols, rows]`; `send` takes raw bytes for xterm.js."""
 
     async def down() -> None:
-        while (chunk := await pty.read()) is not None:
-            await send(chunk)  # type: ignore[misc]
+        try:
+            while (chunk := await pty.read()) is not None:
+                await send(chunk)  # type: ignore[misc]
+        except Exception:  # noqa: BLE001 — the socket went away mid-send: that ends the pump, quietly
+            return
 
     async def up() -> None:
         while True:
