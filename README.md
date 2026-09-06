@@ -46,6 +46,12 @@ shell adapter) and `agentorc` (hook adapters, profiles, policies, Ready to close
 top of it. `sessionorc` never imports `agentorc`; it becomes its own repo only when a second
 consumer appears (docs/design.md §10).
 
+## Requirements
+
+Python 3.12+, tmux 3.2+ (`new-session -e`, bracketed `paste-buffer -p`; kmaster has 3.5a), and
+on each session host a user systemd session with `loginctl enable-linger` so the agent and its
+tmux server survive logout and reboot.
+
 ## CLI
 
 The package installs `agentorc` and an `ao` alias (`ao status`, `ao new`, `ao shell`, ...).

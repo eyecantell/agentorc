@@ -13,6 +13,7 @@ import contextlib
 import json
 import logging
 import os
+import re
 import signal
 import sys
 from collections import defaultdict
@@ -23,7 +24,7 @@ from typing import Any
 from sessionorc import adapters, naming, paths
 from sessionorc.models import Pending, Session, now_iso
 from sessionorc.store import EventQueue, SessionStore
-from sessionorc.tmux import PaneInfo, Tmux
+from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 
 log = logging.getLogger("agentorc.agent")
 
@@ -31,6 +32,7 @@ TICK_SECONDS = float(os.environ.get("AGENTORC_TICK", "2"))
 TAIL_LINES = 6
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
+CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
 
 
 class RpcError(Exception):
@@ -49,7 +51,8 @@ class HostAgent:
         self._dir_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._subscribers: set[asyncio.StreamWriter] = set()
         self._last_pushed: dict[str, str] = {}
-        self._waiters: dict[str, asyncio.Future[dict[str, Any]]] = {}  # tool_use_id → decision
+        # (session id, tool_use_id) → the hook's pending decision
+        self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -74,31 +77,42 @@ class HostAgent:
     async def _tick_loop(self) -> None:
         while True:
             try:
-                await asyncio.to_thread(self.tick)
+                await self.tick()
                 await self._push_changes()
             except Exception:  # noqa: BLE001
                 log.exception("tick failed")
             await asyncio.sleep(TICK_SECONDS)
 
-    # -- reconcile (runs in a thread; only touches self.sessions under the GIL) ------------------
+    # -- reconcile -------------------------------------------------------------------------------
+    #
+    # Concurrency model: every mutation of `self.sessions` and of Session objects happens on the
+    # event loop, never in a thread. Only the tmux subprocess calls run in threads, and they
+    # return plain data. So a tick's reconcile step and an RPC handler can never interleave
+    # inside a check-then-act sequence — the loop runs them one at a time.
 
-    def tick(self) -> None:
-        panes = {p.session: p for p in self.tmux.list_panes(naming.PREFIX)}
+    async def tick(self) -> None:
+        snapshot_at = datetime.now(UTC)
+        panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
+        tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
+        self._reconcile(panes, tails, snapshot_at)
+
+    def _reconcile(self, panes: dict[str, PaneInfo], tails: dict[str, list[str]], snapshot_at: datetime) -> None:
         for sid, event in self.events.drain():
             self._apply_event(sid, event)
         now = datetime.now(UTC)
         for sid, s in list(self.sessions.items()):
             if s.state == "closed":
-                if s.closed_at and datetime.fromisoformat(s.closed_at.replace("Z", "+00:00")) + CLOSED_KEEP < now:
+                if s.closed_at and _parse(s.closed_at) + CLOSED_KEEP < now:
                     self._forget(sid)
                 continue
             pane = panes.get(sid)
             if pane is None:
-                if s.state not in ("exited",):
+                # A session created after the pane snapshot was taken is not judged by it.
+                if s.state != "exited" and _parse(s.created) + CREATE_GRACE < snapshot_at:
                     s.set_state("exited", confidence="scraped")
                     self.store.save(s)
                 continue
-            self._observe(s, pane, now)
+            self._observe(s, pane, tails.get(sid, []), now)
         # tmux sessions with our prefix that we have no record of (created by hand, or the
         # store was lost): adopt them minimally as shells so they appear in the Herd.
         for name, pane in panes.items():
@@ -106,11 +120,10 @@ class HostAgent:
                 s = Session(id=name, name=name[len(naming.PREFIX) :], kind="interactive", adapter="shell", dir="")
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
-                self._observe(s, pane, now)
+                self._observe(s, pane, tails.get(name, []), now)
 
-    def _observe(self, s: Session, pane: PaneInfo, now: datetime) -> None:
+    def _observe(self, s: Session, pane: PaneInfo, tail: list[str], now: datetime) -> None:
         adapter = adapters.get(s.adapter)
-        tail = self.tmux.capture_tail(s.id, TAIL_LINES)
         s.tail = [_clean(t) for t in tail]
         if s.run_log:
             with contextlib.suppress(OSError):
@@ -124,10 +137,10 @@ class HostAgent:
             st = adapter.classify(pane, tail)
             if st and st != s.state:
                 s.set_state(st, confidence="scraped")
-        elif s.state == "working" and s.last_output:
-            last = datetime.fromisoformat(s.last_output.replace("Z", "+00:00"))
-            if now - last > STALL_AFTER:
-                s.set_state("stalled?", confidence="scraped")
+        elif s.state == "working" and s.last_output and now - _parse(s.last_output) > STALL_AFTER:
+            # Hook-fed adapters: the only scraped verdict is the liveness cross-check, and it
+            # applies to `working` alone — a `needs-you` or `idle` session is silent by design.
+            s.set_state("stalled?", confidence="scraped")
         self.store.save(s)
 
     def _apply_event(self, sid: str, event: dict[str, Any]) -> None:
@@ -174,10 +187,13 @@ class HostAgent:
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
-        ad = adapters.get(adapter)
+        try:
+            ad = adapters.get(adapter)
+        except KeyError as e:
+            raise RpcError(str(e).strip('"')) from None
         async with self._dir_locks[str(directory)]:
             if kind == "interactive" and adapter != "shell":
-                for other in self.sessions.values():
+                for other in list(self.sessions.values()):
                     if (
                         other.kind == "interactive"
                         and other.adapter != "shell"
@@ -185,14 +201,22 @@ class HostAgent:
                         and Path(other.dir) == directory
                     ):
                         raise RpcError(f"{directory} already has agent session {other.id} ({other.state}); anchor rule")
-            sid = naming.session_id(
-                directory, repo, name, list(self.sessions) + [p.session for p in self.tmux.list_panes()]
-            )
+            live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
             spec = ad.launch(profile=profile, resume=resume, prompt=prompt, unattended=unattended, cwd=directory)
             if argv:
                 spec.argv = argv
-            env = {"AGENTORC_SESSION": sid, **spec.env}
-            run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
+            taken = set(self.sessions) | set(live)
+            for _attempt in range(5):
+                sid = naming.session_id(directory, repo, name, taken)
+                env = {**spec.env, "AGENTORC_SESSION": sid}  # ours wins, whatever an adapter sets
+                run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
+                try:
+                    await asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log)
+                    break
+                except DuplicateSession:
+                    taken.add(sid)  # design §4.1: handle tmux's own verdict, not just our check
+            else:
+                raise RpcError(f"could not find a free session name for {name!r} in {directory}")
             s = Session(
                 id=sid,
                 name=name,
@@ -206,16 +230,14 @@ class HostAgent:
                 confidence=ad.state_source,
                 run_log=str(run_log),
             )
-            await asyncio.to_thread(self._start, s, spec.argv, env, run_log)
             self.sessions[sid] = s
             self.store.save(s)
             self._remember_dir(directory)
         return s.to_dict()
 
-    def _start(self, s: Session, argv: list[str] | None, env: dict[str, str], run_log: Path) -> None:
+    def _start(self, sid: str, cwd: Path, argv: list[str] | None, env: dict[str, str], run_log: Path) -> None:
         self.tmux.ensure_server()
-        self.tmux.new_session(s.id, s.dir, argv, env)
-        self.tmux.pipe_pane(s.id, run_log)  # from the first byte (invariant 3)
+        self.tmux.new_session(sid, cwd, argv, env, logfile=run_log)  # log from the first byte (invariant 3)
 
     async def rpc_kill(self, id: str) -> dict[str, Any]:
         s = self._get(id)
@@ -282,9 +304,11 @@ class HostAgent:
         )
         s.set_state("needs-you", confidence="hook", pending=pending)
         self.store.save(s)
-        await self._push_changes()
+        # Register the waiter BEFORE the first await: a client reacting to the push must find it.
         fut: asyncio.Future[dict[str, Any]] = asyncio.get_running_loop().create_future()
-        self._waiters[tool_use_id] = fut
+        key = (session, tool_use_id)
+        self._waiters[key] = fut
+        await self._push_changes()
         try:
             return await asyncio.wait_for(fut, timeout=wait)
         except TimeoutError:
@@ -294,11 +318,11 @@ class HostAgent:
             await self._push_changes()
             return None
         finally:
-            self._waiters.pop(tool_use_id, None)
+            self._waiters.pop(key, None)
 
     async def rpc_decide(self, id: str, tool_use_id: str, behavior: str, reason: str | None = None) -> None:
         s = self._get(id)
-        fut = self._waiters.get(tool_use_id)
+        fut = self._waiters.get((id, tool_use_id))
         if fut is None or fut.done():
             raise RpcError("no pending permission with that id (answered, timed out, or in the terminal)")
         if behavior not in ("allow", "deny"):
@@ -400,13 +424,22 @@ class HostAgent:
             return {"id": rid, "error": f"{type(e).__name__}: {e}"}
 
 
+_OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
+_CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+_ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
+
+
 def _clean(text: str) -> str:
     """Strip ANSI/control bytes and cap width: pane output is untrusted everywhere but xterm.js."""
-    import re
-
-    text = re.sub(r"\x1b\[[0-9;?]*[ -/]*[@-~]", "", text)
+    text = _OSC.sub("", text)
+    text = _CSI.sub("", text)
+    text = _ESC_OTHER.sub("", text)
     text = "".join(ch for ch in text if ch == "\t" or ch >= " ")
     return text[:200]
+
+
+def _parse(iso: str) -> datetime:
+    return datetime.fromisoformat(iso.replace("Z", "+00:00"))
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -5,16 +5,25 @@ Every call takes the socket into account so tests can run against a private serv
 
 from __future__ import annotations
 
+import re
 import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 HISTORY_LIMIT = 50000
-_FMT = "#{session_name}\t#{session_created}\t#{pane_current_command}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}"
+_FMT = (
+    "#{session_name}\t#{session_created}\t#{pane_current_command}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}"
+    "\t#{window_index}\t#{pane_index}"
+)
+MIN_VERSION = (3, 2)  # `new-session -e` and `paste-buffer -p`
 
 
 class TmuxError(RuntimeError):
+    pass
+
+
+class DuplicateSession(TmuxError):
     pass
 
 
@@ -26,6 +35,8 @@ class PaneInfo:
     pane_pid: int
     dead: bool
     dead_status: int | None
+    window: int = 0
+    pane: int = 0
 
 
 class Tmux:
@@ -49,8 +60,16 @@ class Tmux:
 
     # -- server ----------------------------------------------------------------------------------
 
+    def version(self) -> tuple[int, int]:
+        out = self.run("-V", check=False).stdout.strip()  # "tmux 3.5a"
+        m = re.search(r"(\d+)\.(\d+)", out)
+        return (int(m.group(1)), int(m.group(2))) if m else (0, 0)
+
     def ensure_server(self) -> None:
         """Start the server if needed and keep it alive with no sessions (design §4.1, §4.6)."""
+        v = self.version()
+        if v < MIN_VERSION:
+            raise TmuxError(f"tmux {v[0]}.{v[1]} is too old; need {MIN_VERSION[0]}.{MIN_VERSION[1]}+")
         # One client invocation: a freshly started server with no sessions would exit before a
         # second command could turn exit-empty off. `;` chains commands inside tmux.
         self.run(
@@ -75,16 +94,28 @@ class Tmux:
     def has_session(self, name: str) -> bool:
         return self.run("has-session", "-t", f"={name}", check=False).returncode == 0
 
-    def new_session(self, name: str, cwd: Path | str, argv: list[str] | None, env: dict[str, str]) -> None:
+    def new_session(
+        self, name: str, cwd: Path | str, argv: list[str] | None, env: dict[str, str], logfile: Path | None = None
+    ) -> None:
+        """Create a detached session. `remain-on-exit` and the run-log `pipe-pane` are chained into
+        the same tmux invocation: a command that exits at once still leaves a dead pane (exit status
+        readable) and the log has its first byte (design §9 invariant 3) — a second invocation
+        would find the pane already gone."""
         args = ["new-session", "-d", "-s", name, "-c", str(cwd)]
         for k, v in env.items():
             args += ["-e", f"{k}={v}"]
         if argv:
             args += ["--", *argv]
-        # Chained in the same invocation so a command that exits at once still leaves a dead pane
-        # (exit status readable, last lines in the log); the agent reaps it (design §6 exit reap).
         args += [";", "set-option", "-w", "-t", f"={name}:", "remain-on-exit", "on"]
-        self.run(*args)
+        if logfile is not None:
+            logfile.parent.mkdir(parents=True, exist_ok=True)
+            args += [";", "pipe-pane", "-t", f"={name}:", f"cat >> '{logfile}'"]
+        cp = self.run(*args, check=False)
+        if cp.returncode != 0:
+            err = cp.stderr.strip() or cp.stdout.strip()
+            if "duplicate session" in err:
+                raise DuplicateSession(err)
+            raise TmuxError(f"tmux new-session {name}: {err}")
 
     def kill_session(self, name: str) -> None:
         self.run("kill-session", "-t", f"={name}", check=False)
@@ -96,9 +127,9 @@ class Tmux:
             return out  # no server
         for line in cp.stdout.splitlines():
             parts = line.split("\t")
-            if len(parts) != 6 or not parts[0].startswith(prefix):
+            if len(parts) != 8 or not parts[0].startswith(prefix):
                 continue
-            name, created, cmd, pid, dead, dead_status = parts
+            name, created, cmd, pid, dead, dead_status, win, pane = parts
             out.append(
                 PaneInfo(
                     session=name,
@@ -107,9 +138,20 @@ class Tmux:
                     pane_pid=int(pid or 0),
                     dead=dead == "1",
                     dead_status=int(dead_status) if dead == "1" and dead_status.lstrip("-").isdigit() else None,
+                    window=int(win or 0),
+                    pane=int(pane or 0),
                 )
             )
         return out
+
+    def main_panes(self, prefix: str = "ao-") -> dict[str, PaneInfo]:
+        """One pane per session — the lowest window/pane index, deterministically."""
+        best: dict[str, PaneInfo] = {}
+        for p in self.list_panes(prefix):
+            cur = best.get(p.session)
+            if cur is None or (p.window, p.pane) < (cur.window, cur.pane):
+                best[p.session] = p
+        return best
 
     # -- I/O -------------------------------------------------------------------------------------
 
