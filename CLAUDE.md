@@ -8,7 +8,7 @@ agentorc is a self-hosted web dashboard that orchestrates interactive AI coding-
 (Claude Code first) and plain shells running in tmux across hosts. **Status: design settled,
 nothing built yet.** [`docs/design.md`](docs/design.md) is the source of truth: requirements,
 architecture, every control (§4.5a — a control that is not in that table does not exist), the
-phase plan (§7), invariants (§9), and a dated decision log (§10). A change in behaviour is a
+phase plan (§7), invariants (§9), and the dated question log (§10, three items still open). A change in behaviour is a
 change to that document first. Mockups regenerate from `docs/mockups/gen.py`.
 
 ## Stack and conventions
