@@ -17,21 +17,22 @@ Grew out of [samscrape](https://github.com/eyecantell/samscrape)'s `tdgrind` wor
 and the [dev-cadence](https://github.com/eyecantell/dev-cadence) working-cadence system, whose
 repo registry it depends on.
 
-## Start here (handoff from the 2026-09-04 design session)
+## Start here (handoff, updated 2026-09-06 evening)
 
-Design is settled enough to build. Steps 1 and 2 landed 2026-09-06; the rest in order:
+**Phase 1 is built** (PRs #1–#4, all Sonnet-reviewed): host agent, Claude Code adapter, Herd
+and Focus pages, New session, CLI. Run it per "Run it" below. What to do next, in order:
 
-1. ~~Evaluate, then install dev-cadence~~ — done, both directions:
-   [ADR 2026-09-06](docs/decisions/2026-09-06-adopt-dev-cadence.md); upstream PRs
-   dev-cadence #82 (`--report --json`) and #83 (board-edit carve-out) await the maintainer.
-2. ~~Write `CLAUDE.md`~~ — done; it is the map, `docs/design.md` is the source of truth.
-3. **Phase 1 of [`docs/design.md`](docs/design.md) §7**: host agent + Claude Code adapter +
-   Herd and Focus pages, kmaster only. The success test is written there. Build against a
-   scratch directory and a throwaway profile first (CLAUDE.md says why).
-4. §10 is fully decided as of 2026-09-05: UI on whichever host installs `agentorc[ui]`, pty
-   bridge (no ttyd), one distribution with a `[ui]` extra, pinned layout in `localStorage`.
-   Tailscale on the UI host is a phase 1 prerequisite; until then the UI binds to localhost and
-   is reached over `ssh -L`. Two small permission-dialog questions remain open there.
+1. **Use it** against a real repo and note what the flows get wrong (board item, due 2026-09-13).
+   Until Tailscale is on kmaster, reach the UI with `ssh -L 8765:127.0.0.1:8765 kmaster`.
+2. **Decisions waiting on Paul**: see [`docs/user_attention.md`](docs/user_attention.md)
+   (dev-cadence PRs #82/#83, GitHub merge settings, the two permission-dialog questions).
+3. **Deferred work** is in [`docs/technical_debt.md`](docs/technical_debt.md) (TD-001 `limited`
+   state, TD-002 attachments, TD-003 phone, TD-004 `hosts.yml`, TD-010 adopting hand-started
+   sessions), then **phase 2** of [`docs/design.md`](docs/design.md) §7: second host, ssh
+   transport, agent install script.
+4. Known gap in the phase 1 success test: only sessions agentorc launched (or hand-started
+   `ao-*` tmux sessions) appear in the Herd. A Claude Code session opened in a VS Code terminal
+   is not a tmux session and is invisible until Adopt (TD-010) exists.
 
 Mockups: https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04 (sources and
 regeneration notes in [`docs/mockups/`](docs/mockups/)). The CSS block at the top of

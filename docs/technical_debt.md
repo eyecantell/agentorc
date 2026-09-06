@@ -21,6 +21,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-007 | test_ui mutates `os.environ` for a module-scoped agent | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-009 | `subscribe` resets the shared push cache: every new tab re-pushes everything to every tab | Low | Open |
+| TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
 
 ---
 
@@ -150,4 +151,17 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Why:** `_last_pushed` is one dict for all subscribers; a new `subscribe` clears it so the newcomer gets a full snapshot, which also re-sends every session to every other connected tab. Harmless at a handful of tabs, wasteful at many; found in the PR #4 review.
 
 **Fix:** per-subscriber last-pushed maps (or send the newcomer a snapshot directly and leave the shared cache alone). Done when opening a second tab produces no traffic on the first.
+
+## TD-010: Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd
+
+**Priority:** Medium
+**Added:** 2026-09-06
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`_reconcile` adoption of `ao-*` panes), `src/agentorc/adapters/claude_code/__init__.py` (`registry_entries`)
+
+**Why:** The phase 1 success test reads "every session Paul has open on kmaster shows the right state". Today the Herd shows sessions agentorc launched plus any hand-started tmux session named `ao-*`. Paul's day-to-day sessions run in VS Code terminals with no tmux at all, so they never appear. Design §4.1 says hand-started sessions enter the Herd by being **adopted** (Resumable tab, phase 4), which assumes a tmux session to attach to; a VS Code-terminal session has none.
+
+**Fix:** two halves. (a) Claude Code's own registry (`~/.claude/sessions/<pid>.json`: `status` busy/idle/shell, `name`, `cwd`, `sessionId`) can populate read-only cards for non-tmux sessions — state guessed (`scraped`), no Focus terminal, Allow/Deny only if the person launches them with agentorc's hooks layer (`claude --settings ~/.agentorc/claude-hooks/<profile>.json`, which works outside tmux too since the hook only needs `AGENTORC_SESSION` and `AGENTORC_HOME`). (b) A `ao wrap` / shell alias that starts Claude inside an `ao-*` tmux session from any terminal, so the VS Code habit produces first-class cards. Done when a session started from a VS Code terminal shows the right state within 5 s.
+
+**Related:** design §4.1 adoption, §4.3 registry cross-check, phase 1 success test.
 
