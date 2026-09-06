@@ -71,6 +71,7 @@ class Session:
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
     closed_at: str | None = None
+    git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

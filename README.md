@@ -52,6 +52,21 @@ Python 3.12+, tmux 3.2+ (`new-session -e`, bracketed `paste-buffer -p`; kmaster 
 on each session host a user systemd session with `loginctl enable-linger` so the agent and its
 tmux server survive logout and reboot.
 
+## Run it (phase 1, one host)
+
+```bash
+pdm install -G ui                      # or: pipx install 'agentorc[ui]' once published
+pdm run agentorc-agent serve           # the host agent: tmux, sessions, hooks, run logs
+pdm run ao ui                          # the web UI on http://127.0.0.1:8765 (never the LAN; use ssh -L or Tailscale)
+pdm run ao new td-302 -d ~/samscrape   # or the New session form; `ao shell` for a plain shell
+```
+
+State lives under `~/.agentorc/` (`AGENTORC_HOME` overrides it — every session the agent creates
+carries it, so hooks inside find the right agent). Profiles: `~/.agentorc/profiles.yml`
+(design §4.2a). `AGENTORC_HOST_NAME` sets the name the UI shows; `AGENTORC_VSCODE_HOST` is the
+ssh alias VS Code links use (must be in your own `~/.ssh/config`); `AGENTORC_LOCAL_HOST=1` makes
+those links `vscode://file/…` instead.
+
 ## CLI
 
 The package installs `agentorc` and an `ao` alias (`ao status`, `ao new`, `ao shell`, ...).
