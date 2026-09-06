@@ -96,6 +96,13 @@ def cmd_send(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_keys(args: argparse.Namespace) -> int:
+    """Raw tmux key names into the pane (Down, Enter, Escape, C-c, 1 …) — for dialogs the
+    terminal owns when no browser is open. Not a menu-answering API: design §9 invariant 6."""
+    call_sync("keys", id=args.id, keys=args.keys)
+    return 0
+
+
 def cmd_tail(args: argparse.Namespace) -> int:
     for line in call_sync("tail", id=args.id, lines=args.lines):
         print(line)
@@ -156,6 +163,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("text", nargs="*")
     p.set_defaults(fn=cmd_send)
+
+    p = sub.add_parser("keys", help="send raw tmux key names (Down Enter Escape C-c …) to a session")
+    p.add_argument("id")
+    p.add_argument("keys", nargs="+")
+    p.set_defaults(fn=cmd_keys)
 
     p = sub.add_parser("tail", help="last lines of a session's pane")
     p.add_argument("id")

@@ -143,13 +143,20 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
 
 The three states the person cares about are already emitted by the tools that have hooks. An
 adapter installs a small hook script that writes
-`~/.agentorc/sessions/<session-id>.json`. Hooks are installed **per profile, at the tool's
-user level** (Claude Code: the profile's `CLAUDE_CONFIG_DIR/settings.json`, merged into the
-existing `hooks` block, never overwriting it), not per repo — sessions run in plain directories
-too, and repos carry their own hooks (dev-cadence's SessionStart guards) that must keep running.
-The hook script knows which agentorc session it belongs to from `AGENTORC_SESSION`, an
-environment variable the host agent sets on the tmux session at creation (decision 2026-09-06,
-[ADR](decisions/2026-09-06-adopt-dev-cadence.md)):
+`~/.agentorc/sessions/<session-id>.json`. Hooks reach a session **per launch, as a settings
+layer** (Claude Code: `claude --settings ~/.agentorc/claude-hooks/<profile>.json`, generated at
+launch), never by editing the person's own `settings.json` and never per repo — sessions run in
+plain directories too, hand-started sessions stay untouched, and repos carry their own hooks
+(dev-cadence's SessionStart guards) that keep running alongside. Verified 2026-09-06 that a
+`--settings` file's hooks fire. The hook script (`agentorc-hook`) knows which agentorc session
+it belongs to from `AGENTORC_SESSION`, and which agent to talk to from `AGENTORC_HOME`; the host
+agent sets both on the tmux session at creation — explicitly, because the tmux server may predate
+the agent and carry another environment (decision 2026-09-06,
+[ADR](decisions/2026-09-06-adopt-dev-cadence.md)). Claude Code's own session uuid is chosen by
+agentorc at launch (`--session-id`), so `adapter_id` is known from birth; a resume passes
+`--resume <id>` instead. **First-run quirk**: the "trust this folder?" dialog is reported by no
+hook, so the adapter marks the directory trusted in the tool's `.claude.json` before launch.
+The hook payload → state mapping:
 
 ```json
 {"session_id": "...", "name": "tdgrind-1", "kind": "interactive", "tool": "claude-code",
@@ -235,7 +242,7 @@ names outside the adapter. The `shell` adapter is the degenerate case and ships 
 class Adapter(Protocol):
     name: str                         # "claude-code"
     def launch_cmd(self, *, profile: Profile, resume: str | None, prompt_file: Path | None, unattended: bool) -> list[str]
-    def install_hooks(self, profile: Profile) -> None   # merges the tool's hook config into the profile's config dir
+    def launch(...) -> LaunchSpec                     # argv + env + adapter_id; writes the per-profile hooks layer
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None

@@ -160,7 +160,7 @@ class Tmux:
         self.run("pipe-pane", "-t", f"={name}:", f"cat >> '{logfile}'")
 
     def capture_tail(self, name: str, lines: int = 8) -> list[str]:
-        cp = self.run("capture-pane", "-p", "-t", f"={name}:", "-S", f"-{lines}", check=False)
+        cp = self.run("capture-pane", "-p", "-J", "-t", f"={name}:", "-S", f"-{lines}", check=False)
         if cp.returncode != 0:
             return []
         rows = [r.rstrip() for r in cp.stdout.split("\n")]

@@ -97,7 +97,7 @@ class HookFedStub:
     name = "hookstub"
     state_source = "hook"
 
-    def launch(self, *, profile, resume, prompt, unattended, cwd):
+    def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
         return LaunchSpec(argv=["bash", "--norc"])
 
     def classify(self, pane, tail):

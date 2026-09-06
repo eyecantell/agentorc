@@ -150,6 +150,8 @@ class HostAgent:
             return
         if aid := event.get("adapter_id"):
             s.adapter_id = aid
+        if delta := event.get("subagent_delta"):
+            s.subagents = max(0, s.subagents + int(delta))
         state = event.get("state")
         if state:
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else None
@@ -202,13 +204,21 @@ class HostAgent:
                     ):
                         raise RpcError(f"{directory} already has agent session {other.id} ({other.state}); anchor rule")
             live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
-            spec = ad.launch(profile=profile, resume=resume, prompt=prompt, unattended=unattended, cwd=directory)
+            try:
+                spec = ad.launch(
+                    profile=profile, resume=resume, prompt=prompt, unattended=unattended, cwd=directory, name=name
+                )
+            except (KeyError, ValueError) as e:
+                raise RpcError(str(e).strip('"')) from None
             if argv:
                 spec.argv = argv
             taken = set(self.sessions) | set(live)
             for _attempt in range(5):
                 sid = naming.session_id(directory, repo, name, taken)
-                env = {**spec.env, "AGENTORC_SESSION": sid}  # ours wins, whatever an adapter sets
+                # Ours win, whatever an adapter sets. AGENTORC_HOME is explicit because the tmux
+                # server may predate this agent and carry a different environment; a hook script
+                # inside the session must find *this* agent's socket (found the hard way, 2026-09-06).
+                env = {**spec.env, "AGENTORC_SESSION": sid, "AGENTORC_HOME": str(paths.home())}
                 run_log = paths.runs_dir() / f"{sid}-{datetime.now(UTC):%Y%m%dT%H%M%SZ}.log"
                 try:
                     await asyncio.to_thread(self._start, sid, directory, spec.argv, env, run_log)
@@ -229,6 +239,7 @@ class HostAgent:
                 unattended=unattended,
                 confidence=ad.state_source,
                 run_log=str(run_log),
+                adapter_id=spec.adapter_id,
             )
             self.sessions[sid] = s
             self.store.save(s)

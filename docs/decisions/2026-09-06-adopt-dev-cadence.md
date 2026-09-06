@@ -37,14 +37,17 @@ adapting, and what agentorc has learned that dev-cadence should have.
 
 ## What the evaluation changed in agentorc's design
 
-1. **Hooks install at the profile level, not per repo.** The design had
+1. **Hooks are a per-launch settings layer, not an edit to anyone's config.** The design had
    `install_hooks(repo)`. dev-cadence seeds `.claude/settings.json` with SessionStart hooks in
-   every consuming repo, and agentorc also runs sessions in directories that are not repos. So
-   the Claude Code adapter installs its hooks into each *profile's* config directory
-   (`CLAUDE_CONFIG_DIR/settings.json`, merged into the existing `hooks` block, never
-   overwritten), and the hook script identifies its session from an environment variable the
-   host agent sets on the tmux session. Repo-level hooks from dev-cadence keep running
-   untouched. Written into design §4.3 and §4.2.
+   every consuming repo, and agentorc also runs sessions in directories that are not repos. The
+   first revision of this ADR moved the install to each profile's `settings.json`; the build
+   session found something better the same day: Claude Code takes `--settings <file>` as a
+   settings layer for one launched session, and hooks in it fire (verified). So the adapter
+   writes `~/.agentorc/claude-hooks/<profile>.json` and passes it at launch. Nothing of the
+   person's is edited, hand-started sessions are untouched, and repo-level hooks keep running.
+   The hook script finds its session and its agent from `AGENTORC_SESSION` and
+   `AGENTORC_HOME`, both set on the tmux session by the host agent. Written into design §4.2
+   and §4.3.
 2. **Board write-back needs a cadence carve-out.** Committing a Snooze or Done edit to main in
    the main checkout contradicts cadence §4 as written; leaving it uncommitted contradicts the
    one-writer rule and "push before you pause". Proposed upstream as a third bounded carve-out
