@@ -1,0 +1,18 @@
+# Written by eyecantell/dev-cadence sync.sh — do not edit by hand.
+source: https://github.com/eyecantell/dev-cadence
+commit: 7a948b6
+synced: 2026-09-06T18:44:52Z
+file: docs/cadence.md 9f2b15e61c1c9364844b1304bcb53f107dfb0fefd5ea8dc2986fe506976c17f4
+file: .claude/skills/stranded-work/SKILL.md 5a54749b867502015307c2f4ed1a3decd5634545a43421298448865e972d808a
+file: .claude/skills/attention/SKILL.md 8cec2e55ff9ec4717cff7a8715007b3a633605e1bf323081d590464eb0a58662
+file: scripts/check_claude_memory.sh e29c2fc87457f33992014a4c5701e1d6e3e8c0dab1164420dea2efce6997f397
+file: scripts/check_anchor.py 45ca625aa4fd72592aec258882b6dadd9fdc025a077f7df06438cd87a33261a1
+file: scripts/nudge_user_attention.py d42dd03fe16b34b99696b5ba83ebc7ea542dbdb82a52988023549e572f973afe
+file: scripts/list_sessions.py cbd06831eccadba3695e60d3f30fed03412f9205392418931586285358f438b8
+file: scripts/generate_session_index.sh bd72f9020df4d978a168ca984ed34abbd1b4c99319cb7f0585b1cb6e1754dcda
+file: scripts/generate_workspace.sh d84c2486326e877e8d8e034c0d48dcbc5c6bc30eb5d97073aedb440184a78004
+file: scripts/open_worktree.sh 1da828e2dbe6a29f9182abfe8cca0b1b6d61f7c87f349acaf33352b2412af4f8
+file: scripts/hydrate_worktree.sh dfb41fdc71ba79766162a27f9d119808d1c97b2187426ed6a219adfe84ecfd9e
+file: scripts/reap_worktrees.sh e0d5017557c9324be17807cbc042583d3a225c00d81e9b5596f8e4535d9c5dad
+file: scripts/git-hooks/pre-push 91d6d7ae48e762ca77e674fda0f2e2052e17e5bf2840a3bfb0d7a1f7a03b1087
+file: scripts/git-hooks/post-merge 3e67d3c4b362c8f74b4b1b7bdc9524426561f3ff6f08fef3e31be0835b5d76d0

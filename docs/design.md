@@ -143,7 +143,13 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
 
 The three states the person cares about are already emitted by the tools that have hooks. An
 adapter installs a small hook script that writes
-`~/.agentorc/sessions/<session-id>.json`:
+`~/.agentorc/sessions/<session-id>.json`. Hooks are installed **per profile, at the tool's
+user level** (Claude Code: the profile's `CLAUDE_CONFIG_DIR/settings.json`, merged into the
+existing `hooks` block, never overwriting it), not per repo — sessions run in plain directories
+too, and repos carry their own hooks (dev-cadence's SessionStart guards) that must keep running.
+The hook script knows which agentorc session it belongs to from `AGENTORC_SESSION`, an
+environment variable the host agent sets on the tmux session at creation (decision 2026-09-06,
+[ADR](decisions/2026-09-06-adopt-dev-cadence.md)):
 
 ```json
 {"session_id": "...", "name": "tdgrind-1", "kind": "interactive", "tool": "claude-code",
@@ -229,7 +235,7 @@ names outside the adapter. The `shell` adapter is the degenerate case and ships 
 class Adapter(Protocol):
     name: str                         # "claude-code"
     def launch_cmd(self, *, profile: Profile, resume: str | None, prompt_file: Path | None, unattended: bool) -> list[str]
-    def install_hooks(self, repo: Path) -> None      # writes/merges the tool's hook config
+    def install_hooks(self, profile: Profile) -> None   # merges the tool's hook config into the profile's config dir
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
@@ -275,7 +281,10 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   dev-cadence `user_attention.md` item are one-line edits the agent makes and commits with a
   fixed message naming the session (`agentorc: snooze <item> to <date> (session <name>)`), so the
   main checkout never sits dirty and the history is auditable. The agent is the only writer to
-  those files from this system; it never pushes.
+  those files from this system; it never pushes. This is a bounded carve-out from cadence §4's
+  branch → PR rule, proposed upstream as dev-cadence PR #83. The items themselves, with the
+  board line each sits on, come from `nudge_user_attention.py --report --json` (dev-cadence
+  PR #82); the Due strip, the Attention tab, and the edits all key on that line number.
 
 ### 4.5 UI
 
@@ -652,7 +661,8 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
 
 - samscrape `scripts/tdgrind.sh` (supervisor being generalized), `scripts/list_sessions.py`,
   `scripts/reap_worktrees.sh`, `docs/cadence.md`
-- eyecantell/dev-cadence — registry `~/.config/dev-cadence/repos.txt`, `/attention`
+- eyecantell/dev-cadence — registry `~/.config/dev-cadence/repos.txt`, `/attention`;
+  adoption and the two upstream PRs: [ADR 2026-09-06](decisions/2026-09-06-adopt-dev-cadence.md)
 - eyecantell/textual-cmdorc — command specs for the buttons
 - Claude Code hooks: https://code.claude.com/docs/en/hooks
 - ttyd: https://github.com/tsl0922/ttyd (fallback terminal transport, not used in phase 1)

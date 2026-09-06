@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/git-hooks/post-merge
+# Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
+# Fires after `git merge` — including the fast-forward of `git pull --ff-only`,
+# which is exactly what the anchor runs right after merging a PR. That is the
+# moment a worktree becomes reapable, so it is the natural trigger: no cron, no
+# marker file, and it runs in-container where worktree paths are real (a
+# host-side scheduler would see container-absolute gitdirs as missing and
+# `git worktree prune` would de-register live worktrees — see reap_worktrees.sh).
+#
+# Reports only. Reaping is destructive and stays a deliberate act: the report
+# prints the one command. To make it automatic, add --reap below — the guards
+# (landed, clean including untracked, no live session, unlocked) are what make
+# that safe, and they are documented in reap_worktrees.sh.
+#
+# Never break or slow a pull: bounded, and exits 0 on every path.
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[[ -x "$ROOT/scripts/reap_worktrees.sh" ]] || exit 0
+
+timeout 20 "$ROOT/scripts/reap_worktrees.sh" --quiet 2>/dev/null
+
+exit 0

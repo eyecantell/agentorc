@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# SYNCED FILE — canonical copy: eyecantell/dev-cadence files/scripts/git-hooks/pre-push
+# Edit it there and re-run sync.sh; an edit made in a consumer repo is overwritten (sync.sh --verify detects one).
+# Block direct pushes to main (docs/cadence.md §4 — all changes go through PRs).
+#
+# Server-side branch protection is paywalled for private repos on GitHub's free
+# plan, so this client-side hook is the seatbelt on the machine all pushes
+# originate from. Enabled per-clone via:
+#     git config core.hooksPath scripts/git-hooks
+# (config is shared across git worktrees, so one setting covers all concurrent
+# Claude Code sessions). PR merges happen server-side via `gh pr merge` and are
+# unaffected.
+#
+# Deliberate override (rare, human-decided):  ALLOW_MAIN_PUSH=1 git push ...
+set -u
+
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+    if [ "$remote_ref" = "refs/heads/main" ] && [ "${ALLOW_MAIN_PUSH:-0}" != "1" ]; then
+        echo "pre-push: BLOCKED — direct push to main (docs/cadence.md §4: use a PR)." >&2
+        echo "pre-push: deliberate override: ALLOW_MAIN_PUSH=1 git push ..." >&2
+        exit 1
+    fi
+done
+exit 0
