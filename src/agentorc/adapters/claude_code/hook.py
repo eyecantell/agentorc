@@ -26,8 +26,9 @@ STATE_EVENTS = {
     "PreToolUse": "working",
     "PostToolUse": "working",
     "Stop": "idle",
-    "SessionEnd": "exited",
 }
+# SessionEnd reasons after which the process is still alive in the pane (a SessionStart follows).
+SESSION_END_STILL_RUNNING = {"clear", "resume"}
 
 NOTIFICATION_KINDS = {
     "permission_prompt": "permission",  # the terminal dialog is up (our hook fell through, or was absent)
@@ -65,6 +66,11 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
             # now lives in the terminal, so it is a question for the Focus screen (design §4.2).
             kind = "question"
         return {**out, "state": "needs-you", "pending": {"kind": kind, "text": payload.get("message", "")}}
+    if ev == "SessionEnd":
+        reason = payload.get("reason") or payload.get("how_ended") or ""
+        if reason in SESSION_END_STILL_RUNNING:
+            return None  # /clear or an in-session /resume: same process, new transcript coming
+        return {**out, "state": "exited", "pending": None}
     if ev == "SubagentStart":
         return {**out, "subagent_delta": 1}
     if ev == "SubagentStop":

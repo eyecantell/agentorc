@@ -8,7 +8,10 @@ in the tmux session's environment.
 
 from __future__ import annotations
 
+import fcntl
 import json
+import logging
+import os
 import re
 import shutil
 import uuid
@@ -36,6 +39,7 @@ HOOK_EVENTS = (
     "SessionEnd",
 )
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
+log = logging.getLogger("agentorc.claude-code")
 
 
 @dataclass
@@ -66,23 +70,27 @@ def pretrust(cwd: Path, profile: Profile) -> bool:
     launched session (no hook reports it). Read-modify-write of the tool's own file, atomic
     replace, skipped when the flag is already set. Returns True when it wrote."""
     path = global_config_file(profile)
+    lock = path.with_name(path.name + ".agentorc-lock")
     try:
-        data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with lock.open("a") as lk:
+            # Serialises agentorc's own launches. Claude Code does not take this lock, so a
+            # rewrite by a running session inside this window is still possible; the window is
+            # one read + one write, and losing our flag only means the dialog appears once.
+            fcntl.flock(lk, fcntl.LOCK_EX)
+            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
+            projects = data.setdefault("projects", {})
+            entry = projects.setdefault(str(cwd), {})
+            if entry.get("hasTrustDialogAccepted") is True:
+                return False
+            entry["hasTrustDialogAccepted"] = True
+            tmp = path.with_suffix(".json.agentorc-tmp")
+            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            tmp.chmod(0o600)
+            tmp.replace(path)
+            return True
     except (OSError, ValueError):
         return False
-    projects = data.setdefault("projects", {})
-    entry = projects.setdefault(str(cwd), {})
-    if entry.get("hasTrustDialogAccepted") is True:
-        return False
-    entry["hasTrustDialogAccepted"] = True
-    tmp = path.with_suffix(".json.agentorc-tmp")
-    try:
-        tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-        tmp.chmod(0o600)
-        tmp.replace(path)
-    except OSError:
-        return False
-    return True
 
 
 def hooks_file(profile: Profile) -> Path:
@@ -102,7 +110,14 @@ def hooks_settings(profile: Profile, hook_cmd: str = "agentorc-hook") -> dict:
 def write_hooks_file(profile: Profile) -> Path:
     p = hooks_file(profile)
     p.parent.mkdir(parents=True, exist_ok=True)
-    cmd = shutil.which("agentorc-hook") or "agentorc-hook"
+    cmd = shutil.which("agentorc-hook")
+    if cmd is None:
+        # A bare name that the launched session cannot resolve either means no state feed at
+        # all for this adapter — say so, since nothing downstream can tell.
+        log.warning(
+            "agentorc-hook not on PATH (%s); hooks for profile %s may never fire", os.environ.get("PATH"), profile.name
+        )
+        cmd = "agentorc-hook"
     p.write_text(json.dumps(hooks_settings(profile, cmd), indent=1), encoding="utf-8")
     return p
 
@@ -139,6 +154,8 @@ class ClaudeCodeAdapter:
         if unattended:
             argv += prof.unattended_args or ["--dangerously-skip-permissions"]
         if prompt:
+            if prompt.startswith("-"):
+                argv.append("--")  # a pasted brief that starts with '-' is a prompt, not an option
             argv.append(prompt)
         env = {"AGENTORC_PERMISSION_WAIT": str(prof.permission_wait), "AGENTORC_PROFILE": prof.name}
         if prof.config_dir:
@@ -179,6 +196,8 @@ class ClaudeCodeAdapter:
         c = self._creds(profile)
         if not c:
             return None
+        # "Recoverable", not "valid right now": a live refresh token means the tool can refresh
+        # the access token itself; only a dead refresh token needs a person to log in again.
         exp = c.get("refreshTokenExpiresAt") or c.get("expiresAt")
         if not exp:
             return True

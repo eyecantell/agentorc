@@ -30,7 +30,9 @@ def test_translate_state_events():
         "pending": None,
     }
     assert translate({"hook_event_name": "Stop"})["state"] == "idle"
-    assert translate({"hook_event_name": "SessionEnd"})["state"] == "exited"
+    assert translate({"hook_event_name": "SessionEnd", "reason": "prompt_input_exit"})["state"] == "exited"
+    assert translate({"hook_event_name": "SessionEnd", "reason": "clear"}) is None  # process still alive
+    assert translate({"hook_event_name": "SessionEnd", "reason": "resume"}) is None
     assert translate({"hook_event_name": "PreCompact"}) is None
 
 
@@ -88,6 +90,8 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert g.adapter_id == "abc-123" and "--resume" in g.argv and "--session-id" not in g.argv
     assert "--dangerously-skip-permissions" in g.argv
     assert g.env["CLAUDE_CONFIG_DIR"] == "/tmp/cc-grind" and g.env["AGENTORC_PERMISSION_WAIT"] == "30"
+    dashed = ad.launch(profile="", resume=None, prompt="-1 is the answer", unattended=False, cwd=tmp_path)
+    assert dashed.argv[-2:] == ["--", "-1 is the answer"]
     with pytest.raises(KeyError, match="unknown profile"):
         ad.launch(profile="nope", resume=None, prompt=None, unattended=False, cwd=tmp_path)
 
