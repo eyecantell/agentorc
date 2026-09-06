@@ -19,17 +19,19 @@ repo registry it depends on.
 
 ## Start here (handoff from the 2026-09-04 design session)
 
-Design is settled enough to build. In order:
+Design is settled enough to build. Steps 1 and 2 landed 2026-09-06; the rest in order:
 
-1. **Evaluate, then install [dev-cadence](https://github.com/eyecantell/dev-cadence)** using the
-   evaluate-first prompt in its README (both directions; file upstream findings as PRs there).
-2. **Write `CLAUDE.md`** for this repo: Python 3.12+, `pdm`, ruff at 120, the one-agent-per-directory anchor rule,
-   and the design doc as the source of truth.
+1. ~~Evaluate, then install dev-cadence~~ — done, both directions:
+   [ADR 2026-09-06](docs/decisions/2026-09-06-adopt-dev-cadence.md); upstream PRs
+   dev-cadence #82 (`--report --json`) and #83 (board-edit carve-out) await the maintainer.
+2. ~~Write `CLAUDE.md`~~ — done; it is the map, `docs/design.md` is the source of truth.
 3. **Phase 1 of [`docs/design.md`](docs/design.md) §7**: host agent + Claude Code adapter +
-   Herd and Focus pages, kmaster only. The success test is written there.
-4. §10 is fully decided as of 2026-09-05: UI on kmaster, pty bridge (no ttyd), one
-   distribution with a `[ui]` extra, pinned layout in `localStorage`. Tailscale on kmaster is a
-   phase 1 prerequisite; until then the UI binds to localhost and is reached over `ssh -L`.
+   Herd and Focus pages, kmaster only. The success test is written there. Build against a
+   scratch directory and a throwaway profile first (CLAUDE.md says why).
+4. §10 is fully decided as of 2026-09-05: UI on whichever host installs `agentorc[ui]`, pty
+   bridge (no ttyd), one distribution with a `[ui]` extra, pinned layout in `localStorage`.
+   Tailscale on the UI host is a phase 1 prerequisite; until then the UI binds to localhost and
+   is reached over `ssh -L`. Two small permission-dialog questions remain open there.
 
 Mockups: https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04 (sources and
 regeneration notes in [`docs/mockups/`](docs/mockups/)). The CSS block at the top of
