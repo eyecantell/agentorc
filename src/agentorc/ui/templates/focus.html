@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}{{ s.name }} · agentorc{% endblock %}
+{% block head %}<link rel="stylesheet" href="/static/vendor/xterm.css">{% endblock %}
+{% block body %}
+<div class="page focus" data-id="{{ s.id }}">
+  <div class="main">
+    <div class="row gap" id="fhead">
+      <a class="muted" href="/">← Herd</a>
+      <span class="mono title">{{ s.place }} / {{ s.name }}</span>
+      <span id="fstate"></span>
+      <span class="grow"></span>
+      <button class="btn" data-act="shell-here" data-id="{{ s.id }}">⌘ Open shell here</button>
+      {% if s.vscode %}<a class="btn" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
+      <button class="btn" data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
+      <button class="btn danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">✕ Kill</button>
+    </div>
+    <div class="inline-banner hidden" id="fbanner"></div>
+    <div id="term" class="termbox"></div>
+    <div class="card composer">
+      <textarea id="compose" placeholder="Compose a prompt… multi-line, paste-friendly. The terminal above takes keys directly for menus and questions. Esc → terminal."></textarea>
+      <div class="row gap">
+        <span class="note" id="composehint"></span>
+        <span class="grow"></span>
+        <button class="btn primary" id="send">→ Send</button>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <div class="card pad">
+      <div class="h2">Session</div>
+      <dl class="kv">
+        <dt>profile</dt><dd class="mono small">{{ s.profile_line }}</dd>
+        <dt>adapter id</dt><dd class="mono small" id="adapter_id">{{ s.adapter_id or '—' }}</dd>
+        <dt>tmux</dt><dd class="mono small">{{ s.id }}</dd>
+        <dt>directory</dt><dd class="mono small">{{ s.dir }}</dd>
+        <dt>started</dt><dd>{{ s.created[:16].replace('T', ' ') }}Z</dd>
+        <dt>last output</dt><dd id="last_output">{{ s.last_output or '—' }}</dd>
+        <dt>mode</dt><dd><button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}">{{ 'unattended' if s.unattended else 'interactive' }}</button></dd>
+        {% if s.run_log %}<dt>run log</dt><dd class="mono small">{{ s.run_log.rsplit('/', 1)[-1] }}</dd>{% endif %}
+      </dl>
+    </div>
+    <div class="card pad" id="gitcard">
+      <div class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></div>
+      <div class="mono small gitfiles" id="gitfiles">{% if s.git %}{% for f in s.git.files %}<div>{{ f }}</div>{% endfor %}{% if not s.git.files %}<div class="muted">clean</div>{% endif %}{% endif %}</div>
+    </div>
+    <div class="card pad">
+      <div class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?" disabled>Close</button></div>
+      <div class="checks" id="checks"></div>
+      <div class="note">Closing is your act; the checklist only says when it is ready.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/vendor/xterm.js"></script>
+<script src="/static/vendor/addon-fit.js"></script>
+<script>AO.focus({{ s | tojson }});</script>
+{% endblock %}

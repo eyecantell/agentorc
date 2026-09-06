@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}agentorc{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css">
+{% block head %}{% endblock %}
+</head>
+<body data-host="{{ host }}">
+<div class="topbar">
+  <a class="wordmark" href="/">agent<b>orc</b></a>
+  <div class="tabs">
+    <a class="tab{% if active == 'Herd' %} on{% endif %}" href="/">Herd</a>
+    <span class="tab off" title="phase 4">Resumable</span>
+    <span class="tab off" title="phase 4">Commands</span>
+    <span class="tab off" title="phase 4">Attention</span>
+  </div>
+  <div class="grow"></div>
+  <span class="mono dim" id="hostchip">{{ host }} <span id="hostdot">●</span></span>
+  <button class="btn ghost light" id="theme" title="dark / light">◐</button>
+  <form method="post" action="/shell" class="inline" id="shellform">
+    <input type="hidden" name="dir" value="">
+    <button class="btn light" type="button" id="shellbtn" title="a shell: host + directory, nothing else">⌘ Shell</button>
+  </form>
+  <a class="btn primary" href="/new">+ New session</a>
+</div>
+<div id="toasts"></div>
+{% block body %}{% endblock %}
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

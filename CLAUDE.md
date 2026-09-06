@@ -5,8 +5,8 @@ Guidance for Claude Code sessions working in this repository.
 ## What this repo is
 
 agentorc is a self-hosted web dashboard that orchestrates interactive AI coding-agent sessions
-(Claude Code first) and plain shells running in tmux across hosts. **Status: design settled,
-nothing built yet.** [`docs/design.md`](docs/design.md) is the source of truth: requirements,
+(Claude Code first) and plain shells running in tmux across hosts. **Status: phase 1 in
+progress** (host agent, Claude Code adapter, Herd and Focus pages). [`docs/design.md`](docs/design.md) is the source of truth: requirements,
 architecture, every control (§4.5a — a control that is not in that table does not exist), the
 phase plan (§7), invariants (§9), and the dated question log (§10, three items still open). A change in behaviour is a
 change to that document first. Mockups regenerate from `docs/mockups/gen.py`.
@@ -20,7 +20,9 @@ change to that document first. Mockups regenerate from `docs/mockups/gen.py`.
   profiles, policies, Ready to close, the board). `sessionorc` never imports `agentorc`.
 - Adapters live under `agentorc/adapters/<tool>/`; core never imports tool-specific names
   outside the adapter (design §4.3).
-- Once the package exists: `pdm run test`, `pdm run lint`. Until then there is nothing to run.
+- `pdm run test` (private tmux sockets, temp `AGENTORC_HOME`; never the user's server),
+  `pdm run lint`, `pdm run fmt`. Run the thing: `pdm run agentorc-agent serve` + `pdm run ao ui`
+  (README "Run it").
 
 ## Building against live sessions — read before phase 1
 

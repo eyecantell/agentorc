@@ -126,6 +126,12 @@ def cmd_decide(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ui(args: argparse.Namespace) -> int:
+    from agentorc.ui.app import main as ui_main
+
+    return ui_main(["--bind", args.bind, "--port", str(args.port)])
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="ao", description="agentorc — sessions in tmux, one view")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -178,6 +184,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("mode", choices=["unattended", "interactive"])
     p.set_defaults(fn=cmd_mode)
+
+    p = sub.add_parser("ui", help="serve the web UI (localhost by default; design §4.5 security)")
+    p.add_argument("--bind", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8765)
+    p.set_defaults(fn=cmd_ui)
 
     for behavior in ("allow", "deny"):
         p = sub.add_parser(behavior, help=f"{behavior} the pending permission")

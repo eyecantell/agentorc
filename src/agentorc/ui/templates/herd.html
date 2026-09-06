@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Herd · agentorc{% endblock %}
+{% block body %}
+<div class="page">
+  <div class="row gap wrap">
+    <span class="h1">Herd</span>
+    <span class="muted" id="count">{{ sessions | length }} sessions</span>
+    <span id="badges">
+      {% if counts['needs-you'] %}<span class="pill s-needs"><span class="dot"></span>{{ counts['needs-you'] }} needs you</span>{% endif %}
+      {% if counts['limited'] %}<span class="pill s-limited"><span class="dot"></span>{{ counts['limited'] }} limited</span>{% endif %}
+      {% if counts['stalled?'] %}<span class="pill s-stalled"><span class="dot"></span>{{ counts['stalled?'] }} stalled</span>{% endif %}
+    </span>
+    <span class="grow"></span>
+    <input class="input" id="filter" placeholder="filter…" style="width: 200px;">
+    <label class="btn ghost"><input type="checkbox" id="showcmd"> show command runs</label>
+    <span class="seg">
+      <button class="btn on" data-sort="urgent">Urgent first</button>
+      <button class="btn" data-sort="pinned">Pinned</button>
+    </span>
+  </div>
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
+  <div class="grid" id="grid">
+    {% for s in sessions %}{% include "card.html" %}{% endfor %}
+  </div>
+  <div class="note" id="empty" {% if sessions %}hidden{% endif %}>No sessions on {{ host }}. Start one with <b>New session</b> or <b>Shell</b>.</div>
+  <div class="note"><b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed. <b>Pinned</b> keeps every card where you dragged it. A dashed pill means the state was guessed from the screen.</div>
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.herd();</script>{% endblock %}

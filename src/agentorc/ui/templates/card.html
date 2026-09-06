@@ -1,0 +1,63 @@
+{# One session card. Rendered on page load and re-rendered per delta on /events; the client swaps
+   it by id, so the DOM position (Pinned mode) survives. Controls per design §4.5a. #}
+<div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}" id="card-{{ s.id }}"
+     data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
+     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}">
+  <div class="sbar"></div>
+  <div class="sc-body">
+    <div class="row">
+      <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>
+      <button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
+              title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>
+      <span class="grow"></span>
+      <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
+            title="{{ 'guessed from the screen' if s.scraped else 'reported by the tool' }}"><span class="dot"></span>{{ s.state_label }}</span>
+    </div>
+    <div class="row"><span class="meta strong">{{ s.place }}</span><span class="grow"></span><span class="meta age" data-since="{{ s.since }}">{{ s.age }}</span></div>
+    <div class="row"><span class="meta strong">{{ s.where }}</span><span class="grow"></span>{% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}</div>
+    <div class="meta">{{ s.profile_line }}</div>
+  </div>
+  <div class="sc-slot">
+    {% if s.state == 'needs-you' and s.pending and s.pending.kind == 'permission' %}
+      <div class="status needs">{{ s.pending.text }}</div>
+      <div class="row gap">
+        <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>
+        <button class="btn sm" data-act="deny" data-id="{{ s.id }}">Deny</button>
+        <span class="meta countdown" data-deadline="{{ s.deadline }}">via hook</span>
+      </div>
+    {% elif s.state == 'needs-you' and s.pending %}
+      <div class="status needs">{{ s.pending.kind }}: {{ s.pending.text }}</div>
+      <div class="row gap"><a class="btn sm primary" href="/focus/{{ s.id }}">Focus</a><span class="meta">answer in the terminal</span></div>
+    {% elif s.state == 'limited' and s.pending %}
+      <div class="status lim">{{ s.pending.text }}</div>
+    {% elif s.state in ('working', 'stalled?') %}
+      <div class="term tail">{% for line in s.tail[-3:] %}{{ line }}
+{% endfor %}</div>
+    {% elif s.state == 'exited' %}
+      <div class="status {{ 'bad' if s.exit_code else '' }}">exited{% if s.exit_code is not none %} · code {{ s.exit_code }}{% endif %}{% if s.ready and not (s.ready | map(attribute=1) | select('equalto', false) | list) %} · ready to close ✓{% endif %}</div>
+      <div class="row gap"><button class="btn sm" data-act="remove" data-id="{{ s.id }}">Forget</button></div>
+    {% elif s.state == 'closed' %}
+      <div class="status ok">closed by you{% if s.closed_at %} · {{ s.closed_at[:16].replace('T', ' ') }}{% endif %}</div>
+    {% elif s.state == 'idle' and s.ready and not (s.ready | map(attribute=1) | select('equalto', false) | list) %}
+      <div class="status ok">ready to close ✓</div>
+      <div class="row gap"><button class="btn sm" data-act="close" data-id="{{ s.id }}">Close session</button></div>
+    {% else %}
+      <div class="status">{% if s.tail %}last: {{ s.tail[-1] }}{% else %}at prompt{% endif %}</div>
+    {% endif %}
+  </div>
+  <div class="sc-foot">
+    <a class="btn sm primary" href="/focus/{{ s.id }}">▣ Focus</a>
+    {% if s.vscode %}<a class="btn sm ghost" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
+    <span class="grow"></span>
+    <details class="more">
+      <summary class="btn sm ghost" title="more">⋯</summary>
+      <div class="menu">
+        <button data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
+        <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">Kill</button>
+        <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?">Close</button>
+        <button data-act="shell-here" data-id="{{ s.id }}">Open shell here</button>
+        <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
+      </div>
+    </details>
+  </div>
+</div>

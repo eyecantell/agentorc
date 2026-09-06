@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import adapters, naming, paths
+from sessionorc.gitinfo import git_info
 from sessionorc.models import Pending, Session, now_iso
 from sessionorc.store import EventQueue, SessionStore
 from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
@@ -32,6 +33,7 @@ TICK_SECONDS = float(os.environ.get("AGENTORC_TICK", "2"))
 TAIL_LINES = 6
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
+GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
 
 
@@ -53,6 +55,7 @@ class HostAgent:
         self._last_pushed: dict[str, str] = {}
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
+        self._git_checked: dict[str, datetime] = {}
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -95,6 +98,30 @@ class HostAgent:
         panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
+        await self._refresh_git(snapshot_at)
+
+    async def _refresh_git(self, now: datetime) -> None:
+        due = [
+            s
+            for s in self.sessions.values()
+            if s.dir
+            and s.state not in ("closed",)
+            and now - self._git_checked.get(s.id, datetime.min.replace(tzinfo=UTC)) > GIT_EVERY
+        ]
+        if not due:
+            return
+        results = await asyncio.gather(*(asyncio.to_thread(git_info, s.dir) for s in due), return_exceptions=True)
+        infos = {s.id: (r if not isinstance(r, BaseException) else None) for s, r in zip(due, results, strict=True)}
+        for s in due:
+            self._git_checked[s.id] = now
+            live = self.sessions.get(s.id)
+            if live is None:
+                continue
+            info = infos.get(s.id)
+            new = info.to_dict() if info else None
+            if new != live.git:
+                live.git = new
+                self.store.save(live)
 
     def _reconcile(self, panes: dict[str, PaneInfo], tails: dict[str, list[str]], snapshot_at: datetime) -> None:
         for sid, event in self.events.drain():
@@ -155,8 +182,17 @@ class HostAgent:
         state = event.get("state")
         if state:
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else None
-            s.set_state(state, confidence="hook", pending=pending)
+            if state == "needs-you" and self._permission_waiting(sid):
+                # Claude Code draws its own dialog a few seconds into a PermissionRequest hook
+                # and fires a permission_prompt Notification for it; the hook is still blocking
+                # and its answer still wins (verified 2026-09-06). Keep Allow / Deny up.
+                pass
+            else:
+                s.set_state(state, confidence="hook", pending=pending)
         self.store.save(s)
+
+    def _permission_waiting(self, sid: str) -> bool:
+        return any(k[0] == sid and not f.done() for k, f in self._waiters.items())
 
     def _forget(self, sid: str) -> None:
         self.sessions.pop(sid, None)

@@ -186,10 +186,13 @@ that stops answering sorts right after `stalled?` (red). No new colour.
 
 **Permissions are answered through the hook, not through keystrokes.** Claude Code's
 `PermissionRequest` hook may return the decision itself. The adapter's hook script asks the host
-agent and blocks; the UI's **Allow** / **Deny** (card, phone) answer the agent, and the dialog
-never appears in the terminal. If nobody answers before the hook timeout the request falls
-through to the normal terminal dialog and the card's buttons collapse to **Focus**, because the
-decision now lives in the terminal. The timeout is per profile (`permission_wait` in
+agent and blocks; the UI's **Allow** / **Deny** (card, phone) answer the agent. *Measured
+2026-09-06 (Claude Code 2.1.263):* the terminal dialog is **not** held back — it appears a few
+seconds into the hook's wait, with a `permission_prompt` notification — but the hook's answer
+still resolves it while the hook is blocking, so both channels work at once and the agent keeps
+the buttons up (it ignores that notification while its waiter is live). If nobody answers before
+the hook timeout the terminal dialog is the only channel left and the card's buttons collapse to
+**Focus**, because the decision now lives in the terminal. The timeout is per profile (`permission_wait` in
 `profiles.yml`), default 10 minutes for interactive sessions — long enough to reach a phone.
 Unattended workers pre-authorise their tool set in the repo's tool settings (the allowlist tdgrind
 already ships) so they rarely reach the hook at all; when one does, the `needs-you` state with its
@@ -204,7 +207,8 @@ tdgrind already polls; the pane's limit message is the scraped fallback.
 
 `ready_when` (the **Ready to close** checklist) is evaluated by the host agent when a session
 goes `idle` or `exited`:
-`git status --porcelain` empty, branch pushed, `gh pr view --json state` merged (when the branch
+`git status --porcelain` empty, branch pushed (a branch with no upstream is *not* pushed — that is
+exactly the stranded work the check exists for), `gh pr view --json state` merged (when the branch
 has a PR), no live subagents (Claude Code: `SubagentStop` balances `SubagentStart`; other
 adapters: nothing running under the pane), and the ledger/attention board touched since the
 session started (dev-cadence repos). Each item is a named check in `.agentorc.yml` so other

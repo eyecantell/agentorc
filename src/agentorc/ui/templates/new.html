@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}New session · agentorc{% endblock %}
+{% block body %}
+<div class="page narrow">
+  <div class="h1">New session</div>
+  <form method="post" action="/new" class="col gap">
+    <div class="grid2">
+      <div class="field"><label>Host</label><span class="input">{{ host }}</span></div>
+      <div class="field"><label>Directory</label>
+        <input class="input mono" name="dir" list="recent" value="{{ prefill.dir }}" placeholder="/path/to/repo or worktree" required>
+        <datalist id="recent">{% for r in recent %}<option value="{{ r }}">{% endfor %}</datalist>
+        <span class="note">a repo checkout, a worktree, or any directory (recent ones offered)</span>
+      </div>
+      <div class="field"><label>Adapter</label>
+        <select class="input" name="adapter">{% for a in adapters %}<option value="{{ a }}"{% if a == prefill.adapter %} selected{% endif %}>{{ a }}</option>{% endfor %}</select>
+        <span class="note">claude-code: state from hooks · shell: guessed from the screen</span>
+      </div>
+      <div class="field"><label>Name</label><input class="input mono" name="name" placeholder="td-302" required></div>
+      <div class="field"><label>Profile</label>
+        <select class="input" name="profile">{% for k, p in profiles.items() %}<option value="{{ k }}"{% if k == default_profile %} selected{% endif %}>{{ p.label }}</option>{% endfor %}</select>
+        <span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span>
+      </div>
+      <div class="field"><label>Resume (optional)</label><input class="input mono" name="resume" value="{{ prefill.resume }}" placeholder="the tool's session id"></div>
+    </div>
+    <div class="field"><label>Opening prompt (optional)</label><textarea class="input tall" name="prompt" placeholder="Paste the brief, or leave empty to start at the prompt."></textarea></div>
+    <label class="radio gap"><input type="checkbox" name="unattended"><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: policies apply (phase 3).</div></div></label>
+    <div class="warn">⚠ One agent session per directory. A second agent session in a directory that already has one is refused, not warned about. Shells are exempt.</div>
+    <div class="row gap end"><a class="btn" href="/">Cancel</a><button class="btn primary" type="submit">Start session</button></div>
+  </form>
+</div>
+{% endblock %}

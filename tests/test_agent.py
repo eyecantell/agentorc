@@ -100,6 +100,16 @@ async def test_permission_roundtrip(agent, tmp_path):
         assert st["pending"]["kind"] == "permission" and st["pending"]["deadline"]
         with pytest.raises(AgentError, match="pending permission"):
             await c.call("send", id=sid, text="hi")
+        # the terminal's own dialog notification must not displace the hook-channel buttons
+        async with LocalClient() as h:
+            await h.call(
+                "hook",
+                session=sid,
+                state="needs-you",
+                pending={"kind": "question", "text": "Claude needs your permission"},
+            )
+        st = await c.call("get", id=sid)
+        assert st["pending"]["kind"] == "permission" and st["pending"]["tool_use_id"] == "tu1"
         await c.call("decide", id=sid, tool_use_id="tu1", behavior="allow", reason="ok")
         assert await task == {"behavior": "allow", "reason": "ok"}
         assert (await c.call("get", id=sid))["state"] == "working"
