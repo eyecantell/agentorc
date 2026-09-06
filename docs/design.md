@@ -408,31 +408,6 @@ Browser mechanics (2026-09-06 review):
   separate and never edited by hand. `vscode_host` in `hosts.yml` overrides the alias if the
   two differ. Mockups (2026-09-04): https://claude.ai/code/artifact/0e14af3a-5e5a-4d9c-88b2-74205c394c04
 
-### 4.5b Reachability, and the shape of a hosted service
-
-Why this is not "install Tailscale": for one person the private network is fine, but the
-question that decides the long-term shape is *how would someone who has never opened a port
-use this?* The answer is the one Tailscale and `cloudflared` themselves use — **the host agent
-dials out; nothing on the host listens.** Three transports, one agent:
-
-| transport | who runs the UI | how the agent is reached | who it is for |
-|---|---|---|---|
-| `local` | you, on the same host | Unix socket | phase 1, one machine |
-| `ssh` | you, on a host you choose | `ssh host agentorc-agent rpc` (§4.6) | phases 2+, several hosts you own |
-| `relay` | a service (yours or a hosted one) | the agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
-
-The `relay` transport is the hosted service: `pipx install agentorc && agentorc join <token>`
-on a laptop or a server, log in on a web page, done — no port forward, no VPN client, no ssh
-keys. It keeps every invariant in §9: the agent is still the only writer, sessions still live
-on the host, the relay sees only what the UI sees today. What changes is where the UI process
-runs and who is trusted to run it, which is a product decision, not an architecture one.
-
-Consequences for what gets built now: the agent's RPC stays a plain JSON-lines stream over any
-byte pipe (already true — `agentorc-agent rpc` is a stdio bridge), the terminal bridge attaches
-through the same pipe rather than a separate port, and nothing in the UI assumes it can reach
-a host by address. `relay` itself is not scheduled; it is a phase after 5, and the first
-hosted version can be a single small VPS running the relay and the UI for a handful of people.
-
 ### 4.5a Controls
 
 Every button in the mockups, what it does, and who executes it (UI → host agent RPC unless
@@ -478,6 +453,31 @@ noted). If a control is not in this table it does not exist.
 | Resumable | **search transcripts…**, Recent / Closed / With board items, date range | filters over the transcript index — *phase 4 polish; phases 1–3 ship the plain list* |
 | Commands | host / repo filters | client-side filters — *phase 4* |
 | Attention | repo filter, overdue · today · this week · undated | client-side filters — *phase 4* |
+
+### 4.5b Reachability, and the shape of a hosted service
+
+Why this is not "install Tailscale": for one person the private network is fine, but the
+question that decides the long-term shape is *how would someone who has never opened a port
+use this?* The answer is the one Tailscale and `cloudflared` themselves use — **the host agent
+dials out; nothing on the host listens.** Three transports, one agent:
+
+| transport | who runs the UI | how the agent is reached | who it is for |
+|---|---|---|---|
+| `local` | you, on the same host | Unix socket | phase 1, one machine |
+| `ssh` | you, on a host you choose | `ssh host agentorc-agent rpc` (§4.6) | phases 2+, several hosts you own |
+| `relay` | a service (yours or a hosted one) | the agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
+
+The `relay` transport is the hosted service: `pipx install agentorc && agentorc join <token>`
+on a laptop or a server, log in on a web page, done — no port forward, no VPN client, no ssh
+keys. It keeps every invariant in §9: the agent is still the only writer, sessions still live
+on the host, the relay sees only what the UI sees today. What changes is where the UI process
+runs and who is trusted to run it, which is a product decision, not an architecture one.
+
+Consequences for what gets built now: the agent's RPC stays a plain JSON-lines stream over any
+byte pipe (already true — `agentorc-agent rpc` is a stdio bridge), the terminal bridge attaches
+through the same pipe rather than a separate port, and nothing in the UI assumes it can reach
+a host by address. `relay` itself is not scheduled; it is a phase after 5, and the first
+hosted version can be a single small VPS running the relay and the UI for a handful of people.
 
 ### 4.6 Transport and terminal mechanics (2026-09-05 review)
 
