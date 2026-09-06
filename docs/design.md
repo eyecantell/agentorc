@@ -70,7 +70,8 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
     just what decides where state comes from.
 
 Non-goals (for now): multi-user access control, a kanban/task-board model of work (see §11 prior
-art), replacing Claude Code's own `/resume`, mobile-first UI.
+art), replacing Claude Code's own `/resume`, mobile-first UI, a hosted (SaaS) UI — the UI is a
+package you install on a server of your choosing (§10).
 
 ## 3. Prior art (surveyed 2026-09-04)
 
@@ -87,7 +88,7 @@ No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap su
 ## 4. Architecture
 
 ```
-laptop browser ──https──▶ agentorc UI (one process, on kmaster; holds a pty per open
+laptop browser ──https──▶ agentorc UI (one process on any host with `agentorc[ui]`; a pty per open
                               │  terminal: `ssh -tt host tmux attach` ↔ xterm.js websocket)
                               │  ssh transport (no public ports on hosts beyond ssh)
               ┌───────────────┼───────────────┐
@@ -308,7 +309,8 @@ Screens:
    existing worktree (only `exited`/`closed` ones are offered; an in-use one is greyed with
    "in use — resume from the Herd"; main refused if it already has a session) → fresh or
    resume → optional brief file → **Unattended** switch (off by default; disabled with "no `unattended:` block in
-   `.agentorc.yml`" for repos without one; hidden for directory sessions).
+   `.agentorc.yml`" for repos without one; hidden for directory sessions). The same mode can be
+   flipped later from the card or Focus header (§4.5a).
 4. **Resumable**: inactive sessions from each adapter's transcript locator (Claude:
    `list_sessions.py`-style index over `~/.claude/projects`), grouped by host/repo, name first
    and adapter id under it, with Resume (prefills New session) or Switch to (a running one), and
@@ -353,6 +355,7 @@ noted). If a control is not in this table it does not exist.
 | card | **Focus** | opens the Focus screen |
 | card | **VS Code** | `vscode://` link for the session's directory on its host (browser-handled) |
 | card | **more ▾** | Wrap up · Kill (confirms) · Close (as above) · Open shell here · Copy tmux command |
+| card / Focus header | **unattended / interactive** badge | a toggle: click flips the session's mode in its record (agent RPC); policies pick the change up on their next tick. Cards show the badge only when unattended; Focus always shows it. Flipping to interactive is how a person takes over a worker; flipping to unattended hands a session to the run window and usage gate, and needs the repo's `unattended:` block |
 | Due strip / Attention | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
 | Due strip / Attention | **Done** | agent checks the item off and commits |
 | Due strip / Attention | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
@@ -417,8 +420,12 @@ unattended mode. A directory session (no repo) reduces to `ready_when: [no_subag
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
-Each runs on the host agent's tick, per repo, only for sessions tagged `unattended`
-(interactive sessions are exempt from gates):
+Each runs on the host agent's tick, per repo, only for sessions whose record says
+`unattended: true` (set at start by the New session switch, or flipped later by the badge
+toggle on the card or Focus header; interactive sessions are exempt from gates). Mode is a
+field on the session record, never re-derived from the brief or the name, and a flip takes
+effect on the next tick without restarting the session. The brief file is required only when
+a *policy* starts a worker; a session flipped to unattended keeps whatever it was doing.
 
 - **Run window**: start missing workers inside the window; wrap-up-then-kill outside.
 - **Usage gate** (per profile): pause unattended sessions on a profile above its 5-hour /
@@ -482,11 +489,13 @@ Each runs on the host agent's tick, per repo, only for sessions tagged `unattend
 
 ## 10. Open questions
 
-- [x] Where does the UI process run → **kmaster** (2026-09-05). There is no VPS yet (only
-      kworker1/2 in ssh config), kmaster already lingers and holds every session, and the UI is
-      a plain package that can move later without a design change. Tailscale goes on kmaster
-      first (phase 1 prerequisite), the phone joins the tailnet, and the VPS is added as a
-      session host in phase 2 — not as the UI host.
+- [x] Where does the UI process run → **wherever `agentorc[ui]` is installed; nothing in the
+      design assumes a particular host** (2026-09-05). The UI host is configured, not fixed:
+      `hosts.yml` lives on it, and it may or may not also be a session host. For Paul it is
+      kmaster (no VPS exists yet; kmaster already lingers and holds every session); another
+      person points it at whatever server they have. Tailscale on that host is the phase 1
+      prerequisite; the VPS is added as a session host in phase 2. Offering the UI as a hosted
+      service is a possible later step, out of scope for every phase listed here.
 - [x] Password vs Tailscale-only for the UI in phase 1 → Tailscale only (2026-09-04).
 - [x] Herd view: table vs card grid → card grid (2026-09-04), with urgent-first/pinned sort modes
       (the sort was called "attention" until it collided with the Attention tab).

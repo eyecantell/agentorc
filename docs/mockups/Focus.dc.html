@@ -29,6 +29,10 @@
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
   .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
+  .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
+  .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; vertical-align: 0; }
+  .badge.toggle.on { color: #fff; background: #1c2128; border-color: #1c2128; }
+  .badge.toggle.on::before { background: #fff; border-color: #fff; }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 12px; font-weight: 500; white-space: nowrap; }
   .btn.primary { background: #1c2128; color: #fff; border-color: #1c2128; }
   .btn.danger { color: #991b1b; border-color: #e5b4b4; }
@@ -97,7 +101,7 @@
     <div style="display: flex; align-items: center; gap: 10px;">
       <a href="#" class="muted">← Herd</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
-      <span class="pill s-needs"><span class="dot"></span>needs you</span><span class="badge">unattended</span>
+      <span class="pill s-needs"><span class="dot"></span>needs you</span><span class="badge toggle on" title="click: switch to interactive">unattended</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
       <span style="flex-grow: 1;"></span>
       <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="btn">Wrap up</span><span class="btn danger"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"></path></svg>Kill</span>

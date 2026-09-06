@@ -27,6 +27,10 @@ CSS = """
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
   .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
+  .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
+  .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; vertical-align: 0; }
+  .badge.toggle.on { color: #fff; background: #1c2128; border-color: #1c2128; }
+  .badge.toggle.on::before { background: #fff; border-color: #fff; }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 12px; font-weight: 500; white-space: nowrap; }
   .btn.primary { background: #1c2128; color: #fff; border-color: #1c2128; }
   .btn.danger { color: #991b1b; border-color: #e5b4b4; }
@@ -156,7 +160,7 @@ SESS = [
 def row(s):
     name, tool, state, age, where, flag, conf, pending, tag = s
     flag_html = f'<span class="flag">{ICON["warn"]}{flag}</span>' if flag else ""
-    tag_html = f'<span class="badge">{tag}</span>' if tag else ""
+    tag_html = f'<span class="badge toggle on" title="click: switch to interactive">{tag}</span>' if tag else ""
     pend = f'<span class="mono" style="font-size: 12px;">{pending}</span>' if pending else '<span class="muted">—</span>'
     return f'''<tr class="{"needs" if state == "needs" else ""}">
   <td><div style="display: flex; align-items: center; gap: 8px;"><a href="#" class="mono" style="font-weight: 500;">{name}</a>{tag_html}</div></td>
@@ -193,7 +197,7 @@ def due_strip(compact=False):
 def herd_desktop():
     def card(host, repo, s):
         name, tool, state, age, where, flag, conf, pending, tag = s
-        tag_html = f'<span class="badge">{tag}</span>' if tag else ""
+        tag_html = f'<span class="badge toggle on" title="click: switch to interactive">{tag}</span>' if tag else ""
         flag_html = f'<span class="flag">{ICON["warn"]}{flag}</span>' if flag else ""
         if state == "needs":
             slot = f'<div class="status" style="border-color: #f59e0b; color: #7c3d00;">{pending}</div><div style="display: flex; gap: 6px;"><span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta" style="align-self: center;">via hook · 9m 12s left</span></div>'
@@ -310,7 +314,7 @@ def focus():
     <div style="display: flex; align-items: center; gap: 10px;">
       <a href="#" class="muted">← Herd</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
-      {pill("needs")}<span class="badge">unattended</span>
+      {pill("needs")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
       <span style="flex-grow: 1;"></span>
       <span class="btn">{ICON["term"]}Open shell here</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{ICON["kill"]}Kill</span>
@@ -416,7 +420,7 @@ def legend():
   <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;">
     <div style="display: flex; gap: 10px; align-items: center;">{pill("working", scraped=True)}<span>Dashed outline: state guessed from the last screen lines (tool without hooks, plain shells). Solid: reported by the tool's hooks.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">claude-code · paul (max) · opus</span><span>Profile line: tool · account · model. Commands, policies, and usage gates key on the profile, so two accounts of one tool are tracked separately.</span></div>
-    <div style="display: flex; gap: 10px; align-items: center;"><span class="badge">unattended</span><span>Policies apply: run window, usage gate, wrap-up-then-kill, credential checks.</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;"><span class="badge toggle on">unattended</span><span class="badge toggle">interactive</span><span>Mode toggle, on every card and the Focus header: click flips the session between unattended (run window, usage gate, wrap-up-then-kill, credential checks apply from the next tick) and interactive (never paused, nudged, or killed by a policy). Cards show it only when on; Focus always.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">shell</span><span>A shell is an adapter like any other: scraped state, no profile, exempt from the one-agent-per-directory rule, as are command runs. Predefined command runs are a separate kind and live on the Commands tab.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">kmaster ● laptop ◐</span><span>Host chips in the top bar: ● reachable, ◐ volatile host currently unreachable (asleep), ○ non-volatile host unreachable (a problem).</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="flag">{ICON["warn"]}dirty · 2 unpushed</span><span>Stranded-work flag: idle or exited with uncommitted or unpushed changes.</span></div>

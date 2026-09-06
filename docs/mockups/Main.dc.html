@@ -29,6 +29,10 @@
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
   .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
+  .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
+  .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; vertical-align: 0; }
+  .badge.toggle.on { color: #fff; background: #1c2128; border-color: #1c2128; }
+  .badge.toggle.on::before { background: #fff; border-color: #fff; }
   .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 12px; font-weight: 500; white-space: nowrap; }
   .btn.primary { background: #1c2128; color: #fff; border-color: #1c2128; }
   .btn.danger { color: #991b1b; border-color: #e5b4b4; }
@@ -120,7 +124,7 @@
 </div><div class="card sc" style="border-color: #dfe3e8;">
   <div class="sbar" style="background: #7c3aed;"></div>
   <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-3</span><span class="badge">unattended</span><span style="flex-grow: 1;"></span><span class="pill s-limited"><span class="dot"></span>limited</span></div>
+    <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-3</span><span class="badge toggle on" title="click: switch to interactive">unattended</span><span style="flex-grow: 1;"></span><span class="pill s-limited"><span class="dot"></span>limited</span></div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">9m</span></div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/tdgrind-3 → td-290</span><span style="flex-grow: 1;"></span></div>
     <div class="meta">claude-code · grind (pro) · sonnet</div>
@@ -130,7 +134,7 @@
 </div><div class="card sc" style="border-color: #dfe3e8;">
   <div class="sbar" style="background: #dc2626;"></div>
   <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-2</span><span class="badge">unattended</span><span style="flex-grow: 1;"></span><span class="pill s-stalled"><span class="dot"></span>stalled?</span></div>
+    <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-2</span><span class="badge toggle on" title="click: switch to interactive">unattended</span><span style="flex-grow: 1;"></span><span class="pill s-stalled"><span class="dot"></span>stalled?</span></div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">47m</span></div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/tdgrind-2 → td-296</span><span style="flex-grow: 1;"></span><span class="flag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>3 unpushed</span></div>
     <div class="meta">claude-code · grind (pro) · sonnet</div>
@@ -140,7 +144,7 @@
 </div><div class="card sc" style="border-color: #dfe3e8;">
   <div class="sbar" style="background: #2563eb;"></div>
   <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-1</span><span class="badge">unattended</span><span style="flex-grow: 1;"></span><span class="pill s-working"><span class="dot"></span>working</span></div>
+    <div style="display: flex; align-items: center; gap: 8px;"><span class="name">tdgrind-1</span><span class="badge toggle on" title="click: switch to interactive">unattended</span><span style="flex-grow: 1;"></span><span class="pill s-working"><span class="dot"></span>working</span></div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">14s</span></div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/tdgrind-1 → td-301</span><span style="flex-grow: 1;"></span></div>
     <div class="meta">claude-code · grind (pro) · sonnet</div>
