@@ -105,6 +105,10 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
 ### 4.1 Session substrate: tmux, one session per conversation
 
 - Session name `ao-<repo-or-dir>-<name>` (prefix lets the agent enumerate its own sessions).
+  Both parts are slugified to `[a-z0-9-]` (tmux treats `:`, `.` and whitespace specially) and a
+  collision within the prefix gets a `-2`, `-3` suffix; the person's original name stays in the
+  record. The agent handles tmux's "duplicate session" error explicitly rather than trusting
+  the check.
 - Every session record carries: `name` (what the person called it), `kind`
   (`interactive` | `command`), `adapter` (`claude-code`, `shell`, …), `profile` (empty for
   `shell`), `dir`, `repo` (optional), `worktree` (optional), and `adapter_id` once known (Claude
@@ -120,8 +124,11 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   filter is on and never rank in the urgency sort.
 - Created **only** by the host agent (one writer per shared resource — see §9). The UI, the CLI,
   and the cron reconcile all call the agent.
-- tmux server runs under a user systemd unit with `loginctl enable-linger`, so a reboot restarts
-  it rather than a cron tick noticing later.
+- The **host agent** runs under a user systemd unit with `loginctl enable-linger`, so a reboot
+  restarts it rather than a cron tick noticing later. tmux is not systemd-owned (it daemonises
+  away from whatever spawns it): the agent starts the server idempotently on its own startup and
+  before every create, with `exit-empty off` so the server survives its last session closing
+  (see §4.6). Default tmux socket, so hand-started sessions and "Copy tmux command" just work.
 - `history-limit` raised at creation; `pipe-pane` streams output to
   `~/.agentorc/runs/<session>-<created>.log` continuously (replaces tdgrind's per-tick
   snapshot; a reboot loses nothing that reached the pipe).
@@ -231,8 +238,11 @@ class Adapter(Protocol):
     def credentials_ok(self, profile: Profile) -> bool | None
 ```
 
-Prompt injection is **core**, not adapter: `tmux send-keys` (`C-u`, literal text, `C-m`) from the
-composer under the Focus terminal. Menus and questions are answered *in* the terminal (keys pass
+Prompt injection is **core**, not adapter: `tmux send-keys -l <text>` then `Enter` from the
+composer under the Focus terminal — no blind `C-u`, since what is painted in the pane may not
+be a readline line. **Send is disabled** while a permission or question is pending (the pane
+owns a dialog) and, for scraped adapters, while a foreground process runs; otherwise it is
+enabled — Claude Code queues input typed while it works. Menus and questions are answered *in* the terminal (keys pass
 through); permissions go through the hook decision channel (§4.2). The core never types a menu
 choice into a pane.
 
@@ -377,7 +387,44 @@ noted). If a control is not in this table it does not exist.
 | Commands | **log**, **Focus** | the run log; the run's terminal |
 | Commands | **edit yml** | opens `.agentorc.yml` in VS Code |
 
-### 4.6 CLI
+### 4.6 Transport and terminal mechanics (2026-09-05 review)
+
+Decisions taken from a review of the `sessionorc` layer before build:
+
+- **One long-lived ssh per host, JSON lines over it.** The UI keeps `ssh host agentorc-agent
+  serve` open and speaks newline-delimited JSON requests/responses on its stdin/stdout (the
+  same protocol the CLI speaks to the Unix socket locally). No per-call ssh handshake, so a
+  Herd refresh across hosts is one round trip, and no argument ever reaches a remote shell —
+  ssh's argv-joining is never used for data. The connection is re-opened with backoff when it
+  drops. Terminal attaches (`ssh -tt host tmux attach -t <name>`) are separate ssh processes
+  and reuse the same master via `ControlMaster auto` / `ControlPersist` in a config file the
+  UI writes and passes with `-F`, so a person's own ssh config is untouched.
+- **`unreachable` is diagnosed, not assumed.** The transport distinguishes *ssh failed* (host
+  down or asleep) from *ssh ok, agent RPC failed* (agent crashed, stale socket). Both grey the
+  cards; the banner says which ("laptop unreachable" vs "agent down on host1"), and **Retry**
+  on the second case also tries `systemctl --user restart agentorc-agent` over ssh.
+- **Creation is serialised per directory** inside the host agent (one `asyncio.Lock` per
+  resolved path), which is what makes the anchor rule (§9 invariant 2) a guarantee rather than
+  a check that two clicks can race past.
+- **Attach behaviour with another client present.** tmux's default `window-size latest` means a
+  browser Focus and a VS Code `tmux attach` on the same session re-size each other's view as
+  each is used. Phase 1 accepts this and tests it (it is what a hand-typed second `tmux attach`
+  does today); `window-size manual` plus a fixed `default-size` is the fallback if the reflow
+  upsets Claude Code's TUI.
+- **Reconnect contract.** The pty lives in the UI process. If that process or the websocket
+  drops, the browser reconnects with backoff and the fresh `tmux attach` redraws the current
+  screen; nothing is replayed from the run log. `send-keys` is an agent RPC independent of any
+  attached pty, so a Send never depends on a Focus being open. The terminal shows tmux's
+  scrollback (`history-limit`) only; the run log is a download, never a terminal source.
+- **Run-log retention.** A session's log is bounded by its lifetime; retention is by age:
+  logs of `exited`/`closed` sessions are deleted after `runs_keep_days` (default 30) on the
+  agent's tick. Live logs are never truncated, so invariant 3 holds while the session exists.
+- **pty bridge implementation.** `ptyprocess` (or `pexpect`'s pty layer) for the child pty, so
+  controlling-tty, `SIGWINCH`, and teardown are handled by a maintained library; the UI adds
+  only the asyncio read loop and the websocket framing. The "about 150 lines" in §10 assumes
+  this.
+
+### 4.7 CLI
 
 Package and canonical command: `agentorc`. The package also registers `ao` as an alias
 (`ao status`, `ao new`, `ao shell`, `ao focus <name>`, `ao off --now`) because that is what gets
@@ -388,7 +435,7 @@ itself (§9 invariant 1).
 ## 5. Configuration
 
 - Hosts: `~/.agentorc/hosts.yml` on the UI host (`name`, `transport: ssh|local`, `ssh`
-  target, `volatile: true|false`, `repos_registry` path). The UI process itself may run on a
+  target, `volatile: true|false`, `repos_registry` path, `runs_keep_days`). The UI process itself may run on a
   laptop; only the session hosts need to stay awake.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
   duplicated. A repo without dev-cadence can still be listed there. Directories that are not
