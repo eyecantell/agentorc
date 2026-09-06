@@ -500,8 +500,8 @@ The later step, and the strongest one, is **automated context management for peo
 not developers**: every session's work lands as a commit, a branch, a ledger line, and a board
 item without the person knowing what a branch is; they see what changed, what is waiting on
 them, and what would otherwise have been lost. dev-cadence is that system for developers, and
-agentorc's fleet view is where its rules (anchor, ready to close, stranded work, ledger before
-idle) get exercised unattended first. Sequence: self-hosted for developers (now) → relay →
+agentorc's fleet view is where its rules (the anchor rule, stranded-work sweeps, ledger before
+idle) and agentorc's own Ready to close get exercised unattended first. Sequence: self-hosted for developers (now) → relay →
 managed host on demand → cadence-as-a-product. Nothing here changes what phase 2 builds; it
 says why the terminal must ride the agent's pipe and why the adapter contract stays neutral.
 
