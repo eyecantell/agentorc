@@ -129,6 +129,14 @@ def ready_to_close(s: dict[str, Any]) -> list[tuple[str, bool]]:
 # -- app -------------------------------------------------------------------------------------------
 
 
+def _int_param(raw: str | None, default: int, lo: int, hi: int) -> int:
+    try:
+        v = int(float(raw)) if raw not in (None, "") else default
+    except (TypeError, ValueError, OverflowError):  # "abc", "NaN", "inf" / "1e999"
+        return default
+    return max(lo, min(hi, v))
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="agentorc")
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
@@ -293,7 +301,12 @@ def create_app() -> FastAPI:
     # -- terminal --------------------------------------------------------------------------------
 
     @app.websocket("/term/{sid}")
-    async def term(ws: WebSocket, sid: str, cols: int = 120, rows: int = 32):
+    async def term(ws: WebSocket, sid: str):
+        # Size comes from the query, leniently: a bad or missing value falls back to a default
+        # instead of a 403 before accept, which a browser can only report as an opaque 1006
+        # (first-use finding 2026-09-06). The client re-sends its real size on open anyway.
+        cols = _int_param(ws.query_params.get("cols"), 120, 10, 500)
+        rows = _int_param(ws.query_params.get("rows"), 32, 2, 200)
         await ws.accept()
         try:
             await call("get", id=sid)
@@ -344,7 +357,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--bind", default="127.0.0.1", help="address to listen on (design §4.5: never the LAN)")
     ap.add_argument("--port", type=int, default=8765)
     args = ap.parse_args(argv)
-    uvicorn.run("agentorc.ui.app:app", host=args.bind, port=args.port, log_level="info", ws_ping_interval=20)
+    # lifespan="off": the app has no startup/shutdown handlers, and with lifespan on, Ctrl+C makes
+    # uvicorn log a CancelledError traceback from starlette's lifespan task (seen 2026-09-06).
+    uvicorn.run(
+        "agentorc.ui.app:app", host=args.bind, port=args.port, log_level="info", ws_ping_interval=20, lifespan="off"
+    )
     return 0
 
 
