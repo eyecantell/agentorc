@@ -8,6 +8,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,6 +28,7 @@ from sessionorc.models import STATE_RANK
 from .pty_bridge import PtySession, attach_argv, pump
 
 HERE = Path(__file__).parent
+log = logging.getLogger("uvicorn.error")  # the logger uvicorn already shows on the console
 templates = Jinja2Templates(directory=str(HERE / "templates"))
 
 WRAPUP_PROMPT = (
@@ -137,9 +139,25 @@ def _int_param(raw: str | None, default: int, lo: int, hi: int) -> int:
     return max(lo, min(hi, v))
 
 
+class _WsAttemptLog:
+    """Log every websocket upgrade the instant it arrives, before any handler runs. uvicorn logs a
+    websocket only once the app accepts or rejects it, so "no line at all" could not distinguish
+    "never reached the server" from "hung before accept" (first-use finding 2026-09-06)."""
+
+    def __init__(self, app: Any):
+        self.app = app
+
+    async def __call__(self, scope: dict, receive: Any, send: Any) -> None:
+        if scope.get("type") == "websocket":
+            client = scope.get("client") or ("?", "?")
+            log.info("websocket attempt from %s:%s for %s", client[0], client[1], scope.get("path"))
+        await self.app(scope, receive, send)
+
+
 def create_app() -> FastAPI:
     app = FastAPI(title="agentorc")
     app.mount("/static", StaticFiles(directory=str(HERE / "static")), name="static")
+    app.add_middleware(_WsAttemptLog)
 
     async def call(method: str, **params: Any) -> Any:
         try:
