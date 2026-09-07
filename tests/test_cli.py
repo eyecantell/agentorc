@@ -81,8 +81,12 @@ def test_keys_reach_the_pane(subprocess_agent, tmp_path, capsys):
 
 
 def test_allow_and_deny(subprocess_agent, tmp_path, capsys):
-    assert cli.main(["shell", "perm", "-d", str(tmp_path)]) == 0
-    sid = capsys.readouterr().out.split()[0]
+    # a hook-fed adapter (the child registers `hookstub`): a shell's scraped state would race the hook
+    assert cli.main(["new", "perm", "-a", "hookstub", "-d", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    sid = out.split()[0]
+    assert "(hookstub, " in out
+    call_sync("hook", session=sid, state="idle")
     wait_state(sid, "idle")
 
     assert cli.main(["allow", sid]) == 1

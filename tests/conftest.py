@@ -32,9 +32,9 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
+from _stubs import HookFedStub
 
 from sessionorc import paths
-from sessionorc.adapters import LaunchSpec
 from sessionorc.agent import HostAgent
 from sessionorc.tmux import Tmux
 
@@ -185,23 +185,9 @@ def subprocess_agent(tmp_path_factory):
 # -- hook-fed stub adapter ----------------------------------------------------------------------
 
 
-class HookFedStub:
-    """A hook-fed adapter that never scrapes: queued or RPC'd hook events alone set its state.
-    Register per test with `monkeypatch.setitem(adapters._REGISTRY, HookFedStub.name, HookFedStub())`
-    after `adapters.load_all()`; never wipe the registry (the built-ins live there)."""
-
-    name = "hookstub"
-    state_source = "hook"
-
-    def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
-        return LaunchSpec(argv=["bash", "--norc"])
-
-    def classify(self, pane, tail):
-        return None
-
-
 @pytest.fixture
 def hookstub(monkeypatch):
+    """Register `HookFedStub` for this test only (the registry keeps its built-ins)."""
     from sessionorc import adapters
 
     adapters.load_all()

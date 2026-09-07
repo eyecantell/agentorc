@@ -62,6 +62,9 @@ class HostAgent:
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
+        # ids removed since the last tick: a pane snapshot taken before the remove must not
+        # re-adopt the pane it still lists (the tick snapshots in a thread; remove runs between)
+        self._removed_at: dict[str, datetime] = {}
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -133,6 +136,7 @@ class HostAgent:
         for sid, event in self.events.drain():
             self._apply_event(sid, event)
         now = datetime.now(UTC)
+        self._removed_at = {k: t for k, t in self._removed_at.items() if now - t < timedelta(minutes=1)}
         for sid, s in list(self.sessions.items()):
             if s.state == "closed":
                 if s.closed_at and _parse(s.closed_at) + CLOSED_KEEP < now:
@@ -149,7 +153,7 @@ class HostAgent:
         # tmux sessions with our prefix that we have no record of (created by hand, or the
         # store was lost): adopt them minimally as shells so they appear in the Herd.
         for name, pane in panes.items():
-            if name not in self.sessions:
+            if name not in self.sessions and self._removed_at.get(name, datetime.min.replace(tzinfo=UTC)) < snapshot_at:
                 s = Session(id=name, name=name[len(naming.PREFIX) :], kind="interactive", adapter="shell", dir="")
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
@@ -360,6 +364,7 @@ class HostAgent:
         # re-adopted as a nameless shell on the next tick (first-use finding 2026-09-06).
         await asyncio.to_thread(self.tmux.kill_session, id)
         self._forget(id)
+        self._removed_at[id] = datetime.now(UTC)
         await self._push_gone(id)
 
     async def rpc_send(self, id: str, text: str) -> None:

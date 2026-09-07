@@ -15,11 +15,16 @@ import logging
 import signal
 import sys
 
+from _stubs import HookFedStub
+
+from sessionorc import adapters
 from sessionorc.agent import HostAgent
 from sessionorc.tmux import Tmux
 
 
 async def _run(socket_name: str) -> None:
+    adapters.load_all()
+    adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
     agent = HostAgent(tmux=Tmux(socket_name=socket_name))
     task = asyncio.ensure_future(agent.serve())
     loop = asyncio.get_running_loop()
