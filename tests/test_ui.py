@@ -81,9 +81,11 @@ def test_new_form_errors_are_clean(client, tmp_path):
 
 
 def test_events_stream_and_permission_buttons(client, tmp_path):
-    r = client.post("/shell", data={"dir": str(tmp_path), "name": "ev"}, follow_redirects=False)
+    # hook-fed adapter (the child registers `hookstub`): a shell's scraped state would race the hook
+    r = client.post("/new", data={"dir": str(tmp_path), "name": "ev", "adapter": "hookstub"}, follow_redirects=False)
+    assert r.status_code == 303, r.text
     sid = r.headers["location"].rsplit("/", 1)[-1]
-    wait_state(client, sid, "idle")
+    wait_state(client, sid, "working")
     with client.websocket_connect("/events") as ws:
         # a hook-side permission request flips the card; the pushed html carries Allow/Deny
         env = {**os.environ, "AGENTORC_SESSION": sid, "AGENTORC_PERMISSION_WAIT": "10"}

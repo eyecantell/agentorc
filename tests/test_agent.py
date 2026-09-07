@@ -56,9 +56,9 @@ async def test_anchor_rule_and_shell_exemption(agent, tmp_path):
         assert b["id"] == a["id"] + "-2"
 
 
-async def test_permission_roundtrip(agent, tmp_path):
+async def test_permission_roundtrip(agent, hookstub, tmp_path):
     async with LocalClient() as c:
-        s = await c.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        s = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name)
         sid = s["id"]
 
         async def hook():
@@ -87,9 +87,9 @@ async def test_permission_roundtrip(agent, tmp_path):
         assert (await c.call("get", id=sid))["state"] == "working"
 
 
-async def test_permission_timeout_falls_to_terminal(agent, tmp_path):
+async def test_permission_timeout_falls_to_terminal(agent, hookstub, tmp_path):
     async with LocalClient() as c:
-        s = await c.call("create", name="t", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        s = await c.call("create", name="t", dir=str(tmp_path), adapter=hookstub.name)
         sid = s["id"]
         res = await c.call("hook", session=sid, kind="permission", text="Edit: x", tool_use_id="tu2", wait_seconds=0.2)
         assert res is None
