@@ -22,6 +22,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-009 | `subscribe` resets the shared push cache: every new tab re-pushes everything to every tab | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
+| TD-011 | VS Code link path is not URL-escaped (spaces break the URI) | Low | Open |
 
 ---
 
@@ -164,4 +165,15 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Fix:** two halves. (a) Claude Code's own registry (`~/.claude/sessions/<pid>.json`: `status` busy/idle/shell, `name`, `cwd`, `sessionId`) can populate read-only cards for non-tmux sessions — state guessed (`scraped`), no Focus terminal, Allow/Deny only if the person launches them with agentorc's hooks layer (`claude --settings ~/.agentorc/claude-hooks/<profile>.json`, which works outside tmux too since the hook only needs `AGENTORC_SESSION` and `AGENTORC_HOME`). (b) A `ao wrap` / shell alias that starts Claude inside an `ao-*` tmux session from any terminal, so the VS Code habit produces first-class cards. Done when a session started from a VS Code terminal shows the right state within 5 s.
 
 **Related:** design §4.1 adoption, §4.3 registry cross-check, phase 1 success test.
+
+## TD-011: VS Code link path is not URL-escaped (spaces break the URI)
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (`vscode_url`)
+
+**Why:** The session directory is interpolated raw into `vscode://vscode-remote/ssh-remote+<host><path>?windowId=_blank`. A directory with a space or `?` produces a malformed URI and the link silently does nothing. Pre-existing; noted by the PR #10 review.
+
+**Fix:** percent-encode the path segments (`urllib.parse.quote(directory, safe="/")`) in both URI forms; test with a space in the path.
 
