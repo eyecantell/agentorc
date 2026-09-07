@@ -55,7 +55,8 @@ def cmd_new(args: argparse.Namespace) -> int:
         dir=args.dir or os.getcwd(),
         adapter=args.adapter,
         profile=args.profile or "",
-        repo=args.repo,
+        repo=args.repo or (args.dir or os.getcwd() if args.worktree else None),
+        worktree=args.worktree,
         unattended=args.unattended,
         resume=args.resume,
         prompt=args.prompt,
@@ -74,6 +75,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
         None,
         None,
     )
+    args.worktree = None
     args.name = args.name or "shell"
     return cmd_new(args)
 
@@ -163,6 +165,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-a", "--adapter", default="claude-code")
     p.add_argument("-p", "--profile", help="tool · account · model profile name")
     p.add_argument("--repo", help="repo root when dir is a worktree")
+    p.add_argument(
+        "-w",
+        "--worktree",
+        help="run in <repo>/.claude/worktrees/NAME on branch NAME (created if missing); dir is the repo",
+    )
     p.add_argument("--unattended", action="store_true")
     p.add_argument("--resume", help="the tool's session id to resume")
     p.add_argument("--prompt", help="opening prompt")

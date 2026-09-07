@@ -22,6 +22,13 @@
       </div>
       <div class="field"><label>Resume (optional)</label><input class="input mono" name="resume" value="{{ prefill.resume }}" placeholder="the tool's session id"></div>
     </div>
+    <div class="field"><label>Where</label>
+      <div class="col" style="gap: 6px;">
+        <label class="radio"><input type="radio" name="where" value="here" checked><div><div>This directory</div><div class="note">the checkout itself, or any directory</div></div></label>
+        <label class="radio"><input type="radio" name="where" value="worktree"><div><div>New worktree</div><div class="note">for a git repo: <code>.claude/worktrees/&lt;name&gt;</code> on branch <code>&lt;name&gt;</code>, from origin's default branch; reused if it exists</div></div>
+          <input class="input mono" name="worktree" placeholder="worktree name (default: the session name)" style="width: 280px;"></label>
+      </div>
+    </div>
     <div class="field"><label>Opening prompt (optional)</label><textarea class="input tall" name="prompt" placeholder="Paste the brief, or leave empty to start at the prompt."></textarea></div>
     <label class="radio gap"><input type="checkbox" name="unattended"><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: policies apply (phase 3).</div></div></label>
     <div class="warn">⚠ One agent session per directory. A second agent session in a directory that already has one is refused, not warned about. Shells are exempt.</div>

@@ -3,6 +3,8 @@ ahead/behind, cheap enough to refresh on a tick."""
 
 from __future__ import annotations
 
+import os
+import re
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -19,6 +21,51 @@ class GitInfo:
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+class WorktreeError(RuntimeError):
+    pass
+
+
+WORKTREES_DIR = ".claude/worktrees"  # design §5 default; Claude Code's own `--worktree` uses the same place
+
+
+def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
+    """`<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
+    (after a fetch) or from HEAD when there is no origin. Reused when it already exists. Runs the
+    repo's own `scripts/hydrate_worktree.sh` when present (dev-cadence repos), so the worktree
+    gets the untracked pieces git leaves out."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
+        raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
+    root = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
+    if root.returncode != 0:
+        raise WorktreeError(f"{repo} is not a git repository")
+    repo = Path(root.stdout.strip())
+    path = repo / WORKTREES_DIR / name
+    if path.is_dir():
+        if subprocess.run(["git", "-C", str(path), "rev-parse", "--git-dir"], capture_output=True).returncode != 0:
+            raise WorktreeError(f"{path} exists but is not a worktree")
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "-C", str(repo), "fetch", "-q", "origin"], capture_output=True, timeout=timeout)
+    base = "origin/HEAD"
+    if (
+        subprocess.run(["git", "-C", str(repo), "rev-parse", "--verify", "-q", base], capture_output=True).returncode
+        != 0
+    ):
+        base = "HEAD"
+    has_branch = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--verify", "-q", f"refs/heads/{name}"], capture_output=True
+    )
+    args = ["git", "-C", str(repo), "worktree", "add", "-q"]
+    args += [str(path), name] if has_branch.returncode == 0 else ["-b", name, str(path), base]
+    cp = subprocess.run(args, capture_output=True, text=True, timeout=timeout)
+    if cp.returncode != 0:
+        raise WorktreeError(f"git worktree add failed: {cp.stderr.strip() or cp.stdout.strip()}")
+    hydrate = repo / "scripts" / "hydrate_worktree.sh"
+    if hydrate.is_file() and os.access(hydrate, os.X_OK):
+        subprocess.run([str(hydrate), str(path)], capture_output=True, timeout=timeout)
+    return path
 
 
 def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:

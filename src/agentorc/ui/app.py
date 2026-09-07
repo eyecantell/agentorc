@@ -21,7 +21,7 @@ from fastapi.templating import Jinja2Templates
 
 from agentorc import hosts
 from agentorc import profiles as profiles_mod
-from sessionorc import paths
+from sessionorc import naming, paths
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.models import STATE_RANK
 
@@ -228,7 +228,12 @@ def create_app() -> FastAPI:
         prompt: str = Form(""),
         resume: str = Form(""),
         unattended: str = Form(""),
+        where: str = Form("here"),
+        worktree: str = Form(""),
     ):
+        wt = None
+        if where == "worktree":
+            wt = worktree.strip() or naming.slug(name.strip() or "session")
         s = await call(
             "create",
             name=name.strip() or "session",
@@ -238,6 +243,8 @@ def create_app() -> FastAPI:
             prompt=prompt.strip() or None,
             resume=resume.strip() or None,
             unattended=unattended == "on",
+            worktree=wt,
+            repo=dir.strip() if wt else None,
         )
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 

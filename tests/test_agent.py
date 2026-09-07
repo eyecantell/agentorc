@@ -135,3 +135,27 @@ async def test_subscribe_streams_changes(agent, tmp_path):
             if ev.get("event") == "session" and ev["session"]["id"] == s["id"] and ev["session"]["state"] == "idle":
                 break
         assert seen
+
+
+async def test_create_in_new_worktree(agent, tmp_path):
+    import subprocess
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for cmd in (
+        ["git", "init", "-q", "-b", "main"],
+        ["git", "config", "user.email", "t@t"],
+        ["git", "config", "user.name", "t"],
+    ):
+        subprocess.run(cmd, cwd=repo, check=True)
+    (repo / "README").write_text("x")
+    subprocess.run(["git", "add", "README"], cwd=repo, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=repo, check=True)
+    async with LocalClient() as c:
+        s = await c.call(
+            "create", name="td 9", dir=str(repo), adapter="shell", argv=["bash", "--norc"], worktree="td-9"
+        )
+        assert s["dir"] == str(repo / ".claude" / "worktrees" / "td-9") and s["repo"] == str(repo)
+        assert (repo / ".claude" / "worktrees" / "td-9" / "README").is_file()
+        with pytest.raises(AgentError, match="letters, digits"):
+            await c.call("create", name="bad", dir=str(repo), adapter="shell", worktree="a b")

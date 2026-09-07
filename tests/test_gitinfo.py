@@ -47,3 +47,30 @@ def test_git_info_ahead_of_upstream(tmp_path):
     info = git_info(repo)
     assert info and info.upstream == "origin/main" and info.ahead == 1 and info.behind == 0 and info.dirty == 0
     assert git_info(tmp_path / "not-a-repo") is None or True  # a non-repo returns None or a parent's info
+
+
+def test_ensure_worktree_creates_reuses_and_validates(tmp_path):
+    from sessionorc.gitinfo import WorktreeError, ensure_worktree
+
+    origin = tmp_path / "origin.git"
+    run("git", "init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    repo = tmp_path / "r"
+    run("git", "clone", "-q", str(origin), str(repo), cwd=tmp_path)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    run("git", "checkout", "-q", "-b", "main", cwd=repo)
+    (repo / "f").write_text("1")
+    run("git", "add", "f", cwd=repo)
+    run("git", "commit", "-q", "-m", "one", cwd=repo)
+    run("git", "push", "-q", "-u", "origin", "main", cwd=repo)
+    wt = ensure_worktree(repo, "topic-1")
+    assert wt == repo / ".claude" / "worktrees" / "topic-1" and (wt / "f").is_file()
+    branch = subprocess.run(["git", "-C", str(wt), "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
+    assert branch.stdout.strip() == "topic-1"
+    assert ensure_worktree(repo, "topic-1") == wt  # idempotent
+    import pytest
+
+    with pytest.raises(WorktreeError, match="letters, digits"):
+        ensure_worktree(repo, "../evil")
+    with pytest.raises(WorktreeError, match="not a git repository"):
+        ensure_worktree(tmp_path / "plain", "x")
