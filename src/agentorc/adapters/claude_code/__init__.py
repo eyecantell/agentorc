@@ -22,7 +22,7 @@ from pathlib import Path
 from agentorc import profiles as profiles_mod
 from agentorc.profiles import Profile
 from sessionorc import paths
-from sessionorc.adapters import LaunchSpec
+from sessionorc.adapters import ExternalSession, LaunchSpec
 from sessionorc.models import Confidence, State
 from sessionorc.tmux import PaneInfo
 
@@ -183,6 +183,31 @@ class ClaudeCodeAdapter:
                 continue
         return out
 
+    def external_sessions(self) -> list[ExternalSession]:
+        """Live Claude Code sessions on this host from its registry, whatever started them.
+        Entries whose pid is gone, or is now a different process, are dropped: the registry keeps
+        `procStart` in the same clock ticks as /proc/<pid>/stat field 22, so equality means the same
+        process (the primary test of dev-cadence's anchor guard; its extra fallbacks for entries
+        that predate the field are not reproduced here — those rely on /proc existence, which is
+        only meaningful within one pid namespace). Phase 1 reads the default profile's config dir
+        only; a second profile's `CLAUDE_CONFIG_DIR` is invisible to the anchor rule (TD-013)."""
+        out: list[ExternalSession] = []
+        for e in self.registry_entries():
+            pid, start = e.get("pid"), e.get("procStart")
+            if not isinstance(pid, int) or not _pid_alive(pid, start):
+                continue
+            if e.get("cwd"):
+                out.append(
+                    ExternalSession(
+                        adapter=self.name,
+                        cwd=str(e["cwd"]),
+                        name=str(e.get("name") or e.get("sessionId") or pid),
+                        tool_id=e.get("sessionId"),
+                        status=e.get("status"),
+                    )
+                )
+        return out
+
     # -- account ---------------------------------------------------------------------------------
 
     def _creds(self, profile: Profile) -> dict | None:
@@ -224,6 +249,20 @@ class ClaudeCodeAdapter:
                 return parse_usage(json.loads(r.read().decode()))
         except Exception:  # noqa: BLE001
             return None
+
+
+def _pid_alive(pid: int, proc_start: object) -> bool:
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text(encoding="ascii", errors="replace")
+    except OSError:
+        return False
+    if proc_start in (None, ""):
+        return True  # older entry without the field: existence is all we have
+    try:
+        actual = int(stat[stat.rindex(")") + 2 :].split()[19])
+        return actual == int(proc_start)
+    except (ValueError, IndexError):
+        return True
 
 
 def parse_usage(d: dict) -> Usage | None:

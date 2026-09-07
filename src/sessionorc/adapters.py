@@ -38,6 +38,34 @@ class Adapter(Protocol):
         ...
 
 
+@dataclass
+class ExternalSession:
+    """A live session of the tool that agentorc did not start (a VS Code terminal, a plain
+    `claude` in a shell): enough to enforce the anchor rule against it (design §9 invariant 2)."""
+
+    adapter: str
+    cwd: str
+    name: str
+    tool_id: str | None
+    status: str | None
+
+
+def external_sessions() -> list[ExternalSession]:
+    """Every registered adapter's view of live sessions outside agentorc. Optional per adapter."""
+    if not _REGISTRY:
+        load_all()
+    out: list[ExternalSession] = []
+    for ad in list(_REGISTRY.values()):
+        fn = getattr(ad, "external_sessions", None)
+        if fn is None:
+            continue
+        try:
+            out.extend(fn())
+        except Exception:  # noqa: BLE001 — a broken registry never blocks a create
+            continue
+    return out
+
+
 class ShellAdapter:
     """A plain shell: `idle` at the prompt, `working` while a foreground process runs, `exited`
     when the pane is dead. Scraped by definition (design §4.1)."""

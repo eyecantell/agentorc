@@ -159,3 +159,51 @@ async def test_create_in_new_worktree(agent, tmp_path):
         assert (repo / ".claude" / "worktrees" / "td-9" / "README").is_file()
         with pytest.raises(AgentError, match="letters, digits"):
             await c.call("create", name="bad", dir=str(repo), adapter="shell", worktree="a b")
+
+
+async def test_occupancy_sees_own_and_external_sessions(agent, tmp_path, monkeypatch):
+    from sessionorc import adapters
+    from sessionorc.adapters import ExternalSession, LaunchSpec
+
+    class Ext:
+        name = "ext-tool"
+        state_source = "hook"
+
+        def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
+            return LaunchSpec(argv=["bash", "--norc"])
+
+        def classify(self, pane, tail):
+            return None
+
+        def external_sessions(self):
+            return [
+                ExternalSession(
+                    adapter="ext-tool",
+                    cwd=str(tmp_path / "vscode"),
+                    name="editor-session",
+                    tool_id="ext-1",
+                    status="busy",
+                )
+            ]
+
+    adapters.load_all()  # the registry must hold the built-ins before we add to it
+    monkeypatch.setitem(adapters._REGISTRY, "ext-tool", Ext())
+    (tmp_path / "vscode").mkdir()
+    (tmp_path / "free").mkdir()
+    async with LocalClient() as c:
+        occ = await c.call("occupancy", dir=str(tmp_path / "vscode"))
+        assert occ["occupants"] == ["editor-session (ext-tool, outside agentorc, busy)"]
+        assert (await c.call("occupancy", dir=str(tmp_path / "free")))["occupants"] == []
+        with pytest.raises(AgentError, match="outside agentorc"):
+            await c.call("create", name="x", dir=str(tmp_path / "vscode"), adapter="ext-tool")
+        # shells are exempt, and a shell in that directory does not occupy it either
+        sh = await c.call("create", name="sh", dir=str(tmp_path / "vscode"), adapter="shell", argv=["bash", "--norc"])
+        assert (await c.call("occupancy", dir=str(tmp_path / "vscode")))["occupants"] == [
+            "editor-session (ext-tool, outside agentorc, busy)"
+        ]
+        # our own live agent session occupies its directory
+        own = await c.call("create", name="own", dir=str(tmp_path / "free"), adapter="ext-tool")
+        occ = await c.call("occupancy", dir=str(tmp_path / "free"))
+        assert occ["occupants"] == [f"{own['id']} (working)"]
+        await c.call("kill", id=sh["id"])
+        await c.call("kill", id=own["id"])
