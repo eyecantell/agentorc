@@ -357,9 +357,11 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--bind", default="127.0.0.1", help="address to listen on (design §4.5: never the LAN)")
     ap.add_argument("--port", type=int, default=8765)
     args = ap.parse_args(argv)
-    # uvicorn re-raises the captured SIGINT after its clean shutdown; Ctrl+C should not print a traceback.
-    with contextlib.suppress(KeyboardInterrupt):
-        uvicorn.run("agentorc.ui.app:app", host=args.bind, port=args.port, log_level="info", ws_ping_interval=20)
+    # lifespan="off": the app has no startup/shutdown handlers, and with lifespan on, Ctrl+C makes
+    # uvicorn log a CancelledError traceback from starlette's lifespan task (seen 2026-09-06).
+    uvicorn.run(
+        "agentorc.ui.app:app", host=args.bind, port=args.port, log_level="info", ws_ping_interval=20, lifespan="off"
+    )
     return 0
 
 

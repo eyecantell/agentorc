@@ -178,7 +178,7 @@
       const cols = Number.isFinite(term.cols) && term.cols > 0 ? term.cols : 120, rows = Number.isFinite(term.rows) && term.rows > 0 ? term.rows : 32;
       ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}?cols=${cols}&rows=${rows}`);
       ws.binaryType = "arraybuffer";
-      ws.onopen = () => { delay = 500; ws.send(JSON.stringify({ resize: [term.cols, term.rows] })); };
+      ws.onopen = () => { delay = 500; ws.send(JSON.stringify({ resize: [cols, rows] })); };
       ws.onmessage = (m) => term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data));
       let opened = false;
       ws.addEventListener("open", () => { opened = true; });
