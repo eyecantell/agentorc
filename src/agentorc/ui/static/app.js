@@ -203,6 +203,10 @@
       if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c")) { copySel(); return false; }
       if (e.ctrlKey && e.shiftKey && (e.key === "V" || e.key === "v")) { pasteClip(); return false; }
       if (e.ctrlKey && !e.shiftKey && (e.key === "c" || e.key === "C") && term.hasSelection()) { copySel(); term.clearSelection(); return false; }
+      // Plain Ctrl+V pastes text too: passed through, Claude Code reads ^V as "paste an image from
+      // the clipboard", which over ssh only produces a "try scp" message (first-use finding).
+      if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "v" || e.key === "V")) { pasteClip(); return false; }
+      if (e.shiftKey && e.key === "Insert") { pasteClip(); return false; }
       return true;
     });
     $("#term").addEventListener("contextmenu", (e) => { e.preventDefault(); pasteClip(); });
@@ -231,6 +235,17 @@
         compose.disabled = true; $("#composehint").textContent = "answer in the terminal above";
       } else { compose.disabled = false; $("#composehint").textContent = ""; }
       $("#fstate").innerHTML = head;
+      // An exited session keeps its dead pane on purpose (exit code, last lines, run log); say so
+      // and offer the two useful next steps instead of leaving tmux's "Pane is dead" to explain it.
+      const ex = $("#fexited");
+      if (v.state === "exited" || v.state === "closed") {
+        const code = v.exit_code == null ? "" : ` (exit code ${v.exit_code})`;
+        const q = `dir=${encodeURIComponent(v.dir || "")}&adapter=${encodeURIComponent(v.adapter || "claude-code")}`;
+        ex.innerHTML = `This session's process has ${v.state}${esc(code)}. The pane is kept so its last screen and run log stay readable. `
+          + (v.adapter_id && v.state === "exited" ? `<a class="btn sm primary" href="/new?${q}&resume=${encodeURIComponent(v.adapter_id)}">Resume this conversation</a> ` : "")
+          + `<a class="btn sm" href="/new?${q}">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`;
+        ex.classList.remove("hidden");
+      } else ex.classList.add("hidden");
       $("#adapter_id").textContent = v.adapter_id || "—";
       $("#last_output").textContent = v.last_output ? fmtAge(v.last_output) + " ago" : "—";
       if (v.git) {
