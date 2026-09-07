@@ -35,6 +35,17 @@
   }
   AO.act = act;
 
+  // vscode:// links: hand the URL to the protocol handler without navigating this tab away
+  // (a plain click replaced the Herd with a blank page when the handler declined — first-use finding).
+  document.addEventListener("click", (ev) => {
+    const a = ev.target.closest('a[href^="vscode://"]');
+    if (!a) return;
+    ev.preventDefault();
+    const f = document.createElement("iframe"); f.style.display = "none"; f.src = a.href;
+    document.body.appendChild(f); setTimeout(() => f.remove(), 3000);
+    AO.toast("opening in VS Code…", true);
+  });
+
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy], [data-sort]");
     if (!b) return;
@@ -172,6 +183,21 @@
     }
     openTerm();
     term.onData((d) => ws && ws.readyState === 1 && ws.send(d));
+    // Copy / paste: Ctrl+C with a selection copies (no ^C), Ctrl+Shift+C copies, Ctrl+Shift+V and
+    // right-click paste; the header buttons do the same for discoverability. Clipboard access
+    // needs a secure context (https or localhost) — ssh -L to 127.0.0.1 qualifies.
+    const copySel = () => { const t = term.getSelection(); if (t) navigator.clipboard.writeText(t).then(() => AO.toast("copied", true), () => AO.toast("clipboard blocked (needs https or localhost)")); return !!t; };
+    const pasteClip = () => navigator.clipboard.readText().then((t) => { if (t && ws && ws.readyState === 1) term.paste(t); }, () => AO.toast("clipboard blocked (needs https or localhost)"));
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== "keydown") return true;
+      if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c")) { copySel(); return false; }
+      if (e.ctrlKey && e.shiftKey && (e.key === "V" || e.key === "v")) { pasteClip(); return false; }
+      if (e.ctrlKey && !e.shiftKey && (e.key === "c" || e.key === "C") && term.hasSelection()) { copySel(); term.clearSelection(); return false; }
+      return true;
+    });
+    $("#term").addEventListener("contextmenu", (e) => { e.preventDefault(); pasteClip(); });
+    $("#tcopy").addEventListener("click", () => { if (!copySel()) AO.toast("select text in the terminal first"); });
+    $("#tpaste").addEventListener("click", pasteClip);
     new ResizeObserver(() => { fit.fit(); ws && ws.readyState === 1 && ws.send(JSON.stringify({ resize: [term.cols, term.rows] })); }).observe($("#term"));
     term.focus();
 

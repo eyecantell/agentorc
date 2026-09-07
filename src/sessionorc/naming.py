@@ -26,7 +26,8 @@ def scope_slug(directory: str | Path, repo: str | None) -> str:
 
 def session_id(directory: str | Path, repo: str | None, name: str, existing: Iterable[str]) -> str:
     """`ao-<scope>-<name>`, with `-2`, `-3`… appended on collision with any id in `existing`."""
-    base = f"{PREFIX}{scope_slug(directory, repo)}-{slug(name)}"
+    scope, nm = scope_slug(directory, repo), slug(name)
+    base = f"{PREFIX}{scope}" if nm == scope else f"{PREFIX}{scope}-{nm}"  # ao-ao-test-ao-test → ao-ao-test
     taken = set(existing)
     if base not in taken:
         return base

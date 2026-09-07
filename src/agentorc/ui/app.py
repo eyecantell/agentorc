@@ -9,7 +9,6 @@ import asyncio
 import contextlib
 import json
 import os
-import socket
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -19,6 +18,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from agentorc import hosts
 from agentorc import profiles as profiles_mod
 from sessionorc import paths
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
@@ -37,14 +37,16 @@ WRAPUP_PROMPT = (
 
 
 def host_name() -> str:
-    return os.environ.get("AGENTORC_HOST_NAME") or socket.gethostname().split(".")[0]
+    return hosts.local_host().name
 
 
 def vscode_url(directory: str) -> str:
-    """`vscode://vscode-remote/ssh-remote+<host><path>` unless this host is marked local."""
-    if os.environ.get("AGENTORC_LOCAL_HOST") == "1":
+    """`vscode://vscode-remote/ssh-remote+<alias><path>` — the alias must be in the person's own
+    ~/.ssh/config (design §4.5) — or `vscode://file/…` when the UI runs where the person sits."""
+    h = hosts.local_host()
+    if h.local:
         return f"vscode://file{directory}"
-    return f"vscode://vscode-remote/ssh-remote+{os.environ.get('AGENTORC_VSCODE_HOST') or host_name()}{directory}"
+    return f"vscode://vscode-remote/ssh-remote+{h.vscode_host}{directory}"
 
 
 # -- view model ------------------------------------------------------------------------------------

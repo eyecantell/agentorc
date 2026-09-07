@@ -15,7 +15,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-001 | `limited` state: wire adapter `usage()` into the agent tick | Medium | Open |
 | TD-002 | Focus composer: Attach / drop / paste upload | Medium | Open |
 | TD-003 | Phone layout: narrow Focus with a soft-key row | Medium | Open |
-| TD-004 | Host identity: `hosts.yml`, host name and VS Code alias are env vars for now | Medium | Open |
+| TD-004 | Host identity: `hosts.yml` (local entry only so far), ssh transport and volatile hosts pending | Medium | Partly done |
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-007 | test_ui mutates `os.environ` for a module-scoped agent | Low | Open |
@@ -84,8 +84,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 
 **Priority:** Medium
 **Added:** 2026-09-06
-**Status:** Open
-**Location:** `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`)
+**Status:** Partly done — `~/.agentorc/hosts.yml` with a `local` entry (name, vscode_host, local) landed 2026-09-06 in `agentorc.hosts` after the first real session hit the unresolvable hostname; env vars remain as overrides. Remaining: the ssh transport entries, `volatile`, `repos_registry`, `runs_keep_days`, and dropping the env vars.
+**Location:** `src/agentorc/hosts.py`, `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`)
 
 **Why:** Phase 1 is one host, so the UI names it from `gethostname()` (on kmaster that is `kmaster-Standard-PC-i440FX-PIIX-1996`) with `AGENTORC_HOST_NAME` / `AGENTORC_VSCODE_HOST` / `AGENTORC_LOCAL_HOST` env overrides. Design §5 wants `~/.agentorc/hosts.yml` (name, transport, ssh target, volatile, `vscode_host`) on the UI host; that is the phase 2 shape and the env vars should disappear into it.
 

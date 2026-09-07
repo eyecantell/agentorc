@@ -30,9 +30,10 @@ STATE_EVENTS = {
 # SessionEnd reasons after which the process is still alive in the pane (a SessionStart follows).
 SESSION_END_STILL_RUNNING = {"clear", "resume"}
 
+# idle_prompt (Claude idle for a minute) is deliberately absent: an idle session waiting for you is
+# `idle`, the normal state, not an alert (design §4.2, first-use finding 2026-09-06).
 NOTIFICATION_KINDS = {
     "permission_prompt": "permission",  # the terminal dialog is up (our hook fell through, or was absent)
-    "idle_prompt": "prompt",
     "elicitation_dialog": "question",
     "elicitation_url_dialog": "question",
     "agent_needs_input": "question",
