@@ -239,11 +239,12 @@ class HostAgent:
             # Design §4.5 New session "new worktree": the checkout is the repo, the session runs in
             # `<repo>/.claude/worktrees/<name>` on branch <name>, created here if missing.
             repo_root = Path(repo).expanduser().resolve() if repo else directory
-            try:
-                directory = await asyncio.to_thread(ensure_worktree, repo_root, worktree)
-            except WorktreeError as e:
-                raise RpcError(str(e)) from None
-            repo = str(repo_root)
+            async with self._dir_locks[f"worktree:{repo_root}:{worktree}"]:  # two creates of one name: second reuses
+                try:
+                    directory = await asyncio.to_thread(ensure_worktree, repo_root, worktree)
+                except WorktreeError as e:
+                    raise RpcError(str(e)) from None
+            repo = str(directory.parent.parent.parent)  # <repo>/.claude/worktrees/<name> → the main checkout
         async with self._dir_locks[str(directory)]:
             if kind == "interactive" and adapter != "shell":
                 for other in list(self.sessions.values()):

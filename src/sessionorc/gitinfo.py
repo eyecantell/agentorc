@@ -37,10 +37,16 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     gets the untracked pieces git leaves out."""
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
         raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
-    root = subprocess.run(["git", "-C", str(repo), "rev-parse", "--show-toplevel"], capture_output=True, text=True)
-    if root.returncode != 0:
+    # The MAIN checkout, even when called from inside a worktree: --show-toplevel would answer
+    # with the worktree and nest the new one under it (cadence §9 path-resolution; review 2026-09-06).
+    common = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+    )
+    if common.returncode != 0:
         raise WorktreeError(f"{repo} is not a git repository")
-    repo = Path(root.stdout.strip())
+    repo = Path(common.stdout.strip()).parent
     path = repo / WORKTREES_DIR / name
     if path.is_dir():
         if subprocess.run(["git", "-C", str(path), "rev-parse", "--git-dir"], capture_output=True).returncode != 0:
@@ -64,7 +70,12 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
         raise WorktreeError(f"git worktree add failed: {cp.stderr.strip() or cp.stdout.strip()}")
     hydrate = repo / "scripts" / "hydrate_worktree.sh"
     if hydrate.is_file() and os.access(hydrate, os.X_OK):
-        subprocess.run([str(hydrate), str(path)], capture_output=True, timeout=timeout)
+        hp = subprocess.run([str(hydrate), str(path)], capture_output=True, text=True, timeout=timeout)
+        if hp.returncode != 0:
+            # The worktree exists and is usable; say what hydration left out rather than hide it.
+            raise WorktreeError(
+                f"worktree created at {path}, but hydrate_worktree.sh failed: {(hp.stderr or hp.stdout).strip()[-400:]}"
+            )
     return path
 
 

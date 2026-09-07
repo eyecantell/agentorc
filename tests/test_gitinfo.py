@@ -74,3 +74,26 @@ def test_ensure_worktree_creates_reuses_and_validates(tmp_path):
         ensure_worktree(repo, "../evil")
     with pytest.raises(WorktreeError, match="not a git repository"):
         ensure_worktree(tmp_path / "plain", "x")
+
+
+def test_ensure_worktree_from_inside_a_worktree_and_without_origin(tmp_path):
+    from sessionorc.gitinfo import ensure_worktree
+
+    repo = tmp_path / "solo"  # no origin: base is HEAD
+    repo.mkdir()
+    run("git", "init", "-q", "-b", "main", cwd=repo)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    (repo / "f").write_text("1")
+    run("git", "add", "f", cwd=repo)
+    run("git", "commit", "-q", "-m", "one", cwd=repo)
+    wt1 = ensure_worktree(repo, "wt1")
+    assert wt1 == repo / ".claude" / "worktrees" / "wt1"
+    # called with the worktree as the "repo": lands beside wt1 under the main checkout, not nested
+    wt2 = ensure_worktree(wt1, "wt2")
+    assert wt2 == repo / ".claude" / "worktrees" / "wt2"
+    # an existing local branch with no worktree yet is checked out, not recreated
+    run("git", "branch", "pre-made", cwd=repo)
+    wt3 = ensure_worktree(repo, "pre-made")
+    head = subprocess.run(["git", "-C", str(wt3), "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
+    assert head.stdout.strip() == "pre-made"
