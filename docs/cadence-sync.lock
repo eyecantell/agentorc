@@ -1,13 +1,13 @@
 # Written by eyecantell/dev-cadence sync.sh — do not edit by hand.
 source: https://github.com/eyecantell/dev-cadence
-commit: 7a948b6
-synced: 2026-09-06T18:44:52Z
-file: docs/cadence.md 9f2b15e61c1c9364844b1304bcb53f107dfb0fefd5ea8dc2986fe506976c17f4
-file: .claude/skills/stranded-work/SKILL.md 5a54749b867502015307c2f4ed1a3decd5634545a43421298448865e972d808a
+commit: f57a7bd
+synced: 2026-09-07T00:14:23Z
+file: docs/cadence.md 7e30355df2feec8fd8d0be7416f9721210881e7ecdbdde661f1297dbe7e5d535
+file: .claude/skills/stranded-work/SKILL.md 88ff09be1891e864425e224c43251039838f4093e4f7372e586ab8a9a5d89351
 file: .claude/skills/attention/SKILL.md 8cec2e55ff9ec4717cff7a8715007b3a633605e1bf323081d590464eb0a58662
 file: scripts/check_claude_memory.sh e29c2fc87457f33992014a4c5701e1d6e3e8c0dab1164420dea2efce6997f397
 file: scripts/check_anchor.py 45ca625aa4fd72592aec258882b6dadd9fdc025a077f7df06438cd87a33261a1
-file: scripts/nudge_user_attention.py d42dd03fe16b34b99696b5ba83ebc7ea542dbdb82a52988023549e572f973afe
+file: scripts/nudge_user_attention.py 742df6242f257567064c15807efbce0767c62a58cb70d9fa0276c4154c9e1d87
 file: scripts/list_sessions.py cbd06831eccadba3695e60d3f30fed03412f9205392418931586285358f438b8
 file: scripts/generate_session_index.sh bd72f9020df4d978a168ca984ed34abbd1b4c99319cb7f0585b1cb6e1754dcda
 file: scripts/generate_workspace.sh d84c2486326e877e8d8e034c0d48dcbc5c6bc30eb5d97073aedb440184a78004

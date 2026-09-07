@@ -65,14 +65,15 @@ adapting, and what agentorc has learned that dev-cadence should have.
 - [dev-cadence #83](https://github.com/eyecantell/dev-cadence/pull/83) — cadence §4 carve-out
   for tool-made Snooze/Done edits on the user's click. Doc, marked *proposed*.
 
-Review and merge of both stay with the maintainer. Until #82 merges, the synced copy here lacks
-`--json`; the next `sync.sh` run picks it up.
+Both merged 2026-09-06 (dev-cadence `7c2b9b7`, `f57a7bd`); re-synced into this repo the same day, so
+`scripts/nudge_user_attention.py --report --json` is available here.
 
-## GitHub settings proposed, not applied
+## GitHub settings — applied 2026-09-06
 
 Cadence §4 asks for squash-only merges, automatic deletion of merged head branches, and a
-0-approval PR ruleset on public repos. As of 2026-09-06 the repo allows all three merge methods,
-does not delete merged heads, and has no rulesets. The commands, for when Paul says yes:
+0-approval PR ruleset on public repos. Applied on Paul's go-ahead: squash is the only merge
+method, merged heads are deleted, and an active ruleset `main: PR required, 0 approvals` (no
+bypass actors; also blocks deletion and force-push of main) is in place. The commands used:
 
 ```bash
 gh api -X PATCH repos/eyecantell/agentorc -f allow_squash_merge=true -f allow_merge_commit=false \
