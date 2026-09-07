@@ -56,9 +56,17 @@ under a hard aggregate budget (``ATTENTION_DUE_FETCH_BUDGET``, default 8 s)
 so a SessionStart hook can opt in without ever waiting long on the network.
 Nudge (delivery) mode is unchanged and takes at most one ``--board``.
 
+``--report --json`` prints the same rows as one JSON object instead of text
+(boards, items with their 1-based board line numbers and parsed due dates, the
+per-row notes, the sweep and sync-staleness lines) so another tool can consume
+the machine-wide view without parsing the human report; ``--due-only`` filters
+the items the same way it filters the text. Items come in board order (the text
+report sorts overdue-first) and there is no header tally — derive counts from
+``items``. The text report stays the human surface and is unchanged.
+
 Usage:
     nudge_user_attention.py [--board PATH] [--dry-run] [--force-weekly]
-    nudge_user_attention.py --report [--board PATH ...] [--fetch]
+    nudge_user_attention.py --report [--board PATH ...] [--fetch] [--due-only] [--json]
 """
 
 import argparse
@@ -95,6 +103,7 @@ MAX_ITEM_CHARS = 200
 class BoardItem:
     text: str
     due: date | None
+    line: int = 0  # 1-based line in the board file; 0 when parsed from a string with no file
 
     def overdue_days(self, today: date) -> int | None:
         """Days at-or-past due (0 = due today); None if no due date or not yet due."""
@@ -106,7 +115,7 @@ class BoardItem:
 def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
     """Extract unchecked items and their optional Due: dates from board markdown."""
     items = []
-    for line in content.splitlines():
+    for lineno, line in enumerate(content.splitlines(), start=1):
         m = ITEM_RE.match(line)
         if not m:
             continue
@@ -119,7 +128,7 @@ def parse_board(content: str, *, warn: bool = True) -> list[BoardItem]:
             except ValueError:
                 if warn:
                     logger.warning("Unparseable Due date in item, treating as undated: %s", text[:80])
-        items.append(BoardItem(text=text, due=due))
+        items.append(BoardItem(text=text, due=due, line=lineno))
     return items
 
 
@@ -690,7 +699,18 @@ def remote_tier(local_roots: list[Path], today: date) -> list[str]:
     return lines
 
 
-def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: bool = False) -> int:
+def _item_json(item: BoardItem, today: date) -> dict:
+    return {
+        "line": item.line,
+        "text": item.text,
+        "due": item.due.isoformat() if item.due else None,
+        "overdue_days": item.overdue_days(today),
+        "due_tag": due_tag(item, today),
+    }
+
+
+def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: bool = False,
+           as_json: bool = False) -> int:
     """Machine-wide attention report to stdout. Report mode never delivers:
     deliver()/send_*() are unreachable from here regardless of environment.
 
@@ -719,7 +739,11 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
             if due_only and not any(p.is_file() for p in _default_boards()):
                 # SessionStart hook path (TD-7): a repo with no board yet has
                 # nothing due — exit 0 with NO output and no ERROR log, per the
-                # hooks-never-break-a-session rule (cadence.md §1).
+                # hooks-never-break-a-session rule (cadence.md §1). The JSON
+                # twin still owes its consumer a parseable object (review
+                # finding on #82): empty, never empty stdout.
+                if as_json:
+                    print(json.dumps({"today": today.isoformat(), "due_only": True, "boards": []}))
                 return 0
             board = resolve_board(None)
             if board is None:
@@ -762,6 +786,35 @@ def report(boards_cli: list[str], fetch: bool, due_only: bool = False, remote: b
         if fr is not None and fr.content is not None:
             return fr.content
         return board.read_text(encoding="utf-8", errors="replace")
+
+    if as_json:
+        # One object, every row, no delivery — the tool-facing twin of the text
+        # report. Items come back in board order with their line numbers so a
+        # consumer can edit the board (snooze = Due: edit, done = tick) by line.
+        out_rows: list[dict] = []
+        for i, (label, board, root, note) in enumerate(rows):
+            fr = fetched.get(i)
+            row: dict = {"label": label, "board": str(board) if board else None,
+                         "root": str(root) if root else None,
+                         "source": fr.source if fr is not None and fr.source else None,
+                         "note": note, "fetch_note": fr.note if fr is not None else None,
+                         # stale: same gate as the text report — only a fetched row
+                         # pays for the best-effort ls-remote (None = current/unknown)
+                         "stale": staleness_line(board) if fr is not None else None,
+                         "sweep": None, "items": []}
+            if board is not None:
+                try:
+                    content = read_board(i, board)
+                except OSError as e:
+                    row["note"] = f"unreadable board: {e}"
+                    content = None
+                if content is not None:
+                    row["sweep"] = sweep_note(content, today)
+                    row["items"] = [_item_json(it, today) for it in parse_board(content, warn=False)
+                                    if not due_only or it.overdue_days(today) is not None]
+            out_rows.append(row)
+        print(json.dumps({"today": today.isoformat(), "due_only": due_only, "boards": out_rows}, indent=2))
+        return 0
 
     if due_only:
         due_lines: list[str] = []
@@ -863,6 +916,10 @@ def main() -> int:
     ap.add_argument("--due-only", action="store_true",
                     help="With --report: print only due/overdue items, compactly; SILENT when none "
                          "are due (TD-7: the SessionStart wake-up line — offline, no delivery)")
+    ap.add_argument("--json", action="store_true",
+                    help="With --report: print the rows as one JSON object (boards, items with board "
+                         "line numbers and parsed due dates) for other tools; --due-only filters "
+                         "items the same way. --remote is text-only and is refused with --json.")
     args = ap.parse_args()
 
     if args.fetch and not args.report:
@@ -871,8 +928,12 @@ def main() -> int:
         ap.error("--remote requires --report")
     if args.due_only and not args.report:
         ap.error("--due-only requires --report")
+    if args.json and not args.report:
+        ap.error("--json requires --report")
+    if args.json and args.remote:
+        ap.error("--json does not cover --remote (the remote tier is text-only)")
     if args.report:
-        return report(args.board or [], args.fetch or args.remote, args.due_only, args.remote)
+        return report(args.board or [], args.fetch or args.remote, args.due_only, args.remote, args.json)
     if args.board and len(args.board) > 1:
         ap.error("nudge mode takes at most one --board (use --report for a multi-board view)")
 

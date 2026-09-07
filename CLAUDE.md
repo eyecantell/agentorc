@@ -23,6 +23,9 @@ change to that document first. Mockups regenerate from `docs/mockups/gen.py`.
 - `pdm run test` (private tmux sockets, temp `AGENTORC_HOME`; never the user's server),
   `pdm run lint`, `pdm run fmt`. Run the thing: `pdm run agentorc-agent serve` + `pdm run ao ui`
   (README "Run it").
+- If `pdm run test` dies with an ImportError inside `_pytest`, the venv is fine but pdm's
+  symlink install cache (`~/.cache/pdm/packages`) lost files: `pdm sync -G ui -G dev --reinstall`
+  (seen 2026-09-06).
 
 ## Building against live sessions — read before phase 1
 
