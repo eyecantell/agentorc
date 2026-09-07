@@ -97,6 +97,11 @@ def install(*, bind: str = "127.0.0.1", port: int = 8765, home: str | None = Non
     cp = _systemctl("enable", *(["--now"] if start else []), *[f"{u}.service" for u in UNITS])
     if cp.returncode != 0:
         raise RuntimeError(cp.stderr.strip() or cp.stdout.strip())
+    if start:
+        # `enable --now` leaves an already-running unit on its old ExecStart; a re-install that
+        # re-points the units (dev venv → stable install) must restart to take effect. Safe: the
+        # agent unit never takes tmux down (KillMode=process); the UI's terminals reconnect.
+        _systemctl("restart", *[f"{u}.service" for u in UNITS])
     return written
 
 
