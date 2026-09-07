@@ -241,7 +241,7 @@
       if (v.state === "exited" || v.state === "closed") {
         const code = v.exit_code == null ? "" : ` (exit code ${v.exit_code})`;
         const q = `dir=${encodeURIComponent(v.dir || "")}&adapter=${encodeURIComponent(v.adapter || "claude-code")}`;
-        ex.innerHTML = `This session's process has ${v.state}${esc(code)}. The pane is kept so its last screen and run log stay readable. `
+        ex.innerHTML = `This session's process has ${esc(v.state)}${esc(code)}. The pane is kept so its last screen and run log stay readable. `
           + (v.adapter_id && v.state === "exited" ? `<a class="btn sm primary" href="/new?${q}&resume=${encodeURIComponent(v.adapter_id)}">Resume this conversation</a> ` : "")
           + `<a class="btn sm" href="/new?${q}">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`;
         ex.classList.remove("hidden");
