@@ -188,6 +188,21 @@ def test_terminal_bridge(client, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
+def test_term_tolerates_bad_size_params(client, tmp_path):
+    """A garbage size must not reject the handshake (the browser only sees a 1006 for that)."""
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "sz"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    with client.websocket_connect(f"/term/{sid}?cols=NaN&rows=") as ws:
+        ws.send_text("echo SIZE-OK\r")
+        buf = b""
+        deadline = time.time() + 8
+        while time.time() < deadline and b"SIZE-OK" not in buf:
+            buf += ws.receive_bytes()
+        assert b"SIZE-OK" in buf
+    client.post(f"/api/sessions/{sid}/kill")
+
+
 def test_term_unknown_session(client):
     with client.websocket_connect("/term/ao-none") as ws:
         assert b"no session" in ws.receive_bytes()
@@ -221,4 +236,3 @@ def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
     assert vscode_url("/tmp/ao-test") == "vscode://vscode-remote/ssh-remote+kmaster/tmp/ao-test?windowId=_blank"
     monkeypatch.setenv("AGENTORC_LOCAL_HOST", "1")
     assert vscode_url("/tmp/ao-test") == "vscode://file/tmp/ao-test?windowId=_blank"
-
