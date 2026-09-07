@@ -11,6 +11,7 @@ local:
 
 from __future__ import annotations
 
+import functools
 import os
 import socket
 from dataclasses import dataclass
@@ -32,16 +33,28 @@ def hosts_file() -> Path:
     return paths.home() / "hosts.yml"
 
 
+@functools.lru_cache(maxsize=8)
+def _read_local_cached(path: str, mtime_ns: int) -> dict:
+    """Parsed `local:` mapping, cached per (path, mtime) so a render loop does not re-parse YAML."""
+    try:
+        doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return {}
+    local = doc.get("local") if isinstance(doc, dict) else None
+    return local if isinstance(local, dict) else {}  # `local: true` / a list: not a mapping → ignore
+
+
+def _read_local(p: Path) -> dict:
+    try:
+        return _read_local_cached(str(p), p.stat().st_mtime_ns)
+    except OSError:
+        return {}
+
+
 def local_host() -> Host:
     """The host this UI runs on. Env vars override the file (kept for one-off runs); with neither,
     the machine's short hostname stands in for both fields."""
-    data: dict = {}
-    p = hosts_file()
-    if p.is_file():
-        try:
-            data = (yaml.safe_load(p.read_text(encoding="utf-8")) or {}).get("local") or {}
-        except (OSError, yaml.YAMLError):
-            data = {}
+    data = _read_local(hosts_file())
     fallback = socket.gethostname().split(".")[0]
     name = os.environ.get("AGENTORC_HOST_NAME") or str(data.get("name") or fallback)
     vscode = os.environ.get("AGENTORC_VSCODE_HOST") or str(data.get("vscode_host") or name)

@@ -438,6 +438,7 @@ noted). If a control is not in this table it does not exist.
 | Focus | **Open shell here** | a `shell` session in this session's directory |
 | Focus | **Wrap up** | sends the wrap-up prompt (same one the policy uses) |
 | Focus | **Kill** | confirms, then kills the tmux session; worktree kept; state `exited` |
+| Focus | **Copy / Paste** | terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+Shift+V, right-click). Needs a secure context: https or localhost |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
 | Focus composer | **Send** | `send-keys` of the composer text |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |

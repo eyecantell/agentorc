@@ -193,8 +193,8 @@ class HookFedStub:
         return None
 
 
-async def test_hook_script_end_to_end(agent, tmp_path):
-    adapters.register(HookFedStub())
+async def test_hook_script_end_to_end(agent, tmp_path, monkeypatch):
+    monkeypatch.setitem(adapters._REGISTRY, HookFedStub.name, HookFedStub())  # restored at teardown
     async with LocalClient() as c:
         s = await c.call("create", name="h", dir=str(tmp_path), adapter="hookstub-e2e")
         sid = s["id"]

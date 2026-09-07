@@ -104,9 +104,9 @@ class HookFedStub:
         return None
 
 
-async def test_offline_hook_events_are_drained(agent, tmp_path):
+async def test_offline_hook_events_are_drained(agent, tmp_path, monkeypatch):
     """A hook that could not reach the socket appends to events/; the next tick applies it."""
-    adapters.register(HookFedStub())
+    monkeypatch.setitem(adapters._REGISTRY, HookFedStub.name, HookFedStub())  # restored at teardown
     async with LocalClient() as c:
         s = await c.call("create", name="q", dir=str(tmp_path), adapter="hookstub")
         agent.events.append(s["id"], {"state": "needs-you", "pending": {"kind": "question", "text": "pick 1-3"}})
