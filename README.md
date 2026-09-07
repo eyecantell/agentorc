@@ -69,6 +69,12 @@ you already have (WireGuard, Tailscale) and bind to that address with `ao ui --b
 put an authenticated tunnel in front (Cloudflare Tunnel + Access pointed at `127.0.0.1:8765`;
 websockets work through it). A hosted, no-setup version is the `relay` transport in design §4.5b.
 
+**Do not start the agent or the UI from a VS Code Remote-SSH terminal.** VS Code auto-forwards
+any port a process in its terminal starts listening on, so `127.0.0.1:8765` on your laptop ends
+up served by VS Code's forwarder instead of your `ssh -L`, and the terminal websockets never
+arrive (pages still load, which makes it hard to spot; found 2026-09-06). Start both from a plain
+ssh session, or set `remote.autoForwardPorts` to false for that remote.
+
 State lives under `~/.agentorc/` (`AGENTORC_HOME` overrides it — every session the agent creates
 carries it, so hooks inside find the right agent). Profiles: `~/.agentorc/profiles.yml`
 (design §4.2a). Host identity: `~/.agentorc/hosts.yml`, e.g. `local: {name: kmaster, vscode_host: kmaster}` —
