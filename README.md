@@ -66,6 +66,17 @@ pdm run ao service install             # instead of the two `serve`/`ui` termina
                                        # (survive logout and reboot with linger; `ao service status`)
 ```
 
+To work on agentorc *with* agentorc, keep the running copy separate from the checkout: install
+a stable, non-editable copy and point the units at it, then promote a merge deliberately.
+
+```bash
+python3 -m virtualenv ~/.local/share/agentorc-venv          # (pipx works the same way, if you have it)
+~/.local/share/agentorc-venv/bin/pip install '/path/to/agentorc[ui]'
+~/.local/share/agentorc-venv/bin/ao service install          # units now run the stable copy; restarts them
+# after a merge you want live:
+~/.local/share/agentorc-venv/bin/pip install --upgrade '/path/to/agentorc[ui]' && ~/.local/share/agentorc-venv/bin/ao service install
+```
+
 Reaching the UI from elsewhere: never a bare public port (design §4.5). Use a private network
 you already have (WireGuard, Tailscale) and bind to that address with `ao ui --bind <addr>`, or
 put an authenticated tunnel in front (Cloudflare Tunnel + Access pointed at `127.0.0.1:8765`;
