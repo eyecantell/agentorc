@@ -88,7 +88,9 @@ async def bridge_stdio() -> int:
         while line := await stdin.readline():
             writer.write(line)
             await writer.drain()
-        writer.close()
+        # Half-close: stdin at EOF means no more requests, but replies to the ones already sent
+        # may still be on their way. A full close here raced them (a piped `rpc` returned nothing).
+        writer.write_eof()
 
     async def down() -> None:
         while line := await reader.readline():
