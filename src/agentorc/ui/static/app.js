@@ -179,7 +179,16 @@
       ws.binaryType = "arraybuffer";
       ws.onopen = () => { delay = 500; ws.send(JSON.stringify({ resize: [term.cols, term.rows] })); };
       ws.onmessage = (m) => term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data));
-      ws.onclose = () => { term.write("\r\n\x1b[90m[agentorc] terminal disconnected — reconnecting\x1b[0m\r\n"); setTimeout(openTerm, delay); delay = Math.min(delay * 2, 10000); };
+      let opened = false;
+      ws.addEventListener("open", () => { opened = true; });
+      ws.onclose = (e) => {
+        // Say what happened: 1006 before open = the handshake never reached the server (a proxy or
+        // port forward that drops websockets is the usual cause); after open = the server closed.
+        const why = e.code === 1006 && !opened ? "websocket handshake failed (code 1006) — does your route to the UI pass websockets? ssh -L does"
+          : `closed (code ${e.code}${e.reason ? ", " + e.reason : ""})`;
+        term.write(`\r\n\x1b[90m[agentorc] terminal ${why} — retrying in ${Math.round(delay / 1000) || 1}s\x1b[0m\r\n`);
+        setTimeout(openTerm, delay); delay = Math.min(delay * 2, 10000);
+      };
     }
     openTerm();
     term.onData((d) => ws && ws.readyState === 1 && ws.send(d));

@@ -210,3 +210,15 @@ def test_herd_renders_with_agent_down(tmp_path, monkeypatch):
         assert r.status_code == 303 and r.headers["location"] == "/"
         r = c.post("/api/sessions/ao-x/kill")
         assert r.status_code == 503
+
+
+def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    monkeypatch.setenv("AGENTORC_VSCODE_HOST", "kmaster")
+    monkeypatch.delenv("AGENTORC_LOCAL_HOST", raising=False)
+    from agentorc.ui.app import vscode_url
+
+    assert vscode_url("/tmp/ao-test") == "vscode://vscode-remote/ssh-remote+kmaster/tmp/ao-test?windowId=_blank"
+    monkeypatch.setenv("AGENTORC_LOCAL_HOST", "1")
+    assert vscode_url("/tmp/ao-test") == "vscode://file/tmp/ao-test?windowId=_blank"
+
