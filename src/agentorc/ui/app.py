@@ -132,7 +132,7 @@ def ready_to_close(s: dict[str, Any]) -> list[tuple[str, bool]]:
 def _int_param(raw: str | None, default: int, lo: int, hi: int) -> int:
     try:
         v = int(float(raw)) if raw not in (None, "") else default
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # "abc", "NaN", "inf" / "1e999"
         return default
     return max(lo, min(hi, v))
 
