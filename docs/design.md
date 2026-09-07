@@ -444,6 +444,7 @@ noted). If a control is not in this table it does not exist.
 | Focus composer | **Send** | `send-keys` of the composer text |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
+| New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
 | Resumable | **Resume** | New session prefilled (host, repo, directory, worktree, Start = Resume) |
 | Resumable | **Switch to** | the running card in the Herd |
