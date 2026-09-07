@@ -186,6 +186,7 @@ async def test_occupancy_sees_own_and_external_sessions(agent, tmp_path, monkeyp
                 )
             ]
 
+    adapters.load_all()  # the registry must hold the built-ins before we add to it
     monkeypatch.setitem(adapters._REGISTRY, "ext-tool", Ext())
     (tmp_path / "vscode").mkdir()
     (tmp_path / "free").mkdir()

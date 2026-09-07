@@ -52,8 +52,10 @@ class ExternalSession:
 
 def external_sessions() -> list[ExternalSession]:
     """Every registered adapter's view of live sessions outside agentorc. Optional per adapter."""
+    if not _REGISTRY:
+        load_all()
     out: list[ExternalSession] = []
-    for ad in list(_REGISTRY.values()) or []:
+    for ad in list(_REGISTRY.values()):
         fn = getattr(ad, "external_sessions", None)
         if fn is None:
             continue

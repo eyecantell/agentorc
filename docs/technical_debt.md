@@ -24,6 +24,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
 | TD-011 | VS Code link path is not URL-escaped (spaces break the URI) | Low | Open |
 | TD-012 | Resuming a conversation that is still live elsewhere is not refused | Low | Open |
+| TD-013 | External-session check reads the default profile's registry only | Low | Open |
 
 ---
 
@@ -188,4 +189,15 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Why:** `create(resume=<id>)` supersedes an *exited* record with that adapter id, but nothing stops a resume of a conversation whose session is still running (in another directory, or hand-started): two tmux sessions would then drive one Claude Code conversation. The anchor rule compares directories, not conversations. Raised in the PR #17 review.
 
 **Fix:** refuse a resume whose adapter id belongs to a live record (state not exited/closed), with the same "already has … ; anchor rule" style error, or offer Switch to instead (Resumable tab).
+
+## TD-013: External-session check reads the default profile's registry only
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Status:** Open
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`registry_entries`, `external_sessions`)
+
+**Why:** The anchor rule's view of Claude Code sessions started outside agentorc comes from `~/.claude/sessions/`, i.e. the default profile's config dir. A second profile with its own `CLAUDE_CONFIG_DIR` keeps its registry elsewhere, so a hand-started session under that account is invisible to occupancy and to the create-time refusal. No second profile exists yet; noted in the PR #20 review.
+
+**Fix:** iterate every declared profile's config dir in `external_sessions()`; test with two temp config dirs.
 

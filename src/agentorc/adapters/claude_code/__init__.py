@@ -184,10 +184,13 @@ class ClaudeCodeAdapter:
         return out
 
     def external_sessions(self) -> list[ExternalSession]:
-        """Live Claude Code sessions on this host from its registry, whatever started them —
-        entries whose pid is gone, or is now a different process, are dropped (the registry
-        keeps `procStart` in the same ticks as /proc/<pid>/stat field 22, so equality means the
-        same process; the dev-cadence anchor guard uses the same test)."""
+        """Live Claude Code sessions on this host from its registry, whatever started them.
+        Entries whose pid is gone, or is now a different process, are dropped: the registry keeps
+        `procStart` in the same clock ticks as /proc/<pid>/stat field 22, so equality means the same
+        process (the primary test of dev-cadence's anchor guard; its extra fallbacks for entries
+        that predate the field are not reproduced here — those rely on /proc existence, which is
+        only meaningful within one pid namespace). Phase 1 reads the default profile's config dir
+        only; a second profile's `CLAUDE_CONFIG_DIR` is invisible to the anchor rule (TD-013)."""
         out: list[ExternalSession] = []
         for e in self.registry_entries():
             pid, start = e.get("pid"), e.get("procStart")

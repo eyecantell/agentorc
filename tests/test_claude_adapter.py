@@ -13,7 +13,14 @@ from pathlib import Path
 import pytest
 
 from agentorc import profiles
-from agentorc.adapters.claude_code import ClaudeCodeAdapter, hooks_settings, munge, parse_usage, pretrust
+from agentorc.adapters.claude_code import (
+    ClaudeCodeAdapter,
+    _pid_alive,
+    hooks_settings,
+    munge,
+    parse_usage,
+    pretrust,
+)
 from agentorc.adapters.claude_code.hook import translate
 from sessionorc import adapters, paths
 from sessionorc.adapters import LaunchSpec
@@ -247,3 +254,37 @@ def test_hook_script_queues_when_agent_down(tmp_path, monkeypatch):
     assert cp.returncode == 0
     q = (tmp_path / "home" / "events" / "ao-x-y.jsonl").read_text().strip()
     assert json.loads(q) == {"adapter_id": "u", "state": "idle", "pending": None}
+
+
+def test_pid_alive_corroborates_procstart():
+    me = os.getpid()
+    stat = Path(f"/proc/{me}/stat").read_text()
+    my_start = int(stat[stat.rindex(")") + 2 :].split()[19])
+    assert _pid_alive(me, my_start) is True
+    assert _pid_alive(me, str(my_start)) is True  # the registry writes it as a string
+    assert _pid_alive(me, my_start + 1) is False  # same pid, a different process
+    assert _pid_alive(me, None) is True  # entry predating the field: existence only
+    assert _pid_alive(2**22 + 12345, my_start) is False  # no such pid
+
+
+def test_external_sessions_filters_dead_entries(tmp_path):
+    prof = profiles.Profile(name="t", config_dir=tmp_path)
+    (tmp_path / "sessions").mkdir()
+    me = os.getpid()
+    stat = Path(f"/proc/{me}/stat").read_text()
+    start = stat[stat.rindex(")") + 2 :].split()[19]
+    (tmp_path / "sessions" / "a.json").write_text(
+        json.dumps(
+            {"pid": me, "procStart": start, "cwd": "/w/live", "name": "live", "sessionId": "s1", "status": "busy"}
+        )
+    )
+    (tmp_path / "sessions" / "b.json").write_text(
+        json.dumps({"pid": me, "procStart": str(int(start) + 7), "cwd": "/w/stale", "sessionId": "s2"})
+    )
+    (tmp_path / "sessions" / "c.json").write_text(json.dumps({"pid": 2**22 + 999, "cwd": "/w/gone", "sessionId": "s3"}))
+    ad = ClaudeCodeAdapter()
+    import unittest.mock as um
+
+    with um.patch("agentorc.adapters.claude_code.profiles_mod.get", return_value=prof):
+        got = ad.external_sessions()
+    assert [(e.cwd, e.name, e.status) for e in got] == [("/w/live", "live", "busy")]
