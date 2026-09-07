@@ -23,6 +23,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-009 | `subscribe` resets the shared push cache: every new tab re-pushes everything to every tab | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
 | TD-011 | VS Code link path is not URL-escaped (spaces break the URI) | Low | Open |
+| TD-012 | Resuming a conversation that is still live elsewhere is not refused | Low | Open |
 
 ---
 
@@ -176,4 +177,15 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Why:** The session directory is interpolated raw into `vscode://vscode-remote/ssh-remote+<host><path>?windowId=_blank`. A directory with a space or `?` produces a malformed URI and the link silently does nothing. Pre-existing; noted by the PR #10 review.
 
 **Fix:** percent-encode the path segments (`urllib.parse.quote(directory, safe="/")`) in both URI forms; test with a space in the path.
+
+## TD-012: Resuming a conversation that is still live elsewhere is not refused
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`rpc_create`, `_supersede`)
+
+**Why:** `create(resume=<id>)` supersedes an *exited* record with that adapter id, but nothing stops a resume of a conversation whose session is still running (in another directory, or hand-started): two tmux sessions would then drive one Claude Code conversation. The anchor rule compares directories, not conversations. Raised in the PR #17 review.
+
+**Fix:** refuse a resume whose adapter id belongs to a live record (state not exited/closed), with the same "already has … ; anchor rule" style error, or offer Switch to instead (Resumable tab).
 

@@ -286,7 +286,19 @@ class HostAgent:
             self.sessions[sid] = s
             self.store.save(s)
             self._remember_dir(directory)
+            if resume:
+                await self._supersede(resume, sid)
         return s.to_dict()
+
+    async def _supersede(self, adapter_id: str, new_sid: str) -> None:
+        """A resumed conversation continues in the new session: the exited record it came from is
+        closed (kept a day, sorted last) and its dead pane dropped, so the Herd shows one card."""
+        for other in list(self.sessions.values()):
+            if other.id != new_sid and other.adapter_id == adapter_id and other.state == "exited":
+                await asyncio.to_thread(self.tmux.kill_session, other.id)
+                other.set_state("closed", confidence=other.confidence)
+                other.closed_at = now_iso()
+                self.store.save(other)
 
     def _start(self, sid: str, cwd: Path, argv: list[str] | None, env: dict[str, str], run_log: Path) -> None:
         self.tmux.ensure_server()
@@ -311,6 +323,9 @@ class HostAgent:
         s = self._get(id)
         if s.state not in ("exited", "closed"):
             raise RpcError(f"{id} is {s.state}; kill it first")
+        # The dead pane is kept until now (exit code, last screen); without this it would be
+        # re-adopted as a nameless shell on the next tick (first-use finding 2026-09-06).
+        await asyncio.to_thread(self.tmux.kill_session, id)
         self._forget(id)
         await self._push_gone(id)
 

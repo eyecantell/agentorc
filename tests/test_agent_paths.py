@@ -136,3 +136,29 @@ def test_clean_strips_osc_csi_and_controls():
     assert _clean("\x1b]0;my-title\x07hello \x1b[32mworld\x1b[0m\r") == "hello world"
     assert _clean("\x1b(Bplain\x1b]2;t\x1b\\ tail") == "plain tail"
     assert len(_clean("x" * 500)) == 200
+
+
+async def test_forget_kills_leftover_pane_and_dead_panes_are_not_adopted(agent, tmp_path):
+    async with LocalClient() as c:
+        s = await c.call("create", name="f", dir=str(tmp_path), adapter="command", kind="command", argv=["true"])
+
+        async def exited():
+            return (await c.call("get", id=s["id"]))["state"] == "exited"
+
+        assert await wait_for(exited)
+        await c.call("remove", id=s["id"])
+        await asyncio.sleep(1.0)  # several ticks
+        assert all(x["id"] != s["id"] for x in await c.call("list"))  # not re-adopted
+        assert not agent.tmux.has_session(s["id"])
+
+
+async def test_resume_supersedes_the_exited_record(agent, tmp_path, monkeypatch):
+    monkeypatch.setitem(adapters._REGISTRY, HookFedStub.name, HookFedStub())
+    async with LocalClient() as c:
+        old = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub")
+        await c.call("hook", session=old["id"], adapter_id="cc-123")
+        await c.call("kill", id=old["id"])
+        new = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub", resume="cc-123")
+        assert new["id"] != old["id"]
+        states = {x["id"]: x["state"] for x in await c.call("list")}
+        assert states[old["id"]] == "closed" and states[new["id"]] != "closed"

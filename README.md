@@ -62,6 +62,8 @@ pdm install -G ui                      # or: pipx install 'agentorc[ui]' once pu
 pdm run agentorc-agent serve           # the host agent: tmux, sessions, hooks, run logs
 pdm run ao ui                          # the web UI on http://127.0.0.1:8765 (localhost by default; see below)
 pdm run ao new td-302 -d ~/samscrape   # or the New session form; `ao shell` for a plain shell
+pdm run ao service install             # instead of the two `serve`/`ui` terminals: systemd user units
+                                       # (survive logout and reboot with linger; `ao service status`)
 ```
 
 Reaching the UI from elsewhere: never a bare public port (design §4.5). Use a private network
