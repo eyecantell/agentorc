@@ -173,7 +173,8 @@ State transitions (Claude Code adapter):
 | Hook event | State |
 |---|---|
 | `SessionStart`, `UserPromptSubmit`, `PreToolUse` | `working` |
-| `Notification` (permission / question / idle prompt), `PermissionRequest` | `needs-you` + pending text |
+| `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
+| `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert (first-use finding 2026-09-06) |
 | `Stop` | `idle` |
 | adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time |
 | `SessionEnd`, or tmux session gone | `exited` |

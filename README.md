@@ -71,9 +71,10 @@ websockets work through it). A hosted, no-setup version is the `relay` transport
 
 State lives under `~/.agentorc/` (`AGENTORC_HOME` overrides it — every session the agent creates
 carries it, so hooks inside find the right agent). Profiles: `~/.agentorc/profiles.yml`
-(design §4.2a). `AGENTORC_HOST_NAME` sets the name the UI shows; `AGENTORC_VSCODE_HOST` is the
-ssh alias VS Code links use (must be in your own `~/.ssh/config`); `AGENTORC_LOCAL_HOST=1` makes
-those links `vscode://file/…` instead.
+(design §4.2a). Host identity: `~/.agentorc/hosts.yml`, e.g. `local: {name: kmaster, vscode_host: kmaster}` —
+`vscode_host` is the ssh alias VS Code links use and must be in your own `~/.ssh/config`; add
+`local: true` when the UI runs on the machine you sit at (`vscode://file/…` links). Without the
+file the machine's hostname is used, which is rarely what VS Code can resolve.
 
 ## CLI
 

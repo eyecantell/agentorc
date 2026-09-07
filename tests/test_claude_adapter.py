@@ -15,7 +15,8 @@ import pytest
 from agentorc import profiles
 from agentorc.adapters.claude_code import ClaudeCodeAdapter, hooks_settings, munge, parse_usage, pretrust
 from agentorc.adapters.claude_code.hook import translate
-from sessionorc import paths
+from sessionorc import adapters, paths
+from sessionorc.adapters import LaunchSpec
 from sessionorc.agent import HostAgent
 from sessionorc.client import LocalClient
 from sessionorc.tmux import Tmux
@@ -57,6 +58,7 @@ def test_translate_permission_and_questions():
     n = translate({"hook_event_name": "Notification", "notification_type": "permission_prompt", "message": "m"})
     assert n["pending"]["kind"] == "question"  # dialog is in the terminal now
     assert translate({"hook_event_name": "Notification", "notification_type": "auth_success"}) is None
+    assert translate({"hook_event_name": "Notification", "notification_type": "idle_prompt", "message": "w"}) is None
     assert translate({"hook_event_name": "SubagentStart"}) == {"subagent_delta": 1}
 
 
@@ -178,9 +180,23 @@ def run_hook(session: str, payload: dict, wait: str = "5") -> subprocess.Complet
     )
 
 
+class HookFedStub:
+    """Hook-fed, never scraped — otherwise the tick reclassifies a shell to idle mid-test (flake)."""
+
+    name = "hookstub-e2e"
+    state_source = "hook"
+
+    def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
+        return LaunchSpec(argv=["bash", "--norc"])
+
+    def classify(self, pane, tail):
+        return None
+
+
 async def test_hook_script_end_to_end(agent, tmp_path):
+    adapters.register(HookFedStub())
     async with LocalClient() as c:
-        s = await c.call("create", name="h", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        s = await c.call("create", name="h", dir=str(tmp_path), adapter="hookstub-e2e")
         sid = s["id"]
         # Stop → idle, carrying the Claude session id
         cp = await asyncio.to_thread(run_hook, sid, {"hook_event_name": "Stop", "session_id": "cc-uuid"})

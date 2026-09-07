@@ -50,6 +50,12 @@ class HostAgent:
         self.store = store or SessionStore()
         self.events = events or EventQueue()
         self.sessions: dict[str, Session] = self.store.load_all()
+        for s in self.sessions.values():
+            # `prompt` pendings (Claude's idle_prompt) stopped being an alert on 2026-09-06; a record
+            # written before that would otherwise show needs-you until the next hook event.
+            if s.pending and s.pending.kind == "prompt":
+                s.set_state("idle", confidence="hook")
+                self.store.save(s)
         self._dir_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._subscribers: set[asyncio.StreamWriter] = set()
         self._last_pushed: dict[str, str] = {}

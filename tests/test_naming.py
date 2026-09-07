@@ -17,3 +17,4 @@ def test_session_id_collision_suffix():
     assert session_id("/x", "/home/p/samscrape", "tdgrind-1", []) == "ao-samscrape-tdgrind-1"
     assert session_id("/x", "/home/p/samscrape", "tdgrind-1", existing) == "ao-samscrape-tdgrind-1-3"
     assert is_ours("ao-x-y") and not is_ours("mine")
+    assert session_id("/tmp/ao-test", None, "ao-test", []) == "ao-ao-test"  # name == directory: once
