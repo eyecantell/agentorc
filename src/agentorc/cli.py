@@ -126,6 +126,22 @@ def cmd_decide(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_service(args: argparse.Namespace) -> int:
+    from agentorc import service
+
+    if args.action == "install":
+        written = service.install(bind=args.bind, port=args.port, start=not args.no_start)
+        print("wrote " + ", ".join(written))
+        print(service.status())
+        print("units run under your user; `loginctl enable-linger` keeps them (and tmux) alive after logout")
+    elif args.action == "uninstall":
+        service.uninstall()
+        print("units disabled and removed (tmux sessions untouched)")
+    else:
+        print(service.status())
+    return 0
+
+
 def cmd_ui(args: argparse.Namespace) -> int:
     from agentorc.ui.app import main as ui_main
 
@@ -189,6 +205,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bind", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
     p.set_defaults(fn=cmd_ui)
+
+    p = sub.add_parser("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
+    p.add_argument("action", choices=["install", "uninstall", "status"])
+    p.add_argument("--bind", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8765)
+    p.add_argument("--no-start", action="store_true", help="write and enable the units without starting them")
+    p.set_defaults(fn=cmd_service)
 
     for behavior in ("allow", "deny"):
         p = sub.add_parser(behavior, help=f"{behavior} the pending permission")
