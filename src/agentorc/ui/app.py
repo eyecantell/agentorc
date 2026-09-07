@@ -45,8 +45,10 @@ def vscode_url(directory: str) -> str:
     ~/.ssh/config (design §4.5) — or `vscode://file/…` when the UI runs where the person sits."""
     h = hosts.local_host()
     if h.local:
-        return f"vscode://file{directory}"
-    return f"vscode://vscode-remote/ssh-remote+{h.vscode_host}{directory}"
+        return f"vscode://file{directory}?windowId=_blank"
+    # windowId=_blank: a new VS Code window. Without it the handler reuses the current window and
+    # replaces whatever it was showing (first-use finding 2026-09-06).
+    return f"vscode://vscode-remote/ssh-remote+{h.vscode_host}{directory}?windowId=_blank"
 
 
 # -- view model ------------------------------------------------------------------------------------
