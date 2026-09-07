@@ -1,4 +1,8 @@
+import pytest
+
 from sessionorc.naming import is_ours, scope_slug, session_id, slug
+
+pytestmark = pytest.mark.unit
 
 
 def test_slug_is_tmux_safe():

@@ -1,42 +1,14 @@
 """End-to-end: an in-process host agent on a private tmux server and a temp AGENTORC_HOME."""
 
 import asyncio
-import contextlib
-import uuid
 
 import pytest
+from conftest import wait_state
 
 from sessionorc import paths
-from sessionorc.agent import HostAgent
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.tmux import Tmux
 
-
-@pytest.fixture
-async def agent(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
-    tmux = Tmux(socket_name=f"ao-test-{uuid.uuid4().hex[:8]}")
-    a = HostAgent(tmux=tmux)
-    task = asyncio.create_task(a.serve(paths.socket_path()))
-    for _ in range(50):
-        if paths.socket_path().exists():
-            break
-        await asyncio.sleep(0.05)
-    yield a
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError, Exception):
-        await task
-    tmux.kill_server()
-
-
-async def wait_state(client, sid, state, timeout=6.0):
-    for _ in range(int(timeout / 0.1)):
-        s = await client.call("get", id=sid)
-        if s["state"] == state:
-            return s
-        await asyncio.sleep(0.1)
-    raise AssertionError(f"{sid} never reached {state}: {s['state']} {s.get('tail')}")
+pytestmark = pytest.mark.integration
 
 
 async def test_shell_lifecycle(agent, tmp_path):

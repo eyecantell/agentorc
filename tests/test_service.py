@@ -1,4 +1,8 @@
+import pytest
+
 from agentorc import service
+
+pytestmark = pytest.mark.unit
 
 
 def test_unit_text_shapes():

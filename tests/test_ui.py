@@ -1,65 +1,26 @@
-"""The web UI against a live host agent on a private tmux server: pages, actions, the /events
-stream, and the /term pty bridge."""
+"""The web UI against a live host agent (a separate process on a private tmux server): pages,
+actions, the /events stream, and the /term pty bridge.
 
-import asyncio
-import contextlib
+The agent is `subprocess_agent`, not a thread: the sync TestClient needs an agent whose loop runs
+on its own. TestClient still keeps an anyio portal thread alive, so ptyprocess's forkpty() warning
+(TD-007) remains."""
+
 import json
-import threading
+import os
+import subprocess
+import sys
 import time
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
 
-from sessionorc import paths
-from sessionorc.agent import HostAgent
 from sessionorc.tmux import Tmux
 
-SOCK = f"ao-test-{uuid.uuid4().hex[:8]}"
-
-
-@pytest.fixture(scope="module")
-def agent_thread(tmp_path_factory):
-    """One agent for the module, on its own loop in a thread, so the sync TestClient can talk to it.
-    Module-scoped monkeypatch: env and tick restored at teardown, whatever the test order."""
-    mp = pytest.MonkeyPatch()
-    home = tmp_path_factory.mktemp("home")
-    mp.setenv("AGENTORC_HOME", str(home))
-    mp.setenv("AGENTORC_TMUX_SOCKET", SOCK)
-    mp.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
-    tmux = Tmux(socket_name=SOCK)
-    loop = asyncio.new_event_loop()
-    a = HostAgent(tmux=tmux)
-    task_holder = {}
-
-    def run():
-        asyncio.set_event_loop(loop)
-        task_holder["t"] = loop.create_task(a.serve(paths.socket_path()))
-        with contextlib.suppress(Exception):
-            loop.run_forever()
-
-    th = threading.Thread(target=run, daemon=True)
-    th.start()
-    for _ in range(50):
-        if paths.socket_path().exists():
-            break
-        time.sleep(0.05)
-    yield a
-
-    async def shutdown():
-        task_holder["t"].cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await task_holder["t"]
-
-    asyncio.run_coroutine_threadsafe(shutdown(), loop).result(timeout=5)
-    loop.call_soon_threadsafe(loop.stop)
-    th.join(timeout=5)
-    tmux.kill_server()
-    mp.undo()
+pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def client(agent_thread):
+def client(subprocess_agent):
     from agentorc.ui.app import create_app
 
     with TestClient(create_app()) as c:
@@ -91,7 +52,7 @@ def test_pages_and_shell_flow(client, tmp_path):
     # send through the composer path, then kill from the card
     assert client.post(f"/api/sessions/{sid}/send", json={"text": "echo via-ui"}).json() == {"ok": True}
     for _ in range(30):
-        tail = agent_thread_tail(client, sid)
+        tail = session_tail(client, sid)
         if any("via-ui" in line for line in tail):
             break
         time.sleep(0.1)
@@ -105,7 +66,7 @@ def test_pages_and_shell_flow(client, tmp_path):
     assert all(x["id"] != sid for x in client.get("/api/sessions").json())
 
 
-def agent_thread_tail(client, sid):
+def session_tail(client, sid):
     s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     return s.get("tail") or []
 
@@ -125,10 +86,7 @@ def test_events_stream_and_permission_buttons(client, tmp_path):
     wait_state(client, sid, "idle")
     with client.websocket_connect("/events") as ws:
         # a hook-side permission request flips the card; the pushed html carries Allow/Deny
-        import subprocess
-        import sys
-
-        env = {**__import__("os").environ, "AGENTORC_SESSION": sid, "AGENTORC_PERMISSION_WAIT": "10"}
+        env = {**os.environ, "AGENTORC_SESSION": sid, "AGENTORC_PERMISSION_WAIT": "10"}
         payload = {
             "hook_event_name": "PermissionRequest",
             "tool_name": "Bash",
@@ -165,7 +123,7 @@ def test_events_stream_and_permission_buttons(client, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
-def test_terminal_bridge(client, tmp_path):
+def test_terminal_bridge(client, subprocess_agent, tmp_path):
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "term"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
     wait_state(client, sid, "idle")
@@ -180,7 +138,7 @@ def test_terminal_bridge(client, tmp_path):
     # the pane is still alive after the viewer disconnects (attach detached, session kept)
     s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert s["state"] in ("idle", "working")
-    tmux = Tmux(socket_name=SOCK)
+    tmux = Tmux(socket_name=subprocess_agent.sock_name)
     assert (
         tmux.run("display", "-p", "-t", f"={sid}:", "#{window_width}x#{window_height}", check=False).stdout.strip()
         == "120x29"  # tmux's status line takes one of the 30 rows

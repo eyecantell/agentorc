@@ -1,4 +1,8 @@
+import pytest
+
 from agentorc import hosts
+
+pytestmark = pytest.mark.unit
 
 
 def test_local_host_from_file_and_env(tmp_path, monkeypatch):
