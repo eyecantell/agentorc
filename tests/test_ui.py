@@ -236,3 +236,17 @@ def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
     assert vscode_url("/tmp/ao-test") == "vscode://vscode-remote/ssh-remote+kmaster/tmp/ao-test?windowId=_blank"
     monkeypatch.setenv("AGENTORC_LOCAL_HOST", "1")
     assert vscode_url("/tmp/ao-test") == "vscode://file/tmp/ao-test?windowId=_blank"
+
+
+def test_closed_session_terminal_is_final_and_occupancy_endpoint(client, tmp_path):
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "cl"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    assert client.post(f"/api/sessions/{sid}/close").json() == {"ok": True}
+    wait_state(client, sid, "closed")
+    with client.websocket_connect(f"/term/{sid}") as ws:
+        assert b"closed" in ws.receive_bytes()
+    r = client.get("/")
+    assert "▣ Details" in r.text
+    assert client.get("/api/occupancy", params={"dir": str(tmp_path)}).json()["occupants"] == []
+    assert client.get("/api/occupancy", params={"dir": ""}).json()["occupants"] == []

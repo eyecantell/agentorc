@@ -286,6 +286,12 @@ def create_app() -> FastAPI:
             raise HTTPException(404, f"no action {action}")
         return JSONResponse({"ok": True})
 
+    @app.get("/api/occupancy")
+    async def api_occupancy(dir: str = ""):
+        if not dir.strip():
+            return {"dir": "", "occupants": [], "git": False}
+        return await call("occupancy", dir=dir.strip())
+
     @app.get("/api/sessions")
     async def api_sessions():
         return [view(s) for s in await call("list")]
@@ -334,10 +340,14 @@ def create_app() -> FastAPI:
         rows = _int_param(ws.query_params.get("rows"), 32, 2, 200)
         await ws.accept()
         try:
-            await call("get", id=sid)
+            s = await call("get", id=sid)
         except HTTPException as e:
             await ws.send_bytes(f"\r\n[agentorc] {e.detail}\r\n".encode())
-            await ws.close()
+            await ws.close(code=4404)  # final: the client must not retry
+            return
+        if s.get("state") == "closed":
+            await ws.send_bytes(b"\r\n[agentorc] this session is closed; its pane is gone (see the banner).\r\n")
+            await ws.close(code=4404)
             return
         try:
             pty = PtySession(attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET")), cols=cols, rows=rows)

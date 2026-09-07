@@ -247,14 +247,8 @@ class HostAgent:
             repo = str(directory.parent.parent.parent)  # <repo>/.claude/worktrees/<name> → the main checkout
         async with self._dir_locks[str(directory)]:
             if kind == "interactive" and adapter != "shell":
-                for other in list(self.sessions.values()):
-                    if (
-                        other.kind == "interactive"
-                        and other.adapter != "shell"
-                        and other.state not in ("exited", "closed")
-                        and Path(other.dir) == directory
-                    ):
-                        raise RpcError(f"{directory} already has agent session {other.id} ({other.state}); anchor rule")
+                for who in await asyncio.to_thread(self.occupants, directory):
+                    raise RpcError(f"{directory} already has agent session {who}; anchor rule (use a worktree)")
             live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
             try:
                 spec = ad.launch(
@@ -309,6 +303,35 @@ class HostAgent:
                 other.set_state("closed", confidence=other.confidence)
                 other.closed_at = now_iso()
                 self.store.save(other)
+
+    def occupants(self, directory: Path) -> list[str]:
+        """Who holds the agent slot for `directory` (design §9 invariant 2): agentorc's own live
+        agent sessions, plus live sessions the adapters can see that agentorc did not start
+        (a VS Code terminal running `claude` in the checkout, say). Shells never count."""
+        directory = Path(directory).resolve()
+        ours = {s.adapter_id for s in self.sessions.values() if s.adapter_id}
+        out = [
+            f"{s.id} ({s.state})"
+            for s in self.sessions.values()
+            if s.kind == "interactive"
+            and s.adapter != "shell"
+            and s.state not in ("exited", "closed")
+            and Path(s.dir).resolve() == directory
+        ]
+        for ext in adapters.external_sessions():
+            if ext.tool_id and ext.tool_id in ours:
+                continue  # that is one of ours, seen through the tool's registry
+            if Path(ext.cwd).resolve() == directory:
+                out.append(f"{ext.name} ({ext.adapter}, outside agentorc{', ' + ext.status if ext.status else ''})")
+        return out
+
+    async def rpc_occupancy(self, dir: str) -> dict[str, Any]:
+        directory = Path(dir).expanduser()
+        if not directory.is_dir():
+            return {"dir": str(directory), "occupants": [], "git": False}
+        occ = await asyncio.to_thread(self.occupants, directory)
+        is_git = (directory / ".git").exists() or await asyncio.to_thread(lambda: git_info(directory) is not None)
+        return {"dir": str(directory.resolve()), "occupants": occ, "git": bool(is_git)}
 
     def _start(self, sid: str, cwd: Path, argv: list[str] | None, env: dict[str, str], run_log: Path) -> None:
         self.tmux.ensure_server()

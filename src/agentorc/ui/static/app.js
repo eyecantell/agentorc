@@ -167,6 +167,30 @@
     });
   };
 
+  // ---- New session: the anchor rule, shown before you press Start ----
+  AO.newSession = function () {
+    const dir = $("[name=dir]"), here = $("[name=where][value=here]"), wt = $("[name=where][value=worktree]"), note = $("#occupancy");
+    let seq = 0;
+    async function check() {
+      const v = dir.value.trim(); const my = ++seq;
+      if (!v) { note.textContent = ""; here.disabled = false; return; }
+      try {
+        const r = await fetch(`/api/occupancy?dir=${encodeURIComponent(v)}`); const o = await r.json();
+        if (my !== seq) return;
+        if (o.occupants && o.occupants.length) {
+          note.innerHTML = `⚠ <b>in use</b> by ${esc(o.occupants.join(", "))} — one agent session per directory (design §9); a new worktree is selected instead.`;
+          here.disabled = true; wt.checked = true;
+        } else {
+          here.disabled = false;
+          note.textContent = o.git ? "free · a git repo, so a worktree is available" : (o.dir ? "free" : "");
+        }
+      } catch (e) { note.textContent = ""; here.disabled = false; }
+    }
+    dir.addEventListener("input", () => { clearTimeout(dir._t); dir._t = setTimeout(check, 250); });
+    dir.addEventListener("change", check);
+    check();
+  };
+
   // ---- Focus ----
   AO.focus = function (s) {
     const id = s.id;
@@ -183,6 +207,7 @@
       let opened = false;
       ws.addEventListener("open", () => { opened = true; });
       ws.onclose = (e) => {
+        if (e.code === 4404) { term.write("\r\n\x1b[90m[agentorc] no terminal for this session\x1b[0m\r\n"); return; }  // final, no retry
         // Say what happened: 1006 before open = the handshake never reached the server (a proxy or
         // port forward that drops websockets is the usual cause); after open = the server closed.
         const why = e.code === 1006 && !opened ? "websocket handshake failed (code 1006) — does your route to the UI pass websockets? ssh -L does"
@@ -191,7 +216,8 @@
         setTimeout(openTerm, delay); delay = Math.min(delay * 2, 10000);
       };
     }
-    openTerm();
+    if (s.state === "closed") term.write("\x1b[90m[agentorc] this session is closed; its pane is gone.\x1b[0m\r\n");
+    else openTerm();
     term.onData((d) => ws && ws.readyState === 1 && ws.send(d));
     // Copy / paste: Ctrl+C with a selection copies (no ^C), Ctrl+Shift+C copies, Ctrl+Shift+V and
     // right-click paste; the header buttons do the same for discoverability. Clipboard access

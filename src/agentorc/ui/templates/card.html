@@ -46,7 +46,7 @@
     {% endif %}
   </div>
   <div class="sc-foot">
-    <a class="btn sm primary" href="/focus/{{ s.id }}">▣ Focus</a>
+    <a class="btn sm {{ 'ghost' if s.state == 'closed' else 'primary' }}" href="/focus/{{ s.id }}" title="{{ 'closed: details only, no terminal' if s.state == 'closed' else 'open the terminal' }}">▣ {{ 'Details' if s.state == 'closed' else 'Focus' }}</a>
     {% if s.vscode %}<a class="btn sm ghost" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
     <span class="grow"></span>
     <details class="more">
