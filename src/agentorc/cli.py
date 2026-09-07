@@ -210,7 +210,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["install", "uninstall", "status"])
     p.add_argument("--bind", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
-    p.add_argument("--no-start", action="store_true", help="write and enable the units without starting them")
+    p.add_argument(
+        "--no-start",
+        action="store_true",
+        help="write and enable the units (start at next login/boot) without starting them now",
+    )
     p.set_defaults(fn=cmd_service)
 
     for behavior in ("allow", "deny"):

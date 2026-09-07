@@ -149,7 +149,7 @@ class HostAgent:
         # tmux sessions with our prefix that we have no record of (created by hand, or the
         # store was lost): adopt them minimally as shells so they appear in the Herd.
         for name, pane in panes.items():
-            if name not in self.sessions and not pane.dead:  # a dead pane with no record is debris, not a session
+            if name not in self.sessions:
                 s = Session(id=name, name=name[len(naming.PREFIX) :], kind="interactive", adapter="shell", dir="")
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
@@ -287,15 +287,15 @@ class HostAgent:
             self.store.save(s)
             self._remember_dir(directory)
             if resume:
-                self._supersede(resume, sid)
+                await self._supersede(resume, sid)
         return s.to_dict()
 
-    def _supersede(self, adapter_id: str, new_sid: str) -> None:
+    async def _supersede(self, adapter_id: str, new_sid: str) -> None:
         """A resumed conversation continues in the new session: the exited record it came from is
         closed (kept a day, sorted last) and its dead pane dropped, so the Herd shows one card."""
         for other in list(self.sessions.values()):
             if other.id != new_sid and other.adapter_id == adapter_id and other.state == "exited":
-                self.tmux.kill_session(other.id)
+                await asyncio.to_thread(self.tmux.kill_session, other.id)
                 other.set_state("closed", confidence=other.confidence)
                 other.closed_at = now_iso()
                 self.store.save(other)

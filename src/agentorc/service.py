@@ -4,11 +4,13 @@
 Two units, `agentorc-agent` and `agentorc-ui`, under `~/.config/systemd/user/`. `KillMode=process`
 on the agent is load-bearing: tmux daemonises inside the service's cgroup, and the default
 `control-group` kill mode would take the tmux server — and every session in it — down with any
-agent restart. With `process`, only the agent's own process is signalled.
+agent restart or stop. With `process`, only the agent's own process is signalled; the tmux server
+is deliberately left running when the unit stops.
 """
 
 from __future__ import annotations
 
+import getpass
 import os
 import shutil
 import subprocess
@@ -48,7 +50,6 @@ def unit_text(name: str, *, bind: str = "127.0.0.1", port: int = 8765, home: str
     if name == "agentorc-agent":
         return f"""[Unit]
 Description=agentorc host agent (tmux sessions, hooks, run logs)
-After=default.target
 
 [Service]
 Type=simple
@@ -92,10 +93,10 @@ def install(*, bind: str = "127.0.0.1", port: int = 8765, home: str | None = Non
         p.write_text(unit_text(name, bind=bind, port=port, home=home or os.environ.get("AGENTORC_HOME")))
         written.append(str(p))
     _systemctl("daemon-reload")
-    if start:
-        cp = _systemctl("enable", "--now", *[f"{u}.service" for u in UNITS])
-        if cp.returncode != 0:
-            raise RuntimeError(cp.stderr.strip() or cp.stdout.strip())
+    # Always enable (a reboot must not need a human, design §8); --no-start only defers the start.
+    cp = _systemctl("enable", *(["--now"] if start else []), *[f"{u}.service" for u in UNITS])
+    if cp.returncode != 0:
+        raise RuntimeError(cp.stderr.strip() or cp.stdout.strip())
     return written
 
 
@@ -112,7 +113,7 @@ def status() -> str:
         cp = _systemctl("is-active", f"{name}.service")
         lines.append(f"{name}: {cp.stdout.strip() or cp.stderr.strip()}")
     linger = subprocess.run(
-        ["loginctl", "show-user", os.environ.get("USER", ""), "-p", "Linger"], capture_output=True, text=True
+        ["loginctl", "show-user", getpass.getuser(), "-p", "Linger"], capture_output=True, text=True
     )
     lines.append(linger.stdout.strip() or "Linger: unknown")
     return "\n".join(lines)
