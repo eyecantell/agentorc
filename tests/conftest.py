@@ -146,31 +146,36 @@ def subprocess_agent(tmp_path_factory):
     mp = pytest.MonkeyPatch()
     home = tmp_path_factory.mktemp("home")
     sock_name = private_socket_name()
-    mp.setenv("AGENTORC_HOME", str(home))
-    mp.setenv("AGENTORC_TMUX_SOCKET", sock_name)
-    mp.setenv("AGENTORC_TICK", str(FAST_TICK))
-    proc = subprocess.Popen(
-        [sys.executable, str(CHILD), sock_name],
-        env=dict(os.environ),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.PIPE,
-        text=True,
-    )
-    sock = home / "agent.sock"
-    if not wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0):
-        proc.kill()
-        raise RuntimeError(f"child agent never opened {sock}:\n{proc.stderr.read()}")
-    if proc.poll() is not None:
-        raise RuntimeError(f"child agent exited {proc.returncode}:\n{proc.stderr.read()}")
-    yield ChildAgent(home=home, sock_name=sock_name, proc=proc)
-    proc.send_signal(signal.SIGTERM)
+    proc: subprocess.Popen | None = None
     try:
-        _, err = proc.communicate(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        _, err = proc.communicate()
-        raise RuntimeError(f"child agent ignored SIGTERM:\n{err}") from None
+        mp.setenv("AGENTORC_HOME", str(home))
+        mp.setenv("AGENTORC_TMUX_SOCKET", sock_name)
+        mp.setenv("AGENTORC_TICK", str(FAST_TICK))
+        proc = subprocess.Popen(
+            [sys.executable, str(CHILD), sock_name],
+            env=dict(os.environ),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        sock = home / "agent.sock"
+        if not wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0):
+            proc.kill()
+            raise RuntimeError(f"child agent never opened {sock}:\n{proc.communicate(timeout=5)[1]}")
+        if proc.poll() is not None:
+            raise RuntimeError(f"child agent exited {proc.returncode}:\n{proc.communicate(timeout=5)[1]}")
+        yield ChildAgent(home=home, sock_name=sock_name, proc=proc)
+        proc.send_signal(signal.SIGTERM)
+        try:
+            _, err = proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            _, err = proc.communicate(timeout=5)
+            raise RuntimeError(f"child agent ignored SIGTERM:\n{err}") from None
     finally:
+        # runs on setup failure too, so the env never leaks into later modules
+        if proc is not None and proc.poll() is None:
+            proc.kill()
         kill_private_server(Tmux(socket_name=sock_name))
         mp.undo()
     if proc.returncode not in (0, -signal.SIGTERM):
