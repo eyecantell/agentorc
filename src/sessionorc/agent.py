@@ -227,7 +227,8 @@ class HostAgent:
         return any(k[0] == sid and not f.done() for k, f in self._waiters.items())
 
     def _forget(self, sid: str) -> None:
-        self.sessions.pop(sid, None)
+        if self.sessions.pop(sid, None) is None:
+            return  # already forgotten (two removes of one id in flight): nothing more to announce
         self.store.delete(sid)
         # Scrub the id from every subscriber's map and queue the one `gone`: whichever
         # `_push_changes` runs next (the caller's or a tick's) announces it exactly once.
