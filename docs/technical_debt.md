@@ -21,7 +21,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-007 | test_ui mutates `os.environ` for a module-scoped agent | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
-| TD-013 | External-session check reads the default profile's registry only | Low | Open |
 | TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Done |
 | TD-015 | Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape | Medium | Open |
 | TD-016 | `send` should confirm the prompt took: a send-and-wait RPC for policies | Medium | Open |
@@ -159,17 +158,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Fix:** two halves. (a) Claude Code's own registry (`~/.claude/sessions/<pid>.json`: `status` busy/idle/shell, `name`, `cwd`, `sessionId`) can populate read-only cards for non-tmux sessions — state guessed (`scraped`), no Focus terminal, Allow/Deny only if the person launches them with agentorc's hooks layer (`claude --settings ~/.agentorc/claude-hooks/<profile>.json`, which works outside tmux too since the hook only needs `AGENTORC_SESSION` and `AGENTORC_HOME`). (b) A `ao wrap` / shell alias that starts Claude inside an `ao-*` tmux session from any terminal, so the VS Code habit produces first-class cards. Done when a session started from a VS Code terminal shows the right state within 5 s.
 
 **Related:** design §4.1 adoption, §4.3 registry cross-check, phase 1 success test.
-
-## TD-013: External-session check reads the default profile's registry only
-
-**Priority:** Low
-**Added:** 2026-09-06
-**Status:** Open
-**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`registry_entries`, `external_sessions`)
-
-**Why:** The anchor rule's view of Claude Code sessions started outside agentorc comes from `~/.claude/sessions/`, i.e. the default profile's config dir. A second profile with its own `CLAUDE_CONFIG_DIR` keeps its registry elsewhere, so a hand-started session under that account is invisible to occupancy and to the create-time refusal. No second profile exists yet; noted in the PR #20 review.
-
-**Fix:** iterate every declared profile's config dir in `external_sessions()`; test with two temp config dirs.
 
 ## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
 

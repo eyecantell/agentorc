@@ -222,8 +222,10 @@ def test_pid_alive_corroborates_procstart():
     assert _pid_alive(2**22 + 12345, my_start) is False  # no such pid
 
 
-def test_external_sessions_filters_dead_entries(tmp_path):
-    prof = profiles.Profile(name="t", config_dir=tmp_path)
+def test_external_sessions_filters_dead_entries(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "profiles.yml").write_text(f"profiles:\n  t: {{config_dir: {tmp_path}}}\n")
     (tmp_path / "sessions").mkdir()
     me = os.getpid()
     stat = Path(f"/proc/{me}/stat").read_text()
@@ -237,9 +239,23 @@ def test_external_sessions_filters_dead_entries(tmp_path):
         json.dumps({"pid": me, "procStart": str(int(start) + 7), "cwd": "/w/stale", "sessionId": "s2"})
     )
     (tmp_path / "sessions" / "c.json").write_text(json.dumps({"pid": 2**22 + 999, "cwd": "/w/gone", "sessionId": "s3"}))
-    ad = ClaudeCodeAdapter()
-    import unittest.mock as um
-
-    with um.patch("agentorc.adapters.claude_code.profiles_mod.get", return_value=prof):
-        got = ad.external_sessions()
+    got = ClaudeCodeAdapter().external_sessions()
     assert [(e.cwd, e.name, e.status) for e in got] == [("/w/live", "live", "busy")]
+
+
+def test_external_sessions_reads_every_profiles_registry(tmp_path, monkeypatch):
+    """TD-013: a second account's registry lives under its own CLAUDE_CONFIG_DIR; the anchor rule
+    must see a session started there. One read per distinct dir; other tools' profiles are skipped."""
+    home, a, b = tmp_path / "home", tmp_path / "claude-a", tmp_path / "claude-b"
+    for d in (home, a / "sessions", b / "sessions", tmp_path / "other" / "sessions"):
+        d.mkdir(parents=True)
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    (home / "profiles.yml").write_text(
+        f"default: a\nprofiles:\n  a: {{config_dir: {a}}}\n  a2: {{config_dir: {a}, model: sonnet}}\n"
+        f"  b: {{config_dir: {b}}}\n  x: {{adapter: other-tool, config_dir: {tmp_path / 'other'}}}\n"
+    )
+    me = os.getpid()
+    for d, name in ((a, "in-a"), (b, "in-b"), (tmp_path / "other", "not-ours")):
+        (d / "sessions" / "s.json").write_text(json.dumps({"pid": me, "cwd": f"/w/{name}", "name": name}))
+    got = ClaudeCodeAdapter().external_sessions()
+    assert sorted(e.name for e in got) == ["in-a", "in-b"]  # once per dir, never the other tool's

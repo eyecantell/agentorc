@@ -189,10 +189,19 @@ class ClaudeCodeAdapter:
         `procStart` in the same clock ticks as /proc/<pid>/stat field 22, so equality means the same
         process (the primary test of dev-cadence's anchor guard; its extra fallbacks for entries
         that predate the field are not reproduced here — those rely on /proc existence, which is
-        only meaningful within one pid namespace). Phase 1 reads the default profile's config dir
-        only; a second profile's `CLAUDE_CONFIG_DIR` is invisible to the anchor rule (TD-013)."""
+        only meaningful within one pid namespace). Every declared profile's config dir is read
+        (each account keeps its own registry under its `CLAUDE_CONFIG_DIR`), once per distinct
+        directory (TD-013); a profile only this adapter cares about is one whose adapter is ours."""
+        seen: set[Path] = set()
+        entries: list[dict] = []
+        for prof in profiles_mod.load()[0].values():
+            d = config_dir(prof).resolve()
+            if prof.adapter != self.name or d in seen:
+                continue
+            seen.add(d)
+            entries.extend(self.registry_entries(prof))
         out: list[ExternalSession] = []
-        for e in self.registry_entries():
+        for e in entries:
             pid, start = e.get("pid"), e.get("procStart")
             if not isinstance(pid, int) or not _pid_alive(pid, start):
                 continue
