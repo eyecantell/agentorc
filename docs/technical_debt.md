@@ -20,7 +20,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Partly done |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
-| TD-023 | `exited` is overloaded: a killed session and a natural exit look the same, but only one still has a pane | Low | Open |
 
 ---
 
@@ -149,16 +148,3 @@ offer to install it into the repo's `.claude/skills/`. Depends on TD-018. Done i
 the adapter-author guide.
 
 **Related:** design §4.7, §7 phase 5; TD-018; ADR 2026-09-10.
-
-## TD-023: `exited` is overloaded: a killed session and a natural exit look the same, but only one still has a pane
-
-**Priority:** Low
-**Added:** 2026-09-10
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`rpc_kill`, `_observe`), `src/agentorc/cli.py` (`cmd_focus`)
-
-**Why:** `rpc_kill` destroys the tmux session and sets `exited`; a process that ends on its own also reads `exited`, but `remain-on-exit` keeps its dead pane (exit code, last screen) until `remove`. Nothing on the record says which, so a client cannot tell whether Focus / `ao focus` will find a pane: the CLI learned to run `tmux attach` as a child and report a non-zero exit instead (PR #46 review), and the UI's `/term` bridge finds out the same way. Found in the PR #46 review.
-
-**Fix:** either record the distinction (`killed_at`, or `pane: bool` refreshed by the tick from the pane snapshot) and have Focus / `ao focus` refuse cleanly when the pane is gone, or make `kill` keep the dead pane like a natural exit (kill the process, not the session) so `exited` always has a pane until `remove`. Done when `ao focus` on a killed session prints agentorc's own line without calling tmux.
-
-**Related:** TD-010 (b), PR #46.

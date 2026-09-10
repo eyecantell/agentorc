@@ -373,8 +373,8 @@ def create_app() -> FastAPI:
             await ws.send_bytes(f"\r\n[agentorc] {e.detail}\r\n".encode())
             await ws.close(code=4404)  # final: the client must not retry
             return
-        if s.get("state") == "closed":
-            await ws.send_bytes(b"\r\n[agentorc] this session is closed; its pane is gone (see the banner).\r\n")
+        if s.get("state") == "closed" or not s.get("pane", True):  # no pane to attach (TD-023)
+            await ws.send_bytes(b"\r\n[agentorc] this session's pane is gone (see the banner).\r\n")
             await ws.close(code=4404)
             return
         sock = os.environ.get("AGENTORC_TMUX_SOCKET")

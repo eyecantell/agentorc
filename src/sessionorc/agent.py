@@ -220,8 +220,9 @@ class HostAgent:
             pane = panes.get(sid)
             if pane is None:
                 # A session created after the pane snapshot was taken is not judged by it.
-                if s.state != "exited" and _parse(s.created) + CREATE_GRACE < snapshot_at:
+                if _parse(s.created) + CREATE_GRACE < snapshot_at and (s.state != "exited" or s.pane):
                     s.set_state("exited", confidence="scraped")
+                    s.pane = False  # gone for good: killed, or the tmux server restarted (TD-023)
                     self.store.save(s)
                 continue
             self._observe(s, pane, tails.get(sid, []), now)
@@ -250,6 +251,7 @@ class HostAgent:
     def _observe(self, s: Session, pane: PaneInfo, tail: list[str], now: datetime) -> None:
         adapter = adapters.get(s.adapter)
         s.tail = [_clean(t) for t in tail]
+        s.pane = True
         if s.run_log:
             with contextlib.suppress(OSError):
                 mtime = datetime.fromtimestamp(Path(s.run_log).stat().st_mtime, UTC)
@@ -481,6 +483,7 @@ class HostAgent:
         s = self._get(id)
         await asyncio.to_thread(self.tmux.kill_session, id)
         s.set_state("exited", confidence="scraped")
+        s.pane = False  # unlike a natural exit, a kill destroys the pane (TD-023)
         self.store.save(s)
         return s.to_dict()
 
@@ -488,6 +491,7 @@ class HostAgent:
         s = self._get(id)
         await asyncio.to_thread(self.tmux.kill_session, id)
         s.set_state("closed", confidence="scraped")
+        s.pane = False
         s.closed_at = now_iso()
         self.store.save(s)
         return s.to_dict()
