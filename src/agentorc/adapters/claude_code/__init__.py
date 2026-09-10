@@ -65,7 +65,10 @@ def config_dir(profile: Profile) -> Path:
 
 def global_config_file(profile: Profile) -> Path:
     """`.claude.json`: sign-in, MCP servers, per-project state such as trust decisions."""
-    return (profile.config_dir / ".claude.json") if profile.config_dir else Path("~/.claude.json").expanduser()
+    # the same fallback as `config_dir()`: under `CLAUDE_CONFIG_DIR` Claude Code keeps `.claude.json` there
+    env = os.environ.get("CLAUDE_CONFIG_DIR")
+    d = profile.config_dir or (Path(env).expanduser() if env else None)
+    return (d / ".claude.json") if d else Path("~/.claude.json").expanduser()
 
 
 def pretrust(cwd: Path, profile: Profile) -> bool:

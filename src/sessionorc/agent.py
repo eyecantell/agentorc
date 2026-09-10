@@ -288,7 +288,11 @@ class HostAgent:
         for ext in exts:
             if (ext.tool_id and ext.tool_id in ours) or (ext.cwd and Path(ext.cwd).resolve() in taken):
                 continue
-            sid = "ext-" + naming.slug(ext.tool_id or ext.name, max_len=48)
+            sid = base = "ext-" + naming.slug(ext.tool_id or ext.name, max_len=48)
+            n = 2
+            while sid in seen:  # two entries with no tool id and one name: never hide the second
+                sid = f"{base}-{n}"
+                n += 1
             seen.add(sid)
             s = self._external.get(sid)
             if s is None:
@@ -304,6 +308,8 @@ class HostAgent:
         for sid in list(self._external):
             if sid not in seen:
                 del self._external[sid]
+                for last in self._subscribers.values():  # as `_forget` does: announce `gone` exactly once
+                    last.pop(sid, None)
                 self._gone.append(sid)
 
     def _is_removed_pane(self, name: str, pane: PaneInfo) -> bool:

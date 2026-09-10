@@ -316,3 +316,5 @@ def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
     assert "▣ Details" in html and "▣ Focus" not in html
     assert ">registry<" in html and 'data-act="mode"' not in html and 'data-act="kill"' not in html
     assert "started outside agentorc" in html
+    html = templates.get_template("card.html").render(s=view({**s, "state": "idle"}))
+    assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
