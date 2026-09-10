@@ -6,7 +6,7 @@ You run in your own git worktree at `.claude/worktrees/tdgrind-ao-1` (branch `td
 1. **TD-024** — `serve` shutdown traceback (fix direction is in the entry; the PR #30 restart tests cover it).
 2. **The CI flake** seen on PR #34: `tests/test_cli.py::test_shell_send_tail_status_kill_close` asserted `│` in `ao status -v` output before the verbose tail rows appeared. Not ledgered yet: run the suite in a loop until it reproduces, ledger it (TD-025), fix the race.
 3. **TD-023** — `exited` overloaded (killed vs natural exit).
-4. **TD-004 remainder, minus ssh** — `volatile`, `repos_registry`, `runs_keep_days` in `hosts.yml` per design §5, and drop the three `AGENTORC_*_HOST` env overrides. The ssh transport entries stay phase 2.
+4. **TD-004 remainder, minus ssh** — `volatile`, `repos_registry`, `runs_keep_days` in `hosts.yml` per design §5, and drop the `AGENTORC_HOST_NAME` / `AGENTORC_VSCODE_HOST` / `AGENTORC_LOCAL_HOST` env overrides. The ssh transport entries stay phase 2.
 5. **TD-010 (a)** — read-only Herd cards for registry-only sessions (`~/.claude/sessions/<pid>.json`) with no tmux; state `scraped`, no Focus terminal. Design §4.1 edit in the same PR. This closes the phase 1 success test's last gap.
 Then stop; do not free-pick beyond the list. For each: verify current code state first (entries lag reality — grep before building; run 1 changed a lot). Loop: pick → fix + `pdm run test` + `pdm run lint` → PR → independent review by a **Sonnet** agent per docs/cadence.md §4 (an Agent with `model: sonnet` — never review on your own model; doc-only PRs get the same fact-check review) → address findings → squash-merge when SHIP → next. Resolved entries move to docs/technical_debt_archive.md with their summary row deleted (cadence §2).
 
