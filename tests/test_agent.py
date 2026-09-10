@@ -210,3 +210,44 @@ async def test_occupancy_sees_own_and_external_sessions(agent, tmp_path, monkeyp
         assert occ["occupants"] == [f"{own['id']} (working)"]
         await c.call("kill", id=sh["id"])
         await c.call("kill", id=own["id"])
+
+
+async def test_limited_from_usage_cap(agent, hookstub, tmp_path, monkeypatch):
+    """TD-001: a profile at 100% of a window makes its interactive sessions `limited` with the reset
+    time; the cap lifting (or the reset time passing) brings them back to `working`; a session that
+    needs you keeps that; subscribers get the usage figure."""
+    from datetime import UTC, datetime, timedelta
+
+    monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    soon = (datetime.now(UTC) + timedelta(hours=2)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    async with LocalClient() as c, LocalClient() as sub:
+        s = await c.call("create", name="cap", dir=str(tmp_path), adapter="hookstub", profile="p1")
+        await sub.call("subscribe")
+        hookstub.usage_value = {"five_hour_pct": 100, "weekly_pct": 12, "five_hour_resets": soon, "weekly_resets": None}
+        got = await wait_state(c, s["id"], "limited")
+        assert got["pending"] == {
+            "kind": "limit",
+            "text": f"5-hour cap · resets {soon[11:16]}Z",
+            "deadline": None,
+            "tool_use_id": None,
+        }
+        assert got["confidence"] == "hook"
+        assert (await c.call("usage"))["p1"]["five_hour_pct"] == 100
+        while (ev := json.loads(await asyncio.wait_for(sub._reader.readline(), 5)))["event"] != "usage":
+            pass
+        assert ev["profile"] == "p1" and ev["usage"]["five_hour_pct"] == 100
+        # the window resets: working again
+        hookstub.usage_value = {"five_hour_pct": 3, "weekly_pct": 12, "five_hour_resets": soon, "weekly_resets": None}
+        await wait_state(c, s["id"], "working")
+        # a cap whose reset time is already behind us is no cap
+        past = (datetime.now(UTC) - timedelta(minutes=1)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        hookstub.usage_value = {"five_hour_pct": 100, "weekly_pct": 12, "five_hour_resets": past, "weekly_resets": None}
+        await asyncio.sleep(0.8)
+        assert (await c.call("get", id=s["id"]))["state"] == "working"
+        # needs-you is never overridden by a cap
+        await c.call("hook", session=s["id"], state="needs-you", pending={"kind": "question", "text": "a or b?"})
+        hookstub.usage_value = {"five_hour_pct": 5, "weekly_pct": 100, "five_hour_resets": None, "weekly_resets": soon}
+        await asyncio.sleep(0.8)
+        assert (await c.call("get", id=s["id"]))["state"] == "needs-you"
+        hookstub.usage_value = None
+        await c.call("kill", id=s["id"])

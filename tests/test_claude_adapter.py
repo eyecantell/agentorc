@@ -259,3 +259,25 @@ def test_external_sessions_reads_every_profiles_registry(tmp_path, monkeypatch):
         (d / "sessions" / "s.json").write_text(json.dumps({"pid": me, "cwd": f"/w/{name}", "name": name}))
     got = ClaudeCodeAdapter().external_sessions()
     assert sorted(e.name for e in got) == ["in-a", "in-b"]  # once per dir, never the other tool's
+
+
+def test_usage_for_by_profile_name(tmp_path, monkeypatch):
+    """TD-001: the core asks by profile name and gets a plain dict; unknown profile or no data → None."""
+    import unittest.mock as um
+
+    from agentorc.adapters.claude_code import Usage
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))  # no profiles.yml: only `default` exists
+    ad = ClaudeCodeAdapter()
+    assert ad.usage_for("no-such-profile") is None
+    u = Usage(five_hour_pct=42, weekly_pct=7, five_hour_resets="2026-09-10T04:00:00Z", weekly_resets=None, fetched="x")
+    with um.patch.object(ClaudeCodeAdapter, "usage", return_value=u):
+        assert ad.usage_for("") == {
+            "five_hour_pct": 42,
+            "weekly_pct": 7,
+            "five_hour_resets": "2026-09-10T04:00:00Z",
+            "weekly_resets": None,
+            "fetched": "x",
+        }
+    with um.patch.object(ClaudeCodeAdapter, "usage", return_value=None):
+        assert ad.usage_for("default") is None

@@ -39,6 +39,7 @@ def wait_state(client, sid, state, timeout=6.0):
 def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/")
     assert r.status_code == 200 and "Herd" in r.text and "No sessions" in r.text
+    assert 'id="usagechip"' in r.text  # the per-profile usage figure (TD-001), empty until a poll lands
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "sh1"}, follow_redirects=False)

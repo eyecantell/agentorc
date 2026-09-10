@@ -187,8 +187,10 @@ def create_app() -> FastAPI:
         # An unreachable agent still gets a page: the banner + Retry are the recovery path
         # (design §4.5 unreachable hosts), never a bare 503.
         agent_down = False
+        usage: dict[str, Any] = {}
         try:
             sessions = await call("list")
+            usage = await call("usage")
         except HTTPException as e:
             if e.status_code != 503:
                 raise
@@ -198,7 +200,14 @@ def create_app() -> FastAPI:
         return templates.TemplateResponse(
             request,
             "herd.html",
-            {"sessions": vs, "counts": counts, "host": host_name(), "active": "Herd", "agent_down": agent_down},
+            {
+                "sessions": vs,
+                "counts": counts,
+                "host": host_name(),
+                "active": "Herd",
+                "agent_down": agent_down,
+                "usage": usage,
+            },
         )
 
     @app.get("/focus/{sid}", response_class=HTMLResponse)
@@ -337,7 +346,7 @@ def create_app() -> FastAPI:
                                 }
                             )
                         )
-                    elif ev.get("event") == "gone":
+                    elif ev.get("event") in ("gone", "usage"):
                         await ws.send_text(json.dumps(ev))
         except (WebSocketDisconnect, AgentUnavailable, ConnectionError):
             pass

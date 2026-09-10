@@ -17,3 +17,8 @@ class HookFedStub:
 
     def classify(self, pane, tail):
         return None
+
+    usage_value = None  # set by a test: what `usage_for` reports for every profile (TD-001)
+
+    def usage_for(self, profile):
+        return self.usage_value

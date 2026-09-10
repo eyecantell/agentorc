@@ -15,7 +15,7 @@ import os
 import re
 import shutil
 import uuid
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -236,6 +236,14 @@ class ClaudeCodeAdapter:
         if not exp:
             return True
         return datetime.fromtimestamp(int(exp) / 1000, UTC) > datetime.now(UTC)
+
+    def usage_for(self, profile: str) -> dict | None:
+        """The core-facing form of `usage()`: by profile name, as a plain dict (TD-001)."""
+        try:
+            u = self.usage(profiles_mod.get(profile or None))
+        except (KeyError, ValueError):
+            return None
+        return asdict(u) if u else None
 
     def usage(self, profile: Profile, timeout: float = 10.0) -> Usage | None:
         """5-hour and weekly utilisation from the OAuth usage endpoint tdgrind already polls.

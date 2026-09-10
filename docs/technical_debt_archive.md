@@ -137,3 +137,17 @@ measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts i
 **Resolved:** 2026-09-10 (PRs #26, #27; ledgered here 2026-09-10) — the spike ran against herdr 0.9.0 in a scratch config and failed the pass criterion (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); design §3 row corrected and the §10 item checked in PR #26; the lessons became TD-015..TD-019 and design §4.1/§4.2/§4.7/§9 edits in PR #28.
 
 **Related:** design §3, §4.5b, §4.5c, §7 phase 2, §10; PRs #23, #24; TD-004 (ssh transport, the work this decides).
+
+## TD-001: Short title of the problem
+
+**Priority:** High | Medium | Low
+**Added:** YYYY-MM-DD
+**Status:** Resolved
+**Location:** `path/to/file.py` (function/section)
+
+**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
+
+**Resolved:** 2026-09-10 (PR #44) — `HostAgent._refresh_usage` (end of each tick) asks each live agent session's adapter `usage_for(profile)` in a thread at most once per `USAGE_EVERY` (60 s), caches per profile (`rpc_usage`), streams `{"event": "usage", …}` to subscribers (also on subscribe), and applies the `limited` rule: an interactive session on a profile at 100% of a window gets `limited` with `Pending(kind="limit", text="5-hour cap · resets HH:MMZ")` (never over `needs-you`), and `working` again once the window resets (a `resets_at` already past is not a cap). `ClaudeCodeAdapter.usage_for` is the name-keyed wrapper of `usage()`. The top bar carries a per-profile chip (`#usagechip`, red at a cap). Switch profile / Wait (§4.5a) are still to build. Design §4.3/§4.4 updated. Tests: `tests/test_agent.py::test_limited_from_usage_cap`, `tests/test_claude_adapter.py::test_usage_for_by_profile_name`.
+
+**Related:** other TDs, PRs, decision docs.
+-->

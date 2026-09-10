@@ -278,6 +278,7 @@ class Adapter(Protocol):
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
     def quirks(self) -> Quirks                      # first-run dialogs, settings pre-seed
     def usage(self, profile: Profile) -> Usage | None     # quota + reset time, per account
+    def usage_for(self, profile: str) -> dict | None      # the same by profile name, for the core (it cannot build a Profile)
     def credentials_ok(self, profile: Profile) -> bool | None
 ```
 
@@ -308,6 +309,11 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
+- Usage: each live agent session's profile is asked its adapter's `usage_for` once a minute in
+  a thread (never per tick); the last answer is cached, served by `usage`, streamed as a `usage`
+  event for the top bar's per-profile figure, and drives the `limited` rule of §4.2 (an
+  interactive session on a profile at 100% of a window shows `limited` with the reset time,
+  `working` again once the window resets). A fetch failure keeps the last answer (TD-001).
 - Attachment drop: accept an uploaded file (the UI copies it over ssh) into
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file

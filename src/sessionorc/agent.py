@@ -36,6 +36,7 @@ CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
+USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
 
@@ -66,6 +67,9 @@ class HostAgent:
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
+        # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
+        self._usage: dict[str, dict[str, Any]] = {}
+        self._usage_checked: dict[str, float] = {}
         # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
         # stamp for expiry). A pane snapshot taken before the remove must not re-adopt the pane it
         # still lists (the tick snapshots in a thread; remove runs between). Keyed by the pane's
@@ -116,6 +120,7 @@ class HostAgent:
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
+        await self._refresh_usage()
 
     async def _refresh_git(self, now: datetime) -> None:
         due = [
@@ -139,6 +144,41 @@ class HostAgent:
             if new != live.git:
                 live.git = new
                 self.store.save(live)
+
+    async def _refresh_usage(self) -> None:
+        """Ask each live agent session's adapter for its profile's usage once a minute, in a
+        thread; a fetch failure keeps the last answer and never gates anything (design §6).
+        Then the `limited` rule: an interactive session on a profile at 100% of a window shows
+        `limited` with the reset time, and goes back to `working` once the window resets."""
+        live = [
+            s
+            for s in self.sessions.values()
+            if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
+        ]
+        mono = time.monotonic()
+        due: dict[str, Any] = {}
+        for s in live:
+            fn = getattr(adapters.get(s.adapter), "usage_for", None)
+            if fn and s.profile not in due and mono - self._usage_checked.get(s.profile, -USAGE_EVERY) >= USAGE_EVERY:
+                due[s.profile] = fn
+        if due:
+            results = await asyncio.gather(
+                *(asyncio.to_thread(fn, prof) for prof, fn in due.items()), return_exceptions=True
+            )
+            for prof, r in zip(due, results, strict=True):
+                self._usage_checked[prof] = mono
+                if isinstance(r, dict) and r != self._usage.get(prof):
+                    self._usage[prof] = r
+                    await self._broadcast({"event": "usage", "profile": prof, "usage": r})
+        for s in live:
+            cap = _cap(self._usage.get(s.profile))
+            if cap and s.state not in ("limited", "needs-you"):
+                # the tool's own endpoint, not the screen: reported, so `hook` (design §9 invariant 4)
+                s.set_state("limited", confidence="hook", pending=Pending(kind="limit", text=cap))
+                self.store.save(s)
+            elif not cap and s.state == "limited" and s.pending and s.pending.kind == "limit":
+                s.set_state("working", confidence="hook")
+                self.store.save(s)
 
     def _reconcile(self, panes: dict[str, PaneInfo], tails: dict[str, list[str]], snapshot_at: datetime) -> None:
         for sid, event in self.events.drain():
@@ -504,6 +544,10 @@ class HostAgent:
         p = paths.recent_dirs_file()
         return p.read_text().splitlines() if p.is_file() else []
 
+    async def rpc_usage(self) -> dict[str, dict[str, Any]]:
+        """Last known usage per profile (TD-001): what the top bar shows."""
+        return dict(self._usage)
+
     async def rpc_adapters(self) -> list[str]:
         return adapters.names()
 
@@ -542,6 +586,11 @@ class HostAgent:
             for sid in gone:
                 await self._send(w, json.dumps({"event": "gone", "id": sid}))
 
+    async def _broadcast(self, msg: dict[str, Any]) -> None:
+        line = json.dumps(msg)
+        for w in list(self._subscribers):
+            await self._send(w, line)
+
     async def _send(self, w: asyncio.StreamWriter, line: str) -> None:
         try:
             w.write((line + "\n").encode())
@@ -563,6 +612,8 @@ class HostAgent:
                     self._subscribers[writer] = {}  # empty: the first push is this tab's full snapshot
                     writer.write((json.dumps({"id": req.get("id"), "result": "subscribed"}) + "\n").encode())
                     await writer.drain()
+                    for prof, u in self._usage.items():  # the top bar's figure, before the cards
+                        await self._send(writer, json.dumps({"event": "usage", "profile": prof, "usage": u}))
                     await self._push_changes()
                     continue
                 writer.write((json.dumps(await self._dispatch(req)) + "\n").encode())
@@ -601,6 +652,27 @@ def _clean(text: str) -> str:
     text = _ESC_OTHER.sub("", text)
     text = "".join(ch for ch in text if ch == "\t" or ch >= " ")
     return text[:200]
+
+
+def _cap(usage: dict[str, Any] | None) -> str | None:
+    """The pending text for a capped profile, or None. A window whose `resets_at` has passed is
+    not a cap any more even before the next poll says so."""
+    if not usage:
+        return None
+    now = datetime.now(UTC)
+    for key, label in (("five_hour", "5-hour"), ("weekly", "weekly")):
+        try:
+            pct = int(usage.get(f"{key}_pct") or 0)
+        except (TypeError, ValueError):
+            continue
+        resets = usage.get(f"{key}_resets")
+        if pct < 100:
+            continue
+        with contextlib.suppress(TypeError, ValueError):
+            if resets and _parse(str(resets)) <= now:
+                continue
+        return f"{label} cap · resets {str(resets)[11:16] + 'Z' if resets else 'unknown'}"
+    return None
 
 
 def _parse(iso: str) -> datetime:

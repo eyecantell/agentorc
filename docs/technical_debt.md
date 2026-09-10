@@ -12,7 +12,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 
 | ID | Title | Priority | Status |
 |----|-------|----------|--------|
-| TD-001 | `limited` state: wire adapter `usage()` into the agent tick | Medium | Open |
 | TD-002 | Focus composer: Attach / drop / paste upload | Medium | Open |
 | TD-003 | Phone layout: narrow Focus with a soft-key row | Medium | Open |
 | TD-004 | Host identity: `hosts.yml` (local entry only so far), ssh transport and volatile hosts pending | Medium | Partly done |
@@ -27,20 +26,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 ---
 
 <!-- Entry template:
-
-## TD-001: Short title of the problem
-
-**Priority:** High | Medium | Low
-**Added:** YYYY-MM-DD
-**Status:** Open
-**Location:** `path/to/file.py` (function/section)
-
-**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
-
-**Fix:** concrete direction(s), and what would count as done.
-
-**Related:** other TDs, PRs, decision docs.
--->
 
 ## TD-001: `limited` state: wire adapter `usage()` into the agent tick
 

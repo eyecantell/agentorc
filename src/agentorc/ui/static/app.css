@@ -39,6 +39,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 15px; color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
 .tabs { display: flex; gap: 2px; } .tab { padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; } .tab.on { background: var(--tab-on); color: #fff; } .tab.off { opacity: .45; cursor: default; }
 #hostchip { font-size: 11px; color: var(--topdim); } #hostdot.down { color: var(--stalled); }
+#usagechip { font-size: 11px; color: var(--topdim); } #usagechip .cap { color: var(--limited); }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }
