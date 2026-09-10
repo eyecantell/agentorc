@@ -44,6 +44,8 @@ def test_shell_send_tail_status_kill_close(subprocess_agent, tmp_path, capsys):
     assert cli.main(["tail", sid, "-n", "10"]) == 0
     assert "CLI-21" in capsys.readouterr().out
 
+    # `status -v` shows the record's tail, which the tick refreshes: wait for it (flaked on CI 2026-09-10)
+    assert wait_for_sync(lambda: any("CLI-21" in line for line in call_sync("get", id=sid)["tail"]))
     assert cli.main(["status", "-v"]) == 0
     out = capsys.readouterr().out
     assert sid in out and "shell" in out and "│" in out  # the verbose tail rows
