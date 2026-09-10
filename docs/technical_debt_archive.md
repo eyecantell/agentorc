@@ -116,3 +116,24 @@ reads do not. agentorc's Focus view is the natural "seen".
 **Resolved:** 2026-09-10 (PR #43) — `Session.seen_at` (persisted) set by `rpc_seen`, which the UI calls when Focus opens (`GET /focus/<id>`), after any card action, and from the open Focus page whenever its session's event arrives `unseen`. `view()` computes `unseen = idle and (no seen_at or since > seen_at)` (whole-second stamps: a tie reads as seen), renders "finished · unseen", sorts it at rank 4.5 (above `idle`, below `working`); `/events` carries the view's rank. `idle` stays `idle` in every payload. Design §4.5 sort list names the slot. Test: `tests/test_ui.py::test_unseen_idle_until_focused`.
 
 **Related:** design §4.2, §4.5 (Herd sort); ADR 2026-09-10.
+
+## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
+
+**Priority:** High
+**Added:** 2026-09-10
+**Status:** Done 2026-09-10 — spike run against herdr 0.9.0 on kmaster in a scratch config; the pass criterion failed (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); §10 item checked, §3 row corrected.
+**Location:** design §3 (herdr row), §10 "Build on, or beside, herdr?"; `src/sessionorc/` (the layer a substrate would sit under)
+
+**Why:** herdr (https://herdr.dev, Apache-2.0, Herdr, Inc., $6M seed 2026-09-09) already ships the
+substrate half of this design — persistent panes, multi-host over ssh, restart recovery, hook-fed
+state for six of its 17 integrated CLIs (not Claude Code, which it screen-scrapes — the spike's finding), a worktree API, an event-subscription socket API — and
+Herdr Cloud is about to ship the `relay` transport of §4.5b. It does not do the half §1 came
+from: states finer than `blocked`, unattended supervision, the anchor rule, Ready to close,
+per-repo commands, phone triage. Core contribution is closed (no unsolicited PRs); plugins and
+the socket API are the open surface. Phase 2 (ssh transport) is the first thing herdr would
+replace, so the decision has to come before phase 2 is built, and it should be decided by a
+measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts in design §3.
+
+**Resolved:** 2026-09-10 (PRs #26, #27; ledgered here 2026-09-10) — the spike ran against herdr 0.9.0 in a scratch config and failed the pass criterion (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); design §3 row corrected and the §10 item checked in PR #26; the lessons became TD-015..TD-019 and design §4.1/§4.2/§4.7/§9 edits in PR #28.
+
+**Related:** design §3, §4.5b, §4.5c, §7 phase 2, §10; PRs #23, #24; TD-004 (ssh transport, the work this decides).
