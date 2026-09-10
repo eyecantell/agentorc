@@ -9,7 +9,7 @@
       <div class="field"><label>Directory</label>
         <input class="input mono" name="dir" list="recent" value="{{ prefill.dir }}" placeholder="/path/to/repo or worktree" required>
         <datalist id="recent">{% for r in recent %}<option value="{{ r }}">{% endfor %}</datalist>
-        <span class="note">a repo checkout, a worktree, or any directory (recent ones offered)</span>
+        <span class="note">a repo checkout, a worktree, or any directory (registered repos and recent ones offered)</span>
         <span class="note" id="occupancy"></span>
       </div>
       <div class="field"><label>Adapter</label>

@@ -238,8 +238,7 @@ def test_herd_renders_with_agent_down(tmp_path, monkeypatch):
 
 def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    monkeypatch.setenv("AGENTORC_VSCODE_HOST", "kmaster")
-    monkeypatch.delenv("AGENTORC_LOCAL_HOST", raising=False)
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  vscode_host: kmaster\n")
     from agentorc.ui.app import vscode_url
 
     assert vscode_url("/tmp/ao-test") == "vscode://vscode-remote/ssh-remote+kmaster/tmp/ao-test?windowId=_blank"
@@ -248,7 +247,7 @@ def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
         vscode_url("/tmp/my repo/a?b")
         == "vscode://vscode-remote/ssh-remote+kmaster/tmp/my%20repo/a%3Fb?windowId=_blank"
     )
-    monkeypatch.setenv("AGENTORC_LOCAL_HOST", "1")
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     assert vscode_url("/tmp/ao-test") == "vscode://file/tmp/ao-test?windowId=_blank"
     assert vscode_url("/tmp/my repo") == "vscode://file/tmp/my%20repo?windowId=_blank"
 

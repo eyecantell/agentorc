@@ -139,3 +139,39 @@ def test_sigterm_stops_serve_cleanly(tmp_path, monkeypatch):
         if proc.poll() is None:
             proc.kill()
         kill_private_server(Tmux(socket_name=sock_name))
+
+
+def test_prune_runs_keeps_live_logs(tmp_path, monkeypatch):
+    """Run-log retention (design §4.6, TD-004): logs older than `runs_keep_days` go, except a running
+    session's; `0` keeps everything."""
+    import os
+    from datetime import UTC, datetime
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    paths.ensure_layout()
+    (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 7\n")
+    old_t = (datetime.now(UTC) - timedelta(days=8)).timestamp()
+    live_log, dead_log, orphan, fresh = (paths.runs_dir() / n for n in ("live.log", "dead.log", "gone.log", "new.log"))
+    for f in (live_log, dead_log, orphan, fresh):
+        f.write_text("x")
+    for f in (live_log, dead_log, orphan):
+        os.utime(f, (old_t, old_t))
+    store = SessionStore()
+    live = Session(id="ao-l", name="l", kind="interactive", adapter="shell", dir=str(tmp_path), run_log=str(live_log))
+    dead = Session(id="ao-d", name="d", kind="interactive", adapter="shell", dir=str(tmp_path), run_log=str(dead_log))
+    dead.set_state("exited", confidence="scraped")
+    store.save(live)
+    store.save(dead)
+    tmux = Tmux(socket_name=private_socket_name())
+    try:
+        a = HostAgent(tmux=tmux)
+        a._prune_runs(datetime.now(UTC))
+        assert live_log.exists() and fresh.exists()  # running session's log; a recent file
+        assert not dead_log.exists() and not orphan.exists()  # exited session's; a forgotten session's
+        os.utime(live_log, (old_t, old_t))
+        (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n")
+        a.sessions.clear()
+        a._prune_runs(datetime.now(UTC))
+        assert live_log.exists()  # 0: never prune
+    finally:
+        kill_private_server(tmux)
