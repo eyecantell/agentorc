@@ -21,7 +21,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Partly done |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 | TD-023 | `exited` is overloaded: a killed session and a natural exit look the same, but only one still has a pane | Low | Open |
-| TD-024 | `agentorc-agent serve` logs a pending-task traceback on every SIGTERM stop | Low | Open |
 
 ---
 
@@ -163,17 +162,3 @@ the adapter-author guide.
 **Fix:** either record the distinction (`killed_at`, or `pane: bool` refreshed by the tick from the pane snapshot) and have Focus / `ao focus` refuse cleanly when the pane is gone, or make `kill` keep the dead pane like a natural exit (kill the process, not the session) so `exited` always has a pane until `remove`. Done when `ao focus` on a killed session prints agentorc's own line without calling tmux.
 
 **Related:** TD-010 (b), PR #46.
-
-## TD-024: `agentorc-agent serve` logs a pending-task traceback on every SIGTERM stop
-
-**Priority:** Low
-**Added:** 2026-09-10
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`main`, the `serve` branch)
-
-**Why:** `main` installs `loop.stop` as the SIGINT/SIGTERM handler and runs `agent.serve()` with `run_until_complete`. `loop.stop` halts the loop with the `serve` coroutine still pending, so the process ends with `ERROR asyncio: Task was destroyed but it is pending!` and an `Exception ignored … RuntimeError: Event loop is closed` traceback in the journal. Seen 2026-09-10 in `journalctl --user -u agentorc-agent` when `ao service install` restarted the unit after the promote (pid 681793). Harmless — sessions are re-adopted on the next tick, nothing is lost — but every restart writes an ERROR line that looks like a crash, and `serve`'s `finally` (cancel the ticker, unlink the socket file) is skipped.
-
-**Fix:** make the signal handler cancel the serve task instead of stopping the loop (`task = loop.create_task(agent.serve()); handler = task.cancel`), catch `CancelledError` in `main`, and let `serve` run its `finally` block; close the loop with `loop.run_until_complete(loop.shutdown_asyncgens())` before returning. Done when `systemctl --user restart agentorc-agent` leaves no ERROR line in the journal.
-
-**Related:** TD-020 (agent restart), the restart tests from PR #30.
-

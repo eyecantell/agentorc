@@ -102,3 +102,40 @@ def test_restart_seeds_hook_freshness(tmp_path, monkeypatch):
         assert not a._hook_fresh("ao-h", datetime.now(UTC) + timedelta(minutes=21))
     finally:
         kill_private_server(tmux)
+
+
+def test_sigterm_stops_serve_cleanly(tmp_path, monkeypatch):
+    """TD-024: SIGTERM cancels the serve task (`serve_until_signal`), so `serve()`'s `finally`
+    unlinks the socket and the process exits 0 without asyncio's pending-task traceback. Runs the
+    test child, which stops exactly the way `agentorc-agent serve` does."""
+    import os
+    import signal
+    import subprocess
+    import sys
+
+    from conftest import CHILD, wait_for_sync
+
+    home = tmp_path / "home"
+    sock_name = private_socket_name()
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)
+    proc = subprocess.Popen(
+        [sys.executable, str(CHILD), sock_name],
+        env=dict(os.environ),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    try:
+        sock = home / "agent.sock"
+        assert wait_for_sync(lambda: sock.exists() or proc.poll() is not None, timeout=10.0)
+        assert proc.poll() is None, proc.communicate(timeout=5)[1]
+        proc.send_signal(signal.SIGTERM)
+        _, err = proc.communicate(timeout=10)
+        assert proc.returncode == 0, err
+        assert not sock.exists(), "serve()'s finally did not unlink the socket"
+        assert "Task was destroyed" not in err and "Traceback" not in err, err
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        kill_private_server(Tmux(socket_name=sock_name))
