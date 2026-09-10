@@ -831,6 +831,8 @@ async def serve_until_signal(agent: HostAgent, sock: Path | None = None) -> None
     (cancel the ticker, unlink the socket file) runs while the loop is still alive and the
     process ends without asyncio's "Task was destroyed but it is pending!" (TD-024).
     """
+    # Run this under `asyncio.run`: its shutdown awaits every task still on the loop (the
+    # cancelled ticker, a live usage refresh), which is what keeps them from being destroyed pending.
     task = asyncio.ensure_future(agent.serve(sock))
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

@@ -6,7 +6,7 @@ the test suite never spawns it. This script takes the socket name as its one arg
 
 Stops the way `agentorc-agent serve` does (`serve_until_signal`, TD-024): SIGTERM cancels the
 serve task, `serve()`'s `finally` unlinks the socket file, and the process exits 0 with no
-pending-task traceback — `test_agent.py` asserts exactly that on this child.
+pending-task traceback — `test_agent_restart.py` asserts exactly that on this child.
 """
 
 import asyncio
