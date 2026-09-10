@@ -11,7 +11,7 @@
       <span class="grow"></span>
       <button class="btn" data-act="shell-here" data-id="{{ s.id }}">⌘ Open shell here</button>
       {% if s.vscode %}<a class="btn" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
-      <button class="btn ghost" id="tcopy" title="copy the terminal selection (Ctrl+Shift+C, or Ctrl+C with a selection)">⧉ Copy</button>
+      <button class="btn ghost" id="tcopy" title="copy the terminal selection — Shift+drag to select (Ctrl+Shift+C, or Ctrl+C with a selection). Wheel or Shift+PageUp scrolls history; Shift+PageDown, q or Esc returns">⧉ Copy</button>
       <button class="btn ghost" id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click)">⎘ Paste</button>
       <button class="btn" data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
       <button class="btn danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">✕ Kill</button>

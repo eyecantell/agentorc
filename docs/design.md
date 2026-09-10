@@ -575,6 +575,13 @@ Decisions taken from a review of the `sessionorc` layer before build:
   screen; nothing is replayed from the run log. `send-keys` is an agent RPC independent of any
   attached pty, so a Send never depends on a Focus being open. The terminal shows tmux's
   scrollback (`history-limit`) only; the run log is a download, never a terminal source.
+- **Scrollback is tmux's, reached through tmux (TD-022, 2026-09-09).** tmux repaints the client
+  in place and keeps the history itself, so xterm.js runs with no local buffer. The attach sets
+  `mouse on` on the session (a session option, never the person's global one): the wheel reaches
+  tmux, which enters copy mode over its history and leaves it on scrolling back to the live
+  screen. Shift+PageUp / Shift+PageDown do the same by a bridge message the UI turns into
+  `copy-mode -e -u` / `page-down` against the session (there is no escape sequence for copy
+  mode). Mouse tracking means plain drag goes to tmux; Shift+drag selects in the browser.
 - **Run-log retention.** A session's log is bounded by its lifetime; retention is by age:
   logs of `exited`/`closed` sessions are deleted after `runs_keep_days` (default 30) on the
   agent's tick. Live logs are never truncated, so invariant 3 holds while the session exists.

@@ -220,3 +220,32 @@ before TD-001's usage polling exists, and a `stalled?` that can say *why* it is 
 **Resolved:** 2026-09-10 (PR #47) — `sessionorc.screen` (`Rule`, `Manifest`, `Match`): one versioned TOML manifest per tool, rules with `any`/`all`/`not` regexes over the last `region` lines, a priority, and an optional pending (`$line` = the matched line); the highest-priority match wins with its evidence. Claude Code ships `adapters/claude_code/screen_rules.toml` (trust dialog → `needs-you`; the spike's three usage-limit screens → `limited`) and `explain(tail)`. The agent applies a hook-fed adapter's verdict as `scraped` only when no hook has reported within `STALL_AFTER` (`_last_hook`; a session no hook has reported on yet takes it at once), never over a fresh hook state. `rpc_explain` and `ao explain <id>` / `ao explain --file <screen> [-a adapter]` print the screen, the rule, the evidence and whether it applies. Fixtures under `tests/fixtures/screens/`; tests `tests/test_screen.py`, `tests/test_agent_paths.py::test_screen_rule_is_a_labelled_fallback_that_a_fresh_hook_outranks`, `tests/test_cli.py::test_explain_file_and_session`. Not done here: a per-adapter stall window and a `stalled?` rule with a reason (the manifest can carry one when a screen for it exists).
 
 **Related:** design §4.2, §9 invariant 4; TD-001 (`limited` from the usage endpoint); ADR 2026-09-10.
+
+## TD-022: Focus terminal cannot scroll back: wheel/PageUp show nothing above the live screen
+
+**Priority:** High
+**Added:** 2026-09-09 (first-use finding, Paul)
+**Status:** Resolved
+**Location:** `src/sessionorc/tmux.py` (`attach_argv`), `src/agentorc/ui/pty_bridge.py` (`scroll_argv`, `pump`),
+`src/agentorc/ui/app.py` (`/term` scroll callback), `src/agentorc/ui/static/app.js` (`AO.focus`)
+
+**Why:** The Focus terminal is xterm.js around `tmux attach`, and scrolling is the one thing that shape
+does not give for free. tmux owns the pane: when a line leaves the top of the screen it goes into
+*tmux's* history (`history-limit` 50000), and tmux repaints the client in place, so xterm.js's own
+5000-line scrollback held nothing useful — the wheel and Shift+PageUp scrolled an empty or stale buffer,
+and the user saw exactly one screen of a Claude Code conversation. `mouse` was off on the user's tmux
+server (default), so the wheel was not forwarded to tmux either. The result on first use: a reply longer
+than the pane could not be read in the UI at all. That broke design §2 requirement 2 ("full conversation
+in an embedded terminal") — the terminal is the *primary* read surface, not a peek — and it made the
+phone layout (TD-003) pointless before it started, since a phone pane is shorter still.
+
+**Resolved:** 2026-09-10 (PR #33). `sessionorc.tmux.attach_argv` (shared by the pty bridge and `ao focus`)
+chains `mouse on` on the session after `tmux attach` (a session option, at attach so adopted and
+pre-existing sessions get it; attach first because a tmux chain stops at the first failure); xterm.js
+runs with `scrollback: 0` so the wheel only ever reaches tmux; Shift+PageUp / Shift+PageDown send a
+`scroll` bridge message that the UI turns into `copy-mode -e -u` / `page-down` against the session.
+Lasting content: design §4.6 ("Scrollback is tmux's"), the `attach_argv` and `scroll_argv` docstrings,
+and `tests/test_ui.py::test_terminal_scrollback_reaches_tmux`. Not verified on the narrow layout (TD-003
+is still open); the Copy button's hint documents Shift+drag for selection under mouse tracking.
+
+**Related:** design §2 req. 2, §4.6, §4.5a; TD-003 (phone layout); TD-002 (composer); TD-010 (b) (`ao focus`).

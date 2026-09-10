@@ -204,7 +204,11 @@
   // ---- Focus ----
   AO.focus = function (s) {
     const id = s.id;
-    const term = new Terminal({ cursorBlink: true, fontFamily: '"JetBrains Mono", Menlo, monospace', fontSize: 13, theme: { background: "#0b0e12" }, scrollback: 5000 });
+    // scrollback: 0 — tmux owns the history (TD-022). The bridge sets `mouse on` on the session, so
+    // tmux asks for mouse tracking and xterm.js forwards the wheel to it (copy mode, its history);
+    // a local buffer would only ever hold stale repaints for the wheel to land on when tmux is not
+    // tracking. Shift+PageUp/PageDown below are the keyboard path; Shift+drag selects locally.
+    const term = new Terminal({ cursorBlink: true, fontFamily: '"JetBrains Mono", Menlo, monospace', fontSize: 13, theme: { background: "#0b0e12" }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     term.open($("#term")); fit.fit();
     let ws, delay = 500;
@@ -243,10 +247,11 @@
       // the clipboard", which over ssh only produces a "try scp" message (first-use finding).
       if (e.ctrlKey && !e.shiftKey && !e.altKey && (e.key === "v" || e.key === "V")) { pasteClip(); return false; }
       if (e.shiftKey && e.key === "Insert") { pasteClip(); return false; }
+      if (e.shiftKey && (e.key === "PageUp" || e.key === "PageDown")) { ws && ws.readyState === 1 && ws.send(JSON.stringify({ scroll: e.key === "PageUp" ? "up" : "down" })); return false; }
       return true;
     });
     $("#term").addEventListener("contextmenu", (e) => { e.preventDefault(); pasteClip(); });
-    $("#tcopy").addEventListener("click", () => { if (!copySel()) AO.toast("select text in the terminal first"); });
+    $("#tcopy").addEventListener("click", () => { if (!copySel()) AO.toast("select text in the terminal first (Shift+drag: plain drag goes to tmux)"); });
     $("#tpaste").addEventListener("click", pasteClip);
     new ResizeObserver(() => { fit.fit(); ws && ws.readyState === 1 && ws.send(JSON.stringify({ resize: [term.cols, term.rows] })); }).observe($("#term"));
     term.focus();

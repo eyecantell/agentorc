@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 
 import ptyprocess
 
@@ -61,9 +61,28 @@ def attach_argv(session_id: str, *, socket_name: str | None = None) -> list[str]
     return tmux_attach_argv(session_id, socket_name=socket_name)
 
 
-async def pump(pty: PtySession, send: Callable[[bytes], object], recv: Callable[[], object]) -> None:
+def scroll_argv(session_id: str, direction: str, *, socket_name: str | None = None) -> list[str]:
+    """Keyboard scrollback (Shift+PageUp/PageDown in the browser; TD-022). Up enters copy mode and
+    pages up (repeatable: each call pages further); down pages down and, thanks to `-e`, leaves
+    copy mode on reaching the live screen. Down outside copy mode is a harmless "not in a mode"."""
+    argv = ["tmux", "-L", socket_name] if socket_name else ["tmux"]
+    target = f"={session_id}:"
+    if direction == "up":
+        return argv + ["copy-mode", "-e", "-u", "-t", target]
+    if direction == "down":
+        return argv + ["send-keys", "-X", "-t", target, "page-down"]
+    raise ValueError(f"scroll direction {direction!r}: expected 'up' or 'down'")
+
+
+async def pump(
+    pty: PtySession,
+    send: Callable[[bytes], object],
+    recv: Callable[[], object],
+    scroll: Callable[[str], Awaitable[None]] | None = None,
+) -> None:
     """Run both directions until either side ends. `recv` yields str (keys), bytes, or a dict
-    with `resize: [cols, rows]`; `send` takes raw bytes for xterm.js."""
+    with `resize: [cols, rows]` or `scroll: "up" | "down"`; `send` takes raw bytes for xterm.js;
+    `scroll` (optional) is awaited for scroll messages, which need a tmux command, not keys."""
 
     async def down() -> None:
         try:
@@ -81,6 +100,8 @@ async def pump(pty: PtySession, send: Callable[[bytes], object], recv: Callable[
                 if "resize" in msg:
                     cols, rows = msg["resize"]
                     pty.resize(int(cols), int(rows))
+                elif "scroll" in msg and scroll is not None:
+                    await scroll(str(msg["scroll"]))  # returns once the tmux command is spawned, not done
                 continue
             pty.write(msg.encode() if isinstance(msg, str) else msg)
 
