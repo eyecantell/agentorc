@@ -146,6 +146,10 @@ async def test_pane_snapshot_older_than_a_remove_does_not_readopt(agent, tmp_pat
         # a wall-clock step between the remove and the tick changes nothing: the stamp is not a clock
         agent._reconcile({s["id"]: stale}, {}, datetime.now(UTC) + timedelta(hours=1))
         assert s["id"] not in agent.sessions
+        # the same second of creation could be the same pane: still skipped (whole-second resolution)
+        same = PaneInfo(session=s["id"], created=born, current_command="bash", pane_pid=0, dead=False, dead_status=None)
+        agent._reconcile({s["id"]: same}, {}, datetime.now(UTC))
+        assert s["id"] not in agent.sessions
         # the same name, a pane created after the removal: a new session, adopted at once
         fresh = PaneInfo(
             session=s["id"], created=born + 1, current_command="bash", pane_pid=0, dead=False, dead_status=None

@@ -44,6 +44,6 @@ that tick (the stamp says "just removed") and then adopted as a nameless shell o
 if the new one is created through the agent, the record exists and the guard never applies.
 One tick of wrong state, only for hand-created reuse of a just-removed name.
 
-**Resolved:** 2026-09-10 (PR #36) — `_is_removed_pane(name, pane)` skips a pane only when `pane.created <= ` the removed pane's creation time, so a hand-made session reusing the name is adopted on the first tick that sees it. Covered by the same test as TD-020.
+**Resolved:** 2026-09-10 (PR #36) — `_is_removed_pane(name, pane)` skips a pane only when `pane.created <= ` the removed pane's creation time, so a hand-made session reusing the name is adopted on the first tick that sees it. Residual: `created` is whole seconds, so a pane that was created, exited, observed, removed and had its name reused all inside one second (or whose pane was already gone at remove, `created` None) stays skipped until the guard expires (`REMOVED_GUARD_SECONDS`, 60 s). Covered by the same test as TD-020, including the equal-second case.
 
 **Related:** PR #22 review; TD-020; TD-010 (adoption of hand-started sessions).

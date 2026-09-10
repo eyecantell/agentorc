@@ -173,6 +173,10 @@ class HostAgent:
         if rem is None:
             return False
         created, _ = rem
+        # `created` is tmux's `session_created`, whole seconds. Equal means "could be the same
+        # pane", so it is skipped: a pane that was created, exited, observed, removed *and* had
+        # its name reused inside one second is the only case this delays (until the guard
+        # expires), and `None` (the pane was already gone at remove) is treated the same way.
         return created is None or pane.created <= created
 
     def _observe(self, s: Session, pane: PaneInfo, tail: list[str], now: datetime) -> None:
@@ -378,6 +382,7 @@ class HostAgent:
             raise RpcError(f"{id} is {s.state}; kill it first")
         # The dead pane is kept until now (exit code, last screen); without this it would be
         # re-adopted as a nameless shell on the next tick (first-use finding 2026-09-06).
+        # one extra `list-panes -a` per remove, a person-driven action: accepted
         pane = (await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)).get(id)
         await asyncio.to_thread(self.tmux.kill_session, id)
         self._forget(id)
