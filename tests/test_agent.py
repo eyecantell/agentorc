@@ -1,6 +1,7 @@
 """End-to-end: an in-process host agent on a private tmux server and a temp AGENTORC_HOME."""
 
 import asyncio
+import json
 
 import pytest
 from conftest import wait_state
@@ -107,6 +108,36 @@ async def test_subscribe_streams_changes(agent, tmp_path):
             if ev.get("event") == "session" and ev["session"]["id"] == s["id"] and ev["session"]["state"] == "idle":
                 break
         assert seen
+
+
+async def test_second_subscriber_gets_a_snapshot_without_disturbing_the_first(agent, tmp_path):
+    """TD-009: each subscriber has its own last-pushed map, so a new tab's full snapshot is not
+    re-sent to every other tab, and a `gone` reaches every tab exactly once."""
+
+    async def next_event(sub: LocalClient, timeout: float) -> dict:
+        # the raw stream, not `subscribe()`'s generator: a timed-out `anext` leaves a generator broken
+        return json.loads(await asyncio.wait_for(sub._reader.readline(), timeout))
+
+    async with LocalClient() as c, LocalClient() as first, LocalClient() as second:
+        s = await c.call("create", name="s", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        await wait_state(c, s["id"], "idle")
+        await first.call("subscribe")
+        got = await next_event(first, 5)
+        assert got["event"] == "session" and got["session"]["id"] == s["id"]
+        await second.call("subscribe")
+        got = await next_event(second, 5)
+        assert got["event"] == "session" and got["session"]["id"] == s["id"]  # the newcomer's snapshot
+        with pytest.raises(TimeoutError):
+            await next_event(first, 1.0)  # nothing changed for the first tab
+        await c.call("kill", id=s["id"])
+        await wait_state(c, s["id"], "exited")
+        await c.call("remove", id=s["id"])
+        for sub in (first, second):
+            while (got := await next_event(sub, 5))["event"] != "gone":
+                pass
+            assert got["id"] == s["id"]
+        with pytest.raises(TimeoutError):
+            await next_event(first, 1.0)  # gone once, not once per push
 
 
 async def test_create_in_new_worktree(agent, tmp_path):
