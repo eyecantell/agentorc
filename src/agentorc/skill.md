@@ -55,7 +55,8 @@ A prompt that is typed is not a prompt that ran. Four unattended workers once sa
 behind what looked like an unsubmitted prompt. So: one prompt, one `ao send <id> --wait --json`,
 then act on the result — `idle`: next step; `needs-you`: see the table; `prompt-stalled` or
 `prompt-stuck`: `ao tail <id>`, understand, then decide. Never re-send on a guess: the text is
-still in the composer, and a second paste appends to it (design §4.2). Without `--wait`, poll
+still in the composer, and a second paste appends to it (measured while fixing TD-027: five
+pastes became one concatenated prompt). Without `--wait`, poll
 `ao status --json` for the state to change before concluding anything.
 
 ## Never
@@ -66,7 +67,8 @@ still in the composer, and a second paste appends to it (design §4.2). Without 
 - Never `send`, `kill`, or `close` a session you did not start unless your brief names it; the
   session in a repo's main checkout is the person's anchor — leave it alone.
 - Never nudge, pause, or kill an interactive session (§9 invariant 5), including "are you done?".
-- Never `send` into `needs-you`, `limited`, or `unreachable`; it is refused or lost.
+- Never `send` into `needs-you` (refused while a permission or question is pending), `limited`
+  (nothing stops you, and the prompt fails or queues behind the cap), or `unreachable` (exit 3).
 - Never edit `~/.claude/settings.json`, `~/.claude.json`, or anything under `~/.agentorc`; never
   start, stop, or restart `agentorc-agent` / `agentorc-ui`. The agent's state is not yours.
 - Never leave a session you started without a record: its work pushed, its ledger touched, then
