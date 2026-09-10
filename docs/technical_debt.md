@@ -25,6 +25,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-011 | VS Code link path is not URL-escaped (spaces break the URI) | Low | Open |
 | TD-012 | Resuming a conversation that is still live elsewhere is not refused | Low | Open |
 | TD-013 | External-session check reads the default profile's registry only | Low | Open |
+| TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Open |
 
 ---
 
@@ -201,3 +202,37 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 
 **Fix:** iterate every declared profile's config dir in `external_sessions()`; test with two temp config dirs.
 
+## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
+
+**Priority:** High
+**Added:** 2026-09-10
+**Status:** Open
+**Location:** design §3 (herdr row), §10 "Build on, or beside, herdr?"; `src/sessionorc/` (the layer a substrate would sit under)
+
+**Why:** herdr (https://herdr.dev, Apache-2.0, Herdr, Inc., $6M seed 2026-09-09) already ships the
+substrate half of this design — persistent panes, multi-host over ssh, restart recovery, hook-fed
+state for Claude Code and 16 other CLIs, a worktree API, an event-subscription socket API — and
+Herdr Cloud is about to ship the `relay` transport of §4.5b. It does not do the half §1 came
+from: states finer than `blocked`, unattended supervision, the anchor rule, Ready to close,
+per-repo commands, phone triage. Core contribution is closed (no unsolicited PRs); plugins and
+the socket API are the open surface. Phase 2 (ssh transport) is the first thing herdr would
+replace, so the decision has to come before phase 2 is built, and it should be decided by a
+measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts in design §3.
+
+**Fix:** a one-to-two-day spike, read-only against herdr, on kmaster in a scratch config:
+1. install herdr, add the Claude Code integration, start two Claude Code sessions and a shell
+   under it alongside the running agentorc agent (they must not fight over hooks — check what
+   its `settings.json` edit does to agentorc's hook entries first; back up `~/.claude`).
+2. `events.subscribe` from a small Python client; drive a permission prompt, a question, and
+   (if reachable) a usage cap; record what `pane.agent_status_changed` and `blocked --message`
+   carry for each. **Pass:** the three are distinguishable and the pending text is present.
+3. Check `agent.prompt` / `agent.send_keys` / `worktree.*` against what `rpc_create`, `send`,
+   `keys`, `kill` need; note anything `sessionorc` exposes that herdr cannot (pipe-pane run logs,
+   `exit-empty off`, session records surviving herdr restarts).
+4. Write the result as a decision doc under `docs/decisions/` and close the §10 question one of
+   three ways: (a) independent — herdr stays a reference; (b) herdr as a `sessionorc` substrate
+   behind a transport, tmux kept for hosts herdr does not fit — then phase 2 becomes that
+   transport; (c) herdr plugins only. Update §7 phases and §4.5b/§4.5c to match.
+Done when the decision doc is merged and the §10 item is checked.
+
+**Related:** design §3, §4.5b, §4.5c, §7 phase 2, §10; PRs #23, #24; TD-004 (ssh transport, the work this decides).
