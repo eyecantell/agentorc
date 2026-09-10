@@ -86,7 +86,7 @@ herdr (below) multi-host on its own is no longer a differentiator; the combinati
 | Vibe Kanban (Apache-2.0) | web kanban, per-task terminal, 10+ agents | UI ideas for diff review | task-board model, single machine, own execution tracking |
 | agent-dashboard (bjornjee) | tmux orchestrator + PWA for approvals | same idea at PoC scale | maintenance unverified |
 | Anthropic Remote Control / cloud sessions | single-session sync, Claude only | — | not a fleet view, not self-hosted |
-| herdr (Apache-2.0, https://herdr.dev) — surveyed 2026-09-09, not in the 2026-09-04 survey | "the runtime coding agents run on": a daemon per machine keeping agent sessions alive in persistent panes, one layout across local and ssh-added machines, restored after a restart; single binary (macOS, Linux, Windows); detects 21 agent CLIs; a CLI and socket API "agents drive" themselves (split panes, start and prompt each other); 36.5k GitHub stars, ~770k installs, ~1k community plugins; "Herdr Cloud" waitlist only | the closest tool to agentorc found so far; its multi-host model is the same shape as §4; worth re-reading its socket API before phase 3 adapters and the relay transport | three states (working / blocked / idle) — no `needs-you` with the pending question, no `limited` with a reset time, no `stalled?`/`unreachable`; detection is "foreground processes, screen manifests, and optional integrations" (its docs), i.e. scraping first — how far the "optional integrations" carry hook-grade state is unconfirmed; no run windows, usage gates, wrap-up-then-kill or credential-lapse detection found on the pages surveyed; no git/worktree awareness, anchor rule, Ready to close, per-repo command buttons, VS Code links, or phone triage; runtime only, no notion of when work is done |
+| herdr (Apache-2.0, https://herdr.dev) — surveyed 2026-09-09, corrected 2026-09-10; not in the 2026-09-04 survey | "the runtime coding agents run on": a Rust daemon per machine keeping agent sessions alive in persistent panes, one layout across local and ssh-added machines, restored after a restart; single binary (macOS, Linux, Windows); 21 agent CLIs, 17 with *integrations* that push `idle`/`blocked --message` state (Claude Code's installs hooks into `settings.json`), screen-matching as the fallback; socket API with `events.subscribe`, `agent.*`, `worktree.*`, `plugin.*`; Claude rate-limit and context bars; ~1k community plugins found by a GitHub topic, no review; 36.5k stars, ~770k installs. Herdr, Inc.: $6M seed (Bessemer, YC) announced 2026-09-09; "Herdr Cloud" (no-ssh machines) next; releases 0.5.1 (2026-04) → 0.9.0 (2026-09). **Does not accept unsolicited pull requests** — an allow-list of approved contributors, bugs fixed by the maintainers' own agent, features via Discussions | the closest tool to agentorc found so far; its socket API and plugin manifest are the surface an agentorc-over-herdr would use (§10) | states are working / blocked / idle / done — one `blocked`, so a permission, a question and a usage cap look alike to anything above it; no `limited` with a reset time, no `stalled?`/`unreachable`; no run windows, usage gates, wrap-up-then-kill or credential-lapse detection found; no anchor rule, Ready to close, per-repo command buttons, VS Code links or first-party phone UI (the TUI over ssh is the mobile story; community mobile apps exist); runtime only, no notion of when work is done |
 
 ## 4. Architecture
 
@@ -740,18 +740,19 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
       the same tool does not ask again. Tempting for `git push` loops, but it is how a permission
       prompt stops being an alert; if added, it must be a third, smaller button and never the
       default.
-- [ ] **Build on, or beside, herdr?** (2026-09-09, §3.) herdr already does the substrate half
-      of this design — persistent panes, multi-host over ssh, a fleet view, an agent-driven
-      socket API — for 21 CLIs with real traction. What it does not do is the half §1 came from:
-      hook-fed state with the pending question, `limited`/`stalled?`/`unreachable`, unattended
-      supervision, repo and worktree awareness, Ready to close, phone triage. Options: (a) keep
-      building — `sessionorc` stays ours, herdr is a reference; (b) make herdr a `sessionorc`
-      transport later, so agentorc's adapters and policies sit on its socket API; (c) adopt
-      herdr and rebuild the agentorc half as herdr plugins. Not blocking phase 1: the adapter
-      contract (§4.3) and the state model are the same under all three, and `sessionorc` is
-      already the layer (b) would replace. Decide before phase 3 (more adapters) or the relay
-      transport, whichever comes first; check herdr's "optional integrations" and plugin API
-      first, since (b) and (c) only pay off if hook-grade state can reach it.
+- [ ] **Build on, or beside, herdr?** (2026-09-09, facts corrected 2026-09-10, §3.) herdr already
+      does the substrate half of this design — persistent panes, multi-host over ssh, a fleet
+      view, hook-fed state for Claude Code, worktrees, an agent-driven socket API — for 21 CLIs,
+      with a funded company behind it and a cloud transport next. What it does not do is the half
+      §1 came from: states finer than `blocked`, unattended supervision, the anchor rule, Ready to
+      close, per-repo commands, phone triage. Core contribution is not an option (no unsolicited
+      PRs); the open door is plugins and the socket API. Options: (a) keep building — `sessionorc`
+      stays ours, herdr is a reference; (b) herdr as a `sessionorc` substrate: agentorc's adapters
+      and policies subscribe to its events and drive `agent.*`, tmux stays for hosts herdr does
+      not fit; (c) ship the agentorc half as herdr plugins only. Not blocking phase 1. Decide before
+      phase 2 (the ssh transport is the first thing herdr would replace); a one-to-two-day spike
+      on (b) — install herdr, subscribe to events, see whether `blocked --message` carries enough
+      to rebuild `needs-you`/`limited` — is the cheapest way to decide.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 
