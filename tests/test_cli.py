@@ -7,7 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from conftest import run_hook, wait_for_sync
+from conftest import pane_line, run_hook, wait_for_sync
 
 from agentorc import cli
 from sessionorc.client import call_sync
@@ -23,7 +23,7 @@ def wait_state(sid: str, state: str, timeout: float = 6.0) -> dict:
             return s
         time.sleep(0.1)
         s = call_sync("get", id=sid)
-    raise AssertionError(f"{sid} never reached {state}: {s['state']} {s.get('tail')}")
+    raise AssertionError(f"{sid} never reached {state}: {s['state']} {s.get('tail')} {pane_line(sid)}")
 
 
 def test_status_empty_and_json(subprocess_agent, capsys):

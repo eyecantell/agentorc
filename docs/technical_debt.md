@@ -20,6 +20,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Partly done |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
+| TD-025 | `tests/test_cli.py` flakes: a shell session's `idle` can take longer than the 6 s wait | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Open |
 
 ---
@@ -149,6 +150,19 @@ offer to install it into the repo's `.claude/skills/`. Depends on TD-018. Done i
 the adapter-author guide.
 
 **Related:** design §4.7, §7 phase 5; TD-018; ADR 2026-09-10.
+
+## TD-025: `tests/test_cli.py` flakes: a shell session's `idle` can take longer than the 6 s wait
+
+**Priority:** Low
+**Added:** 2026-09-10
+**Status:** Open — diagnostics landed (this entry's PR): a timed-out `wait_state` now prints tmux's own pane line (`pane_current_command`, dead flag) next to the record, so the next occurrence says which of the two hypotheses below is true. No code fix yet.
+**Location:** `tests/test_cli.py` (`wait_state`, `test_keys_reach_the_pane`, `test_shell_send_tail_status_kill_close`), `tests/conftest.py` (`wait_state`, `pane_line`), `tests/_agent_child.py`
+
+**Why:** Two distinct flakes have been seen in this module. (1) PR #34's CI run asserted `│` in `ao status -v` before the tick had refreshed the record's tail — fixed in PR #42 by waiting for the tail first. (2) 2026-09-10, one failure in 65 local runs of the module (a Sonnet review was running the suite concurrently, three samscrape workers were on the box): `test_keys_reach_the_pane` — `ao-…-keys never reached idle: working []` after 6 s. A 150-iteration probe of the same create → idle path against a child agent on an idle box measured no start over 1 s, so it is load-sensitive, not deterministic. The shell adapter says `idle` only when `pane_current_command` is a shell name; `ao shell` starts the person's login shell (tmux `default-shell`), whose `~/.bashrc` on kmaster runs `lesspipe`, `dircolors`, bash-completion and a sourced secrets file — under load those foreground commands can plausibly hold `working` past the wait, and the empty tail fits (bashrc prints nothing). The other reading, the pane never appearing in the tick's snapshot, would show as `pane=none` in the new diagnostic. Related but separate: PR #52's CI (3.13 job only) saw tmux report a dead pane without its exit status for over 6 s; that assertion was dropped rather than waited on.
+
+**Fix:** once the diagnostic has named the cause — if it is shell start-up: have the test child's private server set `default-command` to `bash --norc` (test-only; `_agent_child.py` already owns that server's options) or give `wait_state` a longer, load-tolerant timeout for the first `idle` after create; if the pane is missing from the snapshot: that is an agent bug in `_reconcile` / `list_panes`, fix there. Done when 100 consecutive local runs of the module pass with the suite running beside them.
+
+**Related:** PR #34, PR #42 (fix 1), PR #52 (exit-status lag), `tests/README.md` real-environment notes.
 
 ## TD-026: Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI
 
