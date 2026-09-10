@@ -16,6 +16,7 @@ import os
 import re
 import signal
 import sys
+import time
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -35,6 +36,7 @@ CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
+REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
 
 class RpcError(Exception):
@@ -62,9 +64,13 @@ class HostAgent:
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
-        # ids removed since the last tick: a pane snapshot taken before the remove must not
-        # re-adopt the pane it still lists (the tick snapshots in a thread; remove runs between)
-        self._removed_at: dict[str, datetime] = {}
+        # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
+        # stamp for expiry). A pane snapshot taken before the remove must not re-adopt the pane it
+        # still lists (the tick snapshots in a thread; remove runs between). Keyed by the pane's
+        # own creation time, not by clocks compared across a thread hop, so a clock step cannot
+        # re-adopt a dead pane and a hand-made session that reuses the name is adopted at once
+        # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
+        self._removed: dict[str, tuple[int | None, float]] = {}
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -136,7 +142,8 @@ class HostAgent:
         for sid, event in self.events.drain():
             self._apply_event(sid, event)
         now = datetime.now(UTC)
-        self._removed_at = {k: t for k, t in self._removed_at.items() if now - t < timedelta(minutes=1)}
+        mono = time.monotonic()
+        self._removed = {k: v for k, v in self._removed.items() if mono - v[1] < REMOVED_GUARD_SECONDS}
         for sid, s in list(self.sessions.items()):
             if s.state == "closed":
                 if s.closed_at and _parse(s.closed_at) + CLOSED_KEEP < now:
@@ -153,11 +160,24 @@ class HostAgent:
         # tmux sessions with our prefix that we have no record of (created by hand, or the
         # store was lost): adopt them minimally as shells so they appear in the Herd.
         for name, pane in panes.items():
-            if name not in self.sessions and self._removed_at.get(name, datetime.min.replace(tzinfo=UTC)) < snapshot_at:
+            if name not in self.sessions and not self._is_removed_pane(name, pane):
                 s = Session(id=name, name=name[len(naming.PREFIX) :], kind="interactive", adapter="shell", dir="")
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
                 self._observe(s, pane, tails.get(name, []), now)
+
+    def _is_removed_pane(self, name: str, pane: PaneInfo) -> bool:
+        """Is this the pane a recent `remove` killed (as a stale snapshot would still list it)? A
+        pane born after the removed one is a new session and adopts normally (TD-021)."""
+        rem = self._removed.get(name)
+        if rem is None:
+            return False
+        created, _ = rem
+        # `created` is tmux's `session_created`, whole seconds. Equal means "could be the same
+        # pane", so it is skipped: a pane that was created, exited, observed, removed *and* had
+        # its name reused inside one second is the only case this delays (until the guard
+        # expires), and `None` (the pane was already gone at remove) is treated the same way.
+        return created is None or pane.created <= created
 
     def _observe(self, s: Session, pane: PaneInfo, tail: list[str], now: datetime) -> None:
         adapter = adapters.get(s.adapter)
@@ -362,9 +382,11 @@ class HostAgent:
             raise RpcError(f"{id} is {s.state}; kill it first")
         # The dead pane is kept until now (exit code, last screen); without this it would be
         # re-adopted as a nameless shell on the next tick (first-use finding 2026-09-06).
+        # one extra `list-panes -a` per remove, a person-driven action: accepted
+        pane = (await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)).get(id)
         await asyncio.to_thread(self.tmux.kill_session, id)
         self._forget(id)
-        self._removed_at[id] = datetime.now(UTC)
+        self._removed[id] = (pane.created if pane else None, time.monotonic())
         await self._push_gone(id)
 
     async def rpc_send(self, id: str, text: str) -> None:
