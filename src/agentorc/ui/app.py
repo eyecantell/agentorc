@@ -89,6 +89,13 @@ def view(s: dict[str, Any]) -> dict[str, Any]:
     }.get(state, state)
     d["state_label"] = {"needs-you": "needs you", "closed": "closed"}.get(state, state)
     d["rank"] = STATE_RANK.get(state, 9)
+    # Finished while nobody was looking (design §4.2, TD-017): not a state, a rendering of `idle`
+    # that sorts just above the idle it will become once someone opens Focus. Both stamps are whole
+    # seconds, so a finish in the same second as the last look reads as seen.
+    d["unseen"] = state == "idle" and (not s.get("seen_at") or (s.get("since") or "") > s["seen_at"])
+    if d["unseen"]:
+        d["state_label"] = "finished · unseen"
+        d["rank"] = STATE_RANK["idle"] - 0.5
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
     d["host"] = host_name()
@@ -172,8 +179,8 @@ def create_app() -> FastAPI:
         except AgentError as e:
             raise HTTPException(400, str(e)) from e
 
-    def render_card(s: dict[str, Any]) -> str:
-        return templates.get_template("card.html").render(s=view(s))
+    def render_card(v: dict[str, Any]) -> str:
+        return templates.get_template("card.html").render(s=v)
 
     @app.get("/", response_class=HTMLResponse)
     async def herd(request: Request):
@@ -197,7 +204,7 @@ def create_app() -> FastAPI:
     @app.get("/focus/{sid}", response_class=HTMLResponse)
     async def focus(request: Request, sid: str):
         try:
-            s = await call("get", id=sid)
+            s = await call("seen", id=sid)  # opening Focus is the "seen" (TD-017); returns the record
         except HTTPException as e:
             if e.status_code == 503:
                 return RedirectResponse("/", status_code=303)  # the Herd shows the down banner
@@ -283,11 +290,18 @@ def create_app() -> FastAPI:
         elif action == "shell-here":
             s = await call("get", id=sid)
             new = await call("create", name=f"{s['name']}-shell", dir=s["dir"], adapter="shell")
+            with contextlib.suppress(HTTPException):
+                await call("seen", id=sid)  # acted on this card too (TD-017)
             return JSONResponse({"ok": True, "id": new["id"]})
         elif action == "remove":
             await call("remove", id=sid)
+        elif action == "seen":
+            pass  # the mark below is the whole action (the Focus page sends it when its session goes idle)
         else:
             raise HTTPException(404, f"no action {action}")
+        if action != "remove":
+            with contextlib.suppress(HTTPException):
+                await call("seen", id=sid)  # acting on a card counts as looking at it (TD-017)
         return JSONResponse({"ok": True})
 
     @app.get("/api/occupancy")
@@ -310,16 +324,17 @@ def create_app() -> FastAPI:
                 async for ev in c.subscribe():
                     if ev.get("event") == "session":
                         s = ev["session"]
+                        v = view(s)
                         await ws.send_text(
                             json.dumps(
                                 {
                                     "event": "session",
                                     "id": s["id"],
                                     "state": s["state"],
-                                    "rank": STATE_RANK.get(s["state"], 9),
-                                    "html": render_card(s),
-                                    "session": view(s),
-                                }  # noqa: E501
+                                    "rank": v["rank"],  # the view's: unseen idle sorts above idle
+                                    "html": render_card(v),
+                                    "session": v,
+                                }
                             )
                         )
                     elif ev.get("event") == "gone":

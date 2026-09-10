@@ -100,3 +100,19 @@ the spike's automation a matter of `jq`; agentorc's own sessions are the obvious
 **Resolved:** 2026-09-10 (PR #41) — a global `--json` on `ao` (also accepted after any subcommand, `default=SUPPRESS` so the two never fight); every `cmd_*` goes through `emit()` (RPC result, or `{"ok": true, "id": …}` where the RPC returns nothing) and `fail()` (`{"error": …}` on stdout, same exit codes, `hint` for an unreachable agent). `ui` runs a server and prints nothing; `service install`/`uninstall` take the flag but are not exercised by the test (systemd side effects). Prose output is unchanged. README "CLI" documents it; test: `tests/test_cli.py::test_json_on_every_subcommand`.
 
 **Related:** design §4.7; TD-019; ADR 2026-09-10.
+
+## TD-017: Seen-state: "finished while you were away" is not the same as idle
+
+**Priority:** Medium
+**Added:** 2026-09-10
+**Status:** Resolved
+**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Herd card, Focus)
+
+**Why:** A session that went `idle` while nobody was looking is the common phone-triage case, and
+today it sorts and looks exactly like one that has been idle all day. herdr keeps `done` (idle,
+not yet looked at) apart from `idle` by a server-side seen mark that explicit focus clears and
+reads do not. agentorc's Focus view is the natural "seen".
+
+**Resolved:** 2026-09-10 (PR #43) — `Session.seen_at` (persisted) set by `rpc_seen`, which the UI calls when Focus opens (`GET /focus/<id>`), after any card action, and from the open Focus page whenever its session's event arrives `unseen`. `view()` computes `unseen = idle and (no seen_at or since > seen_at)` (whole-second stamps: a tie reads as seen), renders "finished · unseen", sorts it at rank 4.5 (above `idle`, below `working`); `/events` carries the view's rank. `idle` stays `idle` in every payload. Design §4.5 sort list names the slot. Test: `tests/test_ui.py::test_unseen_idle_until_focused`.
+
+**Related:** design §4.2, §4.5 (Herd sort); ADR 2026-09-10.

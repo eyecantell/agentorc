@@ -23,7 +23,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Done |
 | TD-015 | Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape | Medium | Open |
 | TD-016 | `send` should confirm the prompt took: a send-and-wait RPC for policies | Medium | Open |
-| TD-017 | Seen-state: "finished while you were away" is not the same as idle | Medium | Open |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 
 ---
@@ -231,26 +230,6 @@ left `idle` (hook `UserPromptSubmit` or a scraped `working`) *and* then reached 
 three outcomes with the `hookstub` adapter.
 
 **Related:** design §4.4, §6, §9 invariant 6; ADR 2026-09-10.
-
-## TD-017: Seen-state: "finished while you were away" is not the same as idle
-
-**Priority:** Medium
-**Added:** 2026-09-10
-**Status:** Open
-**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Herd card, Focus)
-
-**Why:** A session that went `idle` while nobody was looking is the common phone-triage case, and
-today it sorts and looks exactly like one that has been idle all day. herdr keeps `done` (idle,
-not yet looked at) apart from `idle` by a server-side seen mark that explicit focus clears and
-reads do not. agentorc's Focus view is the natural "seen".
-
-**Fix:** `seen_at` on the record, set when Focus is opened for the session (the terminal bridge
-attaches) or the person acts on the card; `since > seen_at` on an `idle` card renders as
-"finished 12 m ago · unseen" and sorts above plain `idle`, below `needs-you`. Not a new state —
-`idle` stays `idle` in every payload (§4.2 table unchanged). Done when an unattended worker that
-finishes overnight is the first idle card in the morning and drops back after one Focus.
-
-**Related:** design §4.2, §4.5 (Herd sort); ADR 2026-09-10.
 
 ## TD-019: Ship a skill file for `ao` (`ao --skill`)
 
