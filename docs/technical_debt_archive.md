@@ -301,3 +301,20 @@ is still open); the Copy button's hint documents Shift+drag for selection under 
 **Resolved:** 2026-09-10 (PR #60) — **Measured first, and the four screens were not what they looked like.** Read-only `capture-pane -e` on the three samscrape composers shows their `run window is closing …` text painted in **faint** (SGR 2): it is Claude Code's suggested-next-prompt ghost text (the session's own last prompt is a common suggestion), not an unsubmitted prompt — no transcript entry follows, and nothing had sent it: those workers run under agentorc with no supervisor, TD-026 gap (1). The fourth (`ao-agentorc-agentorc-tests-2`) is a dead pane whose last frame shows `/exit` in slash-command colour: it exited normally on 2026-09-09 22:05. A real swallow does exist, and a throwaway session on a private socket reproduced it: with idle waits, 50/50 pastes submitted (Enter and `C-m` alike, even paste and Enter in one tmux command), but a burst of five into a **fresh** session submitted one and concatenated the other four — an Enter that arrives before the tool has read the paste is dropped, which is what a fresh, loaded, or slow-painting session does. Fix: `HostAgent._submit` pastes, waits up to 1 s for the text to paint in the composer, presses Enter, and requires the composer to empty within 1.5 s; one `C-m` retry, then `prompt-stuck` (every `send`, not only `--wait`; the text is never re-pasted). The read goes through a new optional adapter method `composer(tail_raw)` (design §4.3) over `capture-pane -e`, with `sessionorc.screen.painted_text` dropping faint runs so ghost text is never "stuck". Claude Code implements it (last `❯` row); `shell` does not (a running command's echo is not a composer) and keeps the blind paste + Enter. Validated through `_submit` against the real tool: the failing burst 5/5, then 50/50 serial. Tests: `tests/_composer_child.py` (a pane that swallows N Enters per paste) behind `ComposerStub` — `test_send_confirms_the_submit` covers 0 (one submit, faint echo ignored), 1 (`C-m` lands, no duplicate), 2 (`prompt-stuck`, text left in place); `test_composer_reads_painted_text_only`; `test_painted_text_drops_faint_runs`. Design §4.2 (`send` confirms), §4.3 (`composer`), §4.5a Send row.
 
 **Related:** TD-016 (`send --wait`), TD-015 (screen rules), design §4.3, samscrape `scripts/tdgrind.sh` `send_text`.
+
+## TD-019: Ship a skill file for `ao` (`ao --skill`)
+
+**Priority:** Low
+**Added:** 2026-09-10
+**Status:** Resolved
+**Location:** `src/agentorc/cli.py`, a new `src/agentorc/skill.md`
+
+**Why:** `herdr --skill` prints the instructions a coding agent needs to drive it safely: check
+you are inside a managed session, parse ids from JSON, which commands mutate, what not to do
+(never answer another agent's dialog). An agent running inside an agentorc session has the same
+needs — `AGENTORC_SESSION` is set, `ao` is on `PATH` — and the adapter-author guide in phase 5
+is the moment to write it down once the CLI is stable.
+
+**Resolved:** 2026-09-10 (PR #61) — pulled forward from phase 5 because an orchestrator session driving `ao` is next. `ao --skill` prints `src/agentorc/skill.md` (an argparse action, so it works without a subcommand): front matter, the first-three-steps ritual (`AGENTORC_SESSION` is you, `ao status --json`, `--json` on every call), the state table from design §4.2 with what to do in each, the mutating commands with their errors, the TD-027 lesson (verify every send: `send --wait --json`, act on `prompt-stalled` / `prompt-stuck`, never re-send on a guess), the Never list from §9 invariants 1/2/5/6 and the unattended-worker brief rules (no tmux, no other session's dialog, no anchor, no `~/.claude` / `~/.agentorc` / units), and a worked loop. 82 lines. Installing it into a repo is `ao --skill > .claude/skills/ao/SKILL.md`; the New-session install offer stays phase 5 (design §7). Test: `tests/test_cli.py::test_skill_prints_the_rules`. Design §4.7, §7 phase 5, README "CLI".
+
+**Related:** design §4.7, §7 phase 5; TD-018; ADR 2026-09-10.

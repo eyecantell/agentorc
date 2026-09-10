@@ -18,7 +18,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
-| TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 | TD-025 | `tests/test_cli.py` flakes: a shell session's `idle` can take longer than the 6 s wait | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Open |
 
@@ -117,25 +116,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Why:** The hook decision already carries a `reason` (the API and CLI accept one), but the UI's Deny button sends none. "Allow for this session" is not built. Both are open questions in design §10 for Paul to decide (board item).
 
 **Fix:** after the decision: an optional reason field next to Deny (card, Focus, phone); if approved, a third smaller button that updates the session's permission rules through the hook output, never the default. Done when §10 marks both decided and the controls table lists what exists.
-
-## TD-019: Ship a skill file for `ao` (`ao --skill`)
-
-**Priority:** Low
-**Added:** 2026-09-10
-**Status:** Open
-**Location:** `src/agentorc/cli.py`, a new `src/agentorc/skill.md`
-
-**Why:** `herdr --skill` prints the instructions a coding agent needs to drive it safely: check
-you are inside a managed session, parse ids from JSON, which commands mutate, what not to do
-(never answer another agent's dialog). An agent running inside an agentorc session has the same
-needs — `AGENTORC_SESSION` is set, `ao` is on `PATH` — and the adapter-author guide in phase 5
-is the moment to write it down once the CLI is stable.
-
-**Fix:** `ao --skill` prints a Markdown skill (front matter + rules); the New session flow can
-offer to install it into the repo's `.claude/skills/`. Depends on TD-018. Done in phase 5 with
-the adapter-author guide.
-
-**Related:** design §4.7, §7 phase 5; TD-018; ADR 2026-09-10.
 
 ## TD-025: `tests/test_cli.py` flakes: a shell session's `idle` can take longer than the 6 s wait
 
