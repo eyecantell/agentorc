@@ -13,7 +13,7 @@ from conftest import wait_for
 
 from sessionorc import paths
 from sessionorc.agent import _clean
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
 
 pytestmark = pytest.mark.integration
 
@@ -127,6 +127,32 @@ async def test_resume_supersedes_the_exited_record(agent, hookstub, tmp_path):
         assert new["id"] != old["id"]
         states = {x["id"]: x["state"] for x in await c.call("list")}
         assert states[old["id"]] == "closed" and states[new["id"]] != "closed"
+
+
+async def test_resume_of_a_live_conversation_is_refused(agent, hookstub, tmp_path, monkeypatch):
+    """TD-012: two panes must never drive one conversation. A live record of ours, or a live session
+    outside agentorc with that tool id, refuses the resume; the anchor rule (directories) is separate."""
+    from sessionorc import adapters
+    from sessionorc.adapters import ExternalSession
+
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    async with LocalClient() as c:
+        live = await c.call("create", name="conv", dir=str(tmp_path / "a"), adapter="hookstub")
+        await c.call("hook", session=live["id"], adapter_id="cc-live")
+        with pytest.raises(AgentError, match="cc-live is still live in .*kill it first"):
+            await c.call("create", name="again", dir=str(tmp_path / "b"), adapter="hookstub", resume="cc-live")
+        assert [x["id"] for x in await c.call("list")] == [live["id"]]  # nothing was started
+        monkeypatch.setattr(
+            adapters,
+            "external_sessions",
+            lambda: [ExternalSession("ext", str(tmp_path / "c"), "vscode-conv", "cc-ext", "idle")],
+        )
+        with pytest.raises(AgentError, match="vscode-conv .*outside agentorc"):
+            await c.call("create", name="again", dir=str(tmp_path / "b"), adapter="hookstub", resume="cc-ext")
+        await c.call("kill", id=live["id"])
+        new = await c.call("create", name="again", dir=str(tmp_path / "b"), adapter="hookstub", resume="cc-live")
+        assert new["id"] != live["id"] and (await c.call("get", id=live["id"]))["state"] == "closed"  # superseded
 
 
 async def test_pane_snapshot_older_than_a_remove_does_not_readopt(agent, tmp_path):

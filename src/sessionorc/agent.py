@@ -280,6 +280,9 @@ class HostAgent:
             if kind == "interactive" and adapter != "shell":
                 for who in await asyncio.to_thread(self.occupants, directory):
                     raise RpcError(f"{directory} already has agent session {who}; anchor rule (use a worktree)")
+            if resume:
+                for who in await asyncio.to_thread(self.conversation_holders, resume):
+                    raise RpcError(f"conversation {resume} is still live in {who}; kill it first, or Switch to it")
             live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
             try:
                 spec = ad.launch(
@@ -353,6 +356,22 @@ class HostAgent:
             if ext.tool_id and ext.tool_id in ours:
                 continue  # that is one of ours, seen through the tool's registry
             if Path(ext.cwd).resolve() == directory:
+                out.append(f"{ext.name} ({ext.adapter}, outside agentorc{', ' + ext.status if ext.status else ''})")
+        return out
+
+    def conversation_holders(self, adapter_id: str) -> list[str]:
+        """Who is driving the tool conversation `adapter_id` right now (TD-012): a live record of
+        ours, or a live session outside agentorc whose tool id matches. Two panes on one
+        conversation is the failure `resume` must not create; an exited record is superseded
+        instead (`_supersede`)."""
+        out = [
+            f"{s.id} ({s.state})"
+            for s in self.sessions.values()
+            if s.adapter_id == adapter_id and s.state not in ("exited", "closed")
+        ]
+        ours = {s.adapter_id for s in self.sessions.values() if s.adapter_id}
+        for ext in adapters.external_sessions():
+            if ext.tool_id == adapter_id and ext.tool_id not in ours:
                 out.append(f"{ext.name} ({ext.adapter}, outside agentorc{', ' + ext.status if ext.status else ''})")
         return out
 
