@@ -20,6 +20,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Partly done |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
+| TD-023 | `exited` is overloaded: a killed session and a natural exit look the same, but only one still has a pane | Low | Open |
 
 ---
 
@@ -71,6 +72,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Added:** 2026-09-06
 **Status:** Partly done — `~/.agentorc/hosts.yml` with a `local` entry (name, vscode_host, local) landed 2026-09-06 in `agentorc.hosts` after the first real session hit the unresolvable hostname; env vars remain as overrides. Remaining: the ssh transport entries, `volatile`, `repos_registry`, `runs_keep_days`, and dropping the env vars.
 **Location:** `src/agentorc/hosts.py`, `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`)
+
+**Note (2026-09-10, session tdgrind-ao-1):** `runs_keep_days` needs a home the *host agent* reads: `hosts.yml` lives on the UI host and is parsed by `agentorc.hosts`, which `sessionorc` cannot import, so run-log pruning was left unbuilt rather than adding another env var. Decide where per-host agent settings live (a `~/.agentorc/agent.yml` on the session host, say) before building it.
 
 **Why:** Phase 1 is one host, so the UI names it from `gethostname()` (on kmaster that is `kmaster-Standard-PC-i440FX-PIIX-1996`) with `AGENTORC_HOST_NAME` / `AGENTORC_VSCODE_HOST` / `AGENTORC_LOCAL_HOST` env overrides. Design §5 wants `~/.agentorc/hosts.yml` (name, transport, ssh target, volatile, `vscode_host`) on the UI host; that is the phase 2 shape and the env vars should disappear into it.
 
@@ -146,3 +149,16 @@ offer to install it into the repo's `.claude/skills/`. Depends on TD-018. Done i
 the adapter-author guide.
 
 **Related:** design §4.7, §7 phase 5; TD-018; ADR 2026-09-10.
+
+## TD-023: `exited` is overloaded: a killed session and a natural exit look the same, but only one still has a pane
+
+**Priority:** Low
+**Added:** 2026-09-10
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`rpc_kill`, `_observe`), `src/agentorc/cli.py` (`cmd_focus`)
+
+**Why:** `rpc_kill` destroys the tmux session and sets `exited`; a process that ends on its own also reads `exited`, but `remain-on-exit` keeps its dead pane (exit code, last screen) until `remove`. Nothing on the record says which, so a client cannot tell whether Focus / `ao focus` will find a pane: the CLI learned to run `tmux attach` as a child and report a non-zero exit instead (PR #46 review), and the UI's `/term` bridge finds out the same way. Found in the PR #46 review.
+
+**Fix:** either record the distinction (`killed_at`, or `pane: bool` refreshed by the tick from the pane snapshot) and have Focus / `ao focus` refuse cleanly when the pane is gone, or make `kill` keep the dead pane like a natural exit (kill the process, not the session) so `exited` always has a pane until `remove`. Done when `ao focus` on a killed session prints agentorc's own line without calling tmux.
+
+**Related:** TD-010 (b), PR #46.

@@ -9,7 +9,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from conftest import wait_for
+from conftest import wait_for, wait_state
 
 from sessionorc import paths
 from sessionorc.agent import _clean
@@ -38,6 +38,18 @@ async def test_fast_exit_has_log_and_exit_code(agent, tmp_path):
         assert await wait_for(all_exited)
         for x in await c.call("list"):
             assert "first-byte" in Path(x["run_log"]).read_text()
+
+
+async def test_forget_leaves_no_side_table_entry(agent, hookstub, tmp_path):
+    async with LocalClient() as c:
+        s = await c.call("create", name="side", dir=str(tmp_path), adapter="hookstub")
+        await c.call("hook", session=s["id"], state="idle")
+        await asyncio.sleep(0.5)  # a tick: git checked
+        assert s["id"] in agent._last_hook and s["id"] in agent._git_checked
+        await c.call("kill", id=s["id"])
+        await wait_state(c, s["id"], "exited")
+        await c.call("remove", id=s["id"])
+        assert all(s["id"] not in d for d in (agent._last_hook, agent._git_checked, agent._pre_limited))
 
 
 async def test_closed_sessions_are_forgotten_after_keep(agent, tmp_path, monkeypatch):

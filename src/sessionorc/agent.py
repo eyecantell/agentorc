@@ -317,6 +317,8 @@ class HostAgent:
         # `_push_changes` runs next (the caller's or a tick's) announces it exactly once.
         for last in self._subscribers.values():
             last.pop(sid, None)
+        for side in (self._git_checked, self._pre_limited, self._last_hook):  # no keys outlive the record
+            side.pop(sid, None)
         self._gone.append(sid)
 
     # -- RPC methods -----------------------------------------------------------------------------
