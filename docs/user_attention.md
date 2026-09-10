@@ -11,7 +11,6 @@ Format: `- [ ] YYYY-MM-DD (session <first-8-of-session-uuid> on <host>, or n/a) 
 - [ ] 2026-09-06 (session 6d1b7b88 on kmaster) — Decide design §10's two permission-dialog questions: Deny with a reason (cheap, the hook already carries one) and "allow for this session" (a third smaller button, never the default). Context: TD-008, design §10. Due: 2026-09-20.
 - [ ] 2026-09-06 (session 6d1b7b88 on kmaster) — Use phase 1 for real: reach the UI over `ssh -L 8765:127.0.0.1:8765 kmaster`, WireGuard, or a Cloudflare tunnel (design §4.5), run the agent + UI, point a session at samscrape, and note what the flows get wrong. Context: README "Run it", design §7 phase 1 success test. Due: 2026-09-13.
 
-- [ ] 2026-09-10 (session 019chcZM on kmaster) — **Review the herdr decision** ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)): the TD-014 spike ran the same day and chose (a) independent — `sessionorc` stays on tmux, phase 2 builds the ssh transport, herdr is prior art. The measurements are in the ADR; if you read them differently, reopen design §10 before phase 2 starts. Nothing is blocked on this. Due: 2026-09-17.
 
 ## In-flight (parked by a session)
 
