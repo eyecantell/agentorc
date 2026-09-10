@@ -249,3 +249,16 @@ and `tests/test_ui.py::test_terminal_scrollback_reaches_tmux`. Not verified on t
 is still open); the Copy button's hint documents Shift+drag for selection under mouse tracking.
 
 **Related:** design §2 req. 2, §4.6, §4.5a; TD-003 (phone layout); TD-002 (composer); TD-010 (b) (`ao focus`).
+
+## TD-024: `agentorc-agent serve` logs a pending-task traceback on every SIGTERM stop
+
+**Priority:** Low
+**Added:** 2026-09-10
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`main`, the `serve` branch)
+
+**Why:** `main` installs `loop.stop` as the SIGINT/SIGTERM handler and runs `agent.serve()` with `run_until_complete`. `loop.stop` halts the loop with the `serve` coroutine still pending, so the process ends with `ERROR asyncio: Task was destroyed but it is pending!` and an `Exception ignored … RuntimeError: Event loop is closed` traceback in the journal. Seen 2026-09-10 in `journalctl --user -u agentorc-agent` when `ao service install` restarted the unit after the promote (pid 681793). Harmless — sessions are re-adopted on the next tick, nothing is lost — but every restart writes an ERROR line that looks like a crash, and `serve`'s `finally` (cancel the ticker, unlink the socket file) is skipped.
+
+**Resolved:** 2026-09-10 (PR #TBD). `sessionorc.agent.serve_until_signal` runs `serve()` as a task and installs `task.cancel` as the SIGINT/SIGTERM handler; `main` runs it under `asyncio.run`, which also closes async generators and the loop. The test child (`tests/_agent_child.py`) now calls the same helper, and `tests/test_agent_restart.py::test_sigterm_stops_serve_cleanly` asserts exit 0, socket unlinked, no traceback on stderr. Live check on the user unit pending (board).
+
+**Related:** TD-020 (agent restart), the restart tests from PR #30.

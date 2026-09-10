@@ -4,34 +4,26 @@
 the test suite never spawns it. This script takes the socket name as its one argument and reads
 `AGENTORC_HOME` / `AGENTORC_TICK` from its environment like the real agent does.
 
-SIGTERM cancels the serve task rather than stopping the loop: `serve()`'s `finally` then runs
-while the loop is alive and the socket file is unlinked (main()'s `loop.stop()` leaves the task
-pending, harmless in production because serve() unlinks a stale socket on start, but noisy here).
+Stops the way `agentorc-agent serve` does (`serve_until_signal`, TD-024): SIGTERM cancels the
+serve task, `serve()`'s `finally` unlinks the socket file, and the process exits 0 with no
+pending-task traceback — `test_agent.py` asserts exactly that on this child.
 """
 
 import asyncio
-import contextlib
 import logging
-import signal
 import sys
 
 from _stubs import HookFedStub
 
 from sessionorc import adapters
-from sessionorc.agent import HostAgent
+from sessionorc.agent import HostAgent, serve_until_signal
 from sessionorc.tmux import Tmux
 
 
 async def _run(socket_name: str) -> None:
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
-    agent = HostAgent(tmux=Tmux(socket_name=socket_name))
-    task = asyncio.ensure_future(agent.serve())
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, task.cancel)
-    with contextlib.suppress(asyncio.CancelledError):
-        await task
+    await serve_until_signal(HostAgent(tmux=Tmux(socket_name=socket_name)))
 
 
 def main() -> int:

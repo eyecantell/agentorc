@@ -824,6 +824,25 @@ def _parse(iso: str) -> datetime:
     return datetime.fromisoformat(iso.replace("Z", "+00:00"))
 
 
+async def serve_until_signal(agent: HostAgent, sock: Path | None = None) -> None:
+    """Run `agent.serve()` until SIGINT or SIGTERM.
+
+    The signal cancels the serve task rather than stopping the loop, so `serve()`'s `finally`
+    (cancel the ticker, unlink the socket file) runs while the loop is still alive and the
+    process ends without asyncio's "Task was destroyed but it is pending!" (TD-024).
+    """
+    task = asyncio.ensure_future(agent.serve(sock))
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, task.cancel)
+    try:
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    finally:
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            loop.remove_signal_handler(sig)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog="agentorc-agent", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -832,12 +851,7 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if args.cmd == "serve":
-        agent = HostAgent()
-        loop = asyncio.new_event_loop()
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, loop.stop)
-        with contextlib.suppress(RuntimeError):
-            loop.run_until_complete(agent.serve())
+        asyncio.run(serve_until_signal(HostAgent()))
         return 0
     if args.cmd == "rpc":
         from sessionorc.client import bridge_stdio
