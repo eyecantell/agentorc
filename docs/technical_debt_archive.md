@@ -47,3 +47,14 @@ One tick of wrong state, only for hand-created reuse of a just-removed name.
 **Resolved:** 2026-09-10 (PR #36) — `_is_removed_pane(name, pane)` skips a pane only when `pane.created <= ` the removed pane's creation time, so a hand-made session reusing the name is adopted on the first tick that sees it. Residual: `created` is whole seconds, so a pane that was created, exited, observed, removed and had its name reused all inside one second (or whose pane was already gone at remove, `created` None) stays skipped until the guard expires (`REMOVED_GUARD_SECONDS`, 60 s). Covered by the same test as TD-020, including the equal-second case.
 
 **Related:** PR #22 review; TD-020; TD-010 (adoption of hand-started sessions).
+
+## TD-009: `subscribe` resets the shared push cache: every new tab re-pushes everything to every tab
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`_handle_conn`, `_last_pushed`)
+
+**Why:** `_last_pushed` is one dict for all subscribers; a new `subscribe` clears it so the newcomer gets a full snapshot, which also re-sends every session to every other connected tab. Harmless at a handful of tabs, wasteful at many; found in the PR #4 review.
+
+**Resolved:** 2026-09-10 (PR #37) — `HostAgent._subscribers` is now `writer → {session id: last payload sent}`; `_push_changes` serialises each session once and diffs per subscriber, `subscribe` registers an empty map so only the newcomer gets the full snapshot, and `_push_gone` clears the id from every map. Test: `tests/test_agent.py::test_second_subscriber_gets_a_snapshot_without_disturbing_the_first`.

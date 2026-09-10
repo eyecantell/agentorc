@@ -20,7 +20,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-007 | test_ui mutates `os.environ` for a module-scoped agent | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
-| TD-009 | `subscribe` resets the shared push cache: every new tab re-pushes everything to every tab | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
 | TD-012 | Resuming a conversation that is still live elsewhere is not refused | Low | Open |
 | TD-013 | External-session check reads the default profile's registry only | Low | Open |
@@ -148,17 +147,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Why:** The hook decision already carries a `reason` (the API and CLI accept one), but the UI's Deny button sends none. "Allow for this session" is not built. Both are open questions in design §10 for Paul to decide (board item).
 
 **Fix:** after the decision: an optional reason field next to Deny (card, Focus, phone); if approved, a third smaller button that updates the session's permission rules through the hook output, never the default. Done when §10 marks both decided and the controls table lists what exists.
-
-## TD-009: `subscribe` resets the shared push cache: every new tab re-pushes everything to every tab
-
-**Priority:** Low
-**Added:** 2026-09-06
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`_handle_conn`, `_last_pushed`)
-
-**Why:** `_last_pushed` is one dict for all subscribers; a new `subscribe` clears it so the newcomer gets a full snapshot, which also re-sends every session to every other connected tab. Harmless at a handful of tabs, wasteful at many; found in the PR #4 review.
-
-**Fix:** per-subscriber last-pushed maps (or send the newcomer a snapshot directly and leave the shared cache alone). Done when opening a second tab produces no traffic on the first.
 
 ## TD-010: Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd
 

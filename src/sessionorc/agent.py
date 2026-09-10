@@ -59,8 +59,9 @@ class HostAgent:
                 s.set_state("idle", confidence="hook")
                 self.store.save(s)
         self._dir_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
-        self._subscribers: set[asyncio.StreamWriter] = set()
-        self._last_pushed: dict[str, str] = {}
+        # subscriber → what it was last sent, per session (TD-009: a new tab gets its own snapshot
+        # without every other tab being re-sent everything)
+        self._subscribers: dict[asyncio.StreamWriter, dict[str, str]] = {}
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
@@ -227,7 +228,6 @@ class HostAgent:
     def _forget(self, sid: str) -> None:
         self.sessions.pop(sid, None)
         self.store.delete(sid)
-        self._last_pushed.pop(sid, None)
 
     # -- RPC methods -----------------------------------------------------------------------------
 
@@ -487,29 +487,32 @@ class HostAgent:
     # -- streaming -------------------------------------------------------------------------------
 
     async def _push_changes(self) -> None:
+        """Send each subscriber what changed since *it* was last told. One payload per session is
+        serialised once; the per-subscriber comparison is a string compare."""
         if not self._subscribers:
             return
-        for sid, s in self.sessions.items():
-            payload = json.dumps(s.to_dict(), sort_keys=True)
-            if self._last_pushed.get(sid) != payload:
-                self._last_pushed[sid] = payload
-                await self._broadcast({"event": "session", "session": s.to_dict()})
-        for sid in list(self._last_pushed):
-            if sid not in self.sessions:
-                self._last_pushed.pop(sid)
-                await self._broadcast({"event": "gone", "id": sid})
+        payloads = {sid: json.dumps(s.to_dict(), sort_keys=True) for sid, s in self.sessions.items()}
+        for w, last in list(self._subscribers.items()):
+            for sid, payload in payloads.items():
+                if last.get(sid) != payload:
+                    last[sid] = payload
+                    await self._send(w, '{"event": "session", "session": ' + payload + "}")
+            for sid in list(last):
+                if sid not in payloads:
+                    last.pop(sid)
+                    await self._send(w, json.dumps({"event": "gone", "id": sid}))
 
     async def _push_gone(self, sid: str) -> None:
-        await self._broadcast({"event": "gone", "id": sid})
+        for w, last in list(self._subscribers.items()):
+            last.pop(sid, None)
+            await self._send(w, json.dumps({"event": "gone", "id": sid}))
 
-    async def _broadcast(self, msg: dict[str, Any]) -> None:
-        line = (json.dumps(msg) + "\n").encode()
-        for w in list(self._subscribers):
-            try:
-                w.write(line)
-                await w.drain()
-            except (ConnectionError, OSError):
-                self._subscribers.discard(w)
+    async def _send(self, w: asyncio.StreamWriter, line: str) -> None:
+        try:
+            w.write((line + "\n").encode())
+            await w.drain()
+        except (ConnectionError, OSError):
+            self._subscribers.pop(w, None)
 
     # -- connection handling ---------------------------------------------------------------------
 
@@ -522,8 +525,7 @@ class HostAgent:
                     writer.write(b'{"error": "bad json"}\n')
                     continue
                 if req.get("method") == "subscribe":
-                    self._subscribers.add(writer)
-                    self._last_pushed = {}  # resend everything to the new subscriber
+                    self._subscribers[writer] = {}  # empty: the first push is this tab's full snapshot
                     writer.write((json.dumps({"id": req.get("id"), "result": "subscribed"}) + "\n").encode())
                     await writer.drain()
                     await self._push_changes()
@@ -533,7 +535,7 @@ class HostAgent:
         except (ConnectionError, asyncio.IncompleteReadError):
             pass
         finally:
-            self._subscribers.discard(writer)
+            self._subscribers.pop(writer, None)
             writer.close()
 
     async def _dispatch(self, req: dict[str, Any]) -> dict[str, Any]:
