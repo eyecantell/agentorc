@@ -284,7 +284,14 @@
       $$("[data-act=mode]").forEach((b) => { b.classList.toggle("on", !!v.unattended); b.textContent = v.unattended ? "unattended" : "interactive"; });
     }
     render(s);
-    connectEvents((ev) => { if (ev.event === "session" && ev.id === id) render(ev.session); if (ev.event === "gone" && ev.id === id) banner("session removed"); });
+    connectEvents((ev) => {
+      if (ev.event === "session" && ev.id === id) {
+        render(ev.session);
+        // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
+        if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
+      }
+      if (ev.event === "gone" && ev.id === id) banner("session removed");
+    });
   };
   function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 })();

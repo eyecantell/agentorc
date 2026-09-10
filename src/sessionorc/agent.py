@@ -434,6 +434,15 @@ class HostAgent:
         self._get(id)
         return await asyncio.to_thread(self.tmux.capture_tail, id, lines)
 
+    async def rpc_seen(self, id: str) -> dict[str, Any]:
+        """A person looked at this session (Focus opened, a card control used). The UI reads
+        `since > seen_at` on an `idle` record as "finished while you were away" (design §4.2)."""
+        s = self._get(id)
+        s.seen_at = now_iso()
+        self.store.save(s)
+        await self._push_changes()
+        return s.to_dict()
+
     async def rpc_set_mode(self, id: str, unattended: bool) -> dict[str, Any]:
         s = self._get(id)
         s.unattended = bool(unattended)

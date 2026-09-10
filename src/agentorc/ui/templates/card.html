@@ -2,7 +2,7 @@
    it by id, so the DOM position (Pinned mode) survives. Controls per design §4.5a. #}
 <div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}" id="card-{{ s.id }}"
      data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
-     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}">
+     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}"{% if s.unseen %} data-unseen="1"{% endif %}>
   <div class="sbar"></div>
   <div class="sc-body">
     <div class="row">

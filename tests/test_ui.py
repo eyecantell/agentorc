@@ -216,3 +216,27 @@ def test_closed_session_terminal_is_final_and_occupancy_endpoint(client, tmp_pat
     assert "▣ Details" in r.text
     assert client.get("/api/occupancy", params={"dir": str(tmp_path)}).json()["occupants"] == []
     assert client.get("/api/occupancy", params={"dir": ""}).json()["occupants"] == []
+
+
+def test_unseen_idle_until_focused(client, tmp_path):
+    """TD-017: an idle session nobody has looked at renders "finished · unseen" and sorts just above
+    plain idle; opening Focus (or acting on the card) marks it seen; a later finish is unseen again."""
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "unseen"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]  # the redirect to Focus is not followed: never seen
+    s = wait_state(client, sid, "idle")
+    assert s["unseen"] is True and s["state_label"] == "finished · unseen" and s["rank"] == 4.5
+    r = client.get("/")
+    assert f'id="card-{sid}"' in r.text and "finished · unseen" in r.text and 'data-unseen="1"' in r.text
+    assert client.get(f"/focus/{sid}").status_code == 200  # Focus = seen
+    s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert s["unseen"] is False and s["state_label"] == "idle" and s["rank"] == 5 and s["seen_at"]
+    # a new turn that finishes after that look is unseen again. Whole-second stamps: the send
+    # itself counts as a look, so the turn must outlast the second it was sent in (a tie is "seen").
+    assert client.post(f"/api/sessions/{sid}/send", json={"text": "sleep 1.3"}).json() == {"ok": True}
+    wait_state(client, sid, "working")
+    s = wait_state(client, sid, "idle")
+    assert s["unseen"] is True
+    assert client.post(f"/api/sessions/{sid}/seen").json() == {"ok": True}  # what the open Focus page sends
+    s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert s["unseen"] is False
+    client.post(f"/api/sessions/{sid}/kill")

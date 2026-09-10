@@ -344,7 +344,7 @@ Screens:
    (confirms), Close (enabled only when Ready to close passes; a card that passes also shows it
    inline, see §4.2), Open shell here, Copy tmux command. A scraped state shows as a dashed pill outline. Two sort modes, remembered per
    browser: **Urgent first** (`needs-you` → `limited` → `stalled?` → `unreachable` on a
-   non-volatile host → `working` → `idle` / `unreachable` on a volatile host → `exited` →
+   non-volatile host → `working` → unseen `idle` (§4.2) → `idle` / `unreachable` on a volatile host → `exited` →
    `closed`) and **Pinned** (cards stay where the person dragged them, needs-you cards are
    highlighted and counted in the top bar). A **Due** strip above the grid lists the
    dev-cadence board items that are overdue or due today, each with Snooze and Done (agent
