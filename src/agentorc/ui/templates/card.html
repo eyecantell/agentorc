@@ -7,8 +7,8 @@
   <div class="sc-body">
     <div class="row">
       <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>
-      <button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
-              title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>
+      {% if s.external %}<span class="badge" title="known from the tool's live registry: no terminal, no controls">registry</span>{% else %}<button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
+              title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>{% endif %}
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ 'guessed from the screen' if s.scraped else 'reported by the tool' }}"><span class="dot"></span>{{ s.state_label }}</span>
@@ -50,7 +50,7 @@
     <a class="btn sm {{ 'ghost' if nopane else 'primary' }}" href="/focus/{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
     {% if s.vscode %}<a class="btn sm ghost" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
     <span class="grow"></span>
-    <details class="more">
+    {% if not s.external %}<details class="more">
       <summary class="btn sm ghost" title="more">⋯</summary>
       <div class="menu">
         <button data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
@@ -59,6 +59,6 @@
         <button data-act="shell-here" data-id="{{ s.id }}">Open shell here</button>
         <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
       </div>
-    </details>
+    </details>{% endif %}
   </div>
 </div>

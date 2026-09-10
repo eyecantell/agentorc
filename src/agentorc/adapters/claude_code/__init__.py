@@ -58,7 +58,9 @@ def munge(path: Path | str) -> str:
 
 
 def config_dir(profile: Profile) -> Path:
-    return profile.config_dir or Path("~/.claude").expanduser()
+    """The profile's config dir, else what Claude Code itself would use: `CLAUDE_CONFIG_DIR` if
+    set in this process's environment, else `~/.claude`."""
+    return profile.config_dir or Path(os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude").expanduser()
 
 
 def global_config_file(profile: Profile) -> Path:

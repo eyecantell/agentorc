@@ -9,7 +9,9 @@ Two agents are on offer:
   call `asyncio.run`, which hangs against the in-process fixture because a sync test body never
   pumps that fixture's loop.
 
-Both use a private tmux server (`-L ao-test-<uuid>`) and a temp `AGENTORC_HOME`, never the
+Both use a private tmux server (`-L ao-test-<uuid>`), a temp `AGENTORC_HOME` and a temp
+`CLAUDE_CONFIG_DIR` (the default profile's registry; registry-only cards would otherwise show this
+machine's live Claude sessions, TD-010 a), never the
 user's. `subprocess_agent` sets the env in the test process too: the UI under `TestClient` runs
 here and reads `paths.socket_path()` and `AGENTORC_TMUX_SOCKET` from `os.environ` at call time.
 """
@@ -131,6 +133,7 @@ async def wait_state(client, sid: str, state: str, timeout: float = 6.0) -> dict
 @pytest.fixture
 async def agent(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))  # never this machine's live registry
     monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", FAST_TICK)
     sock_name = private_socket_name()
     monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)  # so `pane_line` can look at this server
@@ -164,6 +167,7 @@ def subprocess_agent(tmp_path_factory):
     proc: subprocess.Popen | None = None
     try:
         mp.setenv("AGENTORC_HOME", str(home))
+        mp.setenv("CLAUDE_CONFIG_DIR", str(home / "claude"))  # never this machine's live registry
         mp.setenv("AGENTORC_TMUX_SOCKET", sock_name)
         mp.setenv("AGENTORC_TICK", str(FAST_TICK))
         proc = subprocess.Popen(

@@ -274,6 +274,7 @@
       } else if (v.state === "needs-you" && p) {
         head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>`;
         compose.disabled = true; $("#composehint").textContent = "answer in the terminal above";
+      } else if (v.external) { compose.disabled = true; $("#composehint").textContent = "started outside agentorc: a read-only card (no terminal, no controls)";
       } else { compose.disabled = false; $("#composehint").textContent = ""; }
       $("#fstate").innerHTML = head;
       // An exited session keeps its dead pane on purpose (exit code, last lines, run log); say so

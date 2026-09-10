@@ -70,6 +70,9 @@ class Session:
     # A tmux pane (live or dead) still backs this record. False after `kill`/`close` (the session is
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).
     pane: bool = True
+    # Started outside agentorc and known only from the tool's live registry (TD-010 a): a read-only
+    # card — no tmux pane, no controls, never stored; it leaves when the process does.
+    external: bool = False
     subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None

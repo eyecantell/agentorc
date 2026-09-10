@@ -114,7 +114,9 @@ def view(s: dict[str, Any]) -> dict[str, Any]:
         flags.append(f"{git['ahead']} unpushed")
     d["flag"] = " · ".join(flags) if state in ("idle", "exited", "stalled?", "needs-you") and flags else ""
     prof = s.get("profile") or ""
-    if s.get("adapter") == "shell":
+    if s.get("external"):
+        d["profile_line"] = f"{s.get('adapter')} · started outside agentorc (read-only)"
+    elif s.get("adapter") == "shell":
         d["profile_line"] = "shell"
     else:
         try:
