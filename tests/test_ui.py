@@ -194,8 +194,14 @@ def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
     from agentorc.ui.app import vscode_url
 
     assert vscode_url("/tmp/ao-test") == "vscode://vscode-remote/ssh-remote+kmaster/tmp/ao-test?windowId=_blank"
+    # a space or `?` in the directory is percent-encoded, the separators are not (TD-011)
+    assert (
+        vscode_url("/tmp/my repo/a?b")
+        == "vscode://vscode-remote/ssh-remote+kmaster/tmp/my%20repo/a%3Fb?windowId=_blank"
+    )
     monkeypatch.setenv("AGENTORC_LOCAL_HOST", "1")
     assert vscode_url("/tmp/ao-test") == "vscode://file/tmp/ao-test?windowId=_blank"
+    assert vscode_url("/tmp/my repo") == "vscode://file/tmp/my%20repo?windowId=_blank"
 
 
 def test_closed_session_terminal_is_final_and_occupancy_endpoint(client, tmp_path):

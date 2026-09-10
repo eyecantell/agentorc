@@ -13,6 +13,7 @@ import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -46,11 +47,14 @@ def vscode_url(directory: str) -> str:
     """`vscode://vscode-remote/ssh-remote+<alias><path>` — the alias must be in the person's own
     ~/.ssh/config (design §4.5) — or `vscode://file/…` when the UI runs where the person sits."""
     h = hosts.local_host()
+    # Percent-encode the path: a space or `?` in a directory name would otherwise produce a URI the
+    # browser silently drops (TD-011). `/` stays, so the path reads as a path.
+    path = quote(directory, safe="/")
     if h.local:
-        return f"vscode://file{directory}?windowId=_blank"
+        return f"vscode://file{path}?windowId=_blank"
     # windowId=_blank: a new VS Code window. Without it the handler reuses the current window and
     # replaces whatever it was showing (first-use finding 2026-09-06).
-    return f"vscode://vscode-remote/ssh-remote+{h.vscode_host}{directory}?windowId=_blank"
+    return f"vscode://vscode-remote/ssh-remote+{h.vscode_host}{path}?windowId=_blank"
 
 
 # -- view model ------------------------------------------------------------------------------------
