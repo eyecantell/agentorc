@@ -3,6 +3,7 @@ sessions forgotten after their day, adoption of hand-started `ao-*` sessions, th
 event queue, tail hygiene."""
 
 import asyncio
+import json
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -41,8 +42,9 @@ async def test_fast_exit_has_log_and_exit_code(agent, tmp_path):
 
 async def test_closed_sessions_are_forgotten_after_keep(agent, tmp_path, monkeypatch):
     monkeypatch.setattr("sessionorc.agent.CLOSED_KEEP", timedelta(seconds=0))
-    async with LocalClient() as c:
+    async with LocalClient() as c, LocalClient() as sub:
         s = await c.call("create", name="c", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        await sub.call("subscribe")
         await c.call("close", id=s["id"])
         assert (await c.call("get", id=s["id"]))["state"] == "closed"
 
@@ -51,6 +53,10 @@ async def test_closed_sessions_are_forgotten_after_keep(agent, tmp_path, monkeyp
 
         assert await wait_for(gone)
         assert not (paths.sessions_dir() / f"{s['id']}.json").exists()
+        # the tick's forget is announced to subscribers too (TD-009 routes every forget one way)
+        while (ev := json.loads(await asyncio.wait_for(sub._reader.readline(), 5))).get("event") != "gone":
+            pass
+        assert ev["id"] == s["id"]
 
 
 async def test_hand_started_session_is_adopted(agent, tmp_path):
