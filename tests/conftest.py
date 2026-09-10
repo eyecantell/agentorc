@@ -101,6 +101,19 @@ def wait_for_sync(pred: Callable[[], object], timeout: float = 5.0, step: float 
     return False
 
 
+def pane_line(sid: str) -> str:
+    """What tmux itself says about a session's pane, for a wait that timed out (TD-025): the
+    record's state and tail alone cannot tell a slow shell start from a pane that never appeared."""
+    sock = os.environ.get("AGENTORC_TMUX_SOCKET")
+    if not sock:
+        return "(no AGENTORC_TMUX_SOCKET: pane not inspected)"
+    try:
+        pane = Tmux(socket_name=sock).main_panes().get(sid)
+    except Exception as e:  # noqa: BLE001 — a diagnostic must never mask the assertion
+        return f"(pane lookup failed: {e})"
+    return f"pane={pane}" if pane else "pane=none (not in list-panes)"
+
+
 async def wait_state(client, sid: str, state: str, timeout: float = 6.0) -> dict:
     s = await client.call("get", id=sid)
     end = time.monotonic() + timeout
@@ -109,7 +122,7 @@ async def wait_state(client, sid: str, state: str, timeout: float = 6.0) -> dict
             return s
         await asyncio.sleep(0.1)
         s = await client.call("get", id=sid)
-    raise AssertionError(f"{sid} never reached {state}: {s['state']} {s.get('tail')}")
+    raise AssertionError(f"{sid} never reached {state}: {s['state']} {s.get('tail')} {pane_line(sid)}")
 
 
 # -- the in-process agent -----------------------------------------------------------------------
@@ -119,7 +132,9 @@ async def wait_state(client, sid: str, state: str, timeout: float = 6.0) -> dict
 async def agent(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", FAST_TICK)
-    tmux = Tmux(socket_name=private_socket_name())
+    sock_name = private_socket_name()
+    monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)  # so `pane_line` can look at this server
+    tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))
     assert await wait_for(lambda: paths.socket_path().exists(), timeout=5.0, step=0.05), "agent socket never appeared"
