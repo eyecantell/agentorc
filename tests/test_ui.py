@@ -2,8 +2,8 @@
 actions, the /events stream, and the /term pty bridge.
 
 The agent is `subprocess_agent`, not a thread: the sync TestClient needs an agent whose loop runs
-on its own. TestClient still keeps an anyio portal thread alive, so ptyprocess's forkpty() warning
-(TD-007) remains."""
+on its own. TestClient still keeps an anyio portal thread alive, so ptyprocess's forkpty() runs
+multi-threaded; the warning is filtered in pyproject.toml (TD-007, accepted)."""
 
 import json
 import os

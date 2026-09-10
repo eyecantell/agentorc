@@ -62,6 +62,12 @@ markers = [
     "unit: no tmux, sockets, or subprocesses; sub-second",
     "integration: spawns tmux, a host agent, git, or the hook script",
 ]
+filterwarnings = [
+    # TD-007 (archived): starlette's TestClient keeps a portal thread alive, so ptyprocess's
+    # forkpty() in the /term tests runs in a multi-threaded process. The child only execs, the
+    # exposure is accepted; see tests/README.md "Real-environment dependencies".
+    "ignore:This process .* is multi-threaded, use of forkpty\\(\\) may lead to deadlocks:DeprecationWarning",
+]
 
 [tool.ruff]
 line-length = 120

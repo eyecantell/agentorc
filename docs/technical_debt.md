@@ -18,7 +18,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-004 | Host identity: `hosts.yml` (local entry only so far), ssh transport and volatile hosts pending | Medium | Partly done |
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
-| TD-007 | test_ui mutates `os.environ` for a module-scoped agent | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
 | TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Done |
@@ -123,17 +122,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Fix:** create a throwaway `CLAUDE_CONFIG_DIR`, run `claude` once, see where `.claude.json` lands, pin it with a test. Done when the second profile (grind) launches without the dialog.
 
 **Related:** TD-005, design §4.2a.
-
-## TD-007: test_ui mutates `os.environ` for a module-scoped agent
-
-**Priority:** Low
-**Added:** 2026-09-06
-**Status:** Open
-**Location:** `tests/test_ui.py` (`client` fixture over `subprocess_agent` in `tests/conftest.py`)
-
-**Why:** The UI tests need one agent shared across a sync `TestClient`. The env/tick leak was fixed in PR #4 review (module-scoped `MonkeyPatch`, undone at teardown). The agent thread went away in the test-suite consolidation (2026-09-07): the module's agent is now a separate process (`tests/_agent_child.py` on the private tmux socket; `agentorc-agent serve` cannot take one). What remains: starlette's `TestClient` keeps an anyio portal thread alive for the whole `with` block, so `ptyprocess` still calls `forkpty()` in a multi-threaded process and Python still warns it may deadlock the child — the rare-flake exposure is smaller, not gone.
-
-**Fix:** either drive `/term` through a pty helper subprocess in the tests, or accept the warning and filter it in `pyproject.toml` with a comment pointing here.
 
 ## TD-008: Deny reason input and "allow for this session" (design §10 open questions)
 
