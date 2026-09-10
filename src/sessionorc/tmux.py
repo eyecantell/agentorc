@@ -21,11 +21,20 @@ MIN_VERSION = (3, 2)  # `new-session -e` and `paste-buffer -p`
 
 def attach_argv(session: str, *, socket_name: str | None = None, binary: str = "tmux") -> list[str]:
     """The client command that attaches a terminal to a session: what the UI's pty bridge runs and
-    what `ao focus` execs. Attaching writes nothing to the session (design §9 invariant 1)."""
+    what `ao focus` execs. Attaching writes nothing to the session's pane (design §9 invariant 1);
+    it does chain `mouse on` onto the session (TD-022): tmux owns the history and only ever paints
+    the live screen, so the wheel has to reach tmux, which then scrolls its history in copy mode.
+    A session option, never `-g`: the person's server and their other sessions keep their own
+    setting. Set here rather than at creation so adopted and pre-existing sessions get it too.
+    The attach comes first because tmux stops a `;` chain at the first failure: a missing session
+    fails exactly as a bare attach did, and a set-option that fails (an old tmux) can never cost
+    the terminal. The chained command runs as soon as the client is attached, not on detach
+    (verified 2026-09-09, tmux 3.5a)."""
     argv = [binary]
     if socket_name:
         argv += ["-L", socket_name]
-    return argv + ["attach", "-t", f"={session}:"]
+    target = f"={session}:"
+    return argv + ["attach", "-t", target, ";", "set-option", "-t", target, "mouse", "on"]
 
 
 class TmuxError(RuntimeError):

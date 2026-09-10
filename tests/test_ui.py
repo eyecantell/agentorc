@@ -12,6 +12,7 @@ import sys
 import time
 
 import pytest
+from conftest import wait_for_sync as wait_for
 from fastapi.testclient import TestClient
 
 from sessionorc.tmux import Tmux
@@ -146,6 +147,53 @@ def test_terminal_bridge(client, subprocess_agent, tmp_path):
         tmux.run("display", "-p", "-t", f"={sid}:", "#{window_width}x#{window_height}", check=False).stdout.strip()
         == "120x29"  # tmux's status line takes one of the 30 rows
     )
+    client.post(f"/api/sessions/{sid}/kill")
+
+
+def test_bridge_argv_shapes():
+    from agentorc.ui.pty_bridge import attach_argv, scroll_argv
+
+    a = attach_argv("ao-x", socket_name="s")
+    assert a[:6] == ["tmux", "-L", "s", "attach", "-t", "=ao-x:"]  # attach first: a chain stops at a failure
+    assert a[6:] == [";", "set-option", "-t", "=ao-x:", "mouse", "on"]  # a session option, never -g
+    assert attach_argv("ao-x")[0:2] == ["tmux", "attach"]
+    assert scroll_argv("ao-x", "up", socket_name="s")[3:] == ["copy-mode", "-e", "-u", "-t", "=ao-x:"]
+    assert scroll_argv("ao-x", "down")[1:] == ["send-keys", "-X", "-t", "=ao-x:", "page-down"]
+    with pytest.raises(ValueError):
+        scroll_argv("ao-x", "sideways")
+
+
+def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
+    """TD-022: the attach sets `mouse on` on the session, and a `scroll` bridge message moves tmux
+    into copy mode over its history (up) and back out on reaching the live screen (down)."""
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "scroll"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    tmux = Tmux(socket_name=subprocess_agent.sock_name)
+
+    def mode() -> str:
+        return tmux.run("display", "-p", "-t", f"={sid}:", "#{pane_in_mode}", check=False).stdout.strip()
+
+    with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
+        ws.send_text("seq 1 200; echo SCROLL-DONE\r")
+        buf = b""
+        deadline = time.time() + 8
+        while time.time() < deadline and b"SCROLL-DONE" not in buf:
+            buf += ws.receive_bytes()
+        assert b"SCROLL-DONE" in buf
+        assert tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip() == "mouse on"
+        assert mode() == "0"
+        ws.send_text(json.dumps({"scroll": "up"}))
+        assert wait_for(lambda: mode() == "1"), "scroll up did not enter copy mode"
+        ws.send_text(json.dumps({"scroll": "sideways"}))  # ignored, the bridge stays up
+        ws.send_text(json.dumps({"scroll": "down"}))
+        assert wait_for(lambda: mode() == "0"), "scroll down to the live screen did not leave copy mode"
+        ws.send_text("echo STILL-$((1+1))\r")
+        buf = b""
+        deadline = time.time() + 8
+        while time.time() < deadline and b"STILL-2" not in buf:
+            buf += ws.receive_bytes()
+        assert b"STILL-2" in buf
     client.post(f"/api/sessions/{sid}/kill")
 
 

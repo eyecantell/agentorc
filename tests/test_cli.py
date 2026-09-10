@@ -221,18 +221,19 @@ def test_focus_and_attach_print_the_attach_argv_under_json(subprocess_agent, tmp
     assert cli.main(["--json", "shell", "att", "-d", str(tmp_path), "--attach"]) == 0
     out = json.loads(capsys.readouterr().out)
     sid = out["id"]
-    assert out["attach"] == ["tmux", "-L", subprocess_agent.sock_name, "attach", "-t", f"={sid}:"]
+    assert out["attach"][:6] == ["tmux", "-L", subprocess_agent.sock_name, "attach", "-t", f"={sid}:"]
+    assert out["attach"][6:] == [";", "set-option", "-t", f"={sid}:", "mouse", "on"]  # TD-022
     wait_state(sid, "idle")
     assert cli.main(["--json", "focus", sid]) == 0
     out = json.loads(capsys.readouterr().out)
-    assert out["id"] == sid and out["state"] == "idle" and out["attach"][-1] == f"={sid}:"
+    assert out["id"] == sid and out["state"] == "idle" and out["attach"][5] == f"={sid}:"
     assert cli.main(["focus", "ao-nope"]) == 1
     assert "no session ao-nope" in capsys.readouterr().err
     # a real focus runs tmux attach as a child: patch it (no tty here) and check the argv
     seen = {}
     monkeypatch.setattr("agentorc.cli.subprocess.call", lambda argv: seen.update(argv=argv) or 0)
     assert cli.main(["focus", sid]) == 0
-    assert seen["argv"][0] == "tmux" and seen["argv"][-2:] == ["-t", f"={sid}:"]
+    assert seen["argv"][0] == "tmux" and seen["argv"][3:6] == ["attach", "-t", f"={sid}:"]
     # killed: the record says exited like a natural exit, but the pane is gone — a clear line, exit 1
     call_sync("kill", id=sid)
     wait_state(sid, "exited")

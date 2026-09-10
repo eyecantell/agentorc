@@ -26,7 +26,7 @@ from sessionorc import naming, paths
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.models import STATE_RANK
 
-from .pty_bridge import PtySession, attach_argv, pump
+from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 
 HERE = Path(__file__).parent
 log = logging.getLogger("uvicorn.error")  # the logger uvicorn already shows on the console
@@ -377,8 +377,9 @@ def create_app() -> FastAPI:
             await ws.send_bytes(b"\r\n[agentorc] this session is closed; its pane is gone (see the banner).\r\n")
             await ws.close(code=4404)
             return
+        sock = os.environ.get("AGENTORC_TMUX_SOCKET")
         try:
-            pty = PtySession(attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET")), cols=cols, rows=rows)
+            pty = PtySession(attach_argv(sid, socket_name=sock), cols=cols, rows=rows)
         except Exception as e:  # noqa: BLE001 — no silent failure path (design §4.5)
             await ws.send_bytes(f"\r\n[agentorc] could not attach a terminal: {type(e).__name__}: {e}\r\n".encode())
             await ws.close()
@@ -399,9 +400,25 @@ def create_app() -> FastAPI:
                     return json.loads(text)
             return text
 
+        reapers: set[asyncio.Future[int]] = set()
+
+        async def scroll(direction: str) -> None:
+            # A tmux command against the session, not keys into the pane: there is no escape
+            # sequence that enters copy mode (TD-022). Bad directions are the client's bug; ignore.
+            try:
+                argv = scroll_argv(sid, direction, socket_name=sock)
+            except ValueError:
+                return
+            devnull = asyncio.subprocess.DEVNULL
+            proc = await asyncio.create_subprocess_exec(*argv, stdout=devnull, stderr=devnull)
+            # Reap in the background: waiting here would hold the key pump behind a slow tmux.
+            reapers.add(asyncio.ensure_future(proc.wait()))
+
         try:
-            await pump(pty, send, recv)
+            await pump(pty, send, recv, scroll)
         finally:
+            for f in reapers:
+                f.cancel()
             with contextlib.suppress(Exception):
                 await ws.close()
 
