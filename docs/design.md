@@ -134,7 +134,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   (see §4.6). Default tmux socket, so hand-started sessions and "Copy tmux command" just work.
   tmux, not the agent, **owns the processes**: a host-agent restart, upgrade or crash reconciles
   against live panes and loses no session, where a runtime that holds the ptys itself must kill
-  every session to restart and re-launch the tool with `--resume` (measured on herdr,
+  every session to restart and re-launch the tool with `--resume` once a client attaches (measured on herdr,
   [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)). This is a reason, not an accident.
 - The adapter's **argv runs directly** in the tmux session (`new-session -c <dir> -- <argv>`),
   never through the person's interactive shell: rc files change directories, set aliases and
@@ -580,8 +580,8 @@ typed day to day; it is a separate console-script entry so anyone with a collidi
 drop it without losing anything. The CLI is a thin client of the host agent RPC — it never touches tmux
 itself (§9 invariant 1). Every subcommand takes `--json` and prints the RPC result with the ids
 the next call needs (TD-018); `ao --skill` prints the rules an agent driving `ao` from inside a
-session must follow (TD-019, phase 5). Both are borrowed from herdr's CLI, which made the spike's
-automation trivial ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
+session must follow (TD-019, phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
+automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
 
 ## 5. Configuration
 

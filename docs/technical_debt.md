@@ -249,8 +249,9 @@ Done when the decision doc is merged and the §10 item is checked.
 **Status:** Open
 **Location:** `src/sessionorc/adapters.py` (`classify`), `src/agentorc/adapters/claude_code/__init__.py`, `src/sessionorc/agent.py` (tick)
 
-**Why:** Design §4.2 allows a pane classifier as a labelled fallback, and today it is a regex or
-two inside each adapter. The herdr spike ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md))
+**Why:** Design §4.2 allows a pane classifier as a labelled fallback, and today the only scraped
+verdicts are the shell/command adapters' foreground-process check and the agent's liveness
+cross-check; the Claude Code adapter's `classify` returns nothing. The herdr spike ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md))
 showed what the fallback is for: its screen detector caught the trust dialog, which no Claude Code
 hook reports, and its `agent explain` printed the rule that fired, the region it matched and the
 fallback reason when nothing did. Three things agentorc wants rest on the same mechanism: the
@@ -260,7 +261,7 @@ before TD-001's usage polling exists, and a `stalled?` that can say *why* it is 
 **Fix:** one TOML manifest per tool under the adapter (`rules = [{id, state, region, any/all/not
 patterns, priority}]`, versioned), evaluated over the bottom of the pane on the tick; the result
 is written with `confidence: scraped` and never overrides a `hook` state that is fresher than the
-adapter's `stall_after` (§9 invariant 4). `ao explain <session>` prints the snapshot, the matched
+`STALL_AFTER` window (today a module constant in `agent.py`, per adapter once TD-015 lands; §4.2 "scraped never outranks a fresh hook state"). `ao explain <session>` prints the snapshot, the matched
 rule and the evidence; `ao explain --file` classifies a saved fixture so rules can be tested
 without a live pane. Done when the trust dialog shows as `needs-you` (scraped) on a Claude Code
 session started with a fresh `.claude.json`, and the three usage-limit fixtures from the spike
@@ -321,9 +322,10 @@ finishes overnight is the first idle card in the morning and drops back after on
 
 **Why:** `status --json` exists; `new`, `shell`, `send`, `kill`, `close`, `allow`, `deny`, `tail`
 print prose, so a script or an agent driving `ao` has to parse "ao-x-y  attach: tmux attach …".
-herdr's rule for its CLI — every response is JSON carrying the ids you need next, never predict
-an id — is the one thing that made the spike's automation trivial, and agentorc's own sessions
-are the obvious next driver of `ao`.
+herdr's CLI is JSON-first (most commands print the API response with the ids the next call
+needs, and its skill file tells agents to parse ids rather than predict them), which is what made
+the spike's automation a matter of `jq`; agentorc's own sessions are the obvious next driver of
+`ao`.
 
 **Fix:** a global `--json` that makes every subcommand print the RPC result (or `{"error": …}`
 with the same exit codes). Done when `tests/test_cli.py` covers `--json` for each subcommand.
