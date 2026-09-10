@@ -588,7 +588,11 @@ Package and canonical command: `agentorc`. The package also registers `ao` as an
 (`ao status`, `ao new`, `ao shell`, `ao focus <name>`, `ao off --now`) because that is what gets
 typed day to day; it is a separate console-script entry so anyone with a colliding `ao` can
 drop it without losing anything. The CLI is a thin client of the host agent RPC — it never touches tmux
-itself (§9 invariant 1). Every subcommand takes `--json` and prints the RPC result with the ids
+itself (§9 invariant 1), with one read-only exception: `ao focus <id>` and `ao new --attach` /
+`ao shell --attach` run `tmux attach` on the session, the terminal's Focus screen, which
+creates, kills and types nothing (under `--json` the attach argv is printed instead). That is
+how a session started from any terminal gets a first-class card: `ao new --attach` where you
+would have typed `claude` (TD-010 b). Every subcommand takes `--json` and prints the RPC result with the ids
 the next call needs (TD-018); `ao --skill` prints the rules an agent driving `ao` from inside a
 session must follow (TD-019, phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
 automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).

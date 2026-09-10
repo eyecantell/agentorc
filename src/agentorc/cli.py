@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -12,6 +13,7 @@ from typing import Any
 
 from sessionorc.client import AgentError, AgentUnavailable, call_sync
 from sessionorc.models import STATE_RANK
+from sessionorc.tmux import attach_argv
 
 
 def _age(iso: str) -> str:
@@ -60,6 +62,31 @@ def cmd_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def _attach(args: argparse.Namespace, sid: str, result: Any | None = None) -> int:
+    """`ao focus` / `--attach`: run `tmux attach` on the session (the terminal equivalent of the
+    Focus screen; TD-010 b) as a child, so a pane that is gone (killed: `exited` looks the same
+    as a natural exit, whose pane is kept) gets a clear line here rather than tmux's. Under
+    `--json` nothing is run: the argv is printed for the caller."""
+    argv = attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET"))
+    if args.json:
+        print(json.dumps({**(result or {"id": sid}), "attach": argv}, indent=1))
+        return 0
+    sys.stdout.flush()
+    rc = subprocess.call(argv)
+    if rc != 0:
+        return fail(
+            args, f"could not attach to {sid} (tmux exit {rc}): the pane is gone — killed, or the server restarted", 1
+        )
+    return 0
+
+
+def cmd_focus(args: argparse.Namespace) -> int:
+    s = call_sync("get", id=args.id)  # a clear error for an unknown id, not tmux's
+    if s["state"] == "closed":
+        return fail(args, f"{args.id} is closed; its pane is gone", 1)
+    return _attach(args, args.id, s)
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     s = call_sync(
         "create",
@@ -73,6 +100,10 @@ def cmd_new(args: argparse.Namespace) -> int:
         resume=args.resume,
         prompt=args.prompt,
     )
+    if getattr(args, "attach", False):
+        if not args.json:
+            print(f"{s['id']}  ({s['adapter']}, {s['dir']})")
+        return _attach(args, s["id"], s)
     return emit(args, s, lambda: print(f"{s['id']}  ({s['adapter']}, {s['dir']})\nattach: tmux attach -t {s['id']}"))
 
 
@@ -204,12 +235,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--unattended", action="store_true")
     p.add_argument("--resume", help="the tool's session id to resume")
     p.add_argument("--prompt", help="opening prompt")
+    p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_new)
 
     p = add("shell", help="start a plain shell session here")
     p.add_argument("name", nargs="?")
     p.add_argument("-d", "--dir")
+    p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_shell)
+
+    p = add("focus", help="attach this terminal to a session (the Focus screen, in tmux)")
+    p.add_argument("id")
+    p.set_defaults(fn=cmd_focus)
 
     for name, fn, help_ in (
         ("kill", cmd_kill, "kill a session (worktree kept)"),
