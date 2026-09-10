@@ -2,7 +2,6 @@
 talking to a live host agent."""
 
 import asyncio
-import contextlib
 import json
 import os
 import subprocess
@@ -11,6 +10,7 @@ import uuid
 from pathlib import Path
 
 import pytest
+from conftest import run_hook, wait_for
 
 from agentorc import profiles
 from agentorc.adapters.claude_code import (
@@ -22,11 +22,9 @@ from agentorc.adapters.claude_code import (
     pretrust,
 )
 from agentorc.adapters.claude_code.hook import translate
-from sessionorc import adapters, paths
-from sessionorc.adapters import LaunchSpec
-from sessionorc.agent import HostAgent
 from sessionorc.client import LocalClient
-from sessionorc.tmux import Tmux
+
+pytestmark = pytest.mark.integration  # the hook-script tests spawn processes; split later if wanted
 
 # -- pure -------------------------------------------------------------------------------------
 
@@ -157,53 +155,9 @@ def test_parse_usage_and_credentials(tmp_path):
 # -- the real hook script against a live agent ---------------------------------------------------
 
 
-@pytest.fixture
-async def agent(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
-    tmux = Tmux(socket_name=f"ao-test-{uuid.uuid4().hex[:8]}")
-    a = HostAgent(tmux=tmux)
-    task = asyncio.create_task(a.serve(paths.socket_path()))
-    for _ in range(50):
-        if paths.socket_path().exists():
-            break
-        await asyncio.sleep(0.05)
-    yield a
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError, Exception):
-        await task
-    tmux.kill_server()
-
-
-def run_hook(session: str, payload: dict, wait: str = "5") -> subprocess.CompletedProcess:
-    env = {**os.environ, "AGENTORC_SESSION": session, "AGENTORC_PERMISSION_WAIT": wait}
-    return subprocess.run(
-        [sys.executable, "-m", "agentorc.adapters.claude_code.hook"],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        env=env,
-        timeout=30,
-    )
-
-
-class HookFedStub:
-    """Hook-fed, never scraped — otherwise the tick reclassifies a shell to idle mid-test (flake)."""
-
-    name = "hookstub-e2e"
-    state_source = "hook"
-
-    def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
-        return LaunchSpec(argv=["bash", "--norc"])
-
-    def classify(self, pane, tail):
-        return None
-
-
-async def test_hook_script_end_to_end(agent, tmp_path, monkeypatch):
-    monkeypatch.setitem(adapters._REGISTRY, HookFedStub.name, HookFedStub())  # restored at teardown
+async def test_hook_script_end_to_end(agent, hookstub, tmp_path):
     async with LocalClient() as c:
-        s = await c.call("create", name="h", dir=str(tmp_path), adapter="hookstub-e2e")
+        s = await c.call("create", name="h", dir=str(tmp_path), adapter=hookstub.name)
         sid = s["id"]
         # Stop → idle, carrying the Claude session id
         cp = await asyncio.to_thread(run_hook, sid, {"hook_event_name": "Stop", "session_id": "cc-uuid"})
@@ -218,11 +172,12 @@ async def test_hook_script_end_to_end(agent, tmp_path, monkeypatch):
             "tool_use_id": "tu-e2e",
         }
         fut = asyncio.get_running_loop().run_in_executor(None, run_hook, sid, payload)
-        for _ in range(50):
-            x = await c.call("get", id=sid)
-            if x["state"] == "needs-you":
-                break
-            await asyncio.sleep(0.1)
+
+        async def needs_you():
+            return (await c.call("get", id=sid))["state"] == "needs-you"
+
+        assert await wait_for(needs_you)
+        x = await c.call("get", id=sid)
         assert x["pending"]["kind"] == "permission" and x["pending"]["text"] == "Bash: git push"
         await c.call("decide", id=sid, tool_use_id="tu-e2e", behavior="deny", reason="not yet")
         cp = await fut

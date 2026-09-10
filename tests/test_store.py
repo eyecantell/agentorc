@@ -1,5 +1,9 @@
+import pytest
+
 from sessionorc.models import Pending, Session
 from sessionorc.store import EventQueue, SessionStore
+
+pytestmark = pytest.mark.unit
 
 
 def test_session_roundtrip(tmp_path):

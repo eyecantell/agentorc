@@ -3,44 +3,17 @@ sessions forgotten after their day, adoption of hand-started `ao-*` sessions, th
 event queue, tail hygiene."""
 
 import asyncio
-import contextlib
-import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
+from conftest import wait_for
 
-from sessionorc import adapters, paths
-from sessionorc.adapters import LaunchSpec
-from sessionorc.agent import HostAgent, _clean
+from sessionorc import paths
+from sessionorc.agent import _clean
 from sessionorc.client import LocalClient
-from sessionorc.tmux import Tmux
 
-
-@pytest.fixture
-async def agent(tmp_path, monkeypatch):
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
-    tmux = Tmux(socket_name=f"ao-test-{uuid.uuid4().hex[:8]}")
-    a = HostAgent(tmux=tmux)
-    task = asyncio.create_task(a.serve(paths.socket_path()))
-    for _ in range(50):
-        if paths.socket_path().exists():
-            break
-        await asyncio.sleep(0.05)
-    yield a
-    task.cancel()
-    with contextlib.suppress(asyncio.CancelledError, Exception):
-        await task
-    tmux.kill_server()
-
-
-async def wait_for(pred, timeout=6.0):
-    for _ in range(int(timeout / 0.1)):
-        if await pred():
-            return True
-        await asyncio.sleep(0.1)
-    return False
+pytestmark = pytest.mark.integration
 
 
 async def test_fast_exit_has_log_and_exit_code(agent, tmp_path):
@@ -91,22 +64,8 @@ async def test_hand_started_session_is_adopted(agent, tmp_path):
         assert s["adapter"] == "shell" and s["name"] == "byhand-x" and s["confidence"] == "scraped"
 
 
-class HookFedStub:
-    """A hook-fed adapter: never scraped, so queued hook events are what set its state."""
-
-    name = "hookstub"
-    state_source = "hook"
-
-    def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
-        return LaunchSpec(argv=["bash", "--norc"])
-
-    def classify(self, pane, tail):
-        return None
-
-
-async def test_offline_hook_events_are_drained(agent, tmp_path, monkeypatch):
+async def test_offline_hook_events_are_drained(agent, hookstub, tmp_path):
     """A hook that could not reach the socket appends to events/; the next tick applies it."""
-    monkeypatch.setitem(adapters._REGISTRY, HookFedStub.name, HookFedStub())  # restored at teardown
     async with LocalClient() as c:
         s = await c.call("create", name="q", dir=str(tmp_path), adapter="hookstub")
         agent.events.append(s["id"], {"state": "needs-you", "pending": {"kind": "question", "text": "pick 1-3"}})
@@ -152,8 +111,7 @@ async def test_forget_kills_leftover_pane_and_dead_panes_are_not_adopted(agent, 
         assert not agent.tmux.has_session(s["id"])
 
 
-async def test_resume_supersedes_the_exited_record(agent, tmp_path, monkeypatch):
-    monkeypatch.setitem(adapters._REGISTRY, HookFedStub.name, HookFedStub())
+async def test_resume_supersedes_the_exited_record(agent, hookstub, tmp_path):
     async with LocalClient() as c:
         old = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub")
         await c.call("hook", session=old["id"], adapter_id="cc-123")

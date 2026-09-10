@@ -1,28 +1,20 @@
 """Integration tests against a private tmux server (`-L`), never the user's."""
 
-import time
-import uuid
-
 import pytest
+from conftest import kill_private_server, private_socket_name
+from conftest import wait_for_sync as wait_for
 
 from sessionorc.tmux import Tmux
+
+pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
 def tmux():
-    t = Tmux(socket_name=f"ao-test-{uuid.uuid4().hex[:8]}")
+    t = Tmux(socket_name=private_socket_name())
     t.ensure_server()
     yield t
-    t.kill_server()
-
-
-def wait_for(pred, timeout=5.0):
-    end = time.monotonic() + timeout
-    while time.monotonic() < end:
-        if pred():
-            return True
-        time.sleep(0.05)
-    return False
+    kill_private_server(t)
 
 
 def test_server_survives_empty(tmux):

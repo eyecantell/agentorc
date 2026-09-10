@@ -133,11 +133,11 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Priority:** Low
 **Added:** 2026-09-06
 **Status:** Open
-**Location:** `tests/test_ui.py` (`agent_thread` fixture)
+**Location:** `tests/test_ui.py` (`client` fixture over `subprocess_agent` in `tests/conftest.py`)
 
-**Why:** The UI tests need one agent shared across a sync `TestClient`, so the fixture runs an agent loop in a thread. The env/tick leak was fixed in PR #4 review (module-scoped `MonkeyPatch`, undone at teardown). What remains: `ptyprocess` calls `forkpty()` in a process that already has the agent thread, which Python warns can deadlock the child — a known source of rare CI flakes.
+**Why:** The UI tests need one agent shared across a sync `TestClient`. The env/tick leak was fixed in PR #4 review (module-scoped `MonkeyPatch`, undone at teardown). The agent thread went away in the test-suite consolidation (2026-09-07): the module's agent is now a separate process (`tests/_agent_child.py` on the private tmux socket; `agentorc-agent serve` cannot take one). What remains: starlette's `TestClient` keeps an anyio portal thread alive for the whole `with` block, so `ptyprocess` still calls `forkpty()` in a multi-threaded process and Python still warns it may deadlock the child — the rare-flake exposure is smaller, not gone.
 
-**Fix:** run the module's agent as a subprocess (`agentorc-agent serve` with the private socket) instead of a thread, so the test process is single-threaded when it forks.
+**Fix:** either drive `/term` through a pty helper subprocess in the tests, or accept the warning and filter it in `pyproject.toml` with a comment pointing here.
 
 ## TD-008: Deny reason input and "allow for this session" (design §10 open questions)
 

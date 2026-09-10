@@ -51,12 +51,17 @@ dev = [
 
 [tool.pdm.scripts]
 test = "pytest -q"
+test-fast = "pytest -q -m unit"
 lint = "ruff check src tests"
 fmt = "ruff format src tests"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+markers = [
+    "unit: no tmux, sockets, or subprocesses; sub-second",
+    "integration: spawns tmux, a host agent, git, or the hook script",
+]
 
 [tool.ruff]
 line-length = 120
