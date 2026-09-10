@@ -20,7 +20,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
-| TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Done |
 | TD-015 | Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape | Medium | Open |
 | TD-016 | `send` should confirm the prompt took: a send-and-wait RPC for policies | Medium | Open |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
@@ -144,41 +143,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Fix:** two halves. (a) Claude Code's own registry (`~/.claude/sessions/<pid>.json`: `status` busy/idle/shell, `name`, `cwd`, `sessionId`) can populate read-only cards for non-tmux sessions — state guessed (`scraped`), no Focus terminal, Allow/Deny only if the person launches them with agentorc's hooks layer (`claude --settings ~/.agentorc/claude-hooks/<profile>.json`, which works outside tmux too since the hook only needs `AGENTORC_SESSION` and `AGENTORC_HOME`). (b) A `ao wrap` / shell alias that starts Claude inside an `ao-*` tmux session from any terminal, so the VS Code habit produces first-class cards. Done when a session started from a VS Code terminal shows the right state within 5 s.
 
 **Related:** design §4.1 adoption, §4.3 registry cross-check, phase 1 success test.
-
-## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
-
-**Priority:** High
-**Added:** 2026-09-10
-**Status:** Done 2026-09-10 — spike run against herdr 0.9.0 on kmaster in a scratch config; the pass criterion failed (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); §10 item checked, §3 row corrected.
-**Location:** design §3 (herdr row), §10 "Build on, or beside, herdr?"; `src/sessionorc/` (the layer a substrate would sit under)
-
-**Why:** herdr (https://herdr.dev, Apache-2.0, Herdr, Inc., $6M seed 2026-09-09) already ships the
-substrate half of this design — persistent panes, multi-host over ssh, restart recovery, hook-fed
-state for six of its 17 integrated CLIs (not Claude Code, which it screen-scrapes — the spike's finding), a worktree API, an event-subscription socket API — and
-Herdr Cloud is about to ship the `relay` transport of §4.5b. It does not do the half §1 came
-from: states finer than `blocked`, unattended supervision, the anchor rule, Ready to close,
-per-repo commands, phone triage. Core contribution is closed (no unsolicited PRs); plugins and
-the socket API are the open surface. Phase 2 (ssh transport) is the first thing herdr would
-replace, so the decision has to come before phase 2 is built, and it should be decided by a
-measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts in design §3.
-
-**Fix:** a one-to-two-day spike, read-only against herdr, on kmaster in a scratch config:
-1. install herdr, add the Claude Code integration, start two Claude Code sessions and a shell
-   under it alongside the running agentorc agent (they must not fight over hooks — check what
-   its `settings.json` edit does to agentorc's hook entries first; back up `~/.claude`).
-2. `events.subscribe` from a small Python client; drive a permission prompt, a question, and
-   (if reachable) a usage cap; record what `pane.agent_status_changed` and `blocked --message`
-   carry for each. **Pass:** the three are distinguishable and the pending text is present.
-3. Check `agent.prompt` / `agent.send_keys` / `worktree.*` against what `rpc_create`, `send`,
-   `keys`, `kill` need; note anything `sessionorc` exposes that herdr cannot (pipe-pane run logs,
-   `exit-empty off`, session records surviving herdr restarts).
-4. Write the result as a decision doc under `docs/decisions/` and close the §10 question one of
-   three ways: (a) independent — herdr stays a reference; (b) herdr as a `sessionorc` substrate
-   behind a transport, tmux kept for hosts herdr does not fit — then phase 2 becomes that
-   transport; (c) herdr plugins only. Update §7 phases and §4.5b/§4.5c to match.
-Done when the decision doc is merged and the §10 item is checked.
-
-**Related:** design §3, §4.5b, §4.5c, §7 phase 2, §10; PRs #23, #24; TD-004 (ssh transport, the work this decides).
 
 ## TD-015: Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape
 
