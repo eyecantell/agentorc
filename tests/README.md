@@ -35,8 +35,11 @@
   registry under `~/.claude` to see sessions started outside agentorc. Tests create sessions in
   temp directories, which no real session occupies, so this is harmless but not isolated.
 - `test_gitinfo` sets its own git identity per repo; no global git config is needed.
-- TD-007: `TestClient` keeps a portal thread alive, so `ptyprocess`'s `forkpty()` warning
-  appears on the `/term` tests. Known; not a failure.
+- `TestClient` keeps a portal thread alive, so `ptyprocess`'s `forkpty()` in the `/term` tests
+  runs in a multi-threaded process and Python warns it may deadlock the child. The child only
+  execs `tmux attach`, so the exposure is accepted and the warning is filtered in
+  `pyproject.toml` (TD-007, archived 2026-09-10). If a `/term` test ever hangs in the child,
+  the alternative is a pty helper subprocess.
 
 ## After a killed run
 
