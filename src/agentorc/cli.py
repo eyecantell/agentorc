@@ -65,9 +65,9 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 def _attach(args: argparse.Namespace, sid: str, result: Any | None = None) -> int:
     """`ao focus` / `--attach`: run `tmux attach` on the session (the terminal equivalent of the
-    Focus screen; TD-010 b) as a child, so a pane that is gone (killed: `exited` looks the same
-    as a natural exit, whose pane is kept) gets a clear line here rather than tmux's. Under
-    `--json` nothing is run: the argv is printed for the caller."""
+    Focus screen; TD-010 b) as a child, so a pane that went away since the record was read (a
+    tick behind; `cmd_focus` refuses a known-gone pane before getting here) gets a clear line
+    rather than tmux's. Under `--json` nothing is run: the argv is printed for the caller."""
     argv = attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET"))
     if args.json:
         print(json.dumps({**(result or {"id": sid}), "attach": argv}, indent=1))
@@ -85,6 +85,8 @@ def cmd_focus(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)  # a clear error for an unknown id, not tmux's
     if s["state"] == "closed":
         return fail(args, f"{args.id} is closed; its pane is gone", 1)
+    if not s.get("pane", True):  # killed, or the tmux server restarted (TD-023); a natural exit keeps its pane
+        return fail(args, f"{args.id} has exited and its pane is gone (killed, or the tmux server restarted)", 1)
     return _attach(args, args.id, s)
 
 

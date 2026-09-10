@@ -187,7 +187,7 @@ State transitions (Claude Code adapter):
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert (first-use finding 2026-09-06) |
 | `Stop` | `idle` |
 | adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time |
-| `SessionEnd`, or tmux session gone | `exited` |
+| `SessionEnd`, or tmux session gone | `exited` — the record's `pane` says whether a dead pane is still there to read (natural exit: yes; killed, or the tmux server restarted: no) |
 | person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable |
 | host agent unreachable (a property of the **host**; every card on it flips at once) | `unreachable` — card greyed, last known state kept visible |
 
@@ -472,7 +472,7 @@ noted). If a control is not in this table it does not exist.
 | Focus | **Allow / Deny** | same hook channel as the card |
 | Focus | **Open shell here** | a `shell` session in this session's directory |
 | Focus | **Wrap up** | sends the wrap-up prompt (same one the policy uses) |
-| Focus | **Kill** | confirms, then kills the tmux session; worktree kept; state `exited` |
+| Focus | **Kill** | confirms, then kills the tmux session; worktree kept; state `exited` with `pane: false` — unlike a natural exit, whose dead pane is kept, a kill destroys it, so the card offers Details and Focus / `ao focus` refuse without calling tmux (TD-023) |
 | Focus (exited / closed) | **Resume this conversation** / **New session here** / **Forget** | the exited banner: New session prefilled with the directory and, for Resume, the tool's session id; Forget removes the record (the pane and its run log stay readable until then) |
 | Focus | **Copy / Paste** | terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
@@ -481,7 +481,7 @@ noted). If a control is not in this table it does not exist.
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
-| card (closed) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
+| card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
 | Resumable | **Resume** | New session prefilled (host, repo, directory, worktree, Start = Resume) |
 | Resumable | **Switch to** | the running card in the Herd |

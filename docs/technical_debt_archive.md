@@ -262,3 +262,16 @@ is still open); the Copy button's hint documents Shift+drag for selection under 
 **Resolved:** 2026-09-10 (PR #51). `sessionorc.agent.serve_until_signal` runs `serve()` as a task and installs `task.cancel` as the SIGINT/SIGTERM handler; `main` runs it under `asyncio.run`, which also closes async generators and the loop. The test child (`tests/_agent_child.py`) now calls the same helper, and `tests/test_agent_restart.py::test_sigterm_stops_serve_cleanly` asserts exit 0, socket unlinked, no traceback on stderr. Live check on the user unit pending (board).
 
 **Related:** TD-020 (agent restart), the restart tests from PR #30.
+
+## TD-023: `exited` is overloaded: a killed session and a natural exit look the same, but only one still has a pane
+
+**Priority:** Low
+**Added:** 2026-09-10
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`rpc_kill`, `_observe`), `src/agentorc/cli.py` (`cmd_focus`)
+
+**Why:** `rpc_kill` destroys the tmux session and sets `exited`; a process that ends on its own also reads `exited`, but `remain-on-exit` keeps its dead pane (exit code, last screen) until `remove`. Nothing on the record says which, so a client cannot tell whether Focus / `ao focus` will find a pane: the CLI learned to run `tmux attach` as a child and report a non-zero exit instead (PR #46 review), and the UI's `/term` bridge finds out the same way. Found in the PR #46 review.
+
+**Resolved:** 2026-09-10 (PR #TBD). The record carries `pane: bool` (`sessionorc.models.Session`): the tick sets it true whenever a pane (live or dead) is observed and false when the snapshot has none past the create grace; `kill` and `close` set it false at once. `ao focus` and the UI's `/term` refuse a `pane: false` record with agentorc's own line before any tmux call; the card shows Details instead of Focus and the Focus banner says the pane is gone. Lasting content: design §4.2 (state table), §4.5a (Kill, Details rows); tests in `test_agent.py::test_shell_lifecycle` (natural exit keeps its pane, kill does not), `test_cli.py::test_focus_and_attach_print_the_attach_argv_under_json`, `test_ui.py::test_closed_session_terminal_is_final_and_occupancy_endpoint`.
+
+**Related:** TD-010 (b), PR #46.

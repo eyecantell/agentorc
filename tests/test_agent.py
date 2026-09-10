@@ -36,8 +36,17 @@ async def test_shell_lifecycle(agent, tmp_path):
         tail = await c.call("tail", id=sid, lines=5)
         assert any("sleep 1.5" in line for line in tail)
         assert (paths.runs_dir()).exists() and list(paths.runs_dir().glob(f"{sid}-*.log"))
-        await c.call("kill", id=sid)
+        # a natural exit keeps its dead pane (exit code, last screen); a kill destroys it (TD-023)
+        nat = await c.call("create", name="nat", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        await wait_state(c, nat["id"], "idle")
+        await c.call("send", id=nat["id"], text="exit 3")
+        ended = await wait_state(c, nat["id"], "exited")
+        assert ended["pane"] is True and ended["exit_code"] == 3
+        killed = await c.call("kill", id=sid)
+        assert killed["state"] == "exited" and killed["pane"] is False
         await wait_state(c, sid, "exited")
+        assert (await c.call("get", id=sid))["pane"] is False  # the tick does not bring it back
+        await c.call("remove", id=nat["id"])
         await c.call("remove", id=sid)
         assert all(x["id"] != sid for x in await c.call("list"))
 

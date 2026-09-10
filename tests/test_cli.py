@@ -234,12 +234,14 @@ def test_focus_and_attach_print_the_attach_argv_under_json(subprocess_agent, tmp
     monkeypatch.setattr("agentorc.cli.subprocess.call", lambda argv: seen.update(argv=argv) or 0)
     assert cli.main(["focus", sid]) == 0
     assert seen["argv"][0] == "tmux" and seen["argv"][3:6] == ["attach", "-t", f"={sid}:"]
-    # killed: the record says exited like a natural exit, but the pane is gone — a clear line, exit 1
-    call_sync("kill", id=sid)
+    # killed: `exited` like a natural exit, but the record says the pane is gone (TD-023) — agentorc's
+    # own line, exit 1, and tmux is never run
+    assert call_sync("kill", id=sid)["pane"] is False
     wait_state(sid, "exited")
-    monkeypatch.undo()
+    monkeypatch.setattr("agentorc.cli.subprocess.call", lambda argv: pytest.fail(f"tmux was run: {argv}"))
     assert cli.main(["focus", sid]) == 1
-    assert "could not attach" in capsys.readouterr().err
+    assert "pane is gone" in capsys.readouterr().err
+    monkeypatch.undo()
     call_sync("close", id=sid)
     assert cli.main(["focus", sid]) == 1
     assert "closed" in capsys.readouterr().err

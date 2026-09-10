@@ -260,9 +260,20 @@ def test_closed_session_terminal_is_final_and_occupancy_endpoint(client, tmp_pat
     assert client.post(f"/api/sessions/{sid}/close").json() == {"ok": True}
     wait_state(client, sid, "closed")
     with client.websocket_connect(f"/term/{sid}") as ws:
-        assert b"closed" in ws.receive_bytes()
+        assert b"pane is gone" in ws.receive_bytes()
     r = client.get("/")
     assert "▣ Details" in r.text
+    # a killed session is `exited` with no pane (TD-023): Details, and the terminal is final too
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "kd"}, follow_redirects=False)
+    kid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, kid, "idle")
+    assert client.post(f"/api/sessions/{kid}/kill").json() == {"ok": True}
+    assert wait_state(client, kid, "exited")["pane"] is False
+    with client.websocket_connect(f"/term/{kid}") as ws:
+        assert b"pane is gone" in ws.receive_bytes()
+    card = client.get("/").text.split(f'id="card-{kid}"', 1)[1].split('id="card-', 1)[0]
+    assert "▣ Details" in card and "▣ Focus" not in card
+    client.post(f"/api/sessions/{kid}/remove")
     assert client.get("/api/occupancy", params={"dir": str(tmp_path)}).json()["occupants"] == []
     assert client.get("/api/occupancy", params={"dir": ""}).json()["occupants"] == []
 

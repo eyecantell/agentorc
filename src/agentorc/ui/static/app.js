@@ -230,7 +230,7 @@
         setTimeout(openTerm, delay); delay = Math.min(delay * 2, 10000);
       };
     }
-    if (s.state === "closed") term.write("\x1b[90m[agentorc] this session is closed; its pane is gone.\x1b[0m\r\n");
+    if (s.state === "closed" || s.pane === false) term.write("\x1b[90m[agentorc] this session's pane is gone (killed, closed, or the tmux server restarted).\x1b[0m\r\n");
     else openTerm();
     term.onData((d) => ws && ws.readyState === 1 && ws.send(d));
     // Copy / paste: Ctrl+C with a selection copies (no ^C), Ctrl+Shift+C copies, Ctrl+Shift+V and
@@ -282,7 +282,8 @@
       if (v.state === "exited" || v.state === "closed") {
         const code = v.exit_code == null ? "" : ` (exit code ${v.exit_code})`;
         const q = `dir=${encodeURIComponent(v.dir || "")}&adapter=${encodeURIComponent(v.adapter || "claude-code")}`;
-        ex.innerHTML = `This session's process has ${esc(v.state)}${esc(code)}. The pane is kept so its last screen and run log stay readable. `
+        const kept = v.state === "exited" && v.pane !== false;  // a kill/close destroys the pane (TD-023)
+        ex.innerHTML = `This session's process has ${esc(v.state)}${esc(code)}. ${kept ? "The pane is kept so its last screen and run log stay readable." : "Its pane is gone (killed, or the tmux server restarted); the run log stays readable."} `
           + (v.adapter_id && v.state === "exited" ? `<a class="btn sm primary" href="/new?${q}&resume=${encodeURIComponent(v.adapter_id)}">Resume this conversation</a> ` : "")
           + `<a class="btn sm" href="/new?${q}">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`;
         ex.classList.remove("hidden");

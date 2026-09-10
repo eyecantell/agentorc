@@ -67,6 +67,9 @@ class Session:
     created: str = field(default_factory=now_iso)
     tail: list[str] = field(default_factory=list)
     exit_code: int | None = None
+    # A tmux pane (live or dead) still backs this record. False after `kill`/`close` (the session is
+    # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).
+    pane: bool = True
     subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
