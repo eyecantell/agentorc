@@ -165,13 +165,19 @@ def test_prune_runs_keeps_live_logs(tmp_path, monkeypatch):
     tmux = Tmux(socket_name=private_socket_name())
     try:
         a = HostAgent(tmux=tmux)
-        a._prune_runs(datetime.now(UTC))
+        asyncio.run(a.tick())  # the first tick sweeps
         assert live_log.exists() and fresh.exists()  # running session's log; a recent file
         assert not dead_log.exists() and not orphan.exists()  # exited session's; a forgotten session's
-        os.utime(live_log, (old_t, old_t))
+        os.utime(fresh, (old_t, old_t))
+        asyncio.run(a.tick())
+        assert fresh.exists()  # within the hour: no sweep
+        a._pruned_at -= timedelta(hours=2)
         (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n")
-        a.sessions.clear()
-        a._prune_runs(datetime.now(UTC))
-        assert live_log.exists()  # 0: never prune
+        asyncio.run(a.tick())
+        assert fresh.exists()  # due, but 0 keeps everything
+        (paths.home() / "hosts.yml").write_text("local:\n  runs_keep_days: 7\n")
+        a._pruned_at -= timedelta(hours=2)
+        asyncio.run(a.tick())
+        assert not fresh.exists() and live_log.exists()
     finally:
         kill_private_server(tmux)

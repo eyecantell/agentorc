@@ -138,20 +138,22 @@ class HostAgent:
         await self._refresh_git(snapshot_at)
         if snapshot_at - self._pruned_at > PRUNE_EVERY:
             self._pruned_at = snapshot_at
-            await asyncio.to_thread(self._prune_runs, snapshot_at)
+            # the live set is read here, on the loop (the class's one-writer rule); only the file
+            # work goes to the thread
+            live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ("exited", "closed")}
+            await asyncio.to_thread(self._prune_runs, snapshot_at, live)
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
 
-    def _prune_runs(self, now: datetime) -> None:
-        """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it belongs
-        to a session that is still running (never truncate a live log: invariant 3). Logs of
-        forgotten sessions are the common case — Forget keeps the file until this sweep. `0` keeps
-        everything."""
+    def _prune_runs(self, now: datetime, live: set[str]) -> None:
+        """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
+        `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
+        of forgotten sessions are the common case — Forget keeps the file until this sweep. `0`
+        keeps everything. Runs in a thread: touches files, never `self.sessions`."""
         keep = hosts.local_host().runs_keep_days
         if keep <= 0:
             return
-        live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ("exited", "closed")}
         cutoff = (now - timedelta(days=keep)).timestamp()
         for f in paths.runs_dir().glob("*.log"):
             try:

@@ -225,8 +225,8 @@ def create_app() -> FastAPI:
         profs, default = profiles_mod.load()
         # registered repos (design §5: the dev-cadence registry, `repos_registry` in hosts.yml) first,
         # then recent directories; phase 1 reads the local host's file directly
-        recent = await call("recent_dirs")
-        recent = hosts.local_host().repos() + [d for d in recent if d not in hosts.local_host().repos()]
+        repos = hosts.local_host().repos()
+        recent = repos + [d for d in await call("recent_dirs") if d not in repos]
         adapters = await call("adapters")
         return templates.TemplateResponse(
             request,

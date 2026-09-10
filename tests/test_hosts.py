@@ -23,8 +23,11 @@ def test_local_host_from_file(tmp_path, monkeypatch):
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  runs_keep_days: -1\n  repos_registry: /nope\n")
     h = hosts.local_host()
     assert h.runs_keep_days == 30 and h.repos() == []  # a bad value takes the default; a missing registry is empty
-    (tmp_path / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n")
-    assert hosts.local_host().runs_keep_days == 0  # 0 is a value: keep everything
+    (tmp_path / "hosts.yml").write_text("local:\n  runs_keep_days: 0\n  local: 'false'\n  volatile: 1\n")
+    h = hosts.local_host()
+    assert (
+        h.runs_keep_days == 0 and h.local is False and h.volatile is False
+    )  # 0 keeps all; only a real boolean is true
     for bad in ("local: [not a mapping\n", "local: [a, b]\n", "local: true\n", "- just\n- a list\n", ""):
         (tmp_path / "hosts.yml").write_text(bad)
         h = hosts.local_host()  # malformed YAML, a non-mapping, or an empty file: fallback, never a crash

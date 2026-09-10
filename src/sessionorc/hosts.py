@@ -77,6 +77,11 @@ def _read_local(p: Path) -> dict:
         return {}
 
 
+def _flag(v: object) -> bool:
+    """A YAML boolean; anything else (`"false"` is a string, and truthy) is False."""
+    return v is True
+
+
 def _days(v: object) -> int:
     """`runs_keep_days`: a non-negative int, else the default (a string, a float, a negative)."""
     if isinstance(v, bool) or not isinstance(v, int) or v < 0:
@@ -94,8 +99,8 @@ def local_host() -> Host:
     return Host(
         name=name,
         vscode_host=str(data.get("vscode_host") or name),
-        local=bool(data.get("local", False)),
-        volatile=bool(data.get("volatile", False)),
+        local=_flag(data.get("local")),
+        volatile=_flag(data.get("volatile")),
         repos_registry=Path(str(registry) if registry else DEFAULT_REPOS_REGISTRY).expanduser(),
         runs_keep_days=_days(data.get("runs_keep_days", DEFAULT_RUNS_KEEP_DAYS)),
     )
