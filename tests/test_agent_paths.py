@@ -228,3 +228,41 @@ async def test_pane_snapshot_older_than_a_remove_does_not_readopt(agent, tmp_pat
         agent._removed[s["id"]] = (born, time.monotonic() - 61)
         agent._reconcile({s["id"]: stale}, {}, datetime.now(UTC))
         assert s["id"] in agent.sessions
+
+
+async def test_screen_rule_is_a_labelled_fallback_that_a_fresh_hook_outranks(agent, hookstub, tmp_path, monkeypatch):
+    """TD-015: with no hook yet, the screen rule's verdict is applied as scraped (the trust dialog
+    case); once a hook reports, the screen no longer outranks it; `explain` says which."""
+    from agentorc.adapters.claude_code import RULES_FILE
+    from sessionorc.screen import Manifest
+
+    monkeypatch.setattr(type(hookstub), "rules", Manifest.load(RULES_FILE))
+    async with LocalClient() as c:
+        s = await c.call("create", name="scr", dir=str(tmp_path), adapter="hookstub")
+        assert s["state"] == "working" and s["confidence"] == "hook"  # the launch assumption, no hook yet
+        fixture = Path(__file__).parent / "fixtures" / "screens" / "trust-dialog.txt"
+        agent.tmux.send_prompt(s["id"], f"cat {fixture}")  # the real boxed dialog, through the tick's tail
+
+        async def scraped_needs_you():
+            x = await c.call("get", id=s["id"])
+            return x["state"] == "needs-you" and x["confidence"] == "scraped"
+
+        assert await wait_for(scraped_needs_you)
+        x = await c.call("get", id=s["id"])
+        assert x["pending"]["kind"] == "question" and "trust" in x["pending"]["text"]
+        ex = await c.call("explain", id=s["id"])
+        assert ex["match"]["rule"] == "trust-dialog" and "applied as scraped" in ex["reason"]
+        assert any("trust the files" in ln for ln in ex["match"]["evidence"])
+        # a hook reports: fresher than the screen, the rule no longer applies although still on screen
+        await c.call("hook", session=s["id"], state="working")
+        await asyncio.sleep(0.8)  # several ticks
+        x = await c.call("get", id=s["id"])
+        assert x["state"] == "working" and x["confidence"] == "hook"
+        ex = await c.call("explain", id=s["id"])
+        assert ex["match"]["rule"] == "trust-dialog" and "hook state wins" in ex["reason"] and ex["last_hook"]
+        # a shell has no rules: explain says so
+        sh = await c.call("create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        ex = await c.call("explain", id=sh["id"])
+        assert ex["match"] is None and "no screen rules" in ex["reason"]
+        await c.call("kill", id=s["id"])
+        await c.call("kill", id=sh["id"])

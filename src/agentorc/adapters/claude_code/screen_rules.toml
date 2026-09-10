@@ -1,0 +1,32 @@
+# Screen rules for Claude Code (design §4.2, TD-015): the labelled scraped fallback for what no
+# hook reports. Evaluated over the bottom of the pane; the highest priority match wins; the
+# verdict is written with confidence "scraped" and never outranks a fresh hook state.
+# Patterns are case-insensitive regular expressions. `pending.text = "$line"` uses the matched line.
+tool = "claude-code"
+version = 1
+
+[[rules]]
+# The first-run "trust this folder?" dialog: no hook fires until it is answered (§4.2 quirk).
+id = "trust-dialog"
+state = "needs-you"
+priority = 100
+region = 15
+any = ["Do you trust the files in this folder"]
+all = ["Yes, proceed|No, exit"]  # the dialog's own options: the question alone could be someone's prose
+pending = { kind = "question", text = "trust this folder? (answer in the terminal)" }
+
+[[rules]]
+# The tool's own limit message (the ADR's three usage-limit screens), before TD-001's poll sees it.
+id = "usage-limit"
+state = "limited"
+priority = 90
+any = ["usage limit reached", "hit your usage limit", "You.ve hit your (usage|weekly) limit"]
+pending = { kind = "limit", text = "$line" }
+
+[[rules]]
+id = "rate-limited-429"
+state = "limited"
+priority = 80
+all = ["\\b429\\b"]
+any = ["rate.?limit", "retry", "overloaded", "too many requests"]
+pending = { kind = "limit", text = "$line" }

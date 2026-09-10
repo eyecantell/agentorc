@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from importlib.metadata import entry_points
 from pathlib import Path
@@ -13,6 +14,8 @@ from typing import Protocol, runtime_checkable
 
 from sessionorc.models import Confidence, State
 from sessionorc.tmux import PaneInfo
+
+log = logging.getLogger("agentorc.adapters")
 
 SHELLS = {"bash", "zsh", "sh", "fish", "dash", "ksh"}
 
@@ -38,6 +41,9 @@ class Adapter(Protocol):
         ...
 
     # Optional, looked up with getattr:
+    #   explain(tail) -> screen.Match | None               the screen-rule verdict with its evidence
+    #                                                      (hook-fed adapters: applied as `scraped` only
+    #                                                      when no fresher hook state exists; TD-015)
     #   external_sessions() -> list[ExternalSession]      live sessions of the tool started elsewhere
     #   usage_for(profile: str) -> dict | None            {"five_hour_pct", "weekly_pct", "five_hour_resets",
     #                                                      "weekly_resets", "fetched"}; None = unknown, never
@@ -132,4 +138,5 @@ def load_all() -> None:
             obj = ep.load()
             register(obj() if isinstance(obj, type) else obj)
         except Exception:  # noqa: BLE001 — one broken adapter never takes the agent down
+            log.exception("adapter %s failed to load and is unavailable", getattr(ep, "name", ep))
             continue

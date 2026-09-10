@@ -31,7 +31,7 @@ from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 log = logging.getLogger("agentorc.agent")
 
 TICK_SECONDS = float(os.environ.get("AGENTORC_TICK", "2"))
-TAIL_LINES = 6
+TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
@@ -70,6 +70,15 @@ class HostAgent:
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
+        # when a hook last reported on a session: a screen-rule verdict never outranks a hook
+        # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
+        # trust dialog case — takes the classifier's verdict at once (TD-015)
+        # Seeded on load: a hook-confirmed record was fed by a live hook stream until the agent
+        # stopped, and `since` is a transition time, not a hook time — so count it fresh as of now.
+        # A restart must never let the screen outrank a state a hook just reported.
+        self._last_hook: dict[str, datetime] = {
+            sid: datetime.now(UTC) for sid, s in self.sessions.items() if s.confidence == "hook"
+        }
         # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
         self._usage: dict[str, dict[str, Any]] = {}
         self._usage_checked: dict[str, float] = {}
@@ -253,17 +262,34 @@ class HostAgent:
             st = adapter.classify(pane, tail)
             if st and st != s.state:
                 s.set_state(st, confidence="scraped")
+        elif (m := self._screen_verdict(s, adapter, now)) is not None:
+            # Hook-fed adapter, screen rule fired, no fresher hook state: the labelled fallback
+            if m.state != s.state or (m.pending and m.pending != s.pending):
+                s.set_state(m.state, confidence="scraped", pending=m.pending)
         elif s.state == "working" and s.last_output and now - _parse(s.last_output) > STALL_AFTER:
-            # Hook-fed adapters: the only scraped verdict is the liveness cross-check, and it
-            # applies to `working` alone — a `needs-you` or `idle` session is silent by design.
+            # Hook-fed adapters: the liveness cross-check applies to `working` alone — a
+            # `needs-you` or `idle` session is silent by design.
             s.set_state("stalled?", confidence="scraped")
         self.store.save(s)
+
+    def _hook_fresh(self, sid: str, now: datetime) -> bool:
+        last = self._last_hook.get(sid)
+        return last is not None and now - last <= STALL_AFTER
+
+    def _screen_verdict(self, s: Session, adapter: Any, now: datetime) -> Any:
+        """The adapter's screen-rule match for the session's tail, or None when there is no rule
+        set, nothing matched, or a hook state is fresher (design §4.2: scraped never outranks it)."""
+        explain = getattr(adapter, "explain", None)
+        if explain is None or self._hook_fresh(s.id, now):
+            return None
+        return explain(s.tail)
 
     def _apply_event(self, sid: str, event: dict[str, Any]) -> None:
         """A hook-fed state transition (design §4.2 table). Adapters map hook names to these."""
         s = self.sessions.get(sid)
         if s is None:
             return
+        self._last_hook[sid] = datetime.now(UTC)  # apply time, also for events drained from the offline queue
         if aid := event.get("adapter_id"):
             s.adapter_id = aid
         if delta := event.get("subagent_delta"):
@@ -546,6 +572,43 @@ class HostAgent:
         self._get(id)
         await asyncio.to_thread(lambda: self.tmux.run("send-keys", "-t", f"={id}:", *keys))
 
+    async def rpc_explain(self, id: str, lines: int = 40) -> dict[str, Any]:
+        """Why the session shows the state it does (design §4.2, TD-015): the current screen, the
+        record's state and confidence, the screen rule that would fire on it with its evidence, and
+        whether that verdict applies (no fresher hook state) or is outranked."""
+        s = self._get(id)
+        adapter = adapters.get(s.adapter)
+        tail = [_clean(t) for t in await asyncio.to_thread(self.tmux.capture_tail, id, lines)]
+        explain = getattr(adapter, "explain", None)
+        now = datetime.now(UTC)
+        out: dict[str, Any] = {
+            "id": id,
+            "adapter": s.adapter,
+            "state": s.state,
+            "confidence": s.confidence,
+            "pending": s.pending.to_dict() if s.pending else None,
+            "since": s.since,
+            "last_hook": self._last_hook[id].replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            if id in self._last_hook
+            else None,
+            "tail": tail,
+            "match": None,
+            "reason": "",
+        }
+        if explain is None:
+            src = "foreground process" if adapter.state_source == "scraped" else "hooks only"
+            out["reason"] = f"{s.adapter} has no screen rules; its state comes from {src}"
+            return out
+        m = explain(tail)
+        out["match"] = m.to_dict() if m else None
+        if m is None:
+            out["reason"] = "no screen rule matched"
+        elif self._hook_fresh(id, now):
+            out["reason"] = f"rule {m.rule} matched, but a hook reported within {STALL_AFTER} — the hook state wins"
+        else:
+            out["reason"] = f"rule {m.rule} matched and no fresher hook state exists — applied as scraped"
+        return out
+
     async def rpc_tail(self, id: str, lines: int = 40) -> list[str]:
         self._get(id)
         return await asyncio.to_thread(self.tmux.capture_tail, id, lines)
@@ -577,6 +640,7 @@ class HostAgent:
         s = self.sessions.get(session)
         if s is None:
             return None
+        self._last_hook[session] = datetime.now(UTC)
         wait = float(event.get("wait_seconds") or 600)
         deadline = (datetime.now(UTC) + timedelta(seconds=wait)).replace(microsecond=0)
         tool_use_id = event.get("tool_use_id") or f"{session}:{now_iso()}"

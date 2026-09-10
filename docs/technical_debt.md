@@ -19,7 +19,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Partly done |
-| TD-015 | Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape | Medium | Open |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 
 ---
@@ -128,33 +127,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Fix:** two halves. (a) Claude Code's own registry (`~/.claude/sessions/<pid>.json`: `status` busy/idle/shell, `name`, `cwd`, `sessionId`) can populate read-only cards for non-tmux sessions — state guessed (`scraped`), no Focus terminal, Allow/Deny only if the person launches them with agentorc's hooks layer (`claude --settings ~/.agentorc/claude-hooks/<profile>.json`, which works outside tmux too since the hook only needs `AGENTORC_SESSION` and `AGENTORC_HOME`). (b) A `ao wrap` / shell alias that starts Claude inside an `ao-*` tmux session from any terminal, so the VS Code habit produces first-class cards — done as `ao new --attach` (PR #46). Done when a session started from a VS Code terminal shows the right state within 5 s.
 
 **Related:** design §4.1 adoption, §4.3 registry cross-check, phase 1 success test.
-
-## TD-015: Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape
-
-**Priority:** Medium
-**Added:** 2026-09-10
-**Status:** Open
-**Location:** `src/sessionorc/adapters.py` (`classify`), `src/agentorc/adapters/claude_code/__init__.py`, `src/sessionorc/agent.py` (tick)
-
-**Why:** Design §4.2 allows a pane classifier as a labelled fallback, and today the only scraped
-verdicts are the shell/command adapters' foreground-process check and the agent's liveness
-cross-check; the Claude Code adapter's `classify` returns nothing. The herdr spike ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md))
-showed what the fallback is for: its screen detector caught the trust dialog, which no Claude Code
-hook reports, and its `agent explain` printed the rule that fired, the region it matched and the
-fallback reason when nothing did. Three things agentorc wants rest on the same mechanism: the
-trust dialog and any future dialog no hook covers, `limited` from the tool's own limit message
-before TD-001's usage polling exists, and a `stalled?` that can say *why* it is unsure.
-
-**Fix:** one TOML manifest per tool under the adapter (`rules = [{id, state, region, any/all/not
-patterns, priority}]`, versioned), evaluated over the bottom of the pane on the tick; the result
-is written with `confidence: scraped` and never overrides a `hook` state that is fresher than the
-`STALL_AFTER` window (today a module constant in `agent.py`, per adapter once TD-015 lands; §4.2 "scraped never outranks a fresh hook state"). `ao explain <session>` prints the snapshot, the matched
-rule and the evidence; `ao explain --file` classifies a saved fixture so rules can be tested
-without a live pane. Done when the trust dialog shows as `needs-you` (scraped) on a Claude Code
-session started with a fresh `.claude.json`, and the three usage-limit fixtures from the spike
-classify as `limited`.
-
-**Related:** design §4.2, §9 invariant 4; TD-001 (`limited` from the usage endpoint); ADR 2026-09-10.
 
 ## TD-019: Ship a skill file for `ao` (`ao --skill`)
 

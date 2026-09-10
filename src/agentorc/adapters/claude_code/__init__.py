@@ -24,6 +24,7 @@ from agentorc.profiles import Profile
 from sessionorc import paths
 from sessionorc.adapters import ExternalSession, LaunchSpec
 from sessionorc.models import Confidence, State
+from sessionorc.screen import Manifest, Match
 from sessionorc.tmux import PaneInfo
 
 HOOK_EVENTS = (
@@ -122,12 +123,16 @@ def write_hooks_file(profile: Profile) -> Path:
     return p
 
 
+RULES_FILE = Path(__file__).with_name("screen_rules.toml")
+
+
 class ClaudeCodeAdapter:
     name = "claude-code"
     state_source: Confidence = "hook"
 
-    def __init__(self, binary: str | None = None):
+    def __init__(self, binary: str | None = None, rules: Path | None = None):
         self.binary = binary or "claude"
+        self.rules = Manifest.load(rules or RULES_FILE)  # design §4.2 scraped fallback (TD-015)
 
     # -- launch ----------------------------------------------------------------------------------
 
@@ -163,7 +168,14 @@ class ClaudeCodeAdapter:
         return LaunchSpec(argv=argv, env=env, adapter_id=adapter_id)
 
     def classify(self, pane: PaneInfo | None, tail: list[str]) -> State | None:
-        return None  # hook-fed; the agent's liveness cross-check is the only scraped verdict
+        m = self.explain(tail)
+        return m.state if m else None
+
+    def explain(self, tail: list[str]) -> Match | None:
+        """The screen-rule verdict with its evidence (design §4.2, TD-015): what no hook reports —
+        the trust dialog, the tool's own limit message. The agent applies it as `scraped` only
+        when no fresher hook state exists."""
+        return self.rules.explain(tail)
 
     # -- locators --------------------------------------------------------------------------------
 

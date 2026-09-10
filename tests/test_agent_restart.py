@@ -79,3 +79,26 @@ async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
         await stop(task)
     finally:
         kill_private_server(tmux)
+
+
+def test_restart_seeds_hook_freshness(tmp_path, monkeypatch):
+    """TD-015: after a restart a hook-confirmed record counts as freshly reported (as of the load),
+    so a screen rule cannot outrank it until the stall window passes; a scraped record is cold."""
+    from datetime import UTC, datetime
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    paths.ensure_layout()
+    store = SessionStore()
+    hooked = Session(id="ao-h", name="h", kind="interactive", adapter="hookstub", dir=str(tmp_path), confidence="hook")
+    hooked.since = "2026-01-01T00:00:00Z"  # an old transition: not what freshness is about
+    scraped = Session(id="ao-s", name="s", kind="interactive", adapter="shell", dir=str(tmp_path))
+    store.save(hooked)
+    store.save(scraped)
+    tmux = Tmux(socket_name=private_socket_name())
+    try:
+        a = HostAgent(tmux=tmux)
+        assert a._hook_fresh("ao-h", datetime.now(UTC)) and not a._hook_fresh("ao-s", datetime.now(UTC))
+        assert a._hook_fresh("ao-h", datetime.now(UTC) + timedelta(minutes=19))
+        assert not a._hook_fresh("ao-h", datetime.now(UTC) + timedelta(minutes=21))
+    finally:
+        kill_private_server(tmux)

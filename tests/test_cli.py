@@ -2,6 +2,7 @@
 `asyncio.run`, which needs an agent whose loop runs on its own (tests/README.md rule 4)."""
 
 import json
+import pathlib
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -242,3 +243,28 @@ def test_focus_and_attach_print_the_attach_argv_under_json(subprocess_agent, tmp
     assert cli.main(["focus", sid]) == 1
     assert "closed" in capsys.readouterr().err
     call_sync("remove", id=sid)
+
+
+def test_explain_file_and_session(subprocess_agent, tmp_path, capsys):
+    """TD-015: `ao explain --file` classifies a saved screen with the adapter's rules; `ao explain <id>`
+    shows a live session's screen and reason; both take --json."""
+    fixture = str(pathlib.Path(__file__).parent / "fixtures" / "screens" / "usage-limit-reached.txt")
+    assert cli.main(["explain", "--file", fixture]) == 0
+    out = capsys.readouterr().out
+    assert "rule: usage-limit → limited" in out and "evidence │" in out and "usage limit reached" in out.lower()
+    assert cli.main(["--json", "explain", "--file", fixture]) == 0
+    x = json.loads(capsys.readouterr().out)
+    assert x["match"]["rule"] == "usage-limit" and x["match"]["pending"]["kind"] == "limit"
+    assert cli.main(["explain", "--file", fixture, "-a", "shell"]) == 1
+    assert "no screen rules" in capsys.readouterr().err
+    assert cli.main(["explain"]) == 2
+    assert cli.main(["explain", "--file", str(tmp_path / "nope.txt")]) == 1
+    assert "cannot read" in capsys.readouterr().err
+    capsys.readouterr()
+    assert cli.main(["shell", "ex", "-d", str(tmp_path)]) == 0
+    sid = capsys.readouterr().out.split()[0]
+    wait_state(sid, "idle")
+    assert cli.main(["explain", sid]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(f"{sid}  idle (scraped)") and "why: shell has no screen rules" in out and "screen:" in out
+    call_sync("kill", id=sid)
