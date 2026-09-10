@@ -320,7 +320,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--wait",
         action="store_true",
         help="return once the session has started on the prompt and settled again (idle, needs-you, exited); "
-        "errors prompt-stalled / timeout",
+        "errors prompt-stalled / timeout (every send errors prompt-stuck if the composer keeps the text)",
     )
     p.add_argument("--timeout", type=float, help="seconds to wait for it to settle (default: no limit)")
     p.set_defaults(fn=cmd_send)

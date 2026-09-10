@@ -73,3 +73,14 @@ def test_claude_code_rules_stay_quiet_on_a_plain_prompt():
     assert ad.explain(screen("plain-prompt")) is None
     assert ad.classify(None, screen("plain-prompt")) is None
     assert ad.classify(None, screen("trust-dialog")) == "needs-you"
+
+
+def test_painted_text_drops_faint_runs():
+    from sessionorc.screen import painted_text
+
+    assert painted_text("plain") == "plain"
+    assert painted_text("\x1b[39m❯ \x1b[2mghost\x1b[0m tail") == "❯  tail"
+    assert painted_text("\x1b[2mghost\x1b[22mreal\x1b[0m") == "real"
+    assert painted_text("\x1b[1;2mbold faint\x1b[0;1mbold") == "bold"
+    assert painted_text("\x1b[2mnever reset") == ""
+    assert painted_text("\x1b]0;title\x07x\x1b[Ky") == "xy"

@@ -21,7 +21,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 | TD-025 | `tests/test_cli.py` flakes: a shell session's `idle` can take longer than the 6 s wait | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Open |
-| TD-027 | `send`'s Enter is swallowed after the bracketed paste: four workers sat all afternoon with an unsubmitted wrap-up prompt | Medium | Open |
 
 ---
 
@@ -171,17 +170,3 @@ the adapter-author guide.
 Done when: a hand-started unattended session shows when it will stop and stops then; "run all day today" is one click or one `ao` line with an expiry, not a config edit; the Herd shows a scheduled-but-not-started session; and tdgrind's `config` overrides file has nothing left to express.
 
 **Related:** design §6 run window / usage gate / PAUSE, §7 phase 3 (tdgrind migration — this is the step after it, or the shape the port should take), TD-010 (adopting hand-started sessions faces the same "who stops it" question), samscrape TD-274 (the tdgrind supervisor), samscrape `~/.tdgrind/config` dated overrides of 2026-09-01.
-
-## TD-027: `send`'s Enter is swallowed after the bracketed paste: four workers sat all afternoon with an unsubmitted wrap-up prompt
-
-**Priority:** Medium
-**Added:** 2026-09-10
-**Status:** Open
-**Location:** `src/sessionorc/tmux.py` (`send_prompt`: `paste` then `send_enter`), `src/sessionorc/agent.py` (`rpc_send`)
-
-**Why:** `send_prompt` pastes the text with `paste-buffer -p` and sends `Enter` in the very next tmux command. The likely mechanism (not yet measured): Claude Code is still processing the bracketed paste when the Enter arrives, and consumes it with the paste instead of submitting; the text lands in the composer and stays there. Seen 2026-09-10 at 17:10 on every unattended session on kmaster: `ao-samscrape-tdgrind-1/2/3` each show `❯ run window is closing — wrap up and exit` (one of them the shorter `run window is closing`) unsubmitted since around noon, and `ao-agentorc-tdgrind-ao-1-2` shows `❯ /exit` unsubmitted since 10:24. All four had already finished their work, so nothing was lost this time, but the same swallow on a real prompt means a policy's instruction never runs while the card reads `idle`. samscrape's `tdgrind.sh` `send_text` hit the same thing in August and settled on `C-u`, `send-keys -l <text>`, `C-m` with no bracketed paste; agentorc chose the paste for multi-line briefs (design §4.3). `ao send --wait` (TD-016) would have reported `prompt-stalled` here, but nothing retries, and the sender did not use `--wait`.
-
-**Fix:** after the paste, wait for the composer to show the pasted text (or a short fixed delay, then `C-m` rather than `Enter`; measure which Claude Code accepts reliably), send Enter, and confirm the prompt left the composer — the same screen check `--wait` does, applied to every `send` and retried once with `C-m` before returning. Done when a loop of 50 `ao send` calls against a live Claude session submits 50 of 50, and the four sessions above can be wrapped up by `ao send --wait` without a human pressing Enter.
-
-**Related:** TD-016 (`send --wait`), TD-015 (screen rules), design §4.3, samscrape `scripts/tdgrind.sh` `send_text`.
-

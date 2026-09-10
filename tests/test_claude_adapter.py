@@ -281,3 +281,19 @@ def test_usage_for_by_profile_name(tmp_path, monkeypatch):
         }
     with um.patch.object(ClaudeCodeAdapter, "usage", return_value=None):
         assert ad.usage_for("default") is None
+
+
+def test_composer_reads_painted_text_only():
+    """TD-027: the composer is the last `❯` row; faint text (a suggested next prompt, the first-run
+    placeholder) is not content; a slash command's colour is; no `❯` row means no opinion."""
+    ad = ClaudeCodeAdapter()
+    status = "  ⏸ manual mode on · ? for shortcuts"
+    assert (
+        ad.composer(["\x1b[39m❯ reply with the word tok015", "● tok015", "\x1b[39m❯\xa0real text", status])
+        == "real text"
+    )
+    assert ad.composer(["\x1b[39m❯\xa0\x1b[2mreply with the word tok017\x1b[0m", status]) == ""
+    assert ad.composer(['\x1b[39m❯\xa0\x1b[2mTry "fix typecheck errors"\x1b[0m', status]) == ""
+    assert ad.composer(["\x1b[39m❯\xa0\x1b[38;5;153m/exit\x1b[39m", status]) == "/exit"
+    assert ad.composer(["Do you trust the files in this folder?", "  Yes, proceed", "  No, exit"]) is None
+    assert ad.composer([]) is None

@@ -427,3 +427,42 @@ async def test_registry_only_sessions_get_read_only_cards(agent, hookstub, tmp_p
         with pytest.raises(AgentError, match="no session"):
             await c.call("get", id="ext-u-1")
         await c.call("kill", id=own["id"])
+
+
+async def test_send_confirms_the_submit(agent, composerstubs, tmp_path, monkeypatch):
+    """TD-027: every `send` waits for the paste to paint, presses Enter, and confirms the composer
+    emptied — one `C-m` retry, then `prompt-stuck`. Faint text painted back into the composer (a
+    tool's suggested next prompt) does not count as content."""
+    monkeypatch.setattr("sessionorc.agent.SUBMIT_SECONDS", 0.6)
+
+    async def submitted(sid: str) -> list[str]:
+        return [t for t in await agent.rpc_tail(sid, 20) if t.startswith("SUBMITTED ")]
+
+    async def create(name: str, adapter: str) -> str:
+        (tmp_path / name).mkdir()
+        s = await c.call("create", name=name, dir=str(tmp_path / name), adapter=adapter)
+        assert await agent._poll(lambda: _painted(s["id"]), 5), "the composer child never painted its prompt"
+        return s["id"]
+
+    async def _painted(sid: str) -> bool:
+        return any(t.startswith(">>") for t in await agent.rpc_tail(sid, 3))
+
+    async with LocalClient() as c:
+        # a well-behaved pane: one Enter, one submit, and the faint echo afterwards is not "stuck"
+        s0 = await create("c0", "composer0")
+        await c.call("send", id=s0, text="first prompt")
+        assert await submitted(s0) == ["SUBMITTED first prompt"]
+        await c.call("send", id=s0, text="second prompt")  # composer holds faint "first prompt" here
+        assert await submitted(s0) == ["SUBMITTED first prompt", "SUBMITTED second prompt"]
+
+        # the swallow: Enter lost, C-m lands, one submit, no duplicate text
+        s1 = await create("c1", "composer1")
+        await c.call("send", id=s1, text="retried prompt")
+        assert await submitted(s1) == ["SUBMITTED retried prompt"]
+
+        # both lost: honest failure, the text left in the composer, nothing submitted
+        s2 = await create("c2", "composer2")
+        with pytest.raises(AgentError, match="prompt-stuck"):
+            await c.call("send", id=s2, text="stuck prompt")
+        assert await submitted(s2) == []
+        assert any(t.rstrip().endswith(">> stuck prompt") for t in await agent.rpc_tail(s2, 5))
