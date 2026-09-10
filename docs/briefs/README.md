@@ -1,7 +1,7 @@
 # Briefs for unattended agentorc sessions
 
 A brief is the opening prompt of an unattended worker. Launch one from the main checkout (the
-session gets its own worktree and branch, per design §4.5 "new worktree"):
+session gets its own worktree and branch, per design §4.5a, New session "Where: new worktree"):
 
 ```
 pdm run ao new -d ~/agentorc -w tdgrind-ao-1 --unattended --prompt "$(cat docs/briefs/tdgrind-ao-1.md)" tdgrind-ao-1
