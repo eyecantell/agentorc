@@ -271,3 +271,15 @@ def test_explain_file_and_session(subprocess_agent, tmp_path, capsys):
     out = capsys.readouterr().out
     assert out.startswith(f"{sid}  idle (scraped)") and "why: shell has no screen rules" in out and "screen:" in out
     call_sync("kill", id=sid)
+
+
+def test_skill_prints_the_rules(capsys):
+    """TD-019: `ao --skill` prints the packaged skill and exits 0 without an agent."""
+    with pytest.raises(SystemExit) as e:
+        cli.main(["--skill"])
+    assert e.value.code == 0
+    out = capsys.readouterr().out
+    assert out.startswith("---\nname: ao\n")
+    for must in ("AGENTORC_SESSION", "ao status --json", "prompt-stuck", "invariant 1", "never"):
+        assert must in out.lower() or must in out, must
+    assert out.count("\n") <= 120

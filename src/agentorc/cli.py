@@ -10,6 +10,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
+from importlib import resources
 from typing import Any
 
 from sessionorc.client import AgentError, AgentUnavailable, call_sync
@@ -263,9 +264,29 @@ def cmd_ui(args: argparse.Namespace) -> int:
     return ui_main(["--bind", args.bind, "--port", str(args.port)])
 
 
+def skill_text() -> str:
+    """The `ao` skill (design §4.7, TD-019): front matter + rules, shipped with the package so it can
+    be printed anywhere `ao` runs — `ao --skill > .claude/skills/ao/SKILL.md` installs it in a repo."""
+    return resources.files("agentorc").joinpath("skill.md").read_text(encoding="utf-8")
+
+
+class _SkillAction(argparse.Action):
+    def __init__(self, option_strings, dest, **kw):  # noqa: ANN001 — argparse's Action signature
+        super().__init__(option_strings, dest, nargs=0, **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: ANN001
+        print(skill_text(), end="")
+        parser.exit(0)
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="ao", description="agentorc — sessions in tmux, one view")
     ap.add_argument("--json", action="store_true", help="print the RPC result as JSON (every subcommand; TD-018)")
+    ap.add_argument(
+        "--skill",
+        action=_SkillAction,
+        help="print the rules an agent driving ao from inside a session must follow (Markdown; TD-019)",
+    )
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def add(name: str, **kw: Any) -> argparse.ArgumentParser:

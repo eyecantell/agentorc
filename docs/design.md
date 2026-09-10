@@ -626,7 +626,7 @@ how a session started from any terminal gets a first-class card: `ao new --attac
 would have typed `claude` (TD-010 b). Every subcommand takes `--json` and prints the RPC result with the ids
 the next call needs (TD-018); `ao explain <id>` prints a session's screen, the rule that fires
 on it and whether it applies, and `ao explain --file` classifies a saved screen (TD-015); `ao --skill` prints the rules an agent driving `ao` from inside a
-session must follow (TD-019, phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
+session must follow (TD-019 — planned for phase 5, pulled forward and landed 2026-09-10 because an orchestrator session driving `ao` came first; `ao --skill > .claude/skills/ao/SKILL.md` installs it in a repo, the New-session install offer is still phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
 automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
 
 ## 5. Configuration
@@ -715,7 +715,8 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
    write-back, stranded-work flags.
 5. **Second adapter.** Gemini CLI (hook-fed if the OSC 9 / hooks story verifies) or a scraped
    plain-shell adapter, whichever proves the contract better. Publish to PyPI, write the
-   adapter-author guide.
+   adapter-author guide. The `ao --skill` text (TD-019) was pulled forward and landed in
+   phase 1 (2026-09-10); what remains here is offering to install it from the New session flow.
 
 ## 8. Lessons carried in (dev-cadence + tdgrind)
 
