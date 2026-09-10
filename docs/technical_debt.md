@@ -33,6 +33,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 | TD-020 | `_removed_at` compares wall-clock stamps; a clock step re-adopts a just-removed pane | Low | Open |
 | TD-021 | Immediate id reuse after `remove` can mis-adopt the new pane for one tick | Low | Open |
+| TD-022 | Focus terminal cannot scroll back: wheel/PageUp show nothing above the live screen | High | Open |
 
 ---
 
@@ -390,3 +391,37 @@ pane born after the removal is never confused with the one removed. Add a test b
 `test_agent_paths.py`'s stale-snapshot case.
 
 **Related:** PR #22 review; TD-020; TD-010 (adoption of hand-started sessions).
+
+## TD-022: Focus terminal cannot scroll back: wheel/PageUp show nothing above the live screen
+
+**Priority:** High
+**Added:** 2026-09-09 (first-use finding, Paul)
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.js` (`AO.focus`: `new Terminal({... scrollback: 5000})`, the
+`attachCustomKeyEventHandler`), `src/agentorc/ui/pty_bridge.py` (`attach_argv`), `src/sessionorc/tmux.py`
+(server/session options)
+
+**Why:** The Focus terminal is xterm.js around `tmux attach`, and scrolling is the one thing that shape
+does not give for free. tmux owns the pane: when a line leaves the top of the screen it goes into
+*tmux's* history (`history-limit` 50000), and tmux repaints the client in place, so xterm.js's own
+5000-line scrollback holds nothing useful — the wheel and Shift+PageUp scroll an empty or stale buffer,
+and the user sees exactly one screen of a Claude Code conversation. `mouse` is off on the user's tmux
+server (default), so the wheel is not forwarded to tmux either. The result on first use: a reply longer
+than the pane cannot be read in the UI at all. That breaks design §2 requirement 2 ("full conversation
+in an embedded terminal") — the terminal is the *primary* read surface, not a peek — and it makes the
+phone layout (TD-003) pointless before it starts, since a phone pane is shorter still.
+
+**Fix:** Make scrollback reach tmux history, not xterm's buffer. Preferred: turn `mouse on` for
+agentorc's sessions (a session option, set per session next to `remain-on-exit` in `tmux.py`, never
+`-g` on the user's server): tmux then enters copy mode on wheel-up and scrolls its history, and
+xterm.js forwards wheel events whenever the application enables mouse tracking. Add keyboard access
+for the same thing in the key handler — Shift+PageUp / Shift+PageDown sent as `copy-mode -u`
+(via `tmux send-keys` or the `prefix [` sequence), with `q` / Escape to leave — so it works without a
+wheel. Check the cost: with tmux mouse tracking on, drag-select goes to tmux, so local xterm.js
+selection (Ctrl+Shift+C copy) needs Shift+drag; document that in the header hint. If a visible
+control (a Scroll / History button in the Focus header) is added, it goes in design §4.5a first.
+Done when a reply taller than the pane can be read to its first line from the UI, with wheel and
+keyboard, on desktop and on the narrow layout; `tests/test_ui.py` covers the option being set on
+the session.
+
+**Related:** design §2 req. 2, §4.6, §4.5a; TD-003 (phone layout); TD-002 (composer).
