@@ -15,8 +15,13 @@ class HookFedStub:
     def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
         return LaunchSpec(argv=["bash", "--norc"])
 
+    rules = None  # a `sessionorc.screen.Manifest` set by a test: screen rules for the stub (TD-015)
+
     def classify(self, pane, tail):
         return None
+
+    def explain(self, tail):
+        return self.rules.explain(tail) if self.rules else None
 
     usage_value = None  # set by a test: what `usage_for` reports for every profile (TD-001)
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import pathlib
 import subprocess
 import sys
 from collections.abc import Callable
@@ -147,6 +148,60 @@ def cmd_keys(args: argparse.Namespace) -> int:
     return emit(args, {"ok": True, "id": args.id}, lambda: None)
 
 
+def _print_explanation(x: dict[str, Any]) -> None:
+    head = (
+        f"{x['id']}  {x['state']} ({x['confidence']})"
+        if x.get("id")
+        else f"{x.get('file', 'fixture')}  ({x['adapter']} rules)"
+    )
+    if x.get("pending"):
+        head += f"  ← {x['pending']['kind']}: {x['pending']['text']}"
+    print(head)
+    m = x.get("match")
+    if m:
+        pend = f"  ← {m['pending']['kind']}: {m['pending']['text']}" if m.get("pending") else ""
+        print(f"rule: {m['rule']} → {m['state']}{pend}")
+        for ln in m["evidence"]:
+            print(f"  evidence │ {ln}")
+    print(f"why: {x['reason']}")
+    if x.get("tail"):
+        print("screen:")
+        for ln in x["tail"][-12:]:
+            print(f"  │ {ln}")
+
+
+def cmd_explain(args: argparse.Namespace) -> int:
+    """`ao explain <id>`: the screen, the rule that fires on it and whether it applies (design §4.2,
+    TD-015). `--file` classifies a saved screen with an adapter's rules — no agent needed."""
+    if args.file:
+        from sessionorc import adapters
+
+        try:
+            ad = adapters.get(args.adapter)
+        except KeyError as e:
+            return fail(args, str(e).strip('"'), 1)
+        explain = getattr(ad, "explain", None)
+        if explain is None:
+            return fail(args, f"{args.adapter} has no screen rules", 1)
+        try:
+            tail = pathlib.Path(args.file).read_text(encoding="utf-8", errors="replace").splitlines()
+        except OSError as e:
+            return fail(args, f"cannot read {args.file}: {e.strerror or e}", 1)
+        m = explain(tail)
+        x = {
+            "file": args.file,
+            "adapter": args.adapter,
+            "match": m.to_dict() if m else None,
+            "reason": f"rule {m.rule} matched" if m else "no screen rule matched",
+            "tail": tail,
+        }
+        return emit(args, x, lambda: _print_explanation(x))
+    if not args.id:
+        return fail(args, "explain needs a session id, or --file", 2)
+    x = call_sync("explain", id=args.id, lines=args.lines)
+    return emit(args, x, lambda: _print_explanation(x))
+
+
 def cmd_tail(args: argparse.Namespace) -> int:
     lines = call_sync("tail", id=args.id, lines=args.lines)
     return emit(args, lines, lambda: print("\n".join(lines)) if lines else None)
@@ -272,6 +327,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("keys", nargs="+")
     p.set_defaults(fn=cmd_keys)
+
+    p = add("explain", help="why a session shows its state: screen, rule, evidence (or classify --file)")
+    p.add_argument("id", nargs="?")
+    p.add_argument("--file", help="a saved screen to classify with an adapter's rules instead of a live session")
+    p.add_argument("-a", "--adapter", default="claude-code", help="whose rules, with --file")
+    p.add_argument("-n", "--lines", type=int, default=40)
+    p.set_defaults(fn=cmd_explain)
 
     p = add("tail", help="last lines of a session's pane")
     p.add_argument("id")

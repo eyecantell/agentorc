@@ -142,6 +142,8 @@ measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts i
 
 ## TD-001: Short title of the problem
 
+## TD-015: Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape
+
 **Priority:** Medium
 **Added:** 2026-09-10
 **Status:** Resolved
@@ -203,3 +205,18 @@ then kill) needs exactly this to know the wrap-up request landed.
 **Resolved:** 2026-09-10 (PR #42) — `rpc_send(id, text, wait=False, timeout=None)`: with `wait` it returns the record once the session has started on *this* prompt (a transition off `idle`; a busy session first has its current turn end — a stop on anything but `idle` is returned as is, prompt still queued — then the next turn must start) and then reached one of `SETTLED` (`idle`, `needs-you`, `exited`, `closed`, `limited`, `stalled?`); errors `prompt-stalled` after `SEND_STALL_SECONDS` (5 s, or the remaining `timeout` if shorter) of nothing, `timeout` after `timeout` seconds in total, `removed` if the record goes away. `ao send --wait [--timeout N]` prints the settled state. Nothing is ever re-sent. Tests: `tests/test_agent.py::test_send_wait_three_outcomes`, `tests/test_cli.py::test_send_wait`. Phase 3's wrap-up policy is the intended caller (design §6).
 
 **Related:** design §4.2 (the never-re-send rule), §4.4, §6; ADR 2026-09-10.
+
+**Location:** `src/sessionorc/adapters.py` (`classify`), `src/agentorc/adapters/claude_code/__init__.py`, `src/sessionorc/agent.py` (tick)
+
+**Why:** Design §4.2 allows a pane classifier as a labelled fallback, and today the only scraped
+verdicts are the shell/command adapters' foreground-process check and the agent's liveness
+cross-check; the Claude Code adapter's `classify` returns nothing. The herdr spike ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md))
+showed what the fallback is for: its screen detector caught the trust dialog, which no Claude Code
+hook reports, and its `agent explain` printed the rule that fired, the region it matched and the
+fallback reason when nothing did. Three things agentorc wants rest on the same mechanism: the
+trust dialog and any future dialog no hook covers, `limited` from the tool's own limit message
+before TD-001's usage polling exists, and a `stalled?` that can say *why* it is unsure.
+
+**Resolved:** 2026-09-10 (PR #47) — `sessionorc.screen` (`Rule`, `Manifest`, `Match`): one versioned TOML manifest per tool, rules with `any`/`all`/`not` regexes over the last `region` lines, a priority, and an optional pending (`$line` = the matched line); the highest-priority match wins with its evidence. Claude Code ships `adapters/claude_code/screen_rules.toml` (trust dialog → `needs-you`; the spike's three usage-limit screens → `limited`) and `explain(tail)`. The agent applies a hook-fed adapter's verdict as `scraped` only when no hook has reported within `STALL_AFTER` (`_last_hook`; a session no hook has reported on yet takes it at once), never over a fresh hook state. `rpc_explain` and `ao explain <id>` / `ao explain --file <screen> [-a adapter]` print the screen, the rule, the evidence and whether it applies. Fixtures under `tests/fixtures/screens/`; tests `tests/test_screen.py`, `tests/test_agent_paths.py::test_screen_rule_is_a_labelled_fallback_that_a_fresh_hook_outranks`, `tests/test_cli.py::test_explain_file_and_session`. Not done here: a per-adapter stall window and a `stalled?` rule with a reason (the manifest can carry one when a screen for it exists).
+
+**Related:** design §4.2, §9 invariant 4; TD-001 (`limited` from the usage endpoint); ADR 2026-09-10.

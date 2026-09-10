@@ -236,7 +236,8 @@ detector caught the trust dialog that no hook reports): one versioned rule manif
 evaluated over the bottom of the pane, with `ao explain <session>` printing the rule that fired
 and the evidence, and `ao explain --file` for fixtures. The same rules give `limited` from the
 tool's own limit message and a `stalled?` that can say why. Scraped never outranks a fresh hook
-state.
+state — fresh meaning a hook reported within the stall window; a session no hook has reported
+on yet (the trust dialog appears before any hook fires) takes the classifier's verdict at once.
 
 **Unseen idle.** An `idle` session nobody has looked at since it finished (`since > seen_at`;
 Focus sets `seen_at`) renders "finished · unseen" and sorts above plain `idle` — the morning
@@ -593,7 +594,8 @@ itself (§9 invariant 1), with one read-only exception: `ao focus <id>` and `ao 
 creates, kills and types nothing (under `--json` the attach argv is printed instead). That is
 how a session started from any terminal gets a first-class card: `ao new --attach` where you
 would have typed `claude` (TD-010 b). Every subcommand takes `--json` and prints the RPC result with the ids
-the next call needs (TD-018); `ao --skill` prints the rules an agent driving `ao` from inside a
+the next call needs (TD-018); `ao explain <id>` prints a session's screen, the rule that fires
+on it and whether it applies, and `ao explain --file` classifies a saved screen (TD-015); `ao --skill` prints the rules an agent driving `ao` from inside a
 session must follow (TD-019, phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
 automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
 
