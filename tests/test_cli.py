@@ -212,3 +212,33 @@ def test_send_wait(subprocess_agent, tmp_path, capsys):
     assert cli.main(["send", sid, "--wait", "--timeout", "1", "nothing happens"]) == 1
     assert "prompt-stalled" in capsys.readouterr().err
     call_sync("kill", id=sid)
+
+
+def test_focus_and_attach_print_the_attach_argv_under_json(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-010 (b): `ao focus` / `--attach` exec `tmux attach`; under --json the argv is printed instead
+    (an exec cannot be tested here). The socket comes from the environment, as the pty bridge's does."""
+    assert cli.main(["--json", "shell", "att", "-d", str(tmp_path), "--attach"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    sid = out["id"]
+    assert out["attach"] == ["tmux", "-L", subprocess_agent.sock_name, "attach", "-t", f"={sid}:"]
+    wait_state(sid, "idle")
+    assert cli.main(["--json", "focus", sid]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["id"] == sid and out["state"] == "idle" and out["attach"][-1] == f"={sid}:"
+    assert cli.main(["focus", "ao-nope"]) == 1
+    assert "no session ao-nope" in capsys.readouterr().err
+    # a real focus runs tmux attach as a child: patch it (no tty here) and check the argv
+    seen = {}
+    monkeypatch.setattr("agentorc.cli.subprocess.call", lambda argv: seen.update(argv=argv) or 0)
+    assert cli.main(["focus", sid]) == 0
+    assert seen["argv"][0] == "tmux" and seen["argv"][-2:] == ["-t", f"={sid}:"]
+    # killed: the record says exited like a natural exit, but the pane is gone — a clear line, exit 1
+    call_sync("kill", id=sid)
+    wait_state(sid, "exited")
+    monkeypatch.undo()
+    assert cli.main(["focus", sid]) == 1
+    assert "could not attach" in capsys.readouterr().err
+    call_sync("close", id=sid)
+    assert cli.main(["focus", sid]) == 1
+    assert "closed" in capsys.readouterr().err
+    call_sync("remove", id=sid)

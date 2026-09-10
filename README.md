@@ -97,7 +97,10 @@ file the machine's hostname is used, which is rarely what VS Code can resolve.
 
 ## CLI
 
-The package installs `agentorc` and an `ao` alias (`ao status`, `ao new`, `ao shell`, ...). Every
+The package installs `agentorc` and an `ao` alias (`ao status`, `ao new`, `ao shell`, ...). `ao new
+--attach` (or `ao shell --attach`) starts the session and attaches your terminal to it — type it
+where you would have typed `claude`, and the session is a first-class card; `ao focus <id>`
+attaches to an existing one. Every
 subcommand takes `--json` (before or after the subcommand) and then prints only the RPC result —
 the session dict, the tail lines, `{"ok": true, "id": …}` for calls that return nothing — or
 `{"error": …}` with the same exit codes, so a script or an agent driving `ao` parses ids instead

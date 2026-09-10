@@ -14,6 +14,8 @@ from collections.abc import Callable
 
 import ptyprocess
 
+from sessionorc.tmux import attach_argv as tmux_attach_argv
+
 
 class PtySession:
     def __init__(self, argv: list[str], *, cols: int = 120, rows: int = 32, env: dict[str, str] | None = None):
@@ -56,10 +58,7 @@ class PtySession:
 
 
 def attach_argv(session_id: str, *, socket_name: str | None = None) -> list[str]:
-    argv = ["tmux"]
-    if socket_name:
-        argv += ["-L", socket_name]
-    return argv + ["attach", "-t", f"={session_id}:"]
+    return tmux_attach_argv(session_id, socket_name=socket_name)
 
 
 async def pump(pty: PtySession, send: Callable[[bytes], object], recv: Callable[[], object]) -> None:

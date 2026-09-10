@@ -19,6 +19,15 @@ _FMT = (
 MIN_VERSION = (3, 2)  # `new-session -e` and `paste-buffer -p`
 
 
+def attach_argv(session: str, *, socket_name: str | None = None, binary: str = "tmux") -> list[str]:
+    """The client command that attaches a terminal to a session: what the UI's pty bridge runs and
+    what `ao focus` execs. Attaching writes nothing to the session (design §9 invariant 1)."""
+    argv = [binary]
+    if socket_name:
+        argv += ["-L", socket_name]
+    return argv + ["attach", "-t", f"={session}:"]
+
+
 class TmuxError(RuntimeError):
     pass
 
