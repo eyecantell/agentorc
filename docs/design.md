@@ -132,6 +132,14 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   away from whatever spawns it): the agent starts the server idempotently on its own startup and
   before every create, with `exit-empty off` so the server survives its last session closing
   (see §4.6). Default tmux socket, so hand-started sessions and "Copy tmux command" just work.
+  tmux, not the agent, **owns the processes**: a host-agent restart, upgrade or crash reconciles
+  against live panes and loses no session, where a runtime that holds the ptys itself must kill
+  every session to restart and re-launch the tool with `--resume` once a client attaches (measured on herdr,
+  [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)). This is a reason, not an accident.
+- The adapter's **argv runs directly** in the tmux session (`new-session -c <dir> -- <argv>`),
+  never through the person's interactive shell: rc files change directories, set aliases and
+  print banners, and any of those moves or breaks a launch (the same ADR saw a `.bashrc` `cd`
+  relocate every pane). The `shell` adapter is the one place the person's shell is the point.
 - `history-limit` raised at creation; `pipe-pane` streams output to
   `~/.agentorc/runs/<session>-<created>.log` continuously (replaces tdgrind's per-tick
   snapshot; a reboot loses nothing that reached the pipe).
@@ -221,9 +229,23 @@ that enables when it passes; an idle card that passes shows "ready to close ✓"
 Close; an `exited` card shows the failing items. Closing is always the person's act: the
 checklist is a readiness signal, never a verdict. This is the stranded-work audit with teeth.
 
-Adapters without a usable hook set get a **pane classifier** (regex over the last N lines) and
-`"confidence": "scraped"`. The UI shows the badge so a guessed state is never mistaken for a
-reported one. No adapter may write a scraped state with `confidence: hook`.
+Adapters without a usable hook set get a **pane classifier** and `"confidence": "scraped"`. The
+UI shows the badge so a guessed state is never mistaken for a reported one. No adapter may write
+a scraped state with `confidence: hook`. The classifier's intended shape (TD-015, after herdr's
+detector caught the trust dialog that no hook reports): one versioned rule manifest per tool,
+evaluated over the bottom of the pane, with `ao explain <session>` printing the rule that fired
+and the evidence, and `ao explain --file` for fixtures. The same rules give `limited` from the
+tool's own limit message and a `stalled?` that can say why. Scraped never outranks a fresh hook
+state.
+
+**Unseen idle.** An `idle` session nobody has looked at since it finished (`since > seen_at`;
+Focus sets `seen_at`) renders "finished · unseen" and sorts above plain `idle` — the morning
+triage case. Not a state: `idle` stays `idle` in every payload (TD-017).
+
+**`send` confirms the prompt took.** `send` already refuses while a permission or question is
+pending. With `wait` it also returns only after the session has left `idle` and settled again,
+and fails with `prompt-stalled` when nothing starts within a few seconds — so a policy's wrap-up
+request (§6) is known to have landed, and no text is ever re-sent on a guess (TD-016).
 
 Liveness cross-check: the agent also watches the pipe-pane log's mtime; a `working` state with no
 output for longer than the adapter's `stall_after` is shown as `stalled?`, which is how a
@@ -556,7 +578,10 @@ Package and canonical command: `agentorc`. The package also registers `ao` as an
 (`ao status`, `ao new`, `ao shell`, `ao focus <name>`, `ao off --now`) because that is what gets
 typed day to day; it is a separate console-script entry so anyone with a colliding `ao` can
 drop it without losing anything. The CLI is a thin client of the host agent RPC — it never touches tmux
-itself (§9 invariant 1).
+itself (§9 invariant 1). Every subcommand takes `--json` and prints the RPC result with the ids
+the next call needs (TD-018); `ao --skill` prints the rules an agent driving `ao` from inside a
+session must follow (TD-019, phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
+automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
 
 ## 5. Configuration
 
@@ -663,6 +688,8 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
 6. The core never types a menu choice into a pane; permissions are answered through the hook,
    everything else in the terminal.
 7. The agent's edits to a repo's board file are always committed, never left in the tree.
+8. A session's process is launched as the adapter's argv, never through the person's
+   interactive shell (§4.1); tmux, not the agent, holds the process.
 
 ## 10. Open questions
 

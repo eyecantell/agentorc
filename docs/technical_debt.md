@@ -26,6 +26,11 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-012 | Resuming a conversation that is still live elsewhere is not refused | Low | Open |
 | TD-013 | External-session check reads the default profile's registry only | Low | Open |
 | TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Done |
+| TD-015 | Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape | Medium | Open |
+| TD-016 | `send` should confirm the prompt took: a send-and-wait RPC for policies | Medium | Open |
+| TD-017 | Seen-state: "finished while you were away" is not the same as idle | Medium | Open |
+| TD-018 | `ao --json` on every subcommand | Low | Open |
+| TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 
 ---
 
@@ -236,3 +241,112 @@ measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts i
 Done when the decision doc is merged and the §10 item is checked.
 
 **Related:** design §3, §4.5b, §4.5c, §7 phase 2, §10; PRs #23, #24; TD-004 (ssh transport, the work this decides).
+
+## TD-015: Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape
+
+**Priority:** Medium
+**Added:** 2026-09-10
+**Status:** Open
+**Location:** `src/sessionorc/adapters.py` (`classify`), `src/agentorc/adapters/claude_code/__init__.py`, `src/sessionorc/agent.py` (tick)
+
+**Why:** Design §4.2 allows a pane classifier as a labelled fallback, and today the only scraped
+verdicts are the shell/command adapters' foreground-process check and the agent's liveness
+cross-check; the Claude Code adapter's `classify` returns nothing. The herdr spike ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md))
+showed what the fallback is for: its screen detector caught the trust dialog, which no Claude Code
+hook reports, and its `agent explain` printed the rule that fired, the region it matched and the
+fallback reason when nothing did. Three things agentorc wants rest on the same mechanism: the
+trust dialog and any future dialog no hook covers, `limited` from the tool's own limit message
+before TD-001's usage polling exists, and a `stalled?` that can say *why* it is unsure.
+
+**Fix:** one TOML manifest per tool under the adapter (`rules = [{id, state, region, any/all/not
+patterns, priority}]`, versioned), evaluated over the bottom of the pane on the tick; the result
+is written with `confidence: scraped` and never overrides a `hook` state that is fresher than the
+`STALL_AFTER` window (today a module constant in `agent.py`, per adapter once TD-015 lands; §4.2 "scraped never outranks a fresh hook state"). `ao explain <session>` prints the snapshot, the matched
+rule and the evidence; `ao explain --file` classifies a saved fixture so rules can be tested
+without a live pane. Done when the trust dialog shows as `needs-you` (scraped) on a Claude Code
+session started with a fresh `.claude.json`, and the three usage-limit fixtures from the spike
+classify as `limited`.
+
+**Related:** design §4.2, §9 invariant 4; TD-001 (`limited` from the usage endpoint); ADR 2026-09-10.
+
+## TD-016: `send` should confirm the prompt took: a send-and-wait RPC for policies
+
+**Priority:** Medium
+**Added:** 2026-09-10
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`rpc_send`), `src/agentorc/cli.py` (`send`)
+
+**Why:** `send` already refuses while a permission or question is pending (the right half of the
+rule). It then writes the text and Enter and returns, so a policy that nudges an unattended
+worker cannot tell whether the prompt was taken, swallowed by a dialog that appeared in between,
+or typed into a pane whose agent had just exited. herdr's `agent prompt --wait` names the two
+failure modes worth copying: nothing starts working within a few seconds (`agent_prompt_stalled`),
+and the caller's timeout passes before a settled state. Phase 3's supervisor (§6: wrap-up prompt,
+then kill) needs exactly this to know the wrap-up request landed.
+
+**Fix:** `send(id, text, wait=False, timeout=None)`: with `wait`, return after the session has
+left `idle` (hook `UserPromptSubmit` or a scraped `working`) *and* then reached `idle`,
+`needs-you` or `exited`; error `prompt-stalled` if no activity is seen within 5 s; error
+`timeout` after `timeout` seconds. `ao send --wait`. Never retry a send on its own (§9 invariant
+6 applies to text too). Done when the wrap-up policy in phase 3 uses it and a test covers all
+three outcomes with the `hookstub` adapter.
+
+**Related:** design §4.4, §6, §9 invariant 6; ADR 2026-09-10.
+
+## TD-017: Seen-state: "finished while you were away" is not the same as idle
+
+**Priority:** Medium
+**Added:** 2026-09-10
+**Status:** Open
+**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Herd card, Focus)
+
+**Why:** A session that went `idle` while nobody was looking is the common phone-triage case, and
+today it sorts and looks exactly like one that has been idle all day. herdr keeps `done` (idle,
+not yet looked at) apart from `idle` by a server-side seen mark that explicit focus clears and
+reads do not. agentorc's Focus view is the natural "seen".
+
+**Fix:** `seen_at` on the record, set when Focus is opened for the session (the terminal bridge
+attaches) or the person acts on the card; `since > seen_at` on an `idle` card renders as
+"finished 12 m ago · unseen" and sorts above plain `idle`, below `needs-you`. Not a new state —
+`idle` stays `idle` in every payload (§4.2 table unchanged). Done when an unattended worker that
+finishes overnight is the first idle card in the morning and drops back after one Focus.
+
+**Related:** design §4.2, §4.5 (Herd sort); ADR 2026-09-10.
+
+## TD-018: `ao --json` on every subcommand
+
+**Priority:** Low
+**Added:** 2026-09-10
+**Status:** Open
+**Location:** `src/agentorc/cli.py`
+
+**Why:** `status --json` exists; `new`, `shell`, `send`, `kill`, `close`, `allow`, `deny`, `tail`
+print prose, so a script or an agent driving `ao` has to parse "ao-x-y  attach: tmux attach …".
+herdr's CLI is JSON-first (most commands print the API response with the ids the next call
+needs, and its skill file tells agents to parse ids rather than predict them), which is what made
+the spike's automation a matter of `jq`; agentorc's own sessions are the obvious next driver of
+`ao`.
+
+**Fix:** a global `--json` that makes every subcommand print the RPC result (or `{"error": …}`
+with the same exit codes). Done when `tests/test_cli.py` covers `--json` for each subcommand.
+
+**Related:** design §4.7; TD-019; ADR 2026-09-10.
+
+## TD-019: Ship a skill file for `ao` (`ao --skill`)
+
+**Priority:** Low
+**Added:** 2026-09-10
+**Status:** Open
+**Location:** `src/agentorc/cli.py`, a new `src/agentorc/skill.md`
+
+**Why:** `herdr --skill` prints the instructions a coding agent needs to drive it safely: check
+you are inside a managed session, parse ids from JSON, which commands mutate, what not to do
+(never answer another agent's dialog). An agent running inside an agentorc session has the same
+needs — `AGENTORC_SESSION` is set, `ao` is on `PATH` — and the adapter-author guide in phase 5
+is the moment to write it down once the CLI is stable.
+
+**Fix:** `ao --skill` prints a Markdown skill (front matter + rules); the New session flow can
+offer to install it into the repo's `.claude/skills/`. Depends on TD-018. Done in phase 5 with
+the adapter-author guide.
+
+**Related:** design §4.7, §7 phase 5; TD-018; ADR 2026-09-10.
