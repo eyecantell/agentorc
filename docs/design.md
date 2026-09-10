@@ -260,7 +260,7 @@ does not, Enter is pressed once more as `C-m`, and if the text is still there th
 with `prompt-stuck` — the text left where the person can see it, never re-pasted (TD-027:
 measured 2026-09-10, an Enter that reaches Claude Code before it has read the paste is
 dropped, so a burst of sends into a fresh or slow session lost every Enter but one; the
-paint-wait removes the race). The composer read counts painted text only: Claude Code paints
+paint-wait removes the race). The Claude Code adapter's composer read counts painted text only: the tool paints
 its suggested next prompt — often the session's own last prompt — in faint text, which is not
 an unsubmitted prompt. With `wait` it also returns only after the session has started on *this* prompt and
 settled again (`idle`, `needs-you`, `exited`, `closed`, `limited`, `stalled?`): a busy session queues the text, so the wait

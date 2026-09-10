@@ -642,7 +642,9 @@ class HostAgent:
         a paste landing within ~0.1 s of the previous submit lost its Enter every time), then the
         composer must empty within `SUBMIT_SECONDS`; one retry with `C-m`, then `prompt-stuck`.
         Only the Enter is ever re-sent, and only with the text visibly still in the composer —
-        never the text (design §4.2)."""
+        never the text (design §4.2). A composer that cannot be read (no composer row, or a failed
+        capture — `capture_tail` returns [] then) counts as emptied: no evidence is not evidence of a
+        stuck prompt."""
         reader = getattr(adapter, "composer", None)
         await asyncio.to_thread(self.tmux.paste, sid, text)
         if reader is None:
