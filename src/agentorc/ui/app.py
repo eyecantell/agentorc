@@ -1,6 +1,6 @@
 """The agentorc web UI (design §4.5): server-rendered pages, one `/events` websocket per tab
 pushing rendered cards, one `/term/<id>` websocket per open Focus terminal. Phase 1: the local
-host only; `hosts.yml` and ssh transport arrive in phase 2.
+host only, from `hosts.yml`'s `local` entry; ssh transport arrives in phase 2.
 """
 
 from __future__ import annotations
@@ -20,9 +20,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from agentorc import hosts
 from agentorc import profiles as profiles_mod
-from sessionorc import naming, paths
+from sessionorc import hosts, naming, paths
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.models import STATE_RANK
 
@@ -206,6 +205,7 @@ def create_app() -> FastAPI:
                 "host": host_name(),
                 "active": "Herd",
                 "agent_down": agent_down,
+                "volatile": hosts.local_host().volatile,
                 "usage": usage,
             },
         )
@@ -223,7 +223,10 @@ def create_app() -> FastAPI:
     @app.get("/new", response_class=HTMLResponse)
     async def new_form(request: Request, dir: str = "", adapter: str = "claude-code", resume: str = ""):
         profs, default = profiles_mod.load()
-        recent = await call("recent_dirs")
+        # registered repos (design §5: the dev-cadence registry, `repos_registry` in hosts.yml) first,
+        # then recent directories; phase 1 reads the local host's file directly
+        repos = hosts.local_host().repos()
+        recent = repos + [d for d in await call("recent_dirs") if d not in repos]
         adapters = await call("adapters")
         return templates.TemplateResponse(
             request,

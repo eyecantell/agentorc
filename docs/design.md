@@ -610,7 +610,12 @@ automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.m
 
 - Hosts: `~/.agentorc/hosts.yml` on the UI host (`name`, `transport: ssh|local`, `ssh`
   target, `volatile: true|false`, `repos_registry` path, `runs_keep_days`). The UI process itself may run on a
-  laptop; only the session hosts need to stay awake.
+  laptop; only the session hosts need to stay awake. The parser is `sessionorc.hosts`, shared by
+  the UI and the host agent: in phase 1 both run on the one machine and read the same `local`
+  entry (`name`, `vscode_host`, `local`, `volatile`, `repos_registry`, `runs_keep_days` — landed
+  2026-09-10, TD-004; the env-var overrides are gone). A field the *agent* acts on
+  (`runs_keep_days`) is read on the session host from its own file's `local` entry, so a phase 2
+  session host carries its own copy; the ssh entries remain phase 2.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
   duplicated. A repo without dev-cadence can still be listed there. Directories that are not
   repos are not registered anywhere: New session takes a path, and the agent remembers recent

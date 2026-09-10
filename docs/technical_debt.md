@@ -14,7 +14,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 |----|-------|----------|--------|
 | TD-002 | Focus composer: Attach / drop / paste upload | Medium | Open |
 | TD-003 | Phone layout: narrow Focus with a soft-key row | Medium | Open |
-| TD-004 | Host identity: `hosts.yml` (local entry only so far), ssh transport and volatile hosts pending | Medium | Partly done |
+| TD-004 | Host identity: `hosts.yml` `local` entry complete; ssh transport entries pending (phase 2) | Medium | Partly done |
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
@@ -71,10 +71,10 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 
 **Priority:** Medium
 **Added:** 2026-09-06
-**Status:** Partly done — `~/.agentorc/hosts.yml` with a `local` entry (name, vscode_host, local) landed 2026-09-06 in `agentorc.hosts` after the first real session hit the unresolvable hostname; env vars remain as overrides. Remaining: the ssh transport entries, `volatile`, `repos_registry`, `runs_keep_days`, and dropping the env vars.
-**Location:** `src/agentorc/hosts.py`, `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`)
+**Status:** Partly done — `~/.agentorc/hosts.yml` with a `local` entry (name, vscode_host, local) landed 2026-09-06 after the first real session hit the unresolvable hostname. 2026-09-10 (PR #55): the parser moved to `sessionorc.hosts` so the agent can read it too; `volatile` (Herd banner wording), `repos_registry` (registered repos head the New session directory list) and `runs_keep_days` (run-log retention on the tick, design §4.6) landed; the three `AGENTORC_*_HOST` env overrides are gone. Remaining: the ssh transport entries (phase 2) — and with them the `unreachable` card state and the volatile sort slot, which phase 1's single local host cannot produce.
+**Location:** `src/sessionorc/hosts.py`, `src/sessionorc/agent.py` (`_prune_runs`), `src/agentorc/ui/app.py` (`host_name()`, `vscode_url()`, `new_form`)
 
-**Note (2026-09-10, session tdgrind-ao-1):** `runs_keep_days` needs a home the *host agent* reads: `hosts.yml` lives on the UI host and is parsed by `agentorc.hosts`, which `sessionorc` cannot import, so run-log pruning was left unbuilt rather than adding another env var. Decide where per-host agent settings live (a `~/.agentorc/agent.yml` on the session host, say) before building it.
+**Note (2026-09-10, session tdgrind-ao-1):** the run-1 question "where do per-host agent settings live" was answered by moving the parser into `sessionorc`: the agent reads its own machine's `hosts.yml` `local` entry, which on a phase 2 session host is that host's own file (design §5).
 
 **Why:** Phase 1 is one host, so the UI names it from `gethostname()` (on kmaster that is `kmaster-Standard-PC-i440FX-PIIX-1996`) with `AGENTORC_HOST_NAME` / `AGENTORC_VSCODE_HOST` / `AGENTORC_LOCAL_HOST` env overrides. Design §5 wants `~/.agentorc/hosts.yml` (name, transport, ssh target, volatile, `vscode_host`) on the UI host; that is the phase 2 shape and the env vars should disappear into it.
 

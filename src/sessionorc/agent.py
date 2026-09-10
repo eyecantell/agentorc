@@ -22,7 +22,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, naming, paths
+from sessionorc import adapters, hosts, naming, paths
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
 from sessionorc.models import Pending, Session, State, now_iso
 from sessionorc.store import EventQueue, SessionStore
@@ -39,6 +39,7 @@ CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session can
 SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken within this → prompt-stalled
 SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
+PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs_keep_days`)
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
@@ -91,6 +92,7 @@ class HostAgent:
         # re-adopt a dead pane and a hand-made session that reuses the name is adopted at once
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
+        self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -134,9 +136,32 @@ class HostAgent:
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
+        if snapshot_at - self._pruned_at > PRUNE_EVERY:
+            self._pruned_at = snapshot_at
+            # the live set is read here, on the loop (the class's one-writer rule); only the file
+            # work goes to the thread
+            live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ("exited", "closed")}
+            await asyncio.to_thread(self._prune_runs, snapshot_at, live)
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
+
+    def _prune_runs(self, now: datetime, live: set[str]) -> None:
+        """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
+        `live`, the logs of sessions still running (never truncate a live log: invariant 3). Logs
+        of forgotten sessions are the common case — Forget keeps the file until this sweep. `0`
+        keeps everything. Runs in a thread: touches files, never `self.sessions`."""
+        keep = hosts.local_host().runs_keep_days
+        if keep <= 0:
+            return
+        cutoff = (now - timedelta(days=keep)).timestamp()
+        for f in paths.runs_dir().glob("*.log"):
+            try:
+                if str(f) not in live and f.stat().st_mtime < cutoff:
+                    f.unlink()
+                    log.info("pruned run log %s (older than %d days)", f.name, keep)
+            except OSError:
+                continue
 
     async def _refresh_git(self, now: datetime) -> None:
         due = [

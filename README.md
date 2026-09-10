@@ -93,7 +93,11 @@ carries it, so hooks inside find the right agent). Profiles: `~/.agentorc/profil
 (design §4.2a). Host identity: `~/.agentorc/hosts.yml`, e.g. `local: {name: kmaster, vscode_host: kmaster}` —
 `vscode_host` is the ssh alias VS Code links use and must be in your own `~/.ssh/config`; add
 `local: true` when the UI runs on the machine you sit at (`vscode://file/…` links). Without the
-file the machine's hostname is used, which is rarely what VS Code can resolve.
+file the machine's hostname is used, which is rarely what VS Code can resolve. The same entry
+takes `volatile: true` (a laptop: an unreachable agent is asleep, not an alert), `repos_registry`
+(default `~/.config/dev-cadence/repos.txt`; its repos head the New session directory list) and
+`runs_keep_days` (default 30; run logs of exited/closed sessions older than that are deleted on
+the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`.
 
 ## CLI
 
