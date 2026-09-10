@@ -211,7 +211,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 
 **Why:** herdr (https://herdr.dev, Apache-2.0, Herdr, Inc., $6M seed 2026-09-09) already ships the
 substrate half of this design — persistent panes, multi-host over ssh, restart recovery, hook-fed
-state for Claude Code and 16 other CLIs, a worktree API, an event-subscription socket API — and
+state for six of its 17 integrated CLIs (not Claude Code, which it screen-scrapes — the spike's finding), a worktree API, an event-subscription socket API — and
 Herdr Cloud is about to ship the `relay` transport of §4.5b. It does not do the half §1 came
 from: states finer than `blocked`, unattended supervision, the anchor rule, Ready to close,
 per-repo commands, phone triage. Core contribution is closed (no unsolicited PRs); plugins and
