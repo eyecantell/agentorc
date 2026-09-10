@@ -27,3 +27,8 @@ class HookFedStub:
 
     def usage_for(self, profile):
         return self.usage_value
+
+    external = []  # set by a test: `ExternalSession`s the stub sees outside agentorc (TD-010 a)
+
+    def external_sessions(self):
+        return list(self.external)

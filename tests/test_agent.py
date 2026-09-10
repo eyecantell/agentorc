@@ -4,7 +4,7 @@ import asyncio
 import json
 
 import pytest
-from conftest import wait_state
+from conftest import FAST_TICK, wait_state
 
 from sessionorc import paths
 from sessionorc.client import AgentError, LocalClient
@@ -371,3 +371,59 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         with pytest.raises(AgentError, match="removed: .* went away"):
             await task
         agent.tmux.kill_session(s["id"])
+
+
+async def test_registry_only_sessions_get_read_only_cards(agent, hookstub, tmp_path):
+    """TD-010 (a): a live session the adapter sees outside agentorc (no tmux) is a read-only card:
+    state scraped from the registry status, no pane, no controls; it leaves with its process.
+    One of our own sessions, or a session in a directory one of ours holds, is not doubled."""
+    from sessionorc.adapters import ExternalSession
+
+    ext_dir = tmp_path / "vscode"
+    ext_dir.mkdir()
+    hookstub.external = [
+        ExternalSession(adapter="hookstub", cwd=str(ext_dir), name="editor", tool_id="u-1", status="busy")
+    ]
+    async with LocalClient() as c:
+        for _ in range(30):  # the next tick builds the card
+            if any(x["id"] == "ext-u-1" for x in await c.call("list")):
+                break
+            await asyncio.sleep(0.1)
+        card = await wait_state(c, "ext-u-1", "working")
+        assert card["external"] is True and card["pane"] is False and card["confidence"] == "scraped"
+        assert card["adapter_id"] == "u-1" and card["dir"] == str(ext_dir) and card["name"] == "editor"
+        assert "ext-u-1" in [x["id"] for x in await c.call("list")]
+        hookstub.external[0] = ExternalSession(
+            adapter="hookstub", cwd=str(ext_dir), name="editor", tool_id="u-1", status="idle"
+        )
+        await wait_state(c, "ext-u-1", "idle")
+        assert (await c.call("seen", id="ext-u-1"))["seen_at"]  # a person may look at it
+        for act in ("kill", "close", "remove", "set_mode"):
+            with pytest.raises(AgentError, match="outside agentorc"):
+                await c.call(act, id="ext-u-1", **({"unattended": True} if act == "set_mode" else {}))
+        with pytest.raises(AgentError, match="outside agentorc"):
+            await c.call("send", id="ext-u-1", text="hi")
+        # our own session in another directory, seen through the registry under its tool id: one card
+        own = await c.call("create", name="own", dir=str(tmp_path), adapter="hookstub")
+        await c.call("hook", session=own["id"], state="idle", adapter_id="u-own")
+        hookstub.external.append(
+            ExternalSession(adapter="hookstub", cwd=str(tmp_path), name="own", tool_id="u-own", status="busy")
+        )
+        # and a registry entry with an unknown id in a directory one of ours holds: our pane before its first hook
+        hookstub.external.append(
+            ExternalSession(adapter="hookstub", cwd=str(tmp_path), name="early", tool_id="u-early", status="busy")
+        )
+        await asyncio.sleep(FAST_TICK * 3)
+        ids = [x["id"] for x in await c.call("list")]
+        assert "ext-u-1" in ids and "ext-u-own" not in ids and "ext-u-early" not in ids
+        # the process ends: the card goes
+        hookstub.external.clear()
+        for _ in range(30):
+            if "ext-u-1" not in [x["id"] for x in await c.call("list")]:
+                break
+            await asyncio.sleep(0.1)
+        else:
+            raise AssertionError("registry-only card outlived its entry")
+        with pytest.raises(AgentError, match="no session"):
+            await c.call("get", id="ext-u-1")
+        await c.call("kill", id=own["id"])

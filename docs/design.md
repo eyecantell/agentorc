@@ -119,6 +119,16 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   key on). Resumable shows the name first and the id under it; a session started by hand
   outside agentorc shows only the id until it is **adopted** (attach to the tmux session, give it
   a name), which is also how hand-started sessions enter the Herd.
+- A live session the adapter can see that has **no tmux at all** (`claude` in a VS Code
+  terminal; Claude Code's registry `~/.claude/sessions/<pid>.json`) is a **read-only card**
+  (landed 2026-09-10, TD-010 a): id `ext-<tool id>`, name and directory from the registry, state
+  from its status (`busy` → `working`, `idle` → `idle`, `shell` → `working`), always `scraped`,
+  no pane and no controls — the card offers Details, the badge reads *registry*, and every
+  acting RPC (kill, close, send, mode) refuses with "started outside agentorc". Never stored:
+  rebuilt on every tick and gone when the process is. Not doubled: a registry entry whose tool id
+  one of our records carries, or whose directory one of our live agent sessions holds (our own
+  pane before its first hook), is skipped. Allow/Deny on such a card would need the person to
+  launch with agentorc's hooks layer, which is not wired (the hook needs an `AGENTORC_SESSION`).
 - A **plain shell is an adapter** (`shell`, scraped: `working` while a foreground process runs,
   `idle` at the prompt — a shell waiting for you is the normal state, not an alert — `exited`
   when the pane is gone). Ad-hoc shells are ordinary
@@ -482,6 +492,7 @@ noted). If a control is not in this table it does not exist.
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
+| card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
 | Resumable | **Resume** | New session prefilled (host, repo, directory, worktree, Start = Resume) |
 | Resumable | **Switch to** | the running card in the Herd |

@@ -114,7 +114,9 @@ def view(s: dict[str, Any]) -> dict[str, Any]:
         flags.append(f"{git['ahead']} unpushed")
     d["flag"] = " · ".join(flags) if state in ("idle", "exited", "stalled?", "needs-you") and flags else ""
     prof = s.get("profile") or ""
-    if s.get("adapter") == "shell":
+    if s.get("external"):
+        d["profile_line"] = f"{s.get('adapter')} · started outside agentorc (read-only)"
+    elif s.get("adapter") == "shell":
         d["profile_line"] = "shell"
     else:
         try:
@@ -128,7 +130,10 @@ def view(s: dict[str, Any]) -> dict[str, Any]:
 
 
 def ready_to_close(s: dict[str, Any]) -> list[tuple[str, bool]]:
-    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents."""
+    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents.
+    A registry-only card has nothing to close: no checks, so no Close button (TD-010 a)."""
+    if s.get("external"):
+        return []
     git = s.get("git") or {}
     checks = []
     if s.get("dir") and git:
