@@ -25,7 +25,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-011 | VS Code link path is not URL-escaped (spaces break the URI) | Low | Open |
 | TD-012 | Resuming a conversation that is still live elsewhere is not refused | Low | Open |
 | TD-013 | External-session check reads the default profile's registry only | Low | Open |
-| TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Open |
+| TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Done |
 
 ---
 
@@ -206,7 +206,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 
 **Priority:** High
 **Added:** 2026-09-10
-**Status:** Open
+**Status:** Done 2026-09-10 — spike run against herdr 0.9.0 on kmaster in a scratch config; the pass criterion failed (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); §10 item checked, §3 row corrected.
 **Location:** design §3 (herdr row), §10 "Build on, or beside, herdr?"; `src/sessionorc/` (the layer a substrate would sit under)
 
 **Why:** herdr (https://herdr.dev, Apache-2.0, Herdr, Inc., $6M seed 2026-09-09) already ships the

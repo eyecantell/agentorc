@@ -8,7 +8,7 @@ agentorc is a self-hosted web dashboard that orchestrates interactive AI coding-
 (Claude Code first) and plain shells running in tmux across hosts. **Status: phase 1 in
 progress** (host agent, Claude Code adapter, Herd and Focus pages). [`docs/design.md`](docs/design.md) is the source of truth: requirements,
 architecture, every control (§4.5a — a control that is not in that table does not exist), the
-phase plan (§7), invariants (§9), and the dated question log (§10, four items still open). A change in behaviour is a
+phase plan (§7), invariants (§9), and the dated question log (§10, three items still open). A change in behaviour is a
 change to that document first. Mockups regenerate from `docs/mockups/gen.py`.
 
 ## Stack and conventions
@@ -67,6 +67,7 @@ header belong to dev-cadence: edit them there, never here.
 |---|---|
 | What agentorc is and how it works | [docs/design.md](docs/design.md) |
 | Why dev-cadence was adopted, what it changed in the design | [docs/decisions/2026-09-06-adopt-dev-cadence.md](docs/decisions/2026-09-06-adopt-dev-cadence.md) |
+| Why herdr is prior art and not the session substrate | [docs/decisions/2026-09-10-herdr-spike.md](docs/decisions/2026-09-10-herdr-spike.md) |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | [docs/cadence.md](docs/cadence.md) |
 | Known issues and deferred work | [docs/technical_debt.md](docs/technical_debt.md) |
