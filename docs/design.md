@@ -74,7 +74,7 @@ art), replacing Claude Code's own `/resume`, mobile-first UI. A hosted service i
 non-goal any more: it is the `relay` transport in §4.5b, kept compatible from phase 1 and
 scheduled after phase 5.
 
-## 3. Prior art (surveyed 2026-09-04; herdr added 2026-09-09)
+## 3. Prior art (surveyed 2026-09-04; herdr added 2026-09-09, measured 2026-09-10)
 
 No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap supervision. Since
 herdr (below) multi-host on its own is no longer a differentiator; the combination still is.
@@ -86,7 +86,7 @@ herdr (below) multi-host on its own is no longer a differentiator; the combinati
 | Vibe Kanban (Apache-2.0) | web kanban, per-task terminal, 10+ agents | UI ideas for diff review | task-board model, single machine, own execution tracking |
 | agent-dashboard (bjornjee) | tmux orchestrator + PWA for approvals | same idea at PoC scale | maintenance unverified |
 | Anthropic Remote Control / cloud sessions | single-session sync, Claude only | — | not a fleet view, not self-hosted |
-| herdr (Apache-2.0, https://herdr.dev) — surveyed 2026-09-09, corrected 2026-09-10; not in the 2026-09-04 survey | "the runtime coding agents run on": a Rust daemon per machine keeping agent sessions alive in persistent panes, one layout across local and ssh-added machines, restored after a restart; single binary (macOS, Linux, Windows); 21 agent CLIs, 17 with *integrations* that push `idle`/`blocked --message` state (Claude Code's installs hooks into `settings.json`), screen-matching as the fallback; socket API with `events.subscribe`, `agent.*`, `worktree.*`, `plugin.*`; Claude rate-limit and context bars; ~1k community plugins found by a GitHub topic, no review; 36.5k stars, ~770k installs. Herdr, Inc.: $6M seed (Bessemer, YC) announced 2026-09-09; "Herdr Cloud" (no-ssh machines) next; releases 0.5.1 (2026-04) → 0.9.0 (2026-09). **Does not accept unsolicited pull requests** — an allow-list of approved contributors, bugs fixed by the maintainers' own agent, features via Discussions | the closest tool to agentorc found so far; its socket API and plugin manifest are the surface an agentorc-over-herdr would use (§10) | states are working / blocked / idle / done — one `blocked`, so a permission, a question and a usage cap look alike to anything above it; no `limited` with a reset time, no `stalled?`/`unreachable`; no run windows, usage gates, wrap-up-then-kill or credential-lapse detection found; no anchor rule, Ready to close, per-repo command buttons, VS Code links or first-party phone UI (the TUI over ssh is the mobile story; community mobile apps exist); runtime only, no notion of when work is done |
+| herdr (Apache-2.0, https://herdr.dev) — surveyed 2026-09-09, corrected 2026-09-10, measured 2026-09-10 ([ADR](decisions/2026-09-10-herdr-spike.md)); not in the 2026-09-04 survey | "the runtime coding agents run on": a Rust daemon per machine keeping agent sessions alive in persistent panes, one layout across local and ssh-added machines, restored after a restart; single binary (macOS, Linux, Windows); 21 agent CLIs; 17 *integrations*, of which six (Pi, OMP, Kimi, OpenCode, Kilo, MastraCode) push `idle`/`working`/`blocked` from hooks and the rest — Claude Code, Codex, Copilot, Cursor among them — only report a session id for restore, their state coming from screen-matching manifests; socket API with `events.subscribe`, `agent.*`, `worktree.*`, `plugin.*`; Claude rate-limit and context bars; ~1k community plugins found by a GitHub topic, no review; 36.5k stars, ~770k installs. Herdr, Inc.: $6M seed (Bessemer, YC) announced 2026-09-09; "Herdr Cloud" (no-ssh machines) next; releases 0.5.1 (2026-04) → 0.9.0 (2026-09). **Does not accept unsolicited pull requests** — an allow-list of approved contributors, bugs fixed by the maintainers' own agent, features via Discussions | the closest tool to agentorc found so far; the worktree API shape; a screen-rule fallback for prompts no hook reports (its detector catches the trust dialog); measured as a substrate 2026-09-10 and not taken (§10, ADR) | states are working / blocked / idle / done / unknown — one `blocked`, and the `pane.agent_status_changed` event carries only the state (the `--message` of a report is stored nowhere), so a permission, a question and the trust dialog look alike to anything above it and a usage-limit screen reads as `idle`; an outside source cannot take a Claude pane's state from the screen detector; a server restart ends every pane process (restore = layout + `claude --resume`); panes start through the person's interactive shell (rc files move the cwd); no run log, no exit code, no state for plain shells; the socket API is per machine (multi-host is the TUI over ssh); no `limited` with a reset time, no `stalled?`/`unreachable`; no run windows, usage gates, wrap-up-then-kill or credential-lapse detection found; no anchor rule, Ready to close, per-repo command buttons, VS Code links or first-party phone UI (the TUI over ssh is the mobile story; community mobile apps exist); runtime only, no notion of when work is done |
 
 ## 4. Architecture
 
@@ -623,7 +623,8 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
    Success test: every session Paul has open on kmaster shows the right state within 5 s of a
    change, and a permission prompt can be answered from the browser.
 2. **Second host.** `hosts.yml`, ssh transport, agent install script, the VPS added and a
-   session started there from the UI. Laptop closed for an hour; session still there.
+   session started there from the UI. (Confirmed as the plan 2026-09-10: herdr does not replace
+   this step — [ADR](decisions/2026-09-10-herdr-spike.md).) Laptop closed for an hour; session still there.
    The phone's route in (WireGuard client, or the Cloudflare tunnel) and the phone layout (Herd
    + narrow Focus) land here.
    Attachment upload over ssh (drag and drop, picker, paste) lands here, since the copy path is
@@ -740,19 +741,14 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
       the same tool does not ask again. Tempting for `git push` loops, but it is how a permission
       prompt stops being an alert; if added, it must be a third, smaller button and never the
       default.
-- [ ] **Build on, or beside, herdr?** (2026-09-09, facts corrected 2026-09-10, §3.) herdr already
-      does the substrate half of this design — persistent panes, multi-host over ssh, a fleet
-      view, hook-fed state for Claude Code, worktrees, an agent-driven socket API — for 21 CLIs,
-      with a funded company behind it and a cloud transport next. What it does not do is the half
-      §1 came from: states finer than `blocked`, unattended supervision, the anchor rule, Ready to
-      close, per-repo commands, phone triage. Core contribution is not an option (no unsolicited
-      PRs); the open door is plugins and the socket API. Options: (a) keep building — `sessionorc`
-      stays ours, herdr is a reference; (b) herdr as a `sessionorc` substrate: agentorc's adapters
-      and policies subscribe to its events and drive `agent.*`, tmux stays for hosts herdr does
-      not fit; (c) ship the agentorc half as herdr plugins only. Not blocking phase 1. Decide before
-      phase 2 (the ssh transport is the first thing herdr would replace); a one-to-two-day spike
-      on (b) — install herdr, subscribe to events, see whether `blocked --message` carries enough
-      to rebuild `needs-you`/`limited` — is the cheapest way to decide.
+- [x] **Build on, or beside, herdr?** (2026-09-09; decided 2026-09-10, (a) independent —
+      [ADR](decisions/2026-09-10-herdr-spike.md).) The TD-014 spike measured herdr 0.9.0 as a
+      `sessionorc` substrate: Claude Code's state under herdr is screen-scraped (its integration
+      reports only a session id), the status event carries no kind and no text, a usage-limit
+      screen reads as `idle`, an outside source cannot own a Claude pane's state, a server restart
+      kills every pane process, and the socket API is per machine. So `sessionorc` stays on tmux,
+      phase 2 builds the ssh transport as designed, and herdr is prior art (§3) with two things to
+      borrow later: a screen-rule fallback for prompts no hook reports, and the worktree API shape.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 
@@ -764,5 +760,5 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
   adoption and the two upstream PRs: [ADR 2026-09-06](decisions/2026-09-06-adopt-dev-cadence.md)
 - eyecantell/textual-cmdorc — command specs for the buttons
 - Claude Code hooks: https://code.claude.com/docs/en/hooks
-- herdr: https://herdr.dev, https://github.com/herdrdev/herdr (prior art, §3; open question, §10)
+- herdr: https://herdr.dev, https://github.com/herdrdev/herdr (prior art, §3; decided §10, [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md))
 - ttyd: https://github.com/tsl0922/ttyd (fallback terminal transport, not used in phase 1)
