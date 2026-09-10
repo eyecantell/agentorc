@@ -3,6 +3,7 @@ sessions forgotten after their day, adoption of hand-started `ao-*` sessions, th
 event queue, tail hygiene."""
 
 import asyncio
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -124,7 +125,9 @@ async def test_resume_supersedes_the_exited_record(agent, hookstub, tmp_path):
 
 async def test_pane_snapshot_older_than_a_remove_does_not_readopt(agent, tmp_path):
     """The tick snapshots panes in a thread; a remove that lands before reconcile must not have its
-    dead pane adopted back from the stale snapshot (flaked under CPU load on 2026-09-07)."""
+    dead pane adopted back from the stale snapshot (flaked under CPU load on 2026-09-07). The guard
+    is keyed by the removed pane's own creation time (TD-020, TD-021): a pane of that name born
+    later is a new hand-made session and is adopted on the first tick that sees it."""
     from sessionorc.tmux import PaneInfo
 
     async with LocalClient() as c:
@@ -134,10 +137,23 @@ async def test_pane_snapshot_older_than_a_remove_does_not_readopt(agent, tmp_pat
             return (await c.call("get", id=s["id"]))["state"] == "exited"
 
         assert await wait_for(exited)
-        stale_snapshot_at = datetime.now(UTC)
-        stale = PaneInfo(session=s["id"], created=0, current_command="true", pane_pid=0, dead=True, dead_status=0)
+        born = agent.tmux.main_panes()[s["id"]].created
+        stale = PaneInfo(session=s["id"], created=born, current_command="true", pane_pid=0, dead=True, dead_status=0)
         await c.call("remove", id=s["id"])
-        agent._reconcile({s["id"]: stale}, {}, stale_snapshot_at)
+        assert agent._removed[s["id"]][0] == born
+        agent._reconcile({s["id"]: stale}, {}, datetime.now(UTC))
         assert s["id"] not in agent.sessions
-        agent._reconcile({s["id"]: stale}, {}, datetime.now(UTC))  # a later snapshot: adoption works again
+        # a wall-clock step between the remove and the tick changes nothing: the stamp is not a clock
+        agent._reconcile({s["id"]: stale}, {}, datetime.now(UTC) + timedelta(hours=1))
+        assert s["id"] not in agent.sessions
+        # the same name, a pane created after the removal: a new session, adopted at once
+        fresh = PaneInfo(
+            session=s["id"], created=born + 1, current_command="bash", pane_pid=0, dead=False, dead_status=None
+        )
+        agent._reconcile({s["id"]: fresh}, {}, datetime.now(UTC))
+        assert s["id"] in agent.sessions
+        agent._forget(s["id"])
+        # the guard forgets the name after REMOVED_GUARD_SECONDS
+        agent._removed[s["id"]] = (born, time.monotonic() - 61)
+        agent._reconcile({s["id"]: stale}, {}, datetime.now(UTC))
         assert s["id"] in agent.sessions
