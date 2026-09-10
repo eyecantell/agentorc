@@ -276,7 +276,12 @@ class HostAgent:
                 except WorktreeError as e:
                     raise RpcError(str(e)) from None
             repo = str(directory.parent.parent.parent)  # <repo>/.claude/worktrees/<name> → the main checkout
-        async with self._dir_locks[str(directory)]:
+        async with contextlib.AsyncExitStack() as locks:
+            await locks.enter_async_context(self._dir_locks[str(directory)])
+            if resume:
+                # one create per conversation at a time, whatever the directory: two concurrent
+                # resumes of one id would otherwise both pass the holder check below (TD-012)
+                await locks.enter_async_context(self._dir_locks[f"conversation:{resume}"])
             if kind == "interactive" and adapter != "shell":
                 for who in await asyncio.to_thread(self.occupants, directory):
                     raise RpcError(f"{directory} already has agent session {who}; anchor rule (use a worktree)")

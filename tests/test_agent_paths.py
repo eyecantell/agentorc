@@ -155,6 +155,41 @@ async def test_resume_of_a_live_conversation_is_refused(agent, hookstub, tmp_pat
         assert new["id"] != live["id"] and (await c.call("get", id=live["id"]))["state"] == "closed"  # superseded
 
 
+async def test_concurrent_resumes_of_one_conversation_serialise(agent, tmp_path):
+    """Two creates with the same resume id into different directories: the second sees the first's
+    record (the conversation lock spans check and insert), so at most one is started."""
+    from sessionorc.adapters import LaunchSpec
+
+    class IdStub:
+        name = "idstub"
+        state_source = "hook"
+
+        def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
+            return LaunchSpec(argv=["bash", "--norc"], adapter_id=resume)
+
+        def classify(self, pane, tail):
+            return None
+
+    from sessionorc import adapters
+
+    adapters.load_all()
+    adapters._REGISTRY["idstub"] = IdStub()
+    try:
+        (tmp_path / "a").mkdir()
+        (tmp_path / "b").mkdir()
+        async with LocalClient() as c1, LocalClient() as c2:
+            results = await asyncio.gather(
+                c1.call("create", name="r", dir=str(tmp_path / "a"), adapter="idstub", resume="cc-race"),
+                c2.call("create", name="r", dir=str(tmp_path / "b"), adapter="idstub", resume="cc-race"),
+                return_exceptions=True,
+            )
+        started = [r for r in results if isinstance(r, dict)]
+        refused = [r for r in results if isinstance(r, AgentError)]
+        assert len(started) == 1 and len(refused) == 1 and "still live" in str(refused[0])
+    finally:
+        adapters._REGISTRY.pop("idstub", None)
+
+
 async def test_pane_snapshot_older_than_a_remove_does_not_readopt(agent, tmp_path):
     """The tick snapshots panes in a thread; a remove that lands before reconcile must not have its
     dead pane adopted back from the stale snapshot (flaked under CPU load on 2026-09-07). The guard
