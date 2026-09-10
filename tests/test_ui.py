@@ -232,7 +232,7 @@ def test_unseen_idle_until_focused(client, tmp_path):
     assert s["unseen"] is False and s["state_label"] == "idle" and s["rank"] == 5 and s["seen_at"]
     # a new turn that finishes after that look is unseen again. Whole-second stamps: the send
     # itself counts as a look, so the turn must outlast the second it was sent in (a tie is "seen").
-    assert client.post(f"/api/sessions/{sid}/send", json={"text": "sleep 1.3"}).json() == {"ok": True}
+    assert client.post(f"/api/sessions/{sid}/send", json={"text": "sleep 2"}).json() == {"ok": True}
     wait_state(client, sid, "working")
     s = wait_state(client, sid, "idle")
     assert s["unseen"] is True

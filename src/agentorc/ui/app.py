@@ -290,6 +290,8 @@ def create_app() -> FastAPI:
         elif action == "shell-here":
             s = await call("get", id=sid)
             new = await call("create", name=f"{s['name']}-shell", dir=s["dir"], adapter="shell")
+            with contextlib.suppress(HTTPException):
+                await call("seen", id=sid)  # acted on this card too (TD-017)
             return JSONResponse({"ok": True, "id": new["id"]})
         elif action == "remove":
             await call("remove", id=sid)
