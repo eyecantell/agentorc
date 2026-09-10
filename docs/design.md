@@ -74,9 +74,10 @@ art), replacing Claude Code's own `/resume`, mobile-first UI. A hosted service i
 non-goal any more: it is the `relay` transport in §4.5b, kept compatible from phase 1 and
 scheduled after phase 5.
 
-## 3. Prior art (surveyed 2026-09-04)
+## 3. Prior art (surveyed 2026-09-04; herdr added 2026-09-09)
 
-No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap supervision.
+No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap supervision. Since
+herdr (below) multi-host on its own is no longer a differentiator; the combination still is.
 
 | Tool | Shape | Borrow | Gap vs. goals |
 |---|---|---|---|
@@ -85,6 +86,7 @@ No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap su
 | Vibe Kanban (Apache-2.0) | web kanban, per-task terminal, 10+ agents | UI ideas for diff review | task-board model, single machine, own execution tracking |
 | agent-dashboard (bjornjee) | tmux orchestrator + PWA for approvals | same idea at PoC scale | maintenance unverified |
 | Anthropic Remote Control / cloud sessions | single-session sync, Claude only | — | not a fleet view, not self-hosted |
+| herdr (Apache-2.0, https://herdr.dev) — surveyed 2026-09-09, not in the 2026-09-04 survey | "the runtime coding agents run on": a daemon per machine keeping agent sessions alive in persistent panes, one layout across local and ssh-added machines, restored after a restart; single binary (macOS, Linux, Windows); detects 21 agent CLIs; a CLI and socket API "agents drive" themselves (split panes, start and prompt each other); 36.5k GitHub stars, ~770k installs, ~1k community plugins; "Herdr Cloud" waitlist only | the closest tool to agentorc found so far; its multi-host model is the same shape as §4; worth re-reading its socket API before phase 3 adapters and the relay transport | three states (working / blocked / idle) — no `needs-you` with the pending question, no `limited` with a reset time, no `stalled?`/`unreachable`; detection is "foreground processes, screen manifests, and optional integrations" (its docs), i.e. scraping first — how far the "optional integrations" carry hook-grade state is unconfirmed; no run windows, usage gates, wrap-up-then-kill or credential-lapse detection found on the pages surveyed; no git/worktree awareness, anchor rule, Ready to close, per-repo command buttons, VS Code links, or phone triage; runtime only, no notion of when work is done |
 
 ## 4. Architecture
 
@@ -738,6 +740,18 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
       the same tool does not ask again. Tempting for `git push` loops, but it is how a permission
       prompt stops being an alert; if added, it must be a third, smaller button and never the
       default.
+- [ ] **Build on, or beside, herdr?** (2026-09-09, §3.) herdr already does the substrate half
+      of this design — persistent panes, multi-host over ssh, a fleet view, an agent-driven
+      socket API — for 21 CLIs with real traction. What it does not do is the half §1 came from:
+      hook-fed state with the pending question, `limited`/`stalled?`/`unreachable`, unattended
+      supervision, repo and worktree awareness, Ready to close, phone triage. Options: (a) keep
+      building — `sessionorc` stays ours, herdr is a reference; (b) make herdr a `sessionorc`
+      transport later, so agentorc's adapters and policies sit on its socket API; (c) adopt
+      herdr and rebuild the agentorc half as herdr plugins. Not blocking phase 1: the adapter
+      contract (§4.3) and the state model are the same under all three, and `sessionorc` is
+      already the layer (b) would replace. Decide before phase 3 (more adapters) or the relay
+      transport, whichever comes first; check herdr's "optional integrations" and plugin API
+      first, since (b) and (c) only pay off if hook-grade state can reach it.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 
@@ -749,4 +763,5 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
   adoption and the two upstream PRs: [ADR 2026-09-06](decisions/2026-09-06-adopt-dev-cadence.md)
 - eyecantell/textual-cmdorc — command specs for the buttons
 - Claude Code hooks: https://code.claude.com/docs/en/hooks
+- herdr: https://herdr.dev, https://github.com/herdrdev/herdr (prior art, §3; open question, §10)
 - ttyd: https://github.com/tsl0922/ttyd (fallback terminal transport, not used in phase 1)
