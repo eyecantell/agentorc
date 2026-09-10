@@ -236,14 +236,26 @@ async def test_limited_from_usage_cap(agent, hookstub, tmp_path, monkeypatch):
         while (ev := json.loads(await asyncio.wait_for(sub._reader.readline(), 5)))["event"] != "usage":
             pass
         assert ev["profile"] == "p1" and ev["usage"]["five_hour_pct"] == 100
-        # the window resets: working again
+        # the window resets: back to what it was (working)
         hookstub.usage_value = {"five_hour_pct": 3, "weekly_pct": 12, "five_hour_resets": soon, "weekly_resets": None}
         await wait_state(c, s["id"], "working")
+        # an idle session comes back idle, not working — no hook would correct a wrong `working`
+        await c.call("hook", session=s["id"], state="idle")
+        hookstub.usage_value = {
+            "five_hour_pct": 100,
+            "weekly_pct": 12,
+            "five_hour_resets": "garbage",
+            "weekly_resets": None,
+        }
+        got = await wait_state(c, s["id"], "limited")
+        assert got["pending"]["text"] == "5-hour cap · resets unknown"
+        hookstub.usage_value = {"five_hour_pct": 3, "weekly_pct": 12, "five_hour_resets": soon, "weekly_resets": None}
+        await wait_state(c, s["id"], "idle")
         # a cap whose reset time is already behind us is no cap
         past = (datetime.now(UTC) - timedelta(minutes=1)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         hookstub.usage_value = {"five_hour_pct": 100, "weekly_pct": 12, "five_hour_resets": past, "weekly_resets": None}
         await asyncio.sleep(0.8)
-        assert (await c.call("get", id=s["id"]))["state"] == "working"
+        assert (await c.call("get", id=s["id"]))["state"] == "idle"  # unchanged
         # needs-you is never overridden by a cap
         await c.call("hook", session=s["id"], state="needs-you", pending={"kind": "question", "text": "a or b?"})
         hookstub.usage_value = {"five_hour_pct": 5, "weekly_pct": 100, "five_hour_resets": None, "weekly_resets": soon}

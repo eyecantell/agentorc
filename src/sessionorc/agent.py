@@ -24,7 +24,7 @@ from typing import Any
 
 from sessionorc import adapters, naming, paths
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
-from sessionorc.models import Pending, Session, now_iso
+from sessionorc.models import Pending, Session, State, now_iso
 from sessionorc.store import EventQueue, SessionStore
 from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 
@@ -70,6 +70,8 @@ class HostAgent:
         # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
         self._usage: dict[str, dict[str, Any]] = {}
         self._usage_checked: dict[str, float] = {}
+        self._usage_task: asyncio.Task[None] | None = None
+        self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
         # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
         # stamp for expiry). A pane snapshot taken before the remove must not re-adopt the pane it
         # still lists (the tick snapshots in a thread; remove runs between). Keyed by the pane's
@@ -120,7 +122,9 @@ class HostAgent:
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
-        await self._refresh_usage()
+        if self._usage_task is None or self._usage_task.done():
+            # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
+            self._usage_task = asyncio.create_task(self._refresh_usage())
 
     async def _refresh_git(self, now: datetime) -> None:
         due = [
@@ -149,7 +153,15 @@ class HostAgent:
         """Ask each live agent session's adapter for its profile's usage once a minute, in a
         thread; a fetch failure keeps the last answer and never gates anything (design §6).
         Then the `limited` rule: an interactive session on a profile at 100% of a window shows
-        `limited` with the reset time, and goes back to `working` once the window resets."""
+        `limited` with the reset time, and goes back to what it was once the window resets."""
+        try:
+            await self._refresh_usage_inner()
+        except Exception:  # noqa: BLE001 — a detached task: log, never let it vanish silently
+            log.exception("usage refresh failed")
+        finally:
+            await self._push_changes()
+
+    async def _refresh_usage_inner(self) -> None:
         live = [
             s
             for s in self.sessions.values()
@@ -174,10 +186,12 @@ class HostAgent:
             cap = _cap(self._usage.get(s.profile))
             if cap and s.state not in ("limited", "needs-you"):
                 # the tool's own endpoint, not the screen: reported, so `hook` (design §9 invariant 4)
+                self._pre_limited[s.id] = s.state
                 s.set_state("limited", confidence="hook", pending=Pending(kind="limit", text=cap))
                 self.store.save(s)
             elif not cap and s.state == "limited" and s.pending and s.pending.kind == "limit":
-                s.set_state("working", confidence="hook")
+                # back to what it was (idle stays idle: no hook will come to correct a wrong `working`)
+                s.set_state(self._pre_limited.pop(s.id, "working"), confidence="hook")
                 self.store.save(s)
 
     def _reconcile(self, panes: dict[str, PaneInfo], tails: dict[str, list[str]], snapshot_at: datetime) -> None:
@@ -668,10 +682,13 @@ def _cap(usage: dict[str, Any] | None) -> str | None:
         resets = usage.get(f"{key}_resets")
         if pct < 100:
             continue
-        with contextlib.suppress(TypeError, ValueError):
-            if resets and _parse(str(resets)) <= now:
-                continue
-        return f"{label} cap · resets {str(resets)[11:16] + 'Z' if resets else 'unknown'}"
+        try:
+            at = _parse(str(resets)) if resets else None
+        except (TypeError, ValueError):
+            at = None  # unparseable: still a cap, reset time unknown
+        if at is not None and at <= now:
+            continue
+        return f"{label} cap · resets {at.strftime('%H:%MZ') if at else 'unknown'}"
     return None
 
 

@@ -27,18 +27,19 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 
 <!-- Entry template:
 
-## TD-001: `limited` state: wire adapter `usage()` into the agent tick
+## TD-001: Short title of the problem
 
-**Priority:** Medium
-**Added:** 2026-09-06
+**Priority:** High | Medium | Low
+**Added:** YYYY-MM-DD
 **Status:** Open
-**Location:** `src/sessionorc/agent.py` (tick), `src/agentorc/adapters/claude_code/__init__.py` (`usage()`)
+**Location:** `path/to/file.py` (function/section)
 
-**Why:** Design §4.2 promises a `limited` state (usage cap hit, reset time shown, Switch profile / Wait). `usage()` exists and parses the OAuth usage endpoint, but nothing calls it: the agent never produces `limited`, and the top bar has no usage figure. Left out of phase 1a–1c to keep each PR reviewable. `usage()` is synchronous network I/O and must run in `asyncio.to_thread`, per profile, on a slow cadence (tdgrind polled per tick; once a minute is plenty), with a fetch failure never gating anything (§6).
+**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
 
-**Fix:** per-profile usage cache on the agent (`rpc_usage`), a `limited` transition for interactive sessions whose profile is at 100% of a window (pending text = reset time), `working` again after the reset; `/events` carries a `usage` event for the top bar. Done when a session on a capped profile shows `limited` with its reset time within a minute of the cap.
+**Fix:** concrete direction(s), and what would count as done.
 
-**Related:** design §4.2, §4.2a, §6 usage gate (phase 3).
+**Related:** other TDs, PRs, decision docs.
+-->
 
 ## TD-002: Focus composer: Attach / drop / paste upload
 

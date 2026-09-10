@@ -140,14 +140,50 @@ measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts i
 
 ## TD-001: Short title of the problem
 
-**Priority:** High | Medium | Low
-**Added:** YYYY-MM-DD
+**Priority:** Medium
+**Added:** 2026-09-10
 **Status:** Resolved
-**Location:** `path/to/file.py` (function/section)
+**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Herd card, Focus)
 
-**Why:** what's wrong, how it was found, and the reasoning — future sessions need the why, not just the symptom.
+**Why:** A session that went `idle` while nobody was looking is the common phone-triage case, and
+today it sorts and looks exactly like one that has been idle all day. herdr keeps `done` (idle,
+not yet looked at) apart from `idle` by a server-side seen mark that explicit focus clears and
+reads do not. agentorc's Focus view is the natural "seen".
 
-**Resolved:** 2026-09-10 (PR #44) — `HostAgent._refresh_usage` (end of each tick) asks each live agent session's adapter `usage_for(profile)` in a thread at most once per `USAGE_EVERY` (60 s), caches per profile (`rpc_usage`), streams `{"event": "usage", …}` to subscribers (also on subscribe), and applies the `limited` rule: an interactive session on a profile at 100% of a window gets `limited` with `Pending(kind="limit", text="5-hour cap · resets HH:MMZ")` (never over `needs-you`), and `working` again once the window resets (a `resets_at` already past is not a cap). `ClaudeCodeAdapter.usage_for` is the name-keyed wrapper of `usage()`. The top bar carries a per-profile chip (`#usagechip`, red at a cap). Switch profile / Wait (§4.5a) are still to build. Design §4.3/§4.4 updated. Tests: `tests/test_agent.py::test_limited_from_usage_cap`, `tests/test_claude_adapter.py::test_usage_for_by_profile_name`.
+**Resolved:** 2026-09-10 (PR #43) — `Session.seen_at` (persisted) set by `rpc_seen`, which the UI calls when Focus opens (`GET /focus/<id>`), after any card action, and from the open Focus page whenever its session's event arrives `unseen`. `view()` computes `unseen = idle and (no seen_at or since > seen_at)` (whole-second stamps: a tie reads as seen), renders "finished · unseen", sorts it at rank 4.5 (above `idle`, below `working`); `/events` carries the view's rank. `idle` stays `idle` in every payload. Design §4.5 sort list names the slot. Test: `tests/test_ui.py::test_unseen_idle_until_focused`.
 
-**Related:** other TDs, PRs, decision docs.
--->
+**Related:** design §4.2, §4.5 (Herd sort); ADR 2026-09-10.
+
+## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
+
+**Priority:** High
+**Added:** 2026-09-10
+**Status:** Done 2026-09-10 — spike run against herdr 0.9.0 on kmaster in a scratch config; the pass criterion failed (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); §10 item checked, §3 row corrected.
+**Location:** design §3 (herdr row), §10 "Build on, or beside, herdr?"; `src/sessionorc/` (the layer a substrate would sit under)
+
+**Why:** herdr (https://herdr.dev, Apache-2.0, Herdr, Inc., $6M seed 2026-09-09) already ships the
+substrate half of this design — persistent panes, multi-host over ssh, restart recovery, hook-fed
+state for six of its 17 integrated CLIs (not Claude Code, which it screen-scrapes — the spike's finding), a worktree API, an event-subscription socket API — and
+Herdr Cloud is about to ship the `relay` transport of §4.5b. It does not do the half §1 came
+from: states finer than `blocked`, unattended supervision, the anchor rule, Ready to close,
+per-repo commands, phone triage. Core contribution is closed (no unsolicited PRs); plugins and
+the socket API are the open surface. Phase 2 (ssh transport) is the first thing herdr would
+replace, so the decision has to come before phase 2 is built, and it should be decided by a
+measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts in design §3.
+
+**Resolved:** 2026-09-10 (PRs #26, #27; ledgered here 2026-09-10) — the spike ran against herdr 0.9.0 in a scratch config and failed the pass criterion (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); design §3 row corrected and the §10 item checked in PR #26; the lessons became TD-015..TD-019 and design §4.1/§4.2/§4.7/§9 edits in PR #28.
+
+**Related:** design §3, §4.5b, §4.5c, §7 phase 2, §10; PRs #23, #24; TD-004 (ssh transport, the work this decides).
+
+## TD-001: `limited` state: wire adapter `usage()` into the agent tick
+
+**Priority:** Medium
+**Added:** 2026-09-06
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (tick), `src/agentorc/adapters/claude_code/__init__.py` (`usage()`)
+
+**Why:** Design §4.2 promises a `limited` state (usage cap hit, reset time shown, Switch profile / Wait). `usage()` exists and parses the OAuth usage endpoint, but nothing calls it: the agent never produces `limited`, and the top bar has no usage figure. Left out of phase 1a–1c to keep each PR reviewable. `usage()` is synchronous network I/O and must run in `asyncio.to_thread`, per profile, on a slow cadence (tdgrind polled per tick; once a minute is plenty), with a fetch failure never gating anything (§6).
+
+**Resolved:** 2026-09-10 (PR #44) — `HostAgent._refresh_usage` (a detached task started by the tick, one at a time) asks each live agent session's adapter `usage_for(profile)` in a thread at most once per `USAGE_EVERY` (60 s), caches per profile (`rpc_usage`), streams `{"event": "usage", …}` to subscribers (also on subscribe), and applies the `limited` rule: an interactive session on a profile at 100% of a window gets `limited` with `Pending(kind="limit", text="5-hour cap · resets HH:MMZ")` (never over `needs-you`), and returns to the state it had before the cap once the window resets (a `resets_at` already past is not a cap). `ClaudeCodeAdapter.usage_for` is the name-keyed wrapper of `usage()`. The top bar carries a per-profile chip (`#usagechip`, red at a cap). Switch profile / Wait (§4.5a) are still to build. Design §4.3/§4.4 updated. Tests: `tests/test_agent.py::test_limited_from_usage_cap`, `tests/test_claude_adapter.py::test_usage_for_by_profile_name`.
+
+**Related:** design §4.2, §4.2a, §6 usage gate (phase 3).
