@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -62,19 +63,26 @@ def cmd_status(args: argparse.Namespace) -> int:
 
 
 def _attach(args: argparse.Namespace, sid: str, result: Any | None = None) -> int:
-    """`ao focus` / `--attach`: exec `tmux attach` on the session (the terminal equivalent of the
-    Focus screen; TD-010 b). Under `--json` nothing is exec'd: the argv is printed for the caller."""
+    """`ao focus` / `--attach`: run `tmux attach` on the session (the terminal equivalent of the
+    Focus screen; TD-010 b) as a child, so a pane that is gone (killed: `exited` looks the same
+    as a natural exit, whose pane is kept) gets a clear line here rather than tmux's. Under
+    `--json` nothing is run: the argv is printed for the caller."""
     argv = attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET"))
     if args.json:
         print(json.dumps({**(result or {"id": sid}), "attach": argv}, indent=1))
         return 0
-    os.execvp(argv[0], argv)
-    return 0  # not reached
+    sys.stdout.flush()
+    rc = subprocess.call(argv)
+    if rc != 0:
+        return fail(
+            args, f"could not attach to {sid} (tmux exit {rc}): the pane is gone — killed, or the server restarted", 1
+        )
+    return 0
 
 
 def cmd_focus(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)  # a clear error for an unknown id, not tmux's
-    if s["state"] in ("closed",):
+    if s["state"] == "closed":
         return fail(args, f"{args.id} is closed; its pane is gone", 1)
     return _attach(args, args.id, s)
 
