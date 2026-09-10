@@ -254,7 +254,15 @@ Focus sets `seen_at`) renders "finished · unseen" and sorts above plain `idle` 
 triage case. Not a state: `idle` stays `idle` in every payload (TD-017).
 
 **`send` confirms the prompt took.** `send` already refuses while a permission or question is
-pending. With `wait` it also returns only after the session has started on *this* prompt and
+pending. Every `send` to an adapter that can read its tool's composer (§4.3 `composer`) waits
+for the pasted text to paint before pressing Enter, then requires the composer to empty; if it
+does not, Enter is pressed once more as `C-m`, and if the text is still there the call fails
+with `prompt-stuck` — the text left where the person can see it, never re-pasted (TD-027:
+measured 2026-09-10, an Enter that reaches Claude Code before it has read the paste is
+dropped, so a burst of sends into a fresh or slow session lost every Enter but one; the
+paint-wait removes the race). The composer read counts painted text only: Claude Code paints
+its suggested next prompt — often the session's own last prompt — in faint text, which is not
+an unsubmitted prompt. With `wait` it also returns only after the session has started on *this* prompt and
 settled again (`idle`, `needs-you`, `exited`, `closed`, `limited`, `stalled?`): a busy session queues the text, so the wait
 first lets the current turn end — a stop on a question or an exit is returned as is, prompt
 still queued — then requires the next turn to start. It fails with `prompt-stalled` when
@@ -294,13 +302,17 @@ class Adapter(Protocol):
     def quirks(self) -> Quirks                      # first-run dialogs, settings pre-seed
     def usage(self, profile: Profile) -> Usage | None     # quota + reset time, per account
     def usage_for(self, profile: str) -> dict | None      # the same by profile name, for the core (it cannot build a Profile)
+    def composer(self, tail_raw: list[str]) -> str | None  # optional: the text painted in the tool's input line ("" empty,
+                                                           # None when no composer is on screen); lets `send` confirm a submit (TD-027)
     def credentials_ok(self, profile: Profile) -> bool | None
 ```
 
 Prompt injection is **core**, not adapter: the composer text goes in with `tmux load-buffer`
 + `paste-buffer -p` (bracketed paste, so a multi-line brief lands as one prompt instead of
 submitting line by line) followed by `Enter` — no blind `C-u`, since what is painted in the
-pane may not be a readline line. **Send is disabled** while a permission or question is pending (the pane
+pane may not be a readline line. The Enter waits for the paste to paint and is confirmed by the
+composer emptying, with one `C-m` retry, when the adapter implements `composer` (§4.2, TD-027);
+adapters without it get the blind paste + Enter. **Send is disabled** while a permission or question is pending (the pane
 owns a dialog) and, for scraped adapters, while a foreground process runs; otherwise it is
 enabled — Claude Code queues input typed while it works. Menus and questions are answered *in* the terminal (keys pass
 through); permissions go through the hook decision channel (§4.2). The core never types a menu
@@ -486,7 +498,7 @@ noted). If a control is not in this table it does not exist.
 | Focus (exited / closed) | **Resume this conversation** / **New session here** / **Forget** | the exited banner: New session prefilled with the directory and, for Resume, the tool's session id; Forget removes the record (the pane and its run log stay readable until then) |
 | Focus | **Copy / Paste** | terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
-| Focus composer | **Send** | `send-keys` of the composer text |
+| Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027) |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |

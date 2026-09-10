@@ -24,7 +24,7 @@ from agentorc.profiles import Profile
 from sessionorc import paths
 from sessionorc.adapters import ExternalSession, LaunchSpec
 from sessionorc.models import Confidence, State
-from sessionorc.screen import Manifest, Match
+from sessionorc.screen import Manifest, Match, painted_text
 from sessionorc.tmux import PaneInfo
 
 HOOK_EVENTS = (
@@ -131,6 +131,9 @@ def write_hooks_file(profile: Profile) -> Path:
 RULES_FILE = Path(__file__).with_name("screen_rules.toml")
 
 
+COMPOSER_GLYPH = "❯"  # the composer's prompt glyph; submitted prompts repeat it above, the composer is the last
+
+
 class ClaudeCodeAdapter:
     name = "claude-code"
     state_source: Confidence = "hook"
@@ -181,6 +184,17 @@ class ClaudeCodeAdapter:
         the trust dialog, the tool's own limit message. The agent applies it as `scraped` only
         when no fresher hook state exists."""
         return self.rules.explain(tail)
+
+    def composer(self, tail_raw: list[str]) -> str | None:
+        """The text painted in the composer (the last `❯` row of a raw tail), stripped; "" when it
+        is empty; None when no composer row is on screen (a dialog, a dead pane). Faint text is not
+        counted: the tool paints its suggested next prompt — often the session's own last prompt —
+        and its first-run placeholder that way (TD-027, measured 2026-09-10 on 2.1.268)."""
+        for row in reversed(tail_raw):
+            text = painted_text(row).lstrip()
+            if text.startswith(COMPOSER_GLYPH):
+                return text[len(COMPOSER_GLYPH) :].strip("\xa0 ")
+        return None
 
     # -- locators --------------------------------------------------------------------------------
 

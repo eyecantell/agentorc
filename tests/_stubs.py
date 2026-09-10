@@ -32,3 +32,28 @@ class HookFedStub:
 
     def external_sessions(self):
         return list(self.external)
+
+
+class ComposerStub(HookFedStub):
+    """A hook-fed adapter whose pane runs `_composer_child.py` and that can read its composer
+    (`composer(tail_raw)`, design §4.3), so `send`'s confirm-and-retry can be tested without a
+    real tool (TD-027). `swallow` is passed to the child: Enters lost after each paste."""
+
+    def __init__(self, swallow: int):
+        self.swallow = swallow
+        self.name = f"composer{swallow}"
+
+    def launch(self, *, profile, resume, prompt, unattended, cwd, name=""):
+        import sys
+        from pathlib import Path
+
+        return LaunchSpec(argv=[sys.executable, str(Path(__file__).with_name("_composer_child.py")), str(self.swallow)])
+
+    def composer(self, tail_raw):
+        from sessionorc.screen import painted_text
+
+        for row in reversed(tail_raw):
+            text = painted_text(row).rstrip()
+            if text == ">>" or text.startswith(">> "):
+                return text[2:].strip()
+        return None

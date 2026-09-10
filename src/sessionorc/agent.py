@@ -37,6 +37,9 @@ STALL_AFTER = timedelta(minutes=20)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
 SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken within this → prompt-stalled
+PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)
+SUBMIT_SECONDS = 1.5  # `send`: how long the composer gets to empty after Enter, per try (TD-027)
+COMPOSER_LINES = 12  # raw rows an adapter's `composer` reads (the composer sits above a status line or two)
 SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs_keep_days`)
@@ -596,7 +599,7 @@ class HostAgent:
         s = self._get(id)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
-        await asyncio.to_thread(self.tmux.send_prompt, id, text)
+        await self._submit(id, adapters.get(s.adapter), text)
         if not wait:
             return None
         end = None if timeout is None else time.monotonic() + timeout
@@ -630,6 +633,47 @@ class HostAgent:
         if not await self._wait_state(id, lambda x: x.state in SETTLED and x.rev != rev_before, left()):
             self._raise_not_settled(id, timeout)
         return self._get(id).to_dict()
+
+    async def _submit(self, sid: str, adapter: Any, text: str) -> None:
+        """Paste, Enter, and confirm the prompt left the composer (TD-027, design §4.2). Only an
+        adapter that can read its tool's composer (`composer(tail_raw)`, design §4.3) gets the
+        confirmation; the rest get the blind paste + Enter. The paste is given a moment to paint
+        (Enter sent while the tool is still taking the paste is swallowed — measured 2026-09-10:
+        a paste landing within ~0.1 s of the previous submit lost its Enter every time), then the
+        composer must empty within `SUBMIT_SECONDS`; one retry with `C-m`, then `prompt-stuck`.
+        Only the Enter is ever re-sent, and only with the text visibly still in the composer —
+        never the text (design §4.2)."""
+        reader = getattr(adapter, "composer", None)
+        await asyncio.to_thread(self.tmux.paste, sid, text)
+        if reader is None:
+            await asyncio.to_thread(self.tmux.send_enter, sid)
+            return
+
+        async def composer() -> str | None:
+            return reader(await asyncio.to_thread(self.tmux.capture_tail, sid, COMPOSER_LINES, raw=True))
+
+        if not await self._poll(lambda: composer(), PASTE_SHOW_SECONDS):
+            log.info(
+                "send %s: the paste did not show in the composer within %gs; pressing Enter anyway",
+                sid,
+                PASTE_SHOW_SECONDS,
+            )
+        for key in ("Enter", "C-m"):
+            await asyncio.to_thread(self.tmux.send_key, sid, key)
+            if await self._poll(lambda: _falsy(composer()), SUBMIT_SECONDS):
+                return
+            log.warning("send %s: the composer still shows the prompt %gs after %s", sid, SUBMIT_SECONDS, key)
+        raise RpcError(f"prompt-stuck: {sid} still shows the prompt in its composer after Enter and C-m")
+
+    async def _poll(self, pred: Any, timeout: float) -> bool:
+        """Until `await pred()` is truthy; False on timeout."""
+        end = time.monotonic() + timeout
+        while True:
+            if await pred():
+                return True
+            if time.monotonic() >= end:
+                return False
+            await asyncio.sleep(0.1)
 
     def _raise_not_settled(self, sid: str, timeout: float | None) -> None:
         live = self.sessions.get(sid)
@@ -875,6 +919,11 @@ class HostAgent:
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
 _CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
+
+
+async def _falsy(coro: Any) -> bool:
+    """`not await coro`: a composer that reads empty ("") or unreadable (None) counts as emptied."""
+    return not await coro
 
 
 def _clean(text: str) -> str:

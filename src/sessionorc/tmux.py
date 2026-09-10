@@ -177,8 +177,11 @@ class Tmux:
         logfile.parent.mkdir(parents=True, exist_ok=True)
         self.run("pipe-pane", "-t", f"={name}:", f"cat >> '{logfile}'")
 
-    def capture_tail(self, name: str, lines: int = 8) -> list[str]:
-        cp = self.run("capture-pane", "-p", "-J", "-t", f"={name}:", "-S", f"-{lines}", check=False)
+    def capture_tail(self, name: str, lines: int = 8, raw: bool = False) -> list[str]:
+        """The pane's last `lines` rows. `raw` keeps the SGR attributes (`-e`), for readers that
+        must tell painted text from dim placeholder text (an adapter's `composer`, TD-027)."""
+        args = ["capture-pane", "-p", "-J"] + (["-e"] if raw else []) + ["-t", f"={name}:", "-S", f"-{lines}"]
+        cp = self.run(*args, check=False)
         if cp.returncode != 0:
             return []
         rows = [r.rstrip() for r in cp.stdout.split("\n")]
@@ -189,6 +192,10 @@ class Tmux:
     def send_enter(self, name: str) -> None:
         self.run("send-keys", "-t", f"={name}:", "Enter")
 
+    def send_key(self, name: str, key: str) -> None:
+        """One tmux key name (`Enter`, `C-m`, `Escape`)."""
+        self.run("send-keys", "-t", f"={name}:", key)
+
     def send_literal(self, name: str, text: str) -> None:
         self.run("send-keys", "-t", f"={name}:", "-l", text)
 
@@ -198,5 +205,7 @@ class Tmux:
         self.run("paste-buffer", "-p", "-d", "-b", "ao-paste", "-t", f"={name}:")
 
     def send_prompt(self, name: str, text: str) -> None:
+        """Paste + Enter, unconfirmed. The host agent's `send` confirms the submit when the adapter
+        can read its composer (`HostAgent._submit`, TD-027); this is the blind form."""
         self.paste(name, text)
         self.send_enter(name)

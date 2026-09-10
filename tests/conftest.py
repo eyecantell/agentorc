@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 import pytest
-from _stubs import HookFedStub
+from _stubs import ComposerStub, HookFedStub
 
 from sessionorc import paths
 from sessionorc.agent import HostAgent
@@ -213,6 +213,18 @@ def hookstub(monkeypatch):
     stub = HookFedStub()
     monkeypatch.setitem(adapters._REGISTRY, stub.name, stub)
     return stub
+
+
+@pytest.fixture
+def composerstubs(monkeypatch):
+    """Register `composer0`, `composer1`, `composer2` (a pane that swallows that many Enters per
+    paste) for this test only (TD-027)."""
+    from sessionorc import adapters
+
+    adapters.load_all()
+    for n in (0, 1, 2):
+        stub = ComposerStub(n)
+        monkeypatch.setitem(adapters._REGISTRY, stub.name, stub)
 
 
 # -- the real hook script -----------------------------------------------------------------------

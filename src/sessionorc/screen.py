@@ -16,6 +16,33 @@ from pathlib import Path
 
 from sessionorc.models import Pending, State
 
+_SGR = re.compile(r"\x1b\[([0-9;]*)m")
+_ESC = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[ -/]*[0-~]")
+
+
+def painted_text(row: str) -> str:
+    """A raw pane row (`capture-pane -e`) reduced to the text painted at normal intensity: runs
+    under the faint attribute (SGR 2, what tools use for placeholder and suggestion text) are
+    dropped, every other escape is stripped. Faint ends at SGR 0 or SGR 22. TD-027: Claude Code
+    paints a suggested next prompt into its composer in faint text, and a session's own last
+    prompt is a common suggestion — so "the text is still in the composer" must mean painted text."""
+    out: list[str] = []
+    faint = False
+    pos = 0
+    for m in _SGR.finditer(row):
+        if not faint:
+            out.append(row[pos : m.start()])
+        params = m.group(1).split(";") if m.group(1) else ["0"]
+        for p_ in params:
+            if p_ in ("", "0", "22"):
+                faint = False
+            elif p_ == "2":
+                faint = True
+        pos = m.end()
+    if not faint:
+        out.append(row[pos:])
+    return _ESC.sub("", "".join(out))
+
 
 @dataclass
 class Rule:
