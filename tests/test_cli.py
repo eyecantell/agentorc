@@ -90,7 +90,7 @@ def test_allow_and_deny(subprocess_agent, tmp_path, capsys):
     wait_state(sid, "idle")
 
     assert cli.main(["allow", sid]) == 1
-    assert "no pending permission" in capsys.readouterr().err
+    assert capsys.readouterr().err == f"{sid} has no pending permission\n"  # exact: the pre-TD-018 line
 
     payload = {
         "hook_event_name": "PermissionRequest",

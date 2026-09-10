@@ -127,7 +127,8 @@ def cmd_decide(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)
     pend = s.get("pending") or {}
     if pend.get("kind") != "permission" or not pend.get("tool_use_id"):
-        return fail(args, f"{args.id} has no pending permission", 1)
+        msg = f"{args.id} has no pending permission"
+        return fail(args, msg, 1, prose=msg)  # no "error:" prefix: the line main printed before --json
     call_sync("decide", id=args.id, tool_use_id=pend["tool_use_id"], behavior=args.behavior, reason=args.reason)
     result = {"ok": True, "id": args.id, "behavior": args.behavior, "tool_use_id": pend["tool_use_id"]}
     return emit(args, result, lambda: print(f"{args.behavior}: {pend['text']}"))
@@ -154,13 +155,14 @@ def cmd_service(args: argparse.Namespace) -> int:
     return emit(args, {"status": status}, lambda: print(status))
 
 
-def fail(args: argparse.Namespace, message: str, code: int, **extra: Any) -> int:
-    """An error in the same shape as a success: `{"error": …}` on stdout under `--json`, prose on
-    stderr otherwise; the exit code is the same either way."""
+def fail(args: argparse.Namespace, message: str, code: int, prose: str | None = None, **extra: Any) -> int:
+    """An error in the same shape as a success: `{"error": …, **extra}` on stdout under `--json`;
+    otherwise `prose` (default `error: <message>` plus any `hint` line) on stderr. Same exit code."""
     if args.json:
         print(json.dumps({"error": message, **extra}))
     else:
-        print(f"error: {message}" + (f"\n{extra['hint']}" if extra.get("hint") else ""), file=sys.stderr)
+        line = prose if prose is not None else f"error: {message}"
+        print(line + (f"\n{extra['hint']}" if extra.get("hint") else ""), file=sys.stderr)
     return code
 
 
