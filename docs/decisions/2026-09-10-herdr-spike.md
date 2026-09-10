@@ -70,7 +70,9 @@ distinguishable from herdr's events, with the pending text present.
    Claude Code hook reports (§4.2 first-run quirk). Cohabitation is safe: the integration's hook
    is additive to `settings.json` and inert outside herdr, and agentorc's hooks are a per-launch
    `--settings` layer it never sees. herdr does write remote detection manifests under
-   `~/.local/state/herdr` regardless of `XDG_CONFIG_HOME`.
+   `~/.local/state/herdr` regardless of `XDG_CONFIG_HOME` (every `agent explain` in the run cited
+   `manifest: remote:/home/kmaster/.local/state/herdr/agent-detection/remote/claude.toml`; the
+   directory was removed after the run).
 
 ## Decision
 
