@@ -24,7 +24,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-015 | Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape | Medium | Open |
 | TD-016 | `send` should confirm the prompt took: a send-and-wait RPC for policies | Medium | Open |
 | TD-017 | Seen-state: "finished while you were away" is not the same as idle | Medium | Open |
-| TD-018 | `ao --json` on every subcommand | Low | Open |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 
 ---
@@ -252,25 +251,6 @@ attaches) or the person acts on the card; `since > seen_at` on an `idle` card re
 finishes overnight is the first idle card in the morning and drops back after one Focus.
 
 **Related:** design §4.2, §4.5 (Herd sort); ADR 2026-09-10.
-
-## TD-018: `ao --json` on every subcommand
-
-**Priority:** Low
-**Added:** 2026-09-10
-**Status:** Open
-**Location:** `src/agentorc/cli.py`
-
-**Why:** `status --json` exists; `new`, `shell`, `send`, `kill`, `close`, `allow`, `deny`, `tail`
-print prose, so a script or an agent driving `ao` has to parse "ao-x-y  attach: tmux attach …".
-herdr's CLI is JSON-first (most commands print the API response with the ids the next call
-needs, and its skill file tells agents to parse ids rather than predict them), which is what made
-the spike's automation a matter of `jq`; agentorc's own sessions are the obvious next driver of
-`ao`.
-
-**Fix:** a global `--json` that makes every subcommand print the RPC result (or `{"error": …}`
-with the same exit codes). Done when `tests/test_cli.py` covers `--json` for each subcommand.
-
-**Related:** design §4.7; TD-019; ADR 2026-09-10.
 
 ## TD-019: Ship a skill file for `ao` (`ao --skill`)
 

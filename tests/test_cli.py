@@ -90,7 +90,7 @@ def test_allow_and_deny(subprocess_agent, tmp_path, capsys):
     wait_state(sid, "idle")
 
     assert cli.main(["allow", sid]) == 1
-    assert "no pending permission" in capsys.readouterr().err
+    assert capsys.readouterr().err == f"{sid} has no pending permission\n"  # exact: the pre-TD-018 line
 
     payload = {
         "hook_event_name": "PermissionRequest",
@@ -127,3 +127,63 @@ def test_errors_map_to_exit_codes(subprocess_agent, tmp_path, monkeypatch, capsy
     assert cli.main(["status"]) == 3
     err = capsys.readouterr().err
     assert "not reachable" in err and "agentorc-agent serve" in err
+
+
+def test_json_on_every_subcommand(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-018: `--json` (global or after the subcommand) prints the RPC result and nothing else on
+    stdout; errors are `{"error": …}` with the same exit codes."""
+
+    def out():
+        return json.loads(capsys.readouterr().out)
+
+    assert cli.main(["--json", "shell", "js", "-d", str(tmp_path)]) == 0
+    s = out()
+    sid = s["id"]
+    assert s["adapter"] == "shell" and s["dir"] == str(tmp_path)
+    wait_state(sid, "idle")
+    assert cli.main(["send", sid, "--json", "echo", "J-$((40+2))"]) == 0  # flag after the subcommand
+    assert out() == {"ok": True, "id": sid}
+    assert wait_for_sync(lambda: any("J-42" in line for line in call_sync("tail", id=sid, lines=10)))
+    assert cli.main(["--json", "tail", sid, "-n", "5"]) == 0
+    lines = out()
+    assert isinstance(lines, list) and any("J-42" in line for line in lines)
+    assert cli.main(["--json", "keys", sid, "Enter"]) == 0
+    assert out() == {"ok": True, "id": sid}
+    assert cli.main(["--json", "mode", sid, "unattended"]) == 0
+    assert out()["unattended"] is True
+    assert cli.main(["--json", "status"]) == 0
+    assert sid in [r["id"] for r in out()]  # the module agent holds other tests' sessions too
+    assert cli.main(["--json", "kill", sid]) == 0
+    assert out()["state"] == "exited"
+    assert cli.main(["--json", "close", sid]) == 0
+    assert out()["state"] == "closed"
+    call_sync("remove", id=sid)
+
+    # allow / deny: the hook-fed stub, a real hook process blocking on the permission
+    assert cli.main(["--json", "new", "jperm", "-a", "hookstub", "-d", str(tmp_path)]) == 0
+    pid = out()["id"]
+    call_sync("hook", session=pid, state="idle")
+    wait_state(pid, "idle")
+    assert cli.main(["--json", "allow", pid]) == 1
+    assert out() == {"error": f"{pid} has no pending permission"}
+    payload = {"hook_event_name": "PermissionRequest", "tool_name": "Bash", "tool_input": {"command": "ls"}}
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fut = pool.submit(run_hook, pid, {**payload, "tool_use_id": "tu-json"}, "10")
+        wait_state(pid, "needs-you")
+        assert cli.main(["--json", "deny", pid, "nope"]) == 0
+        assert out() == {"ok": True, "id": pid, "behavior": "deny", "tool_use_id": "tu-json"}
+        cp = fut.result(timeout=15)
+    assert json.loads(cp.stdout)["hookSpecificOutput"]["decision"] == {"behavior": "deny", "reason": "nope"}
+    call_sync("kill", id=pid)
+
+    # errors keep their exit codes, on stdout as JSON
+    assert cli.main(["--json", "kill", "ao-nope"]) == 1
+    assert out() == {"error": "no session ao-nope"}
+    assert capsys.readouterr().err == ""
+    monkeypatch.setattr("agentorc.service.status", lambda: "agentorc-agent: active")
+    assert cli.main(["--json", "service", "status"]) == 0
+    assert out() == {"status": "agentorc-agent: active"}
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "empty-home"))
+    assert cli.main(["--json", "status"]) == 3
+    e = out()
+    assert "not reachable" in e["error"] and "agentorc-agent serve" in e["hint"]

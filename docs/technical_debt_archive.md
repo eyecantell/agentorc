@@ -82,3 +82,21 @@ One tick of wrong state, only for hand-created reuse of a just-removed name.
 **Why:** The UI tests need one agent shared across a sync `TestClient`. The env/tick leak was fixed in PR #4 review (module-scoped `MonkeyPatch`, undone at teardown). The agent thread went away in the test-suite consolidation (2026-09-07): the module's agent is now a separate process (`tests/_agent_child.py` on the private tmux socket; `agentorc-agent serve` cannot take one). What remains: starlette's `TestClient` keeps an anyio portal thread alive for the whole `with` block, so `ptyprocess` still calls `forkpty()` in a multi-threaded process and Python still warns it may deadlock the child — the rare-flake exposure is smaller, not gone.
 
 **Resolved:** 2026-09-10 (PR #40) — accepted: the warning is filtered in `pyproject.toml` (`[tool.pytest.ini_options] filterwarnings`, comment points here) and the residual exposure is written up in `tests/README.md` "Real-environment dependencies" with the pty-helper alternative should a `/term` test ever hang.
+
+## TD-018: `ao --json` on every subcommand
+
+**Priority:** Low
+**Added:** 2026-09-10
+**Status:** Resolved
+**Location:** `src/agentorc/cli.py`
+
+**Why:** `status --json` exists; `new`, `shell`, `send`, `kill`, `close`, `allow`, `deny`, `tail`
+print prose, so a script or an agent driving `ao` has to parse "ao-x-y  attach: tmux attach …".
+herdr's CLI is JSON-first (most commands print the API response with the ids the next call
+needs, and its skill file tells agents to parse ids rather than predict them), which is what made
+the spike's automation a matter of `jq`; agentorc's own sessions are the obvious next driver of
+`ao`.
+
+**Resolved:** 2026-09-10 (PR #41) — a global `--json` on `ao` (also accepted after any subcommand, `default=SUPPRESS` so the two never fight); every `cmd_*` goes through `emit()` (RPC result, or `{"ok": true, "id": …}` where the RPC returns nothing) and `fail()` (`{"error": …}` on stdout, same exit codes, `hint` for an unreachable agent). `ui` runs a server and prints nothing; `service install`/`uninstall` take the flag but are not exercised by the test (systemd side effects). Prose output is unchanged. README "CLI" documents it; test: `tests/test_cli.py::test_json_on_every_subcommand`.
+
+**Related:** design §4.7; TD-019; ADR 2026-09-10.

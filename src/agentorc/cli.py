@@ -6,7 +6,9 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import Any
 
 from sessionorc.client import AgentError, AgentUnavailable, call_sync
 from sessionorc.models import STATE_RANK
@@ -25,6 +27,16 @@ def _age(iso: str) -> str:
     if secs < 86400:
         return f"{secs // 3600}h"
     return f"{secs // 86400}d"
+
+
+def emit(args: argparse.Namespace, result: Any, prose: Callable[[], None]) -> int:
+    """`--json` (TD-018, design §4.7): print the RPC result — the ids the next call needs — and
+    nothing else on stdout; otherwise the human line(s)."""
+    if args.json:
+        print(json.dumps(result, indent=1))
+    else:
+        prose()
+    return 0
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -61,9 +73,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         resume=args.resume,
         prompt=args.prompt,
     )
-    print(f"{s['id']}  ({s['adapter']}, {s['dir']})")
-    print(f"attach: tmux attach -t {s['id']}")
-    return 0
+    return emit(args, s, lambda: print(f"{s['id']}  ({s['adapter']}, {s['dir']})\nattach: tmux attach -t {s['id']}"))
 
 
 def cmd_shell(args: argparse.Namespace) -> int:
@@ -81,51 +91,47 @@ def cmd_shell(args: argparse.Namespace) -> int:
 
 
 def cmd_kill(args: argparse.Namespace) -> int:
-    call_sync("kill", id=args.id)
-    print(f"killed {args.id}")
-    return 0
+    s = call_sync("kill", id=args.id)
+    return emit(args, s, lambda: print(f"killed {args.id}"))
 
 
 def cmd_close(args: argparse.Namespace) -> int:
-    call_sync("close", id=args.id)
-    print(f"closed {args.id}")
-    return 0
+    s = call_sync("close", id=args.id)
+    return emit(args, s, lambda: print(f"closed {args.id}"))
 
 
 def cmd_send(args: argparse.Namespace) -> int:
     text = " ".join(args.text) if args.text else sys.stdin.read()
     call_sync("send", id=args.id, text=text)
-    return 0
+    return emit(args, {"ok": True, "id": args.id}, lambda: None)  # the RPC returns nothing
 
 
 def cmd_keys(args: argparse.Namespace) -> int:
     """Raw tmux key names into the pane (Down, Enter, Escape, C-c, 1 …) — for dialogs the
     terminal owns when no browser is open. Not a menu-answering API: design §9 invariant 6."""
     call_sync("keys", id=args.id, keys=args.keys)
-    return 0
+    return emit(args, {"ok": True, "id": args.id}, lambda: None)
 
 
 def cmd_tail(args: argparse.Namespace) -> int:
-    for line in call_sync("tail", id=args.id, lines=args.lines):
-        print(line)
-    return 0
+    lines = call_sync("tail", id=args.id, lines=args.lines)
+    return emit(args, lines, lambda: print("\n".join(lines)) if lines else None)
 
 
 def cmd_mode(args: argparse.Namespace) -> int:
     s = call_sync("set_mode", id=args.id, unattended=args.mode == "unattended")
-    print(f"{s['id']}: {'unattended' if s['unattended'] else 'interactive'}")
-    return 0
+    return emit(args, s, lambda: print(f"{s['id']}: {'unattended' if s['unattended'] else 'interactive'}"))
 
 
 def cmd_decide(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)
     pend = s.get("pending") or {}
     if pend.get("kind") != "permission" or not pend.get("tool_use_id"):
-        print(f"{args.id} has no pending permission", file=sys.stderr)
-        return 1
+        msg = f"{args.id} has no pending permission"
+        return fail(args, msg, 1, prose=msg)  # no "error:" prefix: the line main printed before --json
     call_sync("decide", id=args.id, tool_use_id=pend["tool_use_id"], behavior=args.behavior, reason=args.reason)
-    print(f"{args.behavior}: {pend['text']}")
-    return 0
+    result = {"ok": True, "id": args.id, "behavior": args.behavior, "tool_use_id": pend["tool_use_id"]}
+    return emit(args, result, lambda: print(f"{args.behavior}: {pend['text']}"))
 
 
 def cmd_service(args: argparse.Namespace) -> int:
@@ -133,15 +139,31 @@ def cmd_service(args: argparse.Namespace) -> int:
 
     if args.action == "install":
         written = service.install(bind=args.bind, port=args.port, start=not args.no_start)
-        print("wrote " + ", ".join(written))
-        print(service.status())
-        print("units run under your user; `loginctl enable-linger` keeps them (and tmux) alive after logout")
-    elif args.action == "uninstall":
+        status = service.status()
+        return emit(
+            args,
+            {"written": written, "status": status},
+            lambda: print(
+                "wrote " + ", ".join(written) + "\n" + status + "\n"
+                "units run under your user; `loginctl enable-linger` keeps them (and tmux) alive after logout"
+            ),
+        )
+    if args.action == "uninstall":
         service.uninstall()
-        print("units disabled and removed (tmux sessions untouched)")
+        return emit(args, {"ok": True}, lambda: print("units disabled and removed (tmux sessions untouched)"))
+    status = service.status()
+    return emit(args, {"status": status}, lambda: print(status))
+
+
+def fail(args: argparse.Namespace, message: str, code: int, prose: str | None = None, **extra: Any) -> int:
+    """An error in the same shape as a success: `{"error": …, **extra}` on stdout under `--json`;
+    otherwise `prose` (default `error: <message>` plus any `hint` line) on stderr. Same exit code."""
+    if args.json:
+        print(json.dumps({"error": message, **extra}))
     else:
-        print(service.status())
-    return 0
+        line = prose if prose is not None else f"error: {message}"
+        print(line + (f"\n{extra['hint']}" if extra.get("hint") else ""), file=sys.stderr)
+    return code
 
 
 def cmd_ui(args: argparse.Namespace) -> int:
@@ -152,14 +174,20 @@ def cmd_ui(args: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="ao", description="agentorc — sessions in tmux, one view")
+    ap.add_argument("--json", action="store_true", help="print the RPC result as JSON (every subcommand; TD-018)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("status", help="list sessions on this host")
+    def add(name: str, **kw: Any) -> argparse.ArgumentParser:
+        p = sub.add_parser(name, **kw)
+        # SUPPRESS: a subparser default would otherwise overwrite the global flag's value
+        p.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+        return p
+
+    p = add("status", help="list sessions on this host")
     p.add_argument("-v", "--verbose", action="store_true", help="show the last output lines")
-    p.add_argument("--json", action="store_true")
     p.set_defaults(fn=cmd_status)
 
-    p = sub.add_parser("new", help="start a session")
+    p = add("new", help="start a session")
     p.add_argument("name")
     p.add_argument("-d", "--dir", help="directory (default: cwd)")
     p.add_argument("-a", "--adapter", default="claude-code")
@@ -175,7 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--prompt", help="opening prompt")
     p.set_defaults(fn=cmd_new)
 
-    p = sub.add_parser("shell", help="start a plain shell session here")
+    p = add("shell", help="start a plain shell session here")
     p.add_argument("name", nargs="?")
     p.add_argument("-d", "--dir")
     p.set_defaults(fn=cmd_shell)
@@ -184,36 +212,36 @@ def build_parser() -> argparse.ArgumentParser:
         ("kill", cmd_kill, "kill a session (worktree kept)"),
         ("close", cmd_close, "close a session"),
     ):
-        p = sub.add_parser(name, help=help_)
+        p = add(name, help=help_)
         p.add_argument("id")
         p.set_defaults(fn=fn)
 
-    p = sub.add_parser("send", help="send a prompt (args or stdin)")
+    p = add("send", help="send a prompt (args or stdin)")
     p.add_argument("id")
     p.add_argument("text", nargs="*")
     p.set_defaults(fn=cmd_send)
 
-    p = sub.add_parser("keys", help="send raw tmux key names (Down Enter Escape C-c …) to a session")
+    p = add("keys", help="send raw tmux key names (Down Enter Escape C-c …) to a session")
     p.add_argument("id")
     p.add_argument("keys", nargs="+")
     p.set_defaults(fn=cmd_keys)
 
-    p = sub.add_parser("tail", help="last lines of a session's pane")
+    p = add("tail", help="last lines of a session's pane")
     p.add_argument("id")
     p.add_argument("-n", "--lines", type=int, default=40)
     p.set_defaults(fn=cmd_tail)
 
-    p = sub.add_parser("mode", help="flip a session between unattended and interactive")
+    p = add("mode", help="flip a session between unattended and interactive")
     p.add_argument("id")
     p.add_argument("mode", choices=["unattended", "interactive"])
     p.set_defaults(fn=cmd_mode)
 
-    p = sub.add_parser("ui", help="serve the web UI (localhost by default; design §4.5 security)")
+    p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")
     p.add_argument("--bind", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
     p.set_defaults(fn=cmd_ui)
 
-    p = sub.add_parser("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
+    p = add("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
     p.add_argument("action", choices=["install", "uninstall", "status"])
     p.add_argument("--bind", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
@@ -225,7 +253,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_service)
 
     for behavior in ("allow", "deny"):
-        p = sub.add_parser(behavior, help=f"{behavior} the pending permission")
+        p = add(behavior, help=f"{behavior} the pending permission")
         p.add_argument("id")
         p.add_argument("reason", nargs="?")
         p.set_defaults(fn=cmd_decide, behavior=behavior)
@@ -237,11 +265,9 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return args.fn(args)
     except AgentUnavailable as e:
-        print(f"error: {e}\nstart it with: agentorc-agent serve", file=sys.stderr)
-        return 3
+        return fail(args, str(e), 3, hint="start it with: agentorc-agent serve")
     except AgentError as e:
-        print(f"error: {e}", file=sys.stderr)
-        return 1
+        return fail(args, str(e), 1)
 
 
 if __name__ == "__main__":
