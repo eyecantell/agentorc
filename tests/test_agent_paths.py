@@ -120,3 +120,24 @@ async def test_resume_supersedes_the_exited_record(agent, hookstub, tmp_path):
         assert new["id"] != old["id"]
         states = {x["id"]: x["state"] for x in await c.call("list")}
         assert states[old["id"]] == "closed" and states[new["id"]] != "closed"
+
+
+async def test_pane_snapshot_older_than_a_remove_does_not_readopt(agent, tmp_path):
+    """The tick snapshots panes in a thread; a remove that lands before reconcile must not have its
+    dead pane adopted back from the stale snapshot (flaked under CPU load on 2026-09-07)."""
+    from sessionorc.tmux import PaneInfo
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="gone", dir=str(tmp_path), adapter="command", kind="command", argv=["true"])
+
+        async def exited():
+            return (await c.call("get", id=s["id"]))["state"] == "exited"
+
+        assert await wait_for(exited)
+        stale_snapshot_at = datetime.now(UTC)
+        stale = PaneInfo(session=s["id"], created=0, current_command="true", pane_pid=0, dead=True, dead_status=0)
+        await c.call("remove", id=s["id"])
+        agent._reconcile({s["id"]: stale}, {}, stale_snapshot_at)
+        assert s["id"] not in agent.sessions
+        agent._reconcile({s["id"]: stale}, {}, datetime.now(UTC))  # a later snapshot: adoption works again
+        assert s["id"] in agent.sessions
