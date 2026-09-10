@@ -31,6 +31,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-017 | Seen-state: "finished while you were away" is not the same as idle | Medium | Open |
 | TD-018 | `ao --json` on every subcommand | Low | Open |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
+| TD-020 | `_removed_at` compares wall-clock stamps; a clock step re-adopts a just-removed pane | Low | Open |
+| TD-021 | Immediate id reuse after `remove` can mis-adopt the new pane for one tick | Low | Open |
 
 ---
 
@@ -350,3 +352,41 @@ offer to install it into the repo's `.claude/skills/`. Depends on TD-018. Done i
 the adapter-author guide.
 
 **Related:** design §4.7, §7 phase 5; TD-018; ADR 2026-09-10.
+
+## TD-020: `_removed_at` compares wall-clock stamps; a clock step re-adopts a just-removed pane
+
+**Priority:** Low
+**Added:** 2026-09-10 (review note on PR #22, 2026-09-07; ledgered late)
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`_reconcile`, `rpc_remove`)
+
+**Why:** `rpc_remove` stamps `_removed_at[id] = datetime.now(UTC)` and `_reconcile` skips
+re-adopting a pane whose stamp is newer than the tick's `snapshot_at`, forgetting stamps after a
+minute. All three are wall-clock; an NTP step or a suspend/resume between them can make a stamp
+look older than the snapshot (the dead pane comes back as a nameless shell for a tick) or keep
+it alive past the minute. Harmless in practice, which is why it is Low, but the guard exists
+because the same re-adoption bit us on first use (2026-09-06).
+
+**Fix:** take `snapshot_at` and the removal stamp from `time.monotonic()` (both are produced by
+this process), keep `datetime` only for fields that are persisted or shown.
+
+**Related:** PR #22 review; TD-021.
+
+## TD-021: Immediate id reuse after `remove` can mis-adopt the new pane for one tick
+
+**Priority:** Low
+**Added:** 2026-09-10 (review note on PR #22, 2026-09-07; ledgered late)
+**Status:** Open
+**Location:** `src/sessionorc/agent.py` (`_reconcile` adoption loop), `src/sessionorc/naming.py`
+
+**Why:** The adoption guard is keyed by tmux session *name*. If a session is removed and a new
+one with the same name is created by hand before the next tick, the new pane is skipped for
+that tick (the stamp says "just removed") and then adopted as a nameless shell on the one after;
+if the new one is created through the agent, the record exists and the guard never applies.
+One tick of wrong state, only for hand-created reuse of a just-removed name.
+
+**Fix:** key the guard by `(name, pane.created)` — tmux reports the pane's creation time — so a
+pane born after the removal is never confused with the one removed. Add a test beside
+`test_agent_paths.py`'s stale-snapshot case.
+
+**Related:** PR #22 review; TD-020; TD-010 (adoption of hand-started sessions).
