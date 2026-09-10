@@ -21,7 +21,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-007 | test_ui mutates `os.environ` for a module-scoped agent | Low | Open |
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
-| TD-012 | Resuming a conversation that is still live elsewhere is not refused | Low | Open |
 | TD-013 | External-session check reads the default profile's registry only | Low | Open |
 | TD-014 | herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10) | High | Done |
 | TD-015 | Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape | Medium | Open |
@@ -160,17 +159,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 **Fix:** two halves. (a) Claude Code's own registry (`~/.claude/sessions/<pid>.json`: `status` busy/idle/shell, `name`, `cwd`, `sessionId`) can populate read-only cards for non-tmux sessions — state guessed (`scraped`), no Focus terminal, Allow/Deny only if the person launches them with agentorc's hooks layer (`claude --settings ~/.agentorc/claude-hooks/<profile>.json`, which works outside tmux too since the hook only needs `AGENTORC_SESSION` and `AGENTORC_HOME`). (b) A `ao wrap` / shell alias that starts Claude inside an `ao-*` tmux session from any terminal, so the VS Code habit produces first-class cards. Done when a session started from a VS Code terminal shows the right state within 5 s.
 
 **Related:** design §4.1 adoption, §4.3 registry cross-check, phase 1 success test.
-
-## TD-012: Resuming a conversation that is still live elsewhere is not refused
-
-**Priority:** Low
-**Added:** 2026-09-06
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`rpc_create`, `_supersede`)
-
-**Why:** `create(resume=<id>)` supersedes an *exited* record with that adapter id, but nothing stops a resume of a conversation whose session is still running (in another directory, or hand-started): two tmux sessions would then drive one Claude Code conversation. The anchor rule compares directories, not conversations. Raised in the PR #17 review.
-
-**Fix:** refuse a resume whose adapter id belongs to a live record (state not exited/closed), with the same "already has … ; anchor rule" style error, or offer Switch to instead (Resumable tab).
 
 ## TD-013: External-session check reads the default profile's registry only
 
