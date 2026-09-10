@@ -36,6 +36,9 @@ CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
+SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken within this → prompt-stalled
+SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends
+REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
@@ -474,11 +477,70 @@ class HostAgent:
         self._removed[id] = (pane.created if pane else None, time.monotonic())
         await self._push_changes()
 
-    async def rpc_send(self, id: str, text: str) -> None:
+    async def rpc_send(self, id: str, text: str, wait: bool = False, timeout: float | None = None) -> dict | None:
+        """Type a prompt. With `wait` (TD-016, design §4.2): return the record once the session has
+        started on *this* prompt and settled again (`SETTLED`). A session that is busy queues the
+        prompt behind its current turn, so the wait first lets that turn end, then looks for the
+        next one to start. Errors: `prompt-stalled` when nothing starts within `SEND_STALL_SECONDS`
+        of the moment it could, `timeout` after `timeout` seconds in total, `removed` if the record
+        goes away. Nothing is ever re-sent on a guess (design §4.2)."""
         s = self._get(id)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
         await asyncio.to_thread(self.tmux.send_prompt, id, text)
+        if not wait:
+            return None
+        end = None if timeout is None else time.monotonic() + timeout
+
+        def left() -> float | None:
+            return None if end is None else max(0.0, end - time.monotonic())
+
+        s = self._get(id)
+        if s.state != "idle":
+            # Busy: the tool queues the text. Wait for the current turn to end; a stop on anything
+            # but idle (a question, an exit) is returned as is — the prompt is still queued behind it.
+            rev_sent = s.rev
+            if not await self._wait_state(id, lambda x: x.state in SETTLED, left()):
+                self._raise_not_settled(id, timeout)
+            s = self._get(id)
+            if s.state != "idle":
+                return s.to_dict()
+            if s.rev - rev_sent >= 3:
+                # working → idle → working → idle inside one poll: the queued turn already ran.
+                # Accepted residual: a permission answered *and* the rest of that same turn finishing
+                # inside one 0.1 s poll would look the same; a turn does not end that fast.
+                return s.to_dict()
+        rev_before = s.rev
+        # Started: any transition off this idle (a hook's UserPromptSubmit → working, a scraped
+        # working, even an exit) within the stall window.
+        stall = SEND_STALL_SECONDS if left() is None else min(SEND_STALL_SECONDS, left())
+        if not await self._wait_state(id, lambda x: x.rev != rev_before, stall):
+            if id not in self.sessions:
+                raise RpcError(f"removed: {id} went away while waiting")
+            raise RpcError(f"prompt-stalled: {id} showed no activity within {stall:g} s")
+        if not await self._wait_state(id, lambda x: x.state in SETTLED and x.rev != rev_before, left()):
+            self._raise_not_settled(id, timeout)
+        return self._get(id).to_dict()
+
+    def _raise_not_settled(self, sid: str, timeout: float | None) -> None:
+        live = self.sessions.get(sid)
+        if live is None:
+            raise RpcError(f"removed: {sid} went away while waiting")
+        raise RpcError(f"timeout: {sid} is still {live.state} after {timeout:g} s")
+
+    async def _wait_state(self, sid: str, pred: Any, timeout: float | None) -> bool:
+        """Poll the record on the loop until `pred(session)` holds; False on timeout (None: no limit)
+        or when the record is gone."""
+        end = None if timeout is None else time.monotonic() + timeout
+        while True:
+            s = self.sessions.get(sid)
+            if s is None:
+                return False
+            if pred(s):
+                return True
+            if end is not None and time.monotonic() >= end:
+                return False
+            await asyncio.sleep(0.1)
 
     async def rpc_keys(self, id: str, keys: list[str]) -> None:
         self._get(id)

@@ -76,6 +76,7 @@ class Session:
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
+        d.pop("rev")
         d["pending"] = self.pending.to_dict() if self.pending else None
         return d
 
@@ -88,9 +89,14 @@ class Session:
         obj.pending = Pending.from_dict(pending) if pending else None
         return obj
 
+    # Transition counter, in memory only (dropped by `to_dict`, so 0 on load): `since` is whole
+    # seconds, so a turn that starts and ends inside one second would look unchanged to a waiter.
+    rev: int = field(default=0, compare=False, repr=False)
+
     def set_state(self, state: State, *, confidence: Confidence, pending: Pending | None = None) -> None:
         if state != self.state:
             self.since = now_iso()
+            self.rev += 1
         self.state = state
         self.confidence = confidence
         self.pending = pending

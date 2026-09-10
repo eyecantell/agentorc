@@ -103,6 +103,8 @@ the spike's automation a matter of `jq`; agentorc's own sessions are the obvious
 
 ## TD-017: Seen-state: "finished while you were away" is not the same as idle
 
+## TD-016: `send` should confirm the prompt took: a send-and-wait RPC for policies
+
 **Priority:** Medium
 **Added:** 2026-09-10
 **Status:** Resolved
@@ -187,3 +189,17 @@ measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts i
 **Resolved:** 2026-09-10 (PR #44) — `HostAgent._refresh_usage` (a detached task started by the tick, one at a time) asks each live agent session's adapter `usage_for(profile)` in a thread at most once per `USAGE_EVERY` (60 s), caches per profile (`rpc_usage`), streams `{"event": "usage", …}` to subscribers (also on subscribe), and applies the `limited` rule: an interactive session on a profile at 100% of a window gets `limited` with `Pending(kind="limit", text="5-hour cap · resets HH:MMZ")` (never over `needs-you`), and returns to the state it had before the cap once the window resets (a `resets_at` already past is not a cap). `ClaudeCodeAdapter.usage_for` is the name-keyed wrapper of `usage()`. The top bar carries a per-profile chip (`#usagechip`, red at a cap). Switch profile / Wait (§4.5a) are still to build. Design §4.3/§4.4 updated. Tests: `tests/test_agent.py::test_limited_from_usage_cap`, `tests/test_claude_adapter.py::test_usage_for_by_profile_name`.
 
 **Related:** design §4.2, §4.2a, §6 usage gate (phase 3).
+
+**Location:** `src/sessionorc/agent.py` (`rpc_send`), `src/agentorc/cli.py` (`send`)
+
+**Why:** `send` already refuses while a permission or question is pending (the right half of the
+rule). It then writes the text and Enter and returns, so a policy that nudges an unattended
+worker cannot tell whether the prompt was taken, swallowed by a dialog that appeared in between,
+or typed into a pane whose agent had just exited. herdr's `agent prompt --wait` names the two
+failure modes worth copying: nothing starts working within a few seconds (`agent_prompt_stalled`),
+and the caller's timeout passes before a settled state. Phase 3's supervisor (§6: wrap-up prompt,
+then kill) needs exactly this to know the wrap-up request landed.
+
+**Resolved:** 2026-09-10 (PR #42) — `rpc_send(id, text, wait=False, timeout=None)`: with `wait` it returns the record once the session has started on *this* prompt (a transition off `idle`; a busy session first has its current turn end — a stop on anything but `idle` is returned as is, prompt still queued — then the next turn must start) and then reached one of `SETTLED` (`idle`, `needs-you`, `exited`, `closed`, `limited`, `stalled?`); errors `prompt-stalled` after `SEND_STALL_SECONDS` (5 s, or the remaining `timeout` if shorter) of nothing, `timeout` after `timeout` seconds in total, `removed` if the record goes away. `ao send --wait [--timeout N]` prints the settled state. Nothing is ever re-sent. Tests: `tests/test_agent.py::test_send_wait_three_outcomes`, `tests/test_cli.py::test_send_wait`. Phase 3's wrap-up policy is the intended caller (design §6).
+
+**Related:** design §4.2 (the never-re-send rule), §4.4, §6; ADR 2026-09-10.

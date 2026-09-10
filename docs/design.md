@@ -243,9 +243,13 @@ Focus sets `seen_at`) renders "finished · unseen" and sorts above plain `idle` 
 triage case. Not a state: `idle` stays `idle` in every payload (TD-017).
 
 **`send` confirms the prompt took.** `send` already refuses while a permission or question is
-pending. With `wait` it also returns only after the session has left `idle` and settled again,
-and fails with `prompt-stalled` when nothing starts within a few seconds — so a policy's wrap-up
-request (§6) is known to have landed, and no text is ever re-sent on a guess (TD-016).
+pending. With `wait` it also returns only after the session has started on *this* prompt and
+settled again (`idle`, `needs-you`, `exited`, `closed`, `limited`, `stalled?`): a busy session queues the text, so the wait
+first lets the current turn end — a stop on a question or an exit is returned as is, prompt
+still queued — then requires the next turn to start. It fails with `prompt-stalled` when
+nothing starts within a few seconds of the moment it could, `timeout` after the caller's limit,
+and `removed` if the record goes away — so a policy's wrap-up request (§6) is known to have
+landed, and no text is ever re-sent on a guess (TD-016).
 
 Liveness cross-check: the agent also watches the pipe-pane log's mtime; a `working` state with no
 output for longer than the adapter's `stall_after` is shown as `stalled?`, which is how a

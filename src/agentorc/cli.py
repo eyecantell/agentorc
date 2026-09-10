@@ -102,8 +102,11 @@ def cmd_close(args: argparse.Namespace) -> int:
 
 def cmd_send(args: argparse.Namespace) -> int:
     text = " ".join(args.text) if args.text else sys.stdin.read()
-    call_sync("send", id=args.id, text=text)
-    return emit(args, {"ok": True, "id": args.id}, lambda: None)  # the RPC returns nothing
+    s = call_sync("send", id=args.id, text=text, wait=args.wait, timeout=args.timeout)
+    if s:  # --wait: the settled record
+        pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
+        return emit(args, s, lambda: print(f"{s['id']}: {s['state']}{pend}"))
+    return emit(args, {"ok": True, "id": args.id}, lambda: None)  # without --wait the RPC returns nothing
 
 
 def cmd_keys(args: argparse.Namespace) -> int:
@@ -219,6 +222,13 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("send", help="send a prompt (args or stdin)")
     p.add_argument("id")
     p.add_argument("text", nargs="*")
+    p.add_argument(
+        "--wait",
+        action="store_true",
+        help="return once the session has started on the prompt and settled again (idle, needs-you, exited); "
+        "errors prompt-stalled / timeout",
+    )
+    p.add_argument("--timeout", type=float, help="seconds to wait for it to settle (default: no limit)")
     p.set_defaults(fn=cmd_send)
 
     p = add("keys", help="send raw tmux key names (Down Enter Escape C-c …) to a session")

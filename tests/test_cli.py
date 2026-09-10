@@ -44,6 +44,8 @@ def test_shell_send_tail_status_kill_close(subprocess_agent, tmp_path, capsys):
     assert cli.main(["tail", sid, "-n", "10"]) == 0
     assert "CLI-21" in capsys.readouterr().out
 
+    # `status -v` shows the record's tail, which the tick refreshes: wait for it (flaked on CI 2026-09-10)
+    assert wait_for_sync(lambda: any("CLI-21" in line for line in call_sync("get", id=sid)["tail"]))
     assert cli.main(["status", "-v"]) == 0
     out = capsys.readouterr().out
     assert sid in out and "shell" in out and "│" in out  # the verbose tail rows
@@ -187,3 +189,26 @@ def test_json_on_every_subcommand(subprocess_agent, tmp_path, capsys, monkeypatc
     assert cli.main(["--json", "status"]) == 3
     e = out()
     assert "not reachable" in e["error"] and "agentorc-agent serve" in e["hint"]
+
+
+def test_send_wait(subprocess_agent, tmp_path, capsys):
+    """`ao send --wait` prints the settled state; the errors map to exit 1 like any RPC error."""
+    assert cli.main(["new", "sw", "-a", "hookstub", "-d", str(tmp_path)]) == 0
+    sid = capsys.readouterr().out.split()[0]
+    call_sync("hook", session=sid, state="idle")
+    wait_state(sid, "idle")
+
+    def turn():
+        time.sleep(0.3)
+        call_sync("hook", session=sid, state="working")
+        time.sleep(0.3)
+        call_sync("hook", session=sid, state="idle")
+
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        fut = pool.submit(turn)
+        assert cli.main(["send", sid, "--wait", "--timeout", "5", "go"]) == 0
+        fut.result(timeout=5)
+    assert capsys.readouterr().out.strip() == f"{sid}: idle"
+    assert cli.main(["send", sid, "--wait", "--timeout", "1", "nothing happens"]) == 1
+    assert "prompt-stalled" in capsys.readouterr().err
+    call_sync("kill", id=sid)

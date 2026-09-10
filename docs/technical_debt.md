@@ -20,7 +20,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-010 | Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd | Medium | Open |
 | TD-015 | Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape | Medium | Open |
-| TD-016 | `send` should confirm the prompt took: a send-and-wait RPC for policies | Medium | Open |
 | TD-019 | Ship a skill file for `ao` (`ao --skill`) | Low | Open |
 
 ---
@@ -156,30 +155,6 @@ session started with a fresh `.claude.json`, and the three usage-limit fixtures 
 classify as `limited`.
 
 **Related:** design §4.2, §9 invariant 4; TD-001 (`limited` from the usage endpoint); ADR 2026-09-10.
-
-## TD-016: `send` should confirm the prompt took: a send-and-wait RPC for policies
-
-**Priority:** Medium
-**Added:** 2026-09-10
-**Status:** Open
-**Location:** `src/sessionorc/agent.py` (`rpc_send`), `src/agentorc/cli.py` (`send`)
-
-**Why:** `send` already refuses while a permission or question is pending (the right half of the
-rule). It then writes the text and Enter and returns, so a policy that nudges an unattended
-worker cannot tell whether the prompt was taken, swallowed by a dialog that appeared in between,
-or typed into a pane whose agent had just exited. herdr's `agent prompt --wait` names the two
-failure modes worth copying: nothing starts working within a few seconds (`agent_prompt_stalled`),
-and the caller's timeout passes before a settled state. Phase 3's supervisor (§6: wrap-up prompt,
-then kill) needs exactly this to know the wrap-up request landed.
-
-**Fix:** `send(id, text, wait=False, timeout=None)`: with `wait`, return after the session has
-left `idle` (hook `UserPromptSubmit` or a scraped `working`) *and* then reached `idle`,
-`needs-you` or `exited`; error `prompt-stalled` if no activity is seen within 5 s; error
-`timeout` after `timeout` seconds. `ao send --wait`. Never retry a send on its own (§9 invariant
-6 applies to text too). Done when the wrap-up policy in phase 3 uses it and a test covers all
-three outcomes with the `hookstub` adapter.
-
-**Related:** design §4.4, §6, §9 invariant 6; ADR 2026-09-10.
 
 ## TD-019: Ship a skill file for `ao` (`ao --skill`)
 
