@@ -17,6 +17,7 @@
     <span class="tab off" title="phase 4">Attention</span>
   </div>
   <div class="grow"></div>
+  <span class="mono dim" id="usagechip" title="usage per profile: 5-hour window · weekly window (TD-001)">{% for prof, u in (usage or {}).items() %}<span data-profile="{{ prof }}">{{ prof }} {{ u.five_hour_pct }}%·{{ u.weekly_pct }}%</span> {% endfor %}</span>
   <span class="mono dim" id="hostchip">{{ host }} <span id="hostdot">●</span></span>
   <button class="btn ghost light" id="theme" title="dark / light">◐</button>
   <form method="post" action="/shell" class="inline" id="shellform">

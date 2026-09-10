@@ -37,6 +37,13 @@ class Adapter(Protocol):
         """Scraped state from the pane; None means "no opinion" (hook-fed adapters)."""
         ...
 
+    # Optional, looked up with getattr:
+    #   external_sessions() -> list[ExternalSession]      live sessions of the tool started elsewhere
+    #   usage_for(profile: str) -> dict | None            {"five_hour_pct", "weekly_pct", "five_hour_resets",
+    #                                                      "weekly_resets", "fetched"}; None = unknown, never
+    #                                                      gates anything (design §4.3 `usage()`, keyed by the
+    #                                                      profile *name* because this package cannot build a Profile)
+
 
 @dataclass
 class ExternalSession:

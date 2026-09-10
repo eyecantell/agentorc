@@ -98,11 +98,21 @@
       // The handshake succeeds even when the agent is down (the server accepts, then closes), so
       // "connected" means the first message, not onopen — otherwise a down agent reload-loops.
       ws.onopen = () => { delay = 500; };
-      ws.onmessage = (m) => { setDown(false); if (reconnected) { location.reload(); return; } onEvent(JSON.parse(m.data)); };
+      ws.onmessage = (m) => { setDown(false); if (reconnected) { location.reload(); return; } const ev = JSON.parse(m.data); if (ev.event === "usage") onUsage(ev); else onEvent(ev); };
       ws.onclose = () => { setDown(true); reconnected = true; setTimeout(open, delay); delay = Math.min(delay * 2, 10000); };
       ws.onerror = () => ws.close();
     }
     open();
+  }
+  // ---- usage chip: one span per profile, "5-hour% · weekly%", red at a cap (TD-001) ----
+  function onUsage(ev) {
+    const chip = $("#usagechip"); if (!chip || !ev.usage) return;
+    let el = chip.querySelector(`[data-profile="${CSS.escape(ev.profile)}"]`);
+    if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.appendChild(el); chip.appendChild(document.createTextNode(" ")); }
+    const u = ev.usage, capped = u.five_hour_pct >= 100 || u.weekly_pct >= 100;
+    el.textContent = `${ev.profile} ${u.five_hour_pct}%·${u.weekly_pct}%`;
+    el.classList.toggle("cap", capped);
+    el.title = `5-hour ${u.five_hour_pct}% (resets ${u.five_hour_resets || "?"}) · weekly ${u.weekly_pct}% (resets ${u.weekly_resets || "?"})`;
   }
   function setDown(down) {
     const dot = $("#hostdot"); if (dot) dot.classList.toggle("down", down);
