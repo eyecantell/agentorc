@@ -24,6 +24,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
 | TD-030 | One name, one session: refuse a live holder, supersede an exited one, drop hidden `-2` suffixes | Medium | Open |
 | TD-031 | Show the model in use on the card and in `ao status` (when the adapter can tell) | Low | Open |
+| TD-032 | An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed | Medium | Open |
 
 ---
 
@@ -206,4 +207,17 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** an optional `model` on the session record, filled by the adapter: from the hook payload if Claude Code provides one (check the SessionStart / UserPromptSubmit input schema first), else from the transcript's last top-level assistant entry on the tick (the locator already knows the path; read the tail, not the file). Shown as the third part of the profile line — `claude-code · paul · fable-5-1` — shortened by dropping the `claude-` prefix, and as a column in `ao status -v` and a field in `--json`. Absent for `shell` and for adapters that cannot tell; never guessed from the profile without saying so (`fable-5-1 (profile)` if the declared model is shown before the first observation). Done when a `/model sonnet` in a live session changes the card within a tick.
 
 **Related:** design §4.2a (profiles: tool · account · model), §4.5 card profile line, TD-001 (usage per profile).
+
+## TD-032: An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed
+
+**Priority:** Medium
+**Added:** 2026-09-11
+**Status:** Open
+**Location:** design §6 (stall policy, phase 3), `src/sessionorc/agent.py` (tick), `src/agentorc/adapters/claude_code/` (screen rules, TD-015 manifest)
+
+**Why:** Run 4 of `tdgrind-ao-1` (`ao-agentorc-tdgrind-ao-1-2`, unattended) opened PR #63 at 20:36 on 2026-09-10 and at 20:40 printed "Waiting for CI on the updated head of PR #63 before merging", then Claude Code printed "Remote Control disconnected — another connection took over this session … this device is standing down (code 4090)" and the pane's footer later showed `/rc failed`. From then until 16:47 on 2026-09-11 the session sat `idle` on the Herd — 20 hours, CI long green, PR unmerged, run unfinished — and nothing flagged it: `idle` is the normal state for a session waiting on a person (§4.2), so an unattended session that has *stopped driving itself* is indistinguishable from one resting between turns. A single `ao send --wait` ("CI is green, merge it, exit") woke it; it merged #63 and exited within 30 s, so the process was fine and only its loop had ended. Two gaps: (1) no policy for an unattended session idle past a threshold with its lane unfinished (§6 has a *stall* rule for `working` with no output, not for `idle` with open work — an orchestrator session, §4.8, would have caught it on its first tick); (2) the stand-down banner is a screen state the classifier does not know (TD-015 manifest): a Claude Code pane that says "standing down" is not `idle`, it is `detached`, and the card should say so.
+
+**Fix:** (a) a TD-015 rule for the Remote Control stand-down / `/rc failed` screen → a labelled `scraped` state (`detached`, or `idle` with pending text "stood down: another device took over") so the card reads differently from a resting worker; (b) in §6, an **idle-with-open-work** rule for `unattended` sessions: idle past `idle_after` (default 15 min) with a `progress` entry still `claimed` or a PR open from the session's branch → flag `stalled?` and nudge once with a fixed prompt through `send --wait`, then wrap up — the same escalation as the working-stall rule; until §6 lands, this is the orchestrator brief's first rule; (c) record in the design (§4.2) that Remote Control takeovers happen to worker panes and what they look like. Done when a worker that stands down is flagged within `idle_after` and the nudge lands without a person.
+
+**Related:** design §4.2 (idle is not an alert), §6 stall, §4.8 orchestrator, TD-015, TD-026 (no stopper for hand-started unattended sessions), TD-028 step (1) (PR #63, the run this happened to).
 
