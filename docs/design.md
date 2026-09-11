@@ -643,9 +643,10 @@ TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao finding TD-029 -
 (each a small RPC on the calling session's own record). Presets are picked at start, `ao new
 --role grinder --lane TD-027,TD-019` (`--lane free-pick` for scan-and-choose; `ao roles` lists
 what the repo and the package define; `--grant orchestrate` adds a grant a preset lacks). The
-CLI knows which session is calling from `AGENTORC_SESSION`, the variable the hook already uses
-(§4.2), and sends it with every RPC: that is how a report lands on the right record and how the
-agent tells a worker acting on another session from a person typing in a terminal (§4.8).
+CLI is to read the calling session from `AGENTORC_SESSION`, the variable the hook already uses
+(§4.2), and send it with every RPC (TD-028 step 1; today it sends nothing): that is how a report
+lands on the right record and how the agent tells a worker acting on another session from a
+person typing in a terminal (§4.8).
 
 ### 4.8 Capabilities, report channels, and role presets (2026-09-10)
 
@@ -670,8 +671,9 @@ non-empty. Two channels cover every worker seen so far and the person's own sess
 - `findings`: references the session filed. Entries `{ref, priority, at, source}`.
 
 Each entry has a **source**, on the same rule as state (§4.2): **declared** — the session said
-so through `ao progress` / `ao finding`; the skill file (`ao --skill`, TD-019) tells every
-session to declare a claim before its first edit and the result before moving on; **derived** —
+so through `ao progress` / `ao finding`; the skill file (`ao --skill`, TD-019) is to tell every
+session to declare a claim before its first edit and the result before moving on (TD-028 step
+2); **derived** —
 the tick reads the session's worktree branch (`tdNNN-*` → claimed), the PRs from that branch and
 their merge state (merged → done), and ledger rows that appeared on main from that branch
 (→ finding), and fills in what the session forgot, always marked `derived`; **scraped** — a
