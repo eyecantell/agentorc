@@ -431,10 +431,10 @@ def create_app() -> FastAPI:
         finally:
             for f in reapers:
                 f.cancel()
+            # `pump` has already closed the pty, so the child is reaped and its status is final:
+            # a `tmux attach` that exited on its own carries its code, and one the teardown
+            # signalled carries None, which is the retryable case (TD-029).
             status = pty.exit_status()
-            # The viewer went away first: end the attach with it, or the tmux client stays attached
-            # to the session for as long as the UI process lives (TD-029).
-            pty.close()
             with contextlib.suppress(Exception):
                 if status not in (0, None) or not produced:
                     # A dead attach is final (TD-029): `tmux attach` exits non-zero when its session

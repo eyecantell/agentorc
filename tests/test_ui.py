@@ -321,12 +321,13 @@ def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
     assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
 
 
-def test_a_dead_attach_is_final_and_a_closed_delta_ends_the_terminal(client, subprocess_agent, tmp_path):
+def test_a_dead_attach_is_final(client, subprocess_agent, tmp_path):
     """TD-029, the reproduction: a record that still claims a pane whose tmux session is gone (a
     tmux server restart, or a close the record has not caught up with) used to let `/term/` run
     `tmux attach`, print tmux's "can't find session", and end normally — which the client treats as
     retryable, so it reconnected twice a second until Forget. A dead attach is now final: the
-    server closes 4404, the one code the client never retries."""
+    server closes 4404, the one code the client never retries. This is the server half only —
+    parts (a) and (c) of the fix are JavaScript, which this repo has no harness for."""
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "dead"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
     wait_state(client, sid, "idle")
