@@ -46,6 +46,10 @@ Mutating — each one is a decision, so check the state first:
   `prompt-stalled` (nothing started), `timeout`, `removed`.
 - `ao allow|deny <id> [reason]` — the pending permission, through the hook channel.
 - `ao mode <id> unattended|interactive`; `ao kill <id>` (worktree kept); `ao close <id>`.
+- Acting on a session other than your own (`send`, `keys`, `kill`, `close`, `mode`, `new`) needs
+  the `orchestrate` grant on your record (`ao status --json` → `capabilities`); without it the
+  agent answers "needs the orchestrate grant". You cannot grant yourself: a person, or a session
+  that already holds the grant, does it with `ao grant <id> orchestrate` (design §4.8).
 - `ao keys <id> Key…` — raw keys. Not for dialogs, menus, or another agent's composer.
 - `ao focus <id>` attaches a terminal: for people, not for you.
 

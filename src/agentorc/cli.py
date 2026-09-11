@@ -13,8 +13,9 @@ from datetime import UTC, datetime
 from importlib import resources
 from typing import Any
 
-from sessionorc.client import AgentError, AgentUnavailable, call_sync
-from sessionorc.models import STATE_RANK
+from sessionorc.client import AgentError, AgentUnavailable
+from sessionorc.client import call_sync as _call_sync
+from sessionorc.models import GRANTS, STATE_RANK
 from sessionorc.tmux import attach_argv
 
 
@@ -31,6 +32,13 @@ def _age(iso: str) -> str:
     if secs < 86400:
         return f"{secs // 3600}h"
     return f"{secs // 86400}d"
+
+
+def call_sync(method: str, **params: Any) -> Any:
+    """Every RPC carries the calling session's id from `AGENTORC_SESSION` (design §4.7, §4.8;
+    TD-028): that is how the agent tells a worker acting on another session from a person at a
+    terminal. Unset outside a session, so nothing changes for a person."""
+    return _call_sync(method, caller=os.environ.get("AGENTORC_SESSION") or None, **params)
 
 
 def emit(args: argparse.Namespace, result: Any, prose: Callable[[], None]) -> int:
@@ -58,8 +66,10 @@ def cmd_status(args: argparse.Namespace) -> int:
         pend = f"  ← {s['pending']['kind']}: {s['pending']['text']}" if s.get("pending") else ""
         mode = " [unattended]" if s.get("unattended") else ""
         print(f"{s['id']:<{w}}  {s['state']:<10}{conf:<3} {_age(s['since']):>4}  {s['adapter']}{mode}{pend}")
-        if args.verbose and s.get("tail"):
-            for line in s["tail"][-3:]:
+        if args.verbose:
+            if s.get("capabilities"):
+                print(f"{'':<{w}}      grants: {', '.join(s['capabilities'])}")
+            for line in (s.get("tail") or [])[-3:]:
                 print(f"{'':<{w}}      │ {line}")
     return 0
 
@@ -103,6 +113,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         unattended=args.unattended,
         resume=args.resume,
         prompt=args.prompt,
+        capabilities=args.grant or [],
     )
     if getattr(args, "attach", False):
         if not args.json:
@@ -121,6 +132,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
         None,
     )
     args.worktree = None
+    args.grant = []
     args.name = args.name or "shell"
     return cmd_new(args)
 
@@ -213,6 +225,14 @@ def cmd_tail(args: argparse.Namespace) -> int:
 def cmd_mode(args: argparse.Namespace) -> int:
     s = call_sync("set_mode", id=args.id, unattended=args.mode == "unattended")
     return emit(args, s, lambda: print(f"{s['id']}: {'unattended' if s['unattended'] else 'interactive'}"))
+
+
+def cmd_grants(args: argparse.Namespace) -> int:
+    """`ao grant <id> orchestrate` / `ao revoke <id> orchestrate` (design §4.8): edit the record's
+    `capabilities`; the agent applies it on the session's next call."""
+    edit = {"add": args.grants} if args.cmd == "grant" else {"remove": args.grants}
+    s = call_sync("set_grants", id=args.id, **edit)
+    return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
 
 
 def cmd_decide(args: argparse.Namespace) -> int:
@@ -313,6 +333,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--unattended", action="store_true")
     p.add_argument("--resume", help="the tool's session id to resume")
     p.add_argument("--prompt", help="opening prompt")
+    p.add_argument(
+        "--grant",
+        action="append",
+        choices=GRANTS,
+        help="a grant the session starts with (design §4.8); `orchestrate` lets it act on other sessions",
+    )
     p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_new)
 
@@ -367,6 +393,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("mode", choices=["unattended", "interactive"])
     p.set_defaults(fn=cmd_mode)
+
+    for name, help_ in (
+        ("grant", "give a session a grant: `orchestrate` lets it act on other sessions (design §4.8)"),
+        ("revoke", "take a grant away from a session"),
+    ):
+        p = add(name, help=help_)
+        p.add_argument("id")
+        p.add_argument("grants", nargs="+", choices=GRANTS, metavar="grant")
+        p.set_defaults(fn=cmd_grants)
 
     p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")
     p.add_argument("--bind", default="127.0.0.1")

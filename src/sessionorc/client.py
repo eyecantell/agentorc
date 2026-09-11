@@ -24,8 +24,11 @@ class AgentUnavailable(AgentError):
 class LocalClient:
     """One connection, sequential requests. Cheap enough to open per CLI call."""
 
-    def __init__(self, sock: Path | None = None):
+    def __init__(self, sock: Path | None = None, caller: str | None = None):
         self.sock = sock or paths.socket_path()
+        # The calling session's id, sent as the envelope's `caller` (design §4.8): the agent gates
+        # acting RPCs on another session by it. None is a person at a terminal or the UI.
+        self.caller = caller
         self._reader: asyncio.StreamReader | None = None
         self._writer: asyncio.StreamWriter | None = None
         self._n = 0
@@ -46,7 +49,10 @@ class LocalClient:
     async def call(self, method: str, **params: Any) -> Any:
         assert self._reader and self._writer
         self._n += 1
-        self._writer.write((json.dumps({"id": self._n, "method": method, "params": params}) + "\n").encode())
+        req: dict[str, Any] = {"id": self._n, "method": method, "params": params}
+        if self.caller:
+            req["caller"] = self.caller
+        self._writer.write((json.dumps(req) + "\n").encode())
         await self._writer.drain()
         line = await self._reader.readline()
         if not line:
@@ -64,9 +70,9 @@ class LocalClient:
             yield json.loads(line)
 
 
-def call_sync(method: str, **params: Any) -> Any:
+def call_sync(method: str, *, caller: str | None = None, **params: Any) -> Any:
     async def _go() -> Any:
-        async with LocalClient() as c:
+        async with LocalClient(caller=caller) as c:
             return await c.call(method, **params)
 
     return asyncio.run(_go())

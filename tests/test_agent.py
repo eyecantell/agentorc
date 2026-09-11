@@ -466,3 +466,69 @@ async def test_send_confirms_the_submit(agent, composerstubs, tmp_path, monkeypa
             await c.call("send", id=s2, text="stuck prompt")
         assert await submitted(s2) == []
         assert any(t.rstrip().endswith(">> stuck prompt") for t in await agent.rpc_tail(s2, 5))
+
+
+async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
+    """Design §4.8, §9 invariant 11: a session acting on another session needs `orchestrate`;
+    self, no caller, and every read pass; `set_grants` is a person's (or a granted session's)."""
+    async with LocalClient() as person:
+        a = (await person.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        b = (await person.call("create", name="b", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        assert (await person.call("get", id=a))["capabilities"] == []
+        async with LocalClient(caller=a) as worker:
+            # session → other: refused for every acting RPC, one message
+            for method, params in (
+                ("send", {"id": b, "text": "echo no"}),
+                ("keys", {"id": b, "keys": ["Enter"]}),
+                ("kill", {"id": b}),
+                ("close", {"id": b}),
+                ("set_mode", {"id": b, "unattended": True}),
+                ("remove", {"id": b}),
+                ("create", {"name": "c", "dir": str(tmp_path), "adapter": "shell"}),
+                ("set_grants", {"id": a, "add": ["orchestrate"]}),  # no self-grant
+                ("set_grants", {"id": b, "add": ["orchestrate"]}),
+            ):
+                with pytest.raises(AgentError, match="needs the orchestrate grant"):
+                    await worker.call(method, **params)
+            assert (await person.call("get", id=b))["state"] != "closed"
+            # session → self: allowed
+            await worker.call("send", id=a, text="echo SELF-OK")
+            assert (await worker.call("set_mode", id=a, unattended=True))["unattended"] is True
+            # reads are never gated
+            assert b in [s["id"] for s in await worker.call("list")]
+            assert (await worker.call("get", id=b))["id"] == b
+            assert isinstance(await worker.call("tail", id=b, lines=3), list)
+            assert (await worker.call("explain", id=b, lines=3))["id"] == b
+            # unknown caller: a session this agent never started holds no grant
+            async with LocalClient(caller="ao-stranger") as stranger:
+                with pytest.raises(AgentError, match="needs the orchestrate grant"):
+                    await stranger.call("kill", id=b)
+            # a person grants; the next call the session makes sees it
+            with pytest.raises(AgentError, match="unknown grant"):
+                await person.call("set_grants", id=a, add=["root"])
+            granted = await person.call("set_grants", id=a, add=["orchestrate"])
+            assert granted["capabilities"] == ["orchestrate"]
+            await worker.call("send", id=b, text="echo FROM-A")
+            c = await worker.call("create", name="c", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            assert c["capabilities"] == []
+            killed = await worker.call("kill", id=b)
+            assert killed["state"] == "exited"
+            # revoked: refused again on the very next call
+            assert (await person.call("set_grants", id=a, remove=["orchestrate"]))["capabilities"] == []
+            with pytest.raises(AgentError, match="needs the orchestrate grant"):
+                await worker.call("kill", id=c["id"])
+        # `capabilities` at create, and it survives the store round trip
+        d = await person.call(
+            "create",
+            name="d",
+            dir=str(tmp_path),
+            adapter="shell",
+            argv=["bash", "--norc"],
+            capabilities=["orchestrate"],
+        )
+        assert d["capabilities"] == ["orchestrate"]
+        assert json.loads((paths.sessions_dir() / f"{d['id']}.json").read_text())["capabilities"] == ["orchestrate"]
+        with pytest.raises(AgentError, match="unknown grant"):
+            await person.call("create", name="e", dir=str(tmp_path), adapter="shell", capabilities=["sudo"])
+        for sid in (a, c["id"], d["id"]):
+            await person.call("kill", id=sid)

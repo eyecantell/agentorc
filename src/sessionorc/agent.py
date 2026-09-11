@@ -24,7 +24,7 @@ from typing import Any
 
 from sessionorc import adapters, hosts, naming, paths
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
-from sessionorc.models import Pending, Session, State, now_iso
+from sessionorc.models import GRANTS, Pending, Session, State, now_iso
 from sessionorc.store import EventQueue, SessionStore
 from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 
@@ -41,6 +41,11 @@ PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in t
 SUBMIT_SECONDS = 1.5  # `send`: how long the composer gets to empty after Enter, per try (TD-027)
 COMPOSER_LINES = 12  # raw rows an adapter's `composer` reads (the composer sits above a status line or two)
 SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends
+# RPCs that act on a session (design §4.8): a caller that is a session needs the `orchestrate`
+# grant to run one of these on a session other than itself (§9 invariant 11). `create` targets a
+# session that is by definition not the caller; `set_grants` is gated so a session cannot grant
+# itself. Reads are never listed here.
+ACTING_RPCS = frozenset({"send", "keys", "kill", "close", "set_mode", "remove", "create", "set_grants"})
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs_keep_days`)
 # a tool registry's status → our state (Claude Code: busy | idle | shell, the last a `!` command running)
@@ -425,10 +430,12 @@ class HostAgent:
         unattended: bool = False,
         resume: str | None = None,
         prompt: str | None = None,
+        capabilities: list[str] | None = None,
     ) -> dict[str, Any]:
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
+        grants = _grants(capabilities or [])
         try:
             ad = adapters.get(adapter)
         except KeyError as e:
@@ -492,6 +499,7 @@ class HostAgent:
                 confidence=ad.state_source,
                 run_log=str(run_log),
                 adapter_id=spec.adapter_id,
+                capabilities=grants,
             )
             self.sessions[sid] = s
             self.store.save(s)
@@ -758,6 +766,18 @@ class HostAgent:
         self.store.save(s)
         return s.to_dict()
 
+    async def rpc_set_grants(
+        self, id: str, add: list[str] | None = None, remove: list[str] | None = None
+    ) -> dict[str, Any]:
+        """`ao grant` / `ao revoke`, the Focus grants chip (design §4.8): edit `capabilities`. Takes
+        effect on the target's next call — the gate reads the record, not a cached copy."""
+        s = self._get(id)
+        adding, removing = _grants(add or []), _grants(remove or [])
+        s.capabilities = [g for g in GRANTS if (g in s.capabilities or g in adding) and g not in removing]
+        self.store.save(s)
+        await self._push_changes()
+        return s.to_dict()
+
     async def rpc_hook(self, session: str, **event: Any) -> dict[str, Any] | None:
         """Called by an adapter's hook script. A `permission` event blocks until answered or timed out."""
         if event.get("kind") == "permission":
@@ -825,6 +845,22 @@ class HostAgent:
         return "pong"
 
     # -- helpers ---------------------------------------------------------------------------------
+
+    def _gate(self, caller: Any, method: str, params: dict[str, Any]) -> None:
+        """Design §4.8, §9 invariant 11: an acting RPC from a session onto a *different* session
+        needs the `orchestrate` grant on the caller's record. No caller (a person's terminal, the
+        UI) or a session acting on itself passes as before. A caller this agent does not know is
+        a session (the id came from `AGENTORC_SESSION`) and holds no grant. Reads are never gated;
+        this is a guard against a confused worker, not a security boundary."""
+        if not caller or method not in ACTING_RPCS:
+            return
+        if method not in ("create", "set_grants") and params.get("id") == caller:
+            return
+        me = self.sessions.get(str(caller))
+        if me is not None and "orchestrate" in me.capabilities:
+            return
+        target = "a new session" if method == "create" else params.get("id", "?")
+        raise RpcError(f"{caller} cannot {method} {target}: needs the orchestrate grant (design §4.8)")
 
     def _get(self, sid: str, *, external: bool = False) -> Session:
         """A record by id. A registry-only card (`external`) is returned only to callers that
@@ -904,11 +940,14 @@ class HostAgent:
 
     async def _dispatch(self, req: dict[str, Any]) -> dict[str, Any]:
         rid = req.get("id")
-        method = getattr(self, f"rpc_{req.get('method')}", None)
+        name = req.get("method")
+        method = getattr(self, f"rpc_{name}", None)
         if method is None:
-            return {"id": rid, "error": f"unknown method {req.get('method')!r}"}
+            return {"id": rid, "error": f"unknown method {name!r}"}
+        params = req.get("params") or {}
         try:
-            return {"id": rid, "result": await method(**(req.get("params") or {}))}
+            self._gate(req.get("caller"), str(name), params)
+            return {"id": rid, "result": await method(**params)}
         except RpcError as e:
             return {"id": rid, "error": str(e)}
         except TypeError as e:
@@ -921,6 +960,14 @@ class HostAgent:
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
 _CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
+
+
+def _grants(names: list[str]) -> list[str]:
+    """Validate a list of grant names against `GRANTS`, in canonical order."""
+    bad = [n for n in names if n not in GRANTS]
+    if bad:
+        raise RpcError(f"unknown grant {', '.join(map(str, bad))}; grants are: {', '.join(GRANTS)}")
+    return [g for g in GRANTS if g in names]
 
 
 async def _falsy(coro: Any) -> bool:
