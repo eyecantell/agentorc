@@ -2,12 +2,14 @@
 
 import asyncio
 import json
+import subprocess
 
 import pytest
 from conftest import FAST_TICK, wait_state
 
-from sessionorc import paths
+from sessionorc import paths, reports
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import FindingEntry, ProgressEntry
 
 pytestmark = pytest.mark.integration
 
@@ -604,3 +606,54 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
         assert [f["ref"] for f in on_disk["findings"]] == ["TD-029", "#59"]
         assert (await person.call("get", id=sid))["lane"] == ["TD-027", "TD-019"]
         await person.call("kill", id=sid)
+
+
+async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaration(agent, tmp_path, monkeypatch):
+    """TD-028 step 3, design §4.8: the tick reads the session's branch and its PRs and fills in the
+    channels, marked `derived` — and §9 invariant 10 keeps it off what the session declared."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@e.com"], ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", str(repo), *args], check=True)
+    (repo / "f").write_text("x")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "one"], check=True)
+    subprocess.run(["git", "-C", str(repo), "checkout", "-qb", "td077-cap"], check=True)
+    monkeypatch.setattr(
+        reports, "_prs", lambda directory, **kw: [{"number": 77, "state": "OPEN", "headRefName": "td077-cap"}]
+    )
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+        await agent.tick()
+        await agent._derive_task  # detached so a slow `gh` never holds up the tick
+        s = await person.call("get", id=sid)
+        assert [(p["ref"], p["status"], p["pr"], p["source"]) for p in s["progress"]] == [
+            ("TD-077", "claimed", 77, "derived")
+        ]
+        # the session declares the same reference done: the declaration replaces the derived entry
+        await person.call("progress", id=sid, ref="TD-077", status="done", pr=77)
+        # ... and the next derivation cannot put it back to claimed (§9 invariant 10)
+        agent._derived_at.clear()
+        await agent.tick()
+        await agent._derive_task
+        s = await person.call("get", id=sid)
+        assert [(p["ref"], p["status"], p["source"]) for p in s["progress"]] == [("TD-077", "done", "declared")]
+        # every entry of a multi-entry derivation is applied and saved: these upserts are the write,
+        # so an `any()` over a generator would have stopped at the first one (review 2026-09-11)
+        monkeypatch.setattr(
+            reports,
+            "derive",
+            lambda directory, branch, pending=None: (
+                [ProgressEntry(ref="TD-080", source="derived"), ProgressEntry(ref="TD-081", source="derived")],
+                [FindingEntry(ref="TD-082", source="derived"), FindingEntry(ref="TD-083", source="derived")],
+            ),
+        )
+        agent._derived_at.clear()
+        await agent.tick()
+        await agent._derive_task
+        on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+        assert [p["ref"] for p in on_disk["progress"]] == ["TD-077", "TD-080", "TD-081"]
+        assert [f["ref"] for f in on_disk["findings"]] == ["TD-082", "TD-083"]
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+        assert sid not in agent._derived_at  # no key outlives the record
