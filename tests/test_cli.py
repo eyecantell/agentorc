@@ -322,3 +322,42 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     assert c["capabilities"] == ["orchestrate"]
     for sid in (a, c["id"]):
         call_sync("kill", id=sid)
+
+
+def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-028 step 2: `ao progress` / `ao finding` land on the caller's own record (or `--id`),
+    print the report line, and show up in `ao status -v` and `--json`; `ao new --lane` sets the lane."""
+
+    def out():
+        return json.loads(capsys.readouterr().out)
+
+    assert cli.main(["--json", "new", "grinder", "-a", "shell", "-d", str(tmp_path), "--lane", "td-27,TD-19"]) == 0
+    sid = out()["id"]
+    wait_state(sid, "idle")
+    # a person at a terminal with no session of their own is told, not guessed at
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    assert cli.main(["progress", "claim", "TD-027"]) == 2
+    assert "run this inside an agentorc session" in capsys.readouterr().err
+    monkeypatch.setenv("AGENTORC_SESSION", sid)  # now `ao` runs inside the grinder
+    assert cli.main(["progress", "claim", "td-27"]) == 0
+    assert capsys.readouterr().out.strip() == f"{sid}: TD-027 · 0/2 done"
+    assert cli.main(["--json", "progress", "done", "TD-027", "--pr", "60"]) == 0
+    assert out()["progress"][0] == {
+        "ref": "TD-027",
+        "status": "done",
+        "pr": 60,
+        "why": None,
+        "source": "declared",
+        "at": call_sync("get", id=sid)["progress"][0]["at"],
+    }
+    assert cli.main(["finding", "TD-029", "--priority", "low"]) == 0
+    assert capsys.readouterr().out.strip() == f"{sid}: filed TD-029 (low)"
+    assert cli.main(["progress", "drop", "TD-019", "--why", "phase 5"]) == 0
+    capsys.readouterr()
+    assert cli.main(["status", "-v"]) == 0
+    shown = capsys.readouterr().out
+    assert "report: TD-027 → #60 · 1/2 done" in shown and "filed:  TD-029 (low)" in shown
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["--json", "finding", "#67", "--id", sid]) == 0  # a person, or an orchestrator, for a worker
+    assert [f["ref"] for f in out()["findings"]] == ["TD-029", "#67"]
+    call_sync("kill", id=sid)

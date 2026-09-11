@@ -668,8 +668,10 @@ name and resolves it within the current repo or directory (TD-030), so the hint 
 `ao focus aotest`.
 Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao progress done
 TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao finding TD-029 --priority low`
-(each a small RPC on the calling session's own record). Presets are picked at start, `ao new
---role grinder --lane TD-027,TD-019` (`--lane free-pick` for scan-and-choose; `ao roles` lists
+(each a small RPC on the calling session's own record — `--id` for another's, since the channels
+are ungated; `ao status -v` prints the same report line the card will, and `--json` the entries). Presets are picked at start, `ao new
+--role grinder --lane TD-027,TD-019` (`--lane` landed with step 2, the rest with step 5;
+`--lane free-pick` for scan-and-choose; `ao roles` lists
 what the repo and the package define; `--grant orchestrate` adds a grant a preset lacks, and
 works without a preset today). `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
 running session's grants (the `set_grants` RPC; `ao status -v` and `--json` show
@@ -695,9 +697,14 @@ Two kinds of capability, deliberately different:
 non-empty. Two channels cover every worker seen so far and the person's own sessions too:
 
 - `progress`: references the session set out to resolve. Entries
-  `{ref, status: claimed | done | dropped, pr, at, source}`. The `lane` on the record is the
+  `{ref, status: claimed | done | dropped, pr, why, at, source}` — `why` carries
+  `ao progress drop`'s reason and is empty otherwise. The `lane` on the record is the
   ordered list of references (or `free-pick`) the session was handed, so the card can say
-  *1 of 2* without parsing the brief.
+  *1 of 2* without parsing the brief. One reference is one entry: a report upserts by `ref`, in
+  the order the references arrived, and a reference is canonical (`td-27` and `TD-027` are one
+  entry; a bare number is a PR, `#59`). The two RPCs are `progress` and `finding`, ungated like
+  the channels themselves — an entry invariant 10 refuses is not an error, the reply carries the
+  record as it stands and names the `refused` entry (landed 2026-09-11, TD-028 step 2).
 - `findings`: references the session filed. Entries `{ref, priority, at, source}`.
 
 Each entry has a **source**, on the same rule as state (§4.2): **declared** — the session said

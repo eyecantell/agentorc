@@ -532,3 +532,75 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             await person.call("create", name="e", dir=str(tmp_path), adapter="shell", capabilities=["sudo"])
         for sid in (a, c["id"], d["id"]):
             await person.call("kill", id=sid)
+
+
+async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
+    """TD-028 step 2, design §4.8: `progress` and `findings` on the record, written by `rpc_progress`
+    / `rpc_finding`; ungated (no grant, any caller); one reference is one entry; §9 invariant 10
+    refuses a derived write over a declared one and says which entry it refused."""
+    async with LocalClient() as person:
+        a = await person.call(
+            "create",
+            name="grinder",
+            dir=str(tmp_path),
+            adapter="shell",
+            argv=["bash", "--norc"],
+            lane=["td-27", "TD-19", "TD-027"],  # deduped after canonicalisation, or the count lies
+        )
+        sid = a["id"]
+        assert a["lane"] == ["TD-027", "TD-019"] and a["progress"] == [] and a["findings"] == []
+        with pytest.raises(AgentError, match="either `free-pick` or a list"):
+            await person.call("create", name="bad", dir=str(tmp_path), adapter="shell", lane=["free-pick", "TD-1"])
+        # the session declares its own, with no grant of any kind
+        async with LocalClient(caller=sid) as worker:
+            s = await worker.call("progress", id=sid, ref="td-27")
+            assert s["progress"] == [
+                {
+                    "ref": "TD-027",
+                    "status": "claimed",
+                    "pr": None,
+                    "why": None,
+                    "at": s["progress"][0]["at"],
+                    "source": "declared",
+                }
+            ]
+            s = await worker.call("progress", id=sid, ref="TD-027", status="done", pr="#60")
+            assert len(s["progress"]) == 1 and s["progress"][0]["status"] == "done" and s["progress"][0]["pr"] == 60
+            s = await worker.call("finding", id=sid, ref="TD-029", priority="low")
+            assert s["findings"] == [
+                {"ref": "TD-029", "priority": "low", "at": s["findings"][0]["at"], "source": "declared"}
+            ]
+            with pytest.raises(AgentError, match="unknown progress status"):
+                await worker.call("progress", id=sid, ref="TD-019", status="finished")
+            with pytest.raises(AgentError, match="needs a reference"):
+                await worker.call("progress", id=sid, ref="  ")
+            with pytest.raises(AgentError, match="not a PR number"):
+                await worker.call("progress", id=sid, ref="TD-019", status="done", pr="sixty")
+            with pytest.raises(AgentError, match="unknown report source"):
+                await worker.call("progress", id=sid, ref="TD-019", source="rumour")
+        # §9 invariant 10: the tick's derived entry cannot overwrite the declaration
+        refused = await person.call("progress", id=sid, ref="TD-027", status="claimed", source="derived")
+        assert refused["progress"][0]["status"] == "done" and refused["refused"]["source"] == "derived"
+        # ... but it fills in a reference the session never declared, marked derived
+        filled = await person.call("progress", id=sid, ref="TD-019", source="derived")
+        assert [(p["ref"], p["source"]) for p in filled["progress"]] == [("TD-027", "declared"), ("TD-019", "derived")]
+        # a declaration replaces that derived entry the moment it arrives
+        async with LocalClient(caller=sid) as worker:
+            later = await worker.call("progress", id=sid, ref="TD-019", status="dropped", why="phase 5")
+            assert later["progress"][1] == {
+                "ref": "TD-019",
+                "status": "dropped",
+                "pr": None,
+                "why": "phase 5",
+                "at": later["progress"][1]["at"],
+                "source": "declared",
+            }
+        # a foreign session may write a record's channels: reports are not an acting RPC (§4.8)
+        async with LocalClient(caller="ao-stranger") as stranger:
+            assert (await stranger.call("finding", id=sid, ref="59"))["findings"][-1]["ref"] == "#59"
+        # and it all survives the store
+        on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+        assert [p["ref"] for p in on_disk["progress"]] == ["TD-027", "TD-019"]
+        assert [f["ref"] for f in on_disk["findings"]] == ["TD-029", "#59"]
+        assert (await person.call("get", id=sid))["lane"] == ["TD-027", "TD-019"]
+        await person.call("kill", id=sid)
