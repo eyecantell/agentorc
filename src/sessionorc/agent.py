@@ -24,7 +24,18 @@ from typing import Any
 
 from sessionorc import adapters, hosts, naming, paths
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
-from sessionorc.models import GRANTS, Pending, Session, State, now_iso
+from sessionorc.models import (
+    GRANTS,
+    PROGRESS_STATUSES,
+    SOURCES,
+    FindingEntry,
+    Pending,
+    ProgressEntry,
+    Session,
+    State,
+    normalize_ref,
+    now_iso,
+)
 from sessionorc.store import EventQueue, SessionStore
 from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 
@@ -431,11 +442,12 @@ class HostAgent:
         resume: str | None = None,
         prompt: str | None = None,
         capabilities: list[str] | None = None,
+        lane: list[str] | None = None,
     ) -> dict[str, Any]:
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
-        grants = _grants(capabilities or [])
+        grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
         try:
             ad = adapters.get(adapter)
         except KeyError as e:
@@ -500,6 +512,7 @@ class HostAgent:
                 run_log=str(run_log),
                 adapter_id=spec.adapter_id,
                 capabilities=grants,
+                lane=references,
             )
             self.sessions[sid] = s
             self.store.save(s)
@@ -778,6 +791,45 @@ class HostAgent:
         await self._push_changes()
         return s.to_dict()
 
+    async def rpc_progress(
+        self,
+        id: str,
+        ref: str,
+        status: str = "claimed",
+        pr: int | None = None,
+        why: str | None = None,
+        source: str = "declared",
+    ) -> dict[str, Any]:
+        """`ao progress claim|done|drop <ref>` (design §4.8): what this session set out to resolve
+        and how it went. A report channel is **ungated** — any session may write any record's, the
+        Herd renders whichever are non-empty — and one reference is one entry, upserted in place."""
+        s = self._get(id)
+        if status not in PROGRESS_STATUSES:
+            raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}")
+        entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
+        return await self._report(s, s.report_progress(entry), entry)
+
+    async def rpc_finding(
+        self, id: str, ref: str, priority: str | None = None, source: str = "declared"
+    ) -> dict[str, Any]:
+        """`ao finding <ref> [--priority …]` (design §4.8): a reference this session filed on the
+        side. Ungated like `progress`, and upserted by reference the same way."""
+        s = self._get(id)
+        entry = FindingEntry(ref=_ref(ref), priority=priority, source=_source(source))
+        return await self._report(s, s.report_finding(entry), entry)
+
+    async def _report(self, s: Session, applied: bool, entry: Any) -> dict[str, Any]:
+        """Save and announce a report entry the record accepted. A refused one (§9 invariant 10: a
+        `derived` or `scraped` entry over a `declared` one) is not an error — the caller gets the
+        record as it stands, with `refused` naming the entry that did not land."""
+        if applied:
+            self.store.save(s)
+            await self._push_changes()
+        out = s.to_dict()
+        if not applied:
+            out["refused"] = entry.to_dict()
+        return out
+
     async def rpc_hook(self, session: str, **event: Any) -> dict[str, Any] | None:
         """Called by an adapter's hook script. A `permission` event blocks until answered or timed out."""
         if event.get("kind") == "permission":
@@ -960,6 +1012,39 @@ class HostAgent:
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
 _CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
+
+
+def _lane(refs: list[str]) -> list[str]:
+    """The references a session was handed (design §4.8), in the order given and each canonical, so
+    a lane item and the session's own claim are the same string. `free-pick` is a lane of its own."""
+    if [r for r in refs if str(r).strip() == "free-pick"]:
+        if len(refs) > 1:
+            raise RpcError("a lane is either `free-pick` or a list of references, not both")
+        return ["free-pick"]
+    return [_ref(r) for r in refs]
+
+
+def _ref(ref: str) -> str:
+    try:
+        return normalize_ref(ref)
+    except ValueError as e:
+        raise RpcError(str(e)) from None
+
+
+def _pr(pr: Any) -> int | None:
+    """A PR number, however it was typed (`59`, `"#59"`, a URL's tail) — or an error, never a lie."""
+    if pr is None or pr == "":
+        return None
+    try:
+        return int(str(pr).lstrip("#"))
+    except ValueError:
+        raise RpcError(f"not a PR number: {pr!r}") from None
+
+
+def _source(source: str) -> str:
+    if source not in SOURCES:
+        raise RpcError(f"unknown report source {source!r}; sources are: {', '.join(SOURCES)}")
+    return source
 
 
 def _grants(names: list[str]) -> list[str]:

@@ -15,7 +15,7 @@ from typing import Any
 
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK
+from sessionorc.models import GRANTS, STATE_RANK, report_line
 from sessionorc.tmux import attach_argv
 
 
@@ -69,6 +69,10 @@ def cmd_status(args: argparse.Namespace) -> int:
         if args.verbose:
             if s.get("capabilities"):
                 print(f"{'':<{w}}      grants: {', '.join(s['capabilities'])}")
+            if line := report_line(s):
+                print(f"{'':<{w}}      report: {line}")
+            if s.get("findings"):
+                print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
             for line in (s.get("tail") or [])[-3:]:
                 print(f"{'':<{w}}      │ {line}")
     return 0
@@ -114,6 +118,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         resume=args.resume,
         prompt=args.prompt,
         capabilities=args.grant or [],
+        lane=args.lane,
     )
     if getattr(args, "attach", False):
         if not args.json:
@@ -132,7 +137,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
         None,
     )
     args.worktree = None
-    args.grant = []
+    args.grant, args.lane = [], []
     args.name = args.name or "shell"
     return cmd_new(args)
 
@@ -235,6 +240,40 @@ def cmd_grants(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
 
 
+def _finding(f: dict[str, Any]) -> str:
+    pri = f" ({f['priority']})" if f.get("priority") else ""
+    return f["ref"] + ("~" if f.get("source") != "declared" else "") + pri
+
+
+def _own_session(args: argparse.Namespace) -> str | None:
+    """Which record a report lands on: `--id` for another session's, otherwise this session's own
+    (`AGENTORC_SESSION`). A person at a terminal with neither gets told, not guessed at."""
+    sid = getattr(args, "id", None) or os.environ.get("AGENTORC_SESSION")
+    if not sid:
+        fail(args, "no session: run this inside an agentorc session, or pass --id <session>", 2)
+    return sid
+
+
+def cmd_progress(args: argparse.Namespace) -> int:
+    """`ao progress claim|done|drop <ref>` (design §4.8): declare a lane item claimed before the
+    first edit and its result before moving on. Ungated, and lands on this session's own record."""
+    sid = _own_session(args)
+    if sid is None:
+        return 2
+    status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
+    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why)
+    return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
+
+
+def cmd_finding(args: argparse.Namespace) -> int:
+    """`ao finding <ref> [--priority …]` (design §4.8): a reference this session filed on the side."""
+    sid = _own_session(args)
+    if sid is None:
+        return 2
+    s = call_sync("finding", id=sid, ref=args.ref, priority=args.priority)
+    return emit(args, s, lambda: print(f"{s['id']}: filed {', '.join(_finding(f) for f in s['findings'])}"))
+
+
 def cmd_decide(args: argparse.Namespace) -> int:
     s = call_sync("get", id=args.id)
     pend = s.get("pending") or {}
@@ -299,6 +338,11 @@ class _SkillAction(argparse.Action):
         parser.exit(0)
 
 
+def _refs(value: str) -> list[str]:
+    """`--lane TD-027,TD-019` → the list; the agent canonicalises each reference (design §4.8)."""
+    return [r.strip() for r in value.split(",") if r.strip()]
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(prog="ao", description="agentorc — sessions in tmux, one view")
     ap.add_argument("--json", action="store_true", help="print the RPC result as JSON (every subcommand; TD-018)")
@@ -338,6 +382,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="append",
         choices=GRANTS,
         help="a grant the session starts with (design §4.8); `orchestrate` lets it act on other sessions",
+    )
+    p.add_argument(
+        "--lane",
+        type=_refs,
+        default=[],
+        help="the references this session was handed, comma-separated (`TD-027,TD-019`) or `free-pick` (design §4.8)",
     )
     p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_new)
@@ -402,6 +452,20 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("id")
         p.add_argument("grants", nargs="+", choices=GRANTS, metavar="grant")
         p.set_defaults(fn=cmd_grants)
+
+    p = add("progress", help="declare a reference claimed, done, or dropped (design §4.8)")
+    p.add_argument("action", choices=["claim", "done", "drop"])
+    p.add_argument("ref", help="a ledger id (TD-027), a PR number, or an attention-board line")
+    p.add_argument("--pr", help="the PR the work is on")
+    p.add_argument("--why", help="why it was dropped")
+    p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
+    p.set_defaults(fn=cmd_progress)
+
+    p = add("finding", help="declare a reference this session filed on the side (design §4.8)")
+    p.add_argument("ref")
+    p.add_argument("--priority")
+    p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
+    p.set_defaults(fn=cmd_finding)
 
     p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")
     p.add_argument("--bind", default="127.0.0.1")
