@@ -112,14 +112,19 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   **A name identifies one session within its scope** (the repo, or the directory for a
   repo-less session; decision 2026-09-10, §10, §9 invariant 12): it is what a person types
   into `ao focus`, `ao send` and the Herd filter, so two cards called `aotest` is a defect, not
-  a namespace. The rules, in the order the agent applies them at create:
+  a namespace. Today `ao focus` and `ao send` take the full id (`ao-agentorc-tests-aotest`);
+  with the rule below a bare name resolves to the one live session of that name in the
+  current repo or directory, and the full id keeps working everywhere (TD-030). The rules, in
+  the order the agent applies them at create:
   - the name is held by a **live** record (any state but `exited` / `closed`) → refused:
     "`aotest` is running — switch to it, or pick another name". The New session form learns
     this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
   - the name is held by an **exited or closed** record → the new session **supersedes** it: it
     takes the id, the old record is forgotten, its run log is kept and linked from the new
-    record as *previous run* (the exited banner's Resume already superseded its record this
-    way since PR #17; a fresh start under the same name now does too). No `-2` card appears.
+    record as *previous run* (a new field). This extends the supersede that Resume has done
+    since PR #17 — which closes the exited record and keeps it a day — to a fresh start under
+    the same name, and goes one step further by forgetting rather than keeping, because the
+    name now belongs to the new session. No `-2` card appears.
   - the id is taken in tmux by a session the agent has **no record of** (hand-made, or a stale
     pane the tick has not adopted yet) → the agent adopts it first if it is ours, else appends
     `-2`, `-3` and — unlike before — shows the suffixed name on the record, so what the Herd
@@ -656,8 +661,11 @@ on it and whether it applies, and `ao explain --file` classifies a saved screen 
 session must follow (TD-019 — planned for phase 5, pulled forward and landed 2026-09-10 because an orchestrator session driving `ao` came first; `ao --skill > .claude/skills/ao/SKILL.md` installs it in a repo, the New-session install offer is still phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
 automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
 `ao new <name>` applies §4.1's name rule and says so: a live holder is refused with
-"`aotest` is running — `ao focus aotest`, or pick another name" (exit 1, the holder's id under
-`--json`); an exited or closed holder is superseded and the reply names the previous run's log.
+"`aotest` is running — `ao focus ao-agentorc-tests-aotest`, or pick another name" (exit 1, the
+holder's id under `--json`); an exited or closed holder is superseded and the reply names the
+previous run's log. Once the rule holds, every subcommand that takes an id also takes a bare
+name and resolves it within the current repo or directory (TD-030), so the hint can say
+`ao focus aotest`.
 Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao progress done
 TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao finding TD-029 --priority low`
 (each a small RPC on the calling session's own record). Presets are picked at start, `ao new
@@ -983,8 +991,8 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 - [x] **Should a name identify one session?** (2026-09-10) → **yes, per scope (§4.1, §9
   invariant 12)**. Raised when the Herd showed `aotest` beside `aotest-2` and `tdgrind-ao-1`
   twice (one exited, one working): the `-2` suffix kept tmux happy while the record kept the
-  original name, so the person saw two cards with one name and could not tell which `ao focus
-  aotest` would open. Decided: a live holder refuses a second session under the name (offer
+  original name, so the person saw two cards with one name and could not tell which one `ao focus` meant (it
+  takes the full id today, which is the other half of the same problem). Decided: a live holder refuses a second session under the name (offer
   Switch to); an exited or closed holder is superseded, the way Resume already superseded its
   exited record (PR #17); a suffix survives only for a tmux id the agent has no record of, and
   is then shown. What this costs: two workers cannot share a name across worktrees any more —
