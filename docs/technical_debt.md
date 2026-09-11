@@ -23,6 +23,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
 | TD-030 | One name, one session: refuse a live holder, supersede an exited one, drop hidden `-2` suffixes | Medium | Open |
+| TD-031 | Show the model in use on the card and in `ao status` (when the adapter can tell) | Low | Open |
 
 ---
 
@@ -192,4 +193,17 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** (1) `rpc_create` looks up the name in scope before choosing an id: live holder → `RpcError("<name> is running — switch to it, or pick another name")` carrying the holder's id; exited/closed holder → kill its dead pane, forget the record, remember its run log on the new record (`previous_run`), reuse the id; (2) `session_id` keeps the suffix path only for ids present in tmux with no record, and the record's `name` then carries the suffix; (3) `shell` gets agent-generated names (`shell`, `shell-2`) shown as the name; (4) `/api/occupancy` (or a sibling) answers the name check for the New session form, which disables Start with **Switch to** for a live holder and shows "replaces the exited `<name>` — run log kept" for a dead one; `ao new` prints the same texts. (5) Every CLI subcommand that takes an id also accepts a bare name: resolved to the one live session of that name in the current repo or directory (cwd), else "ambiguous — <ids>" or "no session named <name> here"; full ids keep working. Until (5) lands, `ao focus` / `ao send` take the full `ao-…` id only. Tests: live refuse, dead supersede with log link, tmux-only collision suffixed and shown, shell auto-name, bare-name resolution (unique, ambiguous, absent). Done when starting `aotest` twice yields one card, and `ao focus aotest` is unambiguous on every host.
 
 **Related:** design §4.1, §4.5a (New session name field), §4.7, §9 invariant 12, §10 (2026-09-10); PR #17 (resume supersedes), TD-023 (`pane` flag), TD-029 (the Close that prompted the report).
+
+## TD-031: Show the model in use on the card and in `ao status` (when the adapter can tell)
+
+**Priority:** Low
+**Added:** 2026-09-11
+**Status:** Open
+**Location:** `src/agentorc/adapters/claude_code/` (hook payload, transcript locator), `src/sessionorc/agent.py` (session record, tick), `src/agentorc/ui/templates/card.html` (`profile_line`), `src/agentorc/cli.py` (`status`)
+
+**Why:** Paul asked for it on 2026-09-11: with grinders on one model and his own sessions on another, the card's profile line (`claude-code · <account or profile>`, plus the profile's *declared* model when one is set) does not say which model a session is actually running, and a `/model` switch mid-session changes it without any card noticing. The profile's declared `model` (§4.2a) is an intent, not an observation. What the adapter can observe for Claude Code: every `type: assistant` entry in the transcript carries `message.model` (`claude-fable-5-1` in this session's transcript; `<synthetic>` for system entries), so the last one is the model in use as of the last turn. Read the entry's own field, not a raw grep: `"model":"sonnet"` also appears inside `tool_input` of Agent calls that *request* a subagent model, which is not the session's model; whether the hook payload carries a model field is unverified (the hook reads none today).
+
+**Fix:** an optional `model` on the session record, filled by the adapter: from the hook payload if Claude Code provides one (check the SessionStart / UserPromptSubmit input schema first), else from the transcript's last top-level assistant entry on the tick (the locator already knows the path; read the tail, not the file). Shown as the third part of the profile line — `claude-code · paul · fable-5-1` — shortened by dropping the `claude-` prefix, and as a column in `ao status -v` and a field in `--json`. Absent for `shell` and for adapters that cannot tell; never guessed from the profile without saying so (`fable-5-1 (profile)` if the declared model is shown before the first observation). Done when a `/model sonnet` in a live session changes the card within a tick.
+
+**Related:** design §4.2a (profiles: tool · account · model), §4.5 card profile line, TD-001 (usage per profile).
 
