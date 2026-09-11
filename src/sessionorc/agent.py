@@ -96,6 +96,7 @@ class HostAgent:
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
         self._derived_at: dict[str, datetime] = {}
+        self._derive_task: asyncio.Task[None] | None = None
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
         # trust dialog case — takes the classifier's verdict at once (TD-015)
@@ -164,7 +165,10 @@ class HostAgent:
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
-        await self._derive_reports(snapshot_at)
+        if self._derive_task is None or self._derive_task.done():
+            # detached for the same reason the usage refresh is: `gh` talks to the network, and the
+            # tick and its push must not wait on it (review 2026-09-11)
+            self._derive_task = asyncio.create_task(self._derive_reports(snapshot_at))
         if snapshot_at - self._pruned_at > PRUNE_EVERY:
             self._pruned_at = snapshot_at
             # the live set is read here, on the loop (the class's one-writer rule); only the file
@@ -216,6 +220,16 @@ class HostAgent:
                 self.store.save(live)
 
     async def _derive_reports(self, now: datetime) -> None:
+        """A detached task: log a failure, never let it vanish silently, and announce what changed
+        (the tick's own push has been and gone by the time this finishes)."""
+        try:
+            await self._derive_reports_inner(now)
+        except Exception:  # noqa: BLE001
+            log.exception("deriving reports failed")
+        finally:
+            await self._push_changes()
+
+    async def _derive_reports_inner(self, now: datetime) -> None:
         """Fill in the report channels the session did not declare (design §4.8, §9 invariant 10):
         its branch, the PRs from it, and the ledger rows those PRs put on main. Every entry is
         marked `derived`, so a declaration stands whatever this finds — the record refuses the
@@ -249,8 +263,10 @@ class HostAgent:
                 log.warning("deriving reports for %s failed: %s", s.id, result)
                 continue
             progress, findings = result
-            changed = any(live.report_progress(e) for e in progress)
-            changed = any(live.report_finding(e) for e in findings) or changed
+            # Lists, not generators: these upserts are the write, and `any()` over a generator
+            # would stop at the first change and silently drop every later entry (review 2026-09-11).
+            applied = [live.report_progress(e) for e in progress] + [live.report_finding(e) for e in findings]
+            changed = any(applied)
             if changed:
                 self.store.save(live)
 
@@ -459,7 +475,7 @@ class HostAgent:
         # `_push_changes` runs next (the caller's or a tick's) announces it exactly once.
         for last in self._subscribers.values():
             last.pop(sid, None)
-        for side in (self._git_checked, self._pre_limited, self._last_hook):  # no keys outlive the record
+        for side in (self._git_checked, self._derived_at, self._pre_limited, self._last_hook):  # no key outlives it
             side.pop(sid, None)
         self._gone.append(sid)
 

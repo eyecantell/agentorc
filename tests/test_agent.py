@@ -9,6 +9,7 @@ from conftest import FAST_TICK, wait_state
 
 from sessionorc import paths, reports
 from sessionorc.client import AgentError, LocalClient
+from sessionorc.models import FindingEntry, ProgressEntry
 
 pytestmark = pytest.mark.integration
 
@@ -624,6 +625,7 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
         await agent.tick()
+        await agent._derive_task  # detached so a slow `gh` never holds up the tick
         s = await person.call("get", id=sid)
         assert [(p["ref"], p["status"], p["pr"], p["source"]) for p in s["progress"]] == [
             ("TD-077", "claimed", 77, "derived")
@@ -633,6 +635,25 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         # ... and the next derivation cannot put it back to claimed (§9 invariant 10)
         agent._derived_at.clear()
         await agent.tick()
+        await agent._derive_task
         s = await person.call("get", id=sid)
         assert [(p["ref"], p["status"], p["source"]) for p in s["progress"]] == [("TD-077", "done", "declared")]
+        # every entry of a multi-entry derivation is applied and saved: these upserts are the write,
+        # so an `any()` over a generator would have stopped at the first one (review 2026-09-11)
+        monkeypatch.setattr(
+            reports,
+            "derive",
+            lambda directory, branch, pending=None: (
+                [ProgressEntry(ref="TD-080", source="derived"), ProgressEntry(ref="TD-081", source="derived")],
+                [FindingEntry(ref="TD-082", source="derived"), FindingEntry(ref="TD-083", source="derived")],
+            ),
+        )
+        agent._derived_at.clear()
+        await agent.tick()
+        await agent._derive_task
+        on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+        assert [p["ref"] for p in on_disk["progress"]] == ["TD-077", "TD-080", "TD-081"]
+        assert [f["ref"] for f in on_disk["findings"]] == ["TD-082", "TD-083"]
         await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+        assert sid not in agent._derived_at  # no key outlives the record

@@ -721,8 +721,8 @@ derived as claimed is re-checked by number, so a merge lands even after the sess
 to its next branch; and a merged PR's ledger rows are read from its squash-merge commit on
 `origin/<default>`, found by the `(#N)` in its subject — the one link that survives GitHub
 deleting the merged head. No `gh`, no network, no origin, a clone that has not fetched since the
-merge: fewer entries, never an error and never a guess, on a five-minute cadence that nothing
-waits on; **scraped** — a
+merge, a claim on a PR older than the one page `gh` is asked for: fewer entries, never an error
+and never a guess, on a five-minute cadence detached from the tick, so nothing waits on it; **scraped** — a
 `TD-NNN` on the screen, a TD-015 rule, fallback only. A declared entry is never overwritten by a
 derived one (§9 invariant 10); a derived entry is replaced the moment the session declares the
 same reference. A reference is a ledger id (`TD-NNN`), an attention-board line, or a PR number;

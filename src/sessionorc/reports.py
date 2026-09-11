@@ -91,9 +91,11 @@ def _git(directory: Path | str, *args: str, timeout: float = 10.0) -> str | None
     return cp.stdout if cp.returncode == 0 else None
 
 
-def _prs(directory: Path | str, limit: int = 30, timeout: float = 20.0) -> list[dict[str, Any]]:
+def _prs(directory: Path | str, limit: int = 100, timeout: float = 20.0) -> list[dict[str, Any]]:
     """This repo's recent PRs through `gh` — the only thing that knows a squash merge happened.
-    No `gh`, no auth, no network, not a GitHub repo: an empty list, and nothing is derived."""
+    One page, newest first: a claim on a PR older than that window never resolves to `done` from
+    here, which is the sort of gap `derived` is allowed to have. No `gh`, no auth, no network, not
+    a GitHub repo: an empty list, and nothing is derived."""
     try:
         cp = subprocess.run(
             [
