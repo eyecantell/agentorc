@@ -21,6 +21,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-025 | `tests/test_cli.py` flakes: a shell session's `idle` can take longer than the 6 s wait | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Open |
 | TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
+| TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
 
 ---
 
@@ -164,4 +165,17 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in order, each its own PR: (1) the CLI sends `AGENTORC_SESSION` as the caller on every RPC and the agent refuses `send`/`keys`/`kill`/`close`/`mode`/`remove`/`create` from a session onto a different session unless its record holds `orchestrate`; `capabilities` on the record, settable at create and by a `set_grants` RPC; (2) `lane`, `progress`, `findings` on the record with `rpc_progress` (claim / done / drop) and `rpc_finding`, `ao progress`, `ao finding`, `--json` included, and the skill text (TD-019's `ao --skill`) gains "declare before the first edit, declare the result before moving on"; (3) the derived source on the tick: worktree branch `tdNNN-*` → claimed, a merged PR from that branch → done, a ledger row that appeared on main from that branch → finding, all marked `derived`; (4) the card report line, the Focus Reports panel with Drop, the grants chip (§4.5a); (5) presets: `ao new --role/--lane/--grant`, `ao roles`, the `roles:` / `ledger:` keys, built-in brief templates for the three presets (the run-1..3 brief in `docs/briefs/tdgrind-ao-1.md` becomes the grinder template with `{lane}` filled in), and the first orchestrator brief. Done when a grinder started with `--lane TD-027,TD-019` shows `TD-027 → #60 · 1/2 done` on its card without anyone reading its pane, and a worker without the grant gets "needs the orchestrate grant" from `ao kill <other>`.
 
 **Related:** design §4.8, §4.5a, §4.7, §5, §6, §9 invariants 9–11, §10 (2026-09-10); TD-019 (done), TD-026, TD-027 (done).
+
+## TD-029: Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget
+
+**Priority:** Medium
+**Added:** 2026-09-10
+**Status:** Open
+**Location:** `src/agentorc/ui/app.py` (`/term/{sid}` websocket), `src/agentorc/ui/static/app.js` (`openTerm` reconnect), `src/sessionorc/agent.py` (`rpc_close`)
+
+**Why:** Paul pressed **Close** on the Focus page of `ao-agentorc-tests-aotest` at 20:32:06 on 2026-09-10. The close succeeded (`POST /api/sessions/…/close` 200; `rpc_close` kills the tmux session, sets `closed`, `pane: false`, `closed_at`). The terminal pane then filled with tmux's `can't find session: ao-agentorc-tests-aotest` repeated, and the UI journal shows **14 accepted `/term/…` websocket attempts in the 16 s** before Paul pressed Forget at 20:32:22 (`remove`, which ended it because `get` then fails and the server closes with 4404). What the code says about that loop: (1) the client resets its backoff to 500 ms in `onopen`, so a connection the server accepts and then closes retries twice a second forever; (2) when the pty path runs and `tmux attach` exits at once, the server ends the handler normally (code 1000), which the client treats as retryable; (3) the guard that should have ended it — "state closed or `pane` false → send *pane is gone* and close 4404" — evidently did not fire on those 14 attempts, or fired and the client did not see 4404. Which of (3)'s halves happened is **not established**: the record was removed before it could be inspected, and the agent log carries nothing for the session. Related design: §4.5 "There is no silent failure path", the exited banner (TD-023), and the events push the Focus page already receives, which knew the session was `closed` from the first delta.
+
+**Fix:** three parts, each independently worth having: (a) the Focus page reacts to a pushed `closed` / `exited pane:false` delta by closing its own terminal websocket and writing the banner line — the push is authoritative and arrives before any reconnect; (b) the server closes 4404 whenever the attach process exits without ever producing pane output, not only when the record already says the pane is gone, so a dead attach is final; (c) the client resets the backoff only after the first byte of pane output, never on open. Then reproduce Paul's sequence (Focus open → Close) in a browser and confirm one "pane is gone" line and no further attempts in the journal. If the reproduction shows the closed check *did* fire, record why the client kept retrying (the 4404 not reaching it) in this entry before archiving.
+
+**Related:** TD-023 (`pane` flag), design §4.5 error rule and §4.5a Focus **Kill** / **Close**, the browser mechanics bullet on reconnect with backoff.
 
