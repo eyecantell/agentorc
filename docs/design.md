@@ -627,7 +627,14 @@ Decisions taken from a review of the `sessionorc` layer before build:
   upsets Claude Code's TUI.
 - **Reconnect contract.** The pty lives in the UI process. If that process or the websocket
   drops, the browser reconnects with backoff and the fresh `tmux attach` redraws the current
-  screen; nothing is replayed from the run log. `send-keys` is an agent RPC independent of any
+  screen; nothing is replayed from the run log. Three rules make that loop terminate (TD-029,
+  2026-09-11): the backoff resets on the first byte of **pane output**, never on open — a
+  connection the server accepts and then ends is not a working terminal; a **dead attach is
+  final**, so the server closes 4404 (the one code the client never retries) whenever the attach
+  process exits non-zero or without ever painting a screen, and not only when the record already
+  says the pane is gone; and a pushed `closed` or `pane: false` delta ends the terminal from the
+  page itself, because the push is authoritative and arrives before any reconnect could — `kill`
+  and `close` announce it as they return, rather than waiting for the next tick. `send-keys` is an agent RPC independent of any
   attached pty, so a Send never depends on a Focus being open. The terminal shows tmux's
   scrollback (`history-limit`) only; the run log is a download, never a terminal source.
 - **Scrollback is tmux's, reached through tmux (TD-022, 2026-09-09).** tmux repaints the client

@@ -25,6 +25,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-030 | One name, one session: refuse a live holder, supersede an exited one, drop hidden `-2` suffixes | Medium | Open |
 | TD-031 | Show the model in use on the card and in `ao status` (when the adapter can tell) | Low | Open |
 | TD-032 | An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed | Medium | Open |
+| TD-033 | Two load-sensitive flakes in the test suite, each seen once in a full run | Low | Open |
 
 ---
 
@@ -173,12 +174,16 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-10
-**Status:** Open
+**Status:** Open — all three hardenings merged 2026-09-11 (PR #71), and the loop is reproduced and explained in a test; what remains is one live Focus → Close in a browser, because the client half (a) and (c) is JavaScript with no test harness (docs/user_attention.md)
 **Location:** `src/agentorc/ui/app.py` (`/term/{sid}` websocket), `src/agentorc/ui/static/app.js` (`openTerm` reconnect), `src/sessionorc/agent.py` (`rpc_close`)
 
 **Why:** Paul pressed **Close** on the Focus page of `ao-agentorc-tests-aotest` at 20:32:06 on 2026-09-10. The close succeeded (`POST /api/sessions/…/close` 200; `rpc_close` kills the tmux session, sets `closed`, `pane: false`, `closed_at`). The terminal pane then filled with tmux's `can't find session: ao-agentorc-tests-aotest` repeated, and the UI journal shows **14 accepted `/term/…` websocket attempts in the 16 s** before Paul pressed Forget at 20:32:22 (`remove`, which ended it because `get` then fails and the server closes with 4404). What the code says about that loop: (1) the client resets its backoff to 500 ms in `onopen`, so a connection the server accepts and then closes retries twice a second forever; (2) when the pty path runs and `tmux attach` exits at once, the server ends the handler normally (code 1000), which the client treats as retryable; (3) the guard that should have ended it — "state closed or `pane` false → send *pane is gone* and close 4404" — evidently did not fire on those 14 attempts, or fired and the client did not see 4404. Which of (3)'s halves happened is **not established**: the record was removed before it could be inspected, and the agent log carries nothing for the session. Related design: §4.5 "There is no silent failure path", the exited banner (TD-023), and the events push the Focus page already receives, which knew the session was `closed` from the first delta.
 
-**Fix:** three parts, each independently worth having: (a) the Focus page reacts to a pushed `closed` / `exited pane:false` delta by closing its own terminal websocket and writing the banner line — the push is authoritative and arrives before any reconnect; (b) the server closes 4404 whenever the attach process exits without ever producing pane output, not only when the record already says the pane is gone, so a dead attach is final; (c) the client resets the backoff only after the first byte of pane output, never on open. Then reproduce Paul's sequence (Focus open → Close) in a browser and confirm one "pane is gone" line and no further attempts in the journal. If the reproduction shows the closed check *did* fire, record why the client kept retrying (the 4404 not reaching it) in this entry before archiving.
+**Fix:** three parts, each independently worth having: (a) ✅ the Focus page reacts to a pushed `closed` / `exited pane:false` delta by closing its own terminal websocket and writing the banner line — the push is authoritative and arrives before any reconnect (and `rpc_kill` / `rpc_close` now announce it as they return, instead of leaving it to the next tick); (b) ✅ the server closes 4404 whenever the attach process exits non-zero or without ever painting a screen, not only when the record already says the pane is gone, so a dead attach is final; (c) ✅ the client resets the backoff on the first byte of pane output, never on open. (Considered and dropped: "the attach is not closed when the websocket goes" — `pump`'s own `finally` has always closed the pty, so there was no leaked `tmux attach` to fix; the review caught the claim before it reached the archive.)
+
+**Which candidate fired (2026-09-11).** Established by test, not by argument. Candidate (3) is **disproven**: when the record says `closed` or `pane: false` the guard does fire and closes 4404 — `test_closed_session_terminal_is_final_and_occupancy_endpoint` has asserted that since TD-023. What actually happened is **(2) driven by (1)**: a record that still claimed a pane whose tmux session was gone let `/term/` run `tmux attach`, which printed tmux's `can't find session` *into the pty* (so "produced no output" would not have caught it either) and exited, and the handler ended the websocket **normally — code 1000**, which the client treats as retryable, with its backoff reset to 500 ms on every open. `test_a_dead_attach_is_final` reproduces exactly that (it asserted `1000` before the fix) and now asserts 4404. Paul's record was `closed` by his Close, so the remaining question is only how his record still claimed a pane at those 14 attempts — the likeliest answer is that the loop was already running *before* the Close (the pane had gone with a tmux server restart) and Forget, not the Close, is what ended it. That part stays unproven: the record was removed before it could be inspected.
+
+**Remaining:** one live Focus → Close in a browser — (a) and (c) are JavaScript, which this repo has no harness for — confirming one banner line and no further `/term/` attempts in the UI journal.
 
 **Related:** TD-023 (`pane` flag), design §4.5 error rule and §4.5a Focus **Kill** / **Close**, the browser mechanics bullet on reconnect with backoff.
 
@@ -207,6 +212,19 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** an optional `model` on the session record, filled by the adapter: from the hook payload if Claude Code provides one (check the SessionStart / UserPromptSubmit input schema first), else from the transcript's last top-level assistant entry on the tick (the locator already knows the path; read the tail, not the file). Shown as the third part of the profile line — `claude-code · paul · fable-5-1` — shortened by dropping the `claude-` prefix, and as a column in `ao status -v` and a field in `--json`. Absent for `shell` and for adapters that cannot tell; never guessed from the profile without saying so (`fable-5-1 (profile)` if the declared model is shown before the first observation). Done when a `/model sonnet` in a live session changes the card within a tick.
 
 **Related:** design §4.2a (profiles: tool · account · model), §4.5 card profile line, TD-001 (usage per profile).
+
+## TD-033: two load-sensitive flakes in the test suite, each seen once in a full run
+
+**Priority:** Low
+**Added:** 2026-09-11
+**Status:** Open — each seen once on 2026-09-11 during TD-029: `tests/test_cli.py::test_explain_file_and_session` (my run) and `tests/test_ui.py::test_terminal_scrollback_reaches_tmux` (the reviewer's). Both passed alone and on a rerun, so they are races, not breaks
+**Location:** `tests/test_cli.py::test_explain_file_and_session`, `tests/test_ui.py::test_terminal_scrollback_reaches_tmux`, `src/sessionorc/agent.py` (`rpc_explain`, the screen verdict)
+
+**Why:** Two different tests failed one full-suite run each while passing on their own and on the next run. Both read a live pane and assert on what it shows, so the likely race is the usual one for this suite (TD-025's shape): the assertion runs before the pane has painted what it looks for. Neither failing assertion's output was captured, which is exactly why this is a ledger entry and not a longer sleep — a sleep would hide the timing rather than wait for the thing being asserted, and there is no evidence yet about which read is early.
+
+**Fix:** on the next occurrence, capture the failing assertion (and its `ao explain --json` for the CLI one), then make the test wait for the screen it asserts on — as `wait_state` does for state — rather than reading once. TD-025 is the same class of flake; if all three point at the same read-once pattern, fix them together with one helper.
+
+**Related:** TD-025 (the `idle` timing flake in the same file), TD-015 (screen rules), design §4.2.
 
 ## TD-032: An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed
 

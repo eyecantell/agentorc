@@ -50,6 +50,17 @@ class PtySession:
         with contextlib.suppress(Exception):
             self.proc.setwinsize(max(2, rows), max(10, cols))
 
+    def exit_status(self) -> int | None:
+        """The attach process's exit code once it is gone, None while it is alive. `tmux attach`
+        exits non-zero when the session it was given is not there, which is how the bridge tells a
+        dead attach from a person detaching (TD-029)."""
+        try:
+            if not self.proc.isalive():  # isalive() reaps, so exitstatus is set after it
+                return self.proc.exitstatus
+        except Exception:  # noqa: BLE001 — already gone, or never started: nothing to report
+            return None
+        return None
+
     def close(self) -> None:
         with contextlib.suppress(Exception):
             self._loop.remove_reader(self.proc.fd)

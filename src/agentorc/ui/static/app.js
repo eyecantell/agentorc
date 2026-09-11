@@ -211,17 +211,28 @@
     const term = new Terminal({ cursorBlink: true, fontFamily: '"JetBrains Mono", Menlo, monospace', fontSize: 13, theme: { background: "#0b0e12" }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     term.open($("#term")); fit.fit();
-    let ws, delay = 500;
+    let ws, delay = 500, paneGone = false;
+    // The pane is gone for good: end the terminal and stop reconnecting. The events push says so
+    // before any reconnect could, and the server's 4404 says so too (TD-029).
+    function endTerm(text) {
+      paneGone = true;
+      if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
+      term.write(`\r\n\x1b[90m[agentorc] ${text}\x1b[0m\r\n`);
+    }
     function openTerm() {
+      if (paneGone) return;
       const cols = Number.isFinite(term.cols) && term.cols > 0 ? term.cols : 120, rows = Number.isFinite(term.rows) && term.rows > 0 ? term.rows : 32;
       ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}?cols=${cols}&rows=${rows}`);
       ws.binaryType = "arraybuffer";
-      ws.onopen = () => { delay = 500; ws.send(JSON.stringify({ resize: [cols, rows] })); };
-      ws.onmessage = (m) => term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data));
+      ws.onopen = () => { ws.send(JSON.stringify({ resize: [cols, rows] })); };
+      // The backoff resets on pane output, never on open (TD-029): a connection the server accepts
+      // and then ends is not a working terminal, and resetting there retried twice a second forever.
+      ws.onmessage = (m) => { delay = 500; term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data)); };
       let opened = false;
       ws.addEventListener("open", () => { opened = true; });
       ws.onclose = (e) => {
-        if (e.code === 4404) { term.write("\r\n\x1b[90m[agentorc] no terminal for this session\x1b[0m\r\n"); return; }  // final, no retry
+        if (paneGone) return;  // the push already ended it
+        if (e.code === 4404) { endTerm("no terminal for this session"); return; }  // final, no retry
         // Say what happened: 1006 before open = the handshake never reached the server (a proxy or
         // port forward that drops websockets is the usual cause); after open = the server closed.
         const why = e.code === 1006 && !opened ? "websocket handshake failed (code 1006) — does your route to the UI pass websockets? ssh -L does"
@@ -230,7 +241,7 @@
         setTimeout(openTerm, delay); delay = Math.min(delay * 2, 10000);
       };
     }
-    if (s.state === "closed" || s.pane === false) term.write("\x1b[90m[agentorc] this session's pane is gone (killed, closed, or the tmux server restarted).\x1b[0m\r\n");
+    if (s.state === "closed" || s.pane === false) { paneGone = true; term.write("\x1b[90m[agentorc] this session's pane is gone (killed, closed, or the tmux server restarted).\x1b[0m\r\n"); }
     else openTerm();
     term.onData((d) => ws && ws.readyState === 1 && ws.send(d));
     // Copy / paste: Ctrl+C with a selection copies (no ^C), Ctrl+Shift+C copies, Ctrl+Shift+V and
@@ -303,6 +314,11 @@
     render(s);
     connectEvents((ev) => {
       if (ev.event === "session" && ev.id === id) {
+        // The pushed delta is authoritative and arrives before any reconnect (TD-029): a closed or
+        // pane-less session ends the terminal here, rather than letting it discover it by retrying.
+        if (!paneGone && (ev.session.state === "closed" || ev.session.pane === false)) {
+          endTerm("this session's pane is gone (see the banner).");
+        }
         render(ev.session);
         // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});

@@ -393,7 +393,11 @@ def create_app() -> FastAPI:
             await ws.close()
             return
 
+        produced = False
+
         async def send(data: bytes) -> None:
+            nonlocal produced
+            produced = True
             await ws.send_bytes(data)
 
         async def recv() -> Any:
@@ -427,8 +431,22 @@ def create_app() -> FastAPI:
         finally:
             for f in reapers:
                 f.cancel()
+            # `pump` has already closed the pty, so the child is reaped and its status is final:
+            # a `tmux attach` that exited on its own carries its code, and one the teardown
+            # signalled carries None, which is the retryable case (TD-029).
+            status = pty.exit_status()
             with contextlib.suppress(Exception):
-                await ws.close()
+                if status not in (0, None) or not produced:
+                    # A dead attach is final (TD-029): `tmux attach` exits non-zero when its session
+                    # is gone, and an attach that never painted a screen attached to nothing. Either
+                    # way the record is behind — retrying twice a second would print tmux's "can't
+                    # find session" forever, which is what Paul saw on 2026-09-10.
+                    await ws.send_bytes(
+                        b"\r\n[agentorc] this session's pane is gone (the attach ended immediately).\r\n"
+                    )
+                    await ws.close(code=4404)
+                else:
+                    await ws.close()
 
     return app
 

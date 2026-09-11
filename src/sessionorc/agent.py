@@ -646,6 +646,7 @@ class HostAgent:
         s.set_state("exited", confidence="scraped")
         s.pane = False  # unlike a natural exit, a kill destroys the pane (TD-023)
         self.store.save(s)
+        await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.to_dict()
 
     async def rpc_close(self, id: str) -> dict[str, Any]:
@@ -655,6 +656,7 @@ class HostAgent:
         s.pane = False
         s.closed_at = now_iso()
         self.store.save(s)
+        await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.to_dict()
 
     async def rpc_remove(self, id: str) -> None:
