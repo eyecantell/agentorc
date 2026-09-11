@@ -1021,7 +1021,9 @@ def _lane(refs: list[str]) -> list[str]:
         if len(refs) > 1:
             raise RpcError("a lane is either `free-pick` or a list of references, not both")
         return ["free-pick"]
-    return [_ref(r) for r in refs]
+    # deduped after canonicalisation: `--lane TD-027,td-27` is one item, or the lane count the card
+    # shows (*1 of 2*) would be a lie about how much work there is (review 2026-09-11)
+    return list(dict.fromkeys(_ref(r) for r in refs))
 
 
 def _ref(ref: str) -> str:

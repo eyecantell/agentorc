@@ -545,7 +545,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
             dir=str(tmp_path),
             adapter="shell",
             argv=["bash", "--norc"],
-            lane=["td-27", "TD-19"],
+            lane=["td-27", "TD-19", "TD-027"],  # deduped after canonicalisation, or the count lies
         )
         sid = a["id"]
         assert a["lane"] == ["TD-027", "TD-019"] and a["progress"] == [] and a["findings"] == []
