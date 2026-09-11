@@ -713,7 +713,16 @@ session to declare a claim before its first edit and the result before moving on
 2); **derived** —
 the tick reads the session's worktree branch (`tdNNN-*` → claimed), the PRs from that branch and
 their merge state (merged → done), and ledger rows that appeared on main from that branch
-(→ finding), and fills in what the session forgot, always marked `derived`; **scraped** — a
+(→ finding), and fills in what the session forgot, always marked `derived` (landed 2026-09-11,
+TD-028 step 3, `sessionorc.reports`). Three things make that honest rather than magical: only the
+`tdNNN-*` branch shape is read (anything looser turns `release-2` into a ledger reference); the
+merge state comes from `gh`, the only thing that knows a squash merge happened, and a PR already
+derived as claimed is re-checked by number, so a merge lands even after the session has moved on
+to its next branch; and a merged PR's ledger rows are read from its squash-merge commit on
+`origin/<default>`, found by the `(#N)` in its subject — the one link that survives GitHub
+deleting the merged head. No `gh`, no network, no origin, a clone that has not fetched since the
+merge: fewer entries, never an error and never a guess, on a five-minute cadence that nothing
+waits on; **scraped** — a
 `TD-NNN` on the screen, a TD-015 rule, fallback only. A declared entry is never overwritten by a
 derived one (§9 invariant 10); a derived entry is replaced the moment the session declares the
 same reference. A reference is a ledger id (`TD-NNN`), an attention-board line, or a PR number;

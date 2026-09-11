@@ -22,7 +22,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, hosts, naming, paths
+from sessionorc import adapters, hosts, naming, paths, reports
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
 from sessionorc.models import (
     GRANTS,
@@ -46,6 +46,9 @@ TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dia
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
+# Derived report entries per session (design §4.8, TD-028 step 3): a `gh` call and a little git, so
+# a slow cadence. Nothing waits on it and a failure derives nothing (`sessionorc.reports`).
+DERIVE_EVERY = timedelta(minutes=5)
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
 SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken within this → prompt-stalled
 PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)
@@ -92,6 +95,7 @@ class HostAgent:
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
+        self._derived_at: dict[str, datetime] = {}
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
         # trust dialog case — takes the classifier's verdict at once (TD-015)
@@ -160,6 +164,7 @@ class HostAgent:
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
+        await self._derive_reports(snapshot_at)
         if snapshot_at - self._pruned_at > PRUNE_EVERY:
             self._pruned_at = snapshot_at
             # the live set is read here, on the loop (the class's one-writer rule); only the file
@@ -208,6 +213,45 @@ class HostAgent:
             new = info.to_dict() if info else None
             if new != live.git:
                 live.git = new
+                self.store.save(live)
+
+    async def _derive_reports(self, now: datetime) -> None:
+        """Fill in the report channels the session did not declare (design §4.8, §9 invariant 10):
+        its branch, the PRs from it, and the ledger rows those PRs put on main. Every entry is
+        marked `derived`, so a declaration stands whatever this finds — the record refuses the
+        write, which is why a refusal is not an error. Runs off the branch `_refresh_git` already
+        read, on its own slow cadence, and never blocks the tick on a failure."""
+        due = [
+            s
+            for s in self.sessions.values()
+            if s.dir
+            and not s.external
+            and s.state != "closed"
+            and (s.git or {}).get("branch")
+            and now - self._derived_at.get(s.id, datetime.min.replace(tzinfo=UTC)) > DERIVE_EVERY
+        ]
+        if not due:
+            return
+        pending = {
+            s.id: [(e.ref, e.pr) for e in s.progress if e.source != "declared" and e.status == "claimed" and e.pr]
+            for s in due
+        }
+        results = await asyncio.gather(
+            *(asyncio.to_thread(reports.derive, s.dir, (s.git or {}).get("branch"), pending[s.id]) for s in due),
+            return_exceptions=True,
+        )
+        for s, result in zip(due, results, strict=True):
+            self._derived_at[s.id] = now
+            live = self.sessions.get(s.id)
+            if live is None:
+                continue
+            if isinstance(result, BaseException):
+                log.warning("deriving reports for %s failed: %s", s.id, result)
+                continue
+            progress, findings = result
+            changed = any(live.report_progress(e) for e in progress)
+            changed = any(live.report_finding(e) for e in findings) or changed
+            if changed:
                 self.store.save(live)
 
     async def _refresh_usage(self) -> None:
