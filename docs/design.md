@@ -114,9 +114,14 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   the check.
 - Every session record carries: `name` (what the person called it), `kind`
   (`interactive` | `command`), `adapter` (`claude-code`, `shell`, …), `profile` (empty for
-  `shell`), `dir`, `repo` (optional), `worktree` (optional), and `adapter_id` once known (Claude
+  `shell`), `dir`, `repo` (optional), `worktree` (optional), `adapter_id` once known (Claude
   Code's session uuid — read from the hook payload; it is what Resumable and the transcript index
-  key on). Resumable shows the name first and the id under it; a session started by hand
+  key on), `capabilities` (grants, §4.8 — empty for most sessions), `lane`, `progress` and
+  `findings` (§4.8's report channels: what the session was handed and what it says it did),
+  `role` (the preset it was started from, a badge and nothing more), and `unattended` with its
+  schedule (§6). Grants, report channels, mode and schedule are independent fields: a grant
+  says what a session may do to others, the channels say what it did, `unattended` says whether
+  policies act on it, the schedule says when. Any can be set without the others. Resumable shows the name first and the id under it; a session started by hand
   outside agentorc shows only the id until it is **adopted** (attach to the tmux session, give it
   a name), which is also how hand-started sessions enter the Herd.
 - A live session the adapter can see that has **no tmux at all** (`claude` in a VS Code
@@ -501,6 +506,11 @@ noted). If a control is not in this table it does not exist.
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027) |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
+| New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `orchestrator`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule |
+| New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `orchestrate`). Unchecked by default for every preset but `orchestrator`; shown with a one-line warning of what the grant allows |
+| card | **report line** | shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, an orchestrator's `last tick 20:10 · 2 wrapped up`; an entry the agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed` |
+| Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (agent RPC, recorded as dropped by the person) |
+| Focus header | **grants** chip | lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes) |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
@@ -628,6 +638,85 @@ the next call needs (TD-018); `ao explain <id>` prints a session's screen, the r
 on it and whether it applies, and `ao explain --file` classifies a saved screen (TD-015); `ao --skill` prints the rules an agent driving `ao` from inside a
 session must follow (TD-019 — planned for phase 5, pulled forward and landed 2026-09-10 because an orchestrator session driving `ao` came first; `ao --skill > .claude/skills/ao/SKILL.md` installs it in a repo, the New-session install offer is still phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
 automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
+Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao progress done
+TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao finding TD-029 --priority low`
+(each a small RPC on the calling session's own record). Presets are picked at start, `ao new
+--role grinder --lane TD-027,TD-019` (`--lane free-pick` for scan-and-choose; `ao roles` lists
+what the repo and the package define; `--grant orchestrate` adds a grant a preset lacks). The
+CLI is to read the calling session from `AGENTORC_SESSION`, the variable the hook already uses
+(§4.2), and send it with every RPC (TD-028 step 1; today it sends nothing): that is how a report
+lands on the right record and how the agent tells a worker acting on another session from a
+person typing in a terminal (§4.8).
+
+### 4.8 Capabilities, report channels, and role presets (2026-09-10)
+
+Four unattended workers ran on kmaster the first day the Herd showed more than one, and the
+Herd could not say which TDs any of them held, had finished, or had filed on the side; nor
+could it stop one worker from `ao kill`-ing another. Both gaps are about what a session *does
+to agentorc*, not what it is called, so the first-class concepts are **capabilities** — verbs
+the agent can see — and **roles** are only presets over them. Considered and rejected: a
+`role` field the agent keys on (a grinder that files a TD while grinding, as run 2 did with
+TD-025, is misdescribed by any single label; and a display keyed on a label shows what a
+session was called rather than what it did).
+
+Two kinds of capability, deliberately different:
+
+**Report channels** — ungated, any session may write them, the Herd renders whichever are
+non-empty. Two channels cover every worker seen so far and the person's own sessions too:
+
+- `progress`: references the session set out to resolve. Entries
+  `{ref, status: claimed | done | dropped, pr, at, source}`. The `lane` on the record is the
+  ordered list of references (or `free-pick`) the session was handed, so the card can say
+  *1 of 2* without parsing the brief.
+- `findings`: references the session filed. Entries `{ref, priority, at, source}`.
+
+Each entry has a **source**, on the same rule as state (§4.2): **declared** — the session said
+so through `ao progress` / `ao finding`; the skill file (`ao --skill`, TD-019) is to tell every
+session to declare a claim before its first edit and the result before moving on (TD-028 step
+2); **derived** —
+the tick reads the session's worktree branch (`tdNNN-*` → claimed), the PRs from that branch and
+their merge state (merged → done), and ledger rows that appeared on main from that branch
+(→ finding), and fills in what the session forgot, always marked `derived`; **scraped** — a
+`TD-NNN` on the screen, a TD-015 rule, fallback only. A declared entry is never overwritten by a
+derived one (§9 invariant 10); a derived entry is replaced the moment the session declares the
+same reference. A reference is a ledger id (`TD-NNN`), an attention-board line, or a PR number;
+the repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references, not prose:
+"refactor the UI module" is not a lane until it has an entry a card can link to.
+
+**Grants** — gated, recorded in `capabilities` on the session, checked by the agent on every
+acting RPC. One exists today:
+
+- `orchestrate`: the session may act on *other* sessions — `send`, `keys`, wrap-up, `kill`,
+  `close`, `mode`, `new`, `remove`. Without it, an acting RPC whose caller is a session and
+  whose target is a different session is refused with "needs the orchestrate grant"; reads
+  (`status`, `tail`, `explain`) are never gated. The caller is known from the session id the CLI
+  sends (§4.7); an RPC with no caller is a person at a terminal or the UI, and is allowed as
+  today. This is a guard against a confused worker, not a security boundary — the socket is
+  local and the id is an environment variable — and it closes the gap where any worker could
+  kill its neighbour. §9 invariant 5 still binds a granted session: interactive sessions are
+  out of reach whoever the caller is.
+
+Being scheduled is **not** a capability and a grant carries no schedule: everything time-shaped
+stays on the `unattended` side (§6, TD-026) and applies to a session whatever it holds.
+
+**Role presets.** A role is a name for New session and `ao new` that resolves to a brief
+template, a default lane shape, and default grants; the record keeps the name as `role` for the
+badge and nothing keys on it (§9 invariant 9). Three ship with the package; a repo may redefine
+any of them or add its own (§5):
+
+| Preset | Brief template says | Lane | Grants | Typically writes |
+|---|---|---|---|---|
+| `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
+| `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
+| `orchestrator` | read `ao --json status` on a cadence; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; never create work | the host, or a list of sessions | `orchestrate` | `progress` per tick: sessions acted on and what was done |
+| `plain` | — (no template) | — | none | whatever it declares |
+
+The first orchestrator is a **session, not code**: its brief is the samscrape supervisor's
+rules written for an agent driving `ao`, and it runs for a few evenings before any rule becomes
+a §6 policy. Rules that prove mechanical (wrap up at the stop time, retry a stalled send) move
+into the tick; those that needed judgement (stuck or thinking? interrupt now?) stay in the
+brief. The grant is what makes this safe to try: the orchestrator's power is a field the person
+can see on the Focus header and revoke, not a promise in its prompt.
 
 ## 5. Configuration
 
@@ -656,6 +745,11 @@ unattended:
   usage_gate: {five_hour_pct: 70, weekly_pct: 70}
   wrapup_minutes: 15
   creds_min_hours: 0.25
+roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
+  grinder: {brief: docs/briefs/grinder.md, lane: free-pick}
+  hunter: {brief: docs/briefs/hunter.md}
+  orchestrator: {brief: docs/briefs/orchestrator.md, grants: [orchestrate]}
+ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - name: test        ; run: pdm run test
@@ -665,7 +759,10 @@ commands:
 
 A repo without the file gets defaults: `adapter: claude-code`, worktrees under
 `.claude/worktrees`, `ready_when: [tree_clean, branch_pushed, no_subagents]`, no commands, no
-unattended mode. A directory session (no repo) reduces to `ready_when: [no_subagents]`.
+unattended mode, the three built-in presets with the package's brief templates, and
+`docs/technical_debt.md` as the ledger. The `unattended:` block is where every time-shaped
+setting lives (window, gate, stop times — TD-026 extends it); a `roles:` preset never carries
+a schedule, and a grant never carries one either. A directory session (no repo) reduces to `ready_when: [no_subagents]`.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
@@ -675,6 +772,12 @@ toggle on the card or Focus header; interactive sessions are exempt from gates).
 field on the session record, never re-derived from the brief or the name, and a flip takes
 effect on the next tick without restarting the session. The brief file is required only when
 a *policy* starts a worker; a session flipped to unattended keeps whatever it was doing.
+Policies key on `unattended` and the session's schedule, never on its role preset or its
+grants (§4.8, §9 invariant 9): an orchestrator session left running past the window is wrapped
+up like any worker, and a plain session with a stop time is stopped like any worker. A policy
+that starts a worker names the preset and lane it starts it with (`workers: [{role: grinder,
+lane: free-pick}, …]` replaces the bare `workers: 3` once §4.8 lands); the schedule stays on
+the block. A policy is agent code and needs no grant; a session doing the same work does.
 
 - **Run window**: start missing workers inside the window; wrap-up-then-kill outside.
 - **Usage gate** (per profile): pause unattended sessions on a profile above its 5-hour /
@@ -710,6 +813,13 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
    disabled and the agent's policies enabled; compare `tdgrind runs` reports against
    agentorc run logs; then delete `tdgrind.sh` from samscrape (ledger a TD there for the
    swap and the cron line in `infra/kmaster/crontab`).
+   **Capabilities, report channels and presets** (§4.8) land at the start of this phase,
+   because the migration is the first time several workers run at once and the Herd has to say
+   what each is doing and keep them off each other: the caller check and the `orchestrate`
+   grant first, then `progress` / `findings` with `ao progress` / `ao finding`, the derived
+   source on the tick, the card's report line and the Focus Reports panel, and last the
+   presets — with an orchestrator run as a session for a few evenings before its mechanical
+   rules become policies here.
 4. **Commands + board.** `.agentorc.yml` buttons (cmdorc where it fits), command-kind sessions
    and the Commands tab, the Due strip on the Herd and the Attention tab with Snooze/Done
    write-back, stranded-work flags.
@@ -742,6 +852,14 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
 7. The agent's edits to a repo's board file are always committed, never left in the tree.
 8. A session's process is launched as the adapter's argv, never through the person's
    interactive shell (§4.1); tmux, not the agent, holds the process.
+9. Nothing keys on a session's role: policies key on `unattended` and the schedule, acting
+   RPCs key on grants, displays key on the report channels (§4.8). A preset sets defaults at
+   start and is a badge afterwards.
+10. A report entry the session declared is never overwritten by one the agent derived; a
+    derived entry is shown as such, like a scraped state.
+11. A session acts on another session only through the agent and only with the `orchestrate`
+    grant on its record; reads are never gated, and a person at a terminal or the UI is not a
+    session.
 
 ## 10. Open questions
 
@@ -828,6 +946,17 @@ a *policy* starts a worker; a session flipped to unattended keeps whatever it wa
       kills every pane process, and the socket API is per machine. So `sessionorc` stays on tmux,
       phase 2 builds the ssh transport as designed, and herdr is prior art (§3) with two things to
       borrow later: a screen-rule fallback for prompts no hook reports, and the worktree API shape.
+- [x] **Are worker types (grinder, hunter, orchestrator) roles the agent keys on, or
+  capabilities?** (2026-09-10) → **capabilities, with roles as presets (§4.8)**. Raised the
+  day the Herd first showed four workers and could not say which TDs any of them held; the
+  first draft made `role` a field with a progress record behind it, and the review asked
+  whether the verbs (report what was found or finished, act on other sessions) were the
+  real thing. They are: a grinder also files findings, a label keyed on intent misdescribes
+  it, and "may act on other sessions" is a grant a person should see and revoke, not a
+  promise in a brief. So: two ungated report channels any session writes, one gated grant the
+  agent checks, presets that only fill the New session form. **Schedule is orthogonal to all
+  of it** — time-shaped settings stay on the `unattended` side (§6, TD-026), so any session
+  can be scheduled and no preset or grant exempts one (§9 invariant 9).
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 
