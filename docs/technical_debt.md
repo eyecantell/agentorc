@@ -22,6 +22,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Open |
 | TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
+| TD-030 | One name, one session: refuse a live holder, supersede an exited one, drop hidden `-2` suffixes | Medium | Open |
 
 ---
 
@@ -178,4 +179,17 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** three parts, each independently worth having: (a) the Focus page reacts to a pushed `closed` / `exited pane:false` delta by closing its own terminal websocket and writing the banner line — the push is authoritative and arrives before any reconnect; (b) the server closes 4404 whenever the attach process exits without ever producing pane output, not only when the record already says the pane is gone, so a dead attach is final; (c) the client resets the backoff only after the first byte of pane output, never on open. Then reproduce Paul's sequence (Focus open → Close) in a browser and confirm one "pane is gone" line and no further attempts in the journal. If the reproduction shows the closed check *did* fire, record why the client kept retrying (the 4404 not reaching it) in this entry before archiving.
 
 **Related:** TD-023 (`pane` flag), design §4.5 error rule and §4.5a Focus **Kill** / **Close**, the browser mechanics bullet on reconnect with backoff.
+
+## TD-030: One name, one session: refuse a live holder, supersede an exited one, drop hidden `-2` suffixes
+
+**Priority:** Medium
+**Added:** 2026-09-10
+**Status:** Open — design landed (§4.1, §9 invariant 12), no code yet
+**Location:** `src/sessionorc/naming.py` (`session_id`), `src/sessionorc/agent.py` (`rpc_create`, `_supersede`, `occupants`), `src/agentorc/cli.py` (`new`, `shell`), `src/agentorc/ui/` (New session form, `/api/occupancy`)
+
+**Why:** `naming.session_id` appends `-2`, `-3` on any id collision — live or dead — and the record keeps the person's original name, so on 2026-09-10 the Herd showed `aotest` beside `aotest-2` and two cards named `tdgrind-ao-1` (one exited, one working). Paul: "it is a little confusing to have multiple sessions of the same name". The name is the handle `ao focus`, `ao send` and the filter take, so ambiguity there is a defect. Design §4.1 now says a name identifies one session per scope: a live holder refuses, an exited or closed holder is superseded (as `_supersede` already does for a resumed conversation), and a suffix is only for a tmux id with no record and is then shown.
+
+**Fix:** (1) `rpc_create` looks up the name in scope before choosing an id: live holder → `RpcError("<name> is running — switch to it, or pick another name")` carrying the holder's id; exited/closed holder → kill its dead pane, forget the record, remember its run log on the new record (`previous_run`), reuse the id; (2) `session_id` keeps the suffix path only for ids present in tmux with no record, and the record's `name` then carries the suffix; (3) `shell` gets agent-generated names (`shell`, `shell-2`) shown as the name; (4) `/api/occupancy` (or a sibling) answers the name check for the New session form, which disables Start with **Switch to** for a live holder and shows "replaces the exited `<name>` — run log kept" for a dead one; `ao new` prints the same texts. Tests: live refuse, dead supersede with log link, tmux-only collision suffixed and shown, shell auto-name. Done when starting `aotest` twice yields one card, and `ao focus aotest` is unambiguous on every host.
+
+**Related:** design §4.1, §4.5a (New session name field), §4.7, §9 invariant 12, §10 (2026-09-10); PR #17 (resume supersedes), TD-023 (`pane` flag), TD-029 (the Close that prompted the report).
 

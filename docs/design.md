@@ -108,10 +108,26 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
 ### 4.1 Session substrate: tmux, one session per conversation
 
 - Session name `ao-<repo-or-dir>-<name>` (prefix lets the agent enumerate its own sessions).
-  Both parts are slugified to `[a-z0-9-]` (tmux treats `:`, `.` and whitespace specially) and a
-  collision within the prefix gets a `-2`, `-3` suffix; the person's original name stays in the
-  record. The agent handles tmux's "duplicate session" error explicitly rather than trusting
-  the check.
+  Both parts are slugified to `[a-z0-9-]` (tmux treats `:`, `.` and whitespace specially).
+  **A name identifies one session within its scope** (the repo, or the directory for a
+  repo-less session; decision 2026-09-10, §10, §9 invariant 12): it is what a person types
+  into `ao focus`, `ao send` and the Herd filter, so two cards called `aotest` is a defect, not
+  a namespace. The rules, in the order the agent applies them at create:
+  - the name is held by a **live** record (any state but `exited` / `closed`) → refused:
+    "`aotest` is running — switch to it, or pick another name". The New session form learns
+    this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
+  - the name is held by an **exited or closed** record → the new session **supersedes** it: it
+    takes the id, the old record is forgotten, its run log is kept and linked from the new
+    record as *previous run* (the exited banner's Resume already superseded its record this
+    way since PR #17; a fresh start under the same name now does too). No `-2` card appears.
+  - the id is taken in tmux by a session the agent has **no record of** (hand-made, or a stale
+    pane the tick has not adopted yet) → the agent adopts it first if it is ours, else appends
+    `-2`, `-3` and — unlike before — shows the suffixed name on the record, so what the Herd
+    says is what tmux has. The agent handles tmux's "duplicate session" error explicitly rather
+    than trusting the check.
+  - `shell` sessions are named by the agent when the person gives no name (`shell`,
+    `shell-2`, …) and follow the same rule under that generated name; registry-only cards
+    (`ext-*`, below) are outside it, their ids come from the tool.
 - Every session record carries: `name` (what the person called it), `kind`
   (`interactive` | `command`), `adapter` (`claude-code`, `shell`, …), `profile` (empty for
   `shell`), `dir`, `repo` (optional), `worktree` (optional), `adapter_id` once known (Claude
@@ -512,6 +528,7 @@ noted). If a control is not in this table it does not exist.
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (agent RPC, recorded as dropped by the person) |
 | Focus header | **grants** chip | lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes) |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
+| New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the exited `aotest` — run log kept" and Start proceeds; free names show nothing |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
@@ -638,6 +655,9 @@ the next call needs (TD-018); `ao explain <id>` prints a session's screen, the r
 on it and whether it applies, and `ao explain --file` classifies a saved screen (TD-015); `ao --skill` prints the rules an agent driving `ao` from inside a
 session must follow (TD-019 — planned for phase 5, pulled forward and landed 2026-09-10 because an orchestrator session driving `ao` came first; `ao --skill > .claude/skills/ao/SKILL.md` installs it in a repo, the New-session install offer is still phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
 automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
+`ao new <name>` applies §4.1's name rule and says so: a live holder is refused with
+"`aotest` is running — `ao focus aotest`, or pick another name" (exit 1, the holder's id under
+`--json`); an exited or closed holder is superseded and the reply names the previous run's log.
 Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao progress done
 TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao finding TD-029 --priority low`
 (each a small RPC on the calling session's own record). Presets are picked at start, `ao new
@@ -860,6 +880,9 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 11. A session acts on another session only through the agent and only with the `orchestrate`
     grant on its record; reads are never gated, and a person at a terminal or the UI is not a
     session.
+12. Within a scope (repo, or directory), a name identifies at most one session record: a live
+    holder refuses a second, an exited or closed holder is superseded by it (§4.1). Suffixes
+    exist only for tmux-level accidents and are then shown, never hidden.
 
 ## 10. Open questions
 
@@ -957,6 +980,15 @@ the block. A policy is agent code and needs no grant; a session doing the same w
   agent checks, presets that only fill the New session form. **Schedule is orthogonal to all
   of it** — time-shaped settings stay on the `unattended` side (§6, TD-026), so any session
   can be scheduled and no preset or grant exempts one (§9 invariant 9).
+- [x] **Should a name identify one session?** (2026-09-10) → **yes, per scope (§4.1, §9
+  invariant 12)**. Raised when the Herd showed `aotest` beside `aotest-2` and `tdgrind-ao-1`
+  twice (one exited, one working): the `-2` suffix kept tmux happy while the record kept the
+  original name, so the person saw two cards with one name and could not tell which `ao focus
+  aotest` would open. Decided: a live holder refuses a second session under the name (offer
+  Switch to); an exited or closed holder is superseded, the way Resume already superseded its
+  exited record (PR #17); a suffix survives only for a tmux id the agent has no record of, and
+  is then shown. What this costs: two workers cannot share a name across worktrees any more —
+  the right price, since the name is the handle every command takes.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 
