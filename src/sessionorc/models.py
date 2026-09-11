@@ -13,6 +13,10 @@ State = Literal["working", "needs-you", "limited", "stalled?", "idle", "exited",
 Kind = Literal["interactive", "command"]
 Confidence = Literal["hook", "scraped"]
 
+# Grants a session record can hold in `capabilities` (design §4.8). `orchestrate`: the session may
+# act on other sessions through the agent (§9 invariant 11).
+GRANTS = ("orchestrate",)
+
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
 # depending on whether the host is volatile, so it gets two slots.
 STATE_RANK: dict[str, int] = {
@@ -79,6 +83,7 @@ class Session:
     closed_at: str | None = None
     seen_at: str | None = None  # last time a person looked (Focus opened, card acted on); TD-017
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
+    capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

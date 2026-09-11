@@ -283,3 +283,42 @@ def test_skill_prints_the_rules(capsys):
     for must in ("AGENTORC_SESSION", "ao status --json", "prompt-stuck", "invariant 1", "never"):
         assert must in out.lower() or must in out, must
     assert out.count("\n") <= 120
+
+
+def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-028 step 1: `ao` sends AGENTORC_SESSION as the caller; `ao grant` / `ao revoke` edit
+    `capabilities`, shown by `ao status -v` and `--json`; `ao new --grant` sets it at create."""
+
+    def out():
+        return json.loads(capsys.readouterr().out)
+
+    assert cli.main(["--json", "shell", "ga", "-d", str(tmp_path)]) == 0
+    a = out()["id"]
+    assert cli.main(["--json", "shell", "gb", "-d", str(tmp_path)]) == 0
+    b = out()["id"]
+    wait_state(a, "idle")
+    wait_state(b, "idle")
+    monkeypatch.setenv("AGENTORC_SESSION", a)  # now `ao` runs inside session a
+    assert cli.main(["kill", b]) == 1
+    assert "needs the orchestrate grant" in capsys.readouterr().err
+    assert cli.main(["--json", "grant", a, "orchestrate"]) == 1  # no self-grant
+    assert "needs the orchestrate grant" in out()["error"]
+    assert cli.main(["--json", "status"]) == 0  # reads pass
+    assert {s["id"] for s in out()} >= {a, b}
+    assert cli.main(["send", a, "echo", "self-ok"]) == 0  # self passes
+    monkeypatch.delenv("AGENTORC_SESSION")  # a person at a terminal
+    assert cli.main(["grant", a, "orchestrate"]) == 0
+    assert capsys.readouterr().out.strip() == f"{a}: grants orchestrate"
+    assert cli.main(["status", "-v"]) == 0
+    assert "grants: orchestrate" in capsys.readouterr().out
+    monkeypatch.setenv("AGENTORC_SESSION", a)
+    assert cli.main(["--json", "kill", b]) == 0
+    assert out()["state"] == "exited"
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["--json", "revoke", a, "orchestrate"]) == 0
+    assert out()["capabilities"] == []
+    assert cli.main(["--json", "new", "gc", "-a", "shell", "-d", str(tmp_path), "--grant", "orchestrate"]) == 0
+    c = out()
+    assert c["capabilities"] == ["orchestrate"]
+    for sid in (a, c["id"]):
+        call_sync("kill", id=sid)

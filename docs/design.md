@@ -642,11 +642,13 @@ Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao p
 TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao finding TD-029 --priority low`
 (each a small RPC on the calling session's own record). Presets are picked at start, `ao new
 --role grinder --lane TD-027,TD-019` (`--lane free-pick` for scan-and-choose; `ao roles` lists
-what the repo and the package define; `--grant orchestrate` adds a grant a preset lacks). The
-CLI is to read the calling session from `AGENTORC_SESSION`, the variable the hook already uses
-(§4.2), and send it with every RPC (TD-028 step 1; today it sends nothing): that is how a report
-lands on the right record and how the agent tells a worker acting on another session from a
-person typing in a terminal (§4.8).
+what the repo and the package define; `--grant orchestrate` adds a grant a preset lacks, and
+works without a preset today). `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
+running session's grants (the `set_grants` RPC; `ao status -v` and `--json` show
+`capabilities`). The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
+(landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
+agent tells a worker acting on another session from a person typing in a terminal (§4.8).
 
 ### 4.8 Capabilities, report channels, and role presets (2026-09-10)
 
@@ -687,11 +689,15 @@ the repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are referen
 acting RPC. One exists today:
 
 - `orchestrate`: the session may act on *other* sessions — `send`, `keys`, wrap-up, `kill`,
-  `close`, `mode`, `new`, `remove`. Without it, an acting RPC whose caller is a session and
+  `close`, `mode`, `new`, `remove`, and `set_grants` (gated on every target, so a session cannot
+  grant itself). Without it, an acting RPC whose caller is a session and
   whose target is a different session is refused with "needs the orchestrate grant"; reads
   (`status`, `tail`, `explain`) are never gated. The caller is known from the session id the CLI
   sends (§4.7); an RPC with no caller is a person at a terminal or the UI, and is allowed as
-  today. This is a guard against a confused worker, not a security boundary — the socket is
+  today; a caller id the agent has no record of is a session too, holding no grant. The agent
+  checks the gate before the method runs, against the record as it is then, so a grant or a
+  revoke takes effect on the session's next call (landed 2026-09-10, TD-028 step 1). This is a
+  guard against a confused worker, not a security boundary — the socket is
   local and the id is an environment variable — and it closes the gap where any worker could
   kill its neighbour. §9 invariant 5 still binds a granted session: interactive sessions are
   out of reach whoever the caller is.

@@ -134,6 +134,7 @@ async def wait_state(client, sid: str, state: str, timeout: float = 6.0) -> dict
 async def agent(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))  # never this machine's live registry
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)  # tests run inside an ao session are not a caller
     monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", FAST_TICK)
     sock_name = private_socket_name()
     monkeypatch.setenv("AGENTORC_TMUX_SOCKET", sock_name)  # so `pane_line` can look at this server
@@ -170,6 +171,9 @@ def subprocess_agent(tmp_path_factory):
         mp.setenv("CLAUDE_CONFIG_DIR", str(home / "claude"))  # never this machine's live registry
         mp.setenv("AGENTORC_TMUX_SOCKET", sock_name)
         mp.setenv("AGENTORC_TICK", str(FAST_TICK))
+        # `ao` sends AGENTORC_SESSION as the caller (design §4.8); a test run from inside an ao
+        # session would otherwise be gated as a session acting on another one
+        mp.delenv("AGENTORC_SESSION", raising=False)
         proc = subprocess.Popen(
             [sys.executable, str(CHILD), sock_name],
             env=dict(os.environ),
