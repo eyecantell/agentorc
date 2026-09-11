@@ -20,6 +20,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-025 | `tests/test_cli.py` flakes: a shell session's `idle` can take longer than the 6 s wait | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Open |
+| TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
 
 ---
 
@@ -150,3 +151,17 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 Done when: a hand-started unattended session shows when it will stop and stops then; "run all day today" is one click or one `ao` line with an expiry, not a config edit; the Herd shows a scheduled-but-not-started session; and tdgrind's `config` overrides file has nothing left to express.
 
 **Related:** design §6 run window / usage gate / PAUSE, §7 phase 3 (tdgrind migration — this is the step after it, or the shape the port should take), TD-010 (adopting hand-started sessions faces the same "who stops it" question), samscrape TD-274 (the tdgrind supervisor), samscrape `~/.tdgrind/config` dated overrides of 2026-09-01.
+
+## TD-028: Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets
+
+**Priority:** Medium
+**Added:** 2026-09-10
+**Status:** Open — design landed (§4.8), no code yet
+**Location:** `src/sessionorc/agent.py` (session record, acting RPCs, tick), `src/sessionorc/client.py` (caller id on every RPC), `src/agentorc/cli.py` (`progress`, `finding`, `new --role/--lane/--grant`, `roles`, the skill text), `src/agentorc/ui/` (report line, Focus Reports panel, grants chip), `.agentorc.yml` loader (`roles:`, `ledger:`)
+
+**Why:** On 2026-09-10 the Herd showed four unattended workers and could not say which TDs any of them held, had finished, or had filed on the side — the answer lived in scrollback and PR titles — and nothing stopped one worker from `ao kill`-ing another. Design §4.8 (decided the same day, §10) makes the verbs first-class: two ungated report channels (`progress`, `findings`, each entry with a declared / derived / scraped source; declared never overwritten, §9 invariant 10) and one gated grant (`orchestrate`, checked by the agent against the caller's session id on every acting RPC, §9 invariant 11). Roles are presets over them and nothing keys on the preset (§9 invariant 9). Schedule is deliberately not part of any of it (TD-026 carries scheduling).
+
+**Fix:** in order, each its own PR: (1) the CLI sends `AGENTORC_SESSION` as the caller on every RPC and the agent refuses `send`/`keys`/`kill`/`close`/`mode`/`remove`/`create` from a session onto a different session unless its record holds `orchestrate`; `capabilities` on the record, settable at create and by a `set_grants` RPC; (2) `lane`, `progress`, `findings` on the record with `rpc_progress` (claim / done / drop) and `rpc_finding`, `ao progress`, `ao finding`, `--json` included, and the skill text (TD-019's `ao --skill`) gains "declare before the first edit, declare the result before moving on"; (3) the derived source on the tick: worktree branch `tdNNN-*` → claimed, a merged PR from that branch → done, a ledger row that appeared on main from that branch → finding, all marked `derived`; (4) the card report line, the Focus Reports panel with Drop, the grants chip (§4.5a); (5) presets: `ao new --role/--lane/--grant`, `ao roles`, the `roles:` / `ledger:` keys, built-in brief templates for the three presets (the run-1..3 brief in `docs/briefs/tdgrind-ao-1.md` becomes the grinder template with `{lane}` filled in), and the first orchestrator brief. Done when a grinder started with `--lane TD-027,TD-019` shows `TD-027 → #60 · 1/2 done` on its card without anyone reading its pane, and a worker without the grant gets "needs the orchestrate grant" from `ao kill <other>`.
+
+**Related:** design §4.8, §4.5a, §4.7, §5, §6, §9 invariants 9–11, §10 (2026-09-10); TD-019 (done), TD-026, TD-027 (done).
+
