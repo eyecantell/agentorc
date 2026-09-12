@@ -141,7 +141,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
     )
     args.worktree = None
     args.grant, args.lane = [], []
-    args.name = args.name or "shell"
+    args.name = args.name or ""  # the agent names it (`shell`, `shell-2`): one name, one session
     return cmd_new(args)
 
 
@@ -501,7 +501,7 @@ def main(argv: list[str] | None = None) -> int:
     except AgentUnavailable as e:
         return fail(args, str(e), 3, hint="start it with: agentorc-agent serve")
     except AgentError as e:
-        return fail(args, str(e), 1)
+        return fail(args, str(e), 1, **e.data)  # the holder's id and state under --json (TD-030)
 
 
 if __name__ == "__main__":

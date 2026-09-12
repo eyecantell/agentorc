@@ -160,6 +160,9 @@ class Session:
     subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
+    # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):
+    # the name is reused, so the previous run stays reachable from the record that took it over.
+    previous_run: str | None = None
     closed_at: str | None = None
     seen_at: str | None = None  # last time a person looked (Focus opened, card acted on); TD-017
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)

@@ -115,7 +115,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   a namespace. Today `ao focus` and `ao send` take the full id (`ao-agentorc-tests-aotest`);
   with the rule below a bare name resolves to the one live session of that name in the
   current repo or directory, and the full id keeps working everywhere (TD-030). The rules, in
-  the order the agent applies them at create:
+  the order the agent applies them at create (steps 1-3 landed 2026-09-11, TD-030):
   - the name is held by a **live** record (any state but `exited` / `closed`) → refused:
     "`aotest` is running — switch to it, or pick another name". The New session form learns
     this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
@@ -126,10 +126,14 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
     the same name, and goes one step further by forgetting rather than keeping, because the
     name now belongs to the new session. No `-2` card appears.
   - the id is taken in tmux by a session the agent has **no record of** (hand-made, or a stale
-    pane the tick has not adopted yet) → the agent adopts it first if it is ours, else appends
-    `-2`, `-3` and — unlike before — shows the suffixed name on the record, so what the Herd
-    says is what tmux has. The agent handles tmux's "duplicate session" error explicitly rather
-    than trusting the check.
+    pane the tick has not adopted yet) → the agent decides on **tmux's own answer**, not on
+    whether the tick has adopted it yet, or the same `ao new` would refuse or suffix depending on
+    the second it landed in: a live pane refuses like a live record (and says the card appears
+    within a tick, which is when the tick adopts it), a dead pane nobody has a record of is
+    killed and its id reused. The suffix therefore survives only for tmux's own
+    "duplicate session" verdict, which the agent still handles explicitly rather than trusting
+    its check — and then `-2`, `-3` is shown in the name on the record, so what the Herd says is
+    what tmux has.
   - `shell` sessions are named by the agent when the person gives no name (`shell`,
     `shell-2`, …) and follow the same rule under that generated name; registry-only cards
     (`ext-*`, below) are outside it, their ids come from the tool.

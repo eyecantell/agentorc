@@ -135,10 +135,18 @@ async def test_resume_supersedes_the_exited_record(agent, hookstub, tmp_path):
         old = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub")
         await c.call("hook", session=old["id"], adapter_id="cc-123")
         await c.call("kill", id=old["id"])
+        # Resumed under the same name, so §4.1's name rule supersedes first and the id is reused:
+        # one card named `conv`, the previous run reachable from it (TD-030).
         new = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub", resume="cc-123")
-        assert new["id"] != old["id"]
+        assert new["id"] == old["id"] and new["previous_run"] == old["run_log"]
+        assert [(x["id"], x["state"] != "closed") for x in await c.call("list")] == [(new["id"], True)]
+        # Resumed under a *different* name: a new id, and the exited record it came from is closed
+        # (kept a day, sorted last) rather than forgotten — that is `_supersede`'s own path.
+        await c.call("hook", session=new["id"], adapter_id="cc-123")  # as the hook reports it
+        await c.call("kill", id=new["id"])
+        other = await c.call("create", name="elsewhere", dir=str(tmp_path), adapter="hookstub", resume="cc-123")
         states = {x["id"]: x["state"] for x in await c.call("list")}
-        assert states[old["id"]] == "closed" and states[new["id"]] != "closed"
+        assert other["id"] != new["id"] and states[new["id"]] == "closed" and states[other["id"]] != "closed"
 
 
 async def test_resume_of_a_live_conversation_is_refused(agent, hookstub, tmp_path, monkeypatch):

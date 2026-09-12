@@ -7,7 +7,7 @@ import subprocess
 import pytest
 from conftest import FAST_TICK, wait_state
 
-from sessionorc import adapters, paths, reports
+from sessionorc import adapters, naming, paths, reports
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import FindingEntry, ProgressEntry
 
@@ -61,11 +61,11 @@ async def test_anchor_rule_and_shell_exemption(agent, tmp_path):
         # shells are exempt (design §9 invariant 2)
         sh = await c.call("create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         assert sh["id"] != a["id"]
-        # same name → suffix, not a collision
+        # same name, the holder exited → superseded, id reused, one card (design §4.1, TD-030)
         await c.call("kill", id=a["id"])
         await wait_state(c, a["id"], "exited")
         b = await c.call("create", name="one", dir=str(tmp_path), adapter="command", argv=["sleep", "30"])
-        assert b["id"] == a["id"] + "-2"
+        assert b["id"] == a["id"] and b["previous_run"] == a["run_log"]
 
 
 async def test_permission_roundtrip(agent, hookstub, tmp_path):
@@ -692,3 +692,48 @@ async def test_the_model_in_use_comes_from_the_hook_and_from_the_tick(agent, tmp
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
         assert sid not in agent._model_checked  # no key outlives the record
+
+
+async def test_one_name_one_session(agent, tmp_path, monkeypatch):
+    """Design §4.1, §9 invariant 12, TD-030: within a scope a name identifies one session — a live
+    holder refuses (and says which id to switch to), an exited or closed one is superseded and its
+    id reused with its run log kept, and a suffix exists only for a tmux session nobody has a
+    record of, and is then part of the name the Herd shows."""
+    async with LocalClient() as c:
+        a = await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        with pytest.raises(AgentError, match=f"aotest is running — `ao focus {a['id']}`") as e:
+            await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert e.value.data == {"holder": a["id"], "holder_state": a["state"]}  # actionable, not just prose
+        assert [x["id"] for x in await c.call("list")] == [a["id"]]  # nothing was started
+        # a closed holder is superseded: same id, one card, the previous run still reachable
+        await c.call("close", id=a["id"])
+        b = await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert b["id"] == a["id"] and b["name"] == "aotest" and b["previous_run"] == a["run_log"]
+        assert b["state"] != "closed" and [x["id"] for x in await c.call("list")] == [b["id"]]
+        # the same name in another scope is another session, suffix-free
+        other = tmp_path / "elsewhere"
+        other.mkdir()
+        far = await c.call("create", name="aotest", dir=str(other), adapter="shell", argv=["bash", "--norc"])
+        assert far["id"] != b["id"] and far["name"] == "aotest" and not far["id"].endswith("-2")
+        # a live tmux session holding the id with no record yet: refused on tmux's own answer, not
+        # on whether the tick has adopted it — the same `ao new` must not depend on the second
+        hand_id = naming.base_id(tmp_path, None, "byhand")
+        agent.tmux.new_session(hand_id, str(tmp_path), ["bash", "--norc"], {})
+        with pytest.raises(AgentError, match="byhand is running") as e:
+            await c.call("create", name="byhand", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert e.value.data == {"holder": hand_id, "holder_state": "unrecorded"}
+        agent.tmux.kill_session(hand_id)  # no record of ours: the agent never made one
+        for sid in (b["id"], far["id"]):
+            await c.call("kill", id=sid)
+
+
+async def test_an_unnamed_session_is_named_by_the_agent(agent, tmp_path):
+    """TD-030 step 3: `ao shell` sends no name, so the agent picks `shell`, `shell-2`, … — a name
+    the caller chose would collide with §4.1's rule the moment a second shell started here."""
+    async with LocalClient() as c:
+        one = await c.call("create", name="", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        two = await c.call("create", name="  ", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert (one["name"], two["name"]) == ("shell", "shell-2")
+        assert one["id"].endswith("-shell") and two["id"].endswith("-shell-2")
+        for sid in (one["id"], two["id"]):
+            await c.call("kill", id=sid)
