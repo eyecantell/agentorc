@@ -112,24 +112,36 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   **A name identifies one session within its scope** (the repo, or the directory for a
   repo-less session; decision 2026-09-10, §10, §9 invariant 12): it is what a person types
   into `ao focus`, `ao send` and the Herd filter, so two cards called `aotest` is a defect, not
-  a namespace. Today `ao focus` and `ao send` take the full id (`ao-agentorc-tests-aotest`);
-  with the rule below a bare name resolves to the one live session of that name in the
-  current repo or directory, and the full id keeps working everywhere (TD-030). The rules, in
-  the order the agent applies them at create:
+  a namespace. Every `ao` subcommand that takes an id also takes a **bare name** (landed
+  2026-09-11), resolved to the one session of that name *here* — this directory, the directory
+  it is under, or a repo it belongs to, which is how a name typed in the checkout finds its
+  worktree — with a live session winning over an exited one of the same name; two matches are
+  "ambiguous — <ids>" and none is "no session named <name> here", never a guess. A full
+  `ao-…` id always means itself, so nothing that worked before changes. The rules, in
+  the order the agent applies them at create (all of TD-030 landed 2026-09-11):
   - the name is held by a **live** record (any state but `exited` / `closed`) → refused:
-    "`aotest` is running — switch to it, or pick another name". The New session form learns
+    "`aotest` is running — switch to it, or pick another name", with the holder's id, its state
+    and the line that switches to it (`ao focus ao-agentorc-tests-aotest`) as error data rather
+    than prose to parse — the CLI prints that as its hint, the form draws a button from it. The New session form learns
     this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
   - the name is held by an **exited or closed** record → the new session **supersedes** it: it
-    takes the id, the old record is forgotten, its run log is kept and linked from the new
-    record as *previous run* (a new field). This extends the supersede that Resume has done
+    takes the id, the old record is **replaced in place** by it (so the card becomes the new
+    session rather than going and coming back, and a start that fails leaves the old record
+    standing), its run log is kept and linked from the new record as *previous run* (a new
+    field), and no cadence or hook bookkeeping outlives the session it was about. This extends the supersede that Resume has done
     since PR #17 — which closes the exited record and keeps it a day — to a fresh start under
     the same name, and goes one step further by forgetting rather than keeping, because the
     name now belongs to the new session. No `-2` card appears.
   - the id is taken in tmux by a session the agent has **no record of** (hand-made, or a stale
-    pane the tick has not adopted yet) → the agent adopts it first if it is ours, else appends
-    `-2`, `-3` and — unlike before — shows the suffixed name on the record, so what the Herd
-    says is what tmux has. The agent handles tmux's "duplicate session" error explicitly rather
-    than trusting the check.
+    pane the tick has not adopted yet) → the agent decides on **tmux's own answer**, not on
+    whether the tick has adopted it yet, or the same `ao new` would refuse or suffix depending on
+    the second it landed in: a live pane refuses like a live record (and says the card appears
+    within a tick, which is when the tick adopts it), a dead pane nobody has a record of is
+    killed and its id reused. The name is checked under a lock on the **scope**, not on the
+    directory, because one scope spans a repo's worktrees. The suffix therefore survives only for tmux's own
+    "duplicate session" verdict, which the agent still handles explicitly rather than trusting
+    its check — and then `-2`, `-3` is shown in the name on the record, so what the Herd says is
+    what tmux has.
   - `shell` sessions are named by the agent when the person gives no name (`shell`,
     `shell-2`, …) and follow the same rule under that generated name; registry-only cards
     (`ext-*`, below) are outside it, their ids come from the tool.
@@ -195,7 +207,15 @@ layer** (Claude Code: `claude --settings ~/.agentorc/claude-hooks/<profile>.json
 launch), never by editing the person's own `settings.json` and never per repo — sessions run in
 plain directories too, hand-started sessions stay untouched, and repos carry their own hooks
 (dev-cadence's SessionStart guards) that keep running alongside. Verified 2026-09-06 that a
-`--settings` file's hooks fire. The hook script (`agentorc-hook`) knows which agentorc session
+`--settings` file's hooks fire. **The layer also carries dev-cadence's one SessionStart line**
+(`scripts/cadence_hooks.sh --session-start`, guarded by `[ -x ]`; cadence §3, 2026-09-11) and
+uses it when the session directory's own `.claude/settings.json` — the worktree's copy, the file
+the tool will load — does not already run those hooks: a worktree whose settings predate a hook
+change still runs the current set, and the line is a no-op in a directory that is not a
+dev-cadence consumer. A directory that wires them itself gets the plain layer, or each hook would
+run twice — the pre-2026-09-11 per-hook block counts as wiring them, so such a worktree runs only the hooks its block names until its branch carries the runner line. The line is byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`).
+Rules and tools stay in the repo — a hand-started session, a human, a clone on another machine
+need them without agentorc; only the wiring for agentorc's own sessions lives here. The hook script (`agentorc-hook`) knows which agentorc session
 it belongs to from `AGENTORC_SESSION`, and which agent to talk to from `AGENTORC_HOME`; the host
 agent sets both on the tmux session at creation — explicitly, because the tmux server may predate
 the agent and carry another environment (decision 2026-09-06,
@@ -547,7 +567,7 @@ noted). If a control is not in this table it does not exist.
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (agent RPC, recorded as dropped by the person) |
 | Focus header | **grants** chip | lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes) |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
-| New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the exited `aotest` — run log kept" and Start proceeds; free names show nothing |
+| New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
@@ -779,10 +799,10 @@ any of them or add its own (§5):
 |---|---|---|---|---|
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
-| `orchestrator` | read `ao --json status` on a cadence; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; never create work | the host, or a list of sessions | `orchestrate` | `progress` per tick: sessions acted on and what was done |
+| `orchestrator` | read `ao --json status` on a cadence; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `orchestrate` | `progress` per tick: sessions acted on and what was done |
 | `plain` | — (no template) | — | none | whatever it declares |
 
-The cadence check is the orchestrator's only judgement about the *work* rather than the *session*, and it is borrowed, not owned: the script is a dev-cadence SYNC file that the working session runs before merging (`/cadence`) and the weekly sweep runs over the window, so the orchestrator adds a third caller, not a third rule set. Its `review` row is self-attested (the worker posted the evidence comment itself), so the orchestrator says *recorded*, never *verified*, and a green check is a reason not to nudge, not proof of a good review.
+The relay is the third of cadence §3's three delivery paths for a convention change (the sync PR, the SessionStart hook, the relay) and the only one that reaches a session already running; the orchestrator keeps a structured record of what it relayed to whom on its launch branch, so a nightly restart does not resend. The cadence check is the orchestrator's only judgement about the *work* rather than the *session*, and it is borrowed, not owned: the script is a dev-cadence SYNC file that the working session runs before merging (`/cadence`) and the weekly sweep runs over the window, so the orchestrator adds a third caller, not a third rule set. Its `review` row is self-attested (the worker posted the evidence comment itself), so the orchestrator says *recorded*, never *verified*, and a green check is a reason not to nudge, not proof of a good review.
 
 The first orchestrator is a **session, not code**: its brief is the samscrape supervisor's
 rules written for an agent driving `ao`, and it runs for a few evenings before any rule becomes

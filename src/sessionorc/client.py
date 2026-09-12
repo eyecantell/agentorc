@@ -14,7 +14,12 @@ from sessionorc import paths
 
 
 class AgentError(Exception):
-    pass
+    """An error the agent returned. `data` is whatever it sent alongside the message — the id of
+    the session holding a name, say — so a caller can act on it instead of parsing prose."""
+
+    def __init__(self, message: str, data: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.data = data or {}
 
 
 class AgentUnavailable(AgentError):
@@ -59,7 +64,7 @@ class LocalClient:
             raise AgentUnavailable("host agent closed the connection")
         resp = json.loads(line)
         if "error" in resp:
-            raise AgentError(resp["error"])
+            raise AgentError(resp["error"], resp.get("error_data"))
         return resp.get("result")
 
     async def subscribe(self) -> AsyncIterator[dict[str, Any]]:

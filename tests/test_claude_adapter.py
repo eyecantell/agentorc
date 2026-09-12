@@ -14,6 +14,7 @@ from conftest import run_hook, wait_for
 
 from agentorc import profiles
 from agentorc.adapters.claude_code import (
+    CADENCE_HOOK_LINE,
     HOOK_EVENTS,
     ClaudeCodeAdapter,
     _pid_alive,
@@ -21,6 +22,8 @@ from agentorc.adapters.claude_code import (
     munge,
     parse_usage,
     pretrust,
+    repo_wires_cadence,
+    write_hooks_file,
 )
 from agentorc.adapters.claude_code.hook import translate
 from sessionorc.adapters import short_model
@@ -76,6 +79,57 @@ def test_hooks_settings_shape():
     pr = h["PermissionRequest"][0]["hooks"][0]
     assert pr["command"] == "/x/agentorc-hook" and pr["timeout"] == 135
     assert h["Stop"][0]["hooks"][0]["timeout"] == 10
+    assert len(h["SessionStart"][0]["hooks"]) == 1  # no cadence line unless asked
+    hc = hooks_settings(prof, "/x/agentorc-hook", cadence_line=True)["hooks"]
+    ss = hc["SessionStart"][0]["hooks"]
+    assert [x["command"] for x in ss] == ["/x/agentorc-hook", CADENCE_HOOK_LINE] and ss[1]["timeout"] >= 130
+    assert CADENCE_HOOK_LINE.startswith('f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]')
+    assert len(hc["Stop"][0]["hooks"]) == 1  # only SessionStart gains it
+
+
+def _settings(d: Path, commands: list[str]) -> None:
+    (d / ".claude").mkdir(parents=True, exist_ok=True)
+    hooks = [{"type": "command", "command": c, "timeout": 20} for c in commands]
+    (d / ".claude" / "settings.json").write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": hooks}]}}))
+
+
+def test_repo_wires_cadence_and_layer_choice(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    prof = profiles.Profile(name="p")
+    bare = tmp_path / "bare"  # no settings at all: a plain directory, or a repo that is no consumer
+    bare.mkdir()
+    assert repo_wires_cadence(bare) is False
+    runner = tmp_path / "runner"  # post-2026-09-11: the one line
+    _settings(
+        runner, ['f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi']
+    )
+    assert repo_wires_cadence(runner) is True
+    legacy = tmp_path / "legacy"  # the pre-migration per-hook block, recognised by its attention line
+    _settings(
+        legacy,
+        [
+            '"$CLAUDE_PROJECT_DIR/scripts/check_anchor.py" --hook',
+            '"$CLAUDE_PROJECT_DIR/scripts/nudge_user_attention.py" --report --due-only',
+        ],
+    )
+    assert repo_wires_cadence(legacy) is True
+    other = tmp_path / "other"  # SessionStart hooks of its own, none of them dev-cadence's
+    _settings(other, ["echo hi"])
+    assert repo_wires_cadence(other) is False
+    broken = tmp_path / "broken"
+    (broken / ".claude").mkdir(parents=True)
+    (broken / ".claude" / "settings.json").write_text("{not json")
+    assert repo_wires_cadence(broken) is False
+    (broken / ".claude" / "settings.json").write_text('{"hooks": {"SessionStart": "oops"}}')
+    assert repo_wires_cadence(broken) is False
+
+    # the layer file follows the choice, by name, so two launches into different dirs do not collide
+    plain = write_hooks_file(prof, runner)
+    plus = write_hooks_file(prof, bare)
+    assert plain.name == "p.json" and plus.name == "p+cadence.json"
+    assert len(json.loads(plain.read_text())["hooks"]["SessionStart"][0]["hooks"]) == 1
+    assert json.loads(plus.read_text())["hooks"]["SessionStart"][0]["hooks"][1]["command"] == CADENCE_HOOK_LINE
+    assert write_hooks_file(prof).name == "p.json"  # no cwd: the plain layer, as before
 
 
 def test_launch_argv_and_env(tmp_path, monkeypatch):

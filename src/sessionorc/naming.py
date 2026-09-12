@@ -24,10 +24,17 @@ def scope_slug(directory: str | Path, repo: str | None) -> str:
     return slug(Path(directory).name)
 
 
+def base_id(directory: str | Path, repo: str | None, name: str) -> str:
+    """The id a name claims in its scope — `ao-<scope>-<name>`, no suffix (design §4.1). A name
+    identifies one session per scope (§9 invariant 12), so this is the identity the agent checks
+    before it starts anything; `session_id` only adds a suffix for a tmux id nobody has a record of."""
+    scope, nm = scope_slug(directory, repo), slug(name)
+    return f"{PREFIX}{scope}" if nm == scope else f"{PREFIX}{scope}-{nm}"  # ao-ao-test-ao-test → ao-ao-test
+
+
 def session_id(directory: str | Path, repo: str | None, name: str, existing: Iterable[str]) -> str:
     """`ao-<scope>-<name>`, with `-2`, `-3`… appended on collision with any id in `existing`."""
-    scope, nm = scope_slug(directory, repo), slug(name)
-    base = f"{PREFIX}{scope}" if nm == scope else f"{PREFIX}{scope}-{nm}"  # ao-ao-test-ao-test → ao-ao-test
+    base = base_id(directory, repo, name)
     taken = set(existing)
     if base not in taken:
         return base

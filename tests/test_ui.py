@@ -321,6 +321,38 @@ def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
     assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
 
 
+def test_the_name_check_endpoint_answers_before_start(client, tmp_path):
+    """TD-030 step 4: the New session form asks what Start would do, the way it already asks about
+    directory occupancy — free, a live holder to switch to, or a replacement with the log kept."""
+    empty = client.get("/api/name_check", params={"dir": "", "name": ""}).json()
+    assert empty["verdict"] == "free" and empty["message"] == ""
+    free = client.get("/api/name_check", params={"dir": str(tmp_path), "name": "nobody"}).json()
+    assert free["verdict"] == "free" and free["holder"] is None and free["id"].endswith("-nobody")
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "held"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    live = client.get("/api/name_check", params={"dir": str(tmp_path), "name": "held"}).json()
+    assert live["verdict"] == "live" and live["holder"] == sid and "switch to it" in live["message"]
+    client.post(f"/api/sessions/{sid}/close")
+    wait_state(client, sid, "closed")
+    again = client.get("/api/name_check", params={"dir": str(tmp_path), "name": "held"}).json()
+    assert again["verdict"] == "supersede" and again["message"] == "replaces the closed held — run log kept"
+
+
+def test_the_shell_button_twice_gives_two_shells(client, tmp_path):
+    """TD-030: the Herd's Shell button sends no name, so the agent names it (`shell`, `shell-2`).
+    With a name of its own it would hit §4.1's rule on the second click and be refused."""
+    ids = []
+    for expected in ("shell", "shell-2"):
+        r = client.post("/shell", data={"dir": str(tmp_path)}, follow_redirects=False)
+        assert r.status_code == 303
+        sid = r.headers["location"].rsplit("/", 1)[-1]
+        ids.append(sid)
+        assert next(x for x in client.get("/api/sessions").json() if x["id"] == sid)["name"] == expected
+    for sid in ids:
+        client.post(f"/api/sessions/{sid}/kill")
+
+
 def test_the_profile_line_says_which_model_is_in_use(tmp_path, monkeypatch):
     """TD-031, design §4.2a: tool · account · model, where the third part is the model actually
     observed. The profile's declared model is an intent, so a line falling back to it says so."""

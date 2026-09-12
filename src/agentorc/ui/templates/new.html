@@ -16,7 +16,8 @@
         <select class="input" name="adapter">{% for a in adapters %}<option value="{{ a }}"{% if a == prefill.adapter %} selected{% endif %}>{{ a }}</option>{% endfor %}</select>
         <span class="note">claude-code: state from hooks · shell: guessed from the screen</span>
       </div>
-      <div class="field"><label>Name</label><input class="input mono" name="name" placeholder="td-302" required></div>
+      <div class="field"><label>Name</label><input class="input mono" name="name" placeholder="td-302" required>
+        <span class="note" id="namecheck"></span></div>
       <div class="field"><label>Profile</label>
         <select class="input" name="profile">{% for k, p in profiles.items() %}<option value="{{ k }}"{% if k == default_profile %} selected{% endif %}>{{ p.label }}</option>{% endfor %}</select>
         <span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span>

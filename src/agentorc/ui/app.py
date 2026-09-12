@@ -288,7 +288,7 @@ def create_app() -> FastAPI:
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
     @app.post("/shell")
-    async def shell(dir: str = Form(...), name: str = Form("shell")):
+    async def shell(dir: str = Form(...), name: str = Form("")):  # unnamed: the agent names it (TD-030)
         s = await call("create", name=name, dir=dir, adapter="shell")
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
@@ -337,6 +337,15 @@ def create_app() -> FastAPI:
         if not dir.strip():
             return {"dir": "", "occupants": [], "git": False}
         return await call("occupancy", dir=dir.strip())
+
+    @app.get("/api/name_check")
+    async def api_name_check(dir: str = "", name: str = "", worktree: bool = False):
+        """What §4.1's name rule would do (design §4.5a, TD-030): the New session form asks as you
+        type, the way it already asks about directory occupancy. `worktree` puts the name in the
+        repo's scope, which is where the session would actually land."""
+        if not (dir.strip() and name.strip()):
+            return {"id": "", "name": name, "verdict": "free", "holder": None, "message": ""}
+        return await call("name_check", dir=dir.strip(), name=name.strip(), repo=dir.strip() if worktree else None)
 
     @app.get("/api/sessions")
     async def api_sessions():

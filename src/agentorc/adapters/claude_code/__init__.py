@@ -101,22 +101,62 @@ def pretrust(cwd: Path, profile: Profile) -> bool:
         return False
 
 
-def hooks_file(profile: Profile) -> Path:
-    return paths.home() / "claude-hooks" / f"{profile.name}.json"
+# dev-cadence's one SessionStart line (design §4.2; cadence §3, 2026-09-11). Byte-identical to the
+# line in dev-cadence `files/.claude/settings.json` — a parity pair: the repo's own settings carry
+# it for hand-started sessions, this layer carries it for the sessions agentorc starts, so a
+# worktree whose settings predate a hook change still runs the current set. The `[ -x ]` guard
+# makes it a no-op in a directory that is not a dev-cadence consumer.
+CADENCE_HOOK_LINE = 'f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi'
+CADENCE_HOOK_TIMEOUT = 150  # > 5 children × the runner's 25 s child timeout
+# A session directory whose own SessionStart already runs dev-cadence's hooks — the one runner
+# line, or the pre-2026-09-11 per-hook block — gets the plain layer, or each hook would run twice.
+# The legacy block runs only the hooks it names (none added after it was seeded); that worktree
+# is current again once its branch carries the runner line. Only `.claude/settings.json` is read:
+# dev-cadence seeds the line there and nowhere else (a hand-copied line in settings.local.json
+# would run the set twice).
+CADENCE_WIRED_MARKERS = ("scripts/cadence_hooks.sh", "scripts/nudge_user_attention.py")
 
 
-def hooks_settings(profile: Profile, hook_cmd: str = "agentorc-hook") -> dict:
-    """The settings layer passed with `--settings`. Only hooks; the profile's own settings still apply."""
+def hooks_file(profile: Profile, cadence_line: bool = False) -> Path:
+    suffix = "+cadence" if cadence_line else ""
+    return paths.home() / "claude-hooks" / f"{profile.name}{suffix}.json"
+
+
+def hooks_settings(profile: Profile, hook_cmd: str = "agentorc-hook", cadence_line: bool = False) -> dict:
+    """The settings layer passed with `--settings`. Only hooks; the profile's own settings still apply.
+    With `cadence_line`, SessionStart also runs dev-cadence's hook runner (CADENCE_HOOK_LINE)."""
     hooks: dict[str, list] = {}
     for ev in HOOK_EVENTS:
         # PermissionRequest may block for the whole permission wait; the others must be instant.
         timeout = profile.permission_wait + 15 if ev == "PermissionRequest" else 10
         hooks[ev] = [{"hooks": [{"type": "command", "command": hook_cmd, "timeout": timeout}]}]
+    if cadence_line:
+        hooks["SessionStart"][0]["hooks"].append(
+            {"type": "command", "command": CADENCE_HOOK_LINE, "timeout": CADENCE_HOOK_TIMEOUT}
+        )
     return {"hooks": hooks}
 
 
-def write_hooks_file(profile: Profile) -> Path:
-    p = hooks_file(profile)
+def repo_wires_cadence(cwd: Path) -> bool:
+    """Does `cwd/.claude/settings.json` — the file Claude Code loads for this directory, so in a
+    worktree the worktree's own copy — already run dev-cadence's SessionStart hooks? Substring match
+    on each SessionStart command; an unreadable or malformed file counts as not wired (the guard in
+    CADENCE_HOOK_LINE keeps that harmless)."""
+    try:
+        data = json.loads((cwd / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        groups = data.get("hooks", {}).get("SessionStart", [])
+        cmds = [str(h.get("command", "")) for g in groups for h in g.get("hooks", [])]
+    except (OSError, ValueError, AttributeError, TypeError):
+        return False
+    return any(m in c for c in cmds for m in CADENCE_WIRED_MARKERS)
+
+
+def write_hooks_file(profile: Profile, cwd: Path | None = None) -> Path:
+    """Write the layer for this launch: the `+cadence` variant when `cwd` does not wire dev-cadence's
+    hooks itself. Two files per profile, chosen by name, so concurrent launches into different
+    directories never overwrite each other's choice."""
+    cadence_line = cwd is not None and not repo_wires_cadence(cwd)
+    p = hooks_file(profile, cadence_line)
     p.parent.mkdir(parents=True, exist_ok=True)
     cmd = shutil.which("agentorc-hook")
     if cmd is None:
@@ -126,7 +166,7 @@ def write_hooks_file(profile: Profile) -> Path:
             "agentorc-hook not on PATH (%s); hooks for profile %s may never fire", os.environ.get("PATH"), profile.name
         )
         cmd = "agentorc-hook"
-    p.write_text(json.dumps(hooks_settings(profile, cmd), indent=1), encoding="utf-8")
+    p.write_text(json.dumps(hooks_settings(profile, cmd, cadence_line), indent=1), encoding="utf-8")
     return p
 
 
@@ -159,7 +199,7 @@ class ClaudeCodeAdapter:
         prof = profiles_mod.get(profile or None)
         adapter_id = resume or str(uuid.uuid4())
         pretrust(cwd, prof)
-        argv = [self.binary, "--settings", str(write_hooks_file(prof))]
+        argv = [self.binary, "--settings", str(write_hooks_file(prof, cwd))]
         argv += ["--resume", resume] if resume else ["--session-id", adapter_id]
         if name:
             argv += ["--name", name]
