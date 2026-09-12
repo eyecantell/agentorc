@@ -6,3 +6,7 @@
 18:14  escalation: concurrent `ao send` races on the fixed `ao-paste` buffer (src/sessionorc/tmux.py paste(), `-d` deletes it); no ledger entry holds it. Board line + PR #76, `ao finding #76 --priority medium`. Nothing was mis-delivered; orchestrator now serializes sends.
 18:14  noted, not acted on: the three samscrape workers have no stop time -- their brief stops on a supervisor's "run window is closing", and tdgrind.sh is PAUSEd since 2026-09-10 (TD-026 gap 1). Nothing will stop them; carried to the end-of-run summary.
 18:36  escalation PR #76 merged (squash) after Sonnet fact-check SHIP, 0 findings; cadence check on it: every row pass. Board line is live.
+18:45  tick 2 (00:45Z). All four workers `working`, output flowing; none idle/stalled/needs-you/limited/exited. agentorc tdgrind-ao-1 still on one long turn (TD-030, PR #75 open) -- 1h40m but producing output, so not stalled.
+18:45  first-tick notice landed in all four composers (verified in each run log). tdgrind-3 acted on the #756 nudge immediately: PR #764 "TD-372: record its board item in the entry (cadence §2 cause-fix)" -- cause fixed, not row.
+18:45  cadence check on new merges + new `done` entries: samscrape #763 (TD-373), #764, #765 (TD-293), #760 (TD-375) -- every row pass, review *recorded*. #758 (TD-374, tdgrind-2) review=fail: comment posted 00:29:43Z, after the 00:28:01Z merge.
+18:45  nudged tdgrind-2 once on #758 (post the comment before `gh pr merge`; never edit the existing one). Queued behind its turn; composer confirmed empty.
