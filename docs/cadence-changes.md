@@ -12,6 +12,10 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-09-12 — a sync PR carries synced files only; the repo's own sessions make every other change
+Do: when an entry asks for a repo-specific change (a SEED file, the repo's own hooks, anything adapt-per-repo), make it in this repo yourself; do not wait for it to arrive from outside.
+See: cadence.md §3 (who makes the change).
+
 ## 2026-09-11 — one SessionStart line calls scripts/cadence_hooks.sh
 Do: if this repo's `.claude/settings.json` still lists dev-cadence hooks one per line, replace them with the one `cadence_hooks.sh` line from dev-cadence's seed; add a new hook to the runner, never to settings.json.
 See: cadence.md §3 (hook wiring), adoption checklist step 2.
