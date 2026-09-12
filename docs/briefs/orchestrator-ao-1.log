@@ -44,3 +44,7 @@
 19:16  the ghost text was no obstacle to the send -- the adapter's composer read counts painted text only (design §4.2), so the paste went in cleanly. Settles the tick-4/5 worry.
 19:16  cadence check: samscrape #783 (TD-377 follow-up, tdgrind-1) -- every row pass, review *recorded*.
 19:16  tdgrind-2 idle 15 min, both items done, nothing open. agentorc tdgrind-ao-1 idle 67 min, lane done. tdgrind-1 `working`.
+19:29  tick 11 (02:29Z). The TD-293 nudge took: tdgrind-3 went `working` and is on a second turn since 02:23:09Z. No second nudge, no escalation.
+19:29  cadence check: samscrape #782 (TD-375 remainder, tdgrind-1) -- every row pass, review *recorded*. Every `tdNNN-*` PR merged since the notice landed has passed every row.
+19:29  three workers now idle with nothing open: tdgrind-1 (02:19:21Z, TD-375/371/378 all done), tdgrind-2 (02:00:38Z, 29 min), tdgrind-ao-1 (01:08:57Z, 80 min). None has exited.
+19:29  no rule fires on any of them: the idle nudge needs an open lane item, and wrap-up needs a passed stop time -- tdgrind-ao-1's is 05:30 MDT and the samscrape three have none at all. So finished-but-not-exited workers sit indefinitely and I may not close them. That is TD-026 gap 1 / TD-032, already ledgered and already on the board; not re-escalated. Carried to the end-of-run summary.
