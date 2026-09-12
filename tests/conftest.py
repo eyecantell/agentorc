@@ -27,6 +27,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from collections.abc import Callable
@@ -45,8 +46,34 @@ CHILD = HERE / "_agent_child.py"
 FAST_TICK = 0.3
 
 
+# Which pytest process owns which private tmux server. The sweep below kills leaked servers, and a
+# live server whose owner is still running belongs to a *concurrent* run — a reviewer's suite beside
+# a worker's, two `pytest` processes in one loop — which must never be swept (TD-025).
+OWNERS = Path(tempfile.gettempdir()) / f"ao-test-owners-{os.getuid()}"
+
+
 def private_socket_name() -> str:
-    return f"ao-test-{uuid.uuid4().hex[:8]}"
+    """A socket name for this process's own tmux server, recorded as owned by it."""
+    name = f"ao-test-{uuid.uuid4().hex[:8]}"
+    with contextlib.suppress(OSError):
+        OWNERS.mkdir(exist_ok=True)
+        (OWNERS / name).write_text(str(os.getpid()))
+    return name
+
+
+def _owner_alive(name: str) -> bool:
+    """Is the pytest process that created this server still running? An unowned socket (a leak from
+    a run that predates this bookkeeping) answers False, so it is still swept."""
+    try:
+        pid = int((OWNERS / name).read_text().strip())
+    except (OSError, ValueError):
+        return False
+    return pid != os.getpid() and Path(f"/proc/{pid}").exists()
+
+
+def _forget_owner(name: str) -> None:
+    with contextlib.suppress(OSError):
+        (OWNERS / name).unlink()
 
 
 # -- stale servers from a killed run ------------------------------------------------------------
@@ -58,23 +85,40 @@ def kill_private_server(tmux: Tmux) -> None:
     if tmux.socket_name:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(f"/tmp/tmux-{os.getuid()}/{tmux.socket_name}")
+        _forget_owner(tmux.socket_name)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def _sweep_stale_test_servers():
+def sweep_stale_test_servers() -> None:
     """A killed pytest run leaves `ao-test-*` tmux servers behind (never the user's). Best effort:
-    a live socket accepts a connection and gets kill-server; a dead socket file is unlinked."""
+    a live socket accepts a connection and gets kill-server; a dead socket file is unlinked.
+
+    **A server another pytest process is still using is left alone** (TD-025). This sweep used to
+    kill every live `ao-test-*` server it found, so a second suite starting six seconds into the
+    first one destroyed the first one's tmux server mid-test: its panes vanished from `list-panes`,
+    its records froze at `working` with an empty tail, and its next `send-keys` failed with
+    `error connecting to /tmp/tmux-…`. That is the whole family of "seen once while a review ran
+    the suite beside me" flakes, and it is why the ownership file exists."""
     for sock in glob.glob(f"/tmp/tmux-{os.getuid()}/ao-test-*"):
+        name = os.path.basename(sock)
         with socket.socket(socket.AF_UNIX) as s:
             try:
                 s.connect(sock)
             except OSError:
                 with contextlib.suppress(OSError):
                     os.unlink(sock)
+                _forget_owner(name)
                 continue
+        if _owner_alive(name):
+            continue  # a concurrent run is using it
         subprocess.run(["tmux", "-S", sock, "kill-server"], capture_output=True, check=False)
         with contextlib.suppress(OSError):
             os.unlink(sock)
+        _forget_owner(name)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _sweep_stale_test_servers():
+    sweep_stale_test_servers()
     yield
 
 

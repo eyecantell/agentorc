@@ -9,6 +9,11 @@
    private server (`-L ao-test-<uuid>`) and a temp `AGENTORC_HOME`. `agentorc-agent serve` is
    never spawned by a test: it builds `Tmux()` with no socket name, which is the real server.
    The subprocess agent is `tests/_agent_child.py`.
+   **Two pytest runs at once must not touch each other** (TD-025): the stale-server sweep kills
+   leaked `ao-test-*` servers, and it skips any whose owning process is still alive
+   (`/tmp/ao-test-owners-<uid>/<socket>`, written by `private_socket_name`). It used to kill them
+   all, which is how a review running the suite beside a worker's run destroyed that run's tmux
+   server mid-test — a harness bug that looked like a timing flake for two weeks.
 2. **Every wait is bounded.** Use `wait_for`, `wait_for_sync`, or `wait_state` from
    `conftest.py`. A bare `sleep` is never synchronisation.
 3. **Tests clean up their own sessions.** Kill what you create; the fixture kills the server,
