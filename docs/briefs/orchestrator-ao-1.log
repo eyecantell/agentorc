@@ -71,3 +71,4 @@
 21:23  tick 25 (05:23Z). Three merges, none on a `tdNNN-*` branch and all four workers idle throughout, so none is a worker's: samscrape #789 and agentorc #82 (`cadence-sync-267cae5`), agentorc #81 (`hook-layer`, design §4.2 launch-layer SessionStart runner). Reported, not checked as worker work.
 21:23  checked the sync rather than assuming it was inert: dev-cadence moved to 267cae5 in both repos, and the new `scripts/check_cadence.py` still parses and still returns the same rows (re-ran it against #76 from origin/main: pass). The review-comment shape is a parity pair, so a sync is exactly when it could have moved -- it did not.
 21:23  all four workers still idle, every lane item `done`, none exited.
+21:34  tick 26 (05:34Z). ok — no merges, all four idle and done, none exited.
