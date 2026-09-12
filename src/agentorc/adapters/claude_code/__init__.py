@@ -110,6 +110,10 @@ CADENCE_HOOK_LINE = 'f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "
 CADENCE_HOOK_TIMEOUT = 150  # > 5 children × the runner's 25 s child timeout
 # A session directory whose own SessionStart already runs dev-cadence's hooks — the one runner
 # line, or the pre-2026-09-11 per-hook block — gets the plain layer, or each hook would run twice.
+# The legacy block runs only the hooks it names (none added after it was seeded); that worktree
+# is current again once its branch carries the runner line. Only `.claude/settings.json` is read:
+# dev-cadence seeds the line there and nowhere else (a hand-copied line in settings.local.json
+# would run the set twice).
 CADENCE_WIRED_MARKERS = ("scripts/cadence_hooks.sh", "scripts/nudge_user_attention.py")
 
 

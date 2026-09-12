@@ -213,7 +213,7 @@ uses it when the session directory's own `.claude/settings.json` — the worktre
 the tool will load — does not already run those hooks: a worktree whose settings predate a hook
 change still runs the current set, and the line is a no-op in a directory that is not a
 dev-cadence consumer. A directory that wires them itself gets the plain layer, or each hook would
-run twice. The line is byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`).
+run twice — the pre-2026-09-11 per-hook block counts as wiring them, so such a worktree runs only the hooks its block names until its branch carries the runner line. The line is byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`).
 Rules and tools stay in the repo — a hand-started session, a human, a clone on another machine
 need them without agentorc; only the wiring for agentorc's own sessions lives here. The hook script (`agentorc-hook`) knows which agentorc session
 it belongs to from `AGENTORC_SESSION`, and which agent to talk to from `AGENTORC_HOME`; the host
