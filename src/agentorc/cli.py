@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from importlib import resources
 from typing import Any
 
+from sessionorc import naming
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
@@ -40,6 +41,37 @@ def call_sync(method: str, **params: Any) -> Any:
     TD-028): that is how the agent tells a worker acting on another session from a person at a
     terminal. Unset outside a session, so nothing changes for a person."""
     return _call_sync(method, caller=os.environ.get("AGENTORC_SESSION") or None, **params)
+
+
+def resolve(ident: str) -> str:
+    """Design §4.1 (TD-030 step 5): every subcommand that takes an id also takes a bare **name**,
+    resolved to the one session of that name here — this directory, or the repo it belongs to.
+    A full `ao-…` id always means itself, so nothing that worked before changes. A live session
+    wins over an exited one of the same name; anything else is an error, never a guess."""
+    if ident.startswith(naming.PREFIX):
+        return ident
+    here = pathlib.Path.cwd().resolve()
+    named = [s for s in call_sync("list") if s.get("name") == ident and _is_here(s, here)]
+    live = [s for s in named if s["state"] not in ("exited", "closed")] or named
+    if len(live) == 1:
+        return str(live[0]["id"])
+    if not live:
+        raise AgentError(f"no session named {ident} here — pass the full id, or `ao status` to see them")
+    raise AgentError(f"{ident} is ambiguous here — {', '.join(sorted(s['id'] for s in live))}")
+
+
+def _is_here(s: dict[str, Any], here: pathlib.Path) -> bool:
+    """The session's scope covers the current directory: it runs here, under here, or in a repo
+    this directory belongs to (which is how a name typed in the checkout finds its worktree)."""
+    for key in ("dir", "repo"):
+        if not s.get(key):
+            continue
+        p = pathlib.Path(str(s[key]))
+        if p == p.parent:
+            continue  # a session rooted at `/` is an ancestor of everything: not a scope
+        if here == p or p in here.parents or here in p.parents:
+            return True
+    return False
 
 
 def emit(args: argparse.Namespace, result: Any, prose: Callable[[], None]) -> int:
@@ -123,6 +155,9 @@ def cmd_new(args: argparse.Namespace) -> int:
         capabilities=args.grant or [],
         lane=args.lane,
     )
+    if s.get("previous_run") and not args.json:
+        # the same note the New session form shows before Start (design §4.1, TD-030)
+        print(f"replaces the earlier {s['name']} — run log kept: {s['previous_run']}")
     if getattr(args, "attach", False):
         if not args.json:
             print(f"{s['id']}  ({s['adapter']}, {s['dir']})")
@@ -497,6 +532,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
+        if isinstance(getattr(args, "id", None), str) and args.id:
+            args.id = resolve(args.id)  # a full id, or a bare name resolved here (TD-030 step 5)
         return args.fn(args)
     except AgentUnavailable as e:
         return fail(args, str(e), 3, hint="start it with: agentorc-agent serve")

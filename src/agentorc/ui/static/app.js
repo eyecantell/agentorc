@@ -180,6 +180,9 @@
   // ---- New session: the anchor rule, shown before you press Start ----
   AO.newSession = function () {
     const dir = $("[name=dir]"), here = $("[name=where][value=here]"), wt = $("[name=where][value=worktree]"), note = $("#occupancy");
+    // Declared up here, not beside `nameCheck` below: the occupancy check calls it when it moves
+    // the scope to a worktree, and a `const` read before its declaration is a ReferenceError.
+    const nm = $("[name=name]"), start = $("button[type=submit]"), nnote = $("#namecheck");
     let seq = 0;
     async function check() {
       const v = dir.value.trim(); const my = ++seq;
@@ -189,7 +192,7 @@
         if (my !== seq) return;
         if (o.occupants && o.occupants.length) {
           note.innerHTML = `⚠ <b>in use</b> by ${esc(o.occupants.join(", "))} — one agent session per directory (design §9); a new worktree is selected instead.`;
-          here.disabled = true; wt.checked = true;
+          here.disabled = true; wt.checked = true; nameCheck();  // the scope moved to the repo
         } else {
           here.disabled = false;
           note.textContent = o.git ? "free · a git repo, so a worktree is available" : (o.dir ? "free" : "");
@@ -198,7 +201,32 @@
     }
     dir.addEventListener("input", () => { clearTimeout(dir._t); dir._t = setTimeout(check, 250); });
     dir.addEventListener("change", check);
-    check();
+
+    // One name, one session (design §4.1, §9 invariant 12): say what Start would do before it is
+    // pressed — a live holder is a refusal, so offer Switch to instead; an exited one is replaced
+    // and its run log kept. Same texts as `ao new` prints: the agent composes them (TD-030).
+    let nseq = 0;
+    async function nameCheck() {
+      const mine = ++nseq, n = nm.value.trim(), d = dir.value.trim();
+      const worktree = $("[name=where][value=worktree]").checked;
+      if (!n || !d) { nnote.textContent = ""; start.disabled = false; return; }
+      try {
+        const q = `dir=${encodeURIComponent(d)}&name=${encodeURIComponent(n)}&worktree=${worktree}`;
+        const o = await (await fetch(`/api/name_check?${q}`)).json();
+        if (mine !== nseq) return;
+        start.disabled = o.verdict === "live";
+        if (o.verdict === "live") {
+          const to = o.holder_state === "unrecorded" ? "" : ` <a class="btn sm primary" href="/focus/${encodeURIComponent(o.holder)}">Switch to</a>`;
+          nnote.innerHTML = `⚠ <b>${esc(o.message)}</b>${to}`;
+        } else nnote.innerHTML = o.verdict === "supersede" ? esc(o.message) : "";
+      } catch (e) { nnote.textContent = ""; start.disabled = false; }
+    }
+    nm.addEventListener("input", () => { clearTimeout(nm._t); nm._t = setTimeout(nameCheck, 250); });
+    nm.addEventListener("change", nameCheck);
+    dir.addEventListener("change", nameCheck);
+    for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", nameCheck);
+    check();  // both once at load: a prefilled directory and a prefilled name are checked too
+    nameCheck();
   };
 
   // ---- Focus ----

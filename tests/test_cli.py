@@ -373,12 +373,50 @@ def test_ao_new_says_which_session_holds_the_name(subprocess_agent, tmp_path, ca
     sid = capsys.readouterr().out.split()[0]
     wait_state(sid, "idle")
     assert cli.main(["new", "aotest", "-a", "shell", "-d", str(tmp_path)]) == 1
-    assert f"aotest is running — `ao focus {sid}`" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "aotest is running — switch to it" in err and f"ao focus {sid}" in err  # the message, then the hint
     assert cli.main(["--json", "new", "aotest", "-a", "shell", "-d", str(tmp_path)]) == 1
     refused = json.loads(capsys.readouterr().out)
-    assert refused["holder"] == sid and refused["holder_state"] == "idle"
+    assert refused["holder"] == sid and refused["holder_state"] == "idle" and f"ao focus {sid}" in refused["hint"]
     assert cli.main(["shell", "-d", str(tmp_path)]) == 0  # named by the agent, not by `ao`
     other = capsys.readouterr().out.split()[0]
     assert other.endswith("-shell") and call_sync("get", id=other)["name"] == "shell"
     for x in (sid, other):
         call_sync("kill", id=x)
+
+
+def test_every_subcommand_takes_a_bare_name(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-030 step 5, design §4.1: a bare name resolves to the one session of that name here; a
+    full id always means itself; ambiguity and absence are errors, never a guess."""
+    (tmp_path / "one").mkdir()
+    (tmp_path / "two").mkdir()
+    assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path / "one")]) == 0
+    first = json.loads(capsys.readouterr().out)["id"]
+    wait_state(first, "idle")
+    monkeypatch.chdir(tmp_path / "one")
+    assert cli.main(["--json", "tail", "w", "-n", "1"]) == 0  # the name, not the id
+    capsys.readouterr()
+    assert cli.main(["--json", "mode", "w", "unattended"]) == 0
+    assert json.loads(capsys.readouterr().out)["id"] == first
+    assert cli.main(["--json", "progress", "claim", "TD-030", "--id", "w"]) == 0  # `--id` too
+    assert json.loads(capsys.readouterr().out)["id"] == first
+    assert cli.main(["--json", "tail", first]) == 0  # the full id still means itself
+    capsys.readouterr()
+    assert cli.main(["tail", "nobody"]) == 1
+    assert "no session named nobody here" in capsys.readouterr().err
+    # a second session of that name in a sibling directory: from the parent, both are "here"
+    assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path / "two")]) == 0
+    second = json.loads(capsys.readouterr().out)["id"]
+    wait_state(second, "idle")
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["tail", "w"]) == 1
+    assert f"w is ambiguous here — {', '.join(sorted([first, second]))}" in capsys.readouterr().err
+    monkeypatch.chdir(tmp_path / "two")
+    assert cli.main(["--json", "tail", "w", "-n", "1"]) == 0  # unambiguous again in its own directory
+    capsys.readouterr()
+    # an exited session of the name does not shadow the live one, and loses to nothing else
+    call_sync("kill", id=second)
+    monkeypatch.chdir(tmp_path)
+    assert cli.main(["--json", "mode", "w", "interactive"]) == 0
+    assert json.loads(capsys.readouterr().out)["id"] == first  # the live one wins
+    call_sync("kill", id=first)

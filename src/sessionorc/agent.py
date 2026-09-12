@@ -647,12 +647,22 @@ class HostAgent:
                 await self._supersede(resume, sid)
         return s.to_dict()
 
-    async def _name_holder(self, directory: Path, repo: str | None, name: str) -> Session | str | None:
-        """Design §4.1: one name, one session per scope. Raises for a **live** holder; otherwise
-        returns what a new session would supersede — the exited or closed record, or the id of a
-        dead pane nobody has a record of — or None when the name is free. Nothing is destroyed
-        here: `_take_name` does that once the launch has succeeded (TD-030)."""
+    async def rpc_name_check(self, dir: str, name: str, repo: str | None = None) -> dict[str, Any]:
+        """What §4.1's name rule would do to this name, without doing it: the New session form's
+        check as you type, and the note `ao new` prints (design §4.5a, TD-030 step 4)."""
+        verdict, _ = await self._name_verdict(Path(dir).expanduser(), repo, name)
+        return verdict
+
+    async def _name_verdict(
+        self, directory: Path, repo: str | None, name: str
+    ) -> tuple[dict[str, Any], Session | str | None]:
+        """The one place §4.1's rule is decided, so the form, the CLI and `create` never drift:
+        `(what it would do, what it would have to supersede)`. `verdict` is `free`, `live` (a
+        holder that is running) or `supersede`, with the text both surfaces show."""
         base = naming.base_id(directory, repo, name)
+        out: dict[str, Any] = {"id": base, "name": name, "verdict": "free", "holder": None, "message": ""}
+        if not name.strip():
+            return out, None
         holder = self.sessions.get(base)
         if holder is None:
             # No record, but tmux may still hold the id (a hand-made session the tick has not
@@ -661,20 +671,48 @@ class HostAgent:
             # depending on the second it landed in (design §4.1).
             pane = (await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)).get(base)
             if pane is None:
-                return None
+                return out, None
             if not pane.dead:
-                raise RpcError(
-                    f"{name} is running outside agentorc — its card appears within a tick, then"
-                    f" `ao focus {base}`; or pick another name",
-                    holder=base,
-                    holder_state="unrecorded",
-                )
-            return base  # a dead pane nobody has a record of: nothing to keep from it
+                out |= {
+                    "verdict": "live",
+                    "holder": base,
+                    "holder_state": "unrecorded",
+                    "message": f"{name} is running outside agentorc — its card appears within a tick",
+                    "hint": f"switch to it with: ao focus {base}",
+                }
+                return out, None
+            out |= {"verdict": "supersede", "holder": base, "holder_state": "unrecorded"}
+            out["message"] = f"replaces a leftover tmux pane called {name} — it has no record and no log"
+            return out, base  # a dead pane nobody has a record of: nothing to keep from it
         if holder.state not in ("exited", "closed"):
+            out |= {
+                "verdict": "live",
+                "holder": holder.id,
+                "holder_state": holder.state,
+                "message": f"{name} is running — switch to it, or pick another name",
+                "hint": f"switch to it with: ao focus {holder.id}",
+            }
+            return out, None
+        out |= {
+            "verdict": "supersede",
+            "holder": holder.id,
+            "holder_state": holder.state,
+            "message": f"replaces the {holder.state} {name} — run log kept",
+        }
+        return out, holder
+
+    async def _name_holder(self, directory: Path, repo: str | None, name: str) -> Session | str | None:
+        """Raises for a **live** holder; otherwise returns what a new session would supersede — the
+        exited or closed record, or the id of a dead pane nobody has a record of — or None when the
+        name is free. Nothing is destroyed here: `_take_name` does that once the launch has
+        succeeded (TD-030)."""
+        verdict, holder = await self._name_verdict(directory, repo, name)
+        if verdict["verdict"] == "live":
             raise RpcError(
-                f"{name} is running — `ao focus {holder.id}`, or pick another name",
-                holder=holder.id,
-                holder_state=holder.state,
+                verdict["message"],
+                holder=verdict["holder"],
+                holder_state=verdict["holder_state"],
+                hint=verdict["hint"],
             )
         return holder
 

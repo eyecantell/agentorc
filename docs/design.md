@@ -112,13 +112,17 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   **A name identifies one session within its scope** (the repo, or the directory for a
   repo-less session; decision 2026-09-10, §10, §9 invariant 12): it is what a person types
   into `ao focus`, `ao send` and the Herd filter, so two cards called `aotest` is a defect, not
-  a namespace. Today `ao focus` and `ao send` take the full id (`ao-agentorc-tests-aotest`);
-  with the rule below a bare name resolves to the one live session of that name in the
-  current repo or directory, and the full id keeps working everywhere (TD-030). The rules, in
-  the order the agent applies them at create (steps 1-3 landed 2026-09-11, TD-030):
+  a namespace. Every `ao` subcommand that takes an id also takes a **bare name** (landed
+  2026-09-11), resolved to the one session of that name *here* — this directory, the directory
+  it is under, or a repo it belongs to, which is how a name typed in the checkout finds its
+  worktree — with a live session winning over an exited one of the same name; two matches are
+  "ambiguous — <ids>" and none is "no session named <name> here", never a guess. A full
+  `ao-…` id always means itself, so nothing that worked before changes. The rules, in
+  the order the agent applies them at create (all of TD-030 landed 2026-09-11):
   - the name is held by a **live** record (any state but `exited` / `closed`) → refused:
-    "`aotest` is running — `ao focus ao-agentorc-tests-aotest`, or pick another name", with the
-    holder's id and state as error data rather than prose to parse. The New session form learns
+    "`aotest` is running — switch to it, or pick another name", with the holder's id, its state
+    and the line that switches to it (`ao focus ao-agentorc-tests-aotest`) as error data rather
+    than prose to parse — the CLI prints that as its hint, the form draws a button from it. The New session form learns
     this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
   - the name is held by an **exited or closed** record → the new session **supersedes** it: it
     takes the id, the old record is **replaced in place** by it (so the card becomes the new
@@ -555,7 +559,7 @@ noted). If a control is not in this table it does not exist.
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (agent RPC, recorded as dropped by the person) |
 | Focus header | **grants** chip | lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes) |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
-| New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the exited `aotest` — run log kept" and Start proceeds; free names show nothing |
+| New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
