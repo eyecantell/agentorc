@@ -70,8 +70,18 @@ def test_shell_send_tail_status_kill_close(subprocess_agent, tmp_path, capsys):
     assert cli.main(["close", sid2]) == 0
     assert capsys.readouterr().out.strip() == f"closed {sid2}"
     assert call_sync("get", id=sid2)["state"] == "closed"
+    assert cli.main(["shell", "-d", str(tmp_path), "live"]) == 0
+    sid3 = capsys.readouterr().out.split()[0]
+    wait_state(sid3, "idle")
+    assert cli.main(["forget", sid3]) != 0  # a live record is refused: "kill it first"
+    assert "kill it first" in capsys.readouterr().err
+    assert cli.main(["forget", sid2]) == 0
+    assert capsys.readouterr().out.strip() == f"forgot {sid2}"
+    assert all(s["id"] != sid2 for s in call_sync("list"))
+    assert cli.main(["kill", sid3]) == 0
+    wait_state(sid3, "exited")
     call_sync("remove", id=sid)
-    call_sync("remove", id=sid2)
+    call_sync("remove", id=sid3)  # sid2 is already forgotten
 
 
 def test_keys_reach_the_pane(subprocess_agent, tmp_path, capsys):

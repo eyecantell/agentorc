@@ -190,6 +190,12 @@ def cmd_close(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"closed {args.id}"))
 
 
+def cmd_forget(args: argparse.Namespace) -> int:
+    """The card's Forget (design §4.5a): drop an exited or closed record; the agent refuses a live one."""
+    call_sync("remove", id=args.id)  # returns nothing: the record is gone, so no record to emit (unlike kill/close)
+    return emit(args, {"id": args.id, "removed": True}, lambda: print(f"forgot {args.id}"))
+
+
 def cmd_send(args: argparse.Namespace) -> int:
     text = " ".join(args.text) if args.text else sys.stdin.read()
     s = call_sync("send", id=args.id, text=text, wait=args.wait, timeout=args.timeout)
@@ -443,6 +449,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, fn, help_ in (
         ("kill", cmd_kill, "kill a session (worktree kept)"),
         ("close", cmd_close, "close a session"),
+        ("forget", cmd_forget, "drop an exited or closed record (the card's Forget)"),
     ):
         p = add(name, help=help_)
         p.add_argument("id")
