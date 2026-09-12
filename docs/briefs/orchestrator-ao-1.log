@@ -1,0 +1,7 @@
+18:14  run 1, tick 1 (00:14-00:40Z). All four in-scope workers `working` throughout; none idle, stalled, needs-you, limited or exited.
+18:14  tdgrind-ao-1 (ao-agentorc-tdgrind-ao-1-3): working -> first-tick cadence-§4 review-evidence notice sent (queued behind a 1h22m turn; composer confirmed empty).
+18:14  samscrape tdgrind-1/2/3 (-2): working -> same notice; first attempt failed (concurrent `ao send` raced on the global `ao-paste` tmux buffer), composers verified empty, re-sent serially, all landed.
+18:14  cadence check, report-only this tick (notice had not yet landed; review fails on pre-notice merges are reported, not nudged): agentorc #69 #70 #71 #72 -- review=fail (no cadence-review comment), every other row pass. samscrape #752 #753 #754 #755 -- review=fail only; #760 (tdgrind-1) all rows pass, review *recorded*.
+18:14  samscrape #756 (tdgrind-3): ledger=fail -- TD-372 named in the title, PR touches neither ledger file. Nudged (non-review row, so nudgeable pre-notice), combined into the same single send.
+18:14  escalation: concurrent `ao send` races on the fixed `ao-paste` buffer (src/sessionorc/tmux.py paste(), `-d` deletes it); no ledger entry holds it. Board line + PR #76, `ao finding #76 --priority medium`. Nothing was mis-delivered; orchestrator now serializes sends.
+18:14  noted, not acted on: the three samscrape workers have no stop time -- their brief stops on a supervisor's "run window is closing", and tdgrind.sh is PAUSEd since 2026-09-10 (TD-026 gap 1). Nothing will stop them; carried to the end-of-run summary.
