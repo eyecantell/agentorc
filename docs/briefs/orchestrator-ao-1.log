@@ -61,3 +61,4 @@
 19:33  tick 15 (03:33Z). ok — no merges, all four idle with every lane item `done`, none exited, nothing pending. No rule fires.
 19:44  tick 16 (03:44Z). ok — no merges, all four idle and done, none exited.
 19:55  tick 17 (03:55Z). ok — no merges, all four idle and done, none exited.
+20:06  tick 18 (04:06Z). ok — no merges, all four idle and done, none exited.
