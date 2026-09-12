@@ -243,27 +243,33 @@ class HostAgent:
         its branch, the PRs from it, and the ledger rows those PRs put on main. Every entry is
         marked `derived`, so a declaration stands whatever this finds — the record refuses the
         write, which is why a refusal is not an error. Runs off the branch `_refresh_git` already
-        read, on its own slow cadence, and never blocks the tick on a failure."""
-        due = [
-            s
-            for s in self.sessions.values()
-            if s.dir
-            and not s.external
-            and s.state != "closed"
-            and (s.git or {}).get("branch")
-            and now - self._derived_at.get(s.id, datetime.min.replace(tzinfo=UTC)) > DERIVE_EVERY
-        ]
+        read, on its own slow cadence, and never blocks the tick on a failure.
+
+        What is checked out in a directory is derived only for the record that *holds* that
+        directory now (TD-034, `reports.holds_directory`) — a worktree is reused run after run, and
+        an exited predecessor sharing the `dir` would otherwise be credited with its successor's
+        branch and PRs. Every record keeps the `pending`-by-PR re-check, which is attributed by a PR
+        the record itself claimed, so a merge still lands on a worker that has since exited
+        (TD-032)."""
+        holders = reports.holds_directory(self.sessions.values())
+        due: list[tuple[Session, str | None, list[tuple[str, int]]]] = []
+        for s in self.sessions.values():
+            if not s.dir or s.external or s.state == "closed":
+                continue
+            if now - self._derived_at.get(s.id, datetime.min.replace(tzinfo=UTC)) <= DERIVE_EVERY:
+                continue
+            branch = (s.git or {}).get("branch") if s.id in holders else None
+            pending = [e for e in s.progress if e.source != "declared" and e.status == "claimed" and e.pr]
+            if not branch and not pending:
+                continue
+            due.append((s, branch, [(e.ref, e.pr) for e in pending if e.pr]))
         if not due:
             return
-        pending = {
-            s.id: [(e.ref, e.pr) for e in s.progress if e.source != "declared" and e.status == "claimed" and e.pr]
-            for s in due
-        }
         results = await asyncio.gather(
-            *(asyncio.to_thread(reports.derive, s.dir, (s.git or {}).get("branch"), pending[s.id]) for s in due),
+            *(asyncio.to_thread(reports.derive, s.dir, branch, pend) for s, branch, pend in due),
             return_exceptions=True,
         )
-        for s, result in zip(due, results, strict=True):
+        for (s, _branch, _pending), result in zip(due, results, strict=True):
             self._derived_at[s.id] = now
             live = self.sessions.get(s.id)
             if live is None:

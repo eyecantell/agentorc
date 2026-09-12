@@ -797,3 +797,49 @@ async def test_an_unnamed_session_is_named_by_the_agent(agent, tmp_path):
         assert one["id"].endswith("-shell") and two["id"].endswith("-shell-2")
         for sid in (one["id"], two["id"]):
             await c.call("kill", id=sid)
+
+
+async def test_derived_entries_go_to_the_record_that_holds_the_directory(agent, tmp_path, monkeypatch):
+    """TD-034: a worktree is reused run after run, so the branch checked out in it is derived only
+    for the record that holds it now — an exited predecessor is not credited with its successor's
+    work. What the predecessor already claimed is still re-checked by PR number, so a merge that
+    happens after it exits still lands on it (TD-032)."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@e.com"], ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", str(repo), *args], check=True)
+    (repo / "f").write_text("x")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "one"], check=True)
+    subprocess.run(["git", "-C", str(repo), "checkout", "-qb", "td077-cap"], check=True)
+    prs = [
+        {"number": 77, "state": "OPEN", "headRefName": "td077-cap"},
+        {"number": 70, "state": "OPEN", "headRefName": "td070-earlier"},
+    ]
+    monkeypatch.setattr(reports, "_prs", lambda directory, **kw: prs)
+    async with LocalClient() as person:
+        old = (await person.call("create", name="run-1", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+        # what run 1 was credited with while it held the directory, and then it exits
+        await person.call("progress", id=old, ref="TD-070", status="claimed", pr=70, source="derived")
+        await person.call("kill", id=old)
+        await wait_state(person, old, "exited")
+        new = (await person.call("create", name="run-2", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+        agent._derived_at.clear()
+        await agent.tick()
+        await agent._derive_task
+        live = await person.call("get", id=new)
+        assert [(p["ref"], p["status"], p["pr"], p["source"]) for p in live["progress"]] == [
+            ("TD-077", "claimed", 77, "derived")
+        ]
+        # the exited record gains nothing from a branch it never saw
+        assert [p["ref"] for p in (await person.call("get", id=old))["progress"]] == ["TD-070"]
+        # ... but its own PR merging still reaches it, which is why skipping exited records is wrong
+        prs[1] = {"number": 70, "state": "MERGED", "mergedAt": "now", "headRefName": "td070-earlier"}
+        agent._derived_at.clear()
+        await agent.tick()
+        await agent._derive_task
+        gone = await person.call("get", id=old)
+        assert [(p["ref"], p["status"], p["pr"]) for p in gone["progress"]] == [("TD-070", "done", 70)]
+        await person.call("kill", id=new)
+        for sid in (old, new):
+            await person.call("remove", id=sid)
