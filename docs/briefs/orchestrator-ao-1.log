@@ -48,3 +48,7 @@
 19:29  cadence check: samscrape #782 (TD-375 remainder, tdgrind-1) -- every row pass, review *recorded*. Every `tdNNN-*` PR merged since the notice landed has passed every row.
 19:29  three workers now idle with nothing open: tdgrind-1 (02:19:21Z, TD-375/371/378 all done), tdgrind-2 (02:00:38Z, 29 min), tdgrind-ao-1 (01:08:57Z, 80 min). None has exited.
 19:29  no rule fires on any of them: the idle nudge needs an open lane item, and wrap-up needs a passed stop time -- tdgrind-ao-1's is 05:30 MDT and the samscrape three have none at all. So finished-but-not-exited workers sit indefinitely and I may not close them. That is TD-026 gap 1 / TD-032, already ledgered and already on the board; not re-escalated. Carried to the end-of-run summary.
+19:45  tick 12 (02:45Z). The TD-293 nudge is fully resolved: tdgrind-3 declared TD-293 **done** via PR #784 (td293-certs-renew-silent-success, merged 02:31:37Z). One nudge, one merged PR, no escalation.
+19:45  cadence check: samscrape #784 (TD-293), #786 (TD-377) -- every row pass, review *recorded*. #785 is `board-*`: outside the match.
+19:45  all four workers now idle with every declared lane item `done` (tdgrind-1 TD-371/375/378; tdgrind-2 TD-374/376; tdgrind-3 TD-293/373; tdgrind-ao-1 TD-028/029/030/031/034). None has exited.
+19:45  no rule fires: nothing open, no stop time passed. Holding on the tick; tdgrind-ao-1's 05:30 MDT stop is the first wrap-up I will be entitled to send.
