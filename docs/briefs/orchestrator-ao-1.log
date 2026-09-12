@@ -19,3 +19,8 @@
 19:09  cadence check: agentorc #75 (TD-030), #77, #78 (TD-034) -- every row pass. samscrape #769-#772 are memory-/cadence- branches, not `tdNNN-*`: outside the mechanical match.
 19:09  tick-1's four review fails re-checked: #69-#72 still fail, evidence backfilled 00:17Z (from the worker merging cadence-sync #74 at 00:12Z, before my notice). A backfilled comment cannot evidence "reviewed before merge" -- correct behaviour, and these are pre-notice merges, so reported, not nudged.
 19:09  samscrape tdgrind-1/2/3 all `working`, fresh turns, output flowing.
+19:21  tick 5 (01:21Z). samscrape tdgrind-3 went **idle** 01:20:43Z after a 2h16m turn, with TD-293 still `claimed` -- the TD-032 stand-down shape. Idle <1 min, so under the 20-min threshold: no nudge yet, first eligible ~01:41Z.
+19:21  the composer text is ghost text, settled: tdgrind-3 shows `keep going, pick another TD` and tdgrind-ao-1 `fix TD-034 now`, both appearing within a minute of each session's own end-of-turn summary and both phrased as a suggestion to that session. Two panes, same shape, one minute apart -- Claude Code's suggested-next-prompt, not typed input. Composers are effectively empty; a send would still concatenate, so still no send into one.
+19:21  cadence check: samscrape #767 (TD-376), #773 (TD-378) -- every row pass, review *recorded*. #762 and #774 are not `tdNNN-*`: outside the match.
+19:21  agentorc tdgrind-ao-1 still idle, lane all done, no output since 01:09 -- nothing open, stop time 05:30 not reached, no action.
+19:21  tdgrind-1 and tdgrind-2 `working`, output flowing.
