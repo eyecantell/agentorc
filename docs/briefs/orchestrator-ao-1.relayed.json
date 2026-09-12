@@ -1,0 +1,6 @@
+{
+  "## 2026-09-11 — the independent review leaves evidence on the PR": ["ao-samscrape-td377-enumeration"],
+  "## 2026-09-11 — briefs, CLAUDE.md and skills cite a convention, never restate it": ["ao-samscrape-td377-enumeration"],
+  "## 2026-09-11 — one SessionStart line calls scripts/cadence_hooks.sh": ["ao-samscrape-td377-enumeration"],
+  "## 2026-09-12 — a sync PR carries synced files only; the repo's own sessions make every other change": ["ao-samscrape-td377-enumeration"]
+}
