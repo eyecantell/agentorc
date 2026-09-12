@@ -52,3 +52,7 @@
 19:45  cadence check: samscrape #784 (TD-293), #786 (TD-377) -- every row pass, review *recorded*. #785 is `board-*`: outside the match.
 19:45  all four workers now idle with every declared lane item `done` (tdgrind-1 TD-371/375/378; tdgrind-2 TD-374/376; tdgrind-3 TD-293/373; tdgrind-ao-1 TD-028/029/030/031/034). None has exited.
 19:45  no rule fires: nothing open, no stop time passed. Holding on the tick; tdgrind-ao-1's 05:30 MDT stop is the first wrap-up I will be entitled to send.
+19:01  tick 13 (03:01Z). samscrape #787, #788 (`td377-deploy-note`, `td377-board`) merged 02:45/02:51Z -- both pass every row, review *recorded*. Reported, not nudged: no worker in scope was `working` then (all four idle since 02:34 or earlier, hooks fresh, feed not stale) and all three samscrape worktrees are back on detached HEAD, so these are not a worker's PRs.
+19:01  RULE GAP 2, for the end-of-run summary: matching merged PRs to a worker "by headRefName to a worker's `tdNNN-*` branches" cannot actually attribute them. Every session here pushes as the same GitHub account and every session follows the same branch convention, so an interactive session's `tdNNN-*` PR is indistinguishable from a worker's. Attribution needs the session's own declared `progress` entry (ref + pr), not the branch name.
+19:01  two interactive `ext-*` sessions on the box, both idle -- out of reach (§9 invariant 5) and out of scope; noted only because they are the likely authors above.
+19:01  all four workers still idle, every lane item `done`, none exited. No rule fires.
