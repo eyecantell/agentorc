@@ -1,5 +1,9 @@
 """Integration tests against a private tmux server (`-L`), never the user's."""
 
+import os
+import subprocess
+
+import conftest
 import pytest
 from conftest import kill_private_server, private_socket_name
 from conftest import wait_for_sync as wait_for
@@ -46,3 +50,29 @@ def test_exit_status_readable(tmux):
     assert wait_for(lambda: any(p.dead and p.session == "ao-t-c" for p in tmux.list_panes()))
     info = {p.session: p for p in tmux.list_panes()}["ao-t-c"]
     assert info.dead_status == 3
+
+
+def test_the_stale_server_sweep_leaves_a_concurrent_runs_server_alone():
+    """TD-025: the sweep exists for servers a killed run left behind, and it used to kill every live
+    `ao-test-*` server — including the one a *concurrent* pytest process was in the middle of using,
+    which is how a suite run beside a review lost its panes mid-test. A server whose owning process
+    is still alive is now left alone; once that process is gone it is swept as before."""
+    name = private_socket_name()
+    sock = f"/tmp/tmux-{os.getuid()}/{name}"
+    t = Tmux(socket_name=name)
+    t.ensure_server()
+    owner = subprocess.Popen(["sleep", "60"])
+    try:
+        (conftest.OWNERS / name).write_text(str(owner.pid))  # as another pytest process would
+        conftest.sweep_stale_test_servers()
+        assert os.path.exists(sock) and t.run("list-sessions", check=False).returncode == 0
+        owner.terminate()
+        owner.wait(timeout=5)
+        # the owner is gone: the server is a leak, and the sweep takes it and its bookkeeping
+        conftest.sweep_stale_test_servers()
+        assert not os.path.exists(sock) and not (conftest.OWNERS / name).exists()
+    finally:
+        if owner.poll() is None:
+            owner.terminate()
+            owner.wait(timeout=5)
+        kill_private_server(t)  # a failed assertion above must not leave a server behind
