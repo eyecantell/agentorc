@@ -1,9 +1,9 @@
 # Written by eyecantell/dev-cadence sync.sh — do not edit by hand.
 source: https://github.com/eyecantell/dev-cadence
-commit: 267cae5
-synced: 2026-09-12T05:13:12Z
-file: docs/cadence.md 8ea91fd7a1c1b276e4529b7484e30bc0f72ae538a0389fdf19f92931277d749e
-file: docs/cadence-changes.md cf1b338a7fd1379a7cd59700ee0abf3eb38030e81adb50396a660d2bb36df9eb
+commit: f6e7666
+synced: 2026-09-12T13:33:42Z
+file: docs/cadence.md 26475d09760bf7c1a347e765e8a66557fea72daa5c6aef3a5e7f2656d8b57791
+file: docs/cadence-changes.md dd6764d605ee18a88d05f244a83d217519e72e604b0e835803b01580fc8ea2f7
 file: .claude/skills/stranded-work/SKILL.md f9327b0f913e4a069c36825a9bfd1548ab8b94623b33610cf299361b8a21bf37
 file: .claude/skills/attention/SKILL.md 8cec2e55ff9ec4717cff7a8715007b3a633605e1bf323081d590464eb0a58662
 file: .claude/skills/cadence/SKILL.md c16920b29c497ff322236ed517a88812b56aec173202376855fc2a81c2786f58
