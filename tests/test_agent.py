@@ -701,12 +701,35 @@ async def test_one_name_one_session(agent, tmp_path, monkeypatch):
     record of, and is then part of the name the Herd shows."""
     async with LocalClient() as c:
         a = await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
-        with pytest.raises(AgentError, match=f"aotest is running — `ao focus {a['id']}`") as e:
+        with pytest.raises(AgentError, match="aotest is running — switch to it") as e:
             await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
-        assert e.value.data == {"holder": a["id"], "holder_state": a["state"]}  # actionable, not just prose
+        # actionable, not just prose: the holder, its state, and the line that switches to it
+        assert e.value.data == {
+            "holder": a["id"],
+            "holder_state": a["state"],
+            "hint": f"switch to it with: ao focus {a['id']}",
+        }
+        # the form's check answers the same question without starting anything (step 4)
+        assert await c.call("name_check", dir=str(tmp_path), name="aotest") == {
+            **e.value.data,
+            "id": a["id"],
+            "name": "aotest",
+            "verdict": "live",
+            "message": "aotest is running — switch to it, or pick another name",
+        }
+        free = await c.call("name_check", dir=str(tmp_path), name="nobody")
+        assert free == {
+            "id": naming.base_id(tmp_path, None, "nobody"),
+            "name": "nobody",
+            "verdict": "free",
+            "holder": None,
+            "message": "",
+        }
         assert [x["id"] for x in await c.call("list")] == [a["id"]]  # nothing was started
         # a closed holder is superseded: same id, one card, the previous run still reachable
         await c.call("close", id=a["id"])
+        check = await c.call("name_check", dir=str(tmp_path), name="aotest")
+        assert check["verdict"] == "supersede" and check["message"] == "replaces the closed aotest — run log kept"
         b = await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         assert b["id"] == a["id"] and b["name"] == "aotest" and b["previous_run"] == a["run_log"]
         assert b["state"] != "closed" and [x["id"] for x in await c.call("list")] == [b["id"]]
@@ -721,7 +744,11 @@ async def test_one_name_one_session(agent, tmp_path, monkeypatch):
         agent.tmux.new_session(hand_id, str(tmp_path), ["bash", "--norc"], {})
         with pytest.raises(AgentError, match="byhand is running") as e:
             await c.call("create", name="byhand", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
-        assert e.value.data == {"holder": hand_id, "holder_state": "unrecorded"}
+        assert e.value.data == {
+            "holder": hand_id,
+            "holder_state": "unrecorded",
+            "hint": f"switch to it with: ao focus {hand_id}",
+        }
         agent.tmux.kill_session(hand_id)  # no record of ours: the agent never made one
         # A *dead* pane nobody has a record of holds nothing worth keeping: killed, id reused.
         # Asserted on the two helpers, because the tick adopts such a pane within a tick and the

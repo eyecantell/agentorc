@@ -199,6 +199,31 @@
     dir.addEventListener("input", () => { clearTimeout(dir._t); dir._t = setTimeout(check, 250); });
     dir.addEventListener("change", check);
     check();
+
+    // One name, one session (design §4.1, §9 invariant 12): say what Start would do before it is
+    // pressed — a live holder is a refusal, so offer Switch to instead; an exited one is replaced
+    // and its run log kept. Same texts as `ao new` prints: the agent composes them (TD-030).
+    const nm = $("[name=name]"), start = $("button[type=submit]"), nnote = $("#namecheck");
+    let nseq = 0;
+    async function nameCheck() {
+      const mine = ++nseq, n = nm.value.trim(), d = dir.value.trim();
+      const worktree = $("[name=where][value=worktree]").checked;
+      if (!n || !d) { nnote.textContent = ""; start.disabled = false; return; }
+      try {
+        const q = `dir=${encodeURIComponent(d)}&name=${encodeURIComponent(n)}&worktree=${worktree}`;
+        const o = await (await fetch(`/api/name_check?${q}`)).json();
+        if (mine !== nseq) return;
+        start.disabled = o.verdict === "live";
+        if (o.verdict === "live") {
+          const to = o.holder_state === "unrecorded" ? "" : ` <a class="btn sm primary" href="/focus/${encodeURIComponent(o.holder)}">Switch to</a>`;
+          nnote.innerHTML = `⚠ <b>${esc(o.message)}</b>${to}`;
+        } else nnote.innerHTML = o.verdict === "supersede" ? esc(o.message) : "";
+      } catch (e) { nnote.textContent = ""; start.disabled = false; }
+    }
+    nm.addEventListener("input", () => { clearTimeout(nm._t); nm._t = setTimeout(nameCheck, 250); });
+    nm.addEventListener("change", nameCheck);
+    dir.addEventListener("change", nameCheck);
+    for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", nameCheck);
   };
 
   // ---- Focus ----

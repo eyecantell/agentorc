@@ -22,7 +22,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Open |
 | TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
-| TD-030 | One name, one session: refuse a live holder, supersede an exited one, drop hidden `-2` suffixes | Medium | Open |
 | TD-032 | An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed | Medium | Open |
 | TD-033 | Two load-sensitive flakes in the test suite, each seen once in a full run | Low | Open |
 
@@ -185,19 +184,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Remaining:** one live Focus → Close in a browser — (a) and (c) are JavaScript, which this repo has no harness for — confirming one banner line and no further `/term/` attempts in the UI journal.
 
 **Related:** TD-023 (`pane` flag), design §4.5 error rule and §4.5a Focus **Kill** / **Close**, the browser mechanics bullet on reconnect with backoff.
-
-## TD-030: One name, one session: refuse a live holder, supersede an exited one, drop hidden `-2` suffixes
-
-**Priority:** Medium
-**Added:** 2026-09-10
-**Status:** Open — design landed (§4.1, §9 invariant 12); steps (1)-(3) merged 2026-09-11 (the name claim, the supersede with `previous_run`, agent-generated shell names); steps (4)-(5) pending — the New session form's check and bare-name resolution in the CLI
-**Location:** `src/sessionorc/naming.py` (`session_id`), `src/sessionorc/agent.py` (`rpc_create`, `_supersede`, `occupants`), `src/agentorc/cli.py` (`new`, `shell`), `src/agentorc/ui/` (New session form, `/api/occupancy`)
-
-**Why:** `naming.session_id` appends `-2`, `-3` on any id collision — live or dead — and the record keeps the person's original name, so on 2026-09-10 the Herd showed `aotest` beside `aotest-2` and two cards named `tdgrind-ao-1` (one exited, one working). Paul: "it is a little confusing to have multiple sessions of the same name". The name is the handle `ao focus`, `ao send` and the filter take, so ambiguity there is a defect. Design §4.1 now says a name identifies one session per scope: a live holder refuses, an exited or closed holder is superseded (as `_supersede` already does for a resumed conversation), and a suffix is only for a tmux id with no record and is then shown.
-
-**Fix:** (1) ✅ 2026-09-11 — `rpc_create` looks up the name in scope before choosing an id: live holder → `RpcError("<name> is running — switch to it, or pick another name")` carrying the holder's id; exited/closed holder → kill its dead pane, forget the record, remember its run log on the new record (`previous_run`), reuse the id. The refusal carries the holder's id and state as error data (`RpcError(**data)` → the envelope's `error_data` → `AgentError.data` → `ao new --json`), so a caller acts on a field rather than parsing prose; (2) ✅ 2026-09-11 — `session_id` keeps the suffix path only for ids present in tmux with no record, and the record's `name` then carries the suffix. In practice the create path decides on tmux's own answer (live pane → refuse, dead pane with no record → kill and reuse), so the suffix is now reached only through tmux's `duplicate session` verdict — deliberately: deciding by "has the tick adopted it yet" made the same command refuse or suffix depending on the second; (3) ✅ 2026-09-11 — `shell` gets agent-generated names (`shell`, `shell-2`) shown as the name: `ao shell` **and** the Herd's Shell button send no name at all and `_auto_name` picks the first free one in scope (the button sent a literal `shell` and would have been refused on the second click — caught in review). The card's own *shell here* action still passes `<name>-shell` deliberately: a second click on one card is refused, which is the rule working, not a bug; (4) `/api/occupancy` (or a sibling) answers the name check for the New session form, which disables Start with **Switch to** for a live holder and shows "replaces the exited `<name>` — run log kept" for a dead one; `ao new` prints the same texts. (5) Every CLI subcommand that takes an id also accepts a bare name: resolved to the one live session of that name in the current repo or directory (cwd), else "ambiguous — <ids>" or "no session named <name> here"; full ids keep working. Until (5) lands, `ao focus` / `ao send` take the full `ao-…` id only. Tests: live refuse, dead supersede with log link, tmux-only collision suffixed and shown, shell auto-name, bare-name resolution (unique, ambiguous, absent). Done when starting `aotest` twice yields one card, and `ao focus aotest` is unambiguous on every host.
-
-**Related:** design §4.1, §4.5a (New session name field), §4.7, §9 invariant 12, §10 (2026-09-10); PR #17 (resume supersedes), TD-023 (`pane` flag), TD-029 (the Close that prompted the report).
 
 ## TD-032: An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed
 

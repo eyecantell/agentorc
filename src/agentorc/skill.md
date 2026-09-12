@@ -60,6 +60,11 @@ Mutating — each one is a decision, so check the state first:
 - `ao keys <id> Key…` — raw keys. Not for dialogs, menus, or another agent's composer.
 - `ao focus <id>` attaches a terminal: for people, not for you.
 
+Every command that takes an id also takes a bare **name** (design §4.1), resolved to the one
+session of that name in this directory or its repo — `ao send w --wait` where `w` is the card's
+name. Prefer the full id from `ao status --json` when you have it: a name is ambiguous the moment
+two scopes share it, and the agent then answers "ambiguous — <ids>" rather than picking one.
+
 ## Verify every send (the TD-027 lesson)
 
 A prompt that is typed is not a prompt that ran. Four unattended workers once sat all afternoon
