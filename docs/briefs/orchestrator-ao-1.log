@@ -108,3 +108,4 @@
 05:36  it answered with its wrap-up restated (lane all done; open: TD-028 (4)-(5), TD-029's browser check, TD-033, TD-034; two dated board lines for Paul on 2026-09-14) and `/exit` now sits in the composer. Tree clean, branch pushed, nothing ahead; no open PRs in either repo.
 05:36  the session is still `idle`, not `exited` -- same shape as run 4's unsubmitted `/exit` (TD-027 archive). Per the brief, if it is still there 20 min after the wrap-up (i.e. after ~11:57Z) I `ao close` it; the worktree stays. Not touching keys.
 05:36  samscrape tdgrind-1/2/3 unchanged: idle, every item done, trees clean and pushed. They have no stop time, so no wrap-up is owed to them.
+05:49  tick 60 (11:49Z). tdgrind-ao-1 still `idle` 12 min after the wrap-up, `/exit` still painted in the composer, no output since 11:37:05Z. The 20-min close window opens at ~11:57Z; next tick acts. samscrape three unchanged (idle, done, clean).
