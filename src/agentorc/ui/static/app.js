@@ -57,10 +57,15 @@
     try {
       let body = {};
       if (action === "mode") body = { unattended: !b.classList.contains("on") };
+      // design §4.5a: **Drop** on a claimed progress item, and the grants chip (§4.8, TD-028 step 4)
+      if (action === "drop") body = { ref: b.dataset.ref };
+      if (action === "grants") body = b.classList.contains("off") ? { add: [b.dataset.grant] } : { remove: [b.dataset.grant] };
       const res = await act(id, action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/")) location.href = "/"; }
       if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
+      if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
+      if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
     } catch (e) { AO.toast(`${action} failed: ${e.message}`); }
   });
 
@@ -334,10 +339,43 @@
         $("#gitline").textContent = v.git.branch + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         $("#gitfiles").innerHTML = v.git.files.length ? v.git.files.map((f) => `<div>${esc(f)}</div>`).join("") : '<div class="muted">clean</div>';
       }
+      renderReports(v);
+      renderGrants(v);
       const checks = v.ready || [];
       $("#checks").innerHTML = checks.map(([n, ok]) => `<div class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✗"} ${esc(n)}</div>`).join("");
       $("#closebtn").disabled = !(checks.length && checks.every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
       $$("[data-act=mode]").forEach((b) => { b.classList.toggle("on", !!v.unattended); b.textContent = v.unattended ? "unattended" : "interactive"; });
+    }
+    // design §4.5a **Reports** / **grants** chip (§4.8, TD-028 step 4). The lists come from the
+    // pushed record, so a `progress` or `finding` call from anywhere shows up here without a reload.
+    function renderReports(v) {
+      const progress = v.progress || [], findings = v.findings || [];
+      $("#reportscard").classList.toggle("hidden", !(progress.length || findings.length));
+      $("#progresslist").innerHTML = progress.map((p) => {
+        const derived = (p.source || "declared") !== "declared";
+        const pr = p.pr ? ` <span class="st">→ #${esc(p.pr)}</span>` : "";
+        const why = p.why ? ` <span class="st">${esc(p.why)}</span>` : "";
+        const drop = p.status === "claimed"
+          ? ` <button class="btn sm ghost" data-act="drop" data-id="${id}" data-ref="${esc(p.ref)}" data-confirm="Drop ${esc(p.ref)}? It is recorded as dropped by you.">Drop</button>` : "";
+        return `<div class="rep${derived ? " derived" : ""}"><span class="ref" title="${derived ? "derived by the agent" : "declared by the session"}">${esc(p.ref)}</span>`
+          + `<span class="st ${esc(p.status)}">${esc(p.status)}</span>${pr}${why}<span class="grow"></span><span class="st age" data-since="${esc(p.at || "")}">${fmtAge(p.at)}</span>${drop}</div>`;
+      }).join("");
+      $("#findinglist").innerHTML = findings.map((f) => {
+        const derived = (f.source || "declared") !== "declared";
+        const pri = f.priority ? ` <span class="st">${esc(f.priority)}</span>` : "";
+        return `<div class="rep${derived ? " derived" : ""}"><span class="ref">${esc(f.ref)}</span><span class="st">filed</span>${pri}`
+          + `<span class="grow"></span><span class="st age" data-since="${esc(f.at || "")}">${fmtAge(f.at)}</span></div>`;
+      }).join("");
+    }
+    function renderGrants(v) {
+      const el = $("#fgrants"); if (!el) return;
+      const all = (el.dataset.grants || "").split(",").filter(Boolean), held = v.capabilities || [];
+      el.innerHTML = all.map((g) => {
+        const on = held.includes(g);
+        const title = on ? `revoke ${g} — it lets this session act on other sessions` : `grant ${g}: this session could send to, kill and close other sessions`;
+        return `<button class="badge${on ? "" : " off"}" data-act="grants" data-id="${id}" data-grant="${esc(g)}" title="${esc(title)}"`
+          + `${on ? ` data-confirm="Revoke ${esc(g)} from this session?"` : ` data-confirm="Grant ${esc(g)}? It lets this session send to, kill and close other sessions."`}>${esc(g)}</button>`;
+      }).join("");
     }
     render(s);
     connectEvents((ev) => {

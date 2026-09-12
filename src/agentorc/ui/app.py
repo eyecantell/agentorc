@@ -24,7 +24,7 @@ from agentorc import profiles as profiles_mod
 from sessionorc import hosts, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
-from sessionorc.models import STATE_RANK
+from sessionorc.models import GRANTS, STATE_RANK, report_head, report_line
 
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 
@@ -137,6 +137,17 @@ def view(s: dict[str, Any]) -> dict[str, Any]:
     pend = s.get("pending") or {}
     d["deadline"] = pend.get("deadline") or ""
     d["ready"] = ready_to_close(s)
+    # The report channels (design §4.8, §4.5a card **report line**, TD-028 step 4). One line, shown
+    # only when a channel is non-empty: `report_line` is the same text `ao status -v` prints — one
+    # formatter, so the card and the CLI cannot drift — and the findings count rides beside it. The
+    # line is dashed when the entry it leads with was derived rather than declared, exactly as a
+    # scraped state is; the `~` in the text says *which* entry, the dash says "not from the session".
+    findings = s.get("findings") or []
+    head = report_head(s)
+    d["report"] = report_line(s)
+    d["report_derived"] = bool(head and head.get("source", "declared") != "declared")
+    d["findings_line"] = f"{len(findings)} filed" if findings else ""
+    d["grants_all"] = list(GRANTS)
     return d
 
 
@@ -321,6 +332,18 @@ def create_app() -> FastAPI:
             with contextlib.suppress(HTTPException):
                 await call("seen", id=sid)  # acted on this card too (TD-017)
             return JSONResponse({"ok": True, "id": new["id"]})
+        elif action == "drop":
+            # design §4.5a Focus **Reports** → Drop: the person let a claim go, and the record says
+            # so rather than losing it — a declaration, so the tick's derived entry cannot undo it.
+            ref = str(body.get("ref") or "").strip()
+            if not ref:
+                raise HTTPException(400, "drop needs the reference to drop")
+            await call("progress", id=sid, ref=ref, status="dropped", why=body.get("why") or "dropped from Focus")
+        elif action == "grants":
+            s = await call("set_grants", id=sid, add=list(body.get("add") or []), remove=list(body.get("remove") or []))
+            with contextlib.suppress(HTTPException):
+                await call("seen", id=sid)
+            return JSONResponse({"ok": True, "capabilities": s.get("capabilities") or []})
         elif action == "remove":
             await call("remove", id=sid)
         elif action == "seen":

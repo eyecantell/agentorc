@@ -16,6 +16,13 @@
     <div class="row"><span class="meta strong">{{ s.place }}</span><span class="grow"></span><span class="meta age" data-since="{{ s.since }}">{{ s.age }}</span></div>
     <div class="row"><span class="meta strong">{{ s.where }}</span><span class="grow"></span>{% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}</div>
     <div class="meta">{{ s.profile_line }}</div>
+    {# design §4.5a card **report line**: only when a channel is non-empty (§4.8, TD-028 step 4) #}
+    {% if s.report or s.findings_line %}<div class="row report">
+      {% if s.report %}<span class="meta{% if s.report_derived %} scraped{% endif %}"
+            title="{{ 'the agent derived this from the branch and its PRs — the session did not declare it' if s.report_derived else 'declared by the session' }}">{{ s.report }}</span>{% endif %}
+      <span class="grow"></span>
+      {% if s.findings_line %}<span class="meta">{{ s.findings_line }}</span>{% endif %}
+    </div>{% endif %}
   </div>
   <div class="sc-slot">
     {% if s.state == 'needs-you' and s.pending and s.pending.kind == 'permission' %}

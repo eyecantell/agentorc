@@ -58,6 +58,17 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .pill .dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 .pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
+/* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
+   dashed, the same signal a scraped state carries */
+.meta.scraped { border-bottom: 1px dashed var(--scraped); }
+.reports .rep { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
+.reports .rep .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+.reports .rep.derived .ref { border-bottom: 1px dashed var(--scraped); }
+.reports .rep .st { font-size: 10.5px; color: var(--muted); }
+.reports .rep .st.done { color: var(--done); }
+.reports .rep .st.dropped { text-decoration: line-through; }
+.grants .badge { margin-right: 4px; cursor: pointer; }
+.grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
 .s-idle, .s-exited, .s-unreachable { background: var(--idle-bg); color: var(--idle-fg); } .s-stalled { background: var(--stalled-bg); color: var(--stalled-fg); }
 .s-done { background: var(--done-bg); color: var(--done-fg); } .s-limited { background: var(--limited-bg); color: var(--limited-fg); }
