@@ -5,3 +5,4 @@
 18:14  samscrape #756 (tdgrind-3): ledger=fail -- TD-372 named in the title, PR touches neither ledger file. Nudged (non-review row, so nudgeable pre-notice), combined into the same single send.
 18:14  escalation: concurrent `ao send` races on the fixed `ao-paste` buffer (src/sessionorc/tmux.py paste(), `-d` deletes it); no ledger entry holds it. Board line + PR #76, `ao finding #76 --priority medium`. Nothing was mis-delivered; orchestrator now serializes sends.
 18:14  noted, not acted on: the three samscrape workers have no stop time -- their brief stops on a supervisor's "run window is closing", and tdgrind.sh is PAUSEd since 2026-09-10 (TD-026 gap 1). Nothing will stop them; carried to the end-of-run summary.
+18:36  escalation PR #76 merged (squash) after Sonnet fact-check SHIP, 0 findings; cadence check on it: every row pass. Board line is live.
