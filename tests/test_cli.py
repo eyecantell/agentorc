@@ -354,9 +354,12 @@ def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tm
     assert capsys.readouterr().out.strip() == f"{sid}: filed TD-029 (low)"
     assert cli.main(["progress", "drop", "TD-019", "--why", "phase 5"]) == 0
     capsys.readouterr()
+    call_sync("hook", session=sid, model="claude-opus-5")  # TD-031: as a hook would report it
     assert cli.main(["status", "-v"]) == 0
     shown = capsys.readouterr().out
     assert "report: TD-027 → #60 · 1/2 done" in shown and "filed:  TD-029 (low)" in shown
+    # `shell` has no opinion on how a model name shortens, so it prints as observed (TD-031)
+    assert "model:  claude-opus-5" in shown
     monkeypatch.delenv("AGENTORC_SESSION")
     assert cli.main(["--json", "finding", "#67", "--id", sid]) == 0  # a person, or an orchestrator, for a worker
     assert [f["ref"] for f in out()["findings"]] == ["TD-029", "#67"]

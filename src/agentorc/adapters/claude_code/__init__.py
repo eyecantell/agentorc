@@ -38,7 +38,9 @@ HOOK_EVENTS = (
     "SubagentStart",
     "SubagentStop",
     "SessionEnd",
+    "PostModelSwitch",  # `/model` mid-session: `to_model` is the model in use from now on (TD-031)
 )
+TRANSCRIPT_TAIL = 256 * 1024  # bytes of transcript read from the end to find the last assistant turn
 USAGE_URL = "https://api.anthropic.com/api/oauth/usage"
 log = logging.getLogger("agentorc.claude-code")
 
@@ -202,6 +204,45 @@ class ClaudeCodeAdapter:
         base = config_dir(profile or profiles_mod.get(None)) / "projects" / munge(cwd)
         p = base / f"{session_id}.jsonl"
         return p if p.is_file() else None
+
+    def model_in_use(self, session_id: str, cwd: Path, profile: str = "") -> str | None:
+        """The model this session is actually running, from the tail of its transcript: every
+        `type: assistant` entry carries `message.model` (TD-031). The entry's own field, never a
+        grep — `"model": "sonnet"` also appears inside an Agent call's `tool_input`, where it
+        names a *requested subagent* model — and never a sidechain entry, which is a subagent's
+        turn rather than the session's. None when it cannot tell, which is never an error."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None  # an unknown profile: never fall back to another account's config dir
+        p = self.transcript_path(session_id, cwd, prof)
+        if p is None:
+            return None
+        try:
+            with p.open("rb") as f:
+                f.seek(0, os.SEEK_END)
+                f.seek(max(0, f.tell() - TRANSCRIPT_TAIL))
+                chunk = f.read()
+        except OSError:
+            return None
+        for line in reversed(chunk.splitlines()):
+            if b'"assistant"' not in line:
+                continue
+            try:
+                d = json.loads(line)  # the first line of the tail may be a fragment: it just fails
+            except ValueError:
+                continue
+            if d.get("type") != "assistant" or d.get("isSidechain"):
+                continue
+            model = (d.get("message") or {}).get("model")
+            if model and model != "<synthetic>":  # system entries carry that, not a model
+                return str(model)
+        return None
+
+    @staticmethod
+    def short_model(model: str) -> str:
+        """`claude-fable-5-1` → `fable-5-1` (design §4.2a's profile line, TD-031)."""
+        return model[len("claude-") :] if model.startswith("claude-") else model
 
     def registry_entries(self, profile: Profile | None = None) -> list[dict]:
         """Claude Code's own live-session registry (`sessions/<pid>.json`): a cross-check for
