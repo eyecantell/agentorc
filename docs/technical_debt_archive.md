@@ -336,12 +336,12 @@ is the moment to write it down once the CLI is stable.
 
 **Priority:** Medium
 **Added:** 2026-09-10
-**Status:** Resolved 2026-09-11 (PRs #75, #76)
+**Status:** Resolved 2026-09-11 (PRs #75, #77)
 **Location:** `src/sessionorc/naming.py` (`session_id`), `src/sessionorc/agent.py` (`rpc_create`, `_supersede`, `occupants`), `src/agentorc/cli.py` (`new`, `shell`), `src/agentorc/ui/` (New session form, `/api/occupancy`)
 
 **Why:** `naming.session_id` appends `-2`, `-3` on any id collision — live or dead — and the record keeps the person's original name, so on 2026-09-10 the Herd showed `aotest` beside `aotest-2` and two cards named `tdgrind-ao-1` (one exited, one working). Paul: "it is a little confusing to have multiple sessions of the same name". The name is the handle `ao focus`, `ao send` and the filter take, so ambiguity there is a defect. Design §4.1 now says a name identifies one session per scope: a live holder refuses, an exited or closed holder is superseded (as `_supersede` already does for a resumed conversation), and a suffix is only for a tmux id with no record and is then shown.
 
-**Resolved:** 2026-09-11 (steps 1-3 in PR #75, steps 4-5 in PR #76). All five steps shipped as the entry specified them, with three decisions worth keeping:
+**Resolved:** 2026-09-11 (steps 1-3 in PR #75, steps 4-5 in PR #77). All five steps shipped as the entry specified them, with three decisions worth keeping:
 
 - **One place decides the rule.** `_name_verdict` answers "what would this name do" and both callers use it: `_name_holder` (which `rpc_create` calls, raising for a live holder) and `rpc_name_check` (which the New session form polls as you type, like the directory occupancy check). The refusal text, the "replaces the closed `<name>` — run log kept" note and the switch-to hint are composed there, so the form and `ao new` cannot drift.
 - **The name is taken only once the launch has succeeded**, and the superseded record is *replaced in place* rather than forgotten — the card becomes the new session instead of going and coming back, and a launch that fails leaves the old record standing (found in review; the first version forgot the record first and lost its run log link if the launch then failed).

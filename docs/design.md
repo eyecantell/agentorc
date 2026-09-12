@@ -120,8 +120,9 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   `ao-…` id always means itself, so nothing that worked before changes. The rules, in
   the order the agent applies them at create (all of TD-030 landed 2026-09-11):
   - the name is held by a **live** record (any state but `exited` / `closed`) → refused:
-    "`aotest` is running — `ao focus ao-agentorc-tests-aotest`, or pick another name", with the
-    holder's id and state as error data rather than prose to parse. The New session form learns
+    "`aotest` is running — switch to it, or pick another name", with the holder's id, its state
+    and the line that switches to it (`ao focus ao-agentorc-tests-aotest`) as error data rather
+    than prose to parse — the CLI prints that as its hint, the form draws a button from it. The New session form learns
     this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
   - the name is held by an **exited or closed** record → the new session **supersedes** it: it
     takes the id, the old record is **replaced in place** by it (so the card becomes the new

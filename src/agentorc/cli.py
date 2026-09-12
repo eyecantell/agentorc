@@ -67,6 +67,8 @@ def _is_here(s: dict[str, Any], here: pathlib.Path) -> bool:
         if not s.get(key):
             continue
         p = pathlib.Path(str(s[key]))
+        if p == p.parent:
+            continue  # a session rooted at `/` is an ancestor of everything: not a scope
         if here == p or p in here.parents or here in p.parents:
             return True
     return False
