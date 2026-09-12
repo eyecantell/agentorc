@@ -14,3 +14,8 @@
 18:58  cadence check: samscrape #768 (TD-371, tdgrind-1) -- every row pass, review *recorded*. #766 is `memory-attempting-the-work`, not a `tdNNN-*` branch, so outside the mechanical match; not checked.
 18:58  tdgrind-2's current turn is a pre-merge review of #767 (verifying CRLF counts against origin/main) -- the #758 nudge appears to have taken; no second nudge.
 18:58  agentorc tdgrind-ao-1: one turn since 23:04Z (1h54m) on TD-030/PR #75, still emitting tool output every tick -- long, not `stalled?`. Watching.
+19:09  tick 4 (01:09Z). agentorc tdgrind-ao-1 went **idle** 01:08:57Z with every lane item declared done (TD-028/029/030/031/034) and its end-of-run summary written; tree clean, branch pushed, nothing ahead. Stop time 05:30 MDT not reached, lane has nothing open -> neither the idle nudge nor wrap-up fires. No action.
+19:09  NOT acted on, deliberately: that worker's composer holds `fix TD-034 now — you have time before 05:30` (NBSP after the prompt marker). `ao explain` strips colour so ghost text vs. a prompt Paul typed cannot be told apart from here, and either way an `ao send` would concatenate onto it (TD-027). Left alone; re-check next tick.
+19:09  cadence check: agentorc #75 (TD-030), #77, #78 (TD-034) -- every row pass. samscrape #769-#772 are memory-/cadence- branches, not `tdNNN-*`: outside the mechanical match.
+19:09  tick-1's four review fails re-checked: #69-#72 still fail, evidence backfilled 00:17Z (from the worker merging cadence-sync #74 at 00:12Z, before my notice). A backfilled comment cannot evidence "reviewed before merge" -- correct behaviour, and these are pre-notice merges, so reported, not nudged.
+19:09  samscrape tdgrind-1/2/3 all `working`, fresh turns, output flowing.
