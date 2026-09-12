@@ -25,7 +25,7 @@
           },
           {
             "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/cadence_changes.py\"; [ -x \"$f\" ] && \"$f\" --hook || true",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/cadence_changes.py\"; if [ -x \"$f\" ]; then \"$f\" --hook; fi",
             "timeout": 20
           }
         ]
