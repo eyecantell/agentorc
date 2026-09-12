@@ -24,6 +24,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
 | TD-032 | An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed | Medium | Open |
 | TD-033 | Two load-sensitive flakes in the test suite, each seen once in a full run | Low | Open |
+| TD-034 | Derived report entries land on every record sharing a directory, including an exited predecessor | Low | Open |
 
 ---
 
@@ -210,3 +211,16 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** on the next occurrence, capture the failing assertion (and its `ao explain --json` for the CLI one), then make the test wait for the screen it asserts on — as `wait_state` does for state — rather than reading once. TD-025 is the same class of flake; if all three point at the same read-once pattern, fix them together with one helper.
 
 **Related:** TD-025 (the `idle` timing flake in the same file), TD-015 (screen rules), design §4.2.
+
+## TD-034: Derived report entries land on every record sharing a directory, including an exited predecessor
+
+**Priority:** Low
+**Added:** 2026-09-11
+**Status:** Open — observed live on 2026-09-11, minutes after TD-028 step 3 was deployed
+**Location:** `src/sessionorc/agent.py` (`_derive_reports_inner`), `src/sessionorc/reports.py` (`derive`)
+
+**Why:** The Herd showed `TD-030 done #77 (derived)` on **`ao-agentorc-tdgrind-ao-1-2`** — run 4's *exited* record — when run 5 (`…-1-3`) did that work. Both records carry the same `dir` (the `tdgrind-ao-1` worktree, reused run after run), and the tick derives from the *directory's current branch and PRs*, so every record pointing at that directory is credited with whatever is checked out there now. The declared entries on run 5's own record are correct and unaffected (§9 invariant 10 only protects against overwriting, not against a derived entry appearing where nothing was declared). It is a display lie of a specific kind: an exited worker looks as though it finished work it never saw, which is exactly the question the report channels exist to answer. It is *not* enough to skip exited records — TD-032's whole point is that a merged PR must still land on the record of the worker that has since exited, and TD-028 step 3 re-checks a `pending` PR by number for that reason.
+
+**Fix:** attribute by *occupancy in time*, not by directory alone — derive the current branch's entries only for the record that currently holds the directory (the live one, or the most recently created when none is live), and keep the `pending`-by-PR-number re-check for everyone, since that is attributed by a PR the record already claimed rather than by what is checked out now. Tests: two records in one directory, one exited and one live, with a `tdNNN-*` branch checked out — only the live one gains the derived claim; the exited one keeps a claim it made earlier and still gains its `done` when that PR merges.
+
+**Related:** design §4.8 (derived source), §9 invariant 10; TD-028 step 3 (PR #70, which introduced this), TD-032 (why skipping exited records is the wrong fix), TD-030 (one name, one session — which stops *new* same-name pairs, but these two predate it).
