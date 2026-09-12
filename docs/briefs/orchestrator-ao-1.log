@@ -28,3 +28,7 @@
 19:32  checked and dismissed, not filed: tdgrind-1's TD-375 entry went `done/#760` -> `claimed/null`, which looked like a derived entry losing a merge. It is not -- the worktree is on a new branch `td375-drain-assert-on-mock` (follow-up work), so `claimed` is correctly re-derived. No finding.
 19:32  cadence check: samscrape #776 (TD-377) -- every row pass, review *recorded*. #777, #778 are `memory-*`: outside the `tdNNN-*` match.
 19:32  agentorc tdgrind-ao-1 idle 23 min, lane all done, nothing open, stop time 05:30 not reached -- no action.
+19:43  tick 7 (01:43Z). samscrape tdgrind-3 idle again 01:41:40Z, TD-293 still `claimed` -- second stand-down (first cleared itself at 01:31). 2 min in, threshold not met; eligible ~02:01Z if it stays idle. Watching, no nudge.
+19:43  cadence check: samscrape #775 (TD-376 follow-up) -- every row pass, review *recorded*. #779 is `memory-*`: outside the match.
+19:43  agentorc tdgrind-ao-1 idle 34 min (pane repainted at 01:34, state unchanged since 01:08:57). Lane all done, nothing open -- no action.
+19:43  tdgrind-1 and tdgrind-2 `working`, output flowing.
