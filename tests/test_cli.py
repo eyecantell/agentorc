@@ -7,7 +7,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
-from conftest import pane_line, run_hook, wait_for_sync
+from conftest import pane_line, run_hook, wait_for_sync, wait_screen
 
 from agentorc import cli
 from sessionorc.client import call_sync
@@ -277,9 +277,16 @@ def test_explain_file_and_session(subprocess_agent, tmp_path, capsys):
     assert cli.main(["shell", "ex", "-d", str(tmp_path)]) == 0
     sid = capsys.readouterr().out.split()[0]
     wait_state(sid, "idle")
-    assert cli.main(["explain", sid]) == 0
-    out = capsys.readouterr().out
-    assert out.startswith(f"{sid}  idle (scraped)") and "why: shell has no screen rules" in out and "screen:" in out
+
+    def explain() -> str:
+        assert cli.main(["explain", sid]) == 0
+        return capsys.readouterr().out
+
+    # `idle` says the shell is the foreground process, which is true before its prompt has painted:
+    # `explain` then has an empty screen and prints no `screen:` section at all. Wait for the
+    # section being asserted on, not for a duration (TD-033).
+    out = wait_screen(sid, explain, lambda o: "screen:" in o, what="the pane's screen in `ao explain`")
+    assert out.startswith(f"{sid}  idle (scraped)") and "why: shell has no screen rules" in out
     call_sync("kill", id=sid)
 
 

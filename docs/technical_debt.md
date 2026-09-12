@@ -22,7 +22,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
 | TD-032 | An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed | Medium | Open |
-| TD-033 | Two load-sensitive flakes in the test suite, each seen once in a full run | Low | Open |
 
 ---
 
@@ -183,19 +182,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** (a) a TD-015 rule for the Remote Control stand-down / `/rc failed` screen → a labelled `scraped` state (`detached`, or `idle` with pending text "stood down: another device took over") so the card reads differently from a resting worker; (b) in §6, an **idle-with-open-work** rule for `unattended` sessions: idle past `idle_after` (default 15 min) with a `progress` entry still `claimed` or a PR open from the session's branch → flag `stalled?` and nudge once with a fixed prompt through `send --wait`, then wrap up — the same escalation as the working-stall rule; until §6 lands, this is the orchestrator brief's first rule; (c) record in the design (§4.2) that Remote Control takeovers happen to worker panes and what they look like. Done when a worker that stands down is flagged within `idle_after` and the nudge lands without a person.
 
 **Related:** design §4.2 (idle is not an alert), §6 stall, §4.8 orchestrator, TD-015, TD-026 (no stopper for hand-started unattended sessions), TD-028 step (1) (PR #63, the run this happened to).
-
-## TD-033: Two load-sensitive flakes in the test suite, each seen once in a full run
-
-**Priority:** Low
-**Added:** 2026-09-11
-**Status:** Open — each seen once on 2026-09-11 during TD-029: `tests/test_cli.py::test_explain_file_and_session` (my run) and `tests/test_ui.py::test_terminal_scrollback_reaches_tmux` (the reviewer's). Both passed alone and on a rerun, so they are races, not breaks
-**Location:** `tests/test_cli.py::test_explain_file_and_session`, `tests/test_ui.py::test_terminal_scrollback_reaches_tmux`, `src/sessionorc/agent.py` (`rpc_explain`, the screen verdict)
-
-**Why:** Two different tests failed one full-suite run each while passing on their own and on the next run. Both read a live pane and assert on what it shows, so the likely race is the usual one for this suite (TD-025's shape): the assertion runs before the pane has painted what it looks for. Neither failing assertion's output was captured, which is exactly why this is a ledger entry and not a longer sleep — a sleep would hide the timing rather than wait for the thing being asserted, and there is no evidence yet about which read is early.
-
-**Fix:** on the next occurrence, capture the failing assertion (and its `ao explain --json` for the CLI one), then make the test wait for the screen it asserts on — as `wait_state` does for state — rather than reading once. TD-025 is the same class of flake; if all three point at the same read-once pattern, fix them together with one helper.
-
-**Related:** TD-025 (the `idle` timing flake in the same file), TD-015 (screen rules), design §4.2.
 
 ## TD-035: Adapters without a session-start hook still run dev-cadence's SessionStart set
 

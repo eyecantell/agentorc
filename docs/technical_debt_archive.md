@@ -382,3 +382,26 @@ The fix keeps the sweep (killed runs really do leak servers) and gives it owners
 Neither hypothesis in the Why was right, and both are worth keeping as a warning: the empty tail and the frozen `working` fit "a slow shell start-up" perfectly, and the box being loaded made a harness bug look like a timing one for two weeks.
 
 **Related:** PR #34, PR #42 (fix 1), PR #52 (exit-status lag), `tests/README.md` real-environment notes.
+
+## TD-033: Two load-sensitive flakes in the test suite, each seen once in a full run
+
+**Priority:** Low
+**Added:** 2026-09-11
+**Status:** Resolved 2026-09-12 (PR #89)
+**Location:** `tests/test_cli.py::test_explain_file_and_session`, `tests/test_ui.py::test_terminal_scrollback_reaches_tmux`, `src/sessionorc/agent.py` (`rpc_explain`, the screen verdict)
+
+**Why:** Two different tests failed one full-suite run each while passing on their own and on the next run. Both read a live pane and assert on what it shows, so the likely race is the usual one for this suite (TD-025's shape): the assertion runs before the pane has painted what it looks for. Neither failing assertion's output was captured, which is exactly why this is a ledger entry and not a longer sleep — a sleep would hide the timing rather than wait for the thing being asserted, and there is no evidence yet about which read is early.
+
+**Resolved:** 2026-09-12 (PRs #91, #89) — **the cause was the test suite's own stale-server sweep** (TD-025, PR #91): it killed every live `ao-test-*` tmux server at session start, including the one a concurrently running pytest process was using. That fits both occurrences exactly — this entry recorded one as "my run" and one as "the reviewer's", which is to say *two suites running at once*, and the reviewer's sweep killed my server (or mine theirs). Nine runs of the two modules, three at a time, are green with TD-025's fix alone and none of the changes below.
+
+So the read-once diagnosis in the Fix above was wrong about these two failures, and worth keeping as a caution: every symptom fitted it — an empty screen, a state that never advanced — because a server that has been killed out from under a run looks exactly like a pane that has not painted yet.
+
+The three test-side waits went in anyway (PR #89), as cheap insurance rather than as the fix, through one helper — `wait_screen` in `tests/conftest.py`, `wait_state` for a screen: re-read until what is being asserted on is there, bounded, with tmux's own pane line on a timeout.
+
+- `test_explain_file_and_session` waits for the `screen:` section it asserts on. `idle` means the shell is the foreground process, which is true before its prompt has painted, so an empty screen there is a real (if rare) possibility on a slow box.
+- `test_unseen_idle_until_focused` (a third test, not in this entry) waits for the sent command to reach the pane before waiting for the `working` it produces — `sleep 2` is only `working` for two seconds.
+- `test_terminal_scrollback_reaches_tmux`'s two read-once assertions (`mouse on`, and the pane not being in copy mode) now wait, like the two `wait_for(mode() == …)` calls already beside them.
+
+`tests/README.md` rule 2 carries the rule and the "run the suspect modules three at a time" recipe — which is how the harness bug surfaced in the first place.
+
+**Related:** TD-025 (the same class and, as it turned out, the same cause; `wait_screen` came from this entry and is there for it), TD-015 (screen rules), design §4.2.
