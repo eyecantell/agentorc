@@ -51,7 +51,7 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
     if model := payload.get("model"):
         out["model"] = model
     if ev == "PostModelSwitch":
-        return {**out, "model": payload.get("to_model") or payload.get("model")} if payload.get("to_model") else None
+        return {**out, "model": payload["to_model"]} if payload.get("to_model") else None
     if ev == "PermissionRequest":
         tool = payload.get("tool_name", "?")
         return {
