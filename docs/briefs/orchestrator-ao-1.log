@@ -10,3 +10,7 @@
 18:45  first-tick notice landed in all four composers (verified in each run log). tdgrind-3 acted on the #756 nudge immediately: PR #764 "TD-372: record its board item in the entry (cadence §2 cause-fix)" -- cause fixed, not row.
 18:45  cadence check on new merges + new `done` entries: samscrape #763 (TD-373), #764, #765 (TD-293), #760 (TD-375) -- every row pass, review *recorded*. #758 (TD-374, tdgrind-2) review=fail: comment posted 00:29:43Z, after the 00:28:01Z merge.
 18:45  nudged tdgrind-2 once on #758 (post the comment before `gh pr merge`; never edit the existing one). Queued behind its turn; composer confirmed empty.
+18:58  tick 3 (00:58Z). All four `working`, output within seconds; nothing to act on. Three samscrape workers started fresh turns (00:49/00:57/00:58Z), so the queued notice/nudge were consumed.
+18:58  cadence check: samscrape #768 (TD-371, tdgrind-1) -- every row pass, review *recorded*. #766 is `memory-attempting-the-work`, not a `tdNNN-*` branch, so outside the mechanical match; not checked.
+18:58  tdgrind-2's current turn is a pre-merge review of #767 (verifying CRLF counts against origin/main) -- the #758 nudge appears to have taken; no second nudge.
+18:58  agentorc tdgrind-ao-1: one turn since 23:04Z (1h54m) on TD-030/PR #75, still emitting tool output every tick -- long, not `stalled?`. Watching.
