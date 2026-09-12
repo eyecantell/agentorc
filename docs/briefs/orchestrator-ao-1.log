@@ -73,3 +73,4 @@
 21:23  all four workers still idle, every lane item `done`, none exited.
 21:34  tick 26 (05:34Z). ok — no merges, all four idle and done, none exited.
 21:45  tick 27 (05:45Z). ok — no merges, all four idle and done, none exited.
+21:56  tick 28 (05:56Z). ok — no merges, all four idle and done, none exited.
