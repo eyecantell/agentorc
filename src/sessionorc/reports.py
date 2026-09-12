@@ -45,17 +45,19 @@ def holds_directory(sessions: Iterable[Session]) -> set[str]:
     it now — so the branch half of `derive` is attributed by occupancy in time, not by the directory
     alone, or an exited predecessor is credited with work it never saw. The holder is the live
     record (the most recently created, when a directory has several — `shell` sessions are exempt
-    from the anchor rule, §9 invariant 2), or the most recently created record when none is live.
+    from the anchor rule, §9 invariant 2), or the most recently created of the rest when none is
+    live. A `closed` record never holds a directory: nothing is derived for one, so letting it hold
+    would leave the directory's last real occupant uncredited.
     Records that do not hold their directory still get the `pending`-by-PR re-check, which is
     attributed by a PR the record already claimed rather than by what is checked out now (TD-032).
     """
     by_dir: dict[str, list[Session]] = {}
     for s in sessions:
-        if s.dir:
+        if s.dir and s.state != "closed":
             by_dir.setdefault(os.path.normpath(s.dir), []).append(s)
     holders: set[str] = set()
     for group in by_dir.values():
-        live = [s for s in group if s.state not in ("exited", "closed")]
+        live = [s for s in group if s.state != "exited"]
         holders.add(max(live or group, key=lambda s: (s.created, s.id)).id)
     return holders
 

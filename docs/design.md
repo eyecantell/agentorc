@@ -760,8 +760,8 @@ TD-028 step 3, `sessionorc.reports`). Four things make that honest rather than m
 merge state comes from `gh`, the only thing that knows a squash merge happened, and a PR already
 derived as claimed is re-checked by number, so a merge lands even after the session has moved on
 to its next branch; and what is checked out in a directory is derived only for the record that
-*holds* that directory now — the live one, or the most recently created when none is live
-(TD-034): a worktree is reused run after run, so attribution is by occupancy in time, not by the
+*holds* that directory now — the live one, or the most recently created of the rest when none is
+live (a `closed` record never holds one, since nothing is derived for it) (TD-034): a worktree is reused run after run, so attribution is by occupancy in time, not by the
 `dir` string, or an exited predecessor is credited with its successor's branch. The by-number
 re-check above is the deliberate exception, being attributed by a PR the record itself claimed;
 and a merged PR's ledger rows are read from its squash-merge commit on
