@@ -8,7 +8,7 @@ You run in your own git worktree at `.claude/worktrees/tdgrind-ao-1` (branch `td
 3. **TD-029** — the Focus terminal reconnect loop after Close: the three hardenings in the entry, then reproduce Close-from-Focus and record which candidate actually fired before archiving.
 4. **TD-031** — the model in use on the card and `ao status -v` (check the hook payload first; else the transcript's last `type: assistant` entry's `message.model`).
 5. **TD-030** — one name, one session (design §4.1, §9 invariant 12): the five steps in the entry. Largest item, last.
-Then stop; do not free-pick beyond the list. For each: verify current code state first (entries lag reality — grep before building; run 1 changed a lot). Loop: pick → fix + `pdm run test` + `pdm run lint` → PR → independent review by a **Sonnet** agent per docs/cadence.md §4 (an Agent with `model: sonnet` — never review on your own model; doc-only PRs get the same fact-check review) → address findings → squash-merge when SHIP → next. Resolved entries move to docs/technical_debt_archive.md with their summary row deleted (cadence §2).
+Then stop; do not free-pick beyond the list. For each: verify current code state first (entries lag reality — grep before building; run 1 changed a lot). Loop: pick → fix + `pdm run test` + `pdm run lint` → PR → merge per `/cadence` (docs/cadence.md §4) → next. Resolved entries move to docs/technical_debt_archive.md with their summary row deleted (cadence §2).
 
 **Avoid**: TD-002/TD-003/TD-008 (Paul's), TD-005/TD-006 (need an attended `claude` run), TD-019 (phase 5), TD-004's ssh transport (phase 2); anything on docs/user_attention.md awaiting Paul's decision; Paul's `aotest` session and any worktree that is not yours.
 

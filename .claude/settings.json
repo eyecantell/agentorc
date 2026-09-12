@@ -22,6 +22,11 @@
             "type": "command",
             "command": "\"$CLAUDE_PROJECT_DIR/scripts/nudge_user_attention.py\" --report --due-only --fetch",
             "timeout": 20
+          },
+          {
+            "type": "command",
+            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/cadence_changes.py\"; if [ -x \"$f\" ]; then \"$f\" --hook; fi",
+            "timeout": 20
           }
         ]
       }
