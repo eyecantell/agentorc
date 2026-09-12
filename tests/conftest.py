@@ -162,6 +162,22 @@ def pane_line(sid: str) -> str:
     return f"pane={pane}" if pane else "pane=none (not in list-panes)"
 
 
+def wait_screen(sid: str, produce, ok, timeout: float = 8.0, step: float = 0.1, what: str = "what it asserts on"):
+    """Read a live pane until it shows the thing the assertion is about, then return that reading
+    (TD-033, TD-025): `produce()` is re-run until `ok(value)`. Several tests read a pane once and
+    asserted on it, which passes on an idle box and races a loaded one — a pane that has not
+    painted yet is not a wrong pane, it is an early read. This is `wait_state` for a screen: bounded,
+    on the real signal, and a timeout says what never appeared plus tmux's own pane line."""
+    end = time.monotonic() + timeout
+    while True:
+        value = produce()
+        if ok(value):
+            return value
+        if time.monotonic() >= end:
+            raise AssertionError(f"{sid}: {what} never appeared in {timeout}s: {value!r} {pane_line(sid)}")
+        time.sleep(step)
+
+
 async def wait_state(client, sid: str, state: str, timeout: float = 6.0) -> dict:
     s = await client.call("get", id=sid)
     end = time.monotonic() + timeout

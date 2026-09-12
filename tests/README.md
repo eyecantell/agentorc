@@ -14,8 +14,15 @@
    (`/tmp/ao-test-owners-<uid>/<socket>`, written by `private_socket_name`). It used to kill them
    all, which is how a review running the suite beside a worker's run destroyed that run's tmux
    server mid-test — a harness bug that looked like a timing flake for two weeks.
-2. **Every wait is bounded.** Use `wait_for`, `wait_for_sync`, or `wait_state` from
-   `conftest.py`. A bare `sleep` is never synchronisation.
+2. **Every wait is bounded.** Use `wait_for`, `wait_for_sync`, `wait_state`, or `wait_screen`
+   from `conftest.py`. A bare `sleep` is never synchronisation.
+   **Never assert on a pane you read once** (TD-025, TD-033): a screen that has not arrived yet is
+   not a wrong screen, it is an early read. `wait_screen(sid, produce, ok)` is `wait_state` for a
+   screen — it re-reads until what the assertion is about is there.
+   To chase a flake that "only happens in a full run", run the suspect modules three at a time
+   (`for i in 1 2 3; do pytest tests/test_cli.py tests/test_ui.py -q > out-$i & done; wait`): that
+   is what turned TD-025 and TD-033 from "seen once, passed on a rerun" into three failures in
+   nine runs and a named cause (which turned out to be the sweep in rule 1, not the tests).
 3. **Tests clean up their own sessions.** Kill what you create; the fixture kills the server,
    but an exited pane left behind is re-adopted on the next tick and confuses the next assertion.
 4. **Pick the right agent fixture.** `agent` (in-process, `async def` tests via `LocalClient`)

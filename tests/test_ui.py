@@ -13,6 +13,7 @@ import time
 
 import pytest
 from conftest import wait_for_sync as wait_for
+from conftest import wait_screen
 from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
@@ -182,8 +183,12 @@ def test_terminal_scrollback_reaches_tmux(client, subprocess_agent, tmp_path):
         while time.time() < deadline and b"SCROLL-DONE" not in buf:
             buf += ws.receive_bytes()
         assert b"SCROLL-DONE" in buf
-        assert tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip() == "mouse on"
-        assert mode() == "0"
+        # both of these were read once, which races the attach (TD-033): the option is set by the
+        # attach and the pane leaves whatever mode it started in, so wait for each
+        assert wait_for(
+            lambda: tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip() == "mouse on"
+        ), "the attach never set `mouse on`"
+        assert wait_for(lambda: mode() == "0"), "the pane never settled on the live screen"
         ws.send_text(json.dumps({"scroll": "up"}))
         assert wait_for(lambda: mode() == "1"), "scroll up did not enter copy mode"
         ws.send_text(json.dumps({"scroll": "sideways"}))  # ignored, the bridge stays up
@@ -293,6 +298,15 @@ def test_unseen_idle_until_focused(client, tmp_path):
     # a new turn that finishes after that look is unseen again. Whole-second stamps: the send
     # itself counts as a look, so the turn must outlast the second it was sent in (a tie is "seen").
     assert client.post(f"/api/sessions/{sid}/send", json={"text": "sleep 2"}).json() == {"ok": True}
+    # the paste can take a moment to reach the pane, and `sleep 2` is only `working` for two
+    # seconds: wait for the command on the screen first, so the state wait starts once it is
+    # running (TD-033)
+    wait_screen(
+        sid,
+        lambda: session_tail(client, sid),
+        lambda t: any("sleep 2" in line for line in t),
+        what="the sent command on the pane",
+    )
     wait_state(client, sid, "working")
     s = wait_state(client, sid, "idle")
     assert s["unseen"] is True
