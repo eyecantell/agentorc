@@ -79,6 +79,11 @@ scheduled after phase 5.
 No surveyed tool does multi-host + hook-fed state + VS Code links + usage-cap supervision. Since
 herdr (below) multi-host on its own is no longer a differentiator; the combination still is.
 
+Prior art for the *shape* of one session controlling another — supervision trees, owner
+references, unit relationships, capability attenuation, ACL placement — was surveyed separately
+on 2026-09-12 for the orchestrator-membership question (§10):
+[ADR 2026-09-12](decisions/2026-09-12-orchestrator-membership-prior-art.md).
+
 | Tool | Shape | Borrow | Gap vs. goals |
 |---|---|---|---|
 | ttyd (MIT) | websocket + xterm.js around any command | the terminal-transport shape (xterm.js over a websocket around a pty); superseded 2026-09-05 by a bridge inside the UI process, since the pty would wrap `ssh` anyway (§10) | terminal only; a second daemon per host |
