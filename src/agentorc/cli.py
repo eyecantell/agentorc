@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from importlib import resources
 from typing import Any
 
+from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.models import GRANTS, STATE_RANK, report_line
@@ -69,6 +70,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         if args.verbose:
             if s.get("capabilities"):
                 print(f"{'':<{w}}      grants: {', '.join(s['capabilities'])}")
+            if model := short_model(s.get("adapter") or "", s.get("model")):
+                print(f"{'':<{w}}      model:  {model}")
             if line := report_line(s):
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):

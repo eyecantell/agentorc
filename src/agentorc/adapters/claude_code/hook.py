@@ -46,6 +46,12 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
     out: dict[str, Any] = {}
     if sid := payload.get("session_id"):
         out["adapter_id"] = sid
+    # Only SessionStart carries `model`, and not always (TD-031); PostModelSwitch is how a `/model`
+    # mid-session reports itself. Read both generically: an event without one says nothing about it.
+    if model := payload.get("model"):
+        out["model"] = model
+    if ev == "PostModelSwitch":
+        return {**out, "model": payload.get("to_model") or payload.get("model")} if payload.get("to_model") else None
     if ev == "PermissionRequest":
         tool = payload.get("tool_name", "?")
         return {

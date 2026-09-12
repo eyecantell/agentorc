@@ -14,6 +14,7 @@ from conftest import run_hook, wait_for
 
 from agentorc import profiles
 from agentorc.adapters.claude_code import (
+    HOOK_EVENTS,
     ClaudeCodeAdapter,
     _pid_alive,
     hooks_settings,
@@ -22,6 +23,7 @@ from agentorc.adapters.claude_code import (
     pretrust,
 )
 from agentorc.adapters.claude_code.hook import translate
+from sessionorc.adapters import short_model
 from sessionorc.client import LocalClient
 
 pytestmark = pytest.mark.integration  # the hook-script tests spawn processes; split later if wanted
@@ -133,6 +135,55 @@ def test_munge_and_transcript_path(tmp_path):
     ad = ClaudeCodeAdapter()
     assert ad.transcript_path("abc", tmp_path / "repo", prof) == d / "abc.jsonl"
     assert ad.transcript_path("zzz", tmp_path / "repo", prof) is None
+
+
+def test_translate_carries_the_model_when_the_payload_has_one():
+    """TD-031: only SessionStart carries `model`, and not always; a `/model` mid-session reports
+    itself as PostModelSwitch's `to_model`. Every other event says nothing about the model."""
+    assert translate({"hook_event_name": "SessionStart", "session_id": "u1", "model": "claude-opus-5"}) == {
+        "adapter_id": "u1",
+        "model": "claude-opus-5",
+        "state": "working",
+        "pending": None,
+    }
+    assert "model" not in translate({"hook_event_name": "SessionStart", "session_id": "u1"})
+    assert "model" not in translate({"hook_event_name": "Stop"})
+    switch = translate({"hook_event_name": "PostModelSwitch", "from_model": "claude-opus-5", "to_model": "x-1"})
+    assert switch == {"model": "x-1"} and "state" not in switch  # a switch is not a state change
+    assert translate({"hook_event_name": "PostModelSwitch"}) is None  # nothing to report
+    assert "PostModelSwitch" in HOOK_EVENTS  # or the switch never reaches the hook at all
+
+
+def test_model_in_use_reads_the_last_top_level_assistant_turn(tmp_path, monkeypatch):
+    """TD-031: the transcript entry's own `message.model`, never a grep, and never a sidechain
+    entry — a subagent's model is not the session's."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    (tmp_path / "home").mkdir()
+    (tmp_path / "home" / "profiles.yml").write_text(
+        f"default: t\nprofiles:\n  t: {{account: t, model: opus, config_dir: {tmp_path / 'cc'}}}\n"
+    )
+    ad = ClaudeCodeAdapter()
+    assert ad.model_in_use("abc", tmp_path / "repo", "t") is None  # no transcript at all: not an error
+    d = tmp_path / "cc" / "projects" / munge(tmp_path / "repo")
+    d.mkdir(parents=True)
+    entries = [
+        {"type": "assistant", "message": {"model": "claude-opus-5"}},
+        # an Agent call that *requests* a subagent model: a grep for "model" would read this one
+        {"type": "user", "message": {"content": [{"tool_use": {"input": {"model": "sonnet"}}}]}},
+        {"type": "assistant", "message": {"model": "claude-fable-5-1"}},
+        {"type": "assistant", "isSidechain": True, "message": {"model": "claude-haiku-4-5"}},
+        {"type": "system", "message": {"model": "<synthetic>"}},
+    ]
+    (d / "abc.jsonl").write_text("".join(json.dumps(e) + "\n" for e in entries))
+    assert ad.model_in_use("abc", tmp_path / "repo", "t") == "claude-fable-5-1"
+    assert ad.model_in_use("abc", tmp_path / "repo") == "claude-fable-5-1"  # the default profile is this one
+    assert ad.model_in_use("abc", tmp_path / "repo", "nope") is None  # an unknown profile, not an exception
+    # a truncated first line (the tail is read from the end, not the start) is skipped, not fatal
+    (d / "abc.jsonl").write_text('del": "fragment"}\n' + json.dumps(entries[0]) + "\n")
+    assert ad.model_in_use("abc", tmp_path / "repo", "t") == "claude-opus-5"
+    assert short_model("claude-code", "claude-fable-5-1") == "fable-5-1"
+    assert short_model("shell", "claude-fable-5-1") == "claude-fable-5-1"  # an adapter with no opinion
+    assert short_model("claude-code", None) == ""
 
 
 def test_parse_usage_and_credentials(tmp_path):

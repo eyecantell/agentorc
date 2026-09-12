@@ -23,7 +23,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
 | TD-030 | One name, one session: refuse a live holder, supersede an exited one, drop hidden `-2` suffixes | Medium | Open |
-| TD-031 | Show the model in use on the card and in `ao status` (when the adapter can tell) | Low | Open |
 | TD-032 | An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed | Medium | Open |
 | TD-033 | Two load-sensitive flakes in the test suite, each seen once in a full run | Low | Open |
 
@@ -200,32 +199,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** design §4.1, §4.5a (New session name field), §4.7, §9 invariant 12, §10 (2026-09-10); PR #17 (resume supersedes), TD-023 (`pane` flag), TD-029 (the Close that prompted the report).
 
-## TD-031: Show the model in use on the card and in `ao status` (when the adapter can tell)
-
-**Priority:** Low
-**Added:** 2026-09-11
-**Status:** Open
-**Location:** `src/agentorc/adapters/claude_code/` (hook payload, transcript locator), `src/sessionorc/agent.py` (session record, tick), `src/agentorc/ui/templates/card.html` (`profile_line`), `src/agentorc/cli.py` (`status`)
-
-**Why:** Paul asked for it on 2026-09-11: with grinders on one model and his own sessions on another, the card's profile line (`claude-code · <account or profile>`, plus the profile's *declared* model when one is set) does not say which model a session is actually running, and a `/model` switch mid-session changes it without any card noticing. The profile's declared `model` (§4.2a) is an intent, not an observation. What the adapter can observe for Claude Code: every `type: assistant` entry in the transcript carries `message.model` (`claude-fable-5-1` in this session's transcript; `<synthetic>` for system entries), so the last one is the model in use as of the last turn. Read the entry's own field, not a raw grep: `"model":"sonnet"` also appears inside `tool_input` of Agent calls that *request* a subagent model, which is not the session's model; whether the hook payload carries a model field is unverified (the hook reads none today).
-
-**Fix:** an optional `model` on the session record, filled by the adapter: from the hook payload if Claude Code provides one (check the SessionStart / UserPromptSubmit input schema first), else from the transcript's last top-level assistant entry on the tick (the locator already knows the path; read the tail, not the file). Shown as the third part of the profile line — `claude-code · paul · fable-5-1` — shortened by dropping the `claude-` prefix, and as a column in `ao status -v` and a field in `--json`. Absent for `shell` and for adapters that cannot tell; never guessed from the profile without saying so (`fable-5-1 (profile)` if the declared model is shown before the first observation). Done when a `/model sonnet` in a live session changes the card within a tick.
-
-**Related:** design §4.2a (profiles: tool · account · model), §4.5 card profile line, TD-001 (usage per profile).
-
-## TD-033: two load-sensitive flakes in the test suite, each seen once in a full run
-
-**Priority:** Low
-**Added:** 2026-09-11
-**Status:** Open — each seen once on 2026-09-11 during TD-029: `tests/test_cli.py::test_explain_file_and_session` (my run) and `tests/test_ui.py::test_terminal_scrollback_reaches_tmux` (the reviewer's). Both passed alone and on a rerun, so they are races, not breaks
-**Location:** `tests/test_cli.py::test_explain_file_and_session`, `tests/test_ui.py::test_terminal_scrollback_reaches_tmux`, `src/sessionorc/agent.py` (`rpc_explain`, the screen verdict)
-
-**Why:** Two different tests failed one full-suite run each while passing on their own and on the next run. Both read a live pane and assert on what it shows, so the likely race is the usual one for this suite (TD-025's shape): the assertion runs before the pane has painted what it looks for. Neither failing assertion's output was captured, which is exactly why this is a ledger entry and not a longer sleep — a sleep would hide the timing rather than wait for the thing being asserted, and there is no evidence yet about which read is early.
-
-**Fix:** on the next occurrence, capture the failing assertion (and its `ao explain --json` for the CLI one), then make the test wait for the screen it asserts on — as `wait_state` does for state — rather than reading once. TD-025 is the same class of flake; if all three point at the same read-once pattern, fix them together with one helper.
-
-**Related:** TD-025 (the `idle` timing flake in the same file), TD-015 (screen rules), design §4.2.
-
 ## TD-032: An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed
 
 **Priority:** Medium
@@ -239,3 +212,15 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** design §4.2 (idle is not an alert), §6 stall, §4.8 orchestrator, TD-015, TD-026 (no stopper for hand-started unattended sessions), TD-028 step (1) (PR #63, the run this happened to).
 
+## TD-033: Two load-sensitive flakes in the test suite, each seen once in a full run
+
+**Priority:** Low
+**Added:** 2026-09-11
+**Status:** Open — each seen once on 2026-09-11 during TD-029: `tests/test_cli.py::test_explain_file_and_session` (my run) and `tests/test_ui.py::test_terminal_scrollback_reaches_tmux` (the reviewer's). Both passed alone and on a rerun, so they are races, not breaks
+**Location:** `tests/test_cli.py::test_explain_file_and_session`, `tests/test_ui.py::test_terminal_scrollback_reaches_tmux`, `src/sessionorc/agent.py` (`rpc_explain`, the screen verdict)
+
+**Why:** Two different tests failed one full-suite run each while passing on their own and on the next run. Both read a live pane and assert on what it shows, so the likely race is the usual one for this suite (TD-025's shape): the assertion runs before the pane has painted what it looks for. Neither failing assertion's output was captured, which is exactly why this is a ledger entry and not a longer sleep — a sleep would hide the timing rather than wait for the thing being asserted, and there is no evidence yet about which read is early.
+
+**Fix:** on the next occurrence, capture the failing assertion (and its `ao explain --json` for the CLI one), then make the test wait for the screen it asserts on — as `wait_state` does for state — rather than reading once. TD-025 is the same class of flake; if all three point at the same read-once pattern, fix them together with one helper.
+
+**Related:** TD-025 (the `idle` timing flake in the same file), TD-015 (screen rules), design §4.2.

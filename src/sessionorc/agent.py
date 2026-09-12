@@ -49,6 +49,8 @@ GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cach
 # Derived report entries per session (design §4.8, TD-028 step 3): a `gh` call and a little git, so
 # a slow cadence. Nothing waits on it and a failure derives nothing (`sessionorc.reports`).
 DERIVE_EVERY = timedelta(minutes=5)
+# The model in use per live agent session (TD-031): a local file's tail, so cheap, but not per tick.
+MODEL_EVERY = timedelta(seconds=30)
 CREATE_GRACE = timedelta(seconds=10)  # a pane snapshot older than a session cannot judge it
 SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken within this → prompt-stalled
 PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)
@@ -96,6 +98,7 @@ class HostAgent:
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
         self._derived_at: dict[str, datetime] = {}
+        self._model_checked: dict[str, datetime] = {}
         self._derive_task: asyncio.Task[None] | None = None
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
@@ -165,6 +168,7 @@ class HostAgent:
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
+        await self._refresh_model(snapshot_at)
         if self._derive_task is None or self._derive_task.done():
             # detached for the same reason the usage refresh is: `gh` talks to the network, and the
             # tick and its push must not wait on it (review 2026-09-11)
@@ -268,6 +272,38 @@ class HostAgent:
             applied = [live.report_progress(e) for e in progress] + [live.report_finding(e) for e in findings]
             changed = any(applied)
             if changed:
+                self.store.save(live)
+
+    async def _refresh_model(self, now: datetime) -> None:
+        """The model each live agent session is running (TD-031, design §4.2a). The hook reports it
+        at SessionStart and on a `/model` switch; this is the cross-check and the fallback for a
+        session that started before the hook carried one — a read of the transcript's tail, in a
+        thread, on its own cadence. An adapter that cannot tell leaves the field alone."""
+        due = []
+        for s in self.sessions.values():
+            if not (s.adapter_id and s.dir) or s.external or s.state == "closed":
+                continue
+            if now - self._model_checked.get(s.id, datetime.min.replace(tzinfo=UTC)) <= MODEL_EVERY:
+                continue
+            try:
+                fn = getattr(adapters.get(s.adapter), "model_in_use", None)
+            except KeyError:
+                fn = None
+            if fn:
+                due.append((s, fn))
+        if not due:
+            return
+        results = await asyncio.gather(
+            *(asyncio.to_thread(fn, str(s.adapter_id), Path(s.dir), s.profile) for s, fn in due),
+            return_exceptions=True,
+        )
+        for (s, _), result in zip(due, results, strict=True):
+            self._model_checked[s.id] = now
+            live = self.sessions.get(s.id)
+            if live is None or isinstance(result, BaseException) or not result:
+                continue
+            if live.model != result:
+                live.model = str(result)
                 self.store.save(live)
 
     async def _refresh_usage(self) -> None:
@@ -450,6 +486,8 @@ class HostAgent:
         self._last_hook[sid] = datetime.now(UTC)  # apply time, also for events drained from the offline queue
         if aid := event.get("adapter_id"):
             s.adapter_id = aid
+        if model := event.get("model"):
+            s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
         if delta := event.get("subagent_delta"):
             s.subagents = max(0, s.subagents + int(delta))
         state = event.get("state")
@@ -475,7 +513,8 @@ class HostAgent:
         # `_push_changes` runs next (the caller's or a tick's) announces it exactly once.
         for last in self._subscribers.values():
             last.pop(sid, None)
-        for side in (self._git_checked, self._derived_at, self._pre_limited, self._last_hook):  # no key outlives it
+        sides = (self._git_checked, self._derived_at, self._model_checked, self._pre_limited, self._last_hook)
+        for side in sides:  # no key outlives the record
             side.pop(sid, None)
         self._gone.append(sid)
 

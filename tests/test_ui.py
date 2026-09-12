@@ -321,6 +321,27 @@ def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
     assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
 
 
+def test_the_profile_line_says_which_model_is_in_use(tmp_path, monkeypatch):
+    """TD-031, design §4.2a: tool · account · model, where the third part is the model actually
+    observed. The profile's declared model is an intent, so a line falling back to it says so."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "profiles.yml").write_text(
+        "default: paul\nprofiles:\n  paul: {account: paul, model: fable-5-1}\n  bare: {account: b}\n"
+    )
+    from agentorc.ui.app import view
+
+    s = {
+        "id": "ao-r-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "working", "since": "2026-09-11T16:00:00Z", "confidence": "hook", "tail": [], "profile": "paul",
+    }  # fmt: skip
+    assert view(s)["profile_line"] == "claude-code · paul · fable-5-1 (profile)"
+    assert view({**s, "model": "claude-opus-5"})["profile_line"] == "claude-code · paul · opus-5"
+    assert view({**s, "profile": "bare"})["profile_line"] == "claude-code · b"  # nothing declared, nothing observed
+    assert view({**s, "profile": "bare", "model": "claude-sonnet-5"})["profile_line"] == "claude-code · b · sonnet-5"
+    assert view({**s, "profile": "gone", "model": "claude-opus-5"})["profile_line"] == "claude-code · gone · opus-5"
+    assert view({**s, "adapter": "shell", "profile": ""})["profile_line"] == "shell"
+
+
 def test_a_dead_attach_is_final(client, subprocess_agent, tmp_path):
     """TD-029, the reproduction: a record that still claims a pane whose tmux session is gone (a
     tmux server restart, or a close the record has not caught up with) used to let `/term/` run

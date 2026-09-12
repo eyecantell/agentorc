@@ -7,7 +7,7 @@ import subprocess
 import pytest
 from conftest import FAST_TICK, wait_state
 
-from sessionorc import paths, reports
+from sessionorc import adapters, paths, reports
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import FindingEntry, ProgressEntry
 
@@ -657,3 +657,38 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
         assert sid not in agent._derived_at  # no key outlives the record
+
+
+async def test_the_model_in_use_comes_from_the_hook_and_from_the_tick(agent, tmp_path, monkeypatch):
+    """TD-031: `model` on the record — reported by the hook (SessionStart, a `/model` switch) and
+    cross-checked on the tick by whatever the adapter can read. An adapter with no opinion, or a
+    reading it cannot make, leaves the field alone rather than guessing from the profile."""
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="m", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        assert (await person.call("get", id=sid))["model"] is None  # `shell` cannot tell, and never will
+        await person.call("hook", session=sid, adapter_id="conv-1", model="claude-opus-5", state="working")
+        assert (await person.call("get", id=sid))["model"] == "claude-opus-5"
+        await person.call("hook", session=sid, state="idle")  # an event with no model says nothing
+        assert (await person.call("get", id=sid))["model"] == "claude-opus-5"
+        await person.call("hook", session=sid, model="claude-sonnet-5")  # a `/model` switch mid-session
+        assert (await person.call("get", id=sid))["model"] == "claude-sonnet-5"
+        # the tick asks the adapter, which for `shell` has nothing to ask — so nothing changes
+        agent._model_checked.clear()
+        await agent.tick()
+        assert (await person.call("get", id=sid))["model"] == "claude-sonnet-5"
+        # an adapter that can read it: the tick picks up a switch the hook never reported
+        monkeypatch.setattr(
+            adapters.get("shell"), "model_in_use", lambda session_id, cwd, profile="": "claude-fable-5-1", raising=False
+        )
+        agent._model_checked.clear()
+        await agent.tick()
+        assert (await person.call("get", id=sid))["model"] == "claude-fable-5-1"
+        assert json.loads((paths.sessions_dir() / f"{sid}.json").read_text())["model"] == "claude-fable-5-1"
+        # a reading it cannot make leaves the last one alone
+        monkeypatch.setattr(adapters.get("shell"), "model_in_use", lambda *a, **kw: None, raising=False)
+        agent._model_checked.clear()
+        await agent.tick()
+        assert (await person.call("get", id=sid))["model"] == "claude-fable-5-1"
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
+        assert sid not in agent._model_checked  # no key outlives the record

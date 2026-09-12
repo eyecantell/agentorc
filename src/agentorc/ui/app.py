@@ -22,6 +22,7 @@ from fastapi.templating import Jinja2Templates
 
 from agentorc import profiles as profiles_mod
 from sessionorc import hosts, naming, paths
+from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.models import STATE_RANK
 
@@ -119,10 +120,20 @@ def view(s: dict[str, Any]) -> dict[str, Any]:
     elif s.get("adapter") == "shell":
         d["profile_line"] = "shell"
     else:
+        # tool · account · model (design §4.2a). The third part is the model actually in use when
+        # the adapter can tell; the profile's declared model is an intent, so it says so (TD-031).
+        declared = None
         try:
-            d["profile_line"] = profiles_mod.get(prof or None).label
+            p = profiles_mod.get(prof or None)
+            line = " · ".join([p.adapter, p.account or p.name])
+            declared = p.model
         except (KeyError, ValueError):
-            d["profile_line"] = f"{s.get('adapter')} · {prof or 'default'}"
+            line = f"{s.get('adapter')} · {prof or 'default'}"
+        if observed := short_model(str(s.get("adapter") or ""), s.get("model")):
+            line += f" · {observed}"
+        elif declared:
+            line += f" · {declared} (profile)"
+        d["profile_line"] = line
     pend = s.get("pending") or {}
     d["deadline"] = pend.get("deadline") or ""
     d["ready"] = ready_to_close(s)

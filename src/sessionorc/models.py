@@ -164,6 +164,9 @@ class Session:
     seen_at: str | None = None  # last time a person looked (Focus opened, card acted on); TD-017
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
     capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)
+    # The model actually in use, when the adapter can tell (TD-031): observed, never the profile's
+    # declared model — that is an intent (§4.2a), and a display says so when it falls back to it.
+    model: str | None = None
     # Report channels (design §4.8). `lane` is the ordered list of references the session was handed
     # (or `["free-pick"]`), so a display can say *1 of 2* without parsing the brief; the other two
     # are what the session says it did.

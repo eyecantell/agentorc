@@ -311,6 +311,20 @@ profile. For Claude Code the adapter maps an account to its own config directory
 (`CLAUDE_CONFIG_DIR`) and a model to the `--model` flag; other adapters map their own
 equivalents. Profiles are declared once per host in `~/.agentorc/profiles.yml`.
 
+The profile's `model` is an **intent**, and a `/model` mid-session changes the reality without
+it, so the card's third part is the model actually **in use** when the adapter can tell it, and
+says `opus-5 (profile)` when only the declared one is known (landed 2026-09-11, TD-031). An
+optional `model` on the record carries the observation. For Claude Code the adapter has two
+sources and uses both: the hook payload — `model` on SessionStart (documented as not always
+present) and `to_model` on `PostModelSwitch`, which is what a `/model` switch reports — and, as
+the cross-check and the fallback for a session that started before the hook carried one, the
+last top-level `assistant` entry of the transcript on the tick (its own `message.model` field,
+never a grep: `"model"` also appears in an Agent call's `tool_input`, where it names a requested
+*subagent* model, and a `isSidechain` entry is a subagent's turn, not the session's). The name is
+shortened by the adapter that owns the naming (`claude-fable-5-1` → `fable-5-1`), shown as the
+third part of the profile line and under `ao status -v`, and is simply absent for `shell` and for
+any adapter that cannot tell — never guessed.
+
 ### 4.3 Adapter contract
 
 One package per tool under `agentorc/adapters/<tool>/`. Core never imports tool-specific
