@@ -71,7 +71,12 @@ REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked aga
 
 
 class RpcError(Exception):
-    pass
+    """A refusal the caller is meant to act on. `data` rides along in the error envelope — the id
+    of the session that already holds a name, say, so `ao new --json` can print it (design §4.1)."""
+
+    def __init__(self, message: str, **data: Any):
+        super().__init__(message)
+        self.data = data
 
 
 class HostAgent:
@@ -505,6 +510,12 @@ class HostAgent:
     def _permission_waiting(self, sid: str) -> bool:
         return any(k[0] == sid and not f.done() for k, f in self._waiters.items())
 
+    def _scrub(self, sid: str) -> None:
+        """No cadence or hook key outlives the session it was about — whether the record is
+        forgotten or replaced in place by a new session of the same name (§4.1)."""
+        for side in (self._git_checked, self._derived_at, self._model_checked, self._pre_limited, self._last_hook):
+            side.pop(sid, None)
+
     def _forget(self, sid: str) -> None:
         if self.sessions.pop(sid, None) is None:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
@@ -513,9 +524,7 @@ class HostAgent:
         # `_push_changes` runs next (the caller's or a tick's) announces it exactly once.
         for last in self._subscribers.values():
             last.pop(sid, None)
-        sides = (self._git_checked, self._derived_at, self._model_checked, self._pre_limited, self._last_hook)
-        for side in sides:  # no key outlives the record
-            side.pop(sid, None)
+        self._scrub(sid)
         self._gone.append(sid)
 
     # -- RPC methods -----------------------------------------------------------------------------
@@ -563,6 +572,10 @@ class HostAgent:
             repo = str(directory.parent.parent.parent)  # <repo>/.claude/worktrees/<name> → the main checkout
         async with contextlib.AsyncExitStack() as locks:
             await locks.enter_async_context(self._dir_locks[str(directory)])
+            # A name identifies one session per *scope* (§4.1), and a scope spans a repo's
+            # worktrees — so the name check needs a lock on the scope, not just on this directory,
+            # or two concurrent creates of one name from two worktrees would both pass it (review).
+            await locks.enter_async_context(self._dir_locks[f"scope:{naming.scope_slug(directory, repo)}"])
             if resume:
                 # one create per conversation at a time, whatever the directory: two concurrent
                 # resumes of one id would otherwise both pass the holder check below (TD-012)
@@ -570,10 +583,16 @@ class HostAgent:
             if kind == "interactive" and adapter != "shell":
                 for who in await asyncio.to_thread(self.occupants, directory):
                     raise RpcError(f"{directory} already has agent session {who}; anchor rule (use a worktree)")
+            # Design §4.1 / §9 invariant 12: a name identifies one session per scope. An unnamed
+            # session is named here, not by its caller, so two of them never collide (TD-030).
+            if not name.strip():
+                name = await asyncio.to_thread(self._auto_name, directory, repo, adapter)
+            # Refuse here; *take* the name below, once the launch has succeeded. Taking it kills a
+            # pane, and a launch that then failed would have killed it for nothing (review).
+            holder = await self._name_holder(directory, repo, name)
             if resume:
                 for who in await asyncio.to_thread(self.conversation_holders, resume):
                     raise RpcError(f"conversation {resume} is still live in {who}; kill it first, or Switch to it")
-            live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
             try:
                 spec = ad.launch(
                     profile=profile, resume=resume, prompt=prompt, unattended=unattended, cwd=directory, name=name
@@ -582,7 +601,14 @@ class HostAgent:
                 raise RpcError(str(e).strip('"')) from None
             if argv:
                 spec.argv = argv
-            taken = set(self.sessions) | set(live)
+            previous_run, freed = await self._take_name(holder)
+            # read after the supersede, so the id it freed is not `taken` and gets reused
+            live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
+            # Records can no longer hold the base id: `_claim_name` refused or superseded the one
+            # session of this name in scope. What is left is a tmux session nobody has a record of
+            # — and then the suffix is part of the name the Herd shows (TD-030 step 2).
+            taken = (set(self.sessions) | set(live)) - ({freed} if freed else set())
+            base = naming.base_id(directory, repo, name)
             for _attempt in range(5):
                 sid = naming.session_id(directory, repo, name, taken)
                 # Ours win, whatever an adapter sets. AGENTORC_HOME is explicit because the tmux
@@ -599,7 +625,7 @@ class HostAgent:
                 raise RpcError(f"could not find a free session name for {name!r} in {directory}")
             s = Session(
                 id=sid,
-                name=name,
+                name=name if sid == base else name + sid[len(base) :],  # a shown suffix, never a hidden one
                 kind=kind,  # type: ignore[arg-type]
                 adapter=adapter,
                 dir=str(directory),
@@ -612,6 +638,7 @@ class HostAgent:
                 adapter_id=spec.adapter_id,
                 capabilities=grants,
                 lane=references,
+                previous_run=previous_run,
             )
             self.sessions[sid] = s
             self.store.save(s)
@@ -619,6 +646,64 @@ class HostAgent:
             if resume:
                 await self._supersede(resume, sid)
         return s.to_dict()
+
+    async def _name_holder(self, directory: Path, repo: str | None, name: str) -> Session | str | None:
+        """Design §4.1: one name, one session per scope. Raises for a **live** holder; otherwise
+        returns what a new session would supersede — the exited or closed record, or the id of a
+        dead pane nobody has a record of — or None when the name is free. Nothing is destroyed
+        here: `_take_name` does that once the launch has succeeded (TD-030)."""
+        base = naming.base_id(directory, repo, name)
+        holder = self.sessions.get(base)
+        if holder is None:
+            # No record, but tmux may still hold the id (a hand-made session the tick has not
+            # adopted yet, or a pane whose record was lost). Decide on tmux's own answer rather
+            # than on when the next tick runs, or the same `ao new` would refuse or suffix
+            # depending on the second it landed in (design §4.1).
+            pane = (await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)).get(base)
+            if pane is None:
+                return None
+            if not pane.dead:
+                raise RpcError(
+                    f"{name} is running outside agentorc — its card appears within a tick, then"
+                    f" `ao focus {base}`; or pick another name",
+                    holder=base,
+                    holder_state="unrecorded",
+                )
+            return base  # a dead pane nobody has a record of: nothing to keep from it
+        if holder.state not in ("exited", "closed"):
+            raise RpcError(
+                f"{name} is running — `ao focus {holder.id}`, or pick another name",
+                holder=holder.id,
+                holder_state=holder.state,
+            )
+        return holder
+
+    async def _take_name(self, holder: Session | str | None) -> tuple[str | None, str | None]:
+        """Supersede what `_name_holder` found, returning `(previous_run, the id it freed)`. The
+        dead pane is killed and the record's run log handed on; the record itself is **replaced in
+        place** by the new one under the same id — not forgotten — so the Herd's card becomes the
+        new session rather than going and coming back, and a launch that fails after this point
+        leaves the old record standing instead of losing it (review 2026-09-11)."""
+        if holder is None:
+            return None, None
+        if isinstance(holder, str):
+            await asyncio.to_thread(self.tmux.kill_session, holder)
+            return None, holder
+        await asyncio.to_thread(self.tmux.kill_session, holder.id)  # a dead pane, if it still has one
+        self._scrub(holder.id)  # the side tables are about the old session, not the new one
+        log.info("%s superseded the %s session of the same name", holder.name, holder.state)
+        return holder.run_log, holder.id
+
+    def _auto_name(self, directory: Path, repo: str | None, adapter: str) -> str:
+        """`shell`, `shell-2`, … for a session started without a name (TD-030 step 3): the agent
+        picks it, so the name it is shown under is the name it holds. Runs in a thread: tmux."""
+        stem = "shell" if adapter == "shell" else adapter
+        live = {p.session for p in self.tmux.list_panes()}
+        for n in range(1, 100):
+            candidate = stem if n == 1 else f"{stem}-{n}"
+            if naming.base_id(directory, repo, candidate) not in (set(self.sessions) | live):
+                return candidate
+        return f"{stem}-{now_iso()}"
 
     async def _supersede(self, adapter_id: str, new_sid: str) -> None:
         """A resumed conversation continues in the new session: the exited record it came from is
@@ -1102,7 +1187,7 @@ class HostAgent:
             self._gate(req.get("caller"), str(name), params)
             return {"id": rid, "result": await method(**params)}
         except RpcError as e:
-            return {"id": rid, "error": str(e)}
+            return {"id": rid, "error": str(e), **({"error_data": e.data} if e.data else {})}
         except TypeError as e:
             return {"id": rid, "error": f"bad params: {e}"}
         except Exception as e:  # noqa: BLE001

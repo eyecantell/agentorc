@@ -7,7 +7,7 @@ import subprocess
 import pytest
 from conftest import FAST_TICK, wait_state
 
-from sessionorc import adapters, paths, reports
+from sessionorc import adapters, naming, paths, reports
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import FindingEntry, ProgressEntry
 
@@ -61,11 +61,11 @@ async def test_anchor_rule_and_shell_exemption(agent, tmp_path):
         # shells are exempt (design §9 invariant 2)
         sh = await c.call("create", name="sh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         assert sh["id"] != a["id"]
-        # same name → suffix, not a collision
+        # same name, the holder exited → superseded, id reused, one card (design §4.1, TD-030)
         await c.call("kill", id=a["id"])
         await wait_state(c, a["id"], "exited")
         b = await c.call("create", name="one", dir=str(tmp_path), adapter="command", argv=["sleep", "30"])
-        assert b["id"] == a["id"] + "-2"
+        assert b["id"] == a["id"] and b["previous_run"] == a["run_log"]
 
 
 async def test_permission_roundtrip(agent, hookstub, tmp_path):
@@ -692,3 +692,81 @@ async def test_the_model_in_use_comes_from_the_hook_and_from_the_tick(agent, tmp
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
         assert sid not in agent._model_checked  # no key outlives the record
+
+
+async def test_one_name_one_session(agent, tmp_path, monkeypatch):
+    """Design §4.1, §9 invariant 12, TD-030: within a scope a name identifies one session — a live
+    holder refuses (and says which id to switch to), an exited or closed one is superseded and its
+    id reused with its run log kept, and a suffix exists only for a tmux session nobody has a
+    record of, and is then part of the name the Herd shows."""
+    async with LocalClient() as c:
+        a = await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        with pytest.raises(AgentError, match=f"aotest is running — `ao focus {a['id']}`") as e:
+            await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert e.value.data == {"holder": a["id"], "holder_state": a["state"]}  # actionable, not just prose
+        assert [x["id"] for x in await c.call("list")] == [a["id"]]  # nothing was started
+        # a closed holder is superseded: same id, one card, the previous run still reachable
+        await c.call("close", id=a["id"])
+        b = await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert b["id"] == a["id"] and b["name"] == "aotest" and b["previous_run"] == a["run_log"]
+        assert b["state"] != "closed" and [x["id"] for x in await c.call("list")] == [b["id"]]
+        # the same name in another scope is another session, suffix-free
+        other = tmp_path / "elsewhere"
+        other.mkdir()
+        far = await c.call("create", name="aotest", dir=str(other), adapter="shell", argv=["bash", "--norc"])
+        assert far["id"] != b["id"] and far["name"] == "aotest" and not far["id"].endswith("-2")
+        # a live tmux session holding the id with no record yet: refused on tmux's own answer, not
+        # on whether the tick has adopted it — the same `ao new` must not depend on the second
+        hand_id = naming.base_id(tmp_path, None, "byhand")
+        agent.tmux.new_session(hand_id, str(tmp_path), ["bash", "--norc"], {})
+        with pytest.raises(AgentError, match="byhand is running") as e:
+            await c.call("create", name="byhand", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert e.value.data == {"holder": hand_id, "holder_state": "unrecorded"}
+        agent.tmux.kill_session(hand_id)  # no record of ours: the agent never made one
+        # A *dead* pane nobody has a record of holds nothing worth keeping: killed, id reused.
+        # Asserted on the two helpers, because the tick adopts such a pane within a tick and the
+        # window in which no record exists is not something a test can wait for.
+        dead_id = naming.base_id(tmp_path, None, "leftover")
+        agent.tmux.new_session(dead_id, str(tmp_path), ["sh", "-c", "exit 0"], {})
+        for _ in range(40):
+            pane = agent.tmux.main_panes(naming.PREFIX).get(dead_id)
+            if pane and pane.dead:
+                break
+            await asyncio.sleep(0.05)
+        else:
+            raise AssertionError("the leftover pane never died")
+        agent.sessions.pop(dead_id, None)  # whatever the tick made of it: this is the no-record case
+        assert await agent._name_holder(tmp_path, None, "leftover") == dead_id
+        assert await agent._take_name(dead_id) == (None, dead_id)  # nothing to hand on, the id freed
+        assert not agent.tmux.has_session(dead_id)
+        for sid in (b["id"], far["id"]):
+            await c.call("kill", id=sid)
+
+
+async def test_a_failed_launch_leaves_the_superseded_record_standing(agent, tmp_path, monkeypatch):
+    """The name is taken only once the launch has succeeded, and the record it supersedes is
+    replaced in place rather than forgotten — so a launch that fails after the check loses
+    neither the old record nor the run log it would have handed on (review 2026-09-11)."""
+    async with LocalClient() as c:
+        old = await c.call("create", name="keep", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        await c.call("kill", id=old["id"])
+        await wait_state(c, old["id"], "exited")
+        monkeypatch.setattr(
+            adapters.get("shell"), "launch", lambda **kw: (_ for _ in ()).throw(ValueError("no launch today"))
+        )
+        with pytest.raises(AgentError, match="no launch today"):
+            await c.call("create", name="keep", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        still = await c.call("get", id=old["id"])
+        assert still["state"] == "exited" and still["run_log"] == old["run_log"]
+
+
+async def test_an_unnamed_session_is_named_by_the_agent(agent, tmp_path):
+    """TD-030 step 3: `ao shell` sends no name, so the agent picks `shell`, `shell-2`, … — a name
+    the caller chose would collide with §4.1's rule the moment a second shell started here."""
+    async with LocalClient() as c:
+        one = await c.call("create", name="", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        two = await c.call("create", name="  ", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert (one["name"], two["name"]) == ("shell", "shell-2")
+        assert one["id"].endswith("-shell") and two["id"].endswith("-shell-2")
+        for sid in (one["id"], two["id"]):
+            await c.call("kill", id=sid)

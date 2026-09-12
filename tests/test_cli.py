@@ -364,3 +364,21 @@ def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tm
     assert cli.main(["--json", "finding", "#67", "--id", sid]) == 0  # a person, or an orchestrator, for a worker
     assert [f["ref"] for f in out()["findings"]] == ["TD-029", "#67"]
     call_sync("kill", id=sid)
+
+
+def test_ao_new_says_which_session_holds_the_name(subprocess_agent, tmp_path, capsys):
+    """TD-030: `ao new` prints §4.1's refusal with the id to switch to, and `--json` carries that id
+    as a field; `ao shell` sends no name at all, so the agent names it."""
+    assert cli.main(["new", "aotest", "-a", "shell", "-d", str(tmp_path)]) == 0
+    sid = capsys.readouterr().out.split()[0]
+    wait_state(sid, "idle")
+    assert cli.main(["new", "aotest", "-a", "shell", "-d", str(tmp_path)]) == 1
+    assert f"aotest is running — `ao focus {sid}`" in capsys.readouterr().err
+    assert cli.main(["--json", "new", "aotest", "-a", "shell", "-d", str(tmp_path)]) == 1
+    refused = json.loads(capsys.readouterr().out)
+    assert refused["holder"] == sid and refused["holder_state"] == "idle"
+    assert cli.main(["shell", "-d", str(tmp_path)]) == 0  # named by the agent, not by `ao`
+    other = capsys.readouterr().out.split()[0]
+    assert other.endswith("-shell") and call_sync("get", id=other)["name"] == "shell"
+    for x in (sid, other):
+        call_sync("kill", id=x)
