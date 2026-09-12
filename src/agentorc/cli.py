@@ -192,7 +192,7 @@ def cmd_close(args: argparse.Namespace) -> int:
 
 def cmd_forget(args: argparse.Namespace) -> int:
     """The card's Forget (design §4.5a): drop an exited or closed record; the agent refuses a live one."""
-    call_sync("remove", id=args.id)
+    call_sync("remove", id=args.id)  # returns nothing: the record is gone, so no record to emit (unlike kill/close)
     return emit(args, {"id": args.id, "removed": True}, lambda: print(f"forgot {args.id}"))
 
 
