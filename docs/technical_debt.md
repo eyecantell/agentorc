@@ -22,6 +22,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
 | TD-032 | An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed | Medium | Open |
+| TD-035 | Adapters without a session-start hook still run dev-cadence's SessionStart set | Low | Open |
 
 ---
 
