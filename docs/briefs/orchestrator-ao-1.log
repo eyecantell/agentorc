@@ -36,3 +36,7 @@
 19:54  tdgrind-3 idle again 01:51:12Z (third spell; it had a turn between 01:41 and 01:51) and has now written an end-of-run-style summary addressed to Paul, with TD-293 still `claimed`. Held: each idle spell restarts the 20-min clock, and this one is 3 min old. Next eligible ~02:11Z.
 19:54  RULE GAP, for the end-of-run summary: "idle for longer than 20 min" measures time since the last turn, but a worker told to self-resume via the `loop` skill wakes every few minutes and resets that clock -- so a lane item can stay `claimed` indefinitely without ever tripping the nudge. The threshold wants to measure time since the lane last moved, not time since the last turn.
 19:54  tdgrind-2 declared TD-376 done. tdgrind-1, tdgrind-2 `working`. agentorc tdgrind-ao-1 idle 45 min, lane done, nothing open -- no action.
+19:05  tick 9 (02:05Z). No new `tdNNN-*` merges; samscrape #781 is `memory-*`, outside the match. Nothing to check.
+19:05  tdgrind-3 idle 14 min continuous (since 01:51:12Z), TD-293 still `claimed` -- crosses the 20-min threshold at 02:11:12Z, so the nudge is owed at the next tick, not this one.
+19:05  tdgrind-2 idle since 02:00:38Z with both its items (TD-374, TD-376) `done` -- nothing open, no nudge.
+19:05  tdgrind-1 `working`. agentorc tdgrind-ao-1 idle 56 min, lane done, nothing open. Three of four are now idle or winding down; none has exited, so the run continues.
