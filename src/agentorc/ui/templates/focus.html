@@ -8,6 +8,8 @@
       <a class="muted" href="/">← Herd</a>
       <span class="mono title">{{ s.place }} / {{ s.name }}</span>
       <span id="fstate"></span>
+      {# design §4.5a Focus header **grants** chip (§4.8): click a grant to revoke it, a dim one to grant it #}
+      <span class="grants" id="fgrants" data-id="{{ s.id }}" data-grants="{{ s.grants_all | join(',') }}"></span>
       <span class="grow"></span>
       <button class="btn" data-act="shell-here" data-id="{{ s.id }}">⌘ Open shell here</button>
       {% if s.vscode %}<a class="btn" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
@@ -45,6 +47,12 @@
     <div class="card pad" id="gitcard">
       <div class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></div>
       <div class="mono small gitfiles" id="gitfiles">{% if s.git %}{% for f in s.git.files %}<div>{{ f }}</div>{% endfor %}{% if not s.git.files %}<div class="muted">clean</div>{% endif %}{% endif %}</div>
+    </div>
+    <div class="card pad reports hidden" id="reportscard">
+      <div class="h2">Reports</div>
+      <div id="progresslist"></div>
+      <div id="findinglist"></div>
+      <div class="note">What the session declared, plus what the agent derived from its branch and PRs (dashed). Drop records that a claim was let go.</div>
     </div>
     <div class="card pad">
       <div class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?" disabled>Close</button></div>

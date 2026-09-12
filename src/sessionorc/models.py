@@ -110,6 +110,16 @@ def normalize_ref(ref: str) -> str:
     return r
 
 
+def report_head(session: dict[str, Any]) -> dict[str, Any] | None:
+    """The one `progress` entry a one-line report leads with: what the session is on now, else the
+    last thing it finished, else whatever it has. One rule, so a card, `ao status -v` and the Focus
+    panel all lead with the same entry."""
+    progress = session.get("progress") or []
+    done = [p for p in progress if p.get("status") == "done"]
+    claimed = [p for p in progress if p.get("status") == "claimed"]
+    return (claimed or done or progress or [None])[-1]
+
+
 def report_line(session: dict[str, Any]) -> str:
     """The one-line report a card or `ao status -v` shows (design §4.8): the reference in hand, the
     PR it is on, and the lane count — `TD-027 → #60 · 1/2 done`. A reference whose entry the agent
@@ -118,8 +128,7 @@ def report_line(session: dict[str, Any]) -> str:
     progress = session.get("progress") or []
     lane = [r for r in (session.get("lane") or []) if r != "free-pick"]
     done = [p for p in progress if p.get("status") == "done"]
-    claimed = [p for p in progress if p.get("status") == "claimed"]
-    head = (claimed or done or progress or [None])[-1]
+    head = report_head(session)
     bits = []
     if head:
         bits.append(

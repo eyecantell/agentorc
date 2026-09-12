@@ -391,3 +391,52 @@ def test_a_dead_attach_is_final(client, subprocess_agent, tmp_path):
         while True:
             ws.receive_bytes()  # tmux's own error, then the close
     assert e.value.code == 4404
+
+
+def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
+    """TD-028 step 4, design §4.5a: the card's **report line** (only when a channel is non-empty,
+    dashed for what the agent derived), the Focus **Reports** panel with **Drop**, and the header
+    **grants** chip. The panel and the chip are rendered by the client from the pushed record, so
+    the page is asserted to carry their containers and the grant list the chip offers."""
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
+        "state": "working", "since": "2026-09-12T10:00:00Z", "confidence": "hook", "tail": [],
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    assert 'class="row report"' not in card.render(s=view(base))  # nothing declared, nothing derived
+    declared = {
+        **base,
+        "lane": ["TD-027", "TD-019"],
+        "progress": [{"ref": "TD-027", "status": "claimed", "pr": 60, "source": "declared", "at": ""}],
+        "findings": [{"ref": "TD-029", "source": "declared", "at": ""}],
+    }
+    html = card.render(s=view(declared))
+    assert "TD-027 → #60 · 0/2 done" in html and "1 filed" in html and "meta scraped" not in html
+    # an entry the agent derived is dashed, like a scraped state, and says so
+    derived = {**declared, "progress": [{**declared["progress"][0], "source": "derived"}]}
+    html = card.render(s=view(derived))
+    assert "TD-027~ → #60" in html and 'class="meta scraped"' in html and "did not declare it" in html
+
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "rep"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    page = client.get(f"/focus/{sid}").text
+    assert 'id="reportscard"' in page and 'id="progresslist"' in page and 'id="findinglist"' in page
+    assert 'id="fgrants"' in page and 'data-grants="orchestrate"' in page
+    # Drop is the person letting a claim go: it lands as a *declaration*, so the tick cannot undo it
+    assert client.post(f"/api/sessions/{sid}/nonsense", json={}).status_code == 404
+    assert client.post(f"/api/sessions/{sid}/drop", json={}).status_code == 400  # a drop needs a reference
+    assert client.post(f"/api/sessions/{sid}/drop", json={"ref": "td-27"}).json() == {"ok": True}
+    s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert [(p["ref"], p["status"], p["source"], p["why"]) for p in s["progress"]] == [
+        ("TD-027", "dropped", "declared", "dropped from Focus")
+    ]
+    assert s["report"] == "TD-027 · 0/1 done" and s["report_derived"] is False
+    # the grants chip: one click grants, the next revokes, and the record is what answers
+    assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["orchestrate"]}).json()["capabilities"] == [
+        "orchestrate"
+    ]
+    assert client.post(f"/api/sessions/{sid}/grants", json={"remove": ["orchestrate"]}).json()["capabilities"] == []
+    assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["sudo"]}).status_code == 400  # unknown grant
+    client.post(f"/api/sessions/{sid}/kill")
