@@ -64,3 +64,4 @@
 20:06  tick 18 (04:06Z). ok — no merges, all four idle and done, none exited.
 20:17  tick 19 (04:17Z). ok — no merges, all four idle and done, none exited.
 20:28  tick 20 (04:28Z). ok — no merges, all four idle and done. Their `last_output` has been frozen at 04:04:23Z for three ticks; checked rather than assumed -- my own record updates in real time (last_out 04:28:18Z), so the agent's feed is live and the panes are simply quiet. Not staleness.
+20:39  tick 21 (04:39Z). ok — no merges, all four idle and done; panes repainted at 04:34, so the earlier freeze was just quiet, as checked last tick.
