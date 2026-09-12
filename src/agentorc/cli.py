@@ -501,7 +501,8 @@ def main(argv: list[str] | None = None) -> int:
     except AgentUnavailable as e:
         return fail(args, str(e), 3, hint="start it with: agentorc-agent serve")
     except AgentError as e:
-        return fail(args, str(e), 1, **e.data)  # the holder's id and state under --json (TD-030)
+        # the holder's id and state under --json (TD-030); `fail`'s own keywords are not overridable
+        return fail(args, str(e), 1, **{k: v for k, v in e.data.items() if k not in ("prose", "code", "message")})
 
 
 if __name__ == "__main__":

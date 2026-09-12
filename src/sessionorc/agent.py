@@ -510,6 +510,12 @@ class HostAgent:
     def _permission_waiting(self, sid: str) -> bool:
         return any(k[0] == sid and not f.done() for k, f in self._waiters.items())
 
+    def _scrub(self, sid: str) -> None:
+        """No cadence or hook key outlives the session it was about — whether the record is
+        forgotten or replaced in place by a new session of the same name (§4.1)."""
+        for side in (self._git_checked, self._derived_at, self._model_checked, self._pre_limited, self._last_hook):
+            side.pop(sid, None)
+
     def _forget(self, sid: str) -> None:
         if self.sessions.pop(sid, None) is None:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
@@ -518,9 +524,7 @@ class HostAgent:
         # `_push_changes` runs next (the caller's or a tick's) announces it exactly once.
         for last in self._subscribers.values():
             last.pop(sid, None)
-        sides = (self._git_checked, self._derived_at, self._model_checked, self._pre_limited, self._last_hook)
-        for side in sides:  # no key outlives the record
-            side.pop(sid, None)
+        self._scrub(sid)
         self._gone.append(sid)
 
     # -- RPC methods -----------------------------------------------------------------------------
@@ -568,6 +572,10 @@ class HostAgent:
             repo = str(directory.parent.parent.parent)  # <repo>/.claude/worktrees/<name> → the main checkout
         async with contextlib.AsyncExitStack() as locks:
             await locks.enter_async_context(self._dir_locks[str(directory)])
+            # A name identifies one session per *scope* (§4.1), and a scope spans a repo's
+            # worktrees — so the name check needs a lock on the scope, not just on this directory,
+            # or two concurrent creates of one name from two worktrees would both pass it (review).
+            await locks.enter_async_context(self._dir_locks[f"scope:{naming.scope_slug(directory, repo)}"])
             if resume:
                 # one create per conversation at a time, whatever the directory: two concurrent
                 # resumes of one id would otherwise both pass the holder check below (TD-012)
@@ -579,11 +587,12 @@ class HostAgent:
             # session is named here, not by its caller, so two of them never collide (TD-030).
             if not name.strip():
                 name = await asyncio.to_thread(self._auto_name, directory, repo, adapter)
-            previous_run = await self._claim_name(directory, repo, name)
+            # Refuse here; *take* the name below, once the launch has succeeded. Taking it kills a
+            # pane, and a launch that then failed would have killed it for nothing (review).
+            holder = await self._name_holder(directory, repo, name)
             if resume:
                 for who in await asyncio.to_thread(self.conversation_holders, resume):
                     raise RpcError(f"conversation {resume} is still live in {who}; kill it first, or Switch to it")
-            live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
             try:
                 spec = ad.launch(
                     profile=profile, resume=resume, prompt=prompt, unattended=unattended, cwd=directory, name=name
@@ -592,10 +601,13 @@ class HostAgent:
                 raise RpcError(str(e).strip('"')) from None
             if argv:
                 spec.argv = argv
+            previous_run, freed = await self._take_name(holder)
+            # read after the supersede, so the id it freed is not `taken` and gets reused
+            live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
             # Records can no longer hold the base id: `_claim_name` refused or superseded the one
             # session of this name in scope. What is left is a tmux session nobody has a record of
             # — and then the suffix is part of the name the Herd shows (TD-030 step 2).
-            taken = set(self.sessions) | set(live)
+            taken = (set(self.sessions) | set(live)) - ({freed} if freed else set())
             base = naming.base_id(directory, repo, name)
             for _attempt in range(5):
                 sid = naming.session_id(directory, repo, name, taken)
@@ -635,11 +647,11 @@ class HostAgent:
                 await self._supersede(resume, sid)
         return s.to_dict()
 
-    async def _claim_name(self, directory: Path, repo: str | None, name: str) -> str | None:
-        """Design §4.1: one name, one session per scope. A live holder refuses; an exited or closed
-        one is superseded — its dead pane killed, its record forgotten, its run log handed to the
-        record taking the name over (returned as `previous_run`), and its id reused, so the Herd
-        shows one card per name rather than `aotest` beside `aotest-2` (TD-030)."""
+    async def _name_holder(self, directory: Path, repo: str | None, name: str) -> Session | str | None:
+        """Design §4.1: one name, one session per scope. Raises for a **live** holder; otherwise
+        returns what a new session would supersede — the exited or closed record, or the id of a
+        dead pane nobody has a record of — or None when the name is free. Nothing is destroyed
+        here: `_take_name` does that once the launch has succeeded (TD-030)."""
         base = naming.base_id(directory, repo, name)
         holder = self.sessions.get(base)
         if holder is None:
@@ -652,24 +664,35 @@ class HostAgent:
                 return None
             if not pane.dead:
                 raise RpcError(
-                    f"{name} is running — `ao focus {base}`, or pick another name"
-                    " (started outside agentorc; its card appears within a tick)",
+                    f"{name} is running outside agentorc — its card appears within a tick, then"
+                    f" `ao focus {base}`; or pick another name",
                     holder=base,
                     holder_state="unrecorded",
                 )
-            await asyncio.to_thread(self.tmux.kill_session, base)  # a dead pane nobody has a record of
-            return None
+            return base  # a dead pane nobody has a record of: nothing to keep from it
         if holder.state not in ("exited", "closed"):
             raise RpcError(
                 f"{name} is running — `ao focus {holder.id}`, or pick another name",
                 holder=holder.id,
                 holder_state=holder.state,
             )
+        return holder
+
+    async def _take_name(self, holder: Session | str | None) -> tuple[str | None, str | None]:
+        """Supersede what `_name_holder` found, returning `(previous_run, the id it freed)`. The
+        dead pane is killed and the record's run log handed on; the record itself is **replaced in
+        place** by the new one under the same id — not forgotten — so the Herd's card becomes the
+        new session rather than going and coming back, and a launch that fails after this point
+        leaves the old record standing instead of losing it (review 2026-09-11)."""
+        if holder is None:
+            return None, None
+        if isinstance(holder, str):
+            await asyncio.to_thread(self.tmux.kill_session, holder)
+            return None, holder
         await asyncio.to_thread(self.tmux.kill_session, holder.id)  # a dead pane, if it still has one
-        previous_run = holder.run_log
-        self._forget(holder.id)
-        log.info("%s superseded the %s session of the same name", name, holder.state)
-        return previous_run
+        self._scrub(holder.id)  # the side tables are about the old session, not the new one
+        log.info("%s superseded the %s session of the same name", holder.name, holder.state)
+        return holder.run_log, holder.id
 
     def _auto_name(self, directory: Path, repo: str | None, adapter: str) -> str:
         """`shell`, `shell-2`, … for a session started without a name (TD-030 step 3): the agent

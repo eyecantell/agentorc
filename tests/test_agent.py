@@ -723,8 +723,41 @@ async def test_one_name_one_session(agent, tmp_path, monkeypatch):
             await c.call("create", name="byhand", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         assert e.value.data == {"holder": hand_id, "holder_state": "unrecorded"}
         agent.tmux.kill_session(hand_id)  # no record of ours: the agent never made one
+        # A *dead* pane nobody has a record of holds nothing worth keeping: killed, id reused.
+        # Asserted on the two helpers, because the tick adopts such a pane within a tick and the
+        # window in which no record exists is not something a test can wait for.
+        dead_id = naming.base_id(tmp_path, None, "leftover")
+        agent.tmux.new_session(dead_id, str(tmp_path), ["sh", "-c", "exit 0"], {})
+        for _ in range(40):
+            pane = agent.tmux.main_panes(naming.PREFIX).get(dead_id)
+            if pane and pane.dead:
+                break
+            await asyncio.sleep(0.05)
+        else:
+            raise AssertionError("the leftover pane never died")
+        agent.sessions.pop(dead_id, None)  # whatever the tick made of it: this is the no-record case
+        assert await agent._name_holder(tmp_path, None, "leftover") == dead_id
+        assert await agent._take_name(dead_id) == (None, dead_id)  # nothing to hand on, the id freed
+        assert not agent.tmux.has_session(dead_id)
         for sid in (b["id"], far["id"]):
             await c.call("kill", id=sid)
+
+
+async def test_a_failed_launch_leaves_the_superseded_record_standing(agent, tmp_path, monkeypatch):
+    """The name is taken only once the launch has succeeded, and the record it supersedes is
+    replaced in place rather than forgotten — so a launch that fails after the check loses
+    neither the old record nor the run log it would have handed on (review 2026-09-11)."""
+    async with LocalClient() as c:
+        old = await c.call("create", name="keep", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        await c.call("kill", id=old["id"])
+        await wait_state(c, old["id"], "exited")
+        monkeypatch.setattr(
+            adapters.get("shell"), "launch", lambda **kw: (_ for _ in ()).throw(ValueError("no launch today"))
+        )
+        with pytest.raises(AgentError, match="no launch today"):
+            await c.call("create", name="keep", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        still = await c.call("get", id=old["id"])
+        assert still["state"] == "exited" and still["run_log"] == old["run_log"]
 
 
 async def test_an_unnamed_session_is_named_by_the_agent(agent, tmp_path):

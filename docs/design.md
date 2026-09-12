@@ -117,11 +117,14 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   current repo or directory, and the full id keeps working everywhere (TD-030). The rules, in
   the order the agent applies them at create (steps 1-3 landed 2026-09-11, TD-030):
   - the name is held by a **live** record (any state but `exited` / `closed`) → refused:
-    "`aotest` is running — switch to it, or pick another name". The New session form learns
+    "`aotest` is running — `ao focus ao-agentorc-tests-aotest`, or pick another name", with the
+    holder's id and state as error data rather than prose to parse. The New session form learns
     this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
   - the name is held by an **exited or closed** record → the new session **supersedes** it: it
-    takes the id, the old record is forgotten, its run log is kept and linked from the new
-    record as *previous run* (a new field). This extends the supersede that Resume has done
+    takes the id, the old record is **replaced in place** by it (so the card becomes the new
+    session rather than going and coming back, and a start that fails leaves the old record
+    standing), its run log is kept and linked from the new record as *previous run* (a new
+    field), and no cadence or hook bookkeeping outlives the session it was about. This extends the supersede that Resume has done
     since PR #17 — which closes the exited record and keeps it a day — to a fresh start under
     the same name, and goes one step further by forgetting rather than keeping, because the
     name now belongs to the new session. No `-2` card appears.
@@ -130,7 +133,8 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
     whether the tick has adopted it yet, or the same `ao new` would refuse or suffix depending on
     the second it landed in: a live pane refuses like a live record (and says the card appears
     within a tick, which is when the tick adopts it), a dead pane nobody has a record of is
-    killed and its id reused. The suffix therefore survives only for tmux's own
+    killed and its id reused. The name is checked under a lock on the **scope**, not on the
+    directory, because one scope spans a repo's worktrees. The suffix therefore survives only for tmux's own
     "duplicate session" verdict, which the agent still handles explicitly rather than trusting
     its check — and then `-2`, `-3` is shown in the name on the record, so what the Herd says is
     what tmux has.

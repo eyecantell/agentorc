@@ -288,7 +288,7 @@ def create_app() -> FastAPI:
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
     @app.post("/shell")
-    async def shell(dir: str = Form(...), name: str = Form("shell")):
+    async def shell(dir: str = Form(...), name: str = Form("")):  # unnamed: the agent names it (TD-030)
         s = await call("create", name=name, dir=dir, adapter="shell")
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
