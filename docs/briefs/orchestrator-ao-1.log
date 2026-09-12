@@ -40,3 +40,7 @@
 19:05  tdgrind-3 idle 14 min continuous (since 01:51:12Z), TD-293 still `claimed` -- crosses the 20-min threshold at 02:11:12Z, so the nudge is owed at the next tick, not this one.
 19:05  tdgrind-2 idle since 02:00:38Z with both its items (TD-374, TD-376) `done` -- nothing open, no nudge.
 19:05  tdgrind-1 `working`. agentorc tdgrind-ao-1 idle 56 min, lane done, nothing open. Three of four are now idle or winding down; none has exited, so the run continues.
+19:16  tick 10 (02:16Z). NUDGE SENT: tdgrind-3 idle 25 min continuous with TD-293 `claimed` -> `ao send --wait` "you are idle with TD-293 open — continue, or declare it dropped with ao progress drop TD-293 --why". Landed and started a turn (--wait returned "still working"), so the prompt took. First and only nudge for this ref; a second would be an escalation.
+19:16  the ghost text was no obstacle to the send -- the adapter's composer read counts painted text only (design §4.2), so the paste went in cleanly. Settles the tick-4/5 worry.
+19:16  cadence check: samscrape #783 (TD-377 follow-up, tdgrind-1) -- every row pass, review *recorded*.
+19:16  tdgrind-2 idle 15 min, both items done, nothing open. agentorc tdgrind-ao-1 idle 67 min, lane done. tdgrind-1 `working`.
