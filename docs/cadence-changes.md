@@ -12,6 +12,10 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-09-11 — one SessionStart line calls scripts/cadence_hooks.sh
+Do: if this repo's `.claude/settings.json` still lists dev-cadence hooks one per line, replace them with the one `cadence_hooks.sh` line from dev-cadence's seed; add a new hook to the runner, never to settings.json.
+See: cadence.md §3 (hook wiring), adoption checklist step 2.
+
 ## 2026-09-11 — briefs, CLAUDE.md and skills cite a convention, never restate it
 Do: write "merge per `/cadence` (docs/cadence.md §4)", not the loop in prose — a restated
 rule is a copy that goes stale the day the rule changes.

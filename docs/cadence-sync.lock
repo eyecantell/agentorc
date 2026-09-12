@@ -1,9 +1,9 @@
 # Written by eyecantell/dev-cadence sync.sh — do not edit by hand.
 source: https://github.com/eyecantell/dev-cadence
-commit: 13c4876
-synced: 2026-09-12T01:02:13Z
-file: docs/cadence.md d429ebea92823cf20c82782b003dcf1f26898417269b253e9f2668f217526c4c
-file: docs/cadence-changes.md a3bd96fceeeed20fe5c1ae8b4ff1c8257a169dd94d5cdc8f7c5b68140d7b9a3e
+commit: 267cae5
+synced: 2026-09-12T05:13:12Z
+file: docs/cadence.md 8ea91fd7a1c1b276e4529b7484e30bc0f72ae538a0389fdf19f92931277d749e
+file: docs/cadence-changes.md cf1b338a7fd1379a7cd59700ee0abf3eb38030e81adb50396a660d2bb36df9eb
 file: .claude/skills/stranded-work/SKILL.md f9327b0f913e4a069c36825a9bfd1548ab8b94623b33610cf299361b8a21bf37
 file: .claude/skills/attention/SKILL.md 8cec2e55ff9ec4717cff7a8715007b3a633605e1bf323081d590464eb0a58662
 file: .claude/skills/cadence/SKILL.md c16920b29c497ff322236ed517a88812b56aec173202376855fc2a81c2786f58
@@ -19,5 +19,6 @@ file: scripts/reap_worktrees.sh e0d5017557c9324be17807cbc042583d3a225c00d81e9b55
 file: scripts/adopt_repo_settings.sh 944cf1dd75bd831b0d2a501fa63d092e4048fb7f8e5f841b3bd53f0bea3fd3bb
 file: scripts/check_cadence.py 00b2250499eed67248b3f9889a079dad231c5f448278735f63e578127f1833fa
 file: scripts/cadence_changes.py d52c65f9fa0dc7122252e2bac4c0d0a2eb6e4f19020bc60e9316caf2c7f1c6cc
+file: scripts/cadence_hooks.sh b6302d1bc8387fd15d0d4f7b6d6752cf190aef52735c142a490bff48485a22be
 file: scripts/git-hooks/pre-push 91d6d7ae48e762ca77e674fda0f2e2052e17e5bf2840a3bfb0d7a1f7a03b1087
 file: scripts/git-hooks/post-merge 3e67d3c4b362c8f74b4b1b7bdc9524426561f3ff6f08fef3e31be0835b5d76d0
