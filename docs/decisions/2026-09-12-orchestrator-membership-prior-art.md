@@ -29,10 +29,12 @@ web search + primary documentation, read-only) covered eight families: Erlang/OT
 trees; Kubernetes `ownerReferences` and controller-runtime; systemd unit relationships;
 process supervisors (supervisord, s6/runit/daemontools, Circus, PM2); capability-based security
 (attenuation, revocation, the confused deputy); multi-agent LLM frameworks (Anthropic's
-orchestrator-workers, AutoGen, CrewAI, and field reports on tmux-based Claude Code fleets);
+orchestrator-workers, AutoGen, CrewAI);
 Unix reparenting and tmux; and ACL-vs-capability-list placement. Lessons below are the
-subagent's, kept with their URLs; the ADOPT/ADAPT/REJECT ranking is the one this repo is acting
-on.
+subagent's, kept with their URLs and then fact-checked against the cited pages; the
+ADOPT/ADAPT/REJECT ranking is the one this repo is acting on. One claim the subagent reported —
+a "3–5 agents" coordination knee attributed to a field report — was **struck** in review because
+the cited page does not contain it and no primary source for it was found (§6).
 
 ## Lessons
 
@@ -56,12 +58,12 @@ on.
 
 ### 2. Kubernetes `ownerReferences` and controllers
 
-- An object may carry several owner references but at most one with `controller: true` — the
-  single managing controller, and the only one with `blockOwnerDeletion` semantics. This is the
-  closest precedent to "several controllers per session", and it says: several owners, *one*
-  authoritative. agentorc's list is deliberately flat (any member may act, none privileged), so
-  that is a choice worth stating rather than leaving implicit.
-  <https://v1-34.docs.kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents>
+- An object may carry several owner references but only one of them names the *managing*
+  controller (`controller: true`). This is the closest precedent to "several controllers per
+  session", and it says: several owners, *one* authoritative. agentorc's list is deliberately
+  flat (any member may act, none privileged), so that is a choice worth stating rather than
+  leaving implicit.
+  <https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.34/#ownerreference-v1-meta>
 - Deleting an owner without its dependents orphans them, and controllers then race to adopt the
   orphans. The design does not say what happens to a `controllers` entry when that controller
   exits: prune it (control silently lost) or leave it (a dangling id treated as valid)?
@@ -71,13 +73,14 @@ on.
   <https://github.com/kubernetes-sigs/controller-runtime/blob/main/pkg/builder/controller.go>
 - Cross-namespace owner references are disallowed. Applies weakly: grant + membership already
   stops a session reaching into a boundary nobody granted it.
+  <https://v1-34.docs.kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents>
 
 ### 3. systemd
 
 - `PartOf=` propagates in one direction only: stopping or restarting the parent reaches the
   child, stopping the child does not reach the parent. "Orchestrator exits → its workers stop"
   is one clean option the design should pick between explicitly.
-  <https://www.freedesktop.org/software/systemd/man/latest/systemd.unit.html>
+  <https://man.archlinux.org/man/systemd.unit.5>
 - `BindsTo=` stops the bound unit even when the target dies unexpectedly. That distinction —
   asked-to-close versus crashed — matters here: a *crashed* orchestrator arguably should not
   take its workers down with it.
@@ -96,7 +99,7 @@ on.
   <https://skarnet.org/software/s6/overview.html>
 - Circus's "flapping" detection stops restarting after too many attempts in a window — a third
   independent lineage converging on the same guard.
-  <https://circus.readthedocs.io/en/latest/for-ops/configuration/>
+  <https://circus.readthedocs.io/en/latest/for-ops/using-plugins/>
 - PM2's ecosystem file is a flat, user-edited array with no ownership hierarchy; grouping is by
   naming convention. The cautionary contrast: people lose track of what belongs to what.
   <https://pm2.keymetrics.io/docs/usage/application-declaration/>
@@ -105,9 +108,10 @@ on.
 
 ### 5. Capability-based security
 
-- "Authority should only shrink along a delegation chain" is the core anti-confused-deputy
-  principle, and "the child's grants ⊆ the creator's grants" is a textbook instance of it. The
-  create rule is on established ground.
+- The capability literature's rule is that access to a subject is a prerequisite for delegating
+  authority to it — you cannot hand on what you do not hold, so authority only shrinks along a
+  delegation chain. "The child's grants ⊆ the creator's grants" is an instance of it, and the
+  create rule is therefore on established ground rather than being a local invention.
   <https://blog.acolyer.org/2016/02/16/capability-myths-demolished/>
 - Capabilities are cheap to delegate and expensive to revoke. The design dodges that by anchoring
   control on the *target* (ACL-shaped): revoking A's control of B is an edit to B's list, not a
@@ -131,11 +135,13 @@ on.
   <https://microsoft.github.io/autogen/stable//user-guide/core-user-guide/design-patterns/group-chat.html>
 - CrewAI's hierarchical process has one manager per crew; no documented multi-manager-per-worker
   case.
-- Field reports on tmux-based Claude Code orchestration name the failure modes: coordination
-  overhead dominates past roughly 3–5 agents, static specs go stale as agents reinterpret them
-  mid-run, and review debt multiplies under bad supervision. The phase plan has no fan-out
-  ceiling.
-  <https://shipyard.build/blog/claude-code-multi-agent/>
+- No framework surveyed publishes a fan-out ceiling, a degradation rule as membership grows, or
+  a treatment of specs going stale as agents reinterpret them mid-run — the three things an
+  orchestrator's own brief has to handle. The research subagent attributed a "3–5 agents"
+  coordination knee to a field report; the fact-check could not find that number in the cited
+  page or anywhere else primary, so it is **struck**, and what is left is the gap itself: the
+  phase plan has no fan-out ceiling, and the number where one should sit is unmeasured. agentorc
+  can measure it on its own workers.
 
 ### 7. Unix reparenting and tmux
 
@@ -154,7 +160,7 @@ on.
 - Lampson's access matrix: ACLs (a column per object) make "who controls Y" and revocation
   trivial; capability lists (a row per subject) make "what does X control" trivial and revocation
   costly. `controllers` is ACL-shaped and matches the queries the UI actually asks.
-  <https://www.sciencedirect.com/topics/computer-science/access-control-matrix>
+  <https://bwlampson.site/08-Protection/Acrobat.pdf> (Lampson, *Protection*, 1971)
 - The confused deputy is associated with ACL systems that rely on ambient authority. The gate
   combines an ACL check (A ∈ B.controllers) with a capability check (A holds `orchestrate`),
   which is the right pair — provided the handler never trusts a claimed caller id or a cached
@@ -188,8 +194,8 @@ Carried into the §10 entry and, where they need code, into TD-036:
   may act") and the dynamic one ("orchestrators restart exited sessions") disagree.
 - **No concurrency or ordering rule** for two controllers acting on one session at once — the
   confused-deputy case the multi-controller design deliberately creates.
-- **No fan-out ceiling** or degradation behaviour for an orc-of-orcs as its membership grows;
-  field reports put the knee at 3–5.
+- **No fan-out ceiling** or degradation behaviour for an orc-of-orcs as its membership grows,
+  and no measured number to put one at — nothing surveyed publishes one.
 - **No distinction between a clean orchestrator exit and a crash** for whatever propagation is
   chosen.
 - **Revocation depends on every RPC re-reading live state** — confirm nothing caches a grant or
@@ -200,6 +206,10 @@ Carried into the §10 entry and, where they need code, into TD-036:
 
 The research was a subagent's, and cadence §8 applies: a subagent's summary is evidence, not a
 source. The lessons above were kept in the subagent's words with their URLs so a reader checks
-the primary document rather than this file; the PR's fact-check review verified the URLs resolve
-and the claims match what they say. Where a lesson contradicts the design rather than extending
+the primary document rather than this file; the PR's fact-check review (Sonnet, PR #97) fetched
+every URL and checked each claim against the page. It caught four: a Circus citation pointing at
+the page without the flapping rule, a Kubernetes citation covering only half its claim, two URLs
+that serve a bot-check to a plain fetch, and — the one that mattered — a quantified "3–5 agents"
+field-report claim its source does not make, now struck. That is the whole reason a research log
+gets a fact-check rather than a read-through. Where a lesson contradicts the design rather than extending
 it, the contradiction is recorded in the design's §10 entry, not resolved silently here.
