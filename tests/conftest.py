@@ -63,7 +63,9 @@ def private_socket_name() -> str:
 
 def _owner_alive(name: str) -> bool:
     """Is the pytest process that created this server still running? An unowned socket (a leak from
-    a run that predates this bookkeeping) answers False, so it is still swept."""
+    a run that predates this bookkeeping) answers False, so it is still swept. A recycled pid can
+    make a leaked server look owned; that costs one skipped sweep, and the next run whose glob finds
+    it takes it — the cost of being wrong the other way is killing a live run's server."""
     try:
         pid = int((OWNERS / name).read_text().strip())
     except (OSError, ValueError):

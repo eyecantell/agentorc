@@ -66,10 +66,13 @@ def test_the_stale_server_sweep_leaves_a_concurrent_runs_server_alone():
         (conftest.OWNERS / name).write_text(str(owner.pid))  # as another pytest process would
         conftest.sweep_stale_test_servers()
         assert os.path.exists(sock) and t.run("list-sessions", check=False).returncode == 0
-    finally:
         owner.terminate()
         owner.wait(timeout=5)
-    # the owner is gone: the server is a leak, and the sweep takes it and its bookkeeping
-    conftest.sweep_stale_test_servers()
-    assert not os.path.exists(sock) and not (conftest.OWNERS / name).exists()
-    kill_private_server(t)
+        # the owner is gone: the server is a leak, and the sweep takes it and its bookkeeping
+        conftest.sweep_stale_test_servers()
+        assert not os.path.exists(sock) and not (conftest.OWNERS / name).exists()
+    finally:
+        if owner.poll() is None:
+            owner.terminate()
+            owner.wait(timeout=5)
+        kill_private_server(t)  # a failed assertion above must not leave a server behind
