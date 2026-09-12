@@ -59,3 +59,4 @@
 19:22  tick 14 (03:22Z). No new merges in either repo. All four workers idle, every lane item `done`, none exited, no pending. No rule fires.
 19:22  correcting my own drift: the brief sets the tick at 600 s and I stretched it to 900/1200 s over ticks 11-13 on the reasoning that nothing was happening. That was my call to make against an explicit instruction, and the instruction wins -- back to 600 s. The cost of a quiet tick is a few seconds; the cost of a missed one is a worker sitting unnoticed, which is the whole reason this brief exists.
 19:33  tick 15 (03:33Z). ok — no merges, all four idle with every lane item `done`, none exited, nothing pending. No rule fires.
+19:44  tick 16 (03:44Z). ok — no merges, all four idle and done, none exited.
