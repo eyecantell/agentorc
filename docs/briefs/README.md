@@ -11,3 +11,14 @@ There is no supervisor for these yet (design §6 usage gate and the run-window p
 phase 3), so each brief carries its own stop time and usage rule. Edit the date and stop time
 in the brief before relaunching. The samscrape workers still run under samscrape's
 `scripts/tdgrind.sh` supervisor; moving them into agentorc is the phase 3 work.
+
+`orchestrator-ao-1.md` is the first orchestrator (design §4.8): a session holding the
+`orchestrate` grant that keeps the unattended workers going and runs the cadence check
+(`scripts/check_cadence.py`, cadence §4) on what they call done. Launch it after the workers:
+
+```
+pdm run ao new -d ~/agentorc -w orchestrator-ao-1 --unattended -p grind --grant orchestrate --prompt "$(cat docs/briefs/orchestrator-ao-1.md)" orchestrator-ao-1
+```
+
+The samscrape workers now launch from agentorc too (`ao new -d ~/samscrape …` from their
+`~/.tdgrind/tdgrind-N-prompt.md` briefs, since 2026-09-10); `scripts/tdgrind.sh` is paused.
