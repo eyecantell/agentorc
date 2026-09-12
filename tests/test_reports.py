@@ -7,6 +7,7 @@ import subprocess
 import pytest
 
 from sessionorc import reports
+from sessionorc.models import Session
 
 pytestmark = pytest.mark.unit
 
@@ -113,3 +114,29 @@ def test_a_broken_repo_derives_what_it_can_and_a_broken_toolchain_derives_nothin
 
 def _boom(*a, **kw):
     raise OSError("nothing on PATH")
+
+
+def test_only_the_record_holding_a_directory_is_credited_with_what_is_checked_out(tmp_path):
+    """TD-034: a worktree is reused run after run, so occupancy in time — not the `dir` string —
+    says whose branch is checked out there. The live record holds it; when none is live the most
+    recently created one does, so a finished run still reads as the last occupant."""
+
+    def rec(sid, directory, state, created):
+        return Session(
+            id=sid, name=sid, kind="agent", adapter="shell", dir=str(directory), state=state, created=created
+        )
+
+    other = tmp_path / "other"
+    old = rec("ao-1", tmp_path, "exited", "2026-09-10T00:00:00Z")
+    new = rec("ao-2", tmp_path, "idle", "2026-09-11T00:00:00Z")
+    alone = rec("ao-3", other, "exited", "2026-09-09T00:00:00Z")
+    assert reports.holds_directory([old, new, alone]) == {"ao-2", "ao-3"}
+    # a trailing slash is the same directory, and `closed` is not live either
+    assert reports.holds_directory([rec("ao-4", f"{tmp_path}/", "closed", "2026-09-12T00:00:00Z"), old, new]) == {
+        "ao-2"
+    }
+    # none live: the most recently created record is the last occupant
+    newer_exit = rec("ao-5", tmp_path, "exited", "2026-09-12T00:00:00Z")
+    assert reports.holds_directory([old, newer_exit]) == {"ao-5"}
+    # nothing to attribute when a record has no directory at all
+    assert reports.holds_directory([rec("ao-6", "", "idle", "2026-09-12T00:00:00Z")]) == set()

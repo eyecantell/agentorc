@@ -11,12 +11,17 @@ the way of what the session declared; that check lives on the record, not here.
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from sessionorc.models import FindingEntry, ProgressEntry, normalize_ref
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from sessionorc.models import Session
 
 # A work branch is named for its ledger reference (cadence §4: `tdNNN-<slug>`). Only that one shape
 # is read: anything looser would turn `release-2` and `ui-3-fix` into ledger references.
@@ -31,6 +36,30 @@ def branch_ref(branch: str | None) -> str | None:
     """`td028-report-channels` → `TD-028`; anything else → None."""
     m = BRANCH_RE.match((branch or "").strip())
     return normalize_ref(f"TD-{m[1]}") if m else None
+
+
+def holds_directory(sessions: Iterable[Session]) -> set[str]:
+    """The ids of the records that *currently occupy* their directory (TD-034).
+
+    A directory is reused run after run, and what is checked out there now belongs to whoever holds
+    it now — so the branch half of `derive` is attributed by occupancy in time, not by the directory
+    alone, or an exited predecessor is credited with work it never saw. The holder is the live
+    record (the most recently created, when a directory has several — `shell` sessions are exempt
+    from the anchor rule, §9 invariant 2), or the most recently created of the rest when none is
+    live. A `closed` record never holds a directory: nothing is derived for one, so letting it hold
+    would leave the directory's last real occupant uncredited.
+    Records that do not hold their directory still get the `pending`-by-PR re-check, which is
+    attributed by a PR the record already claimed rather than by what is checked out now (TD-032).
+    """
+    by_dir: dict[str, list[Session]] = {}
+    for s in sessions:
+        if s.dir and s.state != "closed":
+            by_dir.setdefault(os.path.normpath(s.dir), []).append(s)
+    holders: set[str] = set()
+    for group in by_dir.values():
+        live = [s for s in group if s.state != "exited"]
+        holders.add(max(live or group, key=lambda s: (s.created, s.id)).id)
+    return holders
 
 
 def derive(
