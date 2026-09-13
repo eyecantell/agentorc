@@ -39,14 +39,16 @@ name has been reused (§4.1).
 3. **Attach, in one command per repo:**
 
    ```sh
-   ao control orchestrator-ao-1 add tdgrind-ao-1
-   ao control orchestrator-ao-1 add ao-samscrape-tdgrind-1 ao-samscrape-tdgrind-2 \
-                                    ao-samscrape-tdgrind-3 ao-samscrape-td377-enumeration
+   ao control ao-agentorc-orchestrator-ao-1 add ao-agentorc-tdgrind-ao-1
+   ao control ao-agentorc-orchestrator-ao-1 add ao-samscrape-tdgrind-1 ao-samscrape-tdgrind-2 \
+                                                ao-samscrape-tdgrind-3 ao-samscrape-td377-enumeration
    ```
 
-   Bare names resolve inside the repo they belong to, so the samscrape workers take full ids from
-   anywhere else. A refusal names the session it refused and leaves the rest attached; the exit
-   code is 1 if anything was refused.
+   **Full ids on purpose, so the commands work from any directory.** A bare name resolves only
+   against sessions whose directory or repo contains the cwd, so `ao control orchestrator-ao-1 …`
+   run from `~/samscrape` — the natural place to be, since four of the five targets live there —
+   fails with `no session named orchestrator-ao-1 here`. A refusal names the session it refused and
+   leaves the rest attached; the exit code is 1 if anything was refused.
 4. **Verify both directions before walking away:**
 
    ```sh
@@ -61,9 +63,14 @@ name has been reused (§4.1).
 
 ## What *not* to do
 
-- Do not attach the anchor session, any interactive session, or this repo's other worktrees:
-  §9 invariant 5 keeps interactive sessions out of reach whoever the caller is, and membership is
-  not a way around it.
+- Do not attach the anchor session, any interactive session, or this repo's other worktrees.
+  **Nothing in the code stops you** — this is the one item here that is convention rather than a
+  gate, and it is worth knowing before you lean on it. `_gate` checks the grant and membership and
+  never looks at the target's `kind`; `set_controllers` will happily add an interactive session to
+  a list, and a `send` from its controller will then land. §9 invariant 5 constrains *policies*
+  (§6), and the policy engine does not exist yet, so today the only thing keeping an orchestrator
+  off an interactive session is its brief. TD-041 is filed to make the invariant real; until it
+  lands, attach only the unattended workers above.
 - Do not attach a session to two orchestrators today. It is allowed by design and is the reason
   the list is flat, but what two controllers do when they disagree is an open question (TD-039),
   and the first time it happens should not be unattended overnight.
