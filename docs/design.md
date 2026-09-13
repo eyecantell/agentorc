@@ -812,8 +812,10 @@ acting RPC. One exists today:
   local and the id is an environment variable — and it closes the gap where any worker could
   kill its neighbour. It says *may act on others*, not *on which others*: that is what the
   membership rule below narrows (landed 2026-09-13, TD-036 step 1). §9
-  invariant 5 still binds a granted session: interactive sessions are out of reach whoever the
-  caller is.
+  invariant 5 is *meant* to bind a granted session too — but it is written for policies (§6), and
+  the gate does not check the target's `kind`, so today nothing in the code stops a controller
+  acting on an interactive session; the orchestrator briefs are what keep it off them. TD-041
+  makes it a gate (found 2026-09-13, reviewing TD-036 step 6).
 
 **Membership: `controllers` on the target (2026-09-12; approved 2026-09-13, landing step by step
 under TD-036 — the record, the gate, create and `set_controllers` landed 2026-09-13).**
