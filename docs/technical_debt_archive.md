@@ -108,7 +108,7 @@ the spike's automation a matter of `jq`; agentorc's own sessions are the obvious
 **Priority:** Medium
 **Added:** 2026-09-10
 **Status:** Resolved
-**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Herd card, Focus)
+**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Team card, Focus)
 
 **Why:** A session that went `idle` while nobody was looking is the common phone-triage case, and
 today it sorts and looks exactly like one that has been idle all day. herdr keeps `done` (idle,
@@ -117,7 +117,7 @@ reads do not. agentorc's Focus view is the natural "seen".
 
 **Resolved:** 2026-09-10 (PR #43) — `Session.seen_at` (persisted) set by `rpc_seen`, which the UI calls when Focus opens (`GET /focus/<id>`), after any card action, and from the open Focus page whenever its session's event arrives `unseen`. `view()` computes `unseen = idle and (no seen_at or since > seen_at)` (whole-second stamps: a tie reads as seen), renders "finished · unseen", sorts it at rank 4.5 (above `idle`, below `working`); `/events` carries the view's rank. `idle` stays `idle` in every payload. Design §4.5 sort list names the slot. Test: `tests/test_ui.py::test_unseen_idle_until_focused`.
 
-**Related:** design §4.2, §4.5 (Herd sort); ADR 2026-09-10.
+**Related:** design §4.2, §4.5 (Team sort); ADR 2026-09-10.
 
 ## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
 
@@ -147,7 +147,7 @@ measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts i
 **Priority:** Medium
 **Added:** 2026-09-10
 **Status:** Resolved
-**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Herd card, Focus)
+**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Team card, Focus)
 
 **Why:** A session that went `idle` while nobody was looking is the common phone-triage case, and
 today it sorts and looks exactly like one that has been idle all day. herdr keeps `done` (idle,
@@ -156,7 +156,7 @@ reads do not. agentorc's Focus view is the natural "seen".
 
 **Resolved:** 2026-09-10 (PR #43) — `Session.seen_at` (persisted) set by `rpc_seen`, which the UI calls when Focus opens (`GET /focus/<id>`), after any card action, and from the open Focus page whenever its session's event arrives `unseen`. `view()` computes `unseen = idle and (no seen_at or since > seen_at)` (whole-second stamps: a tie reads as seen), renders "finished · unseen", sorts it at rank 4.5 (above `idle`, below `working`); `/events` carries the view's rank. `idle` stays `idle` in every payload. Design §4.5 sort list names the slot. Test: `tests/test_ui.py::test_unseen_idle_until_focused`.
 
-**Related:** design §4.2, §4.5 (Herd sort); ADR 2026-09-10.
+**Related:** design §4.2, §4.5 (Team sort); ADR 2026-09-10.
 
 ## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
 
@@ -276,14 +276,14 @@ is still open); the Copy button's hint documents Shift+drag for selection under 
 
 **Related:** TD-010 (b), PR #46.
 
-## TD-010: Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Herd
+## TD-010: Adopt hand-started sessions: VS Code-terminal Claude sessions are invisible to the Team
 
 **Priority:** Medium
 **Added:** 2026-09-06
 **Status:** Resolved
 **Location:** `src/sessionorc/agent.py` (`_reconcile` adoption of `ao-*` panes), `src/agentorc/adapters/claude_code/__init__.py` (`registry_entries`)
 
-**Why:** The phase 1 success test reads "every session Paul has open on kmaster shows the right state". Today the Herd shows sessions agentorc launched plus any hand-started tmux session named `ao-*`. Paul's day-to-day sessions run in VS Code terminals with no tmux at all, so they never appear. Design §4.1 says hand-started sessions enter the Herd by being **adopted** (the Resumable tab's Adopt control; not built yet, and not assigned to a phase in §7), which assumes a tmux session to attach to; a VS Code-terminal session has none.
+**Why:** The phase 1 success test reads "every session Paul has open on kmaster shows the right state". Today the Team shows sessions agentorc launched plus any hand-started tmux session named `ao-*`. Paul's day-to-day sessions run in VS Code terminals with no tmux at all, so they never appear. Design §4.1 says hand-started sessions enter the Team by being **adopted** (the Resumable tab's Adopt control; not built yet, and not assigned to a phase in §7), which assumes a tmux session to attach to; a VS Code-terminal session has none.
 
 **Resolved:** 2026-09-10 — (b) PR #46 (`ao new --attach`, `ao focus`); (a) PR #56: `HostAgent._reconcile_external` builds a read-only card (`Session.external`, id `ext-<tool id>`, `pane: false`, state from the registry status, `scraped`) for every live session `adapters.external_sessions()` reports that is not one of ours by tool id or directory; never stored, gone with the process; acting RPCs refuse with "started outside agentorc", `seen` works. `config_dir()` now honours `CLAUDE_CONFIG_DIR` for a profile without one (as Claude Code does), which is also how the test fixtures keep this machine's live registry out of the suite. Not built, by design: Allow/Deny on such a card (no hook channel without agentorc's hooks layer). Lasting content: design §4.1 (the read-only card bullet), §4.5a (card row); `tests/test_agent.py::test_registry_only_sessions_get_read_only_cards`, `tests/test_ui.py::test_registry_only_card_renders_read_only`. Live check on kmaster pending (board).
 
@@ -339,7 +339,7 @@ is the moment to write it down once the CLI is stable.
 **Status:** Resolved 2026-09-11 (PRs #75, #77)
 **Location:** `src/sessionorc/naming.py` (`session_id`), `src/sessionorc/agent.py` (`rpc_create`, `_supersede`, `occupants`), `src/agentorc/cli.py` (`new`, `shell`), `src/agentorc/ui/` (New session form, `/api/occupancy`)
 
-**Why:** `naming.session_id` appends `-2`, `-3` on any id collision — live or dead — and the record keeps the person's original name, so on 2026-09-10 the Herd showed `aotest` beside `aotest-2` and two cards named `tdgrind-ao-1` (one exited, one working). Paul: "it is a little confusing to have multiple sessions of the same name". The name is the handle `ao focus`, `ao send` and the filter take, so ambiguity there is a defect. Design §4.1 now says a name identifies one session per scope: a live holder refuses, an exited or closed holder is superseded (as `_supersede` already does for a resumed conversation), and a suffix is only for a tmux id with no record and is then shown.
+**Why:** `naming.session_id` appends `-2`, `-3` on any id collision — live or dead — and the record keeps the person's original name, so on 2026-09-10 the Team showed `aotest` beside `aotest-2` and two cards named `tdgrind-ao-1` (one exited, one working). Paul: "it is a little confusing to have multiple sessions of the same name". The name is the handle `ao focus`, `ao send` and the filter take, so ambiguity there is a defect. Design §4.1 now says a name identifies one session per scope: a live holder refuses, an exited or closed holder is superseded (as `_supersede` already does for a resumed conversation), and a suffix is only for a tmux id with no record and is then shown.
 
 **Resolved:** 2026-09-11 (steps 1-3 in PR #75, steps 4-5 in PR #77). All five steps shipped as the entry specified them, with three decisions worth keeping:
 
@@ -347,7 +347,7 @@ is the moment to write it down once the CLI is stable.
 - **The name is taken only once the launch has succeeded**, and the superseded record is *replaced in place* rather than forgotten — the card becomes the new session instead of going and coming back, and a launch that fails leaves the old record standing (found in review; the first version forgot the record first and lost its run log link if the launch then failed).
 - **The suffix path is effectively retired.** At create the agent decides on tmux's own answer for an id nobody has a record of (live pane → refuse, dead pane → kill and reuse) rather than on whether the tick has adopted it, so `-2` is now reached only through tmux's own `duplicate session` verdict — and is then shown in the record's name.
 
-Also landed: `previous_run` on the record; the refusal carries `holder`, `holder_state` and a `hint` as error data (`RpcError(**data)` → the envelope's `error_data` → `AgentError.data` → `ao new --json`); the name check is taken under a lock on the **scope**, because a scope spans a repo's worktrees; the Herd's Shell button and `ao shell` both send no name, so the agent names them (`shell`, `shell-2`); and every CLI subcommand resolves a bare name here, with a live session winning over an exited one and ambiguity an error rather than a guess. The lasting content is design §4.1, §4.5a's name-field row, and the `ao` skill's note on names.
+Also landed: `previous_run` on the record; the refusal carries `holder`, `holder_state` and a `hint` as error data (`RpcError(**data)` → the envelope's `error_data` → `AgentError.data` → `ao new --json`); the name check is taken under a lock on the **scope**, because a scope spans a repo's worktrees; the Team's Shell button and `ao shell` both send no name, so the agent names them (`shell`, `shell-2`); and every CLI subcommand resolves a bare name here, with a live session winning over an exited one and ambiguity an error rather than a guess. The lasting content is design §4.1, §4.5a's name-field row, and the `ao` skill's note on names.
 
 **Related:** design §4.1, §4.5a (New session name field), §4.7, §9 invariant 12, §10 (2026-09-10); PR #17 (resume supersedes), TD-023 (`pane` flag), TD-029 (the Close that prompted the report).
 
@@ -358,7 +358,7 @@ Also landed: `previous_run` on the record; the refusal carries `holder`, `holder
 **Status:** Resolved 2026-09-12 (PR #86)
 **Location:** `src/sessionorc/agent.py` (`_derive_reports_inner`), `src/sessionorc/reports.py` (`derive`)
 
-**Why:** The Herd showed `TD-030 done #77 (derived)` on **`ao-agentorc-tdgrind-ao-1-2`** — run 4's *exited* record — when run 5 (`…-1-3`) did that work. Both records carry the same `dir` (the `tdgrind-ao-1` worktree, reused run after run), and the tick derives from the *directory's current branch and PRs*, so every record pointing at that directory is credited with whatever is checked out there now. The declared entries on run 5's own record are correct and unaffected (§9 invariant 10 only protects against overwriting, not against a derived entry appearing where nothing was declared). It is a display lie of a specific kind: an exited worker looks as though it finished work it never saw, which is exactly the question the report channels exist to answer. It is *not* enough to skip exited records — TD-032's whole point is that a merged PR must still land on the record of the worker that has since exited, and TD-028 step 3 re-checks a `pending` PR by number for that reason.
+**Why:** The Team showed `TD-030 done #77 (derived)` on **`ao-agentorc-tdgrind-ao-1-2`** — run 4's *exited* record — when run 5 (`…-1-3`) did that work. Both records carry the same `dir` (the `tdgrind-ao-1` worktree, reused run after run), and the tick derives from the *directory's current branch and PRs*, so every record pointing at that directory is credited with whatever is checked out there now. The declared entries on run 5's own record are correct and unaffected (§9 invariant 10 only protects against overwriting, not against a derived entry appearing where nothing was declared). It is a display lie of a specific kind: an exited worker looks as though it finished work it never saw, which is exactly the question the report channels exist to answer. It is *not* enough to skip exited records — TD-032's whole point is that a merged PR must still land on the record of the worker that has since exited, and TD-028 step 3 re-checks a `pending` PR by number for that reason.
 
 **Resolved:** 2026-09-12 (PR #86) — attribute by *occupancy in time*, not by directory alone — derive the current branch's entries only for the record that currently holds the directory (the live one, or the most recently created when none is live), and keep the `pending`-by-PR-number re-check for everyone, since that is attributed by a PR the record already claimed rather than by what is checked out now. `reports.holds_directory` answers "who holds this directory now" over the whole record set and `_derive_reports_inner` passes the branch only for a holder; every record still gets its `pending`-by-PR re-check, and a record with pending entries and no branch is now derived for too, which it was not before. The lasting content is design §4.8 (the fourth honesty rule) and the two tests: `holds_directory` in `tests/test_reports.py`, and `test_derived_entries_go_to_the_record_that_holds_the_directory` in `tests/test_agent.py` — two records in one directory, one exited and one live, with a `tdNNN-*` branch checked out — only the live one gains the derived claim; the exited one keeps a claim it made earlier and still gains its `done` when that PR merges.
 

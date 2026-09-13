@@ -119,8 +119,8 @@ def head(title):
 
 TAIL = "</x-dc>\n</body>\n</html>\n"
 
-def topbar(active="Herd", narrow=False):
-    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in ["Herd", "Resumable", "Commands", "Attention"])
+def topbar(active="Team", narrow=False):
+    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in ["Team", "Resumable", "Commands", "Attention"])
     return f'''<div class="topbar">
   <span class="wordmark">agent<b>orc</b></span>
   <div style="display: flex; gap: 2px;">{tabs}</div>
@@ -194,7 +194,7 @@ def due_strip(compact=False):
     {rows}
   </div>'''
 
-def herd_desktop():
+def team_desktop():
     def card(host, repo, s):
         name, tool, state, age, where, flag, conf, pending, tag = s
         tag_html = f'<span class="badge toggle on" title="click: switch to interactive">{tag}</span>' if tag else ""
@@ -237,11 +237,11 @@ def herd_desktop():
             ordered.append((host, repo, r))
     ordered.sort(key=lambda t: rank(t[0], t[2][2]))
     cards = "".join(card(h, r, s) for h, r, s in ordered)
-    return head("Herd") + f'''<div style="width: 1440px; min-height: 1360px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Herd")}
+    return head("Team") + f'''<div style="width: 1440px; min-height: 1360px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Team")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   <div style="display: flex; align-items: center; gap: 10px;">
-    <span style="font-size: 16px; font-weight: 600;">Herd</span>
+    <span style="font-size: 16px; font-weight: 600;">Team</span>
     <span class="muted">12 sessions · </span>{pill("needs", "1 needs you")}{pill("limited", "1 limited")}{pill("stalled", "1 stalled")}
     <span style="flex-grow: 1;"></span>
     <span class="input" style="width: 200px; height: 28px; color: #9ca3af;">filter…</span>
@@ -257,7 +257,7 @@ def herd_desktop():
 </div>
 ''' + TAIL
 
-def herd_phone():
+def team_phone():
     def card(host, repo, s):
         name, tool, state, age, where, flag, conf, pending, tag = s
         if state == "needs":
@@ -308,11 +308,11 @@ def focus():
 <span class="q">  ⏳ waiting for permission (agentorc hook · answer above, or the terminal dialog appears in 9m 12s)</span>
 <span class="d">▌</span>'''
     return head("Focus") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Herd")}
+{topbar("Team")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <a href="#" class="muted">← Herd</a>
+      <a href="#" class="muted">← Team</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
       {pill("needs")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
@@ -369,7 +369,7 @@ def focus():
 
 def new_session():
     return head("New session") + f'''<div style="width: 720px; min-height: 960px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Herd", narrow=True)}
+{topbar("Team", narrow=True)}
 <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
   <div style="font-size: 16px; font-weight: 600;">New session</div>
   <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
@@ -383,7 +383,7 @@ def new_session():
       <div class="radio" style="opacity: .55;"><span class="rb"></span><span>Main checkout</span><span class="mono muted" style="font-size: 11px;">/home/kmaster/samscrape</span><span style="flex-grow: 1;"></span><span class="pill s-needs">in use by main</span></div>
       <div class="radio on"><span class="rb"></span><span>New worktree</span><span class="mono muted" style="font-size: 11px;">.claude/worktrees/td-302 from origin/main</span></div>
       <div class="radio"><span class="rb"></span><span>Existing worktree</span><span class="mono muted" style="font-size: 11px;">td-7 (exited) · td-5 (closed, reaped — recreated from its branch)</span></div>
-      <div class="radio" style="opacity: .55;"><span class="rb"></span><span>errors-alerts</span><span class="mono muted" style="font-size: 11px;">idle, dirty</span><span style="flex-grow: 1;"></span><span class="pill s-idle">in use — resume from the Herd</span></div>
+      <div class="radio" style="opacity: .55;"><span class="rb"></span><span>errors-alerts</span><span class="mono muted" style="font-size: 11px;">idle, dirty</span><span style="flex-grow: 1;"></span><span class="pill s-idle">in use — resume from the Team</span></div>
     </div>
     <div class="warn">{ICON["warn"]}<span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
   </div>
@@ -441,9 +441,9 @@ def direction_b():
         c("dev-cadence/attention-fix", "working", "vps · 1m · gemini"),
     ])
     return head("Alt") + f'''<div style="width: 1100px; min-height: 620px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Herd")}
+{topbar("Team")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
-  <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">Herd</span><span class="muted">card grid with live tail — alternate to the table</span></div>
+  <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">Team</span><span class="muted">card grid with live tail — alternate to the table</span></div>
   <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">{cards}</div>
   <div class="note">Trade-off: you see the last lines of every session at once, but fewer sessions fit per screen and host/repo grouping is weaker. The table (Main) scales to 20+ sessions; this scales to ~9.</div>
 </div>
@@ -515,7 +515,7 @@ def resumable():
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   {page_head("Resumable", "31 transcripts · 2 hosts · 3 active now", right)}
   <div class="card"><table><thead><tr><th>Session</th><th>Where</th><th>Start → last</th><th>Started / ended</th><th>Board</th><th></th></tr></thead><tbody>{groups}</tbody></table></div>
-  <div class="note"><b>Resume</b> opens New session with host, repo, and worktree prefilled and Start = Resume; a reaped worktree is recreated from the recorded branch. <b>Switch to</b> jumps to the running card in the Herd (same session: the name and the adapter id travel together from birth). A session started by hand shows only its id until you <b>Adopt</b> it (attach, give it a name), which is how it enters the Herd. The index is generated on demand from each adapter's transcripts (Claude: the JSONL under ~/.claude/projects, same as list_sessions.py), so crashed and disconnected sessions appear too. Closed sessions are filed here after their day on the Herd.</div>
+  <div class="note"><b>Resume</b> opens New session with host, repo, and worktree prefilled and Start = Resume; a reaped worktree is recreated from the recorded branch. <b>Switch to</b> jumps to the running card in the Team (same session: the name and the adapter id travel together from birth). A session started by hand shows only its id until you <b>Adopt</b> it (attach, give it a name), which is how it enters the Team. The index is generated on demand from each adapter's transcripts (Claude: the JSONL under ~/.claude/projects, same as list_sessions.py), so crashed and disconnected sessions appear too. Closed sessions are filed here after their day on the Team.</div>
 </div>
 </div>
 ''' + TAIL
@@ -587,10 +587,10 @@ def commands():
   {page_head("Commands", "5 commands in 2 repos · 1 running", '<span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span>')}
   {groups}
   <div style="display: flex; flex-direction: column; gap: 8px;">
-    <div class="grp" style="padding: 0;"><span>Recent runs</span><span class="path">each run is a session of kind command — same tmux, same log, same Focus; hidden from the Herd unless "show command runs" is on</span></div>
+    <div class="grp" style="padding: 0;"><span>Recent runs</span><span class="path">each run is a session of kind command — same tmux, same log, same Focus; hidden from the Team unless "show command runs" is on</span></div>
     <div class="card"><table><tbody>{rows}</tbody></table></div>
   </div>
-  <div class="note">Buttons come from each repo's checked-in <span class="mono">.agentorc.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Herd and out of the urgency sort. The Attention tab's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
+  <div class="note">Buttons come from each repo's checked-in <span class="mono">.agentorc.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Team and out of the urgency sort. The Attention tab's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
 </div>
 </div>
 ''' + TAIL
@@ -625,7 +625,7 @@ def attention():
         if repo == "samscrape":
             rows += '''<div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eceef1;">
   <span class="pill s-idle" style="justify-self: start;">undated</span>
-  <div class="muted" style="font-size: 12.5px;">19 more items with no Due date — surfaced only here, never on the Herd strip.</div>
+  <div class="muted" style="font-size: 12.5px;">19 more items with no Due date — surfaced only here, never on the Team strip.</div>
   <span class="btn sm ghost">show ▾</span>
 </div>'''
         right += f'''<div class="card" style="padding: 10px 12px 2px; display: flex; flex-direction: column; gap: 6px;">
@@ -638,7 +638,7 @@ def attention():
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   {page_head("Attention", "2 boards · 27 open items · 6 due/overdue · the full dev-cadence board, undated items included", '<span class="mono muted" style="font-size: 11px;">attention command last ran 03:00 MDT</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">overdue · today · this week · undated ▾</span>')}
   {right}
-  <div class="note">The Herd shows only what is overdue or due today, in its Due strip. This tab is the whole board: every repo, undated items too, the same rows the repo's <span class="mono">nudge_user_attention.py --report</span> prints. <b>Focus session</b> opens the session that left the item (matched by adapter id; a closed one opens in Resumable). <b>Snooze</b> and <b>Done</b> are one-line edits the host agent makes to user_attention.md and commits with a message naming the session, so the checkout never sits dirty. Sessions that need you are not repeated here — that is the Herd.</div>
+  <div class="note">The Team shows only what is overdue or due today, in its Due strip. This tab is the whole board: every repo, undated items too, the same rows the repo's <span class="mono">nudge_user_attention.py --report</span> prints. <b>Focus session</b> opens the session that left the item (matched by adapter id; a closed one opens in Resumable). <b>Snooze</b> and <b>Done</b> are one-line edits the host agent makes to user_attention.md and commits with a message naming the session, so the checkout never sits dirty. Sessions that need you are not repeated here — that is the Team.</div>
 </div>
 </div>
 ''' + TAIL
@@ -661,9 +661,9 @@ def darken(html):
     return html
 
 files = {
-    "Main.dc.html": herd_desktop(),
-    "MainDark.dc.html": darken(herd_desktop()),
-    "Phone.dc.html": herd_phone(),
+    "Main.dc.html": team_desktop(),
+    "MainDark.dc.html": darken(team_desktop()),
+    "Phone.dc.html": team_phone(),
     "Focus.dc.html": focus(),
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
@@ -676,9 +676,9 @@ for n, s in files.items():
 
 canvas = {
     "artboards": [
-        {"file": "Main.dc.html", "title": "Herd — desktop", "x": 0, "y": 0, "w": 1440, "h": 1360},
-        {"file": "Phone.dc.html", "title": "Herd — phone", "x": 1540, "y": 0, "w": 390, "h": 1560},
-        {"file": "MainDark.dc.html", "title": "Herd — dark", "x": 2040, "y": 0, "w": 1440, "h": 1360},
+        {"file": "Main.dc.html", "title": "Team — desktop", "x": 0, "y": 0, "w": 1440, "h": 1360},
+        {"file": "Phone.dc.html", "title": "Team — phone", "x": 1540, "y": 0, "w": 390, "h": 1560},
+        {"file": "MainDark.dc.html", "title": "Team — dark", "x": 2040, "y": 0, "w": 1440, "h": 1360},
         {"file": "Focus.dc.html", "title": "Focus — session", "x": 0, "y": 1460, "w": 1440, "h": 980},
         {"file": "NewSession.dc.html", "title": "New session", "x": 1540, "y": 1840, "w": 720, "h": 960},
         {"file": "Legend.dc.html", "title": "States & badges", "x": 0, "y": 2580, "w": 760, "h": 820},
@@ -687,7 +687,7 @@ canvas = {
         {"file": "Attention.dc.html", "title": "Attention", "x": 0, "y": 4480, "w": 1440, "h": 860},
     ],
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Herd, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Team, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions."},
     ],
     "launch": {"view": "canvas"},
 }

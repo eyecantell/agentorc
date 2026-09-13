@@ -36,7 +36,7 @@
   AO.act = act;
 
   // vscode:// links: hand the URL to the protocol handler without navigating this tab away
-  // (a plain click replaced the Herd with a blank page when the handler declined — first-use finding).
+  // (a plain click replaced the Team with a blank page when the handler declined — first-use finding).
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest('a[href^="vscode://"]');
     if (!a) return;
@@ -124,7 +124,7 @@
     const b = $("#agentdown"); if (b) b.classList.toggle("hidden", !down);
   }
 
-  // ---- Herd ----
+  // ---- Team ----
   let sortMode = store.get("sort", "urgent");
   function setSort(m) { sortMode = m; store.set("sort", m); $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === m)); layout(); }
   function layout() {
@@ -153,7 +153,7 @@
       c.hidden = hideKind || (q && !c.textContent.toLowerCase().includes(q));
     });
   }
-  AO.herd = function () {
+  AO.team = function () {
     $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === sortMode));
     $("#filter").addEventListener("input", layout);
     $("#showcmd").addEventListener("change", layout);

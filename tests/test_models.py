@@ -47,7 +47,7 @@ def test_session_roundtrip_is_lossless():
 
 
 def test_state_rank_covers_every_state():
-    """The Herd sorts by STATE_RANK; a state without a rank falls to the bottom silently."""
+    """The Team sorts by STATE_RANK; a state without a rank falls to the bottom silently."""
     assert set(get_args(State)) == set(STATE_RANK)
     assert STATE_RANK["needs-you"] < STATE_RANK["working"] < STATE_RANK["idle"] < STATE_RANK["exited"]
 

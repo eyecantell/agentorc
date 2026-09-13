@@ -10,7 +10,7 @@ Launch unattended TD-grind workers for this repo as agentorc sessions with
 `tdgrind.sh` supervisor or a terminal on Paul's laptop. First one: `tdgrind-ao-1`, 2026-09-09.
 
 **Why:** Paul said on 2026-09-09 "our tdgrind sessions should be in agentorc so we can close
-this laptop". An ao session lives in tmux on kmaster and shows on the Herd; a VS Code terminal
+this laptop". An ao session lives in tmux on kmaster and shows on the Team; a VS Code terminal
 dies with the laptop. Also: in auto mode the permission classifier blocks writes outside the
 repo (`~/.tdgrind-agentorc`, crontab), so the supervisor route could not be set up anyway.
 
