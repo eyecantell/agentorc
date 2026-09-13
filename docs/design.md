@@ -158,13 +158,13 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   `shell`), `dir`, `repo` (optional), `worktree` (optional), `adapter_id` once known (Claude
   Code's session uuid — read from the hook payload; it is what Resumable and the transcript index
   key on), `capabilities` (grants, §4.8 — empty for most sessions), `controllers`
-  (§4.8's membership list: which sessions may act on this one — proposed 2026-09-12, TD-036, not
-  a field today), `lane`, `progress` and
+  (§4.8's membership list: which sessions may act on this one — landed 2026-09-13, TD-036 step 1),
+  `lane`, `progress` and
   `findings` (§4.8's report channels: what the session was handed and what it says it did),
   `role` (the preset it was started from, a badge and nothing more), and `unattended` with its
   schedule (§6). Grants, report channels, mode and schedule are independent fields: a grant
-  says a session may act on others at all (and, once `controllers` lands, membership says on
-  which), the channels say what it did, `unattended` says whether
+  says a session may act on others at all and `controllers` on the target says on which (§4.8),
+  the channels say what it did, `unattended` says whether
   policies act on it, the schedule says when. Any can be set without the others. Resumable shows the name first and the id under it; a session started by hand
   outside agentorc shows only the id until it is **adopted** (attach to the tmux session, give it
   a name), which is also how hand-started sessions enter the Team.
@@ -807,11 +807,12 @@ acting RPC. One exists today:
   guard against a confused worker, not a security boundary — the socket is
   local and the id is an environment variable — and it closes the gap where any worker could
   kill its neighbour. It says *may act on others*, not *on which others*: that is what the
-  membership rule below narrows, once it is implemented (proposed 2026-09-12, TD-036). §9
+  membership rule below narrows (landed 2026-09-13, TD-036 step 1). §9
   invariant 5 still binds a granted session: interactive sessions are out of reach whoever the
   caller is.
 
-**Membership: `controllers` on the target (2026-09-12, proposed — not implemented, TD-036).**
+**Membership: `controllers` on the target (2026-09-12; approved 2026-09-13, landing step by step
+under TD-036 — the record, the gate, create and `set_controllers` landed 2026-09-13).**
 The grant says a session may act on *other* sessions; it does not say *which*. With one
 orchestrator those were the same sentence. They stop being the same sentence the moment there
 are several — `guardians` gets its own, a large repo may want a ui orc and a backend orc, a

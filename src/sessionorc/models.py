@@ -176,6 +176,12 @@ class Session:
     seen_at: str | None = None  # last time a person looked (Focus opened, card acted on); TD-017
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
     capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)
+    # Membership (design §4.8, TD-036): the session ids that may act on *this* session. The list
+    # lives on the target, not on the orchestrator, so the gate is one lookup and nothing has to be
+    # kept in step; empty — the default — means nobody may act on it. A grant says a session may
+    # act on others at all; this says on which. Several controllers are allowed and none is
+    # privileged.
+    controllers: list[str] = field(default_factory=list)
     # The model actually in use, when the adapter can tell (TD-031): observed, never the profile's
     # declared model — that is an intent (§4.2a), and a display says so when it falls back to it.
     model: str | None = None

@@ -61,7 +61,9 @@ SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # wh
 # grant to run one of these on a session other than itself (§9 invariant 11). `create` targets a
 # session that is by definition not the caller; `set_grants` is gated so a session cannot grant
 # itself. Reads are never listed here.
-ACTING_RPCS = frozenset({"send", "keys", "kill", "close", "set_mode", "remove", "create", "set_grants"})
+ACTING_RPCS = frozenset(
+    {"send", "keys", "kill", "close", "set_mode", "remove", "create", "set_grants", "set_controllers"}
+)
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs_keep_days`)
 # a tool registry's status → our state (Claude Code: busy | idle | shell, the last a `!` command running)
@@ -557,11 +559,21 @@ class HostAgent:
         prompt: str | None = None,
         capabilities: list[str] | None = None,
         lane: list[str] | None = None,
+        controllers: list[str] | None = None,
+        caller: str | None = None,
     ) -> dict[str, Any]:
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
+        # Create adds the creator (design §4.8): a session that starts another may act on what it
+        # started, without a second call and without a person in the loop. `caller` is the request
+        # envelope's, injected by the dispatcher — a person's create has none, and then the new
+        # session begins with only whatever `--controller` asked for (often nothing, which means
+        # nobody may act on it: the explicit default).
+        members = _controllers(controllers or [])
+        if caller and caller not in members:
+            members.insert(0, str(caller))
         try:
             ad = adapters.get(adapter)
         except KeyError as e:
@@ -643,6 +655,7 @@ class HostAgent:
                 run_log=str(run_log),
                 adapter_id=spec.adapter_id,
                 capabilities=grants,
+                controllers=members,
                 lane=references,
                 previous_run=previous_run,
             )
@@ -1021,6 +1034,24 @@ class HostAgent:
         await self._push_changes()
         return s.to_dict()
 
+    async def rpc_set_controllers(
+        self, id: str, add: list[str] | None = None, remove: list[str] | None = None
+    ) -> dict[str, Any]:
+        """`ao control <orc> add|remove <session>`, the Focus controllers chip (design §4.8,
+        TD-036): edit which sessions may act on this one. Gated on the *target* like `set_grants`,
+        so a person always may and a session only if it already controls it — control is handed
+        on, never seized. Takes effect on the next call the controller makes: the gate reads the
+        record, not a cached copy."""
+        s = self._get(id)
+        adding, removing = _controllers(add or []), _controllers(remove or [])
+        if s.id in adding:
+            raise RpcError(f"{s.id} cannot be its own controller: it could then drop the ones watching it")
+        kept = [c for c in s.controllers if c not in removing]
+        s.controllers = kept + [c for c in adding if c not in kept]
+        self.store.save(s)
+        await self._push_changes()
+        return s.to_dict()
+
     async def rpc_progress(
         self,
         id: str,
@@ -1130,19 +1161,43 @@ class HostAgent:
 
     def _gate(self, caller: Any, method: str, params: dict[str, Any]) -> None:
         """Design §4.8, §9 invariant 11: an acting RPC from a session onto a *different* session
-        needs the `orchestrate` grant on the caller's record. No caller (a person's terminal, the
-        UI) or a session acting on itself passes as before. A caller this agent does not know is
-        a session (the id came from `AGENTORC_SESSION`) and holds no grant. Reads are never gated;
-        this is a guard against a confused worker, not a security boundary."""
+        needs the `orchestrate` grant on the caller's record **and** the caller in the target's
+        `controllers` (TD-036). Both halves are read from the records here, on every call, so a
+        revoke or a membership edit takes effect on the session's next call and neither is cached.
+        No caller (a person's terminal, the UI) passes; a session acting on itself passes, except
+        for the two RPCs that edit authority — a session may no more hand itself a grant than
+        remove the controller watching it. A caller this agent does not know is a session (the id
+        came from `AGENTORC_SESSION`) and holds no grant. Reads are never gated; this is a guard
+        against a confused worker, not a security boundary."""
         if not caller or method not in ACTING_RPCS:
             return
-        if method not in ("create", "set_grants") and params.get("id") == caller:
+        if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller:
             return
         me = self.sessions.get(str(caller))
-        if me is not None and "orchestrate" in me.capabilities:
+        if me is None or "orchestrate" not in me.capabilities:
+            target = "a new session" if method == "create" else params.get("id", "?")
+            raise RpcError(f"{caller} cannot {method} {target}: needs the orchestrate grant (design §4.8)")
+        if method == "create":
+            # No target to be a member of yet. What create is gated on instead is attenuation: the
+            # child's grants must be a subset of the creator's (design §4.8, capability attenuation).
+            excess = [g for g in _grants(params.get("capabilities") or []) if g not in me.capabilities]
+            if excess:
+                raise RpcError(
+                    f"{caller} cannot create a session holding {', '.join(excess)}: "
+                    f"a session it creates gets no grant it does not hold itself (design §4.8)"
+                )
             return
-        target = "a new session" if method == "create" else params.get("id", "?")
-        raise RpcError(f"{caller} cannot {method} {target}: needs the orchestrate grant (design §4.8)")
+        target_id = str(params.get("id", ""))
+        target = self.sessions.get(target_id)
+        # An id this agent has no record of falls through to the method, which answers "no session
+        # <id>" — a membership refusal here would say more about the fleet than the caller may read.
+        if target is not None and str(caller) not in target.controllers:
+            how = "nobody may act on it" if not target.controllers else "it is controlled by " + ", ".join(
+                target.controllers
+            )
+            raise RpcError(
+                f"{caller} cannot {method} {target_id}: not in its controllers — {how} (design §4.8)"
+            )
 
     def _get(self, sid: str, *, external: bool = False) -> Session:
         """A record by id. A registry-only card (`external`) is returned only to callers that
@@ -1229,6 +1284,11 @@ class HostAgent:
         params = req.get("params") or {}
         try:
             self._gate(req.get("caller"), str(name), params)
+            if name == "create":
+                # `create` seeds the new record's controllers with its creator (design §4.8), so it
+                # needs the envelope's caller. Set unconditionally, after the gate: a client that
+                # put its own `caller` in `params` does not get to choose who it is.
+                params["caller"] = req.get("caller")
             return {"id": rid, "result": await method(**params)}
         except RpcError as e:
             return {"id": rid, "error": str(e), **({"error_data": e.data} if e.data else {})}
@@ -1242,6 +1302,21 @@ class HostAgent:
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
 _CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
+
+
+def _controllers(ids: list[Any]) -> list[str]:
+    """Session ids for a `controllers` list (design §4.8): stripped, deduped, order kept. Ids are
+    not checked against live records on purpose — a controller that has exited keeps its entry
+    (§4.8: an exited orchestrator's workers are surfaced, not silently released), and a list may
+    be set before the session it names is created."""
+    out: list[str] = []
+    for raw in ids:
+        cid = str(raw).strip()
+        if not cid:
+            raise RpcError("a controller is a session id, not an empty string")
+        if cid not in out:
+            out.append(cid)
+    return out
 
 
 def _lane(refs: list[str]) -> list[str]:
