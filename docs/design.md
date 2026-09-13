@@ -731,9 +731,13 @@ are ungated; `ao status -v` prints the same report line the card will, and `--js
 what the repo and the package define; `--grant orchestrate` adds a grant a preset lacks, and
 works without a preset today). `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
 running session's grants (the `set_grants` RPC; `ao status -v` and `--json` show
-`capabilities`). The membership surface that goes with them — `ao new --controller`,
-`ao control <orc> add|remove`, and both directions in `ao status -v` — is proposed, not built
-(§4.8, TD-036). The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+`capabilities`). The membership surface beside them (landed 2026-09-13, TD-036 step 2):
+`ao control <orc> add|remove <session>…` edits membership from the orchestrator's side — which is
+how a person thinks about it, *this orc controls these sessions*, while the list itself lives on
+each target — one `set_controllers` call per target, so a refusal names the session it refused and
+the rest still stand. `ao new --controller <id>…` sets it at create, and `ao new` prints one line
+when a session starts with nobody able to act on it. `ao status -v` prints both directions:
+`under:` from the record, `members:` derived across the records, never stored. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).

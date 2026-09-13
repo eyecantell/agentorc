@@ -348,6 +348,63 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
         call_sync("kill", id=sid)
 
 
+def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-036 step 2: `ao control <orc> add|remove <session>…` edits membership from the
+    orchestrator's side, `ao new --controller` sets it at create, `ao status -v` prints both
+    directions, and `ao new` says so when a session starts with nobody able to act on it."""
+
+    def out():
+        return json.loads(capsys.readouterr().out)
+
+    monkeypatch.chdir(tmp_path)  # `ao control orc add w1` resolves bare names against the cwd
+    assert cli.main(["--json", "shell", "orc", "-d", str(tmp_path)]) == 0
+    orc = out()["id"]
+    assert cli.main(["shell", "w1", "-d", str(tmp_path)]) == 0
+    # the no-controller line, printed once, in the person's own words
+    said = capsys.readouterr().out
+    assert "starts with no controller: nobody may act on it" in said
+    w1 = call_sync("list")
+    w1 = next(s_["id"] for s_ in w1 if s_["name"] == "w1")
+    wait_state(orc, "idle")
+    wait_state(w1, "idle")
+    call_sync("set_grants", id=orc, add=["orchestrate"])
+
+    # a bare name works on both sides (design §4.1), and the output says who is over the session
+    assert cli.main(["control", "orc", "add", "w1"]) == 0
+    assert capsys.readouterr().out.strip() == f"{w1}: under {orc}"
+    assert call_sync("get", id=w1)["controllers"] == [orc]
+    # …so the orchestrator can now act on it, and could not before
+    monkeypatch.setenv("AGENTORC_SESSION", orc)
+    assert cli.main(["send", w1, "echo", "ok"]) == 0
+    monkeypatch.delenv("AGENTORC_SESSION")
+
+    # both directions in `status -v`
+    assert cli.main(["status", "-v"]) == 0
+    shown = capsys.readouterr().out
+    assert f"under:  {orc}" in shown
+    assert f"members: {w1}" in shown
+
+    # one refusal does not lose the rest, and the exit code says something was refused
+    assert cli.main(["--json", "control", "orc", "add", "w1", "nosuchsession"]) == 1
+    res = out()
+    assert [s_["id"] for s_ in res["sessions"]] == [w1]
+    assert "nosuchsession" in res["refused"]
+    # an orchestrator may not be made to control itself
+    assert cli.main(["control", "orc", "add", "orc"]) == 1
+    assert "cannot control itself" in capsys.readouterr().err
+
+    assert cli.main(["control", "orc", "remove", "w1"]) == 0
+    assert capsys.readouterr().out.strip() == f"{w1}: under nobody"
+    assert call_sync("get", id=w1)["controllers"] == []
+
+    # --controller at create, and it is resolved from a name like every other id
+    assert cli.main(["--json", "new", "w2", "-a", "shell", "-d", str(tmp_path), "--controller", "orc"]) == 0
+    w2 = out()
+    assert w2["controllers"] == [orc]
+    for sid in (orc, w1, w2["id"]):
+        call_sync("kill", id=sid)
+
+
 def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-028 step 2: `ao progress` / `ao finding` land on the caller's own record (or `--id`),
     print the report line, and show up in `ao status -v` and `--json`; `ao new --lane` sets the lane."""

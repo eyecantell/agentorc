@@ -102,6 +102,13 @@ def cmd_status(args: argparse.Namespace) -> int:
         if args.verbose:
             if s.get("capabilities"):
                 print(f"{'':<{w}}      grants: {', '.join(s['capabilities'])}")
+            # Both directions of membership (design §4.8): what may act on this session, and — for
+            # an orchestrator — what it may act on. The second is derived from the records here,
+            # never stored, which is the same rule the Focus member list follows.
+            if s.get("controllers"):
+                print(f"{'':<{w}}      under:  {', '.join(s['controllers'])}")
+            if members := [o["id"] for o in sessions if s["id"] in (o.get("controllers") or [])]:
+                print(f"{'':<{w}}      members: {', '.join(members)}")
             if model := short_model(s.get("adapter") or "", s.get("model")):
                 print(f"{'':<{w}}      model:  {model}")
             if line := report_line(s):
@@ -153,8 +160,14 @@ def cmd_new(args: argparse.Namespace) -> int:
         resume=args.resume,
         prompt=args.prompt,
         capabilities=args.grant or [],
+        controllers=[resolve(c) for c in (args.controller or [])],
         lane=args.lane,
     )
+    if not s.get("controllers") and not args.json:
+        # Design §4.8: an empty list is the explicit default, not an error — but an unattended
+        # worker nobody may act on is rarely what was meant, so `ao new` says so once, here,
+        # rather than leaving it to be discovered when a nudge is refused.
+        print(f"{s['id']} starts with no controller: nobody may act on it (ao control <orc> add {s['name']})")
     if s.get("previous_run") and not args.json:
         # the same note the New session form shows before Start (design §4.1, TD-030)
         print(f"replaces the earlier {s['name']} — run log kept: {s['previous_run']}")
@@ -175,7 +188,7 @@ def cmd_shell(args: argparse.Namespace) -> int:
         None,
     )
     args.worktree = None
-    args.grant, args.lane = [], []
+    args.grant, args.lane, args.controller = [], [], []
     args.name = args.name or ""  # the agent names it (`shell`, `shell-2`): one name, one session
     return cmd_new(args)
 
@@ -282,6 +295,33 @@ def cmd_grants(args: argparse.Namespace) -> int:
     edit = {"add": args.grants} if args.cmd == "grant" else {"remove": args.grants}
     s = call_sync("set_grants", id=args.id, **edit)
     return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
+
+
+def cmd_control(args: argparse.Namespace) -> int:
+    """`ao control <orc> add|remove <session>…` (design §4.8, TD-036): edit membership from the
+    orchestrator's side, which is how a person thinks about it — *this orc controls these
+    sessions* — while the list itself lives on each target. One `set_controllers` call per target,
+    so a refusal names the session it refused and the rest still stand."""
+    orc = resolve(args.orc)
+    edit = "add" if args.action == "add" else "remove"
+    done, refused = [], []
+    for ident in args.sessions:
+        try:
+            sid = resolve(ident)
+            if sid == orc:
+                raise AgentError(f"{orc} cannot control itself: it could then drop the ones watching it")
+            done.append(call_sync("set_controllers", id=sid, **{edit: [orc]}))
+        except AgentError as e:
+            refused.append((ident, str(e)))
+    if args.json:
+        print(json.dumps({"controller": orc, "action": edit, "sessions": done, "refused": dict(refused)}, indent=1))
+    else:
+        for s_ in done:
+            under = ", ".join(s_["controllers"]) or "nobody"
+            print(f"{s_['id']}: under {under}")
+        for ident, why in refused:
+            print(f"{ident}: {why}", file=sys.stderr)
+    return 1 if refused else 0
 
 
 def _finding(f: dict[str, Any]) -> str:
@@ -428,6 +468,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="a grant the session starts with (design §4.8); `orchestrate` lets it act on other sessions",
     )
     p.add_argument(
+        "--controller",
+        action="append",
+        metavar="SESSION",
+        help="a session that may act on this one (design §4.8; repeatable). None means nobody may",
+    )
+    p.add_argument(
         "--lane",
         type=_refs,
         default=[],
@@ -497,6 +543,12 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("id")
         p.add_argument("grants", nargs="+", choices=GRANTS, metavar="grant")
         p.set_defaults(fn=cmd_grants)
+
+    p = add("control", help="say which sessions an orchestrator may act on (design §4.8)")
+    p.add_argument("orc", help="the orchestrating session (id or name)")
+    p.add_argument("action", choices=["add", "remove"])
+    p.add_argument("sessions", nargs="+", metavar="session", help="the sessions it controls (id or name)")
+    p.set_defaults(fn=cmd_control)
 
     p = add("progress", help="declare a reference claimed, done, or dropped (design §4.8)")
     p.add_argument("action", choices=["claim", "done", "drop"])
