@@ -171,7 +171,12 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     controllers = list(args.controller or [])
     source = "--controller"
     if not args.controller:
-        controllers, source = (role.controllers, f"role {role.name}") if role.controllers else (cfg.controllers, "repo")
+        # `controllers_set` rather than a truth test: a preset that says `controllers: []` means
+        # *nobody may act on this*, deliberately, and must not fall through to the repo's default.
+        if role.controllers_set:
+            controllers, source = role.controllers, f"role {role.name}"
+        else:
+            controllers, source = cfg.controllers, "repo"
     ids = []
     for c in controllers:
         try:

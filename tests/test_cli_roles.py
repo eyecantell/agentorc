@@ -108,6 +108,20 @@ def test_a_configured_controller_that_is_not_running_is_skipped_not_refused(repo
     assert not [m for m, _ in calls if m == "create"]
 
 
+def test_a_role_with_an_empty_controllers_list_means_nobody_not_the_repo_default(repo, capsys):
+    """`controllers: []` on a preset is a deliberate *nobody* (the module docstring's own example),
+    which a truth test cannot tell from a preset that never mentioned controllers — so the repo's
+    default must not fill it in. Found by the review of PR #116."""
+    root, calls = repo
+    (root / ".agentorc.yml").write_text("controllers: [orc]\nroles: {hunter: {controllers: []}}\n")
+    assert cli.main(["new", "h1", "--role", "hunter"]) == 0
+    out, _ = capsys.readouterr()
+    assert created(calls)["controllers"] == [] and "starts with no controller: nobody may act on it" in out
+    calls.clear()
+    assert cli.main(["new", "g1", "--role", "grinder"]) == 0  # says nothing → the repo's list applies
+    assert created(calls)["controllers"] == [ORC]
+
+
 def test_an_unknown_role_or_grant_is_an_error_naming_it(repo, capsys):
     root, calls = repo
     assert cli.main(["--json", "new", "g1", "--role", "sage"]) == 1

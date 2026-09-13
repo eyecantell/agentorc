@@ -64,6 +64,8 @@ class Role:
     grants: list[str] = field(default_factory=list)
     profile: str | None = None
     controllers: list[str] = field(default_factory=list)
+    controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
+    # deliberately, and the repo's default is not fallen back to (review of PR #116)
     sources: list[str] = field(default_factory=list)  # `built-in`, `org`, `repo`: which layers spoke
     brief_source: str = ""  # which layer the brief came from: the template is read from there
     root: Path | None = None  # the repo the role was resolved in; where a repo brief path is relative to
@@ -265,7 +267,7 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
         if "profile" in block:
             role.profile = block["profile"]
         if "controllers" in block:
-            role.controllers = list(block["controllers"])
+            role.controllers, role.controllers_set = list(block["controllers"]), True
     return role
 
 
