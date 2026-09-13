@@ -339,3 +339,4 @@
 20:39  tick 68 (02:39Z). No merges, no rows owed, all six `idle` and unchanged since tick 67. ok -- quiet tick.
 20:55  tick 69 (02:55Z). No merges, no rows owed, all six `idle` and unchanged. ok -- quiet tick.
 21:11  tick 70 (03:11Z). No merges, no rows owed, all six `idle` and unchanged. ok -- quiet tick.
+21:32  tick 71 (03:32Z). No merges, no rows owed, all six `idle`. tdgrind-2 and tdgrind-3 show fresh `last_output` (03:21, 03:22) without leaving `idle` -- the periodic hook/derive writing, not a turn. ok -- quiet tick.
