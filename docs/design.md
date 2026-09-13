@@ -572,7 +572,7 @@ noted). If a control is not in this table it does not exist.
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027) |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
-| New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `orchestrator`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule |
+| New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `orchestrator`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule — landed 2026-09-13, TD-040 step a: the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants checkboxes are not yet drawn (the preset's grants apply unseen) |
 | New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `orchestrate`). Unchecked by default for every preset but `orchestrator`; shown with a one-line warning of what the grant allows |
 | card | **report line** | shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, an orchestrator's `last tick 20:10 · 2 wrapped up`; an entry the agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed` (landed 2026-09-12) |
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (agent RPC, recorded as dropped by the person — a *declaration*, so the tick cannot undo it) (landed 2026-09-12) |
@@ -580,7 +580,7 @@ noted). If a control is not in this table it does not exist.
 | Focus header | **controllers** chip | the sessions that may act on this one (§4.8): each controller by name, clicking it removes it; **+** asks for a session id or name and adds it (the `set_controllers` RPC — a person always may, a session only if it already controls this one; the agent refuses, the chip only asks). A controller whose session is gone is shown dim, not dropped. Empty reads *no controller — nobody may act on this session*, which is the default, not a warning — landed 2026-09-13, TD-036 step 3 |
 | card | **under `<orc>`** chip | the session's `controllers` when it has any — the controlling session's name, click to focus it; several are listed. Nothing is shown when the list is empty, which is the common case for a person's own session — landed 2026-09-13, TD-036 step 3 |
 | Focus (orchestrator) | **Members** list | for a session holding `orchestrate`: every session whose `controllers` name it, with state, lane and report line — the orchestrator's central view. Derived from the records on each tick, never cached (§4.8) — landed 2026-09-13, TD-036 step 3 |
-| New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `orchestrate` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilling from the repo's or preset's `controllers:` waits on TD-036 step 4 — landed 2026-09-13, TD-036 step 3 |
+| New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `orchestrate` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
@@ -730,10 +730,13 @@ Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao p
 TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao finding TD-029 --priority low`
 (each a small RPC on the calling session's own record — `--id` for another's, since the channels
 are ungated; `ao status -v` prints the same report line the card will, and `--json` the entries). Presets are picked at start, `ao new
---role grinder --lane TD-027,TD-019` (`--lane` landed with step 2, the rest with step 5;
-`--lane free-pick` for scan-and-choose; `ao roles` lists
-what the repo and the package define; `--grant orchestrate` adds a grant a preset lacks, and
-works without a preset today). `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
+--role grinder --lane TD-027,TD-019` (`--lane` landed with TD-028 step 2; `--role` and `ao roles`
+2026-09-13 with TD-040 step a, `agentorc.repoconfig`): the preset fills the brief from its template
+with `{lane}` filled, the lane's default, its grants, its `profile` unless `-p` is given, and its
+`controllers:` — else the repo's — when `--controller` is not, resolved from names to ids in the
+session's directory (an unknown name is an error naming it, and the file); `--lane free-pick` for
+scan-and-choose; `ao roles` lists what the repo and the package define, marking each role's
+source; `--grant orchestrate` adds a grant a preset lacks, and works without a preset. `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
 running session's grants (the `set_grants` RPC; `ao status -v` and `--json` show
 `capabilities`). The membership surface beside them (landed 2026-09-13, TD-036 step 2):
 `ao control <orc> add|remove <session>…` edits membership from the orchestrator's side — which is
@@ -875,7 +878,10 @@ orchestrator controls.** The prior-art survey behind the rules below is
 - **Defaults fill membership at launch.** `.agentorc.yml` may carry `controllers:` per repo and
   per preset (§5), so a worker started in a repo that has an orchestrator is a member from its
   first byte. `ao new` prints one line when a session starts with no controller at all — not an
-  error, just the fact, because an unattended worker nobody may act on is rarely what was meant.
+  error, just the fact, because an unattended worker nobody may act on is rarely what was meant
+  (landed 2026-09-13, TD-036 step 4: the preset's list wins over the repo's, `--controller` over
+  both, names resolve in the session's directory and an unknown one refuses the start; the New
+  session picker is ticked from the same rule).
 - **Surface.** `ao new --controller <id>…`; `ao control <orc> add|remove <session>…`;
   `ao status -v` shows both directions (a session's controllers, an orchestrator's members); the
   worker card carries an *under `<orc>`* chip; the orchestrator's Focus lists its members; New
@@ -910,7 +916,10 @@ stays on the `unattended` side (§6, TD-026) and applies to a session whatever i
 template, a default lane shape, default grants, and — since 2026-09-13, §4.9 — the **profile** it runs under (§4.2a), so the
 pick-list adds an agent by skillset in one choice; the record keeps the name as `role` for the
 badge and nothing keys on it (§9 invariant 9). Three ship with the package; a repo may redefine
-any of them or add its own (§5):
+any of them or add its own (§5) — landed 2026-09-13 (TD-040 step a): `agentorc.repoconfig` reads
+the file, the templates are `agentorc/briefs/<role>.md` with one `{lane}` placeholder, a repo's
+`roles.<name>` overrides per key over the built-in, and the record carries `role` and the repo's
+`ledger:` (so the derived-report tick reads the right file without `sessionorc` knowing the config):
 
 | Preset | Brief template says | Lane | Grants | Typically writes |
 |---|---|---|---|---|

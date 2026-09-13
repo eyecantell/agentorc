@@ -863,12 +863,16 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         assert [(p["ref"], p["status"], p["source"]) for p in s["progress"]] == [("TD-077", "done", "declared")]
         # every entry of a multi-entry derivation is applied and saved: these upserts are the write,
         # so an `any()` over a generator would have stopped at the first one (review 2026-09-11)
+        ledgers: list[str] = []  # the record's `ledger` (§5) reaches the derivation; unset → the default
         monkeypatch.setattr(
             reports,
             "derive",
-            lambda directory, branch, pending=None: (
-                [ProgressEntry(ref="TD-080", source="derived"), ProgressEntry(ref="TD-081", source="derived")],
-                [FindingEntry(ref="TD-082", source="derived"), FindingEntry(ref="TD-083", source="derived")],
+            lambda directory, branch, pending=None, ledger=None: (
+                (ledgers.append(ledger) or [])
+                or (
+                    [ProgressEntry(ref="TD-080", source="derived"), ProgressEntry(ref="TD-081", source="derived")],
+                    [FindingEntry(ref="TD-082", source="derived"), FindingEntry(ref="TD-083", source="derived")],
+                )
             ),
         )
         agent._derived_at.clear()
@@ -877,9 +881,21 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
         assert [p["ref"] for p in on_disk["progress"]] == ["TD-077", "TD-080", "TD-081"]
         assert [f["ref"] for f in on_disk["findings"]] == ["TD-082", "TD-083"]
+        assert ledgers == [reports.LEDGER_DEFAULT]
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
         assert sid not in agent._derived_at  # no key outlives the record
+        # a record created with the repo's `ledger:` (read by the client from `.agentorc.yml`) hands
+        # that path to the derivation — the agent itself never reads the file
+        other = (await person.call("create", name="l", dir=str(repo), adapter="shell", argv=["bash", "--norc"],
+                                   role="grinder", ledger="docs/debt.md"))  # fmt: skip
+        assert other["role"] == "grinder" and other["ledger"] == "docs/debt.md"
+        ledgers.clear()
+        await agent.tick()
+        await agent._derive_task
+        assert ledgers == ["docs/debt.md"]
+        await person.call("kill", id=other["id"])
+        await person.call("remove", id=other["id"])
 
 
 async def test_the_model_in_use_comes_from_the_hook_and_from_the_tick(agent, tmp_path, monkeypatch):

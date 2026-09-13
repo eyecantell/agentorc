@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from importlib import resources
 from typing import Any
 
+from agentorc import repoconfig
 from sessionorc import naming
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
@@ -43,14 +44,15 @@ def call_sync(method: str, **params: Any) -> Any:
     return _call_sync(method, caller=os.environ.get("AGENTORC_SESSION") or None, **params)
 
 
-def resolve(ident: str) -> str:
+def resolve(ident: str, here: pathlib.Path | None = None) -> str:
     """Design §4.1 (TD-030 step 5): every subcommand that takes an id also takes a bare **name**,
     resolved to the one session of that name here — this directory, or the repo it belongs to.
     A full `ao-…` id always means itself, so nothing that worked before changes. A live session
-    wins over an exited one of the same name; anything else is an error, never a guess."""
+    wins over an exited one of the same name; anything else is an error, never a guess. `here`
+    is the directory the name is read from (default: the cwd; `ao new -d` names another)."""
     if ident.startswith(naming.PREFIX):
         return ident
-    here = pathlib.Path.cwd().resolve()
+    here = (here or pathlib.Path.cwd()).resolve()
     named = [s for s in call_sync("list") if s.get("name") == ident and _is_here(s, here)]
     live = [s for s in named if s["state"] not in ("exited", "closed")] or named
     if len(live) == 1:
@@ -147,21 +149,60 @@ def cmd_focus(args: argparse.Namespace) -> int:
     return _attach(args, args.id, s)
 
 
+def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
+    """What the repo's `.agentorc.yml` and the `--role` preset fill in for `ao new` (design §4.8,
+    §5): the brief from the role's template with `{lane}` filled, its lane, its grants (plus any
+    `--grant`), its profile unless `--profile` says otherwise, and — when `--controller` is not
+    given — the preset's `controllers:`, else the repo's, resolved from names to session ids here.
+    The flags always win; the role's name and the repo's `ledger:` ride along on the record."""
+    directory = pathlib.Path(args.dir or os.getcwd())
+    try:
+        if args.adapter == "shell":
+            # a shell asks for nothing (§4.5a): no preset, no membership or ledger from the repo's
+            # file — but the flags typed beside it (`--grant`, `--controller`) still mean themselves
+            cfg, role = repoconfig.RepoConfig(), repoconfig.Role(name="")
+        else:
+            cfg = repoconfig.discover(pathlib.Path(args.repo) if args.repo else directory)
+            role = repoconfig.resolve_role(cfg, args.role) if getattr(args, "role", None) else repoconfig.Role(name="")
+        lane = args.lane or list(role.lane)
+        prompt = args.prompt or role.brief_text(lane)
+    except (KeyError, ValueError) as e:
+        raise AgentError(str(e).strip('"')) from None
+    controllers = list(args.controller or [])
+    source = "--controller"
+    if not args.controller:
+        controllers, source = (role.controllers, f"role {role.name}") if role.controllers else (cfg.controllers, "repo")
+    ids = []
+    for c in controllers:
+        try:
+            ids.append(resolve(c, directory))
+        except AgentError as e:
+            if source == "--controller":
+                raise
+            raise AgentError(f"controllers: from {cfg.path or '.agentorc.yml'} ({source}): {c}: {e}") from None
+    return {
+        "profile": args.profile or role.profile or "",
+        "prompt": prompt,
+        "capabilities": list(dict.fromkeys([*role.grants, *(args.grant or [])])),
+        "controllers": ids,
+        "lane": lane,
+        "role": role.name,
+        "ledger": cfg.ledger if cfg.root else None,  # None for a shell: there is no repo file behind it
+    }
+
+
 def cmd_new(args: argparse.Namespace) -> int:
+    defaults = _launch_defaults(args)
     s = call_sync(
         "create",
         name=args.name,
         dir=args.dir or os.getcwd(),
         adapter=args.adapter,
-        profile=args.profile or "",
         repo=args.repo or (args.dir or os.getcwd() if args.worktree else None),
         worktree=args.worktree,
         unattended=args.unattended,
         resume=args.resume,
-        prompt=args.prompt,
-        capabilities=args.grant or [],
-        controllers=[resolve(c) for c in (args.controller or [])],
-        lane=args.lane,
+        **defaults,
     )
     if not s.get("controllers") and not args.json:
         # Design §4.8: an empty list is the explicit default, not an error — but an unattended
@@ -188,9 +229,36 @@ def cmd_shell(args: argparse.Namespace) -> int:
         None,
     )
     args.worktree = None
-    args.grant, args.lane, args.controller = [], [], []
+    args.grant, args.lane, args.controller, args.role = [], [], [], None
     args.name = args.name or ""  # the agent names it (`shell`, `shell-2`): one name, one session
     return cmd_new(args)
+
+
+def cmd_roles(args: argparse.Namespace) -> int:
+    """`ao roles` (design §4.7, §4.8): every preset that resolves in this repo — the package's
+    built-ins and what the repo's `.agentorc.yml` redefines or adds — with where each came from."""
+    try:
+        cfg = repoconfig.discover(pathlib.Path(args.dir or os.getcwd()))
+        found = repoconfig.roles(cfg)
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    result = {"file": str(cfg.path) if cfg.path else None, "controllers": cfg.controllers, "roles": []}
+    result["roles"] = [r.to_dict() for r in found]
+
+    def prose() -> None:
+        print(f"roles from {cfg.path}" if cfg.path else f"roles: built-in only (no {repoconfig.FILE} under {cfg.root})")
+        w = max(len(r.name) for r in found)
+        for r in found:
+            bits = [
+                f"lane: {', '.join(r.lane) or '-'}",
+                f"grants: {', '.join(r.grants) or 'none'}",
+                f"profile: {r.profile or 'default'}",
+                f"controllers: {', '.join(r.controllers or cfg.controllers) or 'nobody'}",
+                f"brief: {r.brief or '-'}",
+            ]
+            print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
+
+    return emit(args, result, prose)
 
 
 def cmd_kill(args: argparse.Namespace) -> int:
@@ -483,8 +551,16 @@ def build_parser() -> argparse.ArgumentParser:
         default=[],
         help="the references this session was handed, comma-separated (`TD-027,TD-019`) or `free-pick` (design §4.8)",
     )
+    p.add_argument(
+        "--role",
+        help="a preset (design §4.8): fills the brief, lane, grants, profile and controllers; `ao roles` lists them",
+    )
     p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_new)
+
+    p = add("roles", help="list the role presets this repo resolves: built-in and from .agentorc.yml (design §4.8)")
+    p.add_argument("-d", "--dir", help="the repo or directory to read (default: cwd)")
+    p.set_defaults(fn=cmd_roles)
 
     p = add("shell", help="start a plain shell session here")
     p.add_argument("name", nargs="?")

@@ -191,6 +191,14 @@ class Session:
     lane: list[str] = field(default_factory=list)
     progress: list[ProgressEntry] = field(default_factory=list)
     findings: list[FindingEntry] = field(default_factory=list)
+    # The preset the session was started under (design §4.8): a badge, and nothing keys on it
+    # (§9 invariant 9). Empty for a session started without one.
+    role: str = ""
+    # Where a `TD-NNN` reference resolves in this session's repo, relative to its checkout — the
+    # client reads it from the repo's `.agentorc.yml` (`ledger:`, design §5) at create and hands it
+    # over, so the derived-report tick (`sessionorc.reports`) reads the right file without this
+    # package knowing the config format. None: the ledger's default path.
+    ledger: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

@@ -19,8 +19,20 @@
       <div class="field"><label>Name</label><input class="input mono" name="name" placeholder="td-302" required>
         <span class="note" id="namecheck"></span></div>
       <div class="field"><label>Profile</label>
-        <select class="input" name="profile">{% for k, p in profiles.items() %}<option value="{{ k }}"{% if k == default_profile %} selected{% endif %}>{{ p.label }}</option>{% endfor %}</select>
+        {# an empty pick lets the role's `profile` apply (design §4.9 precedence), else the host's default #}
+        <select class="input" name="profile"><option value="" selected>the role's, else {{ default_profile }} (default)</option>{% for k, p in profiles.items() %}<option value="{{ k }}">{{ p.label }}</option>{% endfor %}</select>
         <span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span>
+      </div>
+      {# design §4.5a New session **Role** preset + **Lane** field (§4.8): a preset fills the brief
+         from its template, the lane's default, its grants and its profile; the list is the built-ins
+         plus what the directory's repo defines, refreshed from /api/roles as the directory changes. #}
+      <div class="field"><label>Role</label>
+        <select class="input" name="role" id="role">{% for r in roles %}<option value="{{ r.name }}"{% if r.name == 'plain' %} selected{% endif %} data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}">{{ r.name }} [{{ r.source }}]{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}</option>{% endfor %}</select>
+        <span class="note" id="rolenote">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span>
+      </div>
+      <div class="field"><label>Lane</label>
+        <input class="input mono" name="lane" placeholder="TD-027, TD-019 · or free-pick">
+        <span class="note">the references this session is handed, in order; empty: the role's default</span>
       </div>
       <div class="field"><label>Resume (optional)</label><input class="input mono" name="resume" value="{{ prefill.resume }}" placeholder="the tool's session id"></div>
     </div>
@@ -37,14 +49,14 @@
        this one once it starts. The candidates are the sessions holding `orchestrate` — nothing
        else could act on it anyway — and none is selected by default: an empty list means nobody
        may act on it, which is the explicit default, so the note states it rather than warning. #}
-    <div class="field">
+    <div class="field" id="controllers" data-default="{{ default_controllers|join(',') }}">
       <label>Controllers</label>
       {% if orchestrators %}
         <div class="row gap wrap">
-          {% for o in orchestrators %}<label class="radio"><input type="checkbox" name="controller" value="{{ o.id }}">
+          {% for o in orchestrators %}<label class="radio"><input type="checkbox" name="controller" value="{{ o.id }}" data-name="{{ o.name }}"{% if o.name in default_controllers or o.id in default_controllers %} checked{% endif %}>
             <div><div>{{ o.name }}</div><div class="note mono">{{ o.id }}</div></div></label>{% endfor %}
         </div>
-        <div class="note">The sessions that may act on this one (send, wrap up, kill, close). None selected: nobody may — you can add one later from the session's Focus or with <code>ao control</code>.</div>
+        <div class="note">The sessions that may act on this one (send, wrap up, kill, close). None selected: nobody may — you can add one later from the session's Focus or with <code>ao control</code>. Ticked in advance: the repo's or the role's <code>controllers:</code> from <code>.agentorc.yml</code>.</div>
       {% else %}
         <div class="note">No session holds the <code>orchestrate</code> grant yet, so nothing could act on this one. Grant it from a session's Focus header, then add it here or with <code>ao control</code>.</div>
       {% endif %}

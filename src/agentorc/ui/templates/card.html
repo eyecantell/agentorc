@@ -9,6 +9,7 @@
       <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>
       {% if s.external %}<span class="badge" title="known from the tool's live registry: no terminal, no controls">registry</span>{% else %}<button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
               title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>{% endif %}
+      {% if s.role %}<span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ s.role }}</span>{% endif %}
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ 'guessed from the screen' if s.scraped else 'reported by the tool' }}"><span class="dot"></span>{{ s.state_label }}</span>

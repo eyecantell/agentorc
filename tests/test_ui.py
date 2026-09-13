@@ -45,6 +45,18 @@ def test_pages_and_shell_flow(client, tmp_path):
     assert 'id="usagechip"' in r.text  # the per-profile usage figure (TD-001), empty until a poll lands
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
+    # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
+    assert 'name="role"' in r.text and "orchestrator [built-in] · grants orchestrate" in r.text
+    (tmp_path / ".agentorc.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
+    r = client.get(f"/new?dir={tmp_path}")
+    assert "reviewer [repo]" in r.text and 'data-default="orc"' in r.text
+    roles = client.get(f"/api/roles?dir={tmp_path}").json()
+    assert roles["controllers"] == ["orc"] and [x["name"] for x in roles["roles"]][-1] == "reviewer"
+    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
+    assert "unknown grant 'fly'" in client.get(f"/api/roles?dir={tmp_path}").json()["error"]
+    r = client.post("/new", data={"name": "x", "dir": str(tmp_path), "role": "grinder"}, follow_redirects=False)
+    assert r.status_code == 400 and "unknown grant" in r.text  # a malformed file: Start says so, nothing starts
+    (tmp_path / ".agentorc.yml").unlink()
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "sh1"}, follow_redirects=False)
     assert r.status_code == 303 and r.headers["location"].startswith("/focus/ao-")
     sid = r.headers["location"].rsplit("/", 1)[-1]
