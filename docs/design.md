@@ -854,9 +854,10 @@ orchestrator controls.** The prior-art survey behind the rules below is
 - **Orc-of-orcs is not a special case.** It is a session holding `orchestrate` whose members
   happen to be orchestrators; nothing in the core treats it differently. What it adds is restart,
   and restart needs two rules the design did not have. A restart is **`one_for_one`** — only the
-  session that exited, never its siblings — and it is **bounded: N restarts per period, then stop
-  and escalate to the attention board**, a ceiling OTP, systemd and Circus each arrived at
-  separately. An orchestrator that exits does **not** take its workers down with it, and its
+  session that exited, never its siblings — and it is **bounded: at most 3 restarts of one session
+  in 2 hours, then stop and escalate to the attention board**, a ceiling OTP, systemd and Circus
+  each arrived at separately. The numbers are a starting point written into the briefs
+  (`docs/briefs/`), not a policy yet: §6 takes them when the rule proves mechanical. An orchestrator that exits does **not** take its workers down with it, and its
   entries in their lists do not silently vanish either: the workers keep running and are surfaced
   as controlled by a session that is gone, for a person or the orc-of-orcs to re-attach with
   `ao control`. Adoption is an explicit edit, never automatic reparenting — automatic adoption is
@@ -1232,6 +1233,23 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       frameworks, and agentorg.ai is live (checked 2026-09-13, table in the
       [ADR](decisions/2026-09-13-org-teams-projects.md)). Keep `agentorc` as repo and package
       until there is a product to name; decide before the relay transport ships (§4.5c).
+- [ ] **A session that is meant to run inside a devcontainer** (raised 2026-09-13, from the
+      `guardians` constellation). agentorc launches a session as the adapter's argv in a tmux
+      session **on the host** (§9 invariants 1 and 8). Paul's `guardians` work — five repos under
+      `GuardiansoftheHeart/guardians-devenv`, Claude Code, a dev-cadence consumer — is worked in a
+      VS Code devcontainer mounted at `/workspaces/guardians`, and is not on kmaster yet (only its
+      D1 backups are). A session inside that container is in another mount namespace and process
+      tree: the host agent cannot create a tmux session there, the paths do not line up
+      (`/workspaces/guardians` inside, `~/dev/guardians` outside), and a hook inside the container
+      has to reach the agent's socket outside it — which is the state feed (§4.2), not a detail.
+      Three shapes: (a) run the session on the host against the same checkout and leave the
+      container to the person, which costs whatever the container provides; (b) run a host agent
+      *inside* the container and treat it as another host, which is phase 2's transport (§4.5b)
+      aimed at a container rather than a machine, and is the only one that needs no new concept;
+      (c) teach the adapter a container-exec launch, which puts container knowledge in the adapter
+      and breaks invariant 8's "never through the person's shell" the moment `docker exec` picks up
+      an rc file. Not urgent — nothing is cloned here — but it decides whether the guardians
+      orchestrator is one of ours or a second host. Brief: `docs/briefs/guardians-orchestrator.md`.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 - [x] **Rename the Herd page?** (2026-09-13) → **yes, to Team.** Decided by Paul: "Herd" reads

@@ -20,5 +20,18 @@ in the brief before relaunching. The samscrape workers still run under samscrape
 pdm run ao new -d ~/agentorc -w orchestrator-ao-1 --unattended -p grind --grant orchestrate --prompt "$(cat docs/briefs/orchestrator-ao-1.md)" orchestrator-ao-1
 ```
 
+**Membership (design §4.8, TD-036).** The grant lets an orchestrator act on other sessions; it
+does not say which. Each worker's record carries the `controllers` that may act on *it*, and an
+empty list means nobody may. So a worker started before its orchestrator needs attaching by hand,
+in the same step as the grant — `ao control orchestrator-ao-1 add <worker>…` — or the orchestrator
+starts with the grant and no reach, which looks exactly like a broken orchestrator. Workers an
+orchestrator starts itself list it from birth and need nothing. `ao status -v` shows both
+directions; the launch order that avoids the problem is orchestrator first, then its workers.
+
 The samscrape workers now launch from agentorc too (`ao new -d ~/samscrape …` from their
 `~/.tdgrind/tdgrind-N-prompt.md` briefs, since 2026-09-10); `scripts/tdgrind.sh` is paused.
+
+Two briefs are written but **not launchable yet**, so that their rules are decided before the day
+they are needed: `guardians-orchestrator.md` (blocked — the repos are not on this host, and the
+devcontainer question in design §10 is open) and `orc-of-orcs.md` (needs two orchestrators before
+it is worth running). Both carry the restart ceiling and `one_for_one` scope from TD-036.
