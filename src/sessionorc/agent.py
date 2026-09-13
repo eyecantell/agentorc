@@ -560,6 +560,8 @@ class HostAgent:
         capabilities: list[str] | None = None,
         lane: list[str] | None = None,
         controllers: list[str] | None = None,
+        team: str = "",
+        project: str = "",
         caller: str | None = None,
     ) -> dict[str, Any]:
         directory = Path(dir).expanduser().resolve()
@@ -657,6 +659,8 @@ class HostAgent:
                 capabilities=grants,
                 controllers=members,
                 lane=references,
+                team=str(team or ""),  # badges (§4.9): stored as given, never validated here
+                project=str(project or ""),
                 previous_run=previous_run,
             )
             self.sessions[sid] = s
