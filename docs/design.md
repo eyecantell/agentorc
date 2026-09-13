@@ -734,7 +734,8 @@ are ungated; `ao status -v` prints the same report line the card will, and `--js
 2026-09-13 with TD-040 step a, `agentorc.repoconfig`): the preset fills the brief from its template
 with `{lane}` filled, the lane's default, its grants, its `profile` unless `-p` is given, and its
 `controllers:` — else the repo's — when `--controller` is not, resolved from names to ids in the
-session's directory (an unknown name is an error naming it, and the file); `--lane free-pick` for
+session's directory (a configured name that is not running is skipped with one line naming it
+and the file, never an error; an explicit `--controller` that does not resolve is); `--lane free-pick` for
 scan-and-choose; `ao roles` lists what the repo and the package define, marking each role's
 source; `--grant orchestrate` adds a grant a preset lacks, and works without a preset. `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
 running session's grants (the `set_grants` RPC; `ao status -v` and `--json` show
@@ -880,7 +881,10 @@ orchestrator controls.** The prior-art survey behind the rules below is
   first byte. `ao new` prints one line when a session starts with no controller at all — not an
   error, just the fact, because an unattended worker nobody may act on is rarely what was meant
   (landed 2026-09-13, TD-036 step 4: the preset's list wins over the repo's, `--controller` over
-  both, names resolve in the session's directory and an unknown one refuses the start; the New
+  both, names resolve in the session's directory; a configured name that is not running is
+  **dropped with one stderr line, never an error** — a stale default must not block every start
+  in the repo — and when none remain the no-controller line prints as usual, while an explicit
+  `--controller` naming an unknown session still errors, since the person typed it; the New
   session picker is ticked from the same rule).
 - **Surface.** `ao new --controller <id>…`; `ao control <orc> add|remove <session>…`;
   `ao status -v` shows both directions (a session's controllers, an orchestrator's members); the

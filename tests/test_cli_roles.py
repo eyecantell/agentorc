@@ -87,13 +87,29 @@ def test_controllers_default_from_the_role_then_the_repo_and_names_resolve(repo,
     assert created(calls)["controllers"] == [] and created(calls)["role"] == ""  # a shell asks for nothing
 
 
-def test_an_unknown_controller_name_or_role_is_an_error_naming_it(repo, capsys):
+def test_a_configured_controller_that_is_not_running_is_skipped_not_refused(repo, capsys):
+    """Design §4.8: a stale `controllers:` default must not block every start in the repo — each
+    name that does not resolve is dropped with one line, and the no-controller line prints when
+    none remain. An explicit `--controller` naming an unknown session is still an error."""
     root, calls = repo
-    (root / ".agentorc.yml").write_text("controllers: [ghost-orc]\n")
-    assert cli.main(["new", "g1"]) == 1
-    err = capsys.readouterr().err
-    assert "controllers: from" in err and ".agentorc.yml (repo): ghost-orc: no session named ghost-orc" in err
+    (root / ".agentorc.yml").write_text("controllers: [ghost-orc, orc]\nroles: {hunter: {controllers: [gone]}}\n")
+    assert cli.main(["new", "g1"]) == 0
+    out, err = capsys.readouterr()
+    assert err.strip() == "controllers: `ghost-orc` from .agentorc.yml (repo) is not running — skipped"
+    assert created(calls)["controllers"] == [ORC] and "starts with no controller" not in out
+    calls.clear()
+    assert cli.main(["new", "h1", "--role", "hunter"]) == 0
+    out, err = capsys.readouterr()
+    assert err.strip() == "controllers: `gone` from .agentorc.yml (role hunter) is not running — skipped"
+    assert created(calls)["controllers"] == [] and "starts with no controller: nobody may act on it" in out
+    calls.clear()
+    assert cli.main(["new", "x", "--controller", "ghost-orc"]) == 1
+    assert "no session named ghost-orc" in capsys.readouterr().err
     assert not [m for m, _ in calls if m == "create"]
+
+
+def test_an_unknown_role_or_grant_is_an_error_naming_it(repo, capsys):
+    root, calls = repo
     assert cli.main(["--json", "new", "g1", "--role", "sage"]) == 1
     assert json.loads(capsys.readouterr().out)["error"].startswith("unknown role 'sage'; known: grinder")
     (root / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")

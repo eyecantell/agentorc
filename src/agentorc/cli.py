@@ -176,10 +176,14 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     for c in controllers:
         try:
             ids.append(resolve(c, directory))
-        except AgentError as e:
+        except AgentError:
             if source == "--controller":
-                raise
-            raise AgentError(f"controllers: from {cfg.path or '.agentorc.yml'} ({source}): {c}: {e}") from None
+                raise  # the person typed it: an unknown session is theirs to hear about
+            # A configured default naming a session that is not running is dropped, not an error
+            # (design §4.8): a stale `controllers:` must not block every start in the repo. One line
+            # per name; with none left, the no-controller line below says so as it always has.
+            where = (cfg.path or pathlib.Path(repoconfig.FILE)).name
+            print(f"controllers: `{c}` from {where} ({source}) is not running — skipped", file=sys.stderr)
     return {
         "profile": args.profile or role.profile or "",
         "prompt": prompt,
