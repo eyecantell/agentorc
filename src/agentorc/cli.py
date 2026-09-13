@@ -104,6 +104,10 @@ def cmd_status(args: argparse.Namespace) -> int:
         if args.verbose:
             if s.get("capabilities"):
                 print(f"{'':<{w}}      grants: {', '.join(s['capabilities'])}")
+            if s.get("team"):
+                print(f"{'':<{w}}      team:   {s['team']}")
+            if s.get("project"):
+                print(f"{'':<{w}}      project: {s['project']}")
             # Both directions of membership (design §4.8): what may act on this session, and — for
             # an orchestrator — what it may act on. The second is derived from the records here,
             # never stored, which is the same rule the Focus member list follows.
@@ -212,6 +216,8 @@ def cmd_new(args: argparse.Namespace) -> int:
         unattended=args.unattended,
         resume=args.resume,
         **defaults,
+        team=getattr(args, "team", None) or "",  # badges (design §4.9): plain strings, unvalidated
+        project=getattr(args, "project", None) or "",
     )
     if not s.get("controllers") and not args.json:
         # Design §4.8: an empty list is the explicit default, not an error — but an unattended
@@ -564,6 +570,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--role",
         help="a preset (design §4.8): fills the brief, lane, grants, profile and controllers; `ao roles` lists them",
     )
+    p.add_argument("--team", help="the team this session is started under (design §4.9): a badge, nothing keys on it")
+    p.add_argument("--project", help="the project it is started under (design §4.9): a badge, like --team")
     p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_new)
 

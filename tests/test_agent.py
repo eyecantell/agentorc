@@ -1026,6 +1026,36 @@ async def test_a_failed_launch_leaves_the_superseded_record_standing(agent, tmp_
         assert still["state"] == "exited" and still["run_log"] == old["run_log"]
 
 
+async def test_team_and_project_are_plain_badges_on_the_record(agent, tmp_path):
+    """TD-040 step (b), design §4.9: `create` stores `team` and `project` as two plain strings —
+    no validation, no file read (the agent never opens `org.yml`) — and they come back on `get`
+    and survive the store (§9 invariant 9: badges, nothing keys on them)."""
+    async with LocalClient() as c:
+        s = await c.call(
+            "create",
+            name="g",
+            dir=str(tmp_path),
+            adapter="shell",
+            argv=["bash", "--norc"],
+            team="ao-grind",
+            project="agentorc",
+        )
+        assert (s["team"], s["project"]) == ("ao-grind", "agentorc")
+        got = await c.call("get", id=s["id"])
+        assert (got["team"], got["project"]) == ("ao-grind", "agentorc")
+        saved = agent.store.load(s["id"])
+        assert (saved.team, saved.project) == ("ao-grind", "agentorc")
+        # a team nobody defined is stored all the same: the clients validate, the agent stores
+        plain = await c.call("create", name="p", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        assert (plain["team"], plain["project"]) == ("", "")
+        odd = await c.call(
+            "create", name="o", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="no-such-team"
+        )
+        assert (odd["team"], odd["project"]) == ("no-such-team", "")
+        for sid in (s["id"], plain["id"], odd["id"]):
+            await c.call("kill", id=sid)
+
+
 async def test_an_unnamed_session_is_named_by_the_agent(agent, tmp_path):
     """TD-030 step 3: `ao shell` sends no name, so the agent picks `shell`, `shell-2`, … — a name
     the caller chose would collide with §4.1's rule the moment a second shell started here."""

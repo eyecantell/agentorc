@@ -161,7 +161,8 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   (§4.8's membership list: which sessions may act on this one — landed 2026-09-13, TD-036 step 1),
   `lane`, `progress` and
   `findings` (§4.8's report channels: what the session was handed and what it says it did),
-  `role` (the preset it was started from, a badge and nothing more), and `unattended` with its
+  `role` (the preset it was started from, a badge and nothing more), `team` and `project`
+  (badges, §4.9 — landed 2026-09-13), and `unattended` with its
   schedule (§6). Grants, report channels, mode and schedule are independent fields: a grant
   says a session may act on others at all and `controllers` on the target says on which (§4.8),
   the channels say what it did, `unattended` says whether

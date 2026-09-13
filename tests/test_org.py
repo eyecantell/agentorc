@@ -1,0 +1,245 @@
+"""`agentorc.org` — the `org.yml` reader (design §4.9, TD-040 step b): the defaults, the
+validation, a repo's own `teams:` folded in, and the per-host checkout lookup."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+import yaml
+
+from agentorc import org
+
+ORG = {
+    "projects": {
+        "agentorc": {"repos": {"agentorc": {"kmaster": "~/agentorc"}}},
+        "guardians": {
+            "repos": {
+                "guardians": {"devenv": "/workspaces/guardians"},
+                "guardians-api": {"devenv": "/workspaces/guardians/api"},
+            }
+        },
+    },
+    "teams": {
+        "ao-grind": {
+            "projects": ["agentorc"],
+            "lead": {"role": "orchestrator", "name": "orchestrator-ao-1"},
+            "members": [
+                {"role": "grinder", "count": 2, "name": "tdgrind-ao", "lane": "free-pick"},
+                {"role": "hunter", "name": "hunter-ao", "lane": "ui"},
+            ],
+        },
+        "guardians": {
+            "projects": ["guardians"],
+            "lead": {"home": "guardians", "profile": "orc"},
+            "members": [
+                {"role": "grinder", "home": "guardians-api", "brief": "docs/briefs/api-grinder.md"},
+                {"team": "guardians-ui"},
+            ],
+        },
+        "guardians-ui": {
+            "projects": ["guardians"],
+            "lead": {"role": "person"},
+            "members": [{"role": "grinder", "home": "guardians", "unattended": False, "grants": ["orchestrate"]}],
+        },
+    },
+    "roles": {"grinder": {"profile": "grind"}},
+}
+
+
+def write(tmp_path: Path, doc: object) -> Path:
+    p = tmp_path / "org.yml"
+    p.write_text(yaml.safe_dump(doc) if not isinstance(doc, str) else doc)
+    return p
+
+
+def test_missing_file_is_an_empty_org(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    o = org.load()
+    assert o.projects == {} and o.teams == {} and o.roles == {}
+    assert o.path == tmp_path / "org.yml"
+    assert o.checkout("agentorc", "agentorc", "kmaster") is None
+
+
+def test_projects_and_checkout_expand_home(tmp_path):
+    o = org.load(write(tmp_path, ORG))
+    assert o.checkout("agentorc", "agentorc", "kmaster") == Path("~/agentorc").expanduser()
+    assert o.checkout("guardians", "guardians-api", "devenv") == Path("/workspaces/guardians/api")
+    assert o.checkout("guardians", "guardians-api", "kmaster") is None  # not on this host: phase 2
+    assert o.checkout("guardians", "nope", "devenv") is None and o.checkout("nope", "x", "devenv") is None
+    assert o.roles == {"grinder": {"profile": "grind"}}
+    assert o.path == tmp_path / "org.yml"
+
+
+def test_every_default_of_section_4_9(tmp_path):
+    o = org.load(write(tmp_path, ORG))
+    grind = o.teams["ao-grind"]
+    assert grind.source == tmp_path / "org.yml" and grind.projects == ["agentorc"]
+    assert grind.lead == org.LeadDef(role="orchestrator", name="orchestrator-ao-1", home="agentorc", profile=None)
+    two, one = grind.members
+    # count 1, name = the role, unattended true, grants/brief/profile = the role's, home = the only repo
+    assert one == org.MemberDef(role="hunter", name="hunter-ao", home="agentorc", lane=["ui"])
+    assert one.count == 1 and one.unattended is True and one.grants is None and one.brief is None
+    assert two.count == 2 and two.lane == ["free-pick"] and two.names() == ["tdgrind-ao-1", "tdgrind-ao-2"]
+    assert one.names() == ["hunter-ao"]
+    # lead defaults: role orchestrator, name <team>-lead
+    g = o.teams["guardians"]
+    assert g.lead.role == "orchestrator" and g.lead.name == "guardians-lead" and g.lead.profile == "orc"
+    assert g.members[0].home == "guardians-api" and g.members[0].brief == "docs/briefs/api-grinder.md"
+    assert g.members[1] == org.MemberDef(team="guardians-ui")
+    ui = o.teams["guardians-ui"]
+    assert ui.lead.role == "person" and ui.lead.home == ""  # no lead session, so no home to require
+    assert ui.members[0].unattended is False and ui.members[0].grants == ["orchestrate"]
+    assert o.team_repos(g) == ["guardians", "guardians-api"]
+
+
+def test_member_name_defaults_to_the_role_and_lane_forms(tmp_path):
+    doc = {
+        "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+        "teams": {
+            "t": {
+                "projects": "p",
+                "members": [{"role": "grinder", "lane": "TD-027, TD-019"}, {"role": "x", "lane": ["a"]}],
+            }
+        },
+    }
+    t = org.load(write(tmp_path, doc)).teams["t"]
+    assert t.projects == ["p"] and t.lead.name == "t-lead" and t.lead.home == "r"
+    assert [m.name for m in t.members] == ["grinder", "x"]
+    assert t.members[0].lane == ["TD-027", "TD-019"] and t.members[1].lane == ["a"]
+
+
+@pytest.mark.parametrize(
+    ("doc", "message"),
+    [
+        ("- a list", "the top level must be a mapping"),
+        ({"projects": [1]}, "projects must be a mapping"),
+        ({"projects": {"p": {"repos": "x"}}}, "projects.p.repos must be a mapping"),
+        ({"projects": {"p": {"repos": {"r": "x"}}}}, "projects.p.repos.r must be a mapping"),
+        ({"teams": {"t": [1]}}, "teams.t must be a mapping"),
+        ({"teams": {"t": {"projects": ["p"]}}}, "teams.t.projects: 'p' is not a defined project"),
+        ({"projects": {"p": {"repos": {"r": {"h": "/r"}}}}, "teams": {"t": {}}}, "teams.t.projects: a team is on one"),
+        ({"projects": {"p": {}}, "teams": {"t": {"projects": ["p"]}}}, "teams.t: its projects ['p'] list no repos"),
+        (
+            {"projects": {"p": {"repos": {"r": {"h": "/r"}}}}, "teams": {"t": {"projects": ["p"], "members": {}}}},
+            "teams.t.members must be a list",
+        ),
+        (
+            {"projects": {"p": {"repos": {"r": {"h": "/r"}}}}, "teams": {"t": {"projects": ["p"], "members": [{}]}}},
+            "teams.t.members[0].role is required",
+        ),
+        (
+            {
+                "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+                "teams": {"t": {"projects": ["p"], "members": [{"role": "g", "count": 0}]}},
+            },
+            "teams.t.members[0].count must be a positive integer",
+        ),
+        (
+            {
+                "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+                "teams": {"t": {"projects": ["p"], "members": [{"role": "g", "unattended": "no"}]}},
+            },
+            "teams.t.members[0].unattended must be true or false",
+        ),
+        (
+            {
+                "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+                "teams": {"t": {"projects": ["p"], "members": [{"team": "x", "role": "g"}]}},
+            },
+            "teams.t.members[0]: a nested team member is `{team: <name>}` alone",
+        ),
+        (
+            {
+                "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+                "teams": {"t": {"projects": ["p"], "members": [{"team": "x"}]}},
+            },
+            "teams.t.members[0].team: 'x' is not a defined team",
+        ),
+        (
+            {
+                "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+                "teams": {"t": {"projects": ["p"], "members": [{"team": "t"}]}},
+            },
+            "teams.t nests itself",
+        ),
+        (
+            {
+                "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+                "teams": {"t": {"projects": ["p"], "lead": {"home": "z"}}},
+            },
+            "teams.t.lead.home: 'z' is not a repo of the team's projects",
+        ),
+        (
+            {
+                "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+                "teams": {"t": {"projects": ["p"], "members": [{"role": "g", "home": "z"}]}},
+            },
+            "teams.t.members[0].home: 'z' is not a repo",
+        ),
+        ({"roles": {"g": [1]}}, "roles.g must be a mapping"),
+    ],
+)
+def test_malformed_files_name_the_key(tmp_path, doc, message):
+    with pytest.raises(ValueError, match="org.yml: " + __import__("re").escape(message)):
+        org.load(write(tmp_path, doc))
+
+
+def test_home_is_required_above_one_repo(tmp_path):
+    doc = dict(ORG, teams={"g": {"projects": ["guardians"], "members": [{"role": "grinder"}]}})
+    with pytest.raises(ValueError, match=r"teams\.g\.lead\.home is required when .*\['guardians', 'guardians-api'\]"):
+        org.load(write(tmp_path, doc))
+    doc["teams"]["g"]["lead"] = {"home": "guardians"}
+    with pytest.raises(ValueError, match=r"teams\.g\.members\[0\]\.home is required"):
+        org.load(write(tmp_path, doc))
+    doc["teams"]["g"]["members"][0]["home"] = "guardians-api"
+    assert org.load(write(tmp_path, doc)).teams["g"].members[0].home == "guardians-api"
+
+
+def test_an_indirect_cycle_is_refused(tmp_path):
+    doc = {
+        "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
+        "teams": {
+            "a": {"projects": ["p"], "members": [{"team": "b"}]},
+            "b": {"projects": ["p"], "members": [{"team": "a"}]},
+        },
+    }
+    with pytest.raises(ValueError, match="nests itself"):
+        org.load(write(tmp_path, doc))
+
+
+def test_merge_repo_teams(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))  # no hosts.yml: the short hostname
+    repo = tmp_path / "myrepo"
+    repo.mkdir()
+    base = org.load(write(tmp_path, ORG))
+    repo_teams = {
+        "grind": {"lead": {"name": "orc"}, "members": [{"role": "grinder", "count": 2, "name": "tdgrind"}]},
+        "ao-grind": {"members": [{"role": "impostor"}]},  # collides with the org file: the org wins
+    }
+    merged = org.merge_repo_teams(base, repo, repo_teams)
+    assert "grind" not in base.teams and "myrepo" not in base.projects  # the input is untouched
+    from sessionorc.hosts import local_host
+
+    assert merged.projects["myrepo"].repos == {"myrepo": {local_host().name: repo.resolve()}}
+    assert merged.checkout("myrepo", "myrepo", local_host().name) == repo.resolve()
+    g = merged.teams["grind"]
+    assert g.projects == ["myrepo"] and g.source == repo / ".agentorc.yml"
+    assert g.lead == org.LeadDef(role="orchestrator", name="orc", home="myrepo")
+    assert g.members[0].names() == ["tdgrind-1", "tdgrind-2"] and g.members[0].home == "myrepo"
+    assert merged.teams["ao-grind"] is base.teams["ao-grind"]  # org wins, source still org.yml
+    assert merged.teams["ao-grind"].source == tmp_path / "org.yml"
+    assert merged.roles == base.roles
+    # nothing to merge leaves the org as it was, and the repo is not made a project for nothing
+    assert org.merge_repo_teams(base, repo, None).projects.keys() == base.projects.keys()
+    # a repo team can nest an org team, and its errors name the repo's file
+    merged = org.merge_repo_teams(base, repo, {"outer": {"members": [{"team": "ao-grind"}]}})
+    assert merged.teams["outer"].members[0].team == "ao-grind"
+    with pytest.raises(
+        ValueError, match=r"\.agentorc\.yml: teams\.bad\.members\[0\]\.team: 'nope' is not a defined team"
+    ):
+        org.merge_repo_teams(base, repo, {"bad": {"members": [{"team": "nope"}]}})
+    # an org project of the repo's name is used as it stands
+    doc = dict(ORG, projects={**ORG["projects"], "myrepo": {"repos": {"myrepo": {"elsewhere": "/x"}}}})
+    merged = org.merge_repo_teams(org.load(write(tmp_path, doc)), repo, repo_teams)
+    assert merged.projects["myrepo"].repos == {"myrepo": {"elsewhere": Path("/x")}}

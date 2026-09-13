@@ -567,6 +567,8 @@ class HostAgent:
         controllers: list[str] | None = None,
         role: str = "",
         ledger: str | None = None,
+        team: str = "",
+        project: str = "",
         caller: str | None = None,
     ) -> dict[str, Any]:
         directory = Path(dir).expanduser().resolve()
@@ -666,6 +668,8 @@ class HostAgent:
                 lane=references,
                 role=str(role or ""),
                 ledger=(str(ledger).strip() or None) if ledger else None,
+                team=str(team or ""),  # badges (§4.9): stored as given, never validated here
+                project=str(project or ""),
                 previous_run=previous_run,
             )
             self.sessions[sid] = s
