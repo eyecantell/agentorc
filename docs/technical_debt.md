@@ -272,7 +272,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-13
-**Status:** Done 2026-09-13, PR #PRNUM — found by the independent review of TD-036 step 6, while fact-checking a migration doc that told a person the invariant was enforced
+**Status:** Done 2026-09-13, PR #114 — found by the independent review of TD-036 step 6, while fact-checking a migration doc that told a person the invariant was enforced
 **Location:** `src/sessionorc/agent.py` (`_gate`, `rpc_set_controllers`), `src/agentorc/ui/app.py` (the controllers action), design §4.8 and §9 invariant 5
 
 **Why:** §4.8 said "§9 invariant 5 still binds a granted session: interactive sessions are out of reach whoever the caller is". The code does not do that. `_gate` checks the `orchestrate` grant and membership and never looks at the target's `kind`; `rpc_set_controllers` will add an interactive session to a `controllers` list without complaint, and a `send`, `kill` or `close` from that controller then lands. Invariant 5 as written constrains *policies* (§6) — "never paused, killed, or nudged by a policy" — and the policy engine does not exist yet, so the sentence was true of a thing that is not built while reading as a guarantee about the thing that is. What kept it safe so far is that no interactive session has ever been in a `controllers` list, and the orchestrator briefs say not to; that is a convention, and the migration doc nearly shipped telling a person it was a boundary. The person's own anchor session is the obvious casualty: it sits in the main checkout of every repo, and an orchestrator that acquired it would be nudging the human's own session.
