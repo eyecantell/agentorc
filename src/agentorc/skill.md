@@ -53,7 +53,7 @@ Mutating — each one is a decision, so check the state first:
 - `ao progress claim <ref>` / `ao progress done <ref> --pr N` / `ao progress drop <ref> --why "…"`
   and `ao finding <ref> [--priority low]` — the report channels (design §4.8). **Declare a claim
   before your first edit, and declare the result before you move on to the next reference**: the
-  Herd reads these, and what nobody declares the agent has to guess from branches and PRs. A
+  Team reads these, and what nobody declares the agent has to guess from branches and PRs. A
   reference is a ledger id (`TD-027`), a PR number, or an attention-board line — never prose.
   They are ungated and land on your own record (`--id` for another session's), and what you
   declare is never overwritten by what the agent derives (§9 invariant 10).

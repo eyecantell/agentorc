@@ -41,7 +41,7 @@ def wait_state(client, sid, state, timeout=6.0):
 
 def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/")
-    assert r.status_code == 200 and "Herd" in r.text and "No sessions" in r.text
+    assert r.status_code == 200 and "Team" in r.text and "No sessions" in r.text
     assert 'id="usagechip"' in r.text  # the per-profile usage figure (TD-001), empty until a poll lands
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
@@ -223,8 +223,8 @@ def test_term_unknown_session(client):
         assert b"no session" in ws.receive_bytes()
 
 
-def test_herd_renders_with_agent_down(tmp_path, monkeypatch):
-    """No bare 503: the Herd shows the down banner and Retry when the agent socket is absent."""
+def test_team_renders_with_agent_down(tmp_path, monkeypatch):
+    """No bare 503: the Team shows the down banner and Retry when the agent socket is absent."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "nohome"))
     from agentorc.ui.app import create_app
 
@@ -354,7 +354,7 @@ def test_the_name_check_endpoint_answers_before_start(client, tmp_path):
 
 
 def test_the_shell_button_twice_gives_two_shells(client, tmp_path):
-    """TD-030: the Herd's Shell button sends no name, so the agent names it (`shell`, `shell-2`).
+    """TD-030: the Team's Shell button sends no name, so the agent names it (`shell`, `shell-2`).
     With a name of its own it would hit §4.1's rule on the second click and be refused."""
     ids = []
     for expected in ("shell", "shell-2"):

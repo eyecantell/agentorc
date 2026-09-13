@@ -1,9 +1,9 @@
 {% extends "base.html" %}
-{% block title %}Herd · agentorc{% endblock %}
+{% block title %}Team · agentorc{% endblock %}
 {% block body %}
 <div class="page">
   <div class="row gap wrap">
-    <span class="h1">Herd</span>
+    <span class="h1">Team</span>
     <span class="muted" id="count">{{ sessions | length }} sessions</span>
     <span id="badges">
       {% if counts['needs-you'] %}<span class="pill s-needs"><span class="dot"></span>{{ counts['needs-you'] }} needs you</span>{% endif %}
@@ -26,4 +26,4 @@
   <div class="note"><b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed. <b>Pinned</b> keeps every card where you dragged it. A dashed pill means the state was guessed from the screen.</div>
 </div>
 {% endblock %}
-{% block scripts %}<script>AO.herd();</script>{% endblock %}
+{% block scripts %}<script>AO.team();</script>{% endblock %}

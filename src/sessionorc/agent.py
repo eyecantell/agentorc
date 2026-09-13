@@ -383,7 +383,7 @@ class HostAgent:
                 continue
             self._observe(s, pane, tails.get(sid, []), now)
         # tmux sessions with our prefix that we have no record of (created by hand, or the
-        # store was lost): adopt them minimally as shells so they appear in the Herd.
+        # store was lost): adopt them minimally as shells so they appear in the Team.
         for name, pane in panes.items():
             if name not in self.sessions and not self._is_removed_pane(name, pane):
                 s = Session(id=name, name=name[len(naming.PREFIX) :], kind="interactive", adapter="shell", dir="")
@@ -612,7 +612,7 @@ class HostAgent:
             live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
             # Records can no longer hold the base id: `_claim_name` refused or superseded the one
             # session of this name in scope. What is left is a tmux session nobody has a record of
-            # — and then the suffix is part of the name the Herd shows (TD-030 step 2).
+            # — and then the suffix is part of the name the Team shows (TD-030 step 2).
             taken = (set(self.sessions) | set(live)) - ({freed} if freed else set())
             base = naming.base_id(directory, repo, name)
             for _attempt in range(5):
@@ -725,7 +725,7 @@ class HostAgent:
     async def _take_name(self, holder: Session | str | None) -> tuple[str | None, str | None]:
         """Supersede what `_name_holder` found, returning `(previous_run, the id it freed)`. The
         dead pane is killed and the record's run log handed on; the record itself is **replaced in
-        place** by the new one under the same id — not forgotten — so the Herd's card becomes the
+        place** by the new one under the same id — not forgotten — so the Team's card becomes the
         new session rather than going and coming back, and a launch that fails after this point
         leaves the old record standing instead of losing it (review 2026-09-11)."""
         if holder is None:
@@ -751,7 +751,7 @@ class HostAgent:
 
     async def _supersede(self, adapter_id: str, new_sid: str) -> None:
         """A resumed conversation continues in the new session: the exited record it came from is
-        closed (kept a day, sorted last) and its dead pane dropped, so the Herd shows one card."""
+        closed (kept a day, sorted last) and its dead pane dropped, so the Team shows one card."""
         for other in list(self.sessions.values()):
             if other.id != new_sid and other.adapter_id == adapter_id and other.state == "exited":
                 await asyncio.to_thread(self.tmux.kill_session, other.id)
@@ -1032,7 +1032,7 @@ class HostAgent:
     ) -> dict[str, Any]:
         """`ao progress claim|done|drop <ref>` (design §4.8): what this session set out to resolve
         and how it went. A report channel is **ungated** — any session may write any record's, the
-        Herd renders whichever are non-empty — and one reference is one entry, upserted in place."""
+        Team renders whichever are non-empty — and one reference is one entry, upserted in place."""
         s = self._get(id)
         if status not in PROGRESS_STATUSES:
             raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}")

@@ -209,7 +209,7 @@ def create_app() -> FastAPI:
         return templates.get_template("card.html").render(s=v)
 
     @app.get("/", response_class=HTMLResponse)
-    async def herd(request: Request):
+    async def team(request: Request):
         # An unreachable agent still gets a page: the banner + Retry are the recovery path
         # (design §4.5 unreachable hosts), never a bare 503.
         agent_down = False
@@ -225,12 +225,12 @@ def create_app() -> FastAPI:
         counts = {k: sum(1 for v in vs if v["state"] == k) for k in ("needs-you", "limited", "stalled?")}
         return templates.TemplateResponse(
             request,
-            "herd.html",
+            "team.html",
             {
                 "sessions": vs,
                 "counts": counts,
                 "host": host_name(),
-                "active": "Herd",
+                "active": "Team",
                 "agent_down": agent_down,
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
@@ -243,9 +243,9 @@ def create_app() -> FastAPI:
             s = await call("seen", id=sid)  # opening Focus is the "seen" (TD-017); returns the record
         except HTTPException as e:
             if e.status_code == 503:
-                return RedirectResponse("/", status_code=303)  # the Herd shows the down banner
+                return RedirectResponse("/", status_code=303)  # the Team shows the down banner
             raise
-        return templates.TemplateResponse(request, "focus.html", {"s": view(s), "host": host_name(), "active": "Herd"})
+        return templates.TemplateResponse(request, "focus.html", {"s": view(s), "host": host_name(), "active": "Team"})
 
     @app.get("/new", response_class=HTMLResponse)
     async def new_form(request: Request, dir: str = "", adapter: str = "claude-code", resume: str = ""):
@@ -260,7 +260,7 @@ def create_app() -> FastAPI:
             "new.html",
             {
                 "host": host_name(),
-                "active": "Herd",
+                "active": "Team",
                 "profiles": profs,
                 "default_profile": default,
                 "recent": recent,

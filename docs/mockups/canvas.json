@@ -2,7 +2,7 @@
   "artboards": [
     {
       "file": "Main.dc.html",
-      "title": "Herd \u2014 desktop",
+      "title": "Team \u2014 desktop",
       "x": 0,
       "y": 0,
       "w": 1440,
@@ -10,7 +10,7 @@
     },
     {
       "file": "Phone.dc.html",
-      "title": "Herd \u2014 phone",
+      "title": "Team \u2014 phone",
       "x": 1540,
       "y": 0,
       "w": 390,
@@ -18,7 +18,7 @@
     },
     {
       "file": "MainDark.dc.html",
-      "title": "Herd \u2014 dark",
+      "title": "Team \u2014 dark",
       "x": 2040,
       "y": 0,
       "w": 1440,
@@ -79,7 +79,7 @@
       "x": 0,
       "y": -150,
       "w": 520,
-      "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' \u2192 'Ready to close' + user-driven Close \u2192 closed state; dark artboard added; laptop shown as a volatile host (\u25d0).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass \u2014 renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Herd, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions."
+      "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' \u2192 'Ready to close' + user-driven Close \u2192 closed state; dark artboard added; laptop shown as a volatile host (\u25d0).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass \u2014 renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Team, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions."
     }
   ],
   "launch": {
