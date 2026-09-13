@@ -1194,7 +1194,24 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       is mid-prompt (the confused-deputy case the multi-controller design creates on purpose);
       where an orc-of-orcs' fan-out ceiling sits, which nothing surveyed publishes and agentorc
       can measure on its own workers; whether a clean orchestrator exit and a crash should
-      propagate differently; and go/no-go on implementing any of it.
+      propagate differently. Go/no-go answered 2026-09-13: **go**, TD-036's six steps in order.
+- [ ] **What happens when two controllers of one session disagree?** (raised 2026-09-13 by Paul)
+      The flat `controllers` list makes it possible for a ui orc and a backend orc to hand one
+      worker contradicting instructions; §4.8 leaves "not double-nudging" to their briefs, which
+      is no rule at all. Paul's direction: the worker should be able to put the conflict to both
+      controllers and have *them* resolve it together, and only when they cannot does it go to a
+      person, as a board line. What exists today: a worker reaches upward only through `ao
+      progress` / `ao finding` (declarations about references, not messages to a controller),
+      and two orchestrators can reach each other only by `ao send` typing into the other's
+      terminal, which the grant permits by accident and TD-036's gate closes, since peers do not
+      control each other. So there is no controller-to-controller channel and no conflict
+      object. To design (TD-039): a conflict report the worker raises naming both instructions
+      and both controllers; delivery to every controller of that worker; a bounded exchange
+      between the controllers (peers over a shared target may message each other, which is a
+      new, narrow rule for the gate); and escalation to `user_attention.md` with the exchange
+      attached when the bound is hit or a controller is gone. Not agreed yet: whether the
+      exchange is a session channel or the worker's own Focus thread, and who writes the
+      board line.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 
