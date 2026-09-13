@@ -1,8 +1,11 @@
 # agentorc — design
 
-Status: **settled for build** (2026-09-04 design; the last open questions closed 2026-09-05). Nothing
-is built. This document is the requirements and architecture agreed in the 2026-09-04 design
-session; each open question at the end is a decision that changes what gets built. The project was
+Status: **phase 1 in progress** (2026-09-04 design; the last of the original open questions
+closed 2026-09-05; building since 2026-09-05). The host agent, the Claude Code adapter, the Herd
+and Focus pages, New session and the CLI run today; §7 has the phase plan and
+[`technical_debt.md`](technical_debt.md) what is deferred. This document is the requirements and
+architecture agreed in the 2026-09-04 design session and amended since; each open question at the
+end is a decision that changes what gets built. The project was
 called `sessionherd` for most of that day; see §10 for the rename.
 
 ## 1. Problem
@@ -154,11 +157,14 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   (`interactive` | `command`), `adapter` (`claude-code`, `shell`, …), `profile` (empty for
   `shell`), `dir`, `repo` (optional), `worktree` (optional), `adapter_id` once known (Claude
   Code's session uuid — read from the hook payload; it is what Resumable and the transcript index
-  key on), `capabilities` (grants, §4.8 — empty for most sessions), `lane`, `progress` and
+  key on), `capabilities` (grants, §4.8 — empty for most sessions), `controllers`
+  (§4.8's membership list: which sessions may act on this one — proposed 2026-09-12, TD-036, not
+  a field today), `lane`, `progress` and
   `findings` (§4.8's report channels: what the session was handed and what it says it did),
   `role` (the preset it was started from, a badge and nothing more), and `unattended` with its
   schedule (§6). Grants, report channels, mode and schedule are independent fields: a grant
-  says what a session may do to others, the channels say what it did, `unattended` says whether
+  says a session may act on others at all (and, once `controllers` lands, membership says on
+  which), the channels say what it did, `unattended` says whether
   policies act on it, the schedule says when. Any can be set without the others. Resumable shows the name first and the id under it; a session started by hand
   outside agentorc shows only the id until it is **adopted** (attach to the tmux session, give it
   a name), which is also how hand-started sessions enter the Herd.
@@ -725,7 +731,9 @@ are ungated; `ao status -v` prints the same report line the card will, and `--js
 what the repo and the package define; `--grant orchestrate` adds a grant a preset lacks, and
 works without a preset today). `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
 running session's grants (the `set_grants` RPC; `ao status -v` and `--json` show
-`capabilities`). The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+`capabilities`). The membership surface that goes with them — `ao new --controller`,
+`ao control <orc> add|remove`, and both directions in `ao status -v` — is proposed, not built
+(§4.8, TD-036). The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -798,8 +806,10 @@ acting RPC. One exists today:
   revoke takes effect on the session's next call (landed 2026-09-10, TD-028 step 1). This is a
   guard against a confused worker, not a security boundary — the socket is
   local and the id is an environment variable — and it closes the gap where any worker could
-  kill its neighbour. §9 invariant 5 still binds a granted session: interactive sessions are
-  out of reach whoever the caller is.
+  kill its neighbour. It says *may act on others*, not *on which others*: that is what the
+  membership rule below narrows, once it is implemented (proposed 2026-09-12, TD-036). §9
+  invariant 5 still binds a granted session: interactive sessions are out of reach whoever the
+  caller is.
 
 **Membership: `controllers` on the target (2026-09-12, proposed — not implemented, TD-036).**
 The grant says a session may act on *other* sessions; it does not say *which*. With one
@@ -1104,7 +1114,11 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 - [x] Session identity (2026-09-04): name + adapter id from birth; hand-started sessions show
       the id until adopted.
 - [x] Existing-worktree picker (2026-09-04): only exited/closed worktrees offered; in-use ones
-      greyed with "resume from the Herd".
+      greyed with "resume from the Herd". **Superseded 2026-09-06** by the **Where** control as
+      it was actually built (§4.5a): the worktree is *named*, reused if one of that name exists,
+      and there is no picker — so the only list a person sees is the directory-occupancy answer
+      the form asks for as they type. Noted 2026-09-12: §4.5a is the authority, and a control
+      not in that table does not exist.
 - [ ] **Deny with a reason?** The hook decision can carry a message Claude reads. A one-line
       "why" next to Deny (optional field, card and Focus) would steer the next attempt better
       than a bare refusal. Cost: one input box; the phone gets it too.
