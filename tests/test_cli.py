@@ -297,7 +297,19 @@ def test_skill_prints_the_rules(capsys):
     assert e.value.code == 0
     out = capsys.readouterr().out
     assert out.startswith("---\nname: ao\n")
-    for must in ("AGENTORC_SESSION", "ao status --json", "prompt-stuck", "invariant 1", "never"):
+    for must in (
+        "AGENTORC_SESSION",
+        "ao status --json",
+        "prompt-stuck",
+        "invariant 1",
+        "never",
+        # the membership half of the gate (TD-036 step 2): both refusals, and who may hand control
+        # on — a session that already controls the target, not only a person (review 2026-09-13)
+        "not in its controllers",
+        "needs the orchestrate grant",
+        "or one of its current controllers",
+        "ao control",
+    ):
         assert must in out.lower() or must in out, must
     assert out.count("\n") <= 120
 
@@ -385,13 +397,14 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     assert f"members: {w1}" in shown
 
     # one refusal does not lose the rest, and the exit code says something was refused
-    assert cli.main(["--json", "control", "orc", "add", "w1", "nosuchsession"]) == 1
+    assert cli.main(["--json", "control", "orc", "add", "w1", "nosuchsession", "nosuchsession"]) == 1
     res = out()
     assert [s_["id"] for s_ in res["sessions"]] == [w1]
-    assert "nosuchsession" in res["refused"]
-    # an orchestrator may not be made to control itself
+    # one entry per attempt, not per name: the same bad name twice is two answers
+    assert [r["session"] for r in res["refused"]] == ["nosuchsession", "nosuchsession"]
+    # an orchestrator may not be made to control itself — refused by the agent, not by the CLI
     assert cli.main(["control", "orc", "add", "orc"]) == 1
-    assert "cannot control itself" in capsys.readouterr().err
+    assert "cannot be its own controller" in capsys.readouterr().err
 
     assert cli.main(["control", "orc", "remove", "w1"]) == 0
     assert capsys.readouterr().out.strip() == f"{w1}: under nobody"
@@ -401,6 +414,12 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     assert cli.main(["--json", "new", "w2", "-a", "shell", "-d", str(tmp_path), "--controller", "orc"]) == 0
     w2 = out()
     assert w2["controllers"] == [orc]
+    # a --controller that resolves to nothing refuses *before* the create RPC, so no session, no
+    # pane, and nothing to clean up (review 2026-09-13)
+    before = {s_["id"] for s_ in call_sync("list")}
+    assert cli.main(["--json", "new", "w3", "-a", "shell", "-d", str(tmp_path), "--controller", "ghost"]) == 1
+    assert "no session named ghost here" in out()["error"]
+    assert {s_["id"] for s_ in call_sync("list")} == before
     for sid in (orc, w1, w2["id"]):
         call_sync("kill", id=sid)
 

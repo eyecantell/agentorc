@@ -55,10 +55,10 @@ Mutating — each one is a decision, so check the state first:
   one of them is about you. You cannot grant yourself, and you cannot edit your own
   `controllers`: a person, or a session that already controls the target, does it with
   `ao grant <id> orchestrate` and `ao control <orc> add|remove <session>…`. Sessions you create
-  yourself list you as a controller from birth, so you can always act on your own workers; a
-  session someone else started you cannot touch until a person says so. `ao status -v` prints
-  both directions — `under:` who may act on a session, `members:` what an orchestrator may act
-  on.
+  yourself list you as a controller from birth, so you can always act on your own workers; one
+  someone else started you cannot touch until a person, or one of its current controllers, adds
+  you. `ao status -v` prints both directions — `under:` who may act on a session, `members:`
+  what an orchestrator may act on.
 - `ao progress claim <ref>` / `ao progress done <ref> --pr N` / `ao progress drop <ref> --why "…"`
   and `ao finding <ref> [--priority low]` — the report channels (design §4.8). **Declare a claim
   before your first edit, and declare the result before you move on to the next reference**: the

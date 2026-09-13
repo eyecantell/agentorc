@@ -307,20 +307,24 @@ def cmd_control(args: argparse.Namespace) -> int:
     done, refused = [], []
     for ident in args.sessions:
         try:
-            sid = resolve(ident)
-            if sid == orc:
-                raise AgentError(f"{orc} cannot control itself: it could then drop the ones watching it")
-            done.append(call_sync("set_controllers", id=sid, **{edit: [orc]}))
+            # Every rule about *who may control what* lives in the agent (`rpc_set_controllers`,
+            # `_gate`): a session may not control itself, may not edit its own list, needs the
+            # grant and membership. The CLI re-implements none of them — a copy here would be the
+            # one that goes stale the day the rule changes — it just reports what came back.
+            done.append(call_sync("set_controllers", id=resolve(ident), **{edit: [orc]}))
+        except AgentUnavailable:
+            raise  # not a per-target refusal: `main` gives the agent-is-down message and exit 3
         except AgentError as e:
-            refused.append((ident, str(e)))
+            refused.append({"session": ident, "error": str(e)})
     if args.json:
-        print(json.dumps({"controller": orc, "action": edit, "sessions": done, "refused": dict(refused)}, indent=1))
+        # a list, not a dict keyed by name: the same name twice is two attempts and two answers
+        print(json.dumps({"controller": orc, "action": edit, "sessions": done, "refused": refused}, indent=1))
     else:
         for s_ in done:
             under = ", ".join(s_["controllers"]) or "nobody"
             print(f"{s_['id']}: under {under}")
-        for ident, why in refused:
-            print(f"{ident}: {why}", file=sys.stderr)
+        for r in refused:
+            print(f"{r['session']}: {r['error']}", file=sys.stderr)
     return 1 if refused else 0
 
 
