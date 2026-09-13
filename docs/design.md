@@ -571,6 +571,10 @@ noted). If a control is not in this table it does not exist.
 | card | **report line** | shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, an orchestrator's `last tick 20:10 · 2 wrapped up`; an entry the agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed` (landed 2026-09-12) |
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (agent RPC, recorded as dropped by the person — a *declaration*, so the tick cannot undo it) (landed 2026-09-12) |
 | Focus header | **grants** chip | lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes), each with what the grant allows on its confirm (landed 2026-09-12) |
+| Focus header | **controllers** chip | the sessions that may act on this one (§4.8): each controller's name, click to focus it; click the chip to add or remove one (the `set_controllers` RPC — a person always may, a session only if it already controls this one), with what control allows on its confirm. Empty reads *nobody may act on this session*, which is the default, not a warning — *proposed 2026-09-12, TD-036* |
+| card | **under `<orc>`** chip | the session's `controllers` when it has any — the controlling session's name, click to focus it; several are listed. Nothing is shown when the list is empty, which is the common case for a person's own session — *proposed 2026-09-12, TD-036* |
+| Focus (orchestrator) | **Members** list | for a session holding `orchestrate`: every session whose `controllers` name it, with state, lane and report line — the orchestrator's central view. Derived from the records on each tick, never cached (§4.8) — *proposed 2026-09-12, TD-036* |
+| New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): the live grant-holding sessions on the host, prefilled from the repo's or preset's `controllers:` when one is set and otherwise empty. Empty is allowed and says so in a line — *proposed 2026-09-12, TD-036* |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
@@ -797,6 +801,65 @@ acting RPC. One exists today:
   kill its neighbour. §9 invariant 5 still binds a granted session: interactive sessions are
   out of reach whoever the caller is.
 
+**Membership: `controllers` on the target (2026-09-12, proposed — not implemented, TD-036).**
+The grant says a session may act on *other* sessions; it does not say *which*. With one
+orchestrator those were the same sentence. They stop being the same sentence the moment there
+are several — `guardians` gets its own, a large repo may want a ui orc and a backend orc, a
+read-only cross-repo status orc reports and never acts, and an orchestrator-of-orchestrators
+keeps the others running — because each of them would otherwise reach every session on the host.
+Per-repo boundaries were rejected (§10): **the person says explicitly which sessions each
+orchestrator controls.** The prior-art survey behind the rules below is
+[ADR 2026-09-12](decisions/2026-09-12-orchestrator-membership-prior-art.md).
+
+- **The record.** Every session record carries `controllers: [session ids]`. It lives on the
+  *target*, not on the orchestrator: the gate is then one lookup, there is no second list to keep
+  in step, it is persisted and reloaded with the record it sits on, so it survives an agent
+  restart, and it dies when the record is forgotten. The orchestrator's own member view is *derived* from the records — its Focus
+  lists its members with their states, which is the central view a person reads — and must never
+  become a cache of them.
+- **The gate.** An acting RPC from session A onto session B passes only if A holds `orchestrate`
+  **and** A's id is in B's `controllers` (§9 invariant 11). Both are read from the records on
+  every call, as the grant already is, so a revoke or a membership edit takes effect on the
+  session's next call and nothing caches either. An empty list means **nobody may act on this
+  session** — the default, explicit, with no `--controller none` to remember. A session may have
+  several controllers (a ui orc and a backend orc over one shared session); the list is flat and
+  no member is privileged, which is a departure from the one-managing-controller shape Kubernetes
+  uses, taken because the two orcs are peers and nothing here needs a tie-break. Keeping them
+  from double-nudging is a matter for their briefs. Reads (`status`, `tail`, `explain`) stay
+  ungated, so a read-only status orc needs no grant and no membership at all.
+- **Create adds the creator.** A grant holder may `create`; the new record's `controllers` are
+  the creator plus any `--controller` given, and the child's grants are a subset of the
+  creator's. Authority shrinking along a delegation chain is the established capability pattern,
+  not a local invention — which is what should keep it from being weakened later. Which entry
+  created the session is recorded, so adoption logic can ask who is responsible without a second
+  gate.
+- **Editing the list is itself an acting RPC.** `set_controllers` is gated on the *target*, like
+  `set_grants`: a person at a terminal or the UI always may; a session only if it already
+  controls that target. Control is handed on, never seized.
+- **Orc-of-orcs is not a special case.** It is a session holding `orchestrate` whose members
+  happen to be orchestrators; nothing in the core treats it differently. What it adds is restart,
+  and restart needs two rules the design did not have. A restart is **`one_for_one`** — only the
+  session that exited, never its siblings — and it is **bounded: N restarts per period, then stop
+  and escalate to the attention board**, a ceiling OTP, systemd and Circus each arrived at
+  separately. An orchestrator that exits does **not** take its workers down with it, and its
+  entries in their lists do not silently vanish either: the workers keep running and are surfaced
+  as controlled by a session that is gone, for a person or the orc-of-orcs to re-attach with
+  `ao control`. Adoption is an explicit edit, never automatic reparenting — automatic adoption is
+  simpler and silently changes who may act, which is the thing this change exists to stop. And
+  the brief rule that makes the rest safe: an orchestrator supervises and does not take on
+  worker-shaped coding work, so a bug in the work cannot break the recovery path.
+- **Defaults fill membership at launch.** `.agentorc.yml` may carry `controllers:` per repo and
+  per preset (§5), so a worker started in a repo that has an orchestrator is a member from its
+  first byte. `ao new` prints one line when a session starts with no controller at all — not an
+  error, just the fact, because an unattended worker nobody may act on is rarely what was meant.
+- **Surface.** `ao new --controller <id>…`; `ao control <orc> add|remove <session>…`;
+  `ao status -v` shows both directions (a session's controllers, an orchestrator's members); the
+  worker card carries an *under `<orc>`* chip; the orchestrator's Focus lists its members; New
+  session has a controller picker (§4.5a).
+- **What this is not.** As with the grant, a guard against a confused worker, not a security
+  boundary: the socket is local and the caller id is an environment variable. What it closes is
+  the gap where one orchestrator's mistake reaches every session on the machine.
+
 Being scheduled is **not** a capability and a grant carries no schedule: everything time-shaped
 stays on the `unattended` side (§6, TD-026) and applies to a session whatever it holds.
 
@@ -852,6 +915,8 @@ roles:                                # §4.8 presets; every key optional, built
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick}
   hunter: {brief: docs/briefs/hunter.md}
   orchestrator: {brief: docs/briefs/orchestrator.md, grants: [orchestrate]}
+controllers: [orchestrator-ao-1]      # §4.8: who may act on a session started here (a preset may
+                                      # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
@@ -960,9 +1025,12 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    start and is a badge afterwards.
 10. A report entry the session declared is never overwritten by one the agent derived; a
     derived entry is shown as such, like a scraped state.
-11. A session acts on another session only through the agent and only with the `orchestrate`
-    grant on its record; reads are never gated, and a person at a terminal or the UI is not a
-    session.
+11. A session acts on another session only through the agent, only with the `orchestrate`
+    grant on its record, and only when the caller is in the target's `controllers` list (an
+    empty list means nobody may act on it; the membership half is proposed 2026-09-12, §4.8,
+    TD-036). Grant and membership are both read from the records on every call, so a revoke or
+    a membership edit takes effect on the session's next call and neither is cached. Reads are
+    never gated, and a person at a terminal or the UI is not a session.
 12. Within a scope (repo, or directory), a name identifies at most one session record: a live
     holder refuses a second, an exited or closed holder is superseded by it (§4.1). Suffixes
     exist only for tmux-level accidents and are then shown, never hidden.
@@ -1072,6 +1140,47 @@ the block. A policy is agent code and needs no grant; a session doing the same w
   exited record (PR #17); a suffix survives only for a tmux id the agent has no record of, and
   is then shown. What this costs: two workers cannot share a name across worktrees any more —
   the right price, since the name is the handle every command takes.
+- [ ] **One orchestrator or many; how is membership expressed?** (raised 2026-09-12) Several
+      orchestrators are in sight at once: `guardians` gets its own, a large repo may want a ui
+      orc and a backend orc, a read-only cross-repo status orc that reports and never acts, and
+      an orchestrator-of-orchestrators that keeps the others running and is the one place Paul
+      talks to. Today `orchestrate` is one bit on the *caller* and the gate never looks at the
+      target, so every one of them would reach every session on the host. **Per repo was
+      rejected** — the boundary has to be the one the person set, not one the tool inferred from
+      a path. **Proposed (§4.8, §4.5a, §9 invariant 11; written 2026-09-12, not implemented —
+      TD-036):** `controllers: [session ids]` on each session record; an acting RPC passes only
+      if the caller holds `orchestrate` *and* is in the target's list; empty means nobody may
+      act; several controllers allowed; create adds the creator with the child's grants ⊆ the
+      creator's; `set_controllers` is itself gated on the target; defaults from `.agentorc.yml`.
+      Stored on the target because that makes the gate one lookup, needs no second list kept in
+      step, is reloaded with the record it sits on and dies with it; the orchestrator's member
+      view is derived from the records and must not become a cache of them. The grant stays the
+      one revocable kill switch on the orchestrator.
+      **What the prior-art survey changed**
+      ([ADR](decisions/2026-09-12-orchestrator-membership-prior-art.md)): (a) a **restart
+      ceiling** — N restarts per period, then stop and escalate — which OTP, systemd and Circus
+      each arrived at separately and the design had nothing of; (b) restart scope stated as
+      `one_for_one` rather than left inside "restarts exited ones"; (c) an exited orchestrator
+      neither kills its workers nor silently loses them — they keep running, are surfaced as
+      controlled by a session that is gone, and are re-attached by an explicit edit rather than
+      reparented automatically; (d) "supervisors only supervise" written into the orchestrator
+      brief, so a bug in the work cannot break the recovery path; (e) the create rule cited as
+      capability attenuation, which is what should keep it from being weakened later.
+      **Where the prior art disagrees with the design, and the design stands anyway:** Kubernetes
+      allows several owners but only one *managing* controller, and no supervisor surveyed
+      supports N controllers per unit at all — the flat list where any member may act is
+      agentorc's own choice, taken because a ui orc and a backend orc are peers over a shared
+      session and nothing here needs the tie-break garbage collection needs. systemd's
+      `StopWhenUnneeded=` says a unit nothing depends on should be collected; here an empty
+      `controllers` list means *nobody may act*, not *nobody wants it*, so the session keeps
+      running and is surfaced. Both are deliberate departures, recorded rather than silently
+      taken. One claim the research reported — a "3–5 agents" coordination knee — did not
+      survive its fact-check and is struck (ADR §6); the gap it pointed at is real and unmeasured.
+      **Still open, which is why this is a `[ ]`:** what a second controller does while the first
+      is mid-prompt (the confused-deputy case the multi-controller design creates on purpose);
+      where an orc-of-orcs' fan-out ceiling sits, which nothing surveyed publishes and agentorc
+      can measure on its own workers; whether a clean orchestrator exit and a crash should
+      propagate differently; and go/no-go on implementing any of it.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 
