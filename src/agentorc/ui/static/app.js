@@ -36,7 +36,7 @@
   AO.act = act;
 
   // vscode:// links: hand the URL to the protocol handler without navigating this tab away
-  // (a plain click replaced the Team with a blank page when the handler declined — first-use finding).
+  // (a plain click replaced the Org with a blank page when the handler declined — first-use finding).
   document.addEventListener("click", (ev) => {
     const a = ev.target.closest('a[href^="vscode://"]');
     if (!a) return;
@@ -137,22 +137,32 @@
     const b = $("#agentdown"); if (b) b.classList.toggle("hidden", !down);
   }
 
-  // ---- Team ----
+  // ---- Org (design §4.5 screen 1) ----
+  // The page is one or more `.tgroup` sections, each an optional header plus its own `.grid`: one
+  // per team when any live session carries a `team` badge (design §4.5a **team groups**, §4.9),
+  // and one unnamed, headerless group when none does. Every rule below is per group — Urgent first
+  // sorts inside a section (the lead's card first), Pinned order is stored per team.
   let sortMode = store.get("sort", "urgent");
+  const sections = () => $$("#groups .tgroup");
+  const pinKey = (team) => (team ? "pinned:" + team : "pinned");  // the flat page keeps the old key
   function setSort(m) { sortMode = m; store.set("sort", m); $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === m)); layout(); }
   function layout() {
-    const grid = $("#grid"); if (!grid) return;
-    const cards = $$(".sc", grid);
-    if (sortMode === "urgent") {
-      cards.sort((a, b) => (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name)).forEach((c) => grid.appendChild(c));
-    } else {
-      const order = store.get("pinned", []);
-      cards.sort((a, b) => { const ia = order.indexOf(a.dataset.id), ib = order.indexOf(b.dataset.id); return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib); }).forEach((c) => grid.appendChild(c));
-      store.set("pinned", $$(".sc", grid).map((c) => c.dataset.id));
-    }
-    cards.forEach((c) => c.classList.toggle("highlight", sortMode === "pinned" && c.dataset.state === "needs-you"));
+    const box = $("#groups"); if (!box) return;
+    sections().forEach((sec) => {
+      const grid = $(".grid", sec), lead = sec.dataset.lead || "";
+      const cards = $$(".sc", grid);
+      if (sortMode === "urgent") {
+        cards.sort((a, b) => (b.dataset.id === lead) - (a.dataset.id === lead) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
+          .forEach((c) => grid.appendChild(c));
+      } else {
+        const order = store.get(pinKey(sec.dataset.team), []);
+        cards.sort((a, b) => { const ia = order.indexOf(a.dataset.id), ib = order.indexOf(b.dataset.id); return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib); }).forEach((c) => grid.appendChild(c));
+        store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
+      }
+      cards.forEach((c) => c.classList.toggle("highlight", sortMode === "pinned" && c.dataset.state === "needs-you"));
+    });
     applyFilter();
-    const shown = $$(".sc", grid).filter((c) => !c.hidden);
+    const shown = $$("#groups .sc").filter((c) => !c.hidden);
     $("#count").textContent = `${shown.length} session${shown.length === 1 ? "" : "s"}`;
     $("#empty").hidden = shown.length > 0;
     const counts = {}; shown.forEach((c) => (counts[c.dataset.state] = (counts[c.dataset.state] || 0) + 1));
@@ -160,40 +170,100 @@
       .filter(([k]) => counts[k]).map(([k, cls, l]) => `<span class="pill s-${cls}"><span class="dot"></span>${counts[k]} ${l}</span>`).join("");
   }
   function applyFilter() {
-    const q = ($("#filter") ? $("#filter").value : "").toLowerCase(), cmd = $("#showcmd") && $("#showcmd").checked;
-    $$("#grid .sc").forEach((c) => {
+    const raw = ($("#filter") ? $("#filter").value : "").trim(), cmd = $("#showcmd") && $("#showcmd").checked;
+    // `team:<name>` is the form the card's team badge writes: an exact match on the badge, not a
+    // substring of the card's text, so a team whose name also appears in a branch stays clean.
+    const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
+    const q = team === null ? raw.toLowerCase() : "";
+    $$("#groups .sc").forEach((c) => {
       const hideKind = c.dataset.kind === "command" && !cmd;
-      c.hidden = hideKind || (q && !c.textContent.toLowerCase().includes(q));
+      const miss = team !== null ? (c.dataset.team || "").toLowerCase() !== team : !!q && !c.textContent.toLowerCase().includes(q);
+      c.hidden = hideKind || miss;
+    });
+    // A group with nothing left to show goes away with its header; the empty page says so once.
+    sections().forEach((sec) => (sec.hidden = !$$(".sc", sec).some((c) => !c.hidden)));
+  }
+  // The server derives the groups on every render and every delta (only it sees the whole fleet),
+  // so a badge or `controllers` change moves cards between groups here without a page reload.
+  // `groups` null means the flat grid: one unnamed section, no header anywhere.
+  function syncGroups(gs) {
+    const box = $("#groups"); if (!box) return;
+    box.classList.toggle("flat", !gs);
+    const wanted = gs || [{ team: "", lead: "", ids: $$("#groups .sc").map((c) => c.dataset.id), html: "" }];
+    const keep = [];
+    wanted.forEach((g) => {
+      let sec = sections().find((s) => s.dataset.team === g.team);
+      if (!sec) {
+        sec = document.createElement("section");
+        sec.className = "tgroup"; sec.dataset.team = g.team;
+        sec.innerHTML = '<div class="grid"></div>';
+      }
+      sec.dataset.lead = g.lead || "";
+      let head = $(".ghead", sec);
+      if (g.html) {
+        if (!head) { head = document.createElement("div"); head.className = "row gap wrap ghead"; sec.prepend(head); }
+        head.innerHTML = g.html;
+      } else if (head) head.remove();
+      const grid = $(".grid", sec);
+      (g.ids || []).forEach((id) => { const c = $(`#card-${CSS.escape(id)}`); if (c && c.parentElement !== grid) grid.appendChild(c); });
+      box.appendChild(sec);  // in the server's order
+      keep.push(sec);
+    });
+    sections().forEach((sec) => {
+      if (keep.includes(sec)) return;
+      const home = $(".grid", keep[0]);  // a card the server did not list keeps its place on the page
+      $$(".sc", sec).forEach((c) => home.appendChild(c));
+      sec.remove();
     });
   }
-  AO.team = function () {
+  AO.org = function () {
     $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === sortMode));
     $("#filter").addEventListener("input", layout);
     $("#showcmd").addEventListener("change", layout);
     $("#retry").addEventListener("click", () => location.reload());
-    // drag to pin: HTML5 drag on cards, order saved by id
-    const grid = $("#grid");
-    grid.addEventListener("dragstart", (e) => { const c = e.target.closest(".sc"); if (c) { e.dataTransfer.setData("text/plain", c.dataset.id); c.classList.add("dragging"); } });
-    grid.addEventListener("dragover", (e) => { if (sortMode === "pinned") e.preventDefault(); });
-    grid.addEventListener("drop", (e) => {
+    const box = $("#groups");
+    // The card's team badge filters the page to that team; pressing it again clears the box.
+    box.addEventListener("click", (e) => {
+      const b = e.target.closest(".badge.team"); if (!b) return;
+      e.preventDefault();
+      const f = $("#filter"), q = "team:" + b.dataset.team;
+      f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
+      layout();
+    });
+    // drag to pin: HTML5 drag on cards, order saved by id per group. A card never crosses into
+    // another team's grid — the badge decides the group, not where you dropped it.
+    box.addEventListener("dragstart", (e) => { const c = e.target.closest(".sc"); if (c) { e.dataTransfer.setData("text/plain", c.dataset.id); c.classList.add("dragging"); } });
+    box.addEventListener("dragover", (e) => { if (sortMode === "pinned") e.preventDefault(); });
+    box.addEventListener("drop", (e) => {
       if (sortMode !== "pinned") return; e.preventDefault();
       const id = e.dataTransfer.getData("text/plain"), from = $(`#card-${CSS.escape(id)}`), to = e.target.closest(".sc");
-      if (from && to && from !== to) { grid.insertBefore(from, to); store.set("pinned", $$(".sc", grid).map((c) => c.dataset.id)); }
+      if (!from || !to || from === to || from.parentElement !== to.parentElement) return;
+      const grid = to.parentElement, sec = grid.closest(".tgroup");
+      grid.insertBefore(from, to);
+      store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
     });
-    $$("#grid .sc").forEach((c) => (c.draggable = true));
+    $$("#groups .sc").forEach((c) => (c.draggable = true));
     layout();
     connectEvents((ev) => {
       if (ev.event === "session") {
         const old = $(`#card-${CSS.escape(ev.id)}`);
         const tpl = document.createElement("template"); tpl.innerHTML = ev.html.trim();
         const fresh = tpl.content.firstElementChild; fresh.draggable = true;
-        if (old) old.replaceWith(fresh); else if (sortMode === "pinned") grid.prepend(fresh); else grid.appendChild(fresh);
+        if (old) old.replaceWith(fresh);
+        else {
+          const grid = $(".tgroup .grid");  // syncGroups below moves it into its own group
+          if (sortMode === "pinned") grid.prepend(fresh); else grid.appendChild(fresh);
+        }
+        if (ev.groups !== undefined) syncGroups(ev.groups);
         layout();
       } else if (ev.event === "gone") {
-        const c = $(`#card-${CSS.escape(ev.id)}`); if (c) c.remove(); layout();
+        const c = $(`#card-${CSS.escape(ev.id)}`); if (c) c.remove();
+        if (ev.groups !== undefined) syncGroups(ev.groups);
+        layout();
       } else if (ev.event === "error") AO.toast(ev.text);
     });
   };
+
 
   // ---- New session: the anchor rule, shown before you press Start ----
   AO.newSession = function () {

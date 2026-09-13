@@ -63,6 +63,7 @@ def _str_list(body: dict[str, Any], key: str) -> list[str]:
         raise HTTPException(400, f"{key} must be a list of session ids")
     return [x.strip() for x in v]
 
+
 WRAPUP_PROMPT = (
     "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
     "is in flight, make sure the ledger and user_attention.md reflect any undone steps (ledger before "
@@ -224,6 +225,55 @@ def ready_to_close(s: dict[str, Any]) -> list[tuple[str, bool]]:
     return checks
 
 
+NO_TEAM = ""  # the group key for sessions carrying no `team` badge; rendered as *No team*, last
+DEAD = ("exited", "closed")
+
+
+def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+    """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
+    derived from the views on every render and every delta, never stored. `None` when no *live*
+    session carries a badge — the page then renders the flat grid, with no header anywhere.
+
+    The badge decides the group; `controllers` decides the lead: the one member holding
+    `orchestrate` that other members of the same group list as a controller. A group without one
+    has no lead card and its header says so. Within a group the lead comes first, then the rest in
+    urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
+    per group in Pinned mode. Sessions with no badge form the *No team* group at the end."""
+    if not any(v.get("team") and v.get("state") not in DEAD for v in views):
+        return None
+    by_team: dict[str, list[dict[str, Any]]] = {}
+    for v in views:
+        by_team.setdefault(str(v.get("team") or NO_TEAM), []).append(v)
+    groups: list[dict[str, Any]] = []
+    for team in sorted(by_team, key=lambda t: (t == NO_TEAM, t)):
+        members = sorted(by_team[team], key=lambda v: (v["rank"], v["name"]))
+        lead = None
+        if team != NO_TEAM:
+            ids = {m["id"] for m in members}
+            controlled_by = {c for m in members for c in (m.get("controllers") or []) if c in ids}
+            leads = [m for m in members if "orchestrate" in (m.get("capabilities") or []) and m["id"] in controlled_by]
+            if leads:
+                lead = leads[0]
+                members.remove(lead)
+                members.insert(0, lead)
+        projects = sorted({str(m.get("project")) for m in members if m.get("project")})
+        groups.append(
+            {
+                "team": team,
+                "label": team or "No team",
+                "lead": {k: lead[k] for k in ("id", "name", "state", "state_class", "state_label", "scraped")}
+                if lead
+                else None,
+                "members": members,
+                "ids": [m["id"] for m in members],
+                "projects": projects,
+                "needs": sum(1 for m in members if m.get("state") == "needs-you"),
+                "live": sum(1 for m in members if m.get("state") not in DEAD),
+            }
+        )
+    return groups
+
+
 # -- app -------------------------------------------------------------------------------------------
 
 
@@ -267,8 +317,28 @@ def create_app() -> FastAPI:
     def render_card(v: dict[str, Any]) -> str:
         return templates.get_template("card.html").render(s=v)
 
+    def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
+        """The team groups as the events stream ships them (design §4.5a **team groups**): per group
+        its key, the member ids in order, and the header rendered by the same template the page
+        uses — so the client moves cards between groups and swaps headers without composing any
+        markup of its own. `None` means "flat grid", exactly as the page renders it."""
+        fleet = list(known.values())
+        groups = team_groups([view(s, fleet) for s in fleet])
+        if groups is None:
+            return None
+        head = templates.get_template("group_head.html")
+        return [
+            {
+                "team": g["team"],
+                "lead": (g["lead"] or {}).get("id", ""),
+                "ids": g["ids"],
+                "html": head.render(g=g),
+            }
+            for g in groups
+        ]
+
     @app.get("/", response_class=HTMLResponse)
-    async def team(request: Request):
+    async def org(request: Request):
         # An unreachable agent still gets a page: the banner + Retry are the recovery path
         # (design §4.5 unreachable hosts), never a bare 503.
         agent_down = False
@@ -284,12 +354,13 @@ def create_app() -> FastAPI:
         counts = {k: sum(1 for v in vs if v["state"] == k) for k in ("needs-you", "limited", "stalled?")}
         return templates.TemplateResponse(
             request,
-            "team.html",
+            "org.html",
             {
                 "sessions": vs,
+                "groups": team_groups(vs),
                 "counts": counts,
                 "host": host_name(),
-                "active": "Team",
+                "active": "Org",
                 "agent_down": agent_down,
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
@@ -302,14 +373,14 @@ def create_app() -> FastAPI:
             s = await call("seen", id=sid)  # opening Focus is the "seen" (TD-017); returns the record
         except HTTPException as e:
             if e.status_code == 503:
-                return RedirectResponse("/", status_code=303)  # the Team shows the down banner
+                return RedirectResponse("/", status_code=303)  # the Org shows the down banner
             raise
         try:
             fleet = await call("list")
         except HTTPException:  # the record we already have still renders; membership just empties
             fleet = [s]
         return templates.TemplateResponse(
-            request, "focus.html", {"s": view(s, fleet), "host": host_name(), "active": "Team"}
+            request, "focus.html", {"s": view(s, fleet), "host": host_name(), "active": "Org"}
         )
 
     @app.get("/new", response_class=HTMLResponse)
@@ -332,7 +403,7 @@ def create_app() -> FastAPI:
             "new.html",
             {
                 "host": host_name(),
-                "active": "Team",
+                "active": "Org",
                 "profiles": profs,
                 "default_profile": default,
                 "recent": recent,
@@ -484,6 +555,9 @@ def create_app() -> FastAPI:
                         s = ev["session"]
                         known[s["id"]] = s
                         v = view(s, list(known.values()))
+                        # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
+                        # `controllers` change on one record can move a card, change a lead, or turn
+                        # grouping on or off for the whole page, and only the server sees the fleet.
                         await ws.send_text(
                             json.dumps(
                                 {
@@ -493,6 +567,7 @@ def create_app() -> FastAPI:
                                     "rank": v["rank"],  # the view's: unseen idle sorts above idle
                                     "html": render_card(v),
                                     "session": v,
+                                    "groups": group_heads(known),
                                 }
                             )
                         )
@@ -502,7 +577,7 @@ def create_app() -> FastAPI:
                             # popping on it would one day evict a live session by coincidence
                             went = str(ev.get("id") or "")
                             known.pop(went, None)
-                            await ws.send_text(json.dumps(ev))
+                            await ws.send_text(json.dumps({**ev, "groups": group_heads(known)}))
                             # A card's *under* chip names another record, so the session that went
                             # is not the only card now out of date: every card listing it as a
                             # controller has to be redrawn, or it keeps naming and linking to a

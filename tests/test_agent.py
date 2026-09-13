@@ -921,7 +921,7 @@ async def test_one_name_one_session(agent, tmp_path, monkeypatch):
     """Design §4.1, §9 invariant 12, TD-030: within a scope a name identifies one session — a live
     holder refuses (and says which id to switch to), an exited or closed one is superseded and its
     id reused with its run log kept, and a suffix exists only for a tmux session nobody has a
-    record of, and is then part of the name the Team shows."""
+    record of, and is then part of the name the Org shows."""
     async with LocalClient() as c:
         a = await c.call("create", name="aotest", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         with pytest.raises(AgentError, match="aotest is running — switch to it") as e:

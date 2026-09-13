@@ -1,0 +1,12 @@
+{# One team group's header (design §4.5a Org **team groups**, §4.9): team name, the lead's name and
+   state pill (or "led by you" when no member is the lead), the projects the members carry, and the
+   needs-you count across them. Rendered on page load and re-rendered per delta on /events — the
+   client swaps the header's contents, never composes them. #}
+<span class="h2">{{ g.label }}</span>
+{% if g.lead %}<span class="meta">lead</span> <a class="name" href="/focus/{{ g.lead.id }}">{{ g.lead.name }}</a>
+<span class="pill s-{{ g.lead.state_class }}{% if g.lead.scraped %} scraped{% endif %}"><span class="dot"></span>{{ g.lead.state_label }}</span>
+{% elif g.team %}<span class="meta" title="no member of this team holds orchestrate over the others (design §4.8)">led by you</span>{% endif %}
+{% if g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
+<span class="grow"></span>
+<span class="meta">{{ g.live }} live</span>
+{% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}

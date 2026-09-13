@@ -2,13 +2,16 @@
    it by id, so the DOM position (Pinned mode) survives. Controls per design §4.5a. #}
 <div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}" id="card-{{ s.id }}"
      data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
-     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}"{% if s.unseen %} data-unseen="1"{% endif %}>
+     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}"{% if s.unseen %} data-unseen="1"{% endif %}>
   <div class="sbar"></div>
   <div class="sc-body">
     <div class="row">
       <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>
       {% if s.external %}<span class="badge" title="known from the tool's live registry: no terminal, no controls">registry</span>{% else %}<button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
               title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>{% endif %}
+      {# design §4.5a card **team** badge (§4.9): the team the session was started under; a badge,
+         nothing keys on it (§9 invariant 9). Click filters the grid to that team, client-side. #}
+      {% if s.team %}<button class="badge team" data-team="{{ s.team }}" title="team {{ s.team }} — click: show only this team">{{ s.team }}</button>{% endif %}
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ 'guessed from the screen' if s.scraped else 'reported by the tool' }}"><span class="dot"></span>{{ s.state_label }}</span>
