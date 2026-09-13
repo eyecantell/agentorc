@@ -454,3 +454,65 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     assert client.post(f"/api/sessions/{sid}/grants", json={"remove": ["orchestrate"]}).json()["capabilities"] == []
     assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["sudo"]}).status_code == 400  # unknown grant
     client.post(f"/api/sessions/{sid}/kill")
+
+
+def test_the_membership_controls(client, tmp_path):
+    """TD-036 step 3, design §4.5a: the card's **under `<orc>`** chip, the Focus **controllers**
+    chip, the orchestrator's **Members** list, and the New session **Controllers** picker. Both
+    directions are derived from the fleet on render, never stored, so the assertions go through
+    the real pages rather than a hand-built view."""
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-w", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
+        "state": "working", "since": "2026-09-12T10:00:00Z", "confidence": "hook", "tail": [],
+    }  # fmt: skip
+    orc = {**base, "id": "ao-orc", "name": "orc", "capabilities": ["orchestrate"]}
+    card = templates.get_template("card.html")
+    # no controllers: no chip at all — a person's own session has none, and that is the common case
+    assert "under" not in card.render(s=view(base, [base]))
+    # a controller that exists shows by *name* and links to it; one that is gone keeps its entry
+    held = {**base, "controllers": ["ao-orc"]}
+    html = card.render(s=view(held, [held, orc]))
+    assert 'href="/focus/ao-orc"' in html and ">orc<" in html and "scraped" not in html
+    gone = {**base, "controllers": ["ao-vanished"]}
+    html = card.render(s=view(gone, [gone]))
+    assert ">ao-vanished<" in html and "chip scraped" in html and "re-attach or remove it" in html
+
+    # the live pages
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "mw"}, follow_redirects=False)
+    worker = r.headers["location"].rsplit("/", 1)[-1]
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "morc"}, follow_redirects=False)
+    orc_id = r.headers["location"].rsplit("/", 1)[-1]
+
+    page = client.get(f"/focus/{worker}").text
+    assert 'id="fcontrollers"' in page and "no controller — nobody may act on this session" in page
+    assert 'id="members"' not in page  # not an orchestrator: no member list
+
+    # the chip adds one, and the agent is what actually decides
+    assert client.post(f"/api/sessions/{worker}/controllers", json={"add": [orc_id]}).json() == {
+        "ok": True,
+        "controllers": [orc_id],
+    }
+    assert client.post(f"/api/sessions/{worker}/controllers", json={"add": [worker]}).status_code == 400
+    page = client.get(f"/focus/{worker}").text
+    assert f'data-act="uncontrol" data-id="{worker}" data-who="{orc_id}"' in page
+    assert ">morc ×<" in page
+
+    # the Members list appears once the session holds the grant, and lists what names it
+    client.post(f"/api/sessions/{orc_id}/grants", json={"add": ["orchestrate"]})
+    page = client.get(f"/focus/{orc_id}").text
+    assert 'id="members"' in page and f'href="/focus/{worker}"' in page and ">mw<" in page
+    # the card of the worker now says who is over it
+    assert ">morc<" in client.get("/").text
+
+    # the New session picker offers the grant-holders, and nothing is ticked by default
+    form = client.get("/new").text
+    assert f'name="controller" value="{orc_id}"' in form and "None selected: nobody may" in form
+    assert f'value="{orc_id}" checked' not in form
+
+    # removing the last controller leaves the session running, with nobody able to act (§4.8)
+    assert client.post(f"/api/sessions/{worker}/controllers", json={"remove": [orc_id]}).json()["controllers"] == []
+    assert next(x for x in client.get("/api/sessions").json() if x["id"] == worker)["state"] != "closed"
+    page = client.get(f"/focus/{orc_id}").text
+    assert "no members yet" in page

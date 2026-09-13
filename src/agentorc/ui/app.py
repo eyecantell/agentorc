@@ -12,7 +12,7 @@ import logging
 import os
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import quote
 
 from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
@@ -31,6 +31,11 @@ from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 HERE = Path(__file__).parent
 log = logging.getLogger("uvicorn.error")  # the logger uvicorn already shows on the console
 templates = Jinja2Templates(directory=str(HERE / "templates"))
+
+# The New session form's `controller` field when nothing is ticked: an empty list means nobody may
+# act on the session, which is design §4.8's explicit default. Module-level so the signature keeps
+# no mutable default and no call in its arguments.
+NO_CONTROLLERS: list[str] = []
 
 WRAPUP_PROMPT = (
     "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
@@ -77,8 +82,11 @@ def _age(iso: str | None, now: datetime) -> str:
     return f"{secs // 86400}d"
 
 
-def view(s: dict[str, Any]) -> dict[str, Any]:
-    """Everything a card or the Focus header needs, computed once."""
+def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
+    needed only for the membership directions (design §4.8): who controls this session, and — for
+    an orchestrator — which sessions it controls. Without it both come back empty, which is what a
+    caller that has only one record should show."""
     now = datetime.now(UTC)
     d = dict(s)
     state = s["state"]
@@ -148,6 +156,22 @@ def view(s: dict[str, Any]) -> dict[str, Any]:
     d["report_derived"] = bool(head and head.get("source", "declared") != "declared")
     d["findings_line"] = f"{len(findings)} filed" if findings else ""
     d["grants_all"] = list(GRANTS)
+    # Membership, both directions (design §4.8, §4.5a, TD-036 step 3). `controllers` is on the
+    # record; `members` is derived across the records on every render and never stored — the same
+    # rule `ao status -v` follows, so the page and the CLI cannot disagree. A controller whose
+    # session is gone keeps its entry and shows as its bare id: §4.8 surfaces it rather than
+    # silently releasing the worker.
+    by_id = {o.get("id"): o for o in (fleet or [])}
+    d["controllers"] = [
+        {"id": c, "name": (by_id.get(c) or {}).get("name") or c, "gone": c not in by_id}
+        for c in (s.get("controllers") or [])
+    ]
+    d["members"] = [
+        {"id": o["id"], "name": o.get("name") or o["id"], "state": o.get("state"), "report": report_line(o)}
+        for o in (fleet or [])
+        if s.get("id") in (o.get("controllers") or [])
+    ]
+    d["is_orchestrator"] = "orchestrate" in (s.get("capabilities") or [])
     return d
 
 
@@ -221,7 +245,7 @@ def create_app() -> FastAPI:
             if e.status_code != 503:
                 raise
             sessions, agent_down = [], True
-        vs = sorted((view(s) for s in sessions), key=lambda v: (v["rank"], v["name"]))
+        vs = sorted((view(s, sessions) for s in sessions), key=lambda v: (v["rank"], v["name"]))
         counts = {k: sum(1 for v in vs if v["state"] == k) for k in ("needs-you", "limited", "stalled?")}
         return templates.TemplateResponse(
             request,
@@ -245,7 +269,13 @@ def create_app() -> FastAPI:
             if e.status_code == 503:
                 return RedirectResponse("/", status_code=303)  # the Team shows the down banner
             raise
-        return templates.TemplateResponse(request, "focus.html", {"s": view(s), "host": host_name(), "active": "Team"})
+        try:
+            fleet = await call("list")
+        except HTTPException:  # the record we already have still renders; membership just empties
+            fleet = [s]
+        return templates.TemplateResponse(
+            request, "focus.html", {"s": view(s, fleet), "host": host_name(), "active": "Team"}
+        )
 
     @app.get("/new", response_class=HTMLResponse)
     async def new_form(request: Request, dir: str = "", adapter: str = "claude-code", resume: str = ""):
@@ -255,6 +285,13 @@ def create_app() -> FastAPI:
         repos = hosts.local_host().repos()
         recent = repos + [d for d in await call("recent_dirs") if d not in repos]
         adapters = await call("adapters")
+        # design §4.5a New session **Controllers** picker (§4.8): the candidates are the sessions
+        # holding `orchestrate` — nothing else could act on the new session anyway.
+        orchestrators = [
+            {"id": o["id"], "name": o.get("name") or o["id"]}
+            for o in await call("list")
+            if "orchestrate" in (o.get("capabilities") or []) and o.get("state") not in ("closed", "exited")
+        ]
         return templates.TemplateResponse(
             request,
             "new.html",
@@ -265,6 +302,7 @@ def create_app() -> FastAPI:
                 "default_profile": default,
                 "recent": recent,
                 "adapters": adapters,
+                "orchestrators": orchestrators,
                 "prefill": {"dir": dir, "adapter": adapter, "resume": resume},
             },
         )
@@ -280,6 +318,7 @@ def create_app() -> FastAPI:
         unattended: str = Form(""),
         where: str = Form("here"),
         worktree: str = Form(""),
+        controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
     ):
         wt = None
         if where == "worktree":
@@ -295,6 +334,7 @@ def create_app() -> FastAPI:
             unattended=unattended == "on",
             worktree=wt,
             repo=dir.strip() if wt else None,
+            controllers=[c for c in controller if c.strip()],
         )
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
@@ -344,6 +384,15 @@ def create_app() -> FastAPI:
             with contextlib.suppress(HTTPException):
                 await call("seen", id=sid)
             return JSONResponse({"ok": True, "capabilities": s.get("capabilities") or []})
+        elif action == "controllers":
+            # design §4.5a Focus **controllers** chip (§4.8, TD-036). The UI calls with no `caller`,
+            # so it acts as the person it is: the agent's own rules still decide what is allowed.
+            s = await call(
+                "set_controllers", id=sid, add=list(body.get("add") or []), remove=list(body.get("remove") or [])
+            )
+            with contextlib.suppress(HTTPException):
+                await call("seen", id=sid)
+            return JSONResponse({"ok": True, "controllers": s.get("controllers") or []})
         elif action == "remove":
             await call("remove", id=sid)
         elif action == "seen":
@@ -372,7 +421,8 @@ def create_app() -> FastAPI:
 
     @app.get("/api/sessions")
     async def api_sessions():
-        return [view(s) for s in await call("list")]
+        sessions = await call("list")
+        return [view(s, sessions) for s in sessions]
 
     # -- live state ------------------------------------------------------------------------------
 
@@ -381,10 +431,18 @@ def create_app() -> FastAPI:
         await ws.accept()
         try:
             async with LocalClient() as c:
+                # A delta carries one record, but membership is read across records (design §4.8):
+                # a card's *under* chip names its controllers, which live on other records. So the
+                # loop keeps the fleet it has already been told about — seeded once, then updated
+                # by the very deltas it is rendering — rather than re-listing per event.
+                known: dict[str, dict[str, Any]] = {}
+                with contextlib.suppress(Exception):
+                    known = {o["id"]: o for o in await call("list")}
                 async for ev in c.subscribe():
                     if ev.get("event") == "session":
                         s = ev["session"]
-                        v = view(s)
+                        known[s["id"]] = s
+                        v = view(s, list(known.values()))
                         await ws.send_text(
                             json.dumps(
                                 {
@@ -398,6 +456,7 @@ def create_app() -> FastAPI:
                             )
                         )
                     elif ev.get("event") in ("gone", "usage"):
+                        known.pop(ev.get("id") or "", None)
                         await ws.send_text(json.dumps(ev))
         except (WebSocketDisconnect, AgentUnavailable, ConnectionError):
             pass

@@ -10,6 +10,17 @@
       <span id="fstate"></span>
       {# design §4.5a Focus header **grants** chip (§4.8): click a grant to revoke it, a dim one to grant it #}
       <span class="grants" id="fgrants" data-id="{{ s.id }}" data-grants="{{ s.grants_all | join(',') }}"></span>
+      {# design §4.5a Focus header **controllers** chip (§4.8, TD-036): who may act on this
+         session; click to add or remove one. A person always may; a session only if it already
+         controls this one — the agent decides, this only asks. #}
+      <span class="controllers" id="fcontrollers" data-id="{{ s.id }}"
+            title="the sessions that may act on this one (design §4.8)">
+        {% if s.controllers %}under {% for c in s.controllers %}<button class="chip{% if c.gone %} scraped{% endif %}"
+              data-act="uncontrol" data-id="{{ s.id }}" data-who="{{ c.id }}"
+              title="{{ c.id }} — click to remove it as a controller{{ ' (its session is gone)' if c.gone else '' }}">{{ c.name }} ×</button>{% endfor %}
+        {% else %}<span class="note">no controller — nobody may act on this session</span>{% endif %}
+        <button class="btn sm ghost" data-act="control-add" data-id="{{ s.id }}" title="add a controller">+</button>
+      </span>
       <span class="grow"></span>
       <button class="btn" data-act="shell-here" data-id="{{ s.id }}">⌘ Open shell here</button>
       {% if s.vscode %}<a class="btn" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
@@ -54,6 +65,19 @@
       <div id="findinglist"></div>
       <div class="note">What the session declared, plus what the agent derived from its branch and PRs (dashed). Drop records that a claim was let go.</div>
     </div>
+    {# design §4.5a Focus (orchestrator) **Members** list (§4.8, TD-036): every session whose
+       `controllers` name this one — the orchestrator's central view. Derived from the records on
+       each render, never stored. Shown for a session holding `orchestrate`, even with no members
+       yet, because "none" is the answer a person opening an orchestrator most needs to see. #}
+    {% if s.is_orchestrator %}<div class="card pad" id="members">
+      <div class="h2">Members</div>
+      {% for m in s.members %}<div class="row gap">
+        <a class="name" href="/focus/{{ m.id }}">{{ m.name }}</a>
+        <span class="meta">{{ m.state }}</span><span class="grow"></span>
+        {% if m.report %}<span class="meta">{{ m.report }}</span>{% endif %}
+      </div>{% else %}<div class="note">no members yet — <code>ao control {{ s.name }} add &lt;session&gt;</code>, or the controllers chip on a session's Focus</div>{% endfor %}
+      <div class="note">The sessions this one may act on. It needs both the grant and a place in each session's controllers (design §4.8).</div>
+    </div>{% endif %}
     <div class="card pad">
       <div class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?" disabled>Close</button></div>
       <div class="checks" id="checks"></div>

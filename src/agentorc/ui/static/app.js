@@ -52,6 +52,7 @@
     if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast("copied", true)); return; }
     if (b.dataset.sort) { setSort(b.dataset.sort); return; }
     const id = b.dataset.id, action = b.dataset.act;
+    let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
     const details = b.closest("details"); if (details) details.open = false;
     try {
@@ -60,12 +61,24 @@
       // design §4.5a: **Drop** on a claimed progress item, and the grants chip (§4.8, TD-028 step 4)
       if (action === "drop") body = { ref: b.dataset.ref };
       if (action === "grants") body = b.classList.contains("off") ? { add: [b.dataset.grant] } : { remove: [b.dataset.grant] };
-      const res = await act(id, action, body);
+      // design §4.5a Focus **controllers** chip (§4.8, TD-036): remove one by clicking it, add one
+      // by id. The agent decides what is allowed; a refusal comes back as the toast below.
+      if (action === "uncontrol") { action2 = "controllers"; body = { remove: [b.dataset.who] }; }
+      if (action === "control-add") {
+        const who = prompt("Which session may act on this one? (its id or name from ao status)");
+        if (!who) return;
+        action2 = "controllers"; body = { add: [who.trim()] };
+      }
+      const res = await act(id, action2 || action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/")) location.href = "/"; }
       if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
+      if (action2 === "controllers") {
+        AO.toast(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
+        location.reload();  // the chip and the Members list are server-rendered from the fleet
+      }
     } catch (e) { AO.toast(`${action} failed: ${e.message}`); }
   });
 
