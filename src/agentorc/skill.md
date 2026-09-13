@@ -47,9 +47,18 @@ Mutating — each one is a decision, so check the state first:
 - `ao allow|deny <id> [reason]` — the pending permission, through the hook channel.
 - `ao mode <id> unattended|interactive`; `ao kill <id>` (worktree kept); `ao close <id>`.
 - Acting on a session other than your own (`send`, `keys`, `kill`, `close`, `mode`, `new`) needs
-  the `orchestrate` grant on your record (`ao status --json` → `capabilities`); without it the
-  agent answers "needs the orchestrate grant". You cannot grant yourself: a person, or a session
-  that already holds the grant, does it with `ao grant <id> orchestrate` (design §4.8).
+  **two** things (design §4.8): the `orchestrate` grant on your record, and your id in *that
+  session's* `controllers` (`ao status --json` → `capabilities` and `controllers`). Without the
+  grant the agent answers "needs the orchestrate grant"; with it but without membership,
+  "not in its controllers", and it says whether the list is empty (nobody may act on that
+  session) or names who does hold it. Read the refusal — the two mean different things and only
+  one of them is about you. You cannot grant yourself, and you cannot edit your own
+  `controllers`: a person, or a session that already controls the target, does it with
+  `ao grant <id> orchestrate` and `ao control <orc> add|remove <session>…`. Sessions you create
+  yourself list you as a controller from birth, so you can always act on your own workers; one
+  someone else started you cannot touch until a person, or one of its current controllers, adds
+  you. `ao status -v` prints both directions — `under:` who may act on a session, `members:`
+  what an orchestrator may act on.
 - `ao progress claim <ref>` / `ao progress done <ref> --pr N` / `ao progress drop <ref> --why "…"`
   and `ao finding <ref> [--priority low]` — the report channels (design §4.8). **Declare a claim
   before your first edit, and declare the result before you move on to the next reference**: the
