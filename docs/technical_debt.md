@@ -25,6 +25,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-035 | Adapters without a session-start hook still run dev-cadence's SessionStart set | Low | Open |
 | TD-036 | Orchestrator membership: `controllers` on the target, the gate's second half, `set_controllers`, and the surface | Medium | Open |
 | TD-037 | The mockups are a week stale: three controls that landed are undrawn, and the New session screen draws two controls that do not exist | Low | Open |
+| TD-038 | The embedded terminal is a bare xterm.js: default palette, no bundled font, no renderer addon — it reads as black-and-white next to VS Code's terminal | Medium | Open |
 
 ---
 
@@ -224,3 +225,16 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** regenerate from `gen.py`: add the report line, grants chip and Reports panel to the card and Focus screens, and redraw `new_session()`'s Where control to match `new.html`. Done when every §4.5a row marked *landed* has something on a mockup screen and no mockup screen shows a control the table does not list. Worth doing in the same pass as whatever UI lands next, rather than on its own.
 
 **Related:** design §4.5a, §10 (the superseded existing-worktree picker); TD-036 (whose controls must *not* be drawn yet); `docs/mockups/README.md`.
+
+## TD-038: The embedded terminal is a bare xterm.js: default palette, no bundled font, no renderer addon — it reads as black-and-white next to VS Code's terminal
+
+**Priority:** Medium
+**Added:** 2026-09-13
+**Status:** Open — raised by Paul 2026-09-13: working in the VS Code terminal is more comfortable than the Focus terminal; approximate its font and colours
+**Location:** `src/agentorc/ui/static/app.js` (`AO.focus`, the `new Terminal({...})` options), `src/agentorc/ui/static/app.css` (`.termbox`, `--term`/`--termfg`), `src/agentorc/ui/static/vendor/` (xterm.js, addon-fit only), `src/agentorc/ui/templates/focus.html`
+
+**Why:** the Focus terminal is constructed with `fontFamily: "JetBrains Mono", Menlo, monospace`, `fontSize: 13` and a theme that sets only `background: "#0b0e12"`. Three things follow. (1) No font is bundled or loaded: JetBrains Mono renders only on a client that happens to have it installed; every other browser falls through to Menlo or the platform monospace, which is what a phone or a fresh laptop gets. (2) The ANSI palette is xterm.js's stock one, so Claude Code's colours land, but as the flat default sixteen, with no cursor, selection or bright-colour tuning; the pty bridge already exports `TERM=xterm-256color` (`src/agentorc/ui/pty_bridge.py`), so the colour information is there and unused. (3) Only the fit addon is loaded; xterm.js's DOM renderer draws each cell as an element, which is the blurrier, heavier rendering compared with the WebGL (or canvas) addon VS Code uses. The result is a pane that works but is noticeably less pleasant to read than the same session in VS Code's terminal, which matters because design goal 2 makes driving the session in that pane the product. Design goal 12 says the terminal is dark regardless of theme; that stays — this is about the dark pane's typography and palette, not adding a light one.
+
+**Fix:** approximate VS Code's dark terminal, which is three decisions, each small: (a) ship a monospace webfont under `static/vendor/` with an `@font-face` in `app.css` (JetBrains Mono or Cascadia Code, both OFL — check the licence file goes in alongside it) and give xterm.js the same stack plus a `lineHeight` around 1.2 and a `letterSpacing` of 0; (b) set a full `theme` object — the sixteen ANSI colours, foreground, cursor, cursor accent, selection background — taken from VS Code's Dark Modern terminal palette so colour output looks the same in both places; (c) load `addon-webgl` and fall back to the DOM renderer when the context is lost or unavailable (the addon fires `onContextLoss`; dispose it and carry on). Font size and family should stay a CSS-token-adjacent constant in one place, not three. Design §4.5a needs no new row: none of this is a control. Design goal 12 gets one clause noting the pane follows VS Code's dark palette, and §4.6 a bullet naming the renderer choice. Done when a Claude Code session in Focus and the same session in VS Code's terminal show the same colours for the same output, and the pane uses the bundled font on a machine that has no monospace fonts of its own.
+
+**Related:** design §1 goal 2 (drive the session in place), goal 12 (dark terminal regardless), §4.6 (terminal mechanics); TD-003 (phone layout will inherit the font decision); TD-037 (the Focus mockup's terminal should be redrawn in the same palette when it is regenerated).
