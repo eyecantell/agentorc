@@ -1217,6 +1217,21 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       attached when the bound is hit or a controller is gone. Not agreed yet: whether the
       exchange is a session channel or the worker's own Focus thread, and who writes the
       board line.
+- [x] **What are the nouns above a session — and is the home page Org?** (2026-09-13, Paul)
+      → **Org, Team, Project, Role, Agent**, decided in
+      [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md). Org is the whole and the
+      home page whatever its size; a team is a lead plus the sessions whose `controllers` name
+      it (TD-036's edge is the membership, not a second list); a project is one or more repos
+      with a checkout location per host (guardians is five); a role is the §4.8 preset plus a
+      profile, offered as the pick-list for adding a member; agent is the UI's word for an
+      interactive session. "Access to repos" is which checkouts a team starts in, not
+      credential scoping. Design change and sequencing in TD-040, after TD-036; the Team page
+      becomes Org when teams are definable.
+- [ ] **Product name.** (raised 2026-09-13 by Paul) agentorc.com is a pre-launch business
+      workflow product; `agentorg` collides with AgentOrgs and the "autonomous company"
+      frameworks, and agentorg.ai is live (checked 2026-09-13, table in the
+      [ADR](decisions/2026-09-13-org-teams-projects.md)). Keep `agentorc` as repo and package
+      until there is a product to name; decide before the relay transport ships (§4.5c).
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 - [x] **Rename the Herd page?** (2026-09-13) → **yes, to Team.** Decided by Paul: "Herd" reads
