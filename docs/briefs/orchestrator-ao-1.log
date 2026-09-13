@@ -341,3 +341,4 @@
 21:11  tick 70 (03:11Z). No merges, no rows owed, all six `idle` and unchanged. ok -- quiet tick.
 21:32  tick 71 (03:32Z). No merges, no rows owed, all six `idle`. tdgrind-2 and tdgrind-3 show fresh `last_output` (03:21, 03:22) without leaving `idle` -- the periodic hook/derive writing, not a turn. ok -- quiet tick.
 22:03  tick 72 (04:03Z). No merges, no rows owed, all six `idle`, every tree clean and `ahead=0`. ok -- quiet tick.
+22:34  tick 73 (04:34Z). No merges, no rows owed. **orc-membership-design went `working` at 04:33:57Z**, four hours after declaring itself finished at 00:45 -- it has been prompted or resumed by something outside my view (not by me; I have sent it exactly one message, at tick 58). Nothing owed while a session is working, but a live session is a reason to stop coasting: tightening the cadence from 1800 s back to 600 s, as I said at tick 67 I would if anything started moving again. Its merges are in scope on its own branch per tick 53.
