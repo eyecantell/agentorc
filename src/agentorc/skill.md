@@ -58,7 +58,11 @@ Mutating — each one is a decision, so check the state first:
   yourself list you as a controller from birth, so you can always act on your own workers; one
   someone else started you cannot touch until a person, or one of its current controllers, adds
   you. `ao status -v` prints both directions — `under:` who may act on a session, `members:`
-  what an orchestrator may act on.
+  what an orchestrator may act on. A third refusal has no cure on your side: an interactive
+  session (`unattended: false` — a person's own session, or a worker they took over with
+  `ao mode`) is out of every session's reach whatever your grant and its `controllers`, and the
+  agent says so naming §9 invariant 5; `ao control … add` onto one is refused the same way. A
+  worker you start without `--unattended` is such a session.
 - `ao progress claim <ref>` / `ao progress done <ref> --pr N` / `ao progress drop <ref> --why "…"`
   and `ao finding <ref> [--priority low]` — the report channels (design §4.8). **Declare a claim
   before your first edit, and declare the result before you move on to the next reference**: the
@@ -91,7 +95,8 @@ pastes became one concatenated prompt). Without `--wait`, poll
   only through `ao allow`/`ao deny`, only when supervising that session is your job.
 - Never `send`, `kill`, or `close` a session you did not start unless your brief names it; the
   session in a repo's main checkout is the person's anchor — leave it alone.
-- Never nudge, pause, or kill an interactive session (§9 invariant 5), including "are you done?".
+- Never nudge, pause, or kill an interactive session (§9 invariant 5), including "are you done?";
+  the agent refuses it, so a refusal naming invariant 5 means stop, not retry.
 - Never `send` into `needs-you` (refused while a permission or question is pending), `limited`
   (nothing stops you, and the prompt fails or queues behind the cap), or `unreachable` (exit 3).
 - Never edit `~/.claude/settings.json`, `~/.claude.json`, or anything under `~/.agentorc`; never

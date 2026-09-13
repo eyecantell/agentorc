@@ -556,7 +556,7 @@ noted). If a control is not in this table it does not exist.
 | card | **Focus** | opens the Focus screen |
 | card | **VS Code** | `vscode://` link for the session's directory on its host (browser-handled) |
 | card | **more ▾** | Wrap up · Kill (confirms) · Close (as above) · Open shell here · Copy tmux command |
-| card / Focus header | **unattended / interactive** badge | a toggle: click flips the session's mode in its record (agent RPC); policies pick the change up on their next tick. Cards show the badge only when unattended; Focus always shows it. Flipping to interactive is how a person takes over a worker; flipping to unattended hands a session to the run window and usage gate, and needs the repo's `unattended:` block |
+| card / Focus header | **unattended / interactive** badge | a toggle: click flips the session's mode in its record (agent RPC); policies pick the change up on their next tick. Cards show the badge only when unattended; Focus always shows it. Flipping to interactive is how a person takes over a worker, and takes it out of its controllers' reach on their next call (§9 invariant 5); flipping to unattended hands a session to the run window and usage gate, and needs the repo's `unattended:` block |
 | Due strip / Attention | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
 | Due strip / Attention | **Done** | agent checks the item off and commits |
 | Due strip / Attention | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
@@ -819,11 +819,9 @@ acting RPC. One exists today:
   guard against a confused worker, not a security boundary — the socket is
   local and the id is an environment variable — and it closes the gap where any worker could
   kill its neighbour. It says *may act on others*, not *on which others*: that is what the
-  membership rule below narrows (landed 2026-09-13, TD-036 step 1). §9
-  invariant 5 is *meant* to bind a granted session too — but it is written for policies (§6), and
-  the gate does not check the target's `kind`, so today nothing in the code stops a controller
-  acting on an interactive session; the orchestrator briefs are what keep it off them. TD-041
-  makes it a gate (found 2026-09-13, reviewing TD-036 step 6).
+  membership rule below narrows (landed 2026-09-13, TD-036 step 1). And neither grant nor
+  membership reaches an interactive session: that is §9 invariant 5, a gate since 2026-09-13
+  (TD-041), spelled out after the membership rules below.
 
 **Membership: `controllers` on the target (2026-09-12; approved 2026-09-13, landing step by step
 under TD-036 — the record, the gate, create and `set_controllers` landed 2026-09-13).**
@@ -885,6 +883,25 @@ orchestrator controls.** The prior-art survey behind the rules below is
 - **What this is not.** As with the grant, a guard against a confused worker, not a security
   boundary: the socket is local and the caller id is an environment variable. What it closes is
   the gap where one orchestrator's mistake reaches every session on the machine.
+- **Interactive sessions are out of every controller's reach (§9 invariant 5; a gate since
+  2026-09-13, TD-041).** `kind` says only whether a record is a conversation or a command run;
+  `unattended` is what says a conversation is a worker. An acting RPC from a session onto a
+  target whose record is `kind: interactive` and `unattended: false` — a person's session: their
+  anchor in a repo's main checkout, a shell, a worker they took over with the badge — is refused
+  whatever the caller's grant and membership, with a message naming invariant 5. It is checked
+  before membership, because no edit to the list can change the answer. `set_controllers` from a
+  session onto such a target is refused the same way, so a session cannot put a person's session
+  in a list at all. A person (no caller) is unaffected on both counts: they act on any session,
+  and they may add a controller to their own interactive session — handing it to an orchestrator
+  deliberately is theirs to do, and the entry does nothing until the session is unattended. Like
+  grant and membership the record is read on every call, so `ao mode <id> interactive` (the
+  badge, a person taking over, a controller wrapping up its own worker) takes the session out of
+  every controller's reach on their next call: existing `controllers` entries are not dropped,
+  merely inert, and are live again the moment a person flips it back — only a person can, since
+  a controller's `mode` onto an interactive session is itself refused. A `kind: command` run is
+  not an interactive session and stays reachable to its controllers; a session acting on itself
+  is not gated at all. One consequence for briefs: a session that starts a worker without
+  `--unattended` has started a session it cannot act on.
 
 Being scheduled is **not** a capability and a grant carries no schedule: everything time-shaped
 stays on the `unattended` side (§6, TD-026) and applies to a session whatever it holds.
@@ -1196,7 +1213,13 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    main checkout, worktree, or plain directory). Shells and command runs are exempt.
 3. Every session has a run log from its first byte.
 4. A state shown as `hook` came from a hook; `scraped` is visible in the UI.
-5. Interactive sessions are never paused, killed, or nudged by a policy.
+5. Interactive sessions (`kind: interactive`, `unattended: false`) are never paused, killed, or
+   nudged by a policy, and never acted on by another session: an acting RPC from a session onto
+   one — `set_controllers` included — is refused whatever the caller's grant and membership
+   (§4.8; a gate since 2026-09-13, TD-041). Only a person acts on an interactive session, and
+   only a person hands one to unattended mode or to a controller. Flipping a session to
+   interactive takes it out of every controller's reach on their next call; its `controllers`
+   entries stay, inert.
 6. The core never types a menu choice into a pane; permissions are answered through the hook,
    everything else in the terminal.
 7. The agent's edits to a repo's board file are always committed, never left in the tree.
@@ -1211,7 +1234,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 11. A session acts on another session only through the agent, only with the `orchestrate`
     grant on its record, and only when the caller is in the target's `controllers` list (an
     empty list means nobody may act on it; the membership half is proposed 2026-09-12, §4.8,
-    TD-036). Grant and membership are both read from the records on every call, so a revoke or
+    TD-036) — and never when the target is interactive, whatever the list says (invariant 5). Grant and membership are both read from the records on every call, so a revoke or
     a membership edit takes effect on the session's next call and neither is cached. Reads are
     never gated, and a person at a terminal or the UI is not a session.
 12. Within a scope (repo, or directory), a name identifies at most one session record: a live

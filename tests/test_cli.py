@@ -329,6 +329,7 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     b = out()["id"]
     wait_state(a, "idle")
     wait_state(b, "idle")
+    call_sync("set_mode", id=b, unattended=True)  # a worker; an interactive b is §9 invariant 5's case
     monkeypatch.setenv("AGENTORC_SESSION", a)  # now `ao` runs inside session a
     assert cli.main(["kill", b]) == 1
     assert "needs the orchestrate grant" in capsys.readouterr().err
@@ -385,7 +386,17 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     assert cli.main(["control", "orc", "add", "w1"]) == 0
     assert capsys.readouterr().out.strip() == f"{w1}: under {orc}"
     assert call_sync("get", id=w1)["controllers"] == [orc]
-    # …so the orchestrator can now act on it, and could not before
+    # …so the orchestrator can now act on it — once it is a worker. Interactive, it is a person's
+    # session and out of reach whatever the list says (§9 invariant 5, TD-041); `ao mode` is how
+    # a person hands it over, and the CLI shows the refusal as it came
+    monkeypatch.setenv("AGENTORC_SESSION", orc)
+    assert cli.main(["send", w1, "echo", "ok"]) == 1
+    assert "invariant 5" in capsys.readouterr().err
+    assert cli.main(["control", "orc", "add", "w1"]) == 1  # nor may a session add itself to one
+    assert "invariant 5" in capsys.readouterr().err
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["mode", w1, "unattended"]) == 0
+    assert capsys.readouterr().out.strip() == f"{w1}: unattended"
     monkeypatch.setenv("AGENTORC_SESSION", orc)
     assert cli.main(["send", w1, "echo", "ok"]) == 0
     monkeypatch.delenv("AGENTORC_SESSION")
