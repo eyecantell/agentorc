@@ -24,6 +24,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-032 | An unattended worker that stood down (Remote Control takeover) sat `idle` for 20 h with its PR unmerged and nothing noticed | Medium | Open |
 | TD-035 | Adapters without a session-start hook still run dev-cadence's SessionStart set | Low | Open |
 | TD-036 | Orchestrator membership: `controllers` on the target, the gate's second half, `set_controllers`, and the surface | Medium | Open |
+| TD-037 | The mockups are a week stale: three controls that landed are undrawn, and the New session screen draws two controls that do not exist | Low | Open |
 
 ---
 
@@ -210,3 +211,16 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** in order, each its own PR: (1) `controllers: [session ids]` on the session record, persisted; `_gate` passes an acting RPC from a session only when the caller holds `orchestrate` **and** is in the target's list (empty = nobody), both read live per call, with tests for the refusal, the several-controllers case, the empty default, and that a person (no caller) is unaffected; `create` adds the creator and refuses grants the creator does not hold; a `set_controllers` RPC gated on the target like `set_grants`. (2) CLI: `ao new --controller <id>…`, `ao control <orc> add|remove <session>…`, both directions in `ao status -v`, and the `ao --skill` text gains the membership half of the gate. (3) UI: the card's *under `<orc>`* chip, the Focus controllers chip, the orchestrator's Members list, the New session controller picker (§4.5a). (4) `.agentorc.yml` `controllers:` per repo and per preset (§5), and the one line `ao new` prints when a session starts with no controller. (5) briefs: orchestrator-ao-1 run 3, the `guardians` orchestrator, and the orc-of-orcs — each stating its members, the restart ceiling (N per period, then escalate to the board), `one_for_one` scope, and "supervisors only supervise". (6) migration: the five running workers have no list, so promoting orchestrator-ao-1 must attach it to them (`ao control orchestrator-ao-1 add …`) **in the same step**, or the promotion silently takes its reach away. Done when two orchestrators run on one host, each acts only on its own members, `ao kill` across the boundary is refused by the gate rather than by a brief, and a worker card says who is over it.
 
 **Related:** design §4.8, §4.5a, §5, §9 invariant 11, §10 (2026-09-12); [ADR 2026-09-12](decisions/2026-09-12-orchestrator-membership-prior-art.md); TD-028 (the grant this builds on), TD-026.
+
+## TD-037: The mockups are a week stale: three controls that landed are undrawn, and the New session screen draws two controls that do not exist
+
+**Priority:** Low
+**Added:** 2026-09-13
+**Status:** Open — found by the 2026-09-12 doc-congruence pass; not fixed there, because redrawing three screens is a generator change nobody can review by reading a diff
+**Location:** `docs/mockups/gen.py` (`row()` / `herd_desktop()` card renderer, `focus()`, `new_session()`)
+
+**Why:** `gen.py` was last touched 2026-09-05 and the UI has moved twice since. Undrawn but shipped: the card's **report line**, the Focus header **grants** chip, and the Focus **Reports** side panel (all landed 2026-09-12, `src/agentorc/ui/templates/card.html`, `focus.html`; §4.5a). Drawn but nonexistent: `new_session()` renders a four-way **Where** radio group with an *existing worktree* picker and a separate Fresh/Resume pair, while the shipped form (`src/agentorc/ui/templates/new.html`) has the two-option this-directory/new-worktree control and a plain Resume field — the picker was superseded on 2026-09-06 (§10, noted 2026-09-13) and §4.5a never carried it. That second half is the one that matters: mockups are what a person reads to learn what the product does, so a screen showing a control that does not exist teaches a false UI, and §4.5a's rule ("a control not in this table does not exist") cannot defend itself against a picture. The membership controls (§4.5a, TD-036) are correctly absent — they are proposed, not built — and should stay absent until they ship.
+
+**Fix:** regenerate from `gen.py`: add the report line, grants chip and Reports panel to the card and Focus screens, and redraw `new_session()`'s Where control to match `new.html`. Done when every §4.5a row marked *landed* has something on a mockup screen and no mockup screen shows a control the table does not list. Worth doing in the same pass as whatever UI lands next, rather than on its own.
+
+**Related:** design §4.5a, §10 (the superseded existing-worktree picker); TD-036 (whose controls must *not* be drawn yet); `docs/mockups/README.md`.

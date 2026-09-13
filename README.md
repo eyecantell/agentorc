@@ -11,13 +11,18 @@ see git status per checkout; press configured command buttons; jump to VS Code; 
 unattended workers with run windows and usage caps. Sessions live on the host, so closing the
 laptop changes nothing.
 
-**Status: design only.** Read [`docs/design.md`](docs/design.md). Nothing is built yet.
+**Status: phase 1 in progress.** The host agent, the Claude Code adapter, the Herd and Focus
+pages, New session and the CLI are built and running; phase 2 (a second host over ssh) is not.
+Read [`docs/design.md`](docs/design.md) — §7 has the phase plan, and what is deferred is in
+[`docs/technical_debt.md`](docs/technical_debt.md).
 
 Grew out of [samscrape](https://github.com/eyecantell/samscrape)'s `tdgrind` worker supervisor
 and the [dev-cadence](https://github.com/eyecantell/dev-cadence) working-cadence system, whose
 repo registry it depends on.
 
-## Start here (handoff, updated 2026-09-06 evening)
+## Start here (handoff, updated 2026-09-06 evening; the next-steps list below is from that
+date — the live lists are [`docs/user_attention.md`](docs/user_attention.md) and
+[`docs/technical_debt.md`](docs/technical_debt.md))
 
 **Phase 1 is built** (PRs #1–#4; each was reviewed by a Sonnet subagent in the build session and
 the findings folded into the PR before merge — see the "review fixes" commits): host agent, Claude Code adapter, Herd
@@ -101,7 +106,11 @@ the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`.
 
 ## CLI
 
-The package installs `agentorc` and an `ao` alias (`ao status`, `ao new`, `ao shell`, ...). `ao new
+The package installs `agentorc` and an `ao` alias. Reading: `ao status [-v]`, `ao tail`,
+`ao explain`. Acting on a session: `ao new`, `ao shell`, `ao send`, `ao keys`, `ao allow` /
+`ao deny`, `ao mode`, `ao kill`, `ao close`, `ao forget`. Capabilities and reports (design §4.8):
+`ao grant` / `ao revoke`, `ao progress claim|done|drop`, `ao finding`. Serving: `ao ui`,
+`ao service`. `ao new
 --attach` (or `ao shell --attach`) starts the session and attaches your terminal to it — type it
 where you would have typed `claude`, and the session is a first-class card; `ao focus <id>`
 attaches to an existing one. Every
