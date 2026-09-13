@@ -356,3 +356,4 @@
 03:20  tick 84 (09:20Z). No merges, no rows owed, all six `idle`. ok -- quiet tick. Worker stop (11:30Z) is ~2h 10m out; my own stop 12:30Z.
 03:51  tick 85 (09:51Z). No merges, no rows owed, all six `idle`. ok -- quiet tick.
 04:22  tick 86 (10:22Z). No merges, no rows owed, all six `idle`. ok -- quiet tick. Worker stop 11:30Z is ~68 min out; two ticks to go before it.
+04:53  tick 87 (10:53Z). No merges, no rows owed, all six `idle`, every tree clean and `ahead=0`. ok -- quiet tick. Next tick lands ~11:23Z, just before the workers' 11:30Z stop; the one after that is the wrap-up tick.
