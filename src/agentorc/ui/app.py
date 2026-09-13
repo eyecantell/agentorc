@@ -37,6 +37,32 @@ templates = Jinja2Templates(directory=str(HERE / "templates"))
 # no mutable default and no call in its arguments.
 NO_CONTROLLERS: list[str] = []
 
+
+def _as_session_id(ident: str, fleet: list[dict[str, Any]], *, must_exist: bool = True) -> str:
+    """A session id from what a person typed into the controllers chip: a full id is itself, a name
+    is resolved against the fleet (a live holder wins over an exited one, §4.1). Removing takes
+    whatever it is given — an entry may name a session that is gone, and that is exactly the entry
+    a person most needs to remove."""
+    if any(o.get("id") == ident for o in fleet) or not must_exist:
+        return ident
+    named = [o for o in fleet if o.get("name") == ident]
+    live = [o for o in named if o.get("state") not in ("exited", "closed")] or named
+    if len(live) == 1:
+        return str(live[0]["id"])
+    if not live:
+        raise HTTPException(400, f"no session {ident!r} — use the id or name from ao status")
+    raise HTTPException(400, f"{ident!r} is ambiguous — {', '.join(sorted(str(o['id']) for o in live))}")
+
+
+def _str_list(body: dict[str, Any], key: str) -> list[str]:
+    """A JSON body's list-of-strings field, or a 400. Without the type check `{"add": "ao-x"}`
+    would reach `list()` and explode a string into one-character ids, and `[null]` would store the
+    literal "None" — both accepted downstream, since the agent only refuses empty strings."""
+    v = body.get(key) or []
+    if not isinstance(v, list) or any(not isinstance(x, str) or not x.strip() for x in v):
+        raise HTTPException(400, f"{key} must be a list of session ids")
+    return [x.strip() for x in v]
+
 WRAPUP_PROMPT = (
     "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
     "is in flight, make sure the ledger and user_attention.md reflect any undone steps (ledger before "
@@ -162,12 +188,21 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
     # session is gone keeps its entry and shows as its bare id: §4.8 surfaces it rather than
     # silently releasing the worker.
     by_id = {o.get("id"): o for o in (fleet or [])}
-    d["controllers"] = [
+    # `controllers` stays exactly as the record has it — a list of ids, the same shape
+    # `ao status --json` prints. The display form goes under its own name, so nothing downstream
+    # has to know which of two shapes it was handed (review 2026-09-13).
+    d["under"] = [
         {"id": c, "name": (by_id.get(c) or {}).get("name") or c, "gone": c not in by_id}
         for c in (s.get("controllers") or [])
     ]
     d["members"] = [
-        {"id": o["id"], "name": o.get("name") or o["id"], "state": o.get("state"), "report": report_line(o)}
+        {
+            "id": o["id"],
+            "name": o.get("name") or o["id"],
+            "state": o.get("state"),
+            "lane": ", ".join(o.get("lane") or []),
+            "report": report_line(o),
+        }
         for o in (fleet or [])
         if s.get("id") in (o.get("controllers") or [])
     ]
@@ -380,15 +415,21 @@ def create_app() -> FastAPI:
                 raise HTTPException(400, "drop needs the reference to drop")
             await call("progress", id=sid, ref=ref, status="dropped", why=body.get("why") or "dropped from Focus")
         elif action == "grants":
-            s = await call("set_grants", id=sid, add=list(body.get("add") or []), remove=list(body.get("remove") or []))
+            s = await call("set_grants", id=sid, add=_str_list(body, "add"), remove=_str_list(body, "remove"))
             with contextlib.suppress(HTTPException):
                 await call("seen", id=sid)
             return JSONResponse({"ok": True, "capabilities": s.get("capabilities") or []})
         elif action == "controllers":
             # design §4.5a Focus **controllers** chip (§4.8, TD-036). The UI calls with no `caller`,
             # so it acts as the person it is: the agent's own rules still decide what is allowed.
+            # A typed *name* is resolved to an id first — the agent stores whatever it is given and
+            # a name would sit in the list forever as a controller that can never act (review).
+            fleet = await call("list")
             s = await call(
-                "set_controllers", id=sid, add=list(body.get("add") or []), remove=list(body.get("remove") or [])
+                "set_controllers",
+                id=sid,
+                add=[_as_session_id(c, fleet) for c in _str_list(body, "add")],
+                remove=[_as_session_id(c, fleet, must_exist=False) for c in _str_list(body, "remove")],
             )
             with contextlib.suppress(HTTPException):
                 await call("seen", id=sid)
@@ -456,7 +497,32 @@ def create_app() -> FastAPI:
                             )
                         )
                     elif ev.get("event") in ("gone", "usage"):
-                        known.pop(ev.get("id") or "", None)
+                        if ev.get("event") == "gone":
+                            # only a `gone` names a session; a `usage` event carries a profile, and
+                            # popping on it would one day evict a live session by coincidence
+                            went = str(ev.get("id") or "")
+                            known.pop(went, None)
+                            await ws.send_text(json.dumps(ev))
+                            # A card's *under* chip names another record, so the session that went
+                            # is not the only card now out of date: every card listing it as a
+                            # controller has to be redrawn, or it keeps naming and linking to a
+                            # session that is gone until the page is reloaded (review 2026-09-13).
+                            for other in list(known.values()):
+                                if went in (other.get("controllers") or []):
+                                    ov = view(other, list(known.values()))
+                                    await ws.send_text(
+                                        json.dumps(
+                                            {
+                                                "event": "session",
+                                                "id": other["id"],
+                                                "state": other["state"],
+                                                "rank": ov["rank"],
+                                                "html": render_card(ov),
+                                                "session": ov,
+                                            }
+                                        )
+                                    )
+                            continue
                         await ws.send_text(json.dumps(ev))
         except (WebSocketDisconnect, AgentUnavailable, ConnectionError):
             pass

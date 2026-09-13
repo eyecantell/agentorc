@@ -511,7 +511,47 @@ def test_the_membership_controls(client, tmp_path):
     assert f'name="controller" value="{orc_id}"' in form and "None selected: nobody may" in form
     assert f'value="{orc_id}" checked' not in form
 
+    # a typed *name* is resolved to an id here, where the fleet is known — the agent stores what
+    # it is given, so an unresolved name would sit in the list as a controller that can never act
+    client.post(f"/api/sessions/{worker}/controllers", json={"remove": [orc_id]})
+    assert client.post(f"/api/sessions/{worker}/controllers", json={"add": ["morc"]}).json()["controllers"] == [orc_id]
+    r = client.post(f"/api/sessions/{worker}/controllers", json={"add": ["ghost"]})
+    assert r.status_code == 400 and "no session 'ghost'" in r.json()["detail"]
+    # removing takes whatever it is given: an entry naming a session that is gone is exactly the
+    # one a person most needs to remove
+    assert client.post(f"/api/sessions/{worker}/controllers", json={"remove": ["ao-vanished"]}).status_code == 200
+    # the body is validated: a bare string would otherwise become one controller per character
+    for bad in ({"add": "ao-x"}, {"add": [None]}, {"add": [""]}):
+        assert client.post(f"/api/sessions/{worker}/controllers", json=bad).status_code == 400
+    assert client.post(f"/api/sessions/{worker}/grants", json={"add": "orchestrate"}).status_code == 400
+
+    # the picker's tick reaches the created session (the form round trip, not just its rendering)
+    r = client.post(
+        "/new",
+        data={"name": "picked", "dir": str(tmp_path), "adapter": "shell", "where": "here", "controller": [orc_id]},
+        follow_redirects=False,
+    )
+    picked = r.headers["location"].rsplit("/", 1)[-1]
+    picked_v = next(x for x in client.get("/api/sessions").json() if x["id"] == picked)
+    # the record keeps ids; the display list is `under`, so the two shapes never share a key
+    assert picked_v["controllers"] == [orc_id] and [c["id"] for c in picked_v["under"]] == [orc_id]
+    # …and a form with nothing ticked starts with nobody able to act on it
+    r = client.post(
+        "/new",
+        data={"name": "unpicked", "dir": str(tmp_path), "adapter": "shell", "where": "here"},
+        follow_redirects=False,
+    )
+    unpicked = r.headers["location"].rsplit("/", 1)[-1]
+    assert next(x for x in client.get("/api/sessions").json() if x["id"] == unpicked)["controllers"] == []
+
+    # the Members list carries the lane the §4.5a row promises
+    from agentorc.ui.app import view as _view
+
+    laned = {**base, "id": "ao-m", "lane": ["TD-027", "TD-019"], "controllers": ["ao-orc"]}
+    assert _view(orc, [orc, laned])["members"][0]["lane"] == "TD-027, TD-019"
+
     # removing the last controller leaves the session running, with nobody able to act (§4.8)
+    client.post(f"/api/sessions/{picked}/controllers", json={"remove": [orc_id]})
     assert client.post(f"/api/sessions/{worker}/controllers", json={"remove": [orc_id]}).json()["controllers"] == []
     assert next(x for x in client.get("/api/sessions").json() if x["id"] == worker)["state"] != "closed"
     page = client.get(f"/focus/{orc_id}").text

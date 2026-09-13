@@ -15,7 +15,7 @@
          controls this one — the agent decides, this only asks. #}
       <span class="controllers" id="fcontrollers" data-id="{{ s.id }}"
             title="the sessions that may act on this one (design §4.8)">
-        {% if s.controllers %}under {% for c in s.controllers %}<button class="chip{% if c.gone %} scraped{% endif %}"
+        {% if s.under %}under {% for c in s.under %}<button class="chip{% if c.gone %} scraped{% endif %}"
               data-act="uncontrol" data-id="{{ s.id }}" data-who="{{ c.id }}"
               title="{{ c.id }} — click to remove it as a controller{{ ' (its session is gone)' if c.gone else '' }}">{{ c.name }} ×</button>{% endfor %}
         {% else %}<span class="note">no controller — nobody may act on this session</span>{% endif %}
@@ -73,7 +73,8 @@
       <div class="h2">Members</div>
       {% for m in s.members %}<div class="row gap">
         <a class="name" href="/focus/{{ m.id }}">{{ m.name }}</a>
-        <span class="meta">{{ m.state }}</span><span class="grow"></span>
+        <span class="meta">{{ m.state }}</span>
+        {% if m.lane %}<span class="meta">{{ m.lane }}</span>{% endif %}<span class="grow"></span>
         {% if m.report %}<span class="meta">{{ m.report }}</span>{% endif %}
       </div>{% else %}<div class="note">no members yet — <code>ao control {{ s.name }} add &lt;session&gt;</code>, or the controllers chip on a session's Focus</div>{% endfor %}
       <div class="note">The sessions this one may act on. It needs both the grant and a place in each session's controllers (design §4.8).</div>

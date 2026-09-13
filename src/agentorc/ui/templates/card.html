@@ -19,8 +19,8 @@
     {# design §4.5a card **under `<orc>`** chip (§4.8, TD-036): who may act on this session. Shown
        only when the list is non-empty — a person's own session has none, which is the common case
        and not worth a line. A controller whose session is gone keeps its entry, shown dim. #}
-    {% if s.controllers %}<div class="row"><span class="meta">under
-      {% for c in s.controllers %}<a class="chip{% if c.gone %} scraped{% endif %}" href="/focus/{{ c.id }}"
+    {% if s.under %}<div class="row"><span class="meta">under
+      {% for c in s.under %}<a class="chip{% if c.gone %} scraped{% endif %}" href="/focus/{{ c.id }}"
          title="{{ 'this controller\'s session is gone — re-attach or remove it' if c.gone else 'may act on this session (design §4.8)' }}">{{ c.name }}</a>{% endfor %}
     </span></div>{% endif %}
     {# design §4.5a card **report line**: only when a channel is non-empty (§4.8, TD-028 step 4) #}

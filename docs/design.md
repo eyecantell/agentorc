@@ -1166,8 +1166,8 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       talks to. Today `orchestrate` is one bit on the *caller* and the gate never looks at the
       target, so every one of them would reach every session on the host. **Per repo was
       rejected** — the boundary has to be the one the person set, not one the tool inferred from
-      a path. **Proposed (§4.8, §4.5a, §9 invariant 11; written 2026-09-12, not implemented —
-      TD-036):** `controllers: [session ids]` on each session record; an acting RPC passes only
+      a path. **Decided (§4.8, §4.5a, §9 invariant 11; written 2026-09-12, go from Paul
+      2026-09-13, steps 1–3 landed the same day — TD-036):** `controllers: [session ids]` on each session record; an acting RPC passes only
       if the caller holds `orchestrate` *and* is in the target's list; empty means nobody may
       act; several controllers allowed; create adds the creator with the child's grants ⊆ the
       creator's; `set_controllers` is itself gated on the target; defaults from `.agentorc.yml`.
