@@ -52,6 +52,7 @@
     if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast("copied", true)); return; }
     if (b.dataset.sort) { setSort(b.dataset.sort); return; }
     const id = b.dataset.id, action = b.dataset.act;
+    let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
     const details = b.closest("details"); if (details) details.open = false;
     try {
@@ -60,12 +61,24 @@
       // design §4.5a: **Drop** on a claimed progress item, and the grants chip (§4.8, TD-028 step 4)
       if (action === "drop") body = { ref: b.dataset.ref };
       if (action === "grants") body = b.classList.contains("off") ? { add: [b.dataset.grant] } : { remove: [b.dataset.grant] };
-      const res = await act(id, action, body);
+      // design §4.5a Focus **controllers** chip (§4.8, TD-036): remove one by clicking it, add one
+      // by id. The agent decides what is allowed; a refusal comes back as the toast below.
+      if (action === "uncontrol") { action2 = "controllers"; body = { remove: [b.dataset.who] }; }
+      if (action === "control-add") {
+        const who = prompt("Which session may act on this one? (its id or name from ao status)");
+        if (!who) return;
+        action2 = "controllers"; body = { add: [who.trim()] };
+      }
+      const res = await act(id, action2 || action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/")) location.href = "/"; }
       if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
+      if (action2 === "controllers") {
+        AO.toast(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
+        if (typeof AO.refreshMembership === "function") AO.refreshMembership();
+      }
     } catch (e) { AO.toast(`${action} failed: ${e.message}`); }
   });
 
@@ -341,6 +354,7 @@
       }
       renderReports(v);
       renderGrants(v);
+      renderMembership(v);
       const checks = v.ready || [];
       $("#checks").innerHTML = checks.map(([n, ok]) => `<div class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✗"} ${esc(n)}</div>`).join("");
       $("#closebtn").disabled = !(checks.length && checks.every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
@@ -367,6 +381,43 @@
           + `<span class="grow"></span><span class="st age" data-since="${esc(f.at || "")}">${fmtAge(f.at)}</span></div>`;
       }).join("");
     }
+    // design §4.5a controllers chip + Members list (§4.8, TD-036). Both are membership, which is
+    // read *across* records: this session's delta carries them, but a change on another session
+    // (a controller renamed, removed, or gone) does not reach here as a delta for us — hence the
+    // debounced re-read below. Without it the chip keeps saying who controlled this session at
+    // page load, which is the one thing a membership display must never do.
+    function renderMembership(v) {
+      const el = $("#fcontrollers");
+      if (el) {
+        const cs = v.under || [];
+        el.innerHTML = (cs.length
+          ? "under " + cs.map((c) => `<button class="chip${c.gone ? " scraped" : ""}" data-act="uncontrol" data-id="${esc(id)}" data-who="${esc(c.id)}" title="${esc(c.id)} — click to remove it as a controller${c.gone ? " (its session is gone)" : ""}">${esc(c.name)} ×</button>`).join("")
+          : `<span class="note">no controller — nobody may act on this session</span>`)
+          + ` <button class="btn sm ghost" data-act="control-add" data-id="${esc(id)}" title="add a controller">+</button>`;
+      }
+      const box = $("#members"); if (!box) return;
+      const ms = v.members || [];
+      box.innerHTML = `<div class="h2">Members</div>`
+        + (ms.length
+          ? ms.map((m) => `<div class="row gap"><a class="name" href="/focus/${encodeURIComponent(m.id)}">${esc(m.name)}</a>`
+              + `<span class="meta">${esc(m.state || "")}</span>`
+              + (m.lane ? `<span class="meta">${esc(m.lane)}</span>` : "") + `<span class="grow"></span>`
+              + (m.report ? `<span class="meta">${esc(m.report)}</span>` : "") + `</div>`).join("")
+          : `<div class="note">no members yet — <code>ao control ${esc(v.name || "")} add &lt;session&gt;</code>, or the controllers chip on a session's Focus</div>`)
+        + `<div class="note">The sessions this one may act on. It needs both the grant and a place in each session's controllers (design §4.8).</div>`;
+    }
+    let membershipSoon = null;
+    AO.refreshMembership = refreshMembership;
+    function refreshMembership() {
+      clearTimeout(membershipSoon);
+      membershipSoon = setTimeout(async () => {
+        try {
+          const all = await (await fetch("/api/sessions")).json();
+          const mine = all.find((x) => x.id === id);
+          if (mine) renderMembership(mine);
+        } catch (e) { /* the banner already covers a down agent */ }
+      }, 400);
+    }
     function renderGrants(v) {
       const el = $("#fgrants"); if (!el) return;
       const all = (el.dataset.grants || "").split(",").filter(Boolean), held = v.capabilities || [];
@@ -388,6 +439,8 @@
         render(ev.session);
         // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
+      } else if (ev.event === "session" || ev.event === "gone") {
+        refreshMembership();  // another session changed: it may be a controller or a member of ours
       }
       if (ev.event === "gone" && ev.id === id) banner("session removed");
     });

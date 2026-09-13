@@ -33,6 +33,22 @@
     </div>
     <div class="field"><label>Opening prompt (optional)</label><textarea class="input tall" name="prompt" placeholder="Paste the brief, or leave empty to start at the prompt."></textarea></div>
     <label class="radio gap"><input type="checkbox" name="unattended"><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: policies apply (phase 3).</div></div></label>
+    {# design §4.5a New session **Controllers** picker (§4.8, TD-036): which sessions may act on
+       this one once it starts. The candidates are the sessions holding `orchestrate` — nothing
+       else could act on it anyway — and none is selected by default: an empty list means nobody
+       may act on it, which is the explicit default, so the note states it rather than warning. #}
+    <div class="field">
+      <label>Controllers</label>
+      {% if orchestrators %}
+        <div class="row gap wrap">
+          {% for o in orchestrators %}<label class="radio"><input type="checkbox" name="controller" value="{{ o.id }}">
+            <div><div>{{ o.name }}</div><div class="note mono">{{ o.id }}</div></div></label>{% endfor %}
+        </div>
+        <div class="note">The sessions that may act on this one (send, wrap up, kill, close). None selected: nobody may — you can add one later from the session's Focus or with <code>ao control</code>.</div>
+      {% else %}
+        <div class="note">No session holds the <code>orchestrate</code> grant yet, so nothing could act on this one. Grant it from a session's Focus header, then add it here or with <code>ao control</code>.</div>
+      {% endif %}
+    </div>
     <div class="warn">⚠ One agent session per directory. A second agent session in a directory that already has one is refused, not warned about. Shells are exempt.</div>
     <div class="row gap end"><a class="btn" href="/">Cancel</a><button class="btn primary" type="submit">Start session</button></div>
   </form>
