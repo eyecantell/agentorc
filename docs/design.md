@@ -439,8 +439,8 @@ agent there.
 
 Screens:
 
-1. **Team** (home): a **card grid** (decision 2026-09-04, over a table — keeps each session's
-   facts grouped and shows a live tail). Each card: host/repo (or host/directory), name, age,
+1. **Org** (home; named Herd, then Team, until the team definitions of §4.9 landed): a **card grid** (decision 2026-09-04, over a table — keeps each session's
+   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). Each card: host/repo (or host/directory), name, age,
    state pill, profile line (`shell` for a shell), where (checkout, worktree → branch, or
    directory), dirty/unpushed flag, then either the pending permission with Allow / Deny (hook
    channel, §4.2), a pending question with Focus, the reset time with Switch profile / Wait, or
@@ -584,6 +584,10 @@ noted). If a control is not in this table it does not exist.
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
+| Org | **team groups** | when any live session carries a `team` badge the grid is grouped: a header per team — name, lead (name, state), projects, needs-you count across members — the lead's card first, members after, the sessions on no team under *No team*; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9) |
+| Org | **Teams** strip: **Start / Stop** per definition | every team in `org.yml` and the repos' `.agentorc.yml`, its source and live count; Start runs the same sequence as `ao team start` (all checks before any create), Stop the same as `ao team stop` (wrap-up members, then the lead; **Stop now** kills). Collapsed to a count when nothing is defined (§4.9) |
+| New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is what every session was before |
+| card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
@@ -737,7 +741,11 @@ how a person thinks about it, *this orc controls these sessions*, while the list
 each target — one `set_controllers` call per target, so a refusal names the session it refused and
 the rest still stand. `ao new --controller <id>…` sets it at create, and `ao new` prints one line
 when a session starts with nobody able to act on it. `ao status -v` prints both directions:
-`under:` from the record, `members:` derived across the records, never stored. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+`under:` from the record, `members:` derived across the records, never stored. Teams (§4.9): `ao team start <name>` launches a
+definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every check first, then the lead, then each member with
+`controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills);
+`ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
+`ao new --project <name>` gives a hand-started session the project's reach block. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -882,7 +890,8 @@ Being scheduled is **not** a capability and a grant carries no schedule: everyth
 stays on the `unattended` side (§6, TD-026) and applies to a session whatever it holds.
 
 **Role presets.** A role is a name for New session and `ao new` that resolves to a brief
-template, a default lane shape, and default grants; the record keeps the name as `role` for the
+template, a default lane shape, default grants, and — since 2026-09-13, §4.9 — the **profile** it runs under (§4.2a), so the
+pick-list adds an agent by skillset in one choice; the record keeps the name as `role` for the
 badge and nothing keys on it (§9 invariant 9). Three ship with the package; a repo may redefine
 any of them or add its own (§5):
 
@@ -901,6 +910,141 @@ a §6 policy. Rules that prove mechanical (wrap up at the stop time, retry a sta
 into the tick; those that needed judgement (stuck or thinking? interrupt now?) stay in the
 brief. The grant is what makes this safe to try: the orchestrator's power is a field the person
 can see on the Focus header and revoke, not a promise in its prompt.
+
+### 4.9 Org, Team, Project: the definitions above a session (2026-09-13)
+
+The vocabulary is [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md); this section is
+what the code does with it (TD-040). The one-line summary: a **project** says where repos are, a
+**team** says which roles to start in them under which lead, `ao team start` is the one action
+that launches the lot with the right `controllers` and checkouts, and the Org page shows the
+result grouped. Nothing below adds a second membership list — a team's members at runtime are
+the sessions whose `controllers` name its lead (§4.8); the definition only says how to start
+them.
+
+**Where definitions live.** One org-level file per UI host, `~/.agentorc/org.yml`, beside
+`profiles.yml` and `hosts.yml`, holding `projects:`, `teams:` and an optional org-wide `roles:`.
+A project spans repos and a team spans projects, so neither belongs in one repo's
+`.agentorc.yml`; and the org is per install (ADR), so its file is. A repo's `.agentorc.yml` may
+also carry `teams:` — teams whose only project is that repo — so a repo can ship its own grind
+team beside its code; on a name collision the org file wins and `ao team list` names each
+definition's source. Both files are read on every use and cached nowhere (the profiles rule),
+so editing the file is the whole edit. They are read by the **clients** — `ao team`, `ao new`,
+the UI's New session and Org page — never by the host agent: a team start is an ordinary
+sequence of `create` RPCs, and the agent stores `team` and `project` as two plain strings on the
+record. `sessionorc` stays free of org vocabulary (it never imports `agentorc`), and the agent
+needs no restart when a definition changes.
+
+**Projects.** A named set of one or more repos, each with its checkout path per host:
+
+```yaml
+projects:
+  agentorc:
+    repos:
+      agentorc: {kmaster: ~/agentorc}
+  guardians:
+    repos:
+      guardians:     {devenv: /workspaces/guardians}
+      guardians-api: {devenv: /workspaces/guardians/api}
+```
+
+The repo name is the project's word for it; session ids keep using the checkout's directory
+name as they do today. A repo may sit in several projects (agentorc and dev-cadence can be one
+project or two, the person decides). A project is a grouping over checkouts that exist: it is
+not a place to register a repo — the dev-cadence registry stays that — and `ao team start`
+refuses with the missing path rather than cloning anything. In phase 1 the only host is
+`hosts.yml`'s `local` entry, and an entry for another host is ignored with a note until phase
+2's transport reaches it.
+
+**Teams.** A lead plus members as (role, count), on one or more projects:
+
+```yaml
+teams:
+  ao-grind:
+    projects: [agentorc]
+    lead: {role: orchestrator, name: orchestrator-ao-1}
+    members:
+      - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
+      - {role: hunter, name: hunter-ao, lane: ui}
+  guardians:
+    projects: [guardians]
+    lead: {role: orchestrator, name: guardians-orc, home: guardians}
+    members:
+      - {role: grinder, home: guardians-api, brief: docs/briefs/api-grinder.md}
+      - {team: guardians-ui}          # a nested team: its lead's controllers name this lead
+```
+
+`lead`: `role` (default `orchestrator`; **`person`** means the person leads — no session is
+started and members get an empty `controllers` list plus the team badge), `name` (default
+`<team>-lead`), `home` (a repo name from the team's projects — required when the projects list
+more than one repo, defaulted to the only one otherwise), `profile` (overrides the role's).
+Each member: `role`, `count` (default 1; a count above one suffixes the name `-1`, `-2`, …),
+`name` (the prefix; default the role), `home`, `lane`, `brief` (overrides the role's template),
+`profile`, `grants` (default the role's), `unattended` (default **true** — a team is what runs
+while the person is elsewhere; an interactive member is the exception and is said so). A member
+that is `{team: <name>}` is a nested team: starting the outer team starts the inner one with
+its lead's `controllers` set to the outer lead, which is the orc-of-orcs shape of §4.8 without a
+special case. The flat case ships first; nesting lands once it works.
+
+**Home and reach.** Every team session's home is a worktree in its home repo named after the
+session (`<repo>/.claude/worktrees/<name>`, the New session "new worktree" rule in §4.5a), so the
+main checkout stays the person's and the anchor rule (§9 invariant 2) holds per member without
+anyone counting. The record's `dir` and `repo` are the home, as for every session; `team` and
+`project` are added as badges, like `role` — nothing keys on them (§9 invariant 9). Reach is
+the ADR's phase-1 meaning: when a project has more than one repo, the session's brief is
+prefixed with a **Project** block that names each repo's checkout on this host and which one is
+home. That is the whole of it — no credential, no permission — and `ao new --project <name>`
+gives a hand-started session the same block.
+
+**Starting and stopping.** `ao team start <name>` resolves the definition, then checks
+*everything before launching anything*: every checkout exists on this host, every role and
+profile resolves, and every session name is free under §4.1's rule — a live holder refuses the
+whole start and names it, so there is never half a team; exited or closed holders are
+superseded as §4.1 says, which makes `ao team start` after a night's exit the restart too. Then
+it creates the lead (the role's grants — `orchestrate` for `orchestrator` — its profile, a
+worktree, unattended), and each member with `controllers: [lead id]`, its role, lane, brief
+(the role's template with `{lane}` filled, the Project block in front, a `brief:` override
+instead), profile and worktree. A person runs it, so no attenuation applies (§4.8 create rule);
+an orchestrator running it is subject to it as for any create. It prints one line per session
+with the id, `--json` the records. `ao team stop <name>` sends the wrap-up prompt (the one the
+card's Wrap up sends, §4.5a) to each member, waits for each to go idle or the wrap-up window to
+pass, then to the lead; `--now` kills instead of asking. `ao team status <name>` is the lead's
+Members view for a terminal: each member with state, lane and report line. `ao team list` shows
+every definition, its source file, and whether it is live. A team is **live** when any session
+carrying its badge is live; there is no team record — a team that is stopped is only its
+definition.
+
+**The Org page.** The home route and nav item become **Org**; the Team name retires with the
+page (the second rename this week, and the last: the noun does not change with what is inside,
+ADR). The page is the card grid of §4.5, flat when no live session carries a team badge. When
+any does, the grid is grouped into **team groups**, each with a header — team name, lead (name,
+state), projects, and the needs-you count across its members — the lead's card first, its
+members' cards after, and the sessions on no team in a *No team* group at the end. Grouping is
+derived on each tick from the badge and the `controllers` edges, never stored, so a session
+attached with `ao control` after the start joins the group and one detached leaves it. Above
+the grid, a **Teams** strip lists every definition with Start / Stop and its live count,
+collapsed to a count when nothing is defined. New session gains a **Project** picker that
+narrows the repo list to the project's repos on this host and adds the Project block to the
+brief. Urgent-first sorting works within a group; Pinned order is per group.
+
+**Roles gain a profile.** A preset may name the profile it runs under, so the pick-list adds an
+agent by skillset in one choice: `roles.<name>.profile` in `.agentorc.yml`, in `org.yml`'s
+`roles:`, or nowhere (then the host's default profile). Precedence, lowest first: the package's
+built-ins, `org.yml`, the repo's `.agentorc.yml`, a team member's own `profile`, `--profile` on
+the command line. The package's built-ins name no profile, because profile names are the
+person's (§4.2a).
+
+**Guardians, and any project that lives in a container** (settles the §10 question of
+2026-09-13, this session's call, revisable). A project's repo entry is per host, and a host is
+wherever an `agentorc-agent` runs beside a tmux server — a devcontainer that runs the agent
+*is* a host, shape (b) in §10, which is phase 2's transport aimed at a container. guardians is
+not on kmaster and is not to be cloned there (Paul, 2026-09-12); its project entry names the
+devenv host, and `ao team start guardians` from kmaster waits for phase 2. Nothing in this
+section changes for that: the host column fills in.
+
+**Done when** `ao team start ao-grind` brings up an orchestrator and two grinders, each in its
+own worktree, the grinders' `controllers` naming the orchestrator, the Org page showing the
+three as one group with the lead first, and `ao team stop ao-grind` wrapping them up in the
+right order.
 
 ## 5. Configuration
 
@@ -930,17 +1074,37 @@ unattended:
   wrapup_minutes: 15
   creds_min_hours: 0.25
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
-  grinder: {brief: docs/briefs/grinder.md, lane: free-pick}
+  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}   # profile: §4.9
   hunter: {brief: docs/briefs/hunter.md}
   orchestrator: {brief: docs/briefs/orchestrator.md, grants: [orchestrate]}
 controllers: [orchestrator-ao-1]      # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
+teams:                                # §4.9: teams whose only project is this repo; org.yml wins a name
+  grind: {lead: {role: orchestrator, name: orc}, members: [{role: grinder, count: 2, name: tdgrind}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - name: test        ; run: pdm run test
   - name: cluster     ; run: ./scripts/cluster-status.sh
   - name: attention   ; run: python scripts/nudge_user_attention.py --report
+```
+
+- Org (§4.9): `~/.agentorc/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
+  roster that sits between the package's built-ins and a repo's own. Read by the clients on every
+  use, never by the agent:
+
+```yaml
+projects:
+  agentorc:  {repos: {agentorc: {kmaster: ~/agentorc}}}
+  guardians: {repos: {guardians: {devenv: /workspaces/guardians}, guardians-api: {devenv: /workspaces/guardians/api}}}
+teams:
+  ao-grind:
+    projects: [agentorc]
+    lead: {role: orchestrator, name: orchestrator-ao-1}
+    members:
+      - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
+roles:
+  grinder: {profile: grind}
 ```
 
 A repo without the file gets defaults: `adapter: claude-code`, worktrees under
@@ -1038,9 +1202,10 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 7. The agent's edits to a repo's board file are always committed, never left in the tree.
 8. A session's process is launched as the adapter's argv, never through the person's
    interactive shell (§4.1); tmux, not the agent, holds the process.
-9. Nothing keys on a session's role: policies key on `unattended` and the schedule, acting
-   RPCs key on grants, displays key on the report channels (§4.8). A preset sets defaults at
-   start and is a badge afterwards.
+9. Nothing keys on a session's role, team or project: policies key on `unattended` and the schedule, acting
+   RPCs key on grants and `controllers`, displays key on the report channels (§4.8). A preset sets defaults at
+   start and is a badge afterwards; `team` and `project` are badges from the start (§4.9), and the
+   Org page's grouping is derived from `controllers` and the badge on each tick, never stored.
 10. A report entry the session declared is never overwritten by one the agent derived; a
     derived entry is shown as such, like a scraped state.
 11. A session acts on another session only through the agent, only with the `orchestrate`
@@ -1229,13 +1394,15 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       profile, offered as the pick-list for adding a member; agent is the UI's word for an
       interactive session. "Access to repos" is which checkouts a team starts in, not
       credential scoping. Design change and sequencing in TD-040, after TD-036; the Team page
-      becomes Org when teams are definable.
+      becomes Org when teams are definable. **Design written 2026-09-13 as §4.9** (org.yml,
+      `ao team start|stop|status|list`, the Org page's team groups, a role's `profile`, home
+      and reach); code follows under TD-040.
 - [ ] **Product name.** (raised 2026-09-13 by Paul) agentorc.com is a pre-launch business
       workflow product; `agentorg` collides with AgentOrgs and the "autonomous company"
       frameworks, and agentorg.ai is live (checked 2026-09-13, table in the
       [ADR](decisions/2026-09-13-org-teams-projects.md)). Keep `agentorc` as repo and package
       until there is a product to name; decide before the relay transport ships (§4.5c).
-- [ ] **A session that is meant to run inside a devcontainer** (raised 2026-09-13, from the
+- [x] **A session that is meant to run inside a devcontainer** (raised 2026-09-13, from the
       `guardians` constellation). agentorc launches a session as the adapter's argv in a tmux
       session **on the host** (§9 invariants 1 and 8). Paul's `guardians` work — five repos under
       `GuardiansoftheHeart/guardians-devenv`, Claude Code, a dev-cadence consumer — is worked in a
@@ -1252,6 +1419,10 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       and breaks invariant 8's "never through the person's shell" the moment `docker exec` picks up
       an rc file. Not urgent — nothing is cloned here — but it decides whether the guardians
       orchestrator is one of ours or a second host. Brief: `docs/briefs/guardians-orchestrator.md`.
+      → **(b), a second host** (2026-09-13, the anchor session's call while writing §4.9;
+      revisable): a host is wherever an `agentorc-agent` runs beside a tmux server, a devcontainer
+      that runs one is a host, and a project's repo entry names it per host. guardians stays off
+      kmaster and its team start waits for phase 2's transport.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 - [x] **Rename the Herd page?** (2026-09-13) → **yes, to Team.** Decided by Paul: "Herd" reads
