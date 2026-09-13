@@ -531,3 +531,24 @@ def test_every_subcommand_takes_a_bare_name(subprocess_agent, tmp_path, capsys, 
     assert cli.main(["--json", "mode", "w", "interactive"]) == 0
     assert json.loads(capsys.readouterr().out)["id"] == first  # the live one wins
     call_sync("kill", id=first)
+
+
+def test_ao_new_team_and_project_badges(subprocess_agent, tmp_path, capsys):
+    """TD-040 step (b), design §4.9: `ao new --team --project` pass two plain strings through to
+    the record; `status --json` carries them and `status -v` prints one line each when set."""
+    argv = ["--json", "new", "g", "-a", "shell", "-d", str(tmp_path), "--team", "ao-grind", "--project", "agentorc"]
+    assert cli.main(argv) == 0
+    s = json.loads(capsys.readouterr().out)
+    assert (s["team"], s["project"]) == ("ao-grind", "agentorc")
+    assert cli.main(["--json", "shell", "-d", str(tmp_path)]) == 0  # `ao shell` has no flags: empty badges
+    sh = json.loads(capsys.readouterr().out)
+    assert (sh["team"], sh["project"]) == ("", "")
+    assert cli.main(["--json", "status"]) == 0
+    by_id = {r["id"]: r for r in json.loads(capsys.readouterr().out)}
+    assert (by_id[s["id"]]["team"], by_id[s["id"]]["project"]) == ("ao-grind", "agentorc")
+    assert cli.main(["status", "-v"]) == 0
+    shown = capsys.readouterr().out
+    assert "team:   ao-grind" in shown and "project: agentorc" in shown
+    assert shown.count("team:") == 1  # the shell session shows neither line
+    for sid in (s["id"], sh["id"]):
+        call_sync("kill", id=sid)

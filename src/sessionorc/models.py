@@ -182,6 +182,11 @@ class Session:
     # act on others at all; this says on which. Several controllers are allowed and none is
     # privileged.
     controllers: list[str] = field(default_factory=list)
+    # Badges (design §4.9): the team and project a session was started under, two plain strings
+    # the clients set from `org.yml` — the agent never reads that file, and nothing here keys on
+    # either (§9 invariant 9); the Org page derives its groups from the badge and `controllers`.
+    team: str = ""
+    project: str = ""
     # The model actually in use, when the adapter can tell (TD-031): observed, never the profile's
     # declared model — that is an intent (§4.2a), and a display says so when it falls back to it.
     model: str | None = None
