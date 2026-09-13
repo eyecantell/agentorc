@@ -1,8 +1,11 @@
 # agentorc — design
 
-Status: **settled for build** (2026-09-04 design; the last open questions closed 2026-09-05). Nothing
-is built. This document is the requirements and architecture agreed in the 2026-09-04 design
-session; each open question at the end is a decision that changes what gets built. The project was
+Status: **phase 1 in progress** (2026-09-04 design; the last of the original open questions
+closed 2026-09-05; building since 2026-09-05). The host agent, the Claude Code adapter, the Herd
+and Focus pages, New session and the CLI run today; §7 has the phase plan and
+[`technical_debt.md`](technical_debt.md) what is deferred. This document is the requirements and
+architecture agreed in the 2026-09-04 design session and amended since; each open question at the
+end is a decision that changes what gets built. The project was
 called `sessionherd` for most of that day; see §10 for the rename.
 
 ## 1. Problem
@@ -1114,7 +1117,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       greyed with "resume from the Herd". **Superseded 2026-09-06** by the **Where** control as
       it was actually built (§4.5a): the worktree is *named*, reused if one of that name exists,
       and there is no picker — so the only list a person sees is the directory-occupancy answer
-      the form asks for as they type. Noted 2026-09-13: §4.5a is the authority, and a control
+      the form asks for as they type. Noted 2026-09-12: §4.5a is the authority, and a control
       not in that table does not exist.
 - [ ] **Deny with a reason?** The hook decision can carry a message Claude reads. A one-line
       "why" next to Deny (optional field, card and Focus) would steer the next attempt better
