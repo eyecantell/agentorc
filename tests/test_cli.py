@@ -304,7 +304,9 @@ def test_skill_prints_the_rules(capsys):
 
 def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-028 step 1: `ao` sends AGENTORC_SESSION as the caller; `ao grant` / `ao revoke` edit
-    `capabilities`, shown by `ao status -v` and `--json`; `ao new --grant` sets it at create."""
+    `capabilities`, shown by `ao status -v` and `--json`; `ao new --grant` sets it at create.
+    TD-036: the grant is now only half the gate — the caller must also be in the target's
+    `controllers`."""
 
     def out():
         return json.loads(capsys.readouterr().out)
@@ -329,6 +331,11 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     assert cli.main(["status", "-v"]) == 0
     assert "grants: orchestrate" in capsys.readouterr().out
     monkeypatch.setenv("AGENTORC_SESSION", a)
+    # The grant alone is no longer enough (TD-036): a is not in b's controllers, and an empty list
+    # means nobody may act. `ao control` lands in step 2; here the RPC stands in for it.
+    assert cli.main(["--json", "kill", b]) == 1
+    assert "not in its controllers" in out()["error"]
+    call_sync("set_controllers", id=b, add=[a])
     assert cli.main(["--json", "kill", b]) == 0
     assert out()["state"] == "exited"
     monkeypatch.delenv("AGENTORC_SESSION")
