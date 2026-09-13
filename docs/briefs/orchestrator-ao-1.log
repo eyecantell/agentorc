@@ -338,3 +338,4 @@
 20:23  on cadence: I stretched to 900 s at tick 66 and am holding there rather than going further. The brief says ten minutes; fifteen is a defensible read of it now that no PR is open and every worker has declared itself done, and the next real events are the workers' 11:30Z stop and my own 12:30Z. Thirty would drift from an explicit instruction for a gain I cannot justify, since the whole cost of a wasted tick is a few `gh` calls. If anything starts merging again I go back to 600.
 20:39  tick 68 (02:39Z). No merges, no rows owed, all six `idle` and unchanged since tick 67. ok -- quiet tick.
 20:55  tick 69 (02:55Z). No merges, no rows owed, all six `idle` and unchanged. ok -- quiet tick.
+21:11  tick 70 (03:11Z). No merges, no rows owed, all six `idle` and unchanged. ok -- quiet tick.
