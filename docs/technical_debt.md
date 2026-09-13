@@ -219,7 +219,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Priority:** Low
 **Added:** 2026-09-12
 **Status:** Open — found by the 2026-09-12 doc-congruence pass; not fixed there, because redrawing three screens is a generator change nobody can review by reading a diff
-**Location:** `docs/mockups/gen.py` (`row()` / `herd_desktop()` card renderer, `focus()`, `new_session()`)
+**Location:** `docs/mockups/gen.py` (`row()` / `team_desktop()` card renderer, `focus()`, `new_session()`)
 
 **Why:** `gen.py` was last touched 2026-09-05 and the UI has moved twice since. Undrawn but shipped: the card's **report line**, the Focus header **grants** chip, and the Focus **Reports** side panel (all landed 2026-09-12, `src/agentorc/ui/templates/card.html`, `focus.html`; §4.5a). Drawn but nonexistent: `new_session()` renders a four-way **Where** radio group with an *existing worktree* picker and a separate Fresh/Resume pair, while the shipped form (`src/agentorc/ui/templates/new.html`) has the two-option this-directory/new-worktree control and a plain Resume field — the picker was superseded on 2026-09-06 (§10, noted 2026-09-12) and §4.5a never carried it. That second half is the one that matters: mockups are what a person reads to learn what the product does, so a screen showing a control that does not exist teaches a false UI, and §4.5a's rule ("a control not in this table does not exist") cannot defend itself against a picture. The membership controls (§4.5a, TD-036) are correctly absent — they are proposed, not built — and should stay absent until they ship.
 

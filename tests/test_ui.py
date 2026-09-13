@@ -223,7 +223,7 @@ def test_term_unknown_session(client):
         assert b"no session" in ws.receive_bytes()
 
 
-def test_herd_renders_with_agent_down(tmp_path, monkeypatch):
+def test_team_renders_with_agent_down(tmp_path, monkeypatch):
     """No bare 503: the Team shows the down banner and Retry when the agent socket is absent."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "nohome"))
     from agentorc.ui.app import create_app
