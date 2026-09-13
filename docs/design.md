@@ -813,8 +813,8 @@ orchestrator controls.** The prior-art survey behind the rules below is
 
 - **The record.** Every session record carries `controllers: [session ids]`. It lives on the
   *target*, not on the orchestrator: the gate is then one lookup, there is no second list to keep
-  in step, it survives a restart (ids are stable, §9 invariant 12), and it dies when the record
-  is forgotten. The orchestrator's own member view is *derived* from the records — its Focus
+  in step, it is persisted and reloaded with the record it sits on, so it survives an agent
+  restart, and it dies when the record is forgotten. The orchestrator's own member view is *derived* from the records — its Focus
   lists its members with their states, which is the central view a person reads — and must never
   become a cache of them.
 - **The gate.** An acting RPC from session A onto session B passes only if A holds `orchestrate`
@@ -1153,7 +1153,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       act; several controllers allowed; create adds the creator with the child's grants ⊆ the
       creator's; `set_controllers` is itself gated on the target; defaults from `.agentorc.yml`.
       Stored on the target because that makes the gate one lookup, needs no second list kept in
-      step, survives a restart (invariant 12) and dies with the record; the orchestrator's member
+      step, is reloaded with the record it sits on and dies with it; the orchestrator's member
       view is derived from the records and must not become a cache of them. The grant stays the
       one revocable kill switch on the orchestrator.
       **What the prior-art survey changed**
