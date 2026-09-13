@@ -1040,8 +1040,10 @@ class HostAgent:
         """`ao control <orc> add|remove <session>`, the Focus controllers chip (design §4.8,
         TD-036): edit which sessions may act on this one. Gated on the *target* like `set_grants`,
         so a person always may and a session only if it already controls it — control is handed
-        on, never seized. Takes effect on the next call the controller makes: the gate reads the
-        record, not a cached copy."""
+        on, never seized; and never at all from a session onto an interactive target (§9
+        invariant 5, TD-041 — `_gate` refuses it before this method runs), while a person may hand
+        their own session to a controller deliberately. Takes effect on the next call the
+        controller makes: the gate reads the record, not a cached copy."""
         s = self._get(id)
         adding, removing = _controllers(add or []), _controllers(remove or [])
         if s.id in adding:
@@ -1173,6 +1175,9 @@ class HostAgent:
         came from `AGENTORC_SESSION`) and holds no grant. Reads are never gated; this is a guard
         against a confused worker, not a security boundary.
 
+        Third, §9 invariant 5 (TD-041): a target that is a person's session (`kind: interactive`
+        and not `unattended`) is refused to every session, grant and membership notwithstanding.
+
         `caller is None` — the field absent from the envelope — is the only thing that reads as a
         person. Anything else present is a session, however odd its type: `not caller` would have
         let `"caller": 0` (or `""`, `[]`, `{}`) past both halves of the gate, since the socket
@@ -1205,13 +1210,24 @@ class HostAgent:
         # without `external=True`, and a missing `id`, which is a required argument on all of them
         # and so fails as bad params. Both are pinned by tests; an acting RPC that ever took
         # `external=True` or gave `id` a default would need its own membership check here.
-        if target is not None and str(caller) not in target.controllers:
-            how = "nobody may act on it" if not target.controllers else "it is controlled by " + ", ".join(
-                target.controllers
-            )
+        if target is not None and target.kind == "interactive" and not target.unattended:
+            # §9 invariant 5 (TD-041): a person's session — `kind: interactive` says conversation,
+            # `unattended: false` says not a worker — is out of every session's reach, whatever the
+            # grant and whatever `controllers` says, `set_controllers` included. Checked before
+            # membership because no edit to the list changes the answer; read from the record on
+            # every call, so `ao mode <id> interactive` takes effect on the controller's next call
+            # and its list entry merely goes inert. A person (no caller) never reaches this line.
             raise RpcError(
-                f"{caller} cannot {method} {target_id}: not in its controllers — {how} (design §4.8)"
+                f"{caller} cannot {method} {target_id}: it is interactive, and no session acts on an "
+                f"interactive session — only a person does (design §9 invariant 5)"
             )
+        if target is not None and str(caller) not in target.controllers:
+            how = (
+                "nobody may act on it"
+                if not target.controllers
+                else "it is controlled by " + ", ".join(target.controllers)
+            )
+            raise RpcError(f"{caller} cannot {method} {target_id}: not in its controllers — {how} (design §4.8)")
 
     def _get(self, sid: str, *, external: bool = False) -> Session:
         """A record by id. A registry-only card (`external`) is returned only to callers that

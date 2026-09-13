@@ -475,7 +475,13 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
     self, no caller, and every read pass; `set_grants` is a person's (or a granted session's)."""
     async with LocalClient() as person:
         a = (await person.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
-        b = (await person.call("create", name="b", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        # b is a worker (`unattended`): an interactive b would be refused for a different reason,
+        # §9 invariant 5, which has its own test below
+        b = (
+            await person.call(
+                "create", name="b", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+            )
+        )["id"]
         assert (await person.call("get", id=a))["capabilities"] == []
         async with LocalClient(caller=a) as worker:
             # session → other: refused for every acting RPC, one message
@@ -517,7 +523,9 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             assert (await person.call("set_controllers", id=b, add=[a]))["controllers"] == [a]
             await worker.call("send", id=b, text="echo FROM-A")
             # create adds the creator, so a may act on what it started without a second call
-            c = await worker.call("create", name="c", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            c = await worker.call(
+                "create", name="c", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+            )
             assert c["capabilities"] == []
             assert c["controllers"] == [a]
             await worker.call("send", id=c["id"], text="echo MINE")
@@ -551,10 +559,12 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
     create adds the creator and may not hand out a grant it does not hold; a person is unaffected
     throughout; and the list survives the store."""
     async with LocalClient() as person:
+
         def mk(n: str):
             return person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
 
         ui, backend, shared = [(await mk(n))["id"] for n in ("ui", "backend", "shared")]
+        await person.call("set_mode", id=shared, unattended=True)  # a worker: §9 invariant 5 is tested apart
         for orc in (ui, backend):
             await person.call("set_grants", id=orc, add=["orchestrate"])
         # the empty default: granted, but a member of nothing
@@ -629,7 +639,7 @@ async def test_a_present_caller_is_a_session_however_odd_its_type(agent, tmp_pat
     "no caller" and skip both halves of the gate. Also pins the two ids `_gate` leaves to the
     method: a registry-only record and a missing `id`."""
     async with LocalClient() as person:
-        victim = (await person.call("create", name="v", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))
+        victim = await person.call("create", name="v", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         vid = victim["id"]
 
         async def raw(req: dict) -> dict:
@@ -658,6 +668,74 @@ async def test_a_present_caller_is_a_session_however_odd_its_type(agent, tmp_pat
             with pytest.raises(AgentError, match="bad params"):
                 await orc_client.call("kill")
         for sid in (vid, orc):
+            await person.call("kill", id=sid)
+
+
+async def test_interactive_sessions_are_out_of_every_controller_s_reach(agent, tmp_path):
+    """Design §9 invariant 5, §4.8, TD-041: an acting RPC from a session onto a target that is
+    `kind: interactive` and not `unattended` — a person's session — is refused whatever the grant
+    and membership, `set_controllers` included; a person is unaffected on both counts; `ao mode`
+    to interactive takes a worker out of reach on the next call and leaves its list inert, not
+    dropped; a `kind: command` run and an unattended worker are reachable as before."""
+    async with LocalClient() as person:
+
+        def mk(n: str, **kw):
+            return person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw)
+
+        orc = (await mk("orc"))["id"]
+        await person.call("set_grants", id=orc, add=["orchestrate"])
+        anchor = (await mk("anchor"))["id"]  # the person's own session: interactive by default
+        worker = (await mk("worker", unattended=True))["id"]
+        run = (await mk("run", kind="command"))["id"]
+        assert (await person.call("get", id=anchor))["unattended"] is False
+        # a person may hand their own session to a controller — deliberately, and it is allowed
+        assert (await person.call("set_controllers", id=anchor, add=[orc]))["controllers"] == [orc]
+        for sid in (worker, run):
+            await person.call("set_controllers", id=sid, add=[orc])
+        async with LocalClient(caller=orc) as orc_client:
+            # …but membership buys the controller nothing on an interactive session: every acting
+            # RPC is refused naming the invariant, and the refusal is not the membership one
+            for method, params in (
+                ("send", {"id": anchor, "text": "echo no"}),
+                ("keys", {"id": anchor, "keys": ["Enter"]}),
+                ("kill", {"id": anchor}),
+                ("close", {"id": anchor}),
+                ("set_mode", {"id": anchor, "unattended": True}),  # only a person hands one to unattended
+                ("remove", {"id": anchor}),
+                ("set_controllers", {"id": anchor, "add": ["ao-other"]}),
+                ("set_controllers", {"id": anchor, "remove": [orc]}),
+            ):
+                with pytest.raises(AgentError, match="invariant 5") as e:
+                    await orc_client.call(method, **params)
+                assert "not in its controllers" not in str(e.value)
+            got = await person.call("get", id=anchor)
+            assert got["state"] not in ("exited", "closed") and got["controllers"] == [orc]
+            # a non-member is refused for the same reason: invariant 5 comes before membership
+            stray = (await mk("stray"))["id"]
+            with pytest.raises(AgentError, match="invariant 5"):
+                await orc_client.call("send", id=stray, text="echo no")
+            # the worker and the command run are reachable exactly as before
+            await orc_client.call("send", id=worker, text="echo WORKER")
+            assert (await orc_client.call("set_controllers", id=worker, add=["ao-peer"]))["controllers"] == [
+                orc,
+                "ao-peer",
+            ]
+            assert (await orc_client.call("kill", id=run))["state"] == "exited"
+            # a controller may flip its own worker to interactive (the target is unattended when
+            # the call is gated) — and is out of reach from the very next call, list untouched
+            assert (await orc_client.call("set_mode", id=worker, unattended=False))["unattended"] is False
+            with pytest.raises(AgentError, match="invariant 5"):
+                await orc_client.call("send", id=worker, text="echo no")
+            with pytest.raises(AgentError, match="invariant 5"):
+                await orc_client.call("set_mode", id=worker, unattended=True)
+            assert (await person.call("get", id=worker))["controllers"] == [orc, "ao-peer"]
+            # a person flips it back, and the inert entry is live again
+            assert (await person.call("set_mode", id=worker, unattended=True))["unattended"] is True
+            await orc_client.call("send", id=worker, text="echo BACK")
+        # a person is unaffected throughout
+        await person.call("send", id=anchor, text="echo PERSON")
+        assert (await person.call("set_controllers", id=anchor, remove=[orc]))["controllers"] == []
+        for sid in (orc, anchor, worker, stray):
             await person.call("kill", id=sid)
 
 
