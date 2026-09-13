@@ -623,6 +623,64 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
             await person.call("kill", id=sid)
 
 
+async def test_a_present_caller_is_a_session_however_odd_its_type(agent, tmp_path):
+    """Review 2026-09-13: only an *absent* `caller` is a person. The socket takes raw JSON from any
+    local process, so a caller that is falsy but present — 0, "", [], {}, false — must not read as
+    "no caller" and skip both halves of the gate. Also pins the two ids `_gate` leaves to the
+    method: a registry-only record and a missing `id`."""
+    async with LocalClient() as person:
+        victim = (await person.call("create", name="v", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))
+        vid = victim["id"]
+
+        async def raw(req: dict) -> dict:
+            r, w = await asyncio.open_unix_connection(str(paths.socket_path()))
+            w.write((json.dumps(req) + "\n").encode())
+            await w.drain()
+            line = await r.readline()
+            w.close()
+            return json.loads(line)
+
+        for odd in (0, "", [], {}, False):
+            resp = await raw({"id": 1, "method": "kill", "params": {"id": vid}, "caller": odd})
+            assert "needs the orchestrate grant" in resp.get("error", ""), odd
+        assert (await person.call("get", id=vid))["state"] != "exited"
+        # absent: a person, and allowed exactly as before
+        assert (await raw({"id": 2, "method": "set_mode", "params": {"id": vid, "unattended": True}}))["result"]
+        # a granted non-member still cannot reach it through an odd caller either
+        orc = (await person.call("create", name="o", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        await person.call("set_grants", id=orc, add=["orchestrate"])
+        async with LocalClient(caller=orc) as orc_client:
+            with pytest.raises(AgentError, match="not in its controllers"):
+                await orc_client.call("kill", id=vid)
+            # a registry-only id and a missing id are refused by the method, not by the gate
+            with pytest.raises(AgentError, match="started outside agentorc|no session"):
+                await orc_client.call("kill", id="ao-not-a-record")
+            with pytest.raises(AgentError, match="bad params"):
+                await orc_client.call("kill")
+        for sid in (vid, orc):
+            await person.call("kill", id=sid)
+
+
+async def test_set_controllers_remove_wins_over_add(agent, tmp_path):
+    """Review 2026-09-13: one call naming an id in both `add` and `remove` drops it — the same
+    answer `set_grants` gives, and the safe one of the two."""
+    async with LocalClient() as person:
+        s = await person.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        sid = s["id"]
+        assert (await person.call("set_controllers", id=sid, add=["ao-one", "ao-two"]))["controllers"] == [
+            "ao-one",
+            "ao-two",
+        ]
+        got = await person.call("set_controllers", id=sid, add=["ao-three"], remove=["ao-three", "ao-one"])
+        assert got["controllers"] == ["ao-two"]
+        # and the same call shape on grants still agrees
+        await person.call("set_grants", id=sid, add=["orchestrate"])
+        assert (await person.call("set_grants", id=sid, add=["orchestrate"], remove=["orchestrate"]))[
+            "capabilities"
+        ] == []
+        await person.call("kill", id=sid)
+
+
 async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
     """TD-028 step 2, design §4.8: `progress` and `findings` on the record, written by `rpc_progress`
     / `rpc_finding`; ungated (no grant, any caller); one reference is one entry; §9 invariant 10

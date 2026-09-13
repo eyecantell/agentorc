@@ -1046,8 +1046,11 @@ class HostAgent:
         adding, removing = _controllers(add or []), _controllers(remove or [])
         if s.id in adding:
             raise RpcError(f"{s.id} cannot be its own controller: it could then drop the ones watching it")
-        kept = [c for c in s.controllers if c not in removing]
-        s.controllers = kept + [c for c in adding if c not in kept]
+        # One call naming an id in both `add` and `remove` drops it: remove wins, as it already
+        # does for grants (`rpc_set_grants`'s `and g not in removing`). Two authority-editing RPCs
+        # that disagree on the ambiguous call is how one of them eventually surprises someone, and
+        # of the two answers the safe one is the one that takes authority away (review 2026-09-13).
+        s.controllers = _controllers([c for c in s.controllers + adding if c not in removing])
         self.store.save(s)
         await self._push_changes()
         return s.to_dict()
@@ -1168,8 +1171,14 @@ class HostAgent:
         for the two RPCs that edit authority — a session may no more hand itself a grant than
         remove the controller watching it. A caller this agent does not know is a session (the id
         came from `AGENTORC_SESSION`) and holds no grant. Reads are never gated; this is a guard
-        against a confused worker, not a security boundary."""
-        if not caller or method not in ACTING_RPCS:
+        against a confused worker, not a security boundary.
+
+        `caller is None` — the field absent from the envelope — is the only thing that reads as a
+        person. Anything else present is a session, however odd its type: `not caller` would have
+        let `"caller": 0` (or `""`, `[]`, `{}`) past both halves of the gate, since the socket
+        takes raw JSON from any local process and only `LocalClient` bothers to send a real id
+        (review 2026-09-13)."""
+        if caller is None or method not in ACTING_RPCS:
             return
         if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller:
             return
@@ -1191,6 +1200,11 @@ class HostAgent:
         target = self.sessions.get(target_id)
         # An id this agent has no record of falls through to the method, which answers "no session
         # <id>" — a membership refusal here would say more about the fleet than the caller may read.
+        # Two other ids land here as `None` and are refused by the method rather than by this gate:
+        # a registry-only record (`self._external`), which every acting RPC rejects through `_get`
+        # without `external=True`, and a missing `id`, which is a required argument on all of them
+        # and so fails as bad params. Both are pinned by tests; an acting RPC that ever took
+        # `external=True` or gave `id` a default would need its own membership check here.
         if target is not None and str(caller) not in target.controllers:
             how = "nobody may act on it" if not target.controllers else "it is controlled by " + ", ".join(
                 target.controllers
