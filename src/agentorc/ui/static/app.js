@@ -220,6 +220,45 @@
     dir.addEventListener("input", () => { clearTimeout(dir._t); dir._t = setTimeout(check, 250); });
     dir.addEventListener("change", check);
 
+    // Role presets and the Controllers prefill follow the directory (design §4.5a, §4.8 "Defaults
+    // fill membership at launch"): the repo's `.agentorc.yml` may redefine a preset or add one, and
+    // name who may act on a session started there. The list is rebuilt from /api/roles as the
+    // directory changes; the picker's ticks come from the role's `controllers:` when it has any,
+    // else the repo's, and a person's untick after that is a decision the form keeps.
+    const role = $("#role"), rnote = $("#rolenote"), picker = $("#controllers");
+    let rseq = 0;
+    function tickControllers(names) {
+      for (const c of picker.querySelectorAll("[name=controller]")) c.checked = names.includes(c.dataset.name) || names.includes(c.value);
+    }
+    function applyRole() {
+      const o = role.selectedOptions[0]; if (!o) return;
+      const own = (o.dataset.controllers || "").split(",").filter(Boolean);
+      tickControllers(own.length ? own : (picker.dataset.default || "").split(",").filter(Boolean));
+      $("[name=lane]").placeholder = o.dataset.lane || "TD-027, TD-019 · or free-pick";
+    }
+    async function loadRoles() {
+      const v = dir.value.trim(); const my = ++rseq;
+      try {
+        const o = await (await fetch(`/api/roles?dir=${encodeURIComponent(v)}`)).json();
+        if (my !== rseq) return;
+        const keep = role.value;
+        role.innerHTML = "";
+        for (const r of o.roles) {
+          const opt = document.createElement("option");
+          opt.value = r.name; opt.dataset.lane = r.lane.join(", "); opt.dataset.controllers = r.controllers.join(",");
+          opt.textContent = `${r.name} [${r.source}]` + (r.grants.length ? ` · grants ${r.grants.join(", ")}` : "");
+          role.appendChild(opt);
+        }
+        role.value = [...role.options].some((x) => x.value === keep) ? keep : "plain";
+        picker.dataset.default = (o.controllers || []).join(",");
+        rnote.textContent = o.error ? `⚠ ${o.error}` : (o.file ? `presets from ${o.file}` : "a preset fills the brief, lane, grants and profile it names; each can be edited before Start");
+        applyRole();
+      } catch (e) { /* the built-ins rendered with the page still stand */ }
+    }
+    role.addEventListener("change", applyRole);
+    dir.addEventListener("change", loadRoles);
+    dir.addEventListener("input", () => { clearTimeout(dir._r); dir._r = setTimeout(loadRoles, 400); });
+
     // One name, one session (design §4.1, §9 invariant 12): say what Start would do before it is
     // pressed — a live holder is a refusal, so offer Switch to instead; an exited one is replaced
     // and its run log kept. Same texts as `ao new` prints: the agent composes them (TD-030).
@@ -245,6 +284,7 @@
     for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", nameCheck);
     check();  // both once at load: a prefilled directory and a prefilled name are checked too
     nameCheck();
+    applyRole();  // the ticks the page rendered are the repo's; a role picked later may narrow them
   };
 
   // ---- Focus ----
