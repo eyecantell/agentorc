@@ -354,3 +354,4 @@
 02:18  tick 82 (08:18Z). No merges, no rows owed, all six `idle`. ok -- quiet tick.
 02:49  tick 83 (08:49Z). No merges, no rows owed, all six `idle`. ok -- quiet tick.
 03:20  tick 84 (09:20Z). No merges, no rows owed, all six `idle`. ok -- quiet tick. Worker stop (11:30Z) is ~2h 10m out; my own stop 12:30Z.
+03:51  tick 85 (09:51Z). No merges, no rows owed, all six `idle`. ok -- quiet tick.
