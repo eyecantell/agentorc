@@ -49,7 +49,9 @@ disk keeps `session`, `controllers`, `role` and `profile` as they are.
   `hunter`, `orchestrator` and `plain`; a project or the org may add or redefine roles. Nothing
   at runtime keys on a role (§9 invariant 9) — it is how a member is *started*, not what it is
   allowed to do.
-- **Agent** is what the UI calls an interactive session started from a role. The record's word
+- **Agent** is what the UI calls an interactive session started from a role. An agent lives in
+  exactly one checkout, its **home**, and a project may give it reach into other repos without
+  moving it (Paul, 2026-09-13; TD-040 item 7). The record's word
   stays `session`, because shells and command runs are sessions and not agents.
 
 A team is defined once and started many times: the definition names the lead's role, the
