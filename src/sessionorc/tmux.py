@@ -5,6 +5,8 @@ Every call takes the socket into account so tests can run against a private serv
 
 from __future__ import annotations
 
+import itertools
+import os
 import re
 import shutil
 import subprocess
@@ -17,6 +19,7 @@ _FMT = (
     "\t#{window_index}\t#{pane_index}"
 )
 MIN_VERSION = (3, 2)  # `new-session -e` and `paste-buffer -p`
+_PASTE_SEQ = itertools.count()  # with the pid, makes each paste buffer name unique on a shared server (TD-043)
 
 
 def attach_argv(session: str, *, socket_name: str | None = None, binary: str = "tmux") -> list[str]:
@@ -200,9 +203,22 @@ class Tmux:
         self.run("send-keys", "-t", f"={name}:", "-l", text)
 
     def paste(self, name: str, text: str) -> None:
-        """Bracketed paste via a named buffer: multi-line text lands as one prompt (design §4.3)."""
-        self.run("load-buffer", "-b", "ao-paste", "-", input=text)
-        self.run("paste-buffer", "-p", "-d", "-b", "ao-paste", "-t", f"={name}:")
+        """Bracketed paste via a named buffer: multi-line text lands as one prompt (design §4.3).
+
+        The buffer name is unique per call (TD-043). tmux buffers are per *server*, so a fixed name
+        is shared by every concurrent caller on that server: two `ao send` calls racing on one name
+        either lose the buffer (`paste-buffer -d` deletes it, so the second paste fails with
+        "no buffer ao-paste") or, worse, silently deliver B's text to A's session when B's
+        `load-buffer` lands between A's load and A's paste."""
+        buf = f"ao-paste-{os.getpid():d}-{next(_PASTE_SEQ):d}"
+        try:
+            self.run("load-buffer", "-b", buf, "-", input=text)
+            self.run("paste-buffer", "-p", "-d", "-b", buf, "-t", f"={name}:")
+        except BaseException:
+            # `-d` deletes it on a successful paste, so the cleanup is for the failure path alone:
+            # a load that succeeded and a paste that did not would otherwise leave a buffer behind.
+            self.run("delete-buffer", "-b", buf, check=False)
+            raise
 
     def send_prompt(self, name: str, text: str) -> None:
         """Paste + Enter, unconfirmed. The host agent's `send` confirms the submit when the adapter

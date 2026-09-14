@@ -405,3 +405,27 @@ The three test-side waits went in anyway (PR #89), as cheap insurance rather tha
 `tests/README.md` rule 2 carries the rule and the "run the suspect modules three at a time" recipe — which is how the harness bug surfaced in the first place.
 
 **Related:** TD-025 (the same class and, as it turned out, the same cause; `wait_screen` came from this entry and is there for it), TD-015 (screen rules), design §4.2.
+
+## TD-044: Unit tests read this machine's real `~/.agentorc`, so the suite broke the day the fleet got an `org.yml`
+**Priority:** Medium
+**Added:** 2026-09-13
+**Status:** Resolved
+**Location:** `tests/conftest.py` (the agent fixtures' `AGENTORC_HOME`), `src/sessionorc/paths.py` (`home`)
+
+**Why:** `pdm run test` failed on kmaster with `test_cli_roles.py::test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source`: it asserts `orchestrator  [built-in]` and got `orchestrator  [built-in + org]`. Nothing was wrong with `ao roles` — the test was reading **Paul's own `~/.agentorc/org.yml`**, written the same day when the fleet became a team (TD-040). Only the *agent* fixtures set `AGENTORC_HOME`; a unit test that calls `agentorc.cli` directly sets nothing, and `paths.home()` falls back to `~/.agentorc`, so every unit test on this machine was reading live fleet state. CI never saw it (no `org.yml` there) and it would have gone on breaking every worker's suite silently — the suite is the only way a worker exercises the agent, so a test that depends on the operator's machine is worse than a failing one. CLAUDE.md's promise is "never the user's server"; this is the same promise for `AGENTORC_HOME`.
+
+**Resolved:** 2026-09-13 (PR #123) — a session-scoped autouse fixture (`_never_this_machines_home`) points `AGENTORC_HOME` and `CLAUDE_CONFIG_DIR` at temp directories and clears `AGENTORC_SESSION` for the whole run. Session scope is deliberate: it is set up before the module-scoped `subprocess_agent` and the function-scoped `agent`, which then override it with their own temp home, so the tests that need a real agent home are untouched.
+
+**Related:** TD-040 (the `org.yml` that exposed it), TD-025/TD-033 (the other "the suite must not depend on the machine" fixes), CLAUDE.md "Run the thing".
+
+## TD-043: Concurrent `ao send` calls raced on one server-wide tmux paste buffer
+**Priority:** Medium
+**Added:** 2026-09-13
+**Status:** Resolved
+**Location:** `src/sessionorc/tmux.py` (`paste`)
+
+**Why:** Reported by `orchestrator-ao-1` on 2026-09-11 (board item, now closed). `TmuxSession.paste()` always used the fixed buffer name `ao-paste` and pasted with `-d` (delete after paste). tmux buffers are per *server*, not per session, so the name was shared by every concurrent caller: four `ao send --wait` calls issued in parallel at 2026-09-12 00:21Z left one succeeding and three failing `TmuxError: tmux paste-buffer -p -d -b ao-paste -t =<session>:: no buffer ao-paste`, because the first paste had already deleted the buffer. That failure is the *benign* interleaving — the orchestrator verified afterwards that all three composers were empty, so nothing was mis-delivered. The one that matters was never excluded by the code: B's `load-buffer` landing between A's `load-buffer` and A's `paste-buffer` makes A's session receive B's prompt, silently and with no error anywhere. The orchestrator's workaround was to serialize its sends, which is a bound on one caller and not on the fleet.
+
+**Resolved:** 2026-09-13 (PR #122) — the buffer name is `ao-paste-<pid>-<counter>`, unique per call, and a failed paste deletes its own buffer (`-d` already covers the success path). The test starts four sessions, pastes into all four from four threads, and asserts no error, that each session received only its own text, and that the server holds no leftover buffers; against the old code it fails with exactly the reported `no buffer ao-paste`.
+
+**Related:** design §4.3 (the paste channel), TD-027 (the Enter after the paste), the board item of 2026-09-11 this closes.

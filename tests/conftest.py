@@ -124,6 +124,23 @@ def _sweep_stale_test_servers():
     yield
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _never_this_machines_home(tmp_path_factory):
+    """No test reads this machine's `~/.agentorc` or `~/.claude` (TD-044).
+
+    The agent fixtures set their own `AGENTORC_HOME`, but a *unit* test that only calls into
+    `agentorc.cli` sets nothing — and since `org.yml` landed (TD-040), `ao roles` reads it from
+    `paths.home()`, so on a machine with a real fleet definition those tests saw Paul's roles and
+    failed. Session scope on purpose: it is set up before the module- and function-scoped agent
+    fixtures, which then override it with their own temp home for the tests that need one."""
+    mp = pytest.MonkeyPatch()
+    mp.setenv("AGENTORC_HOME", str(tmp_path_factory.mktemp("unit-home")))
+    mp.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("unit-claude")))
+    mp.delenv("AGENTORC_SESSION", raising=False)  # a test run inside an ao session is not a caller
+    yield
+    mp.undo()
+
+
 # -- waiting --------------------------------------------------------------------------------------
 
 
