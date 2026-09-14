@@ -1,0 +1,6 @@
+  I'll wait for CI on the updated head of PR #63 before merging.
+
+  Remote Control disconnected — another connection took over this session, so this device is standing down (code 4090).
+
+  ❯ 
+  ? for shortcuts                                                    /rc failed

@@ -1,6 +1,7 @@
 """Screen rules (design §4.2, TD-015): the manifest format, matching, priority, evidence, and the
 Claude Code manifest against the saved screens from the herdr spike."""
 
+import pathlib
 from pathlib import Path
 
 import pytest
@@ -51,6 +52,7 @@ def test_manifest_load_priority_and_pending(tmp_path):
         ("usage-limit-reached", "usage-limit", "limited"),
         ("usage-limit-hit", "usage-limit", "limited"),
         ("rate-limited-429", "rate-limited-429", "limited"),
+        ("remote-control-standdown", "remote-control-standdown", "stalled?"),
     ],
 )
 def test_claude_code_rules_on_the_spike_screens(name, rule, state):
@@ -59,7 +61,9 @@ def test_claude_code_rules_on_the_spike_screens(name, rule, state):
     assert m.pending is not None and m.pending.text
 
 
-@pytest.mark.parametrize("name", ["trust-dialog", "usage-limit-reached", "usage-limit-hit", "rate-limited-429"])
+@pytest.mark.parametrize(
+    "name", ["trust-dialog", "usage-limit-reached", "usage-limit-hit", "rate-limited-429", "remote-control-standdown"]
+)
 def test_rules_fire_within_the_ticks_tail(name):
     """The tick hands the rules `TAIL_LINES` lines; every fixture's key line must be inside them, or
     the rule would fire under `ao explain` (40 lines) and never on a tick."""
@@ -84,3 +88,62 @@ def test_painted_text_drops_faint_runs():
     assert painted_text("\x1b[1;2mbold faint\x1b[0;1mbold") == "bold"
     assert painted_text("\x1b[2mnever reset") == ""
     assert painted_text("\x1b]0;title\x07x\x1b[Ky") == "xy"
+
+
+def test_the_standdown_rule_needs_both_of_the_banners_markers():
+    """TD-032, after three reviews of PR #125 broke every looser form of this rule in turn: `any`
+    and `all` may match different lines, so a pair of loose phrases fires on a screen that merely
+    mentions both; two phrases joined by `.*` fire on one line of prose *about* a stand-down; and
+    each marker alone is ordinary text elsewhere — `/etc/rc failed` is a boot-script message and
+    "stands down (code 503)" is any circuit breaker. So the rule wants the close code *and* the
+    `/rc` failure, which is the pair the one observed incident showed.
+
+    What it does not claim: that a pane showing the banner *verbatim* is safe. It is not, and
+    neither is the usage-limit rule — reading the pane is what a screen rule is. What bounds it is
+    that a scraped verdict never outranks a fresh hook (§4.2), and a session reading a file is
+    reporting hooks.
+    """
+    m = Manifest.load(RULES_FILE)
+    quiet = [
+        ["  chore(init): after the reboot, /etc/rc failed"],
+        ["  The circuit breaker stands down (code 503) after three failures"],
+        ["  review: nit — should this service be standing down (code 137) on SIGKILL?"],
+        ["  nit: when remote control disconnected mid-run, the pane kept standing down"],
+        ["  Remote Control is how a phone drives one of these panes.", "  It was standing down by then."],
+        ["  this device is standing down (code 4090)."],  # the code alone is not enough either
+        ["  ? for shortcuts                       /rc failed"],  # nor the footer alone
+    ]
+    for screen_lines in quiet:
+        assert m.explain(screen_lines) is None, screen_lines
+    assert m.explain(["  this device is standing down (code 4090).", "  ? for shortcuts    /rc failed"]) is not None
+    # design §4.2's own paragraph, however the file is wrapped
+    design = pathlib.Path(__file__).parents[1] / "docs" / "design.md"
+    para = [ln for ln in design.read_text().splitlines() if "Remote Control" in ln or "standing down" in ln]
+    assert m.explain(para) is None and m.explain([" ".join(para)]) is None
+
+
+def test_the_rules_own_sources_do_not_trip_the_rule_they_describe():
+    """The fourth review of PR #125: `all` and `any` may be satisfied by different lines of the
+    window, so the rule's own comment — which quoted both counter-examples a line apart — fired on
+    itself. Any pane showing that file (a `cat`, a `git show`, a review of this very change) read as
+    a stood-down worker. The footer marker is anchored to end-of-line, which is where a pane's
+    footer puts it and where prose never does; this test is the standing check, over the three files
+    that talk about the rule, in the same 20-line windows the tick would hand it.
+    """
+    m = Manifest.load(RULES_FILE)
+    root = pathlib.Path(__file__).parents[1]
+    for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
+                root / "docs" / "design.md"):  # fmt: skip
+        lines = pathlib.Path(rel).read_text().splitlines()
+        for i in range(max(1, len(lines) - 19)):
+            got = m.explain(lines[i : i + 20])
+            assert not (got and got.rule == "remote-control-standdown"), f"{rel} line {i + 1}"
+
+
+def test_a_stood_down_pane_that_is_also_rate_limited_reads_as_limited():
+    """Priority 70, below `rate-limited-429`'s 80: both can be on one screen (the device that took
+    over hits a cap on its first call back), and the limit is the more actionable of the two."""
+    m = Manifest.load(RULES_FILE)
+    both = ["  Remote Control disconnected, standing down (code 4090)", "  429 rate limit, retry later"]
+    got = m.explain(both)
+    assert got is not None and (got.rule, got.state) == ("rate-limited-429", "limited")

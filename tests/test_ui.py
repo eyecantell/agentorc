@@ -347,6 +347,26 @@ def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
     assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
 
 
+def test_a_stalled_card_says_why_when_a_screen_rule_explained_it(tmp_path, monkeypatch):
+    """TD-032: a worker that stood down under a Remote Control takeover is `stalled?` with a note
+    from the screen rule. Design §4.2 promises "a `stalled?` that can say why", so the note goes on
+    the card above the tail; a `stalled?` with no explanation still shows the tail alone."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    s = {
+        "id": "ao-x-1", "name": "w1", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "stalled?", "since": "2026-09-11T16:00:00Z", "confidence": "scraped", "pane": True,
+        "tail": ["  This device is standing down (code 4090)."],
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    assert "stood down" not in card.render(s=view(s))
+    stood_down = {**s, "pending": {"kind": "note", "text": "stood down: another device took over this session"}}
+    html = card.render(s=view(stood_down))
+    assert "stood down: another device took over this session" in html
+    assert "code 4090" in html  # the tail is still there under it
+
+
 def test_the_name_check_endpoint_answers_before_start(client, tmp_path):
     """TD-030 step 4: the New session form asks what Start would do, the way it already asks about
     directory occupancy — free, a live holder to switch to, or a replacement with the log kept."""
