@@ -3,13 +3,15 @@
 import asyncio
 import json
 import subprocess
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import FAST_TICK, wait_state
 
 from sessionorc import adapters, naming, paths, reports
+from sessionorc.agent import WRAPUP_GRACE
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.models import FindingEntry, ProgressEntry
+from sessionorc.models import FindingEntry, Pending, ProgressEntry
 
 pytestmark = pytest.mark.integration
 
@@ -831,6 +833,91 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
         assert [f["ref"] for f in on_disk["findings"]] == ["TD-029", "#59"]
         assert (await person.call("get", id=sid))["lane"] == ["TD-027", "TD-019"]
         await person.call("kill", id=sid)
+
+
+async def test_a_session_past_its_stop_time_is_wrapped_up_then_killed(agent, tmp_path):
+    """TD-026 gap 1, design §6: a session started by hand with `--unattended` had no stopper at all.
+    At its `run_until` the agent asks it to wrap up — once, in the client's words — and kills it the
+    moment it settles."""
+    async with LocalClient() as person:
+        s = await person.call(
+            "create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            unattended=True, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up and exit",
+        )  # fmt: skip
+        sid = s["id"]
+        assert s["run_until"] == "2026-09-13T06:00:00Z" and s["wrapup_sent_at"] is None
+        await agent.tick()  # the time is long past, so the first tick asks
+        s = await person.call("get", id=sid)
+        assert s["wrapup_sent_at"] and s["state"] != "exited", "the ask comes before the kill"
+        first_ask = s["wrapup_sent_at"]
+        # the shell took the prompt and is back at its own, which is as settled as a shell gets, so
+        # the next tick stops it — and it is not asked a second time
+        await agent.tick()
+        s = await person.call("get", id=sid)
+        assert s["state"] == "exited" and s["wrapup_sent_at"] == first_ask
+        # the words were the client's, not this package's: they are on the pane the tick captured
+        assert any("wrap up and exit" in line for line in s["tail"]), s["tail"]
+        await person.call("remove", id=sid)
+
+
+async def test_a_session_stopped_on_a_dialog_is_not_typed_at(agent, tmp_path):
+    """A worker sitting on a permission prompt at its stop time cannot wrap up, and typing at it
+    would answer the dialog rather than reach the composer — which is why `send` refuses too (§4.2).
+    Nobody is coming to answer it, so it is stopped instead of asked."""
+    async with LocalClient() as person:
+        sid = (await person.call(
+            "create", name="w3", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            unattended=True, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up",
+        ))["id"]  # fmt: skip
+        rec = agent.sessions[sid]
+        rec.set_state("needs-you", confidence="hook", pending=Pending(kind="permission", text="Bash · rm -rf"))
+        await agent._enforce_stop_times(datetime.now(UTC))
+        assert rec.state == "exited" and rec.wrapup_sent_at is None, "stopped without being asked"
+        await person.call("remove", id=sid)
+
+
+async def test_a_session_that_never_settles_is_stopped_when_the_grace_runs_out(agent, tmp_path):
+    """The half that matters when nobody is watching: a worker still working when its time is up is
+    given `WRAPUP_GRACE` and then stopped anyway. Driven through `_enforce_stop_times` directly, so
+    the state under test is the one being asserted and not whatever the pane happens to say."""
+    async with LocalClient() as person:
+        sid = (await person.call(
+            "create", name="w2", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            unattended=True, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up",
+        ))["id"]  # fmt: skip
+        rec = agent.sessions[sid]
+        now = datetime.now(UTC)
+        rec.set_state("working", confidence="scraped")
+        await agent._enforce_stop_times(now)
+        assert rec.wrapup_sent_at and rec.state == "working", "asked, not stopped"
+        rec.set_state("working", confidence="scraped")
+        await agent._enforce_stop_times(now + WRAPUP_GRACE / 2)
+        assert rec.state == "working", "inside the grace, a working session is left to finish"
+        await agent._enforce_stop_times(now + WRAPUP_GRACE + timedelta(seconds=1))
+        assert rec.state == "exited", "past the grace it is stopped whatever it is doing"
+        await person.call("remove", id=sid)
+
+
+async def test_a_stop_time_only_binds_an_unattended_session(agent, tmp_path):
+    """A stop time is a policy, and §4.2 exempts interactive sessions from those. Storing one that
+    nothing will ever act on is the TD-026 failure inverted, so `set_stop` refuses it."""
+    async with LocalClient() as person:
+        sid = (await person.call(
+            "create", name="i", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+        ))["id"]  # fmt: skip
+        with pytest.raises(AgentError, match="interactive"):
+            await person.call("set_stop", id=sid, run_until="2026-09-13T06:00:00Z")
+        with pytest.raises(AgentError, match="not a time"):
+            await person.call("set_stop", id=sid, run_until="six o'clock")
+        await person.call("set_mode", id=sid, unattended=True)
+        s = await person.call("set_stop", id=sid, run_until="2026-09-14T06:00:00+02:00", wrapup_prompt="stop")
+        assert s["run_until"] == "2026-09-14T04:00:00Z"  # normalised to UTC, whatever the caller sent
+        await agent.tick()
+        assert (await person.call("get", id=sid))["state"] != "exited"  # not yet: the time is ahead
+        s = await person.call("set_stop", id=sid)  # no time clears it
+        assert s["run_until"] is None and s["wrapup_sent_at"] is None
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)
 
 
 async def test_the_tick_retires_a_branch_claim_the_session_abandoned(agent, tmp_path, monkeypatch):

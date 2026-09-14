@@ -1,6 +1,8 @@
 """`ao` against a live agent in another process. Plain `def` tests: `cli.main` -> `call_sync` ->
 `asyncio.run`, which needs an agent whose loop runs on its own (tests/README.md rule 4)."""
 
+import argparse
+import datetime
 import json
 import pathlib
 import time
@@ -10,7 +12,7 @@ import pytest
 from conftest import pane_line, run_hook, wait_for_sync, wait_screen
 
 from agentorc import cli
-from sessionorc.client import call_sync
+from sessionorc.client import AgentError, call_sync
 
 pytestmark = pytest.mark.integration
 
@@ -433,6 +435,53 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     assert {s_["id"] for s_ in call_sync("list")} == before
     for sid in (orc, w1, w2["id"]):
         call_sync("kill", id=sid)
+
+
+def test_until_parses_the_shapes_a_person_types_and_refuses_the_rest():
+    """`ao new --until` / `ao until` (design §6, TD-026). The friendly parsing is the client's,
+    because "the next 06:00" is a question about the caller's clock — the agent only ever stores the
+    instant."""
+    from agentorc.cli import stop_time
+
+    now = datetime.datetime.now().astimezone()
+    plus = datetime.datetime.fromisoformat(stop_time("+90m"))
+    assert datetime.timedelta(minutes=89) < plus - now.astimezone(datetime.UTC) < datetime.timedelta(minutes=91)
+    at = datetime.datetime.fromisoformat(stop_time("06:00")).astimezone()
+    assert (at.hour, at.minute) == (6, 0) and at > now  # the *next* 06:00, never one in the past
+    assert (at - now) < datetime.timedelta(days=1)
+    assert stop_time("2026-09-14T06:00:00Z") == "2026-09-14T06:00:00+00:00".replace("+00:00", "Z")
+    naive = datetime.datetime.fromisoformat(stop_time("2026-09-14T06:00:00")).astimezone()
+    assert (naive.hour, naive.minute) == (6, 0)  # no zone means the caller's, for the same reason
+    for bad in ("", "nope", "25:00", "06:99"):
+        with pytest.raises(AgentError):
+            stop_time(bad)
+
+
+def test_new_until_needs_unattended_and_carries_the_wrap_up_words(tmp_path, monkeypatch, capsys):
+    """A stop time is a policy and policies leave interactive sessions alone (§4.2), so `--until`
+    without `--unattended` is refused rather than stored where nothing will act on it. The wrap-up
+    wording travels with the record — `sessionorc` must not know what a brief is — and it is the one
+    `ao team stop` sends, so both ways of ending a worker say the same thing."""
+    from agentorc import teams
+    from agentorc.cli import _stop
+
+    args = argparse.Namespace(until="+2h", unattended=False)
+    with pytest.raises(AgentError, match="unattended"):
+        _stop(args)
+    assert _stop(argparse.Namespace(until=None, unattended=True)) == {}
+    sent = _stop(argparse.Namespace(until="+2h", unattended=True))
+    assert sent["wrapup_prompt"] == teams.WRAPUP_PROMPT and sent["run_until"].endswith("Z")
+
+
+def test_stop_note_reads_in_the_local_clock(monkeypatch):
+    from agentorc.cli import stop_note
+
+    assert stop_note({}) == ""
+    when = datetime.datetime.now().astimezone() + datetime.timedelta(hours=2)
+    iso = when.astimezone(datetime.UTC).isoformat().replace("+00:00", "Z")
+    note = stop_note({"run_until": iso})
+    assert note.startswith("stops ") and f"{when:%H:%M}" in note  # the reader's clock, not UTC
+    assert "wrap-up sent" in stop_note({"run_until": iso, "wrapup_sent_at": iso})
 
 
 def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tmp_path, capsys, monkeypatch):

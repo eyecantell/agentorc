@@ -1210,6 +1210,22 @@ that starts a worker names the preset and lane it starts it with (`workers: [{ro
 lane: free-pick}, …]` replaces the bare `workers: 3` once §4.8 lands); the schedule stays on
 the block. A policy is agent code and needs no grant; a session doing the same work does.
 
+- **Stop time** (`run_until`, landed 2026-09-13, TD-026): a session may carry the instant it must
+  stop, set at start (`ao new --unattended --until 06:00 | +8h | <ISO>`) or after it (`ao until
+  <session> <when>`, `--clear`), shown by `ao status -v` as *stops 06:00* in the reader's own local
+  time. At the instant, the agent sends the wrap-up prompt **once** and then kills the session when
+  it settles or ten minutes later, whichever comes first — the same two steps, and the same words,
+  as `ao team stop`. The wording travels on the record because `sessionorc` must not know what a
+  brief is, the way `ledger` does. A session sitting on a permission or a question at its stop time is
+  stopped without being asked: typing at it would answer the dialog rather than reach the composer (which is
+  why `send` refuses too), and nobody is coming to answer it — that is what unattended means. This is the general form the rest of this section's schedules
+  reduce to: the run window below sets a stop time rather than being a second mechanism, and the
+  gap it closes first is that a session started by hand with `--unattended` had **no stopper at
+  all** — nothing wrapped it up at 06:00, at a cap, or when its token lapsed, so "start it now so I
+  can watch it" meant "remember to close it yourself". Setting one on an interactive session is
+  refused rather than stored: policies leave those alone (§4.2), and a stop time nothing will act
+  on is the same failure inverted. Still TD-026's, still open: `start_at` and the `scheduled` state,
+  window overrides with an expiry, calendar-shaped schedules, and the New session field.
 - **Run window**: start missing workers inside the window; wrap-up-then-kill outside.
 - **Usage gate** (per profile): pause unattended sessions on a profile above its 5-hour /
   weekly thresholds; resume when usage drops; a fetch failure never pauses. Interactive

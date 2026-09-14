@@ -62,10 +62,15 @@ SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # wh
 # session that is by definition not the caller; `set_grants` is gated so a session cannot grant
 # itself. Reads are never listed here.
 ACTING_RPCS = frozenset(
-    {"send", "keys", "kill", "close", "set_mode", "remove", "create", "set_grants", "set_controllers"}
+    {"send", "keys", "kill", "close", "set_mode", "remove", "create", "set_grants", "set_controllers", "set_stop"}
 )
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs_keep_days`)
+# A session past its `run_until` is asked to wrap up and then killed (design §6, TD-026): this is how
+# long it is given to finish after the ask. It is a grace, not a deadline the session can see — a
+# session that settles sooner is killed sooner, and one that is still working when it runs out is
+# killed anyway, because the whole point is that nobody is watching.
+WRAPUP_GRACE = timedelta(minutes=10)
 # a tool registry's status → our state (Claude Code: busy | idle | shell, the last a `!` command running)
 EXTERNAL_STATES = {"busy": "working", "idle": "idle", "shell": "working"}
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
@@ -195,6 +200,56 @@ class HostAgent:
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
+        await self._enforce_stop_times(snapshot_at)
+
+    async def _enforce_stop_times(self, now: datetime) -> None:
+        """Stop the unattended sessions whose time is up (design §6, TD-026 gap 1).
+
+        A session started by hand with `--unattended` used to have no stopper at all: nothing wrapped
+        it up at 06:00, at a usage cap or when its token lapsed, so "start it now so I can watch it"
+        meant "remember to close it yourself". A `run_until` is the general form, and the weekly run
+        window (phase 3) becomes one way of setting it rather than a second mechanism.
+
+        Two steps, in the order a person would use: at the time, the session is asked to wrap up —
+        once, with the words the client gave at create, because this package must not know what a
+        brief is. Then it is killed when it settles (its work is done, or it is waiting on a person
+        who is not there) or when `WRAPUP_GRACE` runs out, whichever comes first. Interactive
+        sessions are never touched: a stop time is a policy, and policies apply to unattended
+        sessions alone (§4.2).
+        """
+        for s in list(self.sessions.values()):
+            if not (s.unattended and s.run_until) or s.state in ("exited", "closed"):
+                continue
+            if now < _parse(s.run_until):
+                continue
+            if not s.wrapup_sent_at:
+                if s.pending and s.pending.kind in ("permission", "question"):
+                    # A session stopped on a dialog cannot wrap up, and typing at it would answer
+                    # the dialog rather than reach the composer (`send` refuses for this reason,
+                    # §4.2). Nobody is coming to answer it either — that is what unattended means —
+                    # so it is stopped now rather than asked something it cannot hear.
+                    log.info("%s reached its run_until on a pending %s; stopping it", s.id, s.pending.kind)
+                    await self.rpc_kill(s.id)
+                    continue
+                if not s.wrapup_prompt:
+                    # Nothing to say, so say nothing and stop it: a stop time with no wrap-up text is
+                    # still a stop time, and silently running past it is the failure this fixes.
+                    log.info("%s reached its run_until with no wrap-up prompt; stopping it", s.id)
+                    await self.rpc_kill(s.id)
+                    continue
+                log.info("%s reached its run_until (%s); asking it to wrap up", s.id, s.run_until)
+                try:
+                    await self._submit(s.id, adapters.get(s.adapter), s.wrapup_prompt)
+                except Exception:  # noqa: BLE001 — a pane that will not take a prompt is killed below
+                    log.warning("%s would not take the wrap-up prompt; it will be stopped anyway", s.id)
+                s.wrapup_sent_at = now_iso()
+                self.store.save(s)
+                await self._push_changes()
+                continue
+            settled = s.state in SETTLED
+            if settled or now - _parse(s.wrapup_sent_at) >= WRAPUP_GRACE:
+                log.info("%s stopped after its wrap-up (%s)", s.id, "settled" if settled else "grace ran out")
+                await self.rpc_kill(s.id)
 
     def _prune_runs(self, now: datetime, live: set[str]) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
@@ -589,6 +644,8 @@ class HostAgent:
         ledger: str | None = None,
         team: str = "",
         project: str = "",
+        run_until: str | None = None,
+        wrapup_prompt: str | None = None,
         caller: str | None = None,
     ) -> dict[str, Any]:
         directory = Path(dir).expanduser().resolve()
@@ -690,6 +747,8 @@ class HostAgent:
                 ledger=(str(ledger).strip() or None) if ledger else None,
                 team=str(team or ""),  # badges (§4.9): stored as given, never validated here
                 project=str(project or ""),
+                run_until=_stop_time(run_until),
+                wrapup_prompt=(str(wrapup_prompt).strip() or None) if wrapup_prompt else None,
                 previous_run=previous_run,
             )
             self.sessions[sid] = s
@@ -1053,6 +1112,28 @@ class HostAgent:
         s = self._get(id)
         s.unattended = bool(unattended)
         self.store.save(s)
+        return s.to_dict()
+
+    async def rpc_set_stop(
+        self, id: str, run_until: str | None = None, wrapup_prompt: str | None = None
+    ) -> dict[str, Any]:
+        """`ao until <session> <when>` (design §6, TD-026): set or clear a session's stop time.
+
+        Acting, and gated as one: a stop time ends another session's run, which is the same act as
+        `kill` with a delay on it. Passing no time clears it — an unattended session with no stop
+        time is where this started, so clearing one is a decision worth being able to make out loud
+        rather than by restarting the session.
+        """
+        s = self._get(id)
+        when = _stop_time(run_until)  # a malformed time is an error before anything else is judged
+        if when and not s.unattended:
+            raise RpcError(f"{id} is interactive: a stop time is a policy, and policies leave it alone (§4.2)")
+        s.run_until = when
+        if wrapup_prompt is not None:
+            s.wrapup_prompt = str(wrapup_prompt).strip() or None
+        s.wrapup_sent_at = None  # a new time is a new run: whatever was asked before is spent
+        self.store.save(s)
+        await self._push_changes()
         return s.to_dict()
 
     async def rpc_set_grants(
@@ -1461,6 +1542,23 @@ def _cap(usage: dict[str, Any] | None) -> str | None:
             continue
         return f"{label} cap · resets {at.strftime('%H:%MZ') if at else 'unknown'}"
     return None
+
+
+
+def _stop_time(value: str | None) -> str | None:
+    """An ISO stop time, normalised to UTC, or None. A malformed one is an error at create rather
+    than a session nothing ever stops (design §6, TD-026) — the clients do the friendly parsing of
+    `06:00` and `+8h`, because "next 06:00" is a question about the *caller's* clock and this
+    package only ever deals in absolute instants."""
+    if not value:
+        return None
+    try:
+        when = _parse(str(value).strip())
+    except ValueError as exc:
+        raise RpcError(f"run_until: not a time: {value}") from exc
+    if when.tzinfo is None:
+        raise RpcError(f"run_until: needs a timezone (got {value})")
+    return when.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _parse(iso: str) -> datetime:
