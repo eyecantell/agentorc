@@ -32,6 +32,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Open |
 | TD-047 | The design has no word for "a message into a session that is already working": adopt session/turn and *steer* so Send can say which of its two jobs it is doing | Low | Open |
 | TD-049 | An orchestrator only learns what its members did on its own timer: there is no way for a worker to say *I finished* and wake its lead | Medium | Open |
+| TD-050 | The cadence check's `review` row reads the verdict only on a comment's first line, so a report that ends with it counts as no review at all | Medium | Open |
 
 ---
 
@@ -356,3 +357,19 @@ The substrate is already there and unused by sessions: the agent's `subscribe` t
 **Done when:** a worker marking `done --pr N` has its cadence check start within seconds rather than within a tick; a worker that exits is restarted within seconds; a quiet fleet wakes its lead only at the fallback interval; and a lead that was busy when an event fired still sees it on its next wait.
 
 **Related:** design §4.8 (the orchestrator policy row, its cadence and its `progress` per tick), §4.6 (`subscribe`, the delta stream, one connection per subscriber), §4.2 (the states a wake would name), §4.9 (a lead's `controllers` are empty by design — the reason for (7)); TD-026 (scheduling inside the tick: a lead's schedule and its wakes are the same mechanism and should be designed together); TD-036 (the `controllers` edge the scope in (2) reuses).
+
+## TD-050: The cadence check's `review` row reads the verdict only on a comment's first line
+
+**Priority:** Medium
+**Added:** 2026-09-14
+**Status:** Open — the fix is dev-cadence's (`scripts/check_cadence.py` and `docs/cadence.md` both carry the SYNCED FILE header), so this entry records the finding and the board item asks for the call
+
+**Location:** `scripts/check_cadence.py` (`REVIEW_RE`, the `review` row), `docs/cadence.md` §4 (where the format is given)
+
+**Why:** The row matches `REVIEW_RE` against `body.splitlines()[:1]` — the comment's **first line only**. Every reviewer in this repo is briefed to *end* its report with the verdict line ("End with exactly one line: `cadence-review: …`"), which is the natural place for a conclusion, and a PR comment written that way reads to the check as **no review at all**: the row says "no `cadence-review:` comment on the PR (cadence §4)", which is indistinguishable from never having had one reviewed. PRs #138 and #139 both failed on exactly this, each with a genuine independent review posted minutes before the merge. Neither §4 nor the script's own docstring mentions the position, so the rule is invisible until a session trips it — and by then the PR is merged and the row can never go green (the board item of 2026-09-13).
+
+There is a second, sharper edge: a merged PR's row cannot be repaired. Editing the comment to move the verdict line makes the check see it and then fail on `updated_at > merged_at` ("review comment edited after the merge"), which is the right answer and still a permanent FAIL. So a session that learns the rule the usual way leaves a red row behind whatever it does.
+
+**Fix:** either (a) `docs/cadence.md` §4 says "the verdict must be the comment's first line" where it gives the format, so the rule is visible where it is read; or (b) `REVIEW_RE` scans the whole body rather than the first line, which costs nothing, removes the trap, and matches how the reports are actually written — with (a) as documentation either way. Preference is (b): the check is a detector, and a detector that misses the evidence in front of it is worse than one that is slightly looser. Done when a review comment ending with its verdict line passes the `review` row.
+
+**Related:** cadence §4; PRs #138, #139 (both failed this way), #141 (posted first-line-first and passes); the 2026-09-13 board item on a merged PR's `review` row being unclearable; TD-042.
