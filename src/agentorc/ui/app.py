@@ -45,6 +45,8 @@ NO_GRANTS: list[str] = []
 # design §4.5a New session **Grants** checkboxes: "shown with a one-line warning of what the grant
 # allows". Keyed by the grant, so a grant added to `GRANTS` without a line here is visible as a
 # missing note rather than silently shipping an unexplained checkbox (a test pins it).
+UNDESCRIBED_GRANT = "⚠ this grant has no description — see design §4.8"
+
 GRANT_NOTES: dict[str, str] = {
     "orchestrate": (
         "lets this session act on other sessions — send to them, wrap them up, kill them — "
@@ -510,7 +512,10 @@ def create_app() -> FastAPI:
                 # (`sessionorc.models.GRANTS`, the same list `ao new --grant` offers), each with
                 # the one-line warning the row asks for.
                 "grants_all": list(GRANTS),
-                "grant_notes": GRANT_NOTES,
+                # Jinja renders a missing key as empty, so a grant added to GRANTS without a note
+                # would ship a silent, unexplained checkbox. Say so on the page instead (review of
+                # PR #141); the test still fails first for anyone who runs them.
+                "grant_notes": {g: GRANT_NOTES.get(g) or UNDESCRIBED_GRANT for g in GRANTS},
                 "roles": roles["roles"],
                 "default_controllers": roles.get("controllers") or [],
                 # design §4.5a New session **Project** picker (§4.9): the projects defined on this
