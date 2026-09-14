@@ -209,6 +209,15 @@ class Session:
     # over, so the derived-report tick (`sessionorc.reports`) reads the right file without this
     # package knowing the config format. None: the ledger's default path.
     ledger: str | None = None
+    # When this session must stop, and how to ask it to (design §6, TD-026 gap 1). A session started
+    # by hand with `--unattended` had no stopper at all: nothing wrapped it up at 06:00, at a usage
+    # cap or when its token lapsed, so "start it now so I can watch it" meant "remember to close it
+    # yourself". `run_until` is an absolute UTC time; at it the agent sends `wrapup_prompt` once and
+    # kills the session when it settles or the grace runs out. The prompt's *wording* comes from the
+    # client, like `ledger` does, because this package must not know what a brief or a role is.
+    run_until: str | None = None
+    wrapup_prompt: str | None = None
+    wrapup_sent_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

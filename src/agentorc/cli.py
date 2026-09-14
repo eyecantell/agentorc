@@ -6,10 +6,11 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 from collections.abc import Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib import resources
 from typing import Any
 
@@ -116,6 +117,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      under:  {', '.join(s['controllers'])}")
             if members := [o["id"] for o in sessions if s["id"] in (o.get("controllers") or [])]:
                 print(f"{'':<{w}}      members: {', '.join(members)}")
+            if note := stop_note(s):
+                print(f"{'':<{w}}      {note}")
             if model := short_model(s.get("adapter") or "", s.get("model")):
                 print(f"{'':<{w}}      model:  {model}")
             if line := report_line(s):
@@ -225,6 +228,55 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     }
 
 
+def stop_time(when: str) -> str:
+    """`--until` in the shapes a person types, as an absolute UTC instant (design §6, TD-026).
+
+    `06:00` is the next 06:00 *here* — the host's local time, because that is the clock the person
+    saying "stop at six" is reading; `+8h` / `+90m` / `+45s` is from now; anything else must be an
+    ISO time, and one without a zone is read as local for the same reason. The agent only ever sees
+    the instant: "next 06:00" is a question about the caller's clock, not the record's.
+    """
+    text = (when or "").strip()
+    if not text:
+        raise AgentError("--until: no time given")
+    now = datetime.now().astimezone()
+    if m := re.fullmatch(r"\+(\d+)\s*([smhd])", text, re.IGNORECASE):
+        unit = {"s": "seconds", "m": "minutes", "h": "hours", "d": "days"}[m[2].lower()]
+        return _utc(now + timedelta(**{unit: int(m[1])}))
+    if m := re.fullmatch(r"(\d{1,2}):(\d{2})", text):
+        hour, minute = int(m[1]), int(m[2])
+        if hour > 23 or minute > 59:
+            raise AgentError(f"--until: not a time of day: {text}")
+        at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        return _utc(at if at > now else at + timedelta(days=1))  # today if it is still ahead
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise AgentError(f"--until: not a time: {text} (try 06:00, +8h, or an ISO time)") from exc
+    return _utc(parsed if parsed.tzinfo else parsed.astimezone())
+
+
+def _utc(when: datetime) -> str:
+    return when.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _stop(args: argparse.Namespace) -> dict[str, str]:
+    """`--until` and the words the agent will use when the time comes (design §6, TD-026).
+
+    The wrap-up wording travels with the record because `sessionorc` must not know what a brief or a
+    role is — the same reason `ledger` does. It is the one `ao team stop` sends, so a worker that
+    runs out of time and a worker its lead wraps up are asked the same thing in the same words.
+    """
+    until = getattr(args, "until", None)
+    if not until:
+        return {}
+    if not getattr(args, "unattended", False):
+        # A stop time is a policy, and §4.2 says policies never touch an interactive session. Silently
+        # storing one that nothing will ever act on is the failure this entry is about, inverted.
+        raise AgentError("--until applies to unattended sessions: add --unattended, or leave it off")
+    return {"run_until": stop_time(until), "wrapup_prompt": teams.WRAPUP_PROMPT}
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     defaults = _launch_defaults(args)
     s = call_sync(
@@ -239,6 +291,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         **defaults,
         team=getattr(args, "team", None) or "",  # badges (design §4.9): plain strings, unvalidated
         project=getattr(args, "project", None) or "",
+        **_stop(args),
     )
     if not s.get("controllers") and not args.json:
         # Design §4.8: an empty list is the explicit default, not an error — but an unattended
@@ -546,6 +599,25 @@ def cmd_grants(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
 
 
+def cmd_until(args: argparse.Namespace) -> int:
+    """`ao until <session> <when>` / `ao until <session> --clear` (design §6, TD-026): set or clear
+    when an unattended session stops. Acting, so it is gated like `kill` — a stop time is a kill
+    with a delay on it."""
+    when = None if args.clear else stop_time(args.when or "")
+    s = call_sync("set_stop", id=resolve(args.id), run_until=when, wrapup_prompt=teams.WRAPUP_PROMPT)
+    return emit(args, s, lambda: print(f"{s['id']}: {stop_note(s) or 'no stop time'}"))
+
+
+def stop_note(s: dict[str, Any]) -> str:
+    """"stops 06:00" for a display, in the reader's own local time — the record keeps UTC."""
+    if not s.get("run_until"):
+        return ""
+    when = datetime.fromisoformat(str(s["run_until"]).replace("Z", "+00:00")).astimezone()
+    day = "" if when.date() == datetime.now().astimezone().date() else when.strftime("%a ")
+    sent = " · wrap-up sent" if s.get("wrapup_sent_at") else ""
+    return f"stops {day}{when:%H:%M}{sent}"
+
+
 def cmd_control(args: argparse.Namespace) -> int:
     """`ao control <orc> add|remove <session>…` (design §4.8, TD-036): edit membership from the
     orchestrator's side, which is how a person thinks about it — *this orc controls these
@@ -738,6 +810,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--team", help="the team this session is started under (design §4.9): a badge, nothing keys on it")
     p.add_argument(
+        "--until",
+        metavar="WHEN",
+        help="when this unattended session stops (design §6, TD-026): 06:00 (the next one, local), "
+        "+8h, or an ISO time. At it the session is asked to wrap up and is killed once it settles "
+        "or ten minutes later — so a worker started by hand has a stopper without anyone remembering",
+    )
+    p.add_argument(
         "--project",
         help="the project it is started under (design §4.9): the badge, and the Project block in front of the brief "
         "naming each of the project's repos on this host when there is more than one",
@@ -828,6 +907,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("mode", choices=["unattended", "interactive"])
     p.set_defaults(fn=cmd_mode)
+
+    p = add("until", help="set or clear when an unattended session stops (design §6, TD-026)")
+    p.add_argument("id")
+    p.add_argument("when", nargs="?", help="06:00 (the next one, local), +8h, or an ISO time")
+    p.add_argument("--clear", action="store_true", help="remove the stop time: nothing will stop it")
+    p.set_defaults(fn=cmd_until)
 
     for name, help_ in (
         ("grant", "give a session a grant: `orchestrate` lets it act on other sessions (design §4.8)"),
