@@ -94,7 +94,9 @@ def test_no_two_entries_share_a_body():
             why = body[body.index("**Why:**") :].split("\n\n")[0].strip() if "**Why:**" in body else ""
             if why and why in whys.values():
                 other = next(k for k, v in whys.items() if v == why)
-                raise AssertionError(f"{path.name}: {id_} and {other} have the same **Why:** — one is under the wrong title")
+                raise AssertionError(
+                    f"{path.name}: {id_} and {other} have the same **Why:** — one is under the wrong title"
+                )
             whys[id_] = why
 
 
