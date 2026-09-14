@@ -928,15 +928,19 @@ orchestrator controls.** The prior-art survey behind the rules below is
 - **What this is not.** As with the grant, a guard against a confused worker, not a security
   boundary: the socket is local and the caller id is an environment variable. What it closes is
   the gap where one orchestrator's mistake reaches every session on the machine.
-- **Interactive sessions are out of every controller's reach (§9 invariant 5; a gate since
-  2026-09-13, TD-041).** `kind` says only whether a record is a conversation or a command run;
+- **Interactive sessions are out of every controller's reach — for *acting*; a message still
+  reaches them (§9 invariant 5; a gate since 2026-09-13, TD-041; the message carve-out
+  2026-09-14, §4.10).** `kind` says only whether a record is a conversation or a command run;
   `unattended` is what says a conversation is a worker. An acting RPC from a session onto a
   target whose record is `kind: interactive` and `unattended: false` — a person's session: their
   anchor in a repo's main checkout, a shell, a worker they took over with the badge — is refused
   whatever the caller's grant and membership, with a message naming invariant 5. It is checked
   before membership, because no edit to the list can change the answer. `set_controllers` from a
   session onto such a target is refused the same way, so a session cannot put a person's session
-  in a list at all. A person (no caller) is unaffected on both counts: they act on any session,
+  in a list at all. Everything in this bullet is about *acting*: since 2026-09-14 a **message** to an
+  interactive session is delivered (§4.10), because a mailbox entry types nothing, starts no turn
+  and changes no state until the person reads it — so "out of reach" means nobody may act on it,
+  not that nobody may address it. A person (no caller) is unaffected on both counts: they act on any session,
   and they may add a controller to their own interactive session — handing it to an orchestrator
   deliberately is theirs to do, and the entry does nothing until the session is unattended. Like
   grant and membership the record is read on every call, so `ao mode <id> interactive` (the
@@ -1162,9 +1166,12 @@ Four kinds of session-to-session traffic exist in practice — a lead nudging a 
 telling its lead it finished, two leads settling which of them a shared worker should listen to,
 and two workers avoiding each other's reference — and the design had one mechanism for all four:
 `ao send`, which is the agent typing synthetic keystrokes into the target's pane. Only the first
-works. A worker reaches upward through `progress` and `findings`, which are *declarations on its
-own record* read by whoever looks at the card, not messages to anyone; two leads are peers, so
-TD-036's gate refuses them each other; two workers coordinate by side effects — a ledger row, a
+works. A worker reaches upward through `progress` and `findings`, which are the wrong shape for
+it: they are *declarations about references* that the Org renders on a card, addressed to nobody
+and delivered to nobody — and being ungated (§4.8: any session may write any record's) is not the
+same as being a channel, since writing onto another session's record states a fact about that
+session rather than telling it anything, and nothing carries it to the session that must read it;
+two leads are peers, so TD-036's gate refuses them each other; two workers coordinate by side effects — a ledger row, a
 branch name, a PR that already claims the reference.
 
 **The cause is a conflation, not four missing features.** `orchestrate` plus `controllers`
@@ -1180,7 +1187,9 @@ control and a message are different things, with different delivery and differen
 `inbox`, on the same rule as `controllers`: it lives on the *recipient*, is persisted and
 reloaded with the record, and dies when the record is forgotten. An entry is
 `{id, from, to, at, kind, text, about, read_at, reply_to}` — `from` the sender's session id (or
-the person, when a person sends one), `about` an optional reference (a session id, a `TD-NNN`, a
+the person, when a person sends one), `to` the **list** of addressed sessions, since a `conflict`
+goes to two controllers at once and one entry lands in each of their inboxes carrying the same
+`id`, which is what makes a thread one thread; `about` an optional reference (a session id, a `TD-NNN`, a
 PR) that the message concerns. Nothing is typed anywhere. A message therefore never interrupts a
 turn, never races the composer, never needs `send`'s submit-confirmation dance (§4.2), and cannot
 be mistaken by the receiver for its own brief or for the person talking to it — which a `send`
@@ -1471,8 +1480,8 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     TD-036) — and never when the target is interactive, whatever the list says (invariant 5). Grant and membership are both read from the records on every call, so a revoke or
     a membership edit takes effect on the session's next call and neither is cached. Reads are
     never gated, and a person at a terminal or the UI is not a session. Acting is what changes a
-    session — `send`, `keys`, `kill`, `close`, `mode`, `new`, `remove`, `set_grants`,
-    `set_controllers`. **Messaging is not acting** and does not pass through this gate: its own,
+    session — the agent's `ACTING_RPCS`: `send`, `keys`, `kill`, `close`, `set_mode`, `create`,
+    `remove`, `set_grants`, `set_controllers` and `set_stop` (`ao until`, §6). **Messaging is not acting** and does not pass through this gate: its own,
     weaker rule is §4.10's graph (my controllers, my members, my team, a shared target), it needs
     no grant, and it is refused by naming that rule rather than this one.
 12. Within a scope (repo, or directory), a name identifies at most one session record: a live
