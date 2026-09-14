@@ -369,6 +369,10 @@ def test_a_card_says_when_the_session_stops_and_only_then(tmp_path, monkeypatch)
     assert "wrap-up sent" not in html
     asked = {**stopping, "wrapup_sent_at": "2026-09-13T16:00:00Z"}
     assert "wrap-up sent" in card.render(s=view(asked))
+    # a record whose `run_until` is not a time costs that card its note and nothing else: `view` runs
+    # for every session on the grid, so a raise here would take down the page (PR #131 review)
+    assert "stops" not in card.render(s=view({**base, "run_until": "half six"}))
+    assert view({**base, "run_until": "half six"})["stop_note"] == ""
 
 
 def test_the_new_session_form_refuses_a_stop_time_on_an_interactive_session(tmp_path, monkeypatch):

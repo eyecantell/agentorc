@@ -1226,8 +1226,10 @@ the block. A policy is agent code and needs no grant; a session doing the same w
   all** — nothing wrapped it up at 06:00, at a cap, or when its token lapsed, so "start it now so I
   can watch it" meant "remember to close it yourself". Setting one on an interactive session is
   refused rather than stored: policies leave those alone (§4.2), and a stop time nothing will act
-  on is the same failure inverted. Still TD-026's, still open: `start_at` and the `scheduled` state,
-  window overrides with an expiry, calendar-shaped schedules, and the New session field.
+  on is the same failure inverted. The card and the Focus header show it, and the New session form takes
+  one (§4.5a, landed 2026-09-13) — but nothing on the page *edits* a stop time after the start; `ao until`
+  has no page equivalent yet. Still TD-026's, still open: `start_at` and the `scheduled` state, window
+  overrides with an expiry, calendar-shaped schedules, and editing a stop time from the page.
 - **Run window**: start missing workers inside the window; wrap-up-then-kill outside.
 - **Usage gate** (per profile): pause unattended sessions on a profile above its 5-hour /
   weekly thresholds; resume when usage drops; a fetch failure never pauses. Interactive

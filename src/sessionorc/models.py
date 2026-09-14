@@ -136,7 +136,13 @@ def stop_note(session: dict[str, Any]) -> str:
     when = session.get("run_until")
     if not when:
         return ""
-    at = datetime.fromisoformat(str(when).replace("Z", "+00:00")).astimezone()
+    try:
+        at = datetime.fromisoformat(str(when).replace("Z", "+00:00")).astimezone()
+    except ValueError:
+        # A record is written through `_stop_time`'s validator, so this needs a hand-edited or
+        # corrupted one — and then it is one card's note, not the whole grid: `view()` runs this for
+        # every session on the page. The `since` field beside it is read the same way (`_age`).
+        return ""
     day = "" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")
     return f"stops {day}{at:%H:%M}" + (" · wrap-up sent" if session.get("wrapup_sent_at") else "")
 
