@@ -1544,7 +1544,6 @@ def _cap(usage: dict[str, Any] | None) -> str | None:
     return None
 
 
-
 def _stop_time(value: str | None) -> str | None:
     """An ISO stop time, normalised to UTC, or None. A malformed one is an error at create rather
     than a session nothing ever stops (design §6, TD-026) — the clients do the friendly parsing of

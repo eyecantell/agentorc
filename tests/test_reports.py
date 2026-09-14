@@ -44,9 +44,7 @@ def stub_prs(monkeypatch, prs, *, head=...):
     monkeypatch.setattr(
         reports,
         "_prs_for_head",
-        lambda directory, branch, **kw: (
-            None if found is None else [p for p in found if p.get("headRefName") == branch]
-        ),
+        lambda directory, branch, **kw: None if found is None else [p for p in found if p.get("headRefName") == branch],
     )
 
 
@@ -198,4 +196,3 @@ def test_an_unreachable_gh_retires_nothing(repo, monkeypatch):
     # and a genuine "no PR from that branch" still retires
     stub_prs(monkeypatch, [], head=[])
     assert reports.derive(repo, "main", left=[("TD-077", "td077-cap")]) == ([], [], ["TD-077"])
-

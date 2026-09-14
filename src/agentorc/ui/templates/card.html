@@ -27,6 +27,9 @@
       {% for c in s.under %}<a class="chip{% if c.gone %} scraped{% endif %}" href="/focus/{{ c.id }}"
          title="{{ 'this controller\'s session is gone — re-attach or remove it' if c.gone else 'may act on this session (design §4.8)' }}">{{ c.name }}</a>{% endfor %}
     </span></div>{% endif %}
+    {# design §6 / §4.5a: when this session stops (TD-026). Shown only when something will — which
+       is every unattended session given a time and no other. #}
+    {% if s.stop_note %}<div class="row"><span class="meta" title="the agent asks it to wrap up at this time, then stops it">{{ s.stop_note }}</span></div>{% endif %}
     {# design §4.5a card **report line**: only when a channel is non-empty (§4.8, TD-028 step 4) #}
     {% if s.report or s.findings_line %}<div class="row report">
       {% if s.report %}<span class="meta{% if s.report_derived %} scraped{% endif %}"

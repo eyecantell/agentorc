@@ -23,11 +23,12 @@ from fastapi.templating import Jinja2Templates
 from agentorc import org as orgmod
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig, teamrun, teams
+from agentorc.cli import stop_time as clistop
 from sessionorc import hosts, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_head, report_line
+from sessionorc.models import GRANTS, STATE_RANK, report_head, report_line, stop_note
 
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 
@@ -155,6 +156,22 @@ def _age(iso: str | None, now: datetime) -> str:
     return f"{secs // 86400}d"
 
 
+def stop_fields(until: str, unattended: bool) -> dict[str, str]:
+    """The New session **Until** field (design §6, §4.5a, TD-026). Same rule as `ao new --until`:
+    the friendly shapes are parsed here, in the caller's clock, and the agent is handed an instant;
+    a stop time on an interactive session is refused rather than stored, because policies leave
+    those alone (§4.2) and a stop time nothing acts on is TD-026's own failure inverted."""
+    text = (until or "").strip()
+    if not text:
+        return {}
+    if not unattended:
+        raise HTTPException(400, "a stop time applies to unattended sessions: tick Unattended, or clear Until")
+    try:
+        return {"run_until": clistop(text), "wrapup_prompt": teams.WRAPUP_PROMPT}
+    except AgentError as e:
+        raise HTTPException(400, str(e)) from None
+
+
 def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
@@ -228,6 +245,9 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
     d["report"] = report_line(s)
     d["report_derived"] = bool(head and head.get("source", "declared") != "declared")
     d["findings_line"] = f"{len(findings)} filed" if findings else ""
+    # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
+    # the host's local clock. Empty for every session nothing will stop, which is most of them.
+    d["stop_note"] = stop_note(s)
     d["grants_all"] = list(GRANTS)
     # Membership, both directions (design §4.8, §4.5a, TD-036 step 3). `controllers` is on the
     # record; `members` is derived across the records on every render and never stored — the same
@@ -516,6 +536,7 @@ def create_app() -> FastAPI:
         role: str = Form(""),
         lane: str = Form(""),
         project: str = Form(""),
+        until: str = Form(""),
         controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
     ):
         wt = None
@@ -562,6 +583,7 @@ def create_app() -> FastAPI:
             ledger=ledger,
             controllers=[c for c in controller if c.strip()],
             project=project.strip(),  # a badge, exactly as `ao new --project` sets it (§9 invariant 9)
+            **stop_fields(until, unattended == "on"),
         )
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 

@@ -8,6 +8,8 @@
       <a class="muted" href="/">← Org</a>
       <span class="mono title">{{ s.place }} / {{ s.name }}</span>
       <span id="fstate"></span>
+      {# design §6 (TD-026): when this session stops, beside the mode badge it belongs to #}
+      {% if s.stop_note %}<span class="badge" title="the agent asks it to wrap up at this time, then stops it">{{ s.stop_note }}</span>{% endif %}
       {# design §4.5a Focus header **grants** chip (§4.8): click a grant to revoke it, a dim one to grant it #}
       <span class="grants" id="fgrants" data-id="{{ s.id }}" data-grants="{{ s.grants_all | join(',') }}"></span>
       {# design §4.5a Focus header **controllers** chip (§4.8, TD-036): who may act on this

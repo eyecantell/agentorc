@@ -125,6 +125,22 @@ def report_head(session: dict[str, Any]) -> dict[str, Any] | None:
     return (claimed or done or progress or [None])[-1]
 
 
+def stop_note(session: dict[str, Any]) -> str:
+    """ "stops 06:00" for a card or `ao status -v` (design §6, TD-026), empty when nothing will stop
+    it. One formatter, so the page and the CLI cannot drift — the rule `report_line` above follows.
+
+    The record keeps UTC; this reads in the *host's* local clock, which in phase 1 is the one the
+    person is looking at. A day prefix appears once the stop is not today, so *stops Mon 06:00* can
+    never be read as this evening.
+    """
+    when = session.get("run_until")
+    if not when:
+        return ""
+    at = datetime.fromisoformat(str(when).replace("Z", "+00:00")).astimezone()
+    day = "" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")
+    return f"stops {day}{at:%H:%M}" + (" · wrap-up sent" if session.get("wrapup_sent_at") else "")
+
+
 def report_line(session: dict[str, Any]) -> str:
     """The one-line report a card or `ao status -v` shows (design §4.8): the reference in hand, the
     PR it is on, and the lane count — `TD-027 → #60 · 1/2 done`. A reference whose entry the agent
