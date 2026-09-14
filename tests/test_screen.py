@@ -90,11 +90,13 @@ def test_painted_text_drops_faint_runs():
     assert painted_text("\x1b]0;title\x07x\x1b[Ky") == "xy"
 
 
-def test_the_standdown_rule_reads_only_the_banners_two_markers():
-    """TD-032, after two reviews of PR #125 killed the looser forms. `any` and `all` may match
-    different lines, and even within one line a pair of phrases joined by `.*` fires on a sentence
-    *about* a stand-down — which is what a review comment, or an unwrapped paragraph of this repo's
-    own docs, looks like. So the rule reads the close code and the footer, and nothing else.
+def test_the_standdown_rule_needs_both_of_the_banners_markers():
+    """TD-032, after three reviews of PR #125 broke every looser form of this rule in turn: `any`
+    and `all` may match different lines, so a pair of loose phrases fires on a screen that merely
+    mentions both; two phrases joined by `.*` fire on one line of prose *about* a stand-down; and
+    each marker alone is ordinary text elsewhere — `/etc/rc failed` is a boot-script message and
+    "stands down (code 503)" is any circuit breaker. So the rule wants the close code *and* the
+    `/rc` failure, which is the pair the one observed incident showed.
 
     What it does not claim: that a pane showing the banner *verbatim* is safe. It is not, and
     neither is the usage-limit rule — reading the pane is what a screen rule is. What bounds it is
@@ -103,18 +105,18 @@ def test_the_standdown_rule_reads_only_the_banners_two_markers():
     """
     m = Manifest.load(RULES_FILE)
     quiet = [
-        ["  nit: when remote control disconnected mid-run, the retry loop kept the pane standing down"],
-        ["  fix: after another device took over this session, the worker is left standing down forever"],
-        ["  The tool says so on the pane — Remote Control disconnected, another connection took over,"
-         " this device is standing down with a close code — and the footer carries a failed /rc."],
+        ["  chore(init): after the reboot, /etc/rc failed"],
+        ["  The circuit breaker stands down (code 503) after three failures"],
+        ["  review: nit — should this service be standing down (code 137) on SIGKILL?"],
+        ["  nit: when remote control disconnected mid-run, the pane kept standing down"],
         ["  Remote Control is how a phone drives one of these panes.", "  It was standing down by then."],
-        ["  I checked whether /rc failed anywhere in the log."],
+        ["  this device is standing down (code 4090)."],  # the code alone is not enough either
+        ["  ? for shortcuts                       /rc failed"],  # nor the footer alone
     ]
     for screen_lines in quiet:
         assert m.explain(screen_lines) is None, screen_lines
-    assert m.explain(["  this device is standing down (code 4090)."]) is not None
-    assert m.explain(["  ? for shortcuts                       /rc failed"]) is not None
-    # and design §4.2's own paragraph stays quiet however the file is wrapped
+    assert m.explain(["  this device is standing down (code 4090).", "  ? for shortcuts    /rc failed"]) is not None
+    # design §4.2's own paragraph, however the file is wrapped
     design = pathlib.Path(__file__).parents[1] / "docs" / "design.md"
     para = [ln for ln in design.read_text().splitlines() if "Remote Control" in ln or "standing down" in ln]
     assert m.explain(para) is None and m.explain([" ".join(para)]) is None

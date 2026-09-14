@@ -36,21 +36,24 @@ pending = { kind = "limit", text = "$line" }
 # down, so the pane is alive and nothing is driving it. It happened to an unattended worker on
 # 2026-09-10 and left it `idle` for 20 h with its PR unmerged (TD-032) — `idle` is the resting state
 # of a session waiting on a person, which is exactly what this is not.
-# Only the banner's two unambiguous markers are read: the close code and the footer. Two reviews of
-# PR #125 killed the looser forms — `any` and `all` may match *different* lines, and even within one
-# line a pair of phrases joined by `.*` fires on a sentence *about* a stand-down ("when remote
-# control disconnected … the pane kept standing down"), which is what a review comment or an
-# unwrapped paragraph of this repo's own docs looks like.
-# A pane displaying the banner *verbatim* still reads as the banner; so does the usage-limit rule
-# for its message. Reading the pane is what a screen rule is, and what bounds it is that a scraped
-# verdict never outranks a fresh hook (§4.2) — a session reading a file is reporting hooks.
+#
+# BOTH markers are required — the close code (`all`) and the `/rc` failure (`any`) — because three
+# reviews of PR #125 broke every looser form in turn: `any` and `all` may match *different* lines,
+# so a pair of loose phrases fires on a screen that merely mentions both; two phrases joined by `.*`
+# fire on one line of prose *about* a stand-down; and each marker alone is ordinary text elsewhere
+# ("/etc/rc failed" is a boot-script message, "stands down (code 503)" is any circuit breaker). The
+# pair is what the one observed incident showed, and nothing else plausibly carries both.
+# The cost is a stand-down showing only one of them, which would be missed — the right way round for
+# a scraped rule, and the cheap half to loosen once someone captures a real pane: this is written
+# from a sentence quoted in TD-032, not from a screen anyone saved.
+# A pane displaying the banner *verbatim* reads as the banner, as it does for the usage-limit rule;
+# what bounds that is §4.2's rule that a scraped verdict never outranks a fresh hook, and a session
+# reading a file is reporting hooks.
 # Priority below `rate-limited-429`: a pane that is also rate limited has the more actionable answer.
 id = "remote-control-standdown"
 state = "stalled?"
 priority = 70
 region = 20
-any = [
-  "stand(s|ing)? down \\(code \\d+\\)",
-  "/rc failed\\s*$",
-]
+all = ["stand(s|ing)? down \\(code \\d+\\)"]
+any = ["/rc failed"]
 pending = { kind = "note", text = "stood down: another device took over this session" }
