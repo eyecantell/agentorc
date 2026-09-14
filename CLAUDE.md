@@ -68,6 +68,7 @@ header belong to dev-cadence: edit them there, never here.
 | What agentorc is and how it works | [docs/design.md](docs/design.md) |
 | Why dev-cadence was adopted, what it changed in the design | [docs/decisions/2026-09-06-adopt-dev-cadence.md](docs/decisions/2026-09-06-adopt-dev-cadence.md) |
 | Why herdr is prior art and not the session substrate | [docs/decisions/2026-09-10-herdr-spike.md](docs/decisions/2026-09-10-herdr-spike.md) |
+| Why OpenAI's Agents API is not the substrate, and the four lessons taken from it | [docs/decisions/2026-09-13-openai-agents-api.md](docs/decisions/2026-09-13-openai-agents-api.md) |
 | What Org, Team, Project and Role mean, and why the name stays agentorc for now | [docs/decisions/2026-09-13-org-teams-projects.md](docs/decisions/2026-09-13-org-teams-projects.md) |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | [docs/cadence.md](docs/cadence.md) |
