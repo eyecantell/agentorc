@@ -30,6 +30,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-041 | §9 invariant 5 is convention, not a gate: nothing stops a controller acting on an interactive session | Medium | Done 2026-09-13 |
 | TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Open |
 | TD-043 | The design has no word for "a message into a session that is already working": adopt session/turn and *steer* so Send can say which of its two jobs it is doing | Low | Open |
+| TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Open |
 
 ---
 
@@ -299,3 +300,27 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** adopt *turn* and *steer* as design vocabulary: say it once in §4.3 beside the Send rule, use it in §4.5's composer description and §4.5a's row for Send, and reflect it in the UI where it is free — the composer's Send affordance reading as steering when the session is `working` and as a new prompt when it is `idle` (a label or a hint line, not a second control; §4.5a still governs what controls exist). Done when a reader of §4.3 can say in one sentence what Send does in each state, and the Focus composer tells them the same thing without their having to read the state pill.
 
 **Related:** design §4.3, §4.5, §4.5a; TD-027 (the composer confirmation that makes a submit observable at all); [ADR 2026-09-13](decisions/2026-09-13-openai-agents-api.md).
+
+## TD-046: A session cannot be popped out into its own browser window, so switching between agents needs the mouse
+
+**Priority:** Medium
+**Added:** 2026-09-13 (raised by Paul)
+
+**Status:** Open — design task first: not to be coded before the control is in design §4.5a and the behaviour in §4.5
+
+**Location:** `src/agentorc/ui/templates/card.html` (the Focus button), `focus.html`, `base.html` (the chrome a popped-out window should not carry), `src/agentorc/ui/static/app.js` (the events websocket, one per tab today), `src/agentorc/ui/app.py` (`/focus/{sid}`), design §4.5 screen 2 and §4.5a
+
+**Why:** every Focus opens in the tab you were in, so moving between two working agents is Org → click a card → Focus → back → click the other. Paul (2026-09-13): *"having the ability to alt-tab between agent sessions is quite useful (instead of having to involve the mouse to click)."* That is the real requirement — **the operating system's window switcher, not a widget inside the page**. One OS window per agent makes the fleet behave like the terminals it replaces: alt-tab is muscle memory, the windows can be tiled or sent to separate monitors, and the terminal keeps its own scrollback and keyboard focus instead of being torn down and rebuilt on every navigation. It also fixes something the current shape cannot: a pane you are watching disappears the moment you look at another one, so there is no way to keep two agents visible at once on one screen.
+
+**Fix (design first, then code), the pieces that need deciding:**
+
+1. **The control.** A **pop out** button on the card's `more ▾` menu and in the Focus header, plus the obvious shortcut of middle-click or ctrl-click on Focus behaving as it already does on a link. §4.5a gains the row; a control not in that table does not exist.
+2. **A chromeless route.** `/focus/{sid}?window=1` (or a `/pane/{sid}`) rendering the Focus screen without the nav, so the window is the session and nothing else. Decide whether the side panels come with it.
+3. **The window itself.** `window.open` with a **name keyed on the session id**, so pressing pop out twice focuses the window that exists rather than opening a second one. Decide the default size and whether position is remembered per session (localStorage, like Pinned order).
+4. **The window title is the point.** It is what alt-tab shows, so it must be the session's name first and short — `tdgrind-ao-1 · working` rather than `agentorc — Focus`. It has to track the state deltas the page already receives, and say when the session needs you, since a window switcher is the only place a background window can speak.
+5. **Cost of many windows.** Each tab opens its own `/events` websocket and its own terminal pty (§4.6). Decide the ceiling, what happens when it is reached, and whether a popped-out window that loses its session (killed, closed, forgotten) closes itself or shows the exited banner — today `/focus` of a dead record still renders Details.
+6. **The opener's grid.** A card whose session is popped out should say so and offer *focus that window* rather than a second one, or the person ends up with two views of one pane and no way to tell them apart.
+
+Done when two agents can be open in two OS windows at once, alt-tab moves between them, each window's title names its session and its state, and popping out the same session twice raises the first window instead of opening another.
+
+**Related:** design §4.5 screen 2 (Focus), §4.5a, §4.6 (transport and terminal mechanics — one pty per open terminal), §4.5b (reachability: a popped-out window is the same origin, so the tunnel or private network carries it unchanged); TD-029 (a closed session's terminal reconnecting), TD-038 (the terminal's look).
