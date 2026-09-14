@@ -101,7 +101,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid var(--border); font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status.needs { border-color: var(--needs); color: var(--needs-fg); } .status.ok { border-color: var(--done); } .status.bad { border-color: var(--stalled); } .status.lim { border-color: var(--limited); }
-.term { background: var(--term); color: var(--termfg); font-family: "JetBrains Mono", monospace; font-size: 12px; line-height: 1.5; padding: 10px 12px; border-radius: 4px; white-space: pre; overflow: hidden; }
+.term { background: var(--term); color: var(--termfg); font-family: "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; padding: 10px 12px; border-radius: 4px; white-space: pre; overflow: hidden; }
 .term.tail { font-size: 11px; line-height: 1.55; padding: 6px 9px; color: var(--tail); min-height: 54px; }
 details.more { position: relative; } details.more summary { list-style: none; } details.more summary::-webkit-details-marker { display: none; }
 details.more .menu { position: absolute; right: 0; top: 28px; z-index: 5; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 4px; display: flex; flex-direction: column; min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }

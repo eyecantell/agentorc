@@ -61,7 +61,11 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
     reaps the worktree, and moves the card to `closed`). An exit that fails the checklist is
     shown as `exited` with the failing items. The tool never declares work done.
 12. **Dark mode**: CSS tokens, `prefers-color-scheme` default plus a manual toggle. The
-    terminal panes are dark regardless, so light chrome is the jarring case at night.
+    terminal panes are dark regardless, so light chrome is the jarring case at night. The Focus
+    pane carries VS Code's Dark Modern terminal palette (the sixteen ANSI colours, foreground,
+    cursor and selection), so the same output is the same colour in Focus as in the editor's
+    terminal beside it — literals, not tokens, because the pane must not follow the page
+    (landed 2026-09-13, TD-038).
 13. **Local and volatile hosts**: the person's own laptop is a host too (transport `local`,
     no ssh). A host marked `volatile: true` sleeps with the lid; its sessions show
     `unreachable` (not `stalled?`) when the agent stops answering, its VS Code links use the

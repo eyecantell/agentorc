@@ -7,6 +7,8 @@ multi-threaded; the warning is filtered in pyproject.toml (TD-007, accepted)."""
 
 import json
 import os
+import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -346,6 +348,26 @@ def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
     assert "started outside agentorc" in html
     html = templates.get_template("card.html").render(s=view({**s, "state": "idle"}))
     assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
+
+
+def test_the_terminal_palette_is_complete_and_dark(tmp_path):
+    """TD-038 (b), design goal 12 and §4.6: the pane carries VS Code's Dark Modern terminal palette,
+    so the same Claude Code output is the same colour in Focus as in the editor's terminal beside
+    it. This repo has no JavaScript harness, so the check is over the source: every ANSI name
+    present, every value a hex colour, and the background a literal rather than a theme token —
+    the pane is dark whatever the page is, which is the whole of goal 12.
+    """
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    block = js[js.index("AO.TERM_THEME = {") : js.index("};", js.index("AO.TERM_THEME = {"))]
+    colours = dict(re.findall(r'(\w+): "(#[0-9a-fA-F]{6})"', block))
+    base = ["black", "red", "green", "yellow", "blue", "magenta", "cyan", "white"]
+    wanted = [*base, *(f"bright{n.capitalize()}" for n in base), "foreground", "background", "cursor"]
+    assert not [n for n in wanted if n not in colours], sorted(set(wanted) - set(colours))
+    assert "var(--" not in block, "goal 12: the pane does not follow the page theme"
+    # and the one place the font lives, so it cannot drift back to three
+    opts = js[js.index("AO.TERM_OPTS = {") : js.index("};", js.index("AO.TERM_OPTS = {"))]
+    assert "fontFamily" in opts and "fontSize" in opts
+    assert js.count("new Terminal(") == 1 and "AO.TERM_OPTS" in js[js.index("new Terminal(") :]
 
 
 def test_a_card_says_when_the_session_stops_and_only_then(tmp_path, monkeypatch):
