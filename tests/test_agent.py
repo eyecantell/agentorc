@@ -1272,6 +1272,13 @@ async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_u
         s = await person.call("set_stop", id=sid, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up and exit")
         assert s["wrapup_sent_at"] == first_ask, "re-confirming the same time is not a new run"
 
+        # the same instant spelled differently is still the same instant — the comparison is a
+        # string compare, and it is only safe because `_stop_time` canonicalises every spelling
+        for same in ("2026-09-13T06:00:00+00:00", "2026-09-13T08:00:00+02:00", "2026-09-13T06:00:00.500Z"):
+            got = await person.call("set_stop", id=sid, run_until=same, wrapup_prompt="wrap up and exit")
+            assert got["run_until"] == "2026-09-13T06:00:00Z"
+            assert got["wrapup_sent_at"] == first_ask, f"{same} is the same run"
+
         # a different time *is* a new run, and is asked again
         s = await person.call("set_stop", id=sid, run_until="2026-09-13T07:00:00Z", wrapup_prompt="wrap up and exit")
         assert s["wrapup_sent_at"] is None
