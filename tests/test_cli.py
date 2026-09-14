@@ -811,3 +811,11 @@ def test_two_callers_whose_ids_differ_only_past_the_slug_do_not_share_a_cursor(t
     a = "ao-agentorc-a-very-long-orchestrator-session-name-one"
     b = "ao-agentorc-a-very-long-orchestrator-session-name-two"
     assert _cursor_file(a) != _cursor_file(b)
+
+
+def test_the_skill_tells_a_session_that_ao_wait_exists():
+    """A command no session knows about is half-shipped: `ao --skill` is where a supervising
+    session learns what it can do, and `ao wait` changes how such a session is written."""
+    skill = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "skill.md").read_text()
+    assert "ao wait" in skill
+    assert "silence is not an event" in skill.lower()  # the limit, where the reader will act on it
