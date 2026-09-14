@@ -50,12 +50,6 @@ One tick of wrong state, only for hand-created reuse of a just-removed name.
 
 ## TD-009: `subscribe` resets the shared push cache: every new tab re-pushes everything to every tab
 
-## TD-012: Resuming a conversation that is still live elsewhere is not refused
-
-## TD-013: External-session check reads the default profile's registry only
-
-## TD-007: test_ui mutates `os.environ` for a module-scoped agent
-
 **Priority:** Low
 **Added:** 2026-09-06
 **Status:** Resolved
@@ -65,18 +59,33 @@ One tick of wrong state, only for hand-created reuse of a just-removed name.
 
 **Resolved:** 2026-09-10 (PR #37) — `HostAgent._subscribers` is now `writer → {session id: last payload sent}`; `_push_changes` serialises each session once and diffs per subscriber, `subscribe` registers an empty map so only the newcomer gets the full snapshot, and `_forget` scrubs the id from every map and queues one `gone` that the next `_push_changes` (the caller's or a tick's) announces once. Test: `tests/test_agent.py::test_second_subscriber_gets_a_snapshot_without_disturbing_the_first`.
 
+## TD-012: Resuming a conversation that is still live elsewhere is not refused
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Status:** Resolved
 **Location:** `src/sessionorc/agent.py` (`rpc_create`, `_supersede`)
 
 **Why:** `create(resume=<id>)` supersedes an *exited* record with that adapter id, but nothing stops a resume of a conversation whose session is still running (in another directory, or hand-started): two tmux sessions would then drive one Claude Code conversation. The anchor rule compares directories, not conversations. Raised in the PR #17 review.
 
 **Resolved:** 2026-09-10 (PR #38) — `rpc_create` refuses a `resume` whose conversation is still live: `HostAgent.conversation_holders(adapter_id)` lists live records of ours with that adapter id plus live sessions outside agentorc (`adapters.external_sessions()`) with that tool id, and the create errors `conversation … is still live in …; kill it first, or Switch to it`. A per-conversation lock (`_dir_locks["conversation:<id>"]`, taken with the directory lock) spans the check and the record insert, so two concurrent resumes of one id into different directories start at most one. An exited record is still superseded. Test: `tests/test_agent_paths.py::test_resume_of_a_live_conversation_is_refused`.
 
+## TD-013: External-session check reads the default profile's registry only
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Status:** Resolved
 **Location:** `src/agentorc/adapters/claude_code/__init__.py` (`registry_entries`, `external_sessions`)
 
 **Why:** The anchor rule's view of Claude Code sessions started outside agentorc comes from `~/.claude/sessions/`, i.e. the default profile's config dir. A second profile with its own `CLAUDE_CONFIG_DIR` keeps its registry elsewhere, so a hand-started session under that account is invisible to occupancy and to the create-time refusal. No second profile exists yet; noted in the PR #20 review.
 
 **Resolved:** 2026-09-10 (PR #39) — `ClaudeCodeAdapter.external_sessions()` reads the registry of every profile declared in `profiles.yml` whose adapter is `claude-code`, once per distinct config dir (the implicit `default` profile still reads `~/.claude`). Test: `tests/test_claude_adapter.py::test_external_sessions_reads_every_profiles_registry` (two config dirs, a duplicate, another tool's profile).
 
+## TD-007: test_ui mutates `os.environ` for a module-scoped agent
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Status:** Resolved
 **Location:** `tests/test_ui.py` (`client` fixture over `subprocess_agent` in `tests/conftest.py`)
 
 **Why:** The UI tests need one agent shared across a sync `TestClient`. The env/tick leak was fixed in PR #4 review (module-scoped `MonkeyPatch`, undone at teardown). The agent thread went away in the test-suite consolidation (2026-09-07): the module's agent is now a separate process (`tests/_agent_child.py` on the private tmux socket; `agentorc-agent serve` cannot take one). What remains: starlette's `TestClient` keeps an anyio portal thread alive for the whole `with` block, so `ptyprocess` still calls `forkpty()` in a multi-threaded process and Python still warns it may deadlock the child — the rare-flake exposure is smaller, not gone.
@@ -103,8 +112,6 @@ the spike's automation a matter of `jq`; agentorc's own sessions are the obvious
 
 ## TD-017: Seen-state: "finished while you were away" is not the same as idle
 
-## TD-016: `send` should confirm the prompt took: a send-and-wait RPC for policies
-
 **Priority:** Medium
 **Added:** 2026-09-10
 **Status:** Resolved
@@ -118,6 +125,25 @@ reads do not. agentorc's Focus view is the natural "seen".
 **Resolved:** 2026-09-10 (PR #43) — `Session.seen_at` (persisted) set by `rpc_seen`, which the UI calls when Focus opens (`GET /focus/<id>`), after any card action, and from the open Focus page whenever its session's event arrives `unseen`. `view()` computes `unseen = idle and (no seen_at or since > seen_at)` (whole-second stamps: a tie reads as seen), renders "finished · unseen", sorts it at rank 4.5 (above `idle`, below `working`); `/events` carries the view's rank. `idle` stays `idle` in every payload. Design §4.5 sort list names the slot. Test: `tests/test_ui.py::test_unseen_idle_until_focused`.
 
 **Related:** design §4.2, §4.5 (Team sort); ADR 2026-09-10.
+
+## TD-016: `send` should confirm the prompt took: a send-and-wait RPC for policies
+
+**Priority:** Medium
+**Added:** 2026-09-10
+**Status:** Resolved
+**Location:** `src/sessionorc/agent.py` (`rpc_send`), `src/agentorc/cli.py` (`send`)
+
+**Why:** `send` already refuses while a permission or question is pending (the right half of the
+rule). It then writes the text and Enter and returns, so a policy that nudges an unattended
+worker cannot tell whether the prompt was taken, swallowed by a dialog that appeared in between,
+or typed into a pane whose agent had just exited. herdr's `agent prompt --wait` names the two
+failure modes worth copying: nothing starts working within a few seconds (`agent_prompt_stalled`),
+and the caller's timeout passes before a settled state. Phase 3's supervisor (§6: wrap-up prompt,
+then kill) needs exactly this to know the wrap-up request landed.
+
+**Resolved:** 2026-09-09 (PR #42) — `send(id, text, wait=…, timeout=…)` returns the settled record, erroring `prompt-stalled` when nothing starts within `SEND_STALL_SECONDS` (5 s), `timeout` when the caller's window passes first, and `removed` when the record goes away; `ao send --wait`. The wrap-up path in `agentorc/teams.py` and the `ao` skill both read those error names. *(Body reconstructed 2026-09-14 from the pre-archive entry — see TD-048.)*
+
+**Related:** design §4.2, §6, §9 invariant 6; TD-015, TD-017.
 
 ## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
 
@@ -139,45 +165,26 @@ measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts i
 **Resolved:** 2026-09-10 (PRs #26, #27; ledgered here 2026-09-10) — the spike ran against herdr 0.9.0 in a scratch config and failed the pass criterion (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); design §3 row corrected and the §10 item checked in PR #26; the lessons became TD-015..TD-019 and design §4.1/§4.2/§4.7/§9 edits in PR #28.
 
 **Related:** design §3, §4.5b, §4.5c, §7 phase 2, §10; PRs #23, #24; TD-004 (ssh transport, the work this decides).
-
-## TD-001: Short title of the problem
 
 ## TD-015: Screen-rule manifests per tool with `ao explain`: the scraped second source gets a shape
 
 **Priority:** Medium
 **Added:** 2026-09-10
 **Status:** Resolved
-**Location:** `src/sessionorc/models.py` (`Session`), `src/sessionorc/agent.py`, `src/agentorc/ui/` (Team card, Focus)
+**Location:** `src/sessionorc/adapters.py` (`classify`), `src/agentorc/adapters/claude_code/__init__.py`, `src/sessionorc/agent.py` (tick)
 
-**Why:** A session that went `idle` while nobody was looking is the common phone-triage case, and
-today it sorts and looks exactly like one that has been idle all day. herdr keeps `done` (idle,
-not yet looked at) apart from `idle` by a server-side seen mark that explicit focus clears and
-reads do not. agentorc's Focus view is the natural "seen".
+**Why:** Design §4.2 allows a pane classifier as a labelled fallback, and today the only scraped
+verdicts are the shell/command adapters' foreground-process check and the agent's liveness
+cross-check; the Claude Code adapter's `classify` returns nothing. The herdr spike ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md))
+showed what the fallback is for: its screen detector caught the trust dialog, which no Claude Code
+hook reports, and its `agent explain` printed the rule that fired, the region it matched and the
+fallback reason when nothing did. Three things agentorc wants rest on the same mechanism: the
+trust dialog and any future dialog no hook covers, `limited` from the tool's own limit message
+before TD-001's usage polling exists, and a `stalled?` that can say *why* it is unsure.
 
-**Resolved:** 2026-09-10 (PR #43) — `Session.seen_at` (persisted) set by `rpc_seen`, which the UI calls when Focus opens (`GET /focus/<id>`), after any card action, and from the open Focus page whenever its session's event arrives `unseen`. `view()` computes `unseen = idle and (no seen_at or since > seen_at)` (whole-second stamps: a tie reads as seen), renders "finished · unseen", sorts it at rank 4.5 (above `idle`, below `working`); `/events` carries the view's rank. `idle` stays `idle` in every payload. Design §4.5 sort list names the slot. Test: `tests/test_ui.py::test_unseen_idle_until_focused`.
+**Resolved:** 2026-09-09 (PR #47) — `src/sessionorc/screen.py` evaluates one TOML manifest per tool (`screen_rules.toml` beside the adapter: `id`, `state`, `region`, `any`/`all`/`not`, `priority`, an optional `pending`), the tick writes the verdict as scraped so it never outranks a fresh hook state, and `ao explain <session>` (or `--file` over a saved capture) prints the screen, the rule that fired and its evidence. Tests: `tests/test_screen.py`. *(Body reconstructed 2026-09-14 from the pre-archive entry — see TD-048.)*
 
-**Related:** design §4.2, §4.5 (Team sort); ADR 2026-09-10.
-
-## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
-
-**Priority:** High
-**Added:** 2026-09-10
-**Status:** Done 2026-09-10 — spike run against herdr 0.9.0 on kmaster in a scratch config; the pass criterion failed (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); §10 item checked, §3 row corrected.
-**Location:** design §3 (herdr row), §10 "Build on, or beside, herdr?"; `src/sessionorc/` (the layer a substrate would sit under)
-
-**Why:** herdr (https://herdr.dev, Apache-2.0, Herdr, Inc., $6M seed 2026-09-09) already ships the
-substrate half of this design — persistent panes, multi-host over ssh, restart recovery, hook-fed
-state for six of its 17 integrated CLIs (not Claude Code, which it screen-scrapes — the spike's finding), a worktree API, an event-subscription socket API — and
-Herdr Cloud is about to ship the `relay` transport of §4.5b. It does not do the half §1 came
-from: states finer than `blocked`, unattended supervision, the anchor rule, Ready to close,
-per-repo commands, phone triage. Core contribution is closed (no unsolicited PRs); plugins and
-the socket API are the open surface. Phase 2 (ssh transport) is the first thing herdr would
-replace, so the decision has to come before phase 2 is built, and it should be decided by a
-measurement, not by argument. Analysis in session 019chcZM (2026-09-10); facts in design §3.
-
-**Resolved:** 2026-09-10 (PRs #26, #27; ledgered here 2026-09-10) — the spike ran against herdr 0.9.0 in a scratch config and failed the pass criterion (Claude Code state is screen-scraped, the status event carries no kind or text, no `limited`); decided (a) independent in [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); design §3 row corrected and the §10 item checked in PR #26; the lessons became TD-015..TD-019 and design §4.1/§4.2/§4.7/§9 edits in PR #28.
-
-**Related:** design §3, §4.5b, §4.5c, §7 phase 2, §10; PRs #23, #24; TD-004 (ssh transport, the work this decides).
+**Related:** design §4.2, §4.3, §10; [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); TD-001, TD-032 (a rule added later).
 
 ## TD-001: `limited` state: wire adapter `usage()` into the agent tick
 
@@ -459,3 +466,23 @@ The three test-side waits went in anyway (PR #89), as cheap insurance rather tha
 **Not done here:** no rendered check. `shot.sh` needs a Chromium, and the session that did this pass had none — the artboards were verified by reading the generated HTML (tag balance, group order, the counts in the headers). Anyone with a browser should run `docs/mockups/shot.sh` once and re-seed the canvas.
 
 **Related:** design §4.5a, §10 (the superseded existing-worktree picker); TD-036 (whose controls must *not* be drawn yet); `docs/mockups/README.md`.
+
+## TD-048: The ledger's two files broke their own rules and nothing read them: a reused id, four lost bodies, two entries archived under someone else's text
+
+**Priority:** Medium
+**Added:** 2026-09-14
+**Status:** Resolved
+**Location:** `docs/technical_debt.md`, `docs/technical_debt_archive.md`, `tests/test_ledger.py`
+
+**Why:** `technical_debt.md` states two rules about itself — ids are "assigned in order and never reused", and the summary table "lists exactly the entries that have a body in this file" — and nothing checked either, so both were broken for days without a symptom. Three separate failures had accumulated:
+
+1. **A reused id.** TD-043 was assigned on 2026-09-13 to a tmux paste-buffer race (PR #122), resolved and archived the same day; hours later another session, reading the open file alone, assigned TD-043 again to a vocabulary entry. For a day the number meant two things, and the code, the tests and the board all pointed at the archived one.
+2. **Four entries with no body.** Archiving TD-012 (PR #38) inserted its heading directly after TD-009's *heading* rather than after TD-009's body; PRs #39 and #40 stacked TD-013 and TD-007 on the same spot. The result was four headings in a row followed by four bodies under the last of them, and the metadata lines of three entries were dropped entirely.
+3. **Two entries archived under someone else's text.** TD-016 (PR #42) and TD-015 (PR #47) were each archived with TD-017's seen-state body pasted beneath their titles. The archive therefore described `send --wait` and the screen-rule manifests as a phone-triage seen mark — wrong in a way that reads as plausible, which is the dangerous kind. Both bodies had never been correct in the archive; TD-017's own body appeared three times.
+
+Every one of these is what a concurrent fleet does to a shared text file: the merges were clean, the conflicts were resolved by keeping both sides, and no reader ever compared the two files.
+
+**Resolved:** 2026-09-14 (PR #138) — the duplicate TD-043 renumbered to TD-047 and moved into id order; the four stacked entries given back their own bodies and their `Priority`/`Added`/`Status` lines, recovered from `git show 872d6a8`, `59ce382^`, `272084e^` and `1a4fd31^`; TD-015's and TD-016's real bodies recovered from the open ledger as it stood before each was archived, each with a `**Resolved:**` line written from what the code actually ships today (`src/sessionorc/screen.py` + `ao explain`; `send(wait=…)` with `prompt-stalled`/`timeout`/`removed`) and marked as reconstructed. `tests/test_ledger.py` now enforces what the prose claims: no id is used twice across both files, no id is open and archived at once, the summary table and the entries match exactly, the open file is in id order, and every entry has a body of its own (a `**Priority:**` and a `**Why:**`, plus a `**Resolved:**` in the archive) — which is the shape both the stacking and the wrong-body bugs break.
+
+**Related:** TD-047 (the renumbered entry); PRs #38, #39, #40, #42, #47 (where the damage was introduced), #122 (the first TD-043); cadence §2 (the archive rule).
+
