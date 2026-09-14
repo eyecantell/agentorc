@@ -117,9 +117,13 @@ def test_a_broken_repo_derives_what_it_can_and_a_broken_toolchain_derives_nothin
     assert [(p.ref, p.status, p.pr) for p in progress] == [("TD-001", "done", 1)] and findings == []
     monkeypatch.undo()
     monkeypatch.setattr(reports.subprocess, "run", _boom)  # no `gh` and no `git` on PATH
-    progress, findings, _ = reports.derive(tmp_path, "td001-a")
+    progress, findings, retire = reports.derive(tmp_path, "td001-a")
     # the branch name is the one signal that needs no subprocess at all, so the claim survives
     assert [(p.ref, p.status, p.pr) for p in progress] == [("TD-001", "claimed", None)] and findings == []
+    # and with no toolchain at all, a claim the session left is kept, never retired (TD-045)
+    assert reports.derive(tmp_path, "main", left=[("TD-001", "td001-a")]) == ([], [], [])
+    assert retire == []
+    assert reports._prs_for_head(tmp_path, "td001-a") is None  # the real function, through the real failure
 
 
 def _boom(*a, **kw):
