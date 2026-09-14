@@ -658,6 +658,31 @@ def create_app() -> FastAPI:
     # (it waits on states), so it goes to a worker thread and the event loop stays free.
 
     background: set[asyncio.Task[Any]] = set()  # strong refs: a bare create_task may be collected
+    stopping_leads: set[str] = set()  # teams whose lead-stop is already in flight: one per team
+    stop_errors: dict[str, str] = {}  # a background lead-stop that failed, until the strip reports it
+
+    def _lead_stopped(team: str, lead: str) -> Any:
+        """What becomes of the background half of a stop. A task whose exception nobody retrieves is
+        a silent failure path, and §4.5 "Errors" says there is none here — so the outcome is logged
+        either way, and a failure is kept for the strip to report on its next refresh, which is the
+        only channel a request that has already returned still has (review of PR #124)."""
+
+        def done(task: asyncio.Task[Any]) -> None:
+            background.discard(task)
+            stopping_leads.discard(team)
+            if task.cancelled():
+                log.warning("team %s: stopping its lead %s was cancelled", team, lead)
+                stop_errors[team] = f"stopping {lead} was cancelled"
+                return
+            err = task.exception()
+            if err is None:
+                log.info("team %s: lead %s stopped", team, lead)
+                stop_errors.pop(team, None)
+                return
+            log.error("team %s: stopping its lead %s failed: %s", team, lead, err)
+            stop_errors[team] = f"{lead} did not stop: {str(err).strip(chr(34))}"
+
+        return done
 
     def _team_http(e: Exception) -> HTTPException:
         """One mapping for every way a start or a stop can fail, so the strip reports the agent's
@@ -670,7 +695,14 @@ def create_app() -> FastAPI:
 
     @app.get("/api/teams")
     async def api_teams():
-        return teams_view(await call("list"))
+        v = teams_view(await call("list"))
+        for row in v.get("teams", []):
+            if row["name"] in stopping_leads:
+                row["stopping"] = True
+            failed = stop_errors.pop(row["name"], None)  # reported once, then forgotten
+            if failed:
+                row["error"] = failed
+        return v
 
     @app.post("/api/teams/{name}/start")
     async def api_team_start(name: str):
@@ -692,14 +724,28 @@ def create_app() -> FastAPI:
         except (teams.TeamError, ValueError, AgentError, AgentUnavailable) as e:
             raise _team_http(e) from None
         pending = None
+        if st.lead is not None and name in stopping_leads:
+            # Two presses, or a slow first stop: the lead is already being stopped and a second task
+            # would send it a second wrap-up or kill, whose failure the first would swallow.
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "team": name,
+                    "now": now,
+                    "sessions": st.acted,
+                    "lead": None,
+                    "text": f"{name}: already stopping — its lead follows when the members settle",
+                }
+            )
         if st.lead is not None:
             # §4.9's order is members, then the lead once they settle — up to the wrap-up window,
             # which is minutes. The page must not hold a request open that long, so the second half
             # runs behind the response and the state deltas on /events show it happening.
             pending = st.lead.get("name") or st.lead["id"]
+            stopping_leads.add(name)
             task = asyncio.create_task(asyncio.to_thread(teamrun.stop_lead, rpc, st))
             background.add(task)
-            task.add_done_callback(background.discard)
+            task.add_done_callback(_lead_stopped(name, pending))
         sent = len(st.acted)
         msg = f"{name}: {'killed' if now else 'wrap-up sent to'} {sent} session{'' if sent == 1 else 's'}"
         if pending:

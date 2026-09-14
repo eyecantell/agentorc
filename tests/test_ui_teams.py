@@ -337,3 +337,45 @@ def test_a_one_repo_project_badges_without_a_block_and_an_undefined_name_still_b
         )
     assert [p["project"] for p in fleet.creates()] == ["ao", "nosuch"]
     assert {p["prompt"] for p in fleet.creates()} == {"go"}  # no reach to describe either way
+
+
+def test_a_background_lead_stop_that_fails_is_reported_rather_than_dropped(world, client, monkeypatch):
+    """§4.5 "Errors": there is no silent failure path. The lead's stop happens after the response,
+    so its outcome reaches the page through the strip's own refresh, once (review of PR #124)."""
+    tmp_path, fleet = world
+
+    def boom(call, st, **kw):
+        raise RuntimeError("agent said no")
+
+    monkeypatch.setattr(teamrun, "stop_lead", boom)
+    fleet.sessions += [badged("orc-ao", "ao-grind"), badged("grind-1", "ao-grind")]
+    assert client.post("/api/teams/ao-grind/stop", json={}).json()["lead"] == "orc-ao"
+    row = None
+    for _ in range(40):  # the failure lands behind the response; each request lets the loop turn
+        row = next(t for t in client.get("/api/teams").json()["teams"] if t["name"] == "ao-grind")
+        if row.get("error"):
+            break
+        time.sleep(0.05)
+    assert row and "orc-ao did not stop" in row["error"] and "agent said no" in row["error"]
+    again = next(t for t in client.get("/api/teams").json()["teams"] if t["name"] == "ao-grind")
+    assert "error" not in again  # reported once, then forgotten
+
+
+def test_two_stop_presses_do_not_start_two_lead_stops(world, client, monkeypatch):
+    """A second press while the first is still waiting out the wrap-up window would send the lead a
+    second wrap-up or kill, and the first task would swallow the failure (review of PR #124)."""
+    tmp_path, fleet = world
+    started: list[str] = []
+
+    def slow(call, st, **kw):
+        started.append(st.lead["name"])
+        time.sleep(0.4)  # hold the members' settle wait open, as the real one does for minutes
+        return st
+
+    monkeypatch.setattr(teamrun, "stop_lead", slow)
+    fleet.sessions += [badged("orc-ao", "ao-grind"), badged("grind-1", "ao-grind")]
+    first = client.post("/api/teams/ao-grind/stop", json={}).json()
+    second = client.post("/api/teams/ao-grind/stop", json={}).json()
+    assert first["lead"] == "orc-ao"
+    assert second["lead"] is None and "already stopping" in second["text"]
+    assert started == ["orc-ao"]  # one task, not two

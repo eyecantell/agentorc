@@ -236,6 +236,21 @@
       $$(".stop", row).forEach((b) => (b.hidden = n === 0));
     });
   }
+  // A stop returns before its lead does (design §4.9: the members settle first, which is minutes).
+  // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
+  // rather than leaving a failure nobody ever sees (design §4.5 "Errors"; review of PR #124).
+  async function watchStop(name, lead) {
+    for (let i = 0; i < 90; i++) {
+      await new Promise((r) => setTimeout(r, 5000));
+      let rows = [];
+      try { rows = (await (await fetch("/api/teams")).json()).teams || []; } catch (e) { continue; }
+      const row = rows.find((t) => t.name === name);
+      if (!row) return;
+      if (row.error) { AO.toast(`${name}: ${row.error}`); return; }
+      if (!row.stopping) { AO.toast(`${name}: ${lead} stopped`, true); return; }
+    }
+    AO.toast(`${name}: ${lead} is still stopping — see the agent log`);
+  }
   async function teamAct(name, what, btn) {
     const stop = what !== "start";
     const url = `/api/teams/${encodeURIComponent(name)}/${stop ? "stop" : "start"}`;
@@ -249,6 +264,12 @@
       // in a toast, as every other RPC error on this page is (design §4.5 "Errors").
       if (!r.ok) throw new Error(o.detail || r.statusText);
       AO.toast(o.text || `${name}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started`, true);
+      // The same two things `ao team start|stop` says and a request could not: a member the
+      // definition starts interactive is out of its lead's reach (design §9 invariant 5), and the
+      // lead's own stop happens after the response (review of PR #124).
+      (o.out_of_reach || []).forEach((who) =>
+        AO.toast(`${name}: ${who} is interactive, so its lead cannot act on it — §9 invariant 5`));
+      if (o.lead) watchStop(name, o.lead);
     } catch (e) {
       AO.toast(`${name}: ${e.message}`);
     } finally {
