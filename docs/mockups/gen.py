@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Emit the agentorc mockup artboards (.dc.html) + canvas.json from one shared style."""
-import json, pathlib
+import json, pathlib, re
 
 OUT = pathlib.Path(__file__).parent
 
@@ -842,19 +842,41 @@ files = {
 for n, s in files.items():
     (OUT / n).write_text(s)
 
+# The canvas layout is computed, never typed: an artboard's height comes from the file it was just
+# written to, and each column stacks with a fixed gutter. Two artboards drew on top of each other
+# when Focus grew and a second Focus was inserted (found by the PR #127 review) — a hand-kept `y` is
+# a bug waiting for the next screen to change size.
+LAYOUT = [
+    # (file, title, column)
+    ("Main.dc.html", "Org — desktop", 0),
+    ("Focus.dc.html", "Focus — member", 0),
+    ("FocusOrc.dc.html", "Focus — orchestrator", 0),
+    ("Legend.dc.html", "States & badges", 0),
+    ("Resumable.dc.html", "Resumable", 0),
+    ("Attention.dc.html", "Attention", 0),
+    ("Phone.dc.html", "Org — phone", 1),
+    ("NewSession.dc.html", "New session", 1),
+    ("Commands.dc.html", "Commands", 1),
+    ("MainDark.dc.html", "Org — dark", 2),
+]
+COLUMN_X = {0: 0, 1: 1540, 2: 3120}
+GUTTER = 100
+
+
+def artboards():
+    """Every artboard placed from its own `width` / `min-height`, column by column."""
+    out, y = [], dict.fromkeys(COLUMN_X, 0)
+    for name, title, col in LAYOUT:
+        text = (OUT / name).read_text()
+        m = re.search(r"width: (\d+)px; min-height: (\d+)px", text)
+        w, h = (int(m[1]), int(m[2])) if m else (1440, 900)
+        out.append({"file": name, "title": title, "x": COLUMN_X[col], "y": y[col], "w": w, "h": h})
+        y[col] += h + GUTTER
+    return out
+
+
 canvas = {
-    "artboards": [
-        {"file": "Main.dc.html", "title": "Org — desktop", "x": 0, "y": 0, "w": 1440, "h": 1560},
-        {"file": "Phone.dc.html", "title": "Org — phone", "x": 1540, "y": 0, "w": 390, "h": 1560},
-        {"file": "MainDark.dc.html", "title": "Org — dark", "x": 2040, "y": 0, "w": 1440, "h": 1560},
-        {"file": "Focus.dc.html", "title": "Focus — member", "x": 0, "y": 1660, "w": 1440, "h": 1280},
-        {"file": "FocusOrc.dc.html", "title": "Focus — orchestrator", "x": 0, "y": 3040, "w": 1440, "h": 980},
-        {"file": "NewSession.dc.html", "title": "New session", "x": 1540, "y": 1840, "w": 720, "h": 1180},
-        {"file": "Legend.dc.html", "title": "States & badges", "x": 0, "y": 2580, "w": 760, "h": 820},
-        {"file": "Resumable.dc.html", "title": "Resumable", "x": 0, "y": 3540, "w": 1440, "h": 700},
-        {"file": "Commands.dc.html", "title": "Commands", "x": 1540, "y": 3540, "w": 1440, "h": 820},
-        {"file": "Attention.dc.html", "title": "Attention", "x": 0, "y": 4480, "w": 1440, "h": 860},
-    ],
+    "artboards": artboards(),
     "annotations": [
         {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
