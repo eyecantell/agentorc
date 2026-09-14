@@ -419,3 +419,4 @@
 07:14  tick 32 (13:14Z). tdgrind-ao-1: `idle` since 03:08:05Z (~10h), unchanged. No merges, no open PRs. ok -- quiet tick.
 07:45  tick 33 (13:45Z). tdgrind-ao-1: `idle` since 03:08:05Z (~10h 35m), unchanged. No merges, no open PRs. ok -- quiet tick.
 08:16  tick 34 (14:16Z). tdgrind-ao-1: `idle` since 03:08:05Z (~11h), unchanged. No merges, no open PRs. ok -- quiet tick.
+08:47  tick 35 (14:47Z). **tdgrind-ao-1 has woken**: `working` since 14:28:28Z after 11h 20m idle, last output 14:37:59Z. Its screen shows a `/compact` run right after the end-of-run summary, so something or someone drove the pane; the record is still `unattended` and still lists me, so it stays in scope. No lane items claimed, no new dones, tree clean (behind 2 on main). Nothing owed: `working` means wait, and it is 10 min inside the 30-min stall window.
