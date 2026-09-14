@@ -1246,3 +1246,34 @@ async def test_derived_entries_go_to_the_record_that_holds_the_directory(agent, 
         await person.call("kill", id=new)
         for sid in (old, new):
             await person.call("remove", id=sid)
+
+
+async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_up_twice(agent, tmp_path):
+    """Found in the review of PR #147, which put a button in front of this.
+
+    `set_stop` used to clear `wrapup_sent_at` on every call. A session already asked to wrap up and
+    sitting inside its grace would then be asked again on the next tick — and since the ask happens
+    *before* the grace check, touching the stop time repeatedly deferred the forced kill for as
+    long as someone kept touching it. That is TD-026 gap 1 reintroduced through the edit path, and
+    the value most likely to do it is the one the Focus control pre-fills: the session's own,
+    possibly already elapsed, `run_until`.
+    """
+    async with LocalClient() as person:
+        s = await person.call(
+            "create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            unattended=True, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up and exit",
+        )  # fmt: skip
+        sid = s["id"]
+        await agent.tick()
+        first_ask = (await person.call("get", id=sid))["wrapup_sent_at"]
+        assert first_ask
+
+        # the person opens the stops badge and presses OK without changing anything
+        s = await person.call("set_stop", id=sid, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up and exit")
+        assert s["wrapup_sent_at"] == first_ask, "re-confirming the same time is not a new run"
+
+        # a different time *is* a new run, and is asked again
+        s = await person.call("set_stop", id=sid, run_until="2026-09-13T07:00:00Z", wrapup_prompt="wrap up and exit")
+        assert s["wrapup_sent_at"] is None
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)

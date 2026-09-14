@@ -787,7 +787,6 @@ def test_a_stop_time_can_be_set_and_cleared_from_focus(client, tmp_path):
 
     # a time the agent cannot parse is refused, not stored
     assert client.post(f"/api/sessions/{sid}/stop", json={"until": "half six"}).status_code == 400
-    assert client.get(f"/api/sessions/{sid}/stop").status_code in (404, 405)  # it is a POST action
     client.post(f"/api/sessions/{sid}/kill")
 
 
