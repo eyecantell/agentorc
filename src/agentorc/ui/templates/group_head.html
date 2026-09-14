@@ -4,7 +4,7 @@
    client swaps the header's contents, never composes them. #}
 <span class="h2">{{ g.label }}</span>
 {% if g.lead %}<span class="meta">lead</span> <a class="name" href="/focus/{{ g.lead.id }}">{{ g.lead.name }}</a>
-<span class="pill s-{{ g.lead.state_class }}{% if g.lead.scraped %} scraped{% endif %}"><span class="dot"></span>{{ g.lead.state_label }}</span>
+<span class="pill s-{{ g.lead.state_class }}{% if g.lead.scraped %} scraped{% endif %}"><span class="dot"></span>{{ g.lead.state_label }}</span>{% if g.lead_elsewhere %} <span class="meta" title="the lead carries a different team badge, so its card is in that group (design §4.9)">elsewhere</span>{% endif %}
 {% elif g.team %}<span class="meta" title="no member of this team holds orchestrate over the others (design §4.8)">led by you</span>{% endif %}
 {% if g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
 <span class="grow"></span>

@@ -129,3 +129,16 @@ def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
     assert 'class="badge team"' in html  # the card's team badge
     assert "orchestrator-ao-1" in html and 'id="card-ao-g1"' in html
     assert html.index('data-team="ao-grind"') < html.index('id="card-ao-sh"')  # No team last
+
+
+def test_a_lead_whose_own_badge_differs_is_still_found_but_keeps_its_card():
+    """`ao team start` gives the lead its team's badge, but a hand-typed `ao new --team` need not —
+    and a group whose members plainly name a controller must not claim it is led by the person.
+    The lead is found across the fleet; its card stays under its own badge (review of PR #117)."""
+    orc = sess("o", "orc", team="other", caps=["orchestrate"])
+    w1 = sess("w1", "w1", team="t", controllers=["o"])
+    w2 = sess("w2", "w2", team="t", controllers=["o"])
+    groups = {g["team"]: g for g in team_groups([orc, w1, w2])}
+    assert groups["t"]["lead"]["name"] == "orc" and groups["t"]["lead_elsewhere"] is True
+    assert groups["t"]["ids"] == ["w1", "w2"]  # the lead's card is not moved into this group
+    assert groups["other"]["ids"] == ["o"] and groups["other"]["lead"] is None

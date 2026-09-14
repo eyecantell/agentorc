@@ -238,7 +238,12 @@ def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
     `orchestrate` that other members of the same group list as a controller. A group without one
     has no lead card and its header says so. Within a group the lead comes first, then the rest in
     urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
-    per group in Pinned mode. Sessions with no badge form the *No team* group at the end."""
+    per group in Pinned mode. Sessions with no badge form the *No team* group at the end.
+
+    A lead carrying a different badge from its members — which `ao team start` never produces, but a
+    hand-typed `ao new --team` can — is still found, by looking across the whole fleet rather than
+    only inside the group (review of PR #117). Its card stays where its own badge puts it; the
+    header names it and says so, because moving the card would contradict the badge."""
     if not any(v.get("team") and v.get("state") not in DEAD for v in views):
         return None
     by_team: dict[str, list[dict[str, Any]]] = {}
@@ -247,15 +252,22 @@ def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
     groups: list[dict[str, Any]] = []
     for team in sorted(by_team, key=lambda t: (t == NO_TEAM, t)):
         members = sorted(by_team[team], key=lambda v: (v["rank"], v["name"]))
-        lead = None
+        lead, lead_elsewhere = None, False
         if team != NO_TEAM:
-            ids = {m["id"] for m in members}
-            controlled_by = {c for m in members for c in (m.get("controllers") or []) if c in ids}
-            leads = [m for m in members if "orchestrate" in (m.get("capabilities") or []) and m["id"] in controlled_by]
+            named = {c for m in members for c in (m.get("controllers") or [])}
+            # The fleet, not just this group: a lead whose own badge differs is still this group's
+            # lead, and saying "led by you" over a group that plainly has one would be a lie.
+            leads = sorted(
+                (v for v in views if "orchestrate" in (v.get("capabilities") or []) and v["id"] in named),
+                key=lambda v: (str(v.get("team") or "") != team, v["rank"], v["name"]),  # our own badge first
+            )
             if leads:
                 lead = leads[0]
-                members.remove(lead)
-                members.insert(0, lead)
+                if lead in members:
+                    members.remove(lead)
+                    members.insert(0, lead)
+                else:
+                    lead_elsewhere = True
         projects = sorted({str(m.get("project")) for m in members if m.get("project")})
         groups.append(
             {
@@ -264,6 +276,7 @@ def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
                 "lead": {k: lead[k] for k in ("id", "name", "state", "state_class", "state_label", "scraped")}
                 if lead
                 else None,
+                "lead_elsewhere": lead_elsewhere,  # its card sits under its own badge, not here
                 "members": members,
                 "ids": [m["id"] for m in members],
                 "projects": projects,
