@@ -67,7 +67,8 @@ def derive(
     branch: str | None,
     pending: list[tuple[str, int]] | None = None,
     ledger: str = LEDGER_DEFAULT,
-) -> tuple[list[ProgressEntry], list[FindingEntry]]:
+    left: list[tuple[str, str | None]] | None = None,
+) -> tuple[list[ProgressEntry], list[FindingEntry], list[str]]:
     """Everything this session's repo can say about it, all entries `derived` (design §4.8):
 
     - the checked-out branch is named for a reference → that reference is `claimed`;
@@ -77,6 +78,14 @@ def derive(
     - the ledger rows a merged PR of this session put on main, other than the reference itself →
       findings. The squash-merge commit is found by its `(#N)` subject, which is what survives the
       branch (GitHub deletes a merged head, and the session checks out something else next).
+
+    `left` is the branch-only claims the session has since moved off — `(ref, the branch it came
+    from)`. Each is looked up one last time by branch name: a PR from it makes the claim real (and
+    merged makes it `done`), and no PR at all puts its reference in the third return value, the
+    refs to retire. That is the whole answer to TD-045: a branch created and abandoned before its
+    PR existed used to leave a `claimed` entry nothing could ever remove. A claim with no branch
+    recorded is retired too — those are the entries written before the field existed, and they are
+    the immortal ones already on the records.
     """
     prs = _prs(directory)
     by_head = {p.get("headRefName"): p for p in prs if p.get("headRefName")}
@@ -84,11 +93,28 @@ def derive(
     progress: list[ProgressEntry] = []
     merged: dict[int, str] = {}  # PR number → the reference it carries
 
+    retire: list[str] = []
     if ref := branch_ref(branch):
         pr = by_head.get(branch)
         number = pr.get("number") if pr else None
         done = bool(pr) and _merged(pr)
-        progress.append(ProgressEntry(ref=ref, status="done" if done else "claimed", pr=number, source="derived"))
+        progress.append(
+            ProgressEntry(ref=ref, status="done" if done else "claimed", pr=number, source="derived", branch=branch)
+        )
+        if done and isinstance(number, int):
+            merged[number] = ref
+    for ref, from_branch in left or []:
+        pr = by_head.get(from_branch) if from_branch else None
+        if pr is None:
+            retire.append(ref)
+            continue
+        number = pr.get("number")
+        done = _merged(pr)
+        progress.append(
+            ProgressEntry(
+                ref=ref, status="done" if done else "claimed", pr=number, source="derived", branch=from_branch
+            )
+        )
         if done and isinstance(number, int):
             merged[number] = ref
     for ref, number in pending or []:
@@ -104,7 +130,7 @@ def derive(
             if row != ref and row not in seen:
                 seen.add(row)
                 findings.append(FindingEntry(ref=row, source="derived"))
-    return progress, findings
+    return progress, findings, retire
 
 
 def _merged(pr: dict[str, Any]) -> bool:

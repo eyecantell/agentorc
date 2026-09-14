@@ -6,6 +6,7 @@ A session is a tmux session, with or without a repo, with or without an agent (d
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -71,6 +72,10 @@ class ProgressEntry:
     why: str | None = None  # `ao progress drop <ref> --why "…"`
     at: str = field(default_factory=now_iso)
     source: Source = "declared"
+    # The branch a `derived` claim came from, so a claim the session has since left can be re-checked
+    # by name for the PR it may have grown, and retired when it never grew one (TD-045). Never set on
+    # a declared entry: what the session says about itself stands on its own.
+    branch: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -245,6 +250,31 @@ class Session:
     def report_finding(self, entry: FindingEntry) -> bool:
         """Upsert a `findings` entry by reference; same invariant-10 rule as `report_progress`."""
         return _upsert(self.findings, entry)
+
+    def retire_branch_claims(self, refs: Iterable[str]) -> bool:
+        """Drop the derived, PR-less `claimed` entries named in `refs`. Returns True if any went.
+
+        Nothing else in the system could ever remove one: the `pending` re-check works by PR number,
+        the upsert has no delete branch, and invariant 10 means a derived entry is replaced only
+        when the session *declares* the same reference. So a `tdNNN-*` branch created and abandoned
+        before its PR existed — what a grinder does the moment it finds a neighbour already holds
+        that TD — left a `claimed` entry forever, and the idle-with-open-work nudge (§4.8, §6) fires
+        on exactly that (TD-045). Who is retireable is decided by `sessionorc.reports.derive`, which
+        is the half that can see whether the branch ever grew a PR.
+
+        Narrow on purpose: a `done` entry is a fact about the past and stays, an entry carrying a PR
+        number stays because the by-number re-check is still watching it, and a *declared* entry is
+        the session's own word and is never touched (§9 invariant 10)."""
+        wanted = set(refs)
+        if not wanted:
+            return False
+        before = len(self.progress)
+        self.progress = [
+            e
+            for e in self.progress
+            if not (e.source != "declared" and e.status == "claimed" and not e.pr and e.ref in wanted)
+        ]
+        return len(self.progress) != before
 
 
 def _upsert(entries: list[Any], entry: Any) -> bool:

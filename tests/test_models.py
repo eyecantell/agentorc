@@ -91,6 +91,23 @@ def test_report_entries_upsert_by_ref_and_declared_wins():
     assert s.findings[0].priority == "low"
 
 
+def test_retire_branch_claims_takes_only_the_derived_prless_claims_it_is_given():
+    """TD-045: the one delete in the report channels, and it is narrow — a `done` entry is a fact
+    about the past, an entry with a PR is still being re-checked by number, and a declaration is the
+    session's own word (§9 invariant 10)."""
+    s = Session(id="a", name="a", kind="interactive", adapter="shell", dir="/")
+    s.report_progress(ProgressEntry(ref="TD-001", source="derived", branch="td001-a"))  # retireable
+    s.report_progress(ProgressEntry(ref="TD-002", source="derived", pr=2, branch="td002-b"))  # has a PR
+    s.report_progress(ProgressEntry(ref="TD-003", status="done", source="derived", branch="td003-c"))  # done
+    s.report_progress(ProgressEntry(ref="TD-004"))  # declared
+    assert s.retire_branch_claims([]) is False
+    assert s.retire_branch_claims(["TD-005"]) is False  # a reference it does not hold
+    assert s.retire_branch_claims(["TD-002", "TD-003", "TD-004"]) is False  # none of them qualify
+    assert [p.ref for p in s.progress] == ["TD-001", "TD-002", "TD-003", "TD-004"]
+    assert s.retire_branch_claims(["TD-001", "TD-004"]) is True
+    assert [p.ref for p in s.progress] == ["TD-002", "TD-003", "TD-004"]  # order kept, declaration kept
+
+
 def test_report_entries_survive_the_store_roundtrip():
     s = Session(id="a", name="a", kind="interactive", adapter="shell", dir="/", lane=["TD-027", "TD-019"])
     s.report_progress(ProgressEntry(ref="TD-027", status="done", pr=60))

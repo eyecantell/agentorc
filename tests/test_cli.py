@@ -459,6 +459,7 @@ def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tm
         "pr": 60,
         "why": None,
         "source": "declared",
+        "branch": None,  # a declaration never carries one (TD-045)
         "at": call_sync("get", id=sid)["progress"][0]["at"],
     }
     assert cli.main(["finding", "TD-029", "--priority", "low"]) == 0

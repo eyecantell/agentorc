@@ -787,6 +787,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
                     "why": None,
                     "at": s["progress"][0]["at"],
                     "source": "declared",
+                    "branch": None,  # TD-045: only a derived claim records the branch it came from
                 }
             ]
             s = await worker.call("progress", id=sid, ref="TD-027", status="done", pr="#60")
@@ -819,6 +820,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
                 "why": "phase 5",
                 "at": later["progress"][1]["at"],
                 "source": "declared",
+                "branch": None,
             }
         # a foreign session may write a record's channels: reports are not an acting RPC (§4.8)
         async with LocalClient(caller="ao-stranger") as stranger:
@@ -828,6 +830,47 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
         assert [p["ref"] for p in on_disk["progress"]] == ["TD-027", "TD-019"]
         assert [f["ref"] for f in on_disk["findings"]] == ["TD-029", "#59"]
         assert (await person.call("get", id=sid))["lane"] == ["TD-027", "TD-019"]
+        await person.call("kill", id=sid)
+
+
+async def test_the_tick_retires_a_branch_claim_the_session_abandoned(agent, tmp_path, monkeypatch):
+    """TD-045: a `tdNNN-*` branch created and abandoned before its PR existed — what a grinder does
+    the moment it finds a neighbour already holds that TD — used to leave a `claimed` entry nothing
+    could ever remove, and the idle-with-open-work nudge fires on exactly that."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for args in (["init", "-q", "-b", "main"], ["config", "user.email", "t@e.com"], ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", str(repo), *args], check=True)
+    (repo / "f").write_text("x")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "one"], check=True)
+    subprocess.run(["git", "-C", str(repo), "checkout", "-qb", "td077-cap"], check=True)
+    monkeypatch.setattr(reports, "_prs", lambda directory, **kw: [])  # the branch never grew a PR
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
+        await agent.tick()
+        await agent._derive_task
+        s = await person.call("get", id=sid)
+        assert [(p["ref"], p["status"], p["pr"], p["branch"]) for p in s["progress"]] == [
+            ("TD-077", "claimed", None, "td077-cap")
+        ]
+        # the session gives the branch up for a neighbour and moves to its own
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "main"], check=True)
+        agent._git_checked.clear()  # the branch read has its own cadence; the derive follows it
+        agent._derived_at.clear()
+        await agent.tick()
+        await agent._derive_task
+        assert (await person.call("get", id=sid))["progress"] == []
+        assert json.loads((paths.sessions_dir() / f"{sid}.json").read_text())["progress"] == []  # and it is saved
+        # a declaration of the same shape is untouched by any number of ticks (§9 invariant 10)
+        async with LocalClient(caller=sid) as worker:
+            await worker.call("progress", id=sid, ref="TD-077")
+        agent._git_checked.clear()
+        agent._derived_at.clear()
+        await agent.tick()
+        await agent._derive_task
+        s = await person.call("get", id=sid)
+        assert [(p["ref"], p["status"], p["source"]) for p in s["progress"]] == [("TD-077", "claimed", "declared")]
         await person.call("kill", id=sid)
 
 
@@ -867,11 +910,12 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         monkeypatch.setattr(
             reports,
             "derive",
-            lambda directory, branch, pending=None, ledger=None: (
+            lambda directory, branch, pending=None, ledger=None, left=None: (
                 (ledgers.append(ledger) or [])
                 or (
                     [ProgressEntry(ref="TD-080", source="derived"), ProgressEntry(ref="TD-081", source="derived")],
                     [FindingEntry(ref="TD-082", source="derived"), FindingEntry(ref="TD-083", source="derived")],
+                    [],
                 )
             ),
         )
