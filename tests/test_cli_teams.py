@@ -422,7 +422,9 @@ def test_the_packaged_brief_templates_name_no_run_and_no_clock():
 
 def test_the_repos_own_briefs_name_no_run_and_no_clock():
     """The same rule for `docs/briefs/`, which is where a repo keeps the briefs its teams name."""
-    for b in sorted(REPO_BRIEFS.glob("*.md")):
+    briefs = sorted(REPO_BRIEFS.glob("*.md"))
+    assert briefs, "no briefs found under docs/briefs/"
+    for b in briefs:
         assert not teams.unrepeatable(b.read_text()), f"{b.name} is written for one run"
 
 
@@ -451,3 +453,43 @@ def test_a_team_start_says_when_a_brief_names_one_run_and_starts_it_anyway(world
     err = capsys.readouterr().err
     assert "line 3" in err and "TD-042" in err
     assert "a clock time" in err and "a run number" in err
+
+
+def test_an_unclosed_fence_does_not_hide_the_rest_of_the_brief():
+    """A brief with an unterminated ``` would put every line after it out of reach, so a stale stop
+    time below a typo'd fence would never be found (review of PR #139)."""
+    assert teams.unrepeatable("```\nan example\n\nStop at 05:30 on 2026-09-12.\n")
+    # a *closed* fence still hides its example
+    assert teams.unrepeatable("```\nao until 05:30\n```\n\nplain prose\n") == []
+
+
+def test_a_shell_redirect_is_not_a_run_number():
+    """`pdm run test 2>&1` is a command, not a fifth run (review of PR #139)."""
+    assert teams.unrepeatable("Loop: `pdm run test 2>&1 | tee log`, then `pdm run lint 2>&1`.") == []
+    assert teams.unrepeatable("this is run 2 of the night")
+
+
+def test_a_partial_start_still_says_the_brief_names_one_run(world, capsys, monkeypatch):
+    """The sessions that *did* start are running on that brief, so the warning matters here most."""
+    tmp_path, state = world
+    (tmp_path / "agentorc" / "docs").mkdir()
+    (tmp_path / "agentorc" / "docs" / "b.md").write_text("Stop at 05:30 on 2026-09-12 (run 5).\n")
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][0]["brief"] = "docs/b.md"
+    write_org(tmp_path, doc)
+
+    real = cli.call_sync
+    calls = {"n": 0}
+
+    def flaky(method, **params):
+        if method == "create":
+            calls["n"] += 1
+            if calls["n"] == 3:
+                raise RuntimeError("host went away")
+        return real(method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", flaky)
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    err = capsys.readouterr().err
+    assert "already started" in err
+    assert "TD-042" in err and "a clock time" in err

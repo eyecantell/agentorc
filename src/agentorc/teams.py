@@ -45,7 +45,8 @@ REACH_NOTE = (
 # bare date is deliberately *not* a marker — briefs cite dated ADRs and say what was true on a day,
 # and warning about those would teach the reader to ignore the warning.
 _CLOCK = re.compile(r"\b\d{1,2}:\d{2}\b")
-_RUN = re.compile(r"\bruns?\s+\d+\b", re.I)
+# `pdm run test 2>&1` is a command, not a fifth run: a digit that opens a shell redirect is not one.
+_RUN = re.compile(r"\bruns?\s+\d+\b(?!\s*[>&|])", re.I)
 _FENCE = re.compile(r"^\s*(```|~~~)")
 
 
@@ -56,12 +57,19 @@ def unrepeatable(text: str) -> list[str]:
     says it once and starts the team anyway — the alternative, refusing, would make a team
     unstartable over a sentence."""
     found, fenced = [], False
-    for n, line in enumerate(text.split("\n"), 1):
-        if _FENCE.match(line):  # an example command may legitimately show a clock time
-            fenced = not fenced
-            continue
-        if fenced:
-            continue
+    lines = text.split("\n")
+    # An unterminated fence would put every line after it out of reach, so a brief with an unclosed
+    # ``` would be silently unchecked (review of PR #139). An odd number of fence lines means the
+    # file does not close what it opens; check the whole text rather than trusting the toggle.
+    if sum(1 for line in lines if _FENCE.match(line)) % 2:
+        fenced = None  # skip the fence logic entirely: check every line
+    for n, line in enumerate(lines, 1):
+        if fenced is not None:
+            if _FENCE.match(line):  # an example command may legitimately show a clock time
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
         for what, hit in (("a clock time", _CLOCK.search(line)), ("a run number", _RUN.search(line))):
             if hit:
                 found.append(f"line {n}: {what} ({hit.group(0)!r}) — {line.strip()[:80]}")

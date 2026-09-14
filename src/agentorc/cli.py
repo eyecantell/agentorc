@@ -382,7 +382,11 @@ def cmd_team_start(args: argparse.Namespace) -> int:
     except teamrun.PartialStart as e:
         for rec in e.created:
             print(_team_line(rec, args.name, e.plan), file=sys.stderr)
-        return fail(args, f"{e} (above)", 1)
+        # The sessions that *did* start are running on the brief, so a stale one matters more here
+        # than on the happy path, not less (review of PR #139).
+        for warning in e.plan.warnings:
+            print(f"{warning} (TD-042: a brief describes the job, not the run)", file=sys.stderr)
+        return fail(args, f"{e} (above)", 1, unrepeatable=list(e.plan.warnings))
     except (teams.TeamError, ValueError) as e:
         return fail(args, str(e), 1)
 

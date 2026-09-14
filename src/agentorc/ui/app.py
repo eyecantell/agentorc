@@ -712,7 +712,10 @@ def create_app() -> FastAPI:
         if isinstance(e, AgentUnavailable):
             return HTTPException(503, f"host agent unreachable: {e}")
         if isinstance(e, teamrun.PartialStart):
-            return HTTPException(409, str(e))
+            # The created sessions are running on the brief, so a stale-brief warning belongs on
+            # this path most of all (review of PR #139). `detail` is what the toast renders.
+            warnings = " · ".join(e.plan.warnings)
+            return HTTPException(409, f"{e}{' — ' + warnings if warnings else ''}")
         return HTTPException(400, str(e).strip('"'))
 
     @app.get("/api/teams")
