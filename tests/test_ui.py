@@ -736,6 +736,13 @@ def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
     assert '"→ Steer" : "→ Send"' in js
     assert "steers the turn in flight" in js and "starts a new turn" in js
 
+    # A dead or out-of-reach session has no turn to start or steer, and the composer used to sit
+    # enabled there saying nothing. Merely useless before; "starts a new turn" at a killed session
+    # would be a lie, so those states are excluded ahead of the branch that says it.
+    dead = js[js.index('} else if (v.state === "exited"') : js.index("design §4.3: one button, two jobs")]
+    assert '"closed"' in dead and '"unreachable"' in dead and "compose.disabled = true" in dead
+    assert "this session's process has ended" in dead and "cannot be reached" in dead
+
     # and the design says it where §4.5a points: the Send row and the §4.3 rule
     design = (pathlib.Path(__file__).parents[1] / "docs" / "design.md").read_text()
     send_row = next(ln for ln in design.split("\n") if ln.startswith("| Focus composer | **Send** |"))

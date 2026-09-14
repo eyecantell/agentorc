@@ -561,6 +561,16 @@
         head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>`;
         compose.disabled = true; $("#composehint").textContent = "answer in the terminal above";
       } else if (v.external) { compose.disabled = true; $("#composehint").textContent = "started outside agentorc: a read-only card (no terminal, no controls)";
+      } else if (v.state === "exited" || v.state === "closed" || v.state === "unreachable") {
+        // There is no turn to start or steer: the pane is dead or out of reach. The composer used
+        // to sit enabled here and say nothing, which was merely useless; saying "starts a new
+        // turn" at a dead session would be a lie, so the state that made the hint necessary is
+        // the state that has to be excluded from it. The exited banner below offers the two real
+        // next steps (Resume this conversation, New session here). TD-047.
+        compose.disabled = true;
+        $("#composehint").textContent = v.state === "unreachable"
+          ? "the host agent cannot be reached: nothing can be sent until it is back"
+          : "this session's process has ended: resume it or start a new one, below";
       } else {
         // design §4.3: one button, two jobs. A message to an `idle` session starts a turn; a
         // message to a `working` one steers the turn in flight. Both are the same paste and the
