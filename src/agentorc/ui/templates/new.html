@@ -38,8 +38,20 @@
          from its template, the lane's default, its grants and its profile; the list is the built-ins
          plus what the directory's repo defines, refreshed from /api/roles as the directory changes. #}
       <div class="field"><label>Role</label>
-        <select class="input" name="role" id="role">{% for r in roles %}<option value="{{ r.name }}"{% if r.name == 'plain' %} selected{% endif %} data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}">{{ r.name }} [{{ r.source }}]{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}</option>{% endfor %}</select>
+        <select class="input" name="role" id="role">{% for r in roles %}<option value="{{ r.name }}"{% if r.name == 'plain' %} selected{% endif %} data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}">{{ r.name }} [{{ r.source }}]{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}</option>{% endfor %}</select>
         <span class="note" id="rolenote">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span>
+      </div>
+      {# design §4.5a New session **Grants** checkboxes (§4.8): the capabilities the session starts
+         with. Unchecked for every preset but the ones whose `grants:` name one — the preset's
+         grants used to apply unseen, which is the one power in the system a person should never
+         acquire without seeing it. Reticked as the Role changes; an untick after that stands. #}
+      <div class="field" id="grants">
+        <label>Grants</label>
+        <div class="row gap wrap">
+          {% for g in grants_all %}<label class="radio"><input type="checkbox" name="grant" value="{{ g }}">
+            <div><div class="mono">{{ g }}</div><div class="note">{{ grant_notes[g] }}</div></div></label>{% endfor %}
+        </div>
+        <div class="note">None is the default and is what every session has: a session with no grant can act on nothing but itself.</div>
       </div>
       <div class="field"><label>Lane</label>
         <input class="input mono" name="lane" placeholder="TD-027, TD-019 · or free-pick">

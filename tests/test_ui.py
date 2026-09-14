@@ -658,3 +658,65 @@ def test_the_membership_controls(client, tmp_path):
     assert next(x for x in client.get("/api/sessions").json() if x["id"] == worker)["state"] != "closed"
     page = client.get(f"/focus/{orc_id}").text
     assert "no members yet" in page
+
+
+def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_what_is_ticked(client, tmp_path):
+    """Design §4.5a New session **Grants** checkboxes (TD-028 step 5).
+
+    A preset's grants used to apply unseen: picking `orchestrator` in the form started a session
+    that could send to, wrap up and kill other sessions, and nothing on the page said so. That is
+    the one power in the system a person should never acquire without seeing it — and the reverse
+    matters as much: a tick the person removed has to be honoured, not overridden by the preset.
+    """
+    from agentorc.ui.app import GRANT_NOTES
+    from sessionorc.models import GRANTS
+
+    r = client.get("/new")
+    assert r.status_code == 200
+    for g in GRANTS:
+        assert f'name="grant" value="{g}"' in r.text
+        assert GRANT_NOTES[g] in r.text  # §4.5a: "a one-line warning of what the grant allows"
+    # the role options carry their grants, which is what ticks the boxes as the Role changes
+    assert 'data-grants="orchestrate"' in r.text and 'data-grants=""' in r.text
+
+    # ticked: the session gets it
+    r = client.post(
+        "/new",
+        data={
+            "name": "g1",
+            "dir": str(tmp_path),
+            "adapter": "hookstub",
+            "role": "orchestrator",
+            "grant": "orchestrate",
+        },
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert "orchestrate" in (got.get("capabilities") or [])
+
+    # unticked on an `orchestrator` preset: the person's decision stands over the preset's grants.
+    # A second directory, since one agent session per directory is refused (§9 invariant 2).
+    other = tmp_path / "other"
+    other.mkdir()
+    r = client.post(
+        "/new",
+        data={"name": "g2", "dir": str(other), "adapter": "hookstub", "role": "orchestrator"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    sid2 = r.headers["location"].rsplit("/", 1)[-1]
+    got2 = next(x for x in client.get("/api/sessions").json() if x["id"] == sid2)
+    assert (got2.get("capabilities") or []) == []
+    for s_ in (sid, sid2):
+        client.post(f"/api/sessions/{s_}/kill")
+
+
+def test_every_grant_has_the_one_line_warning_the_control_table_promises():
+    """A grant added to `GRANTS` without a note would ship an unexplained checkbox."""
+    from agentorc.ui.app import GRANT_NOTES
+    from sessionorc.models import GRANTS
+
+    assert set(GRANT_NOTES) == set(GRANTS)
+    assert all(GRANT_NOTES[g].strip() for g in GRANTS)
