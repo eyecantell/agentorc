@@ -1052,7 +1052,13 @@ names another host is a note inside the Project block, not a start, until phase 
 and `ao team stop` waits on each member's *state* (idle, exited or closed, or a `--timeout`
 window, default 300 s), which is what a client can see — "wrapped up" is not a state the record
 carries. The lead is started with an empty `controllers` list: the definition, not a repo
-default, is the authority over a team session, and it is a person who runs the start.
+default, is the authority over a team session, and it is a person who runs the start. A member
+the definition starts **interactive** keeps its `controllers: [lead]` but is out of its lead's
+reach for as long as it stays interactive (§9 invariant 5, a gate since TD-041), so the start
+says so in one line per member rather than leaving a list that silently never fires. The
+`project` badge a session carries is the first of the team's projects that lists its home repo;
+a repo in two projects is therefore badged by the first, and a member that wants the other
+names it with its own `project:`.
 
 **The Org page.** The home route and nav item become **Org**; the Team name retires with the
 page (the second rename this week, and the last: the noun does not change with what is inside,

@@ -386,11 +386,23 @@ def cmd_team_start(args: argparse.Namespace) -> int:
         for rec in created:
             print(_team_line(rec, args.name, p), file=sys.stderr)
         return fail(args, f"team {args.name}: {e} — {len(created)} session(s) already started (above)", 1)
-    result = {"team": args.name, "lead": lead_id or None, "sessions": created}
+    # §9 invariant 5, as TD-041 made it a gate: no session acts on an interactive one, so a member
+    # the definition starts interactive carries `controllers: [lead]` that can never fire. The list
+    # is set and the start stands — it is a fact about the definition, not an error — but it is said
+    # out loud, the way `ao new` says a session nobody may act on (§4.8). Review of PR #118.
+    out_of_reach = [x.name for x in p.members if not x.unattended] if lead_id else []
+    result = {"team": args.name, "lead": lead_id or None, "sessions": created, "out_of_reach": out_of_reach}
 
     def prose() -> None:
         for rec in created:
             print(_team_line(rec, args.name, p))
+        for name in out_of_reach:
+            print(
+                f"{name} is interactive, so {p.lead.name if p.lead else 'the lead'} cannot act on it "
+                "(design §9 invariant 5): its controllers are recorded and take effect if you flip it "
+                "to unattended",
+                file=sys.stderr,
+            )
 
     return emit(args, result, prose)
 

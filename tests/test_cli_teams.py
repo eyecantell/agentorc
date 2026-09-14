@@ -190,6 +190,24 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert "member grinder" in out
 
 
+def test_an_interactive_member_is_started_but_said_to_be_out_of_its_leads_reach(world, capsys):
+    """§9 invariant 5 is a gate since TD-041: no session acts on an interactive one. A member the
+    definition starts interactive keeps its `controllers: [lead]`, and they are inert until someone
+    flips it — so the start says so rather than leaving a list that silently never fires (review of
+    PR #118)."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][1]["unattended"] = False  # the hunter, watched by a person
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    made = creates(state)
+    hunt = next(p for p in made if p["name"] == "hunt")
+    assert hunt["unattended"] is False and hunt["controllers"] == ["ao-agentorc-orc-ao"]  # recorded, inert
+    err = capsys.readouterr().err
+    assert "hunt is interactive, so orc-ao cannot act on it" in err and "invariant 5" in err
+    assert "grind-1" not in err  # the unattended members say nothing
+
+
 def test_a_person_lead_starts_no_lead_session_and_members_are_controlled_by_nobody(world):
     tmp_path, state = world
     doc = org_doc(tmp_path)
