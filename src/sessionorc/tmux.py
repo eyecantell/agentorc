@@ -214,9 +214,11 @@ class Tmux:
         try:
             self.run("load-buffer", "-b", buf, "-", input=text)
             self.run("paste-buffer", "-p", "-d", "-b", buf, "-t", f"={name}:")
-        finally:
-            # `-d` deletes it on a successful paste; this clears the buffer a failed paste left behind.
+        except BaseException:
+            # `-d` deletes it on a successful paste, so the cleanup is for the failure path alone:
+            # a load that succeeded and a paste that did not would otherwise leave a buffer behind.
             self.run("delete-buffer", "-b", buf, check=False)
+            raise
 
     def send_prompt(self, name: str, text: str) -> None:
         """Paste + Enter, unconfirmed. The host agent's `send` confirms the submit when the adapter
