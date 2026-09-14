@@ -720,3 +720,39 @@ def test_every_grant_has_the_one_line_warning_the_control_table_promises():
 
     assert set(GRANT_NOTES) == set(GRANTS)
     assert all(GRANT_NOTES[g].strip() for g in GRANTS)
+
+
+def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
+    """Design §4.3/§4.5a (TD-047): one button does two jobs and the person cannot tell which.
+
+    Send is enabled while the agent works — Claude Code queues input typed at it — so the same
+    button starts a new piece of work on an idle session and redirects work already in flight on a
+    working one. The design had the behaviour right and no word for it; `turn` and `steer` are the
+    words, and the composer has to say the same thing the prose does without the reader having to
+    decode the state pill.
+    """
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert '"→ Steer" : "→ Send"' in js
+    assert "steers the turn in flight" in js and "starts a new turn" in js
+
+    # A dead or out-of-reach session has no turn to start or steer, and the composer used to sit
+    # enabled there saying nothing. Merely useless before; "starts a new turn" at a killed session
+    # would be a lie, so those states are excluded ahead of the branch that says it.
+    dead = js[js.index('} else if (v.state === "exited"') : js.index("design §4.3: one button, two jobs")]
+    assert '"closed"' in dead and '"unreachable"' in dead and "compose.disabled = true" in dead
+    assert "this session's process has ended" in dead and "cannot be reached" in dead
+    # the banner offers Resume only on `exited` with an adapter id, so the hint must not promise it
+    assert 'v.state === "exited" && v.adapter_id' in dead and "start a new session here" in dead
+
+    # `stalled?` is a working session that stopped producing output (§4.2) — a turn in flight, so
+    # it steers. `limited` must not claim a turn starts now: §4.2 says nothing the person does
+    # unblocks a cap, and §4.5a's controls for it are Switch profile and Wait.
+    assert 'v.state === "working" || v.state === "stalled?"' in js
+    assert "the profile is at its cap: what you send waits" in js
+    assert "this session looks stalled" in js
+
+    # and the design says it where §4.5a points: the Send row and the §4.3 rule
+    design = (pathlib.Path(__file__).parents[1] / "docs" / "design.md").read_text()
+    send_row = next(ln for ln in design.split("\n") if ln.startswith("| Focus composer | **Send** |"))
+    assert "Steer" in send_row and "starts a new turn" in send_row
+    assert "to an `idle` session it starts a turn; to a `working` one it steers the turn in flight" in design
