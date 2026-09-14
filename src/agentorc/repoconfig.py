@@ -18,7 +18,8 @@ commands: [{name: test, run: pdm run test}]
 Missing file: the defaults §5 lists. A malformed file: a `ValueError` naming the key. Read on every
 use and cached nowhere (the profiles rule), by the clients only — the host agent never reads it, so
 `sessionorc` stays free of it. Roles resolve lowest-first: the package's built-ins (`PRESETS`), an
-org-level overlay (`roles_overlay`; `org.yml` is a later step and is not read here), then the
+org-level overlay (`roles_overlay`, which the callers fill from `org.yml` — this module never
+reads that file itself), then the
 repo's own `roles:`, each overriding per key.
 """
 
