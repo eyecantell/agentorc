@@ -954,6 +954,16 @@ the file, the templates are `agentorc/briefs/<role>.md` with one `{lane}` placeh
 `roles.<name>` overrides per key over the built-in, and the record carries `role` and the repo's
 `ledger:` (so the derived-report tick reads the right file without `sessionorc` knowing the config):
 
+**A brief describes the job, not the run** (TD-042). `ao team start` is the restart as well as
+the start (§4.9), so a brief that names one night cannot start the next: the run-specific facts
+come from the definition or the record — the lane from `--lane` or `lane:`, the members from
+`ao status -v`, the stop from the usage gate or the lead's wrap-up (`ao team stop`), never a date
+written into the file. The first real `ao team start` broke on exactly this, bringing up two
+sessions whose brief told them to stop at a time already past, and one did so within a minute.
+`ao team start` says so when a brief it is about to hand out names a clock time or a run number,
+and starts the team anyway — a brief is prose and the judgement is its author's. A bare date is
+deliberately not warned about: briefs cite dated ADRs and state what was true on a day.
+
 | Preset | Brief template says | Lane | Grants | Typically writes |
 |---|---|---|---|---|
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
@@ -1042,6 +1052,10 @@ role's; an explicit `grants: []` on an orchestrator lead means *none*, which lea
 act on its own members, and is a thing to write only on purpose. **A key nobody reads is an
 error naming it**, in a team, a lead or a member: silence about a typo is how a lead's `brief:`
 disappears into a file that looks right.
+A `brief:` anywhere in a definition — on the lead or on a member — names a file that has to be
+repeatable, for the reason in §4.8: this command is the restart, so a brief written for one run
+strands the next one. The start warns and proceeds when it finds a clock time or a run number in
+the text it is about to hand over.
 Each member: `role`, `count` (default 1; a count above one suffixes the name `-1`, `-2`, …),
 `name` (the prefix; default the role), `home`, `lane`, `brief` (overrides the role's template),
 `profile`, `grants` (default the role's), `unattended` (default **true** — a team is what runs

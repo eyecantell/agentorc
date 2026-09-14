@@ -285,6 +285,8 @@
       // lead's own stop happens after the response (review of PR #124).
       (o.out_of_reach || []).forEach((who) =>
         AO.toast(`${name}: ${who} is interactive, so its lead cannot act on it — §9 invariant 5`));
+      // TD-042: a brief written for one night cannot start the next. The team started; this is a note.
+      (o.unrepeatable || []).forEach((w) => AO.toast(`${name}: ${w}`));
       if (o.lead) watchStop(name, o.lead);
     } catch (e) {
       AO.toast(`${name}: ${e.message}`);
