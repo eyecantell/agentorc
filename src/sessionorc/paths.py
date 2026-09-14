@@ -30,10 +30,17 @@ def socket_path() -> Path:
     return home() / "agent.sock"
 
 
+def waits_dir() -> Path:
+    """One cursor file per waiter (`ao wait`, design §4.8 "Waking a lead", TD-049): what that
+    caller had already seen when it last looked, so an event that arrives while it is busy is
+    still there when it comes back."""
+    return home() / "waits"
+
+
 def recent_dirs_file() -> Path:
     return home() / "recent_dirs"
 
 
 def ensure_layout() -> None:
-    for d in (sessions_dir(), events_dir(), runs_dir(), attachments_dir()):
+    for d in (sessions_dir(), events_dir(), runs_dir(), attachments_dir(), waits_dir()):
         d.mkdir(parents=True, exist_ok=True)

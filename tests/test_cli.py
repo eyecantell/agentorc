@@ -602,3 +602,136 @@ def test_ao_new_team_and_project_badges(subprocess_agent, tmp_path, capsys):
     assert shown.count("team:") == 1  # the shell session shows neither line
     for sid in (s["id"], sh["id"]):
         call_sync("kill", id=sid)
+
+
+# ── TD-049: a lead blocks instead of sleeping (design §4.8 "Waking a lead") ────────────────────
+
+
+def test_the_wake_vocabulary_ignores_what_moves_every_tick_and_notices_what_a_lead_acts_on():
+    """The exclusions are the whole point (design §4.8).
+
+    `last_output`, `tail`, `since`, `seen_at` and `git` move on almost every tick of a healthy
+    session. A digest over the whole record would wake a lead continuously and be worth less than
+    the poll it replaces, so the vocabulary is short and deliberate.
+    """
+    from sessionorc.models import wake_digest
+
+    base = {
+        "id": "a", "state": "working", "exit_code": None, "pending": None,
+        "progress": [], "findings": [], "controllers": ["lead"],
+    }
+    same = wake_digest(base)
+    for noise in ("last_output", "tail", "since", "seen_at", "git", "subagents", "model", "name"):
+        assert wake_digest({**base, noise: "moved"}) == same, f"{noise} must not wake a lead"
+    # a permission's countdown is not the event; the question is
+    asking = {**base, "state": "needs-you", "pending": {"kind": "permission", "text": "rm -rf x", "deadline": "1"}}
+    assert wake_digest(asking) == wake_digest({**asking, "pending": {**asking["pending"], "deadline": "2"}})
+    assert wake_digest(asking) != same
+
+    # and the four things a lead exists to react to
+    assert wake_digest({**base, "state": "exited"}) != same
+    assert wake_digest({**base, "progress": [{"ref": "TD-1", "status": "done", "pr": 7}]}) != same
+    assert wake_digest({**base, "findings": [{"ref": "TD-2", "priority": "high"}]}) != same
+    assert wake_digest({**base, "controllers": []}) != same
+
+
+def test_a_lead_waits_on_what_it_controls_and_a_person_sees_everything():
+    """Scope reuses the authority rule (§4.8): a lead waits on exactly what it may act on."""
+    from agentorc.cli import wait_scope
+
+    ss = [{"id": "m1", "controllers": ["lead"]}, {"id": "m2", "controllers": ["other"]}, {"id": "m3"}]
+    assert [s["id"] for s in wait_scope(ss, "lead", "controlled")] == ["m1"]
+    assert [s["id"] for s in wait_scope(ss, "lead", "all")] == ["m1", "m2", "m3"]
+    assert [s["id"] for s in wait_scope(ss, None, "controlled")] == ["m1", "m2", "m3"]  # a person
+
+
+def test_an_event_that_fired_while_the_lead_was_busy_is_still_there_when_it_comes_back():
+    """The case that decides whether this is worth having (design §4.8, TD-049 step 4).
+
+    A lead is not blocked mid-turn — it is running a cadence check or writing a board line — and a
+    lead that misses the one event it existed for is worse than a poll. The comparison is against
+    what this caller last *saw*, not against what happened to be streamed while it listened, so
+    the `subscribe` snapshot answers it before the stream is ever read.
+    """
+    from agentorc.cli import wake_changes
+    from sessionorc.models import wake_digest
+
+    working = {"id": "m1", "state": "working", "controllers": ["lead"], "progress": []}
+    done = {**working, "state": "idle", "progress": [{"ref": "TD-1", "status": "done", "pr": 7}]}
+
+    # first wait ever: record where we are, wake on nothing — otherwise every lead's first call
+    # returns its whole fleet and it learns to ignore the result
+    changed, cursor = wake_changes({}, [working])
+    assert changed == [] and cursor == {"m1": wake_digest(working)}
+
+    # the worker finishes while the lead is mid-turn; the next wait still sees it
+    changed, cursor2 = wake_changes(cursor, [done])
+    assert [s["id"] for s in changed] == ["m1"]
+    # and does not report it twice
+    assert wake_changes(cursor2, [done]) == ([], cursor2)
+
+
+def test_a_session_that_went_away_is_a_wake_of_its_own():
+    """The one a lead most needs: a member that exited and was forgotten has no record to diff."""
+    from agentorc.cli import wake_changes
+
+    _, cursor = wake_changes({}, [{"id": "m1", "state": "working", "controllers": ["lead"]}])
+    changed, cursor2 = wake_changes(cursor, [])
+    assert changed == [{"id": "m1", "gone": True}] and cursor2 == {}
+
+
+def test_wait_returns_at_the_timeout_when_nothing_changes(subprocess_agent, capsys):
+    """A quiet fleet costs one blocked connection and returns at the fallback interval."""
+    import time
+
+    t0 = time.monotonic()
+    assert cli.main(["wait", "--timeout", "1.2", "--scope", "all"]) == 0
+    assert 1.0 <= time.monotonic() - t0 < 12.0
+    assert "nothing changed" in capsys.readouterr().out
+
+
+def test_a_worker_marking_done_wakes_a_waiting_lead_within_seconds(subprocess_agent, tmp_path, capsys):
+    """The "Done when" of TD-049: a worker marking `done --pr N` has its lead awake in seconds
+    rather than within a tick. The wait runs in a thread because it blocks, which is the point."""
+    import threading
+    import time
+
+    r = cli.main(["--json", "shell", "-d", str(tmp_path), "w1"])
+    assert r == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    # the waiter is a person here (no AGENTORC_SESSION in the test process), so --scope all is
+    # the same set; what is being tested is the wake, not the scope
+    assert cli.main(["wait", "--timeout", "1", "--scope", "all"]) == 0  # first call records the cursor
+    capsys.readouterr()
+
+    out: dict = {}
+
+    def waiter() -> None:
+        out["code"] = cli.main(["--json", "wait", "--timeout", "20", "--scope", "all"])
+
+    t = threading.Thread(target=waiter)
+    t.start()
+    time.sleep(1.0)  # let it get past the snapshot and settle into the stream
+    t0 = time.monotonic()
+    assert cli.main(["progress", "done", "TD-999", "--pr", "7", "--id", sid]) == 0
+    t.join(timeout=25)
+    assert not t.is_alive() and out["code"] == 0
+    assert time.monotonic() - t0 < 15.0  # seconds, not a tick
+    woke = [x for x in json.loads(capsys.readouterr().out.split("\n", 1)[-1] or "[]") if x.get("id") == sid]
+    assert woke and any(p["ref"] == "TD-999" and p["pr"] == 7 for p in woke[0]["progress"])
+    cli.main(["kill", sid])
+
+
+def test_the_design_describes_the_wake_before_the_code_does_it():
+    """A behaviour change is a change to the design first (CLAUDE.md, §4.5a's rule for controls).
+
+    `ao wait` is not a UI control, so it earns no §4.5a row — but §4.8's orchestrator row said the
+    lead reads status *on a cadence*, and that sentence is what this changes.
+    """
+    design = pathlib.Path(__file__).parents[1] / "docs" / "design.md"
+    text = design.read_text()
+    assert "**Waking a lead**" in text
+    row = next(ln for ln in text.split("\n") if ln.startswith("| `orchestrator` |"))
+    assert "ao wait" in row, "§4.8's orchestrator row still says the lead only polls"
+    for promise in ("the authority rule", "The timer stays", "Nothing is sent into the lead's pane"):
+        assert promise in text, promise

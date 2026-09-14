@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import os
 import pathlib
@@ -16,11 +17,11 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import repoconfig, teamrun, teams
-from sessionorc import hosts, naming
+from sessionorc import hosts, naming, paths
 from sessionorc.adapters import short_model
-from sessionorc.client import AgentError, AgentUnavailable
+from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note, wake_digest
 from sessionorc.tmux import attach_argv
 
 
@@ -86,6 +87,155 @@ def emit(args: argparse.Namespace, result: Any, prose: Callable[[], None]) -> in
     else:
         prose()
     return 0
+
+
+# ── ao wait: a lead blocks instead of sleeping (design §4.8 "Waking a lead", TD-049) ──────────
+
+
+# How long a quiet stream means the opening snapshot is complete. Generous next to a burst of
+# local writes on a unix socket, and it only ever costs one extra moment before the first answer.
+SNAPSHOT_GAP = 0.4
+
+
+def wait_scope(sessions: list[dict[str, Any]], caller: str | None, scope: str) -> list[dict[str, Any]]:
+    """Which sessions a waiter is watching. The default reuses the authority rule (§4.8): a lead
+    waits on exactly the sessions it may act on — the ones whose `controllers` name it — so the
+    wake and the authority cannot drift apart. A person at a terminal has no caller and watches
+    everything, which is what `ao status` already shows them."""
+    if scope == "all" or caller is None:
+        return list(sessions)
+    return [s for s in sessions if caller in (s.get("controllers") or [])]
+
+
+def _cursor_file(caller: str | None) -> pathlib.Path:
+    return paths.waits_dir() / f"{naming.slug(caller or 'person')}.json"
+
+
+def read_cursor(caller: str | None) -> dict[str, str]:
+    try:
+        got = json.loads(_cursor_file(caller).read_text())
+    except (OSError, ValueError):
+        return {}
+    return got if isinstance(got, dict) else {}
+
+
+def write_cursor(caller: str | None, cursor: dict[str, str]) -> None:
+    f = _cursor_file(caller)
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        tmp = f.with_suffix(".tmp")
+        tmp.write_text(json.dumps(cursor))
+        tmp.replace(f)  # atomic: a half-written cursor would wake on everything, or on nothing
+    except OSError:
+        pass  # a cursor that cannot be saved costs one redundant wake, never a missed one
+
+
+def wake_changes(before: dict[str, str], now: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """The sessions whose wake digest differs from what this waiter last saw, and the new cursor.
+
+    A session that has gone is a change too, and the one a lead most needs: `{"id": …, "gone":
+    true}` stands in for the record that is no longer there. A *first* wait (no cursor) reports
+    nothing and simply records where it is — otherwise the first call of every lead's life would
+    return its whole fleet and it would learn to ignore the result."""
+    cursor = {s["id"]: wake_digest(s) for s in now}
+    if not before:
+        return [], cursor
+    changed = [s for s in now if before.get(s["id"]) != cursor[s["id"]]]
+    changed += [{"id": sid, "gone": True} for sid in before if sid not in cursor]
+    return changed, cursor
+
+
+def cmd_wait(args: argparse.Namespace) -> int:
+    """`ao wait [--timeout N]` (design §4.8 "Waking a lead", TD-049): block until something a lead
+    acts on changes, or the timeout passes.
+
+    A lead's tick ends with this instead of sleeping: an event returns in about a second, a quiet
+    window returns at the timeout, and **that timeout is the fallback poll** — one mechanism, not
+    two that can disagree. Nothing is sent into the lead's pane, so there is no interrupt to
+    invent and no keystrokes landing mid-turn (§4.8: the agent, which already sees every record
+    and computes the deltas, is the right thing to turn a declaration into a wake).
+
+    The cursor is what makes a busy lead safe. `subscribe` opens with a snapshot of every record
+    (§4.6), so the first thing this does is compare that snapshot against what this caller last
+    *saw* — which means a wake that fired while the lead was running a cadence check is still
+    there on its next wait. Only then does it listen."""
+    caller = os.environ.get("AGENTORC_SESSION") or None
+    before = read_cursor(caller)
+    latest: dict[str, str] = {}
+
+    async def go() -> list[dict[str, Any]]:
+        deadline = asyncio.get_running_loop().time() + max(args.timeout, 0.0)
+        async with LocalClient(caller=caller) as c:
+            events = c.subscribe().__aiter__()
+            seen: dict[str, dict[str, Any]] = {}
+            snapshot_done = False
+            # `asyncio.wait`, not `wait_for`: a timeout has to leave the pending read alone.
+            # `wait_for` cancels it, and a cancelled `__anext__` ends the generator — so the next
+            # read raised StopAsyncIteration at once and every wait returned immediately.
+            read: asyncio.Task[Any] | None = None
+            try:
+                while True:
+                    left = deadline - asyncio.get_running_loop().time()
+                    if left <= 0:
+                        return []
+                    if read is None:
+                        read = asyncio.ensure_future(events.__anext__())
+                    # The opening snapshot arrives as a burst; a gap in it means it is complete.
+                    # After that every line is a live delta, judged as it lands.
+                    window = min(SNAPSHOT_GAP, left) if not snapshot_done else left
+                    done, _ = await asyncio.wait({read}, timeout=window)
+                    ev = None
+                    if done:
+                        try:
+                            ev = read.result()
+                        except StopAsyncIteration:
+                            return []
+                        finally:
+                            read = None
+                    elif snapshot_done:
+                        return []
+                    else:
+                        snapshot_done = True  # the burst has stopped: judge what it said
+                    if ev is not None:
+                        if ev.get("event") == "session":
+                            seen[ev["session"]["id"]] = ev["session"]
+                        elif ev.get("event") == "gone":
+                            seen.pop(ev["id"], None)
+                        else:
+                            continue
+                        if not snapshot_done:
+                            continue  # still reading the snapshot; half of it would be noise
+                    watched = wait_scope(list(seen.values()), caller, args.scope)
+                    changed, latest_cursor = wake_changes(before, watched)
+                    latest.clear()
+                    latest.update(latest_cursor)
+                    if changed:
+                        return changed
+            finally:
+                if read is not None:
+                    read.cancel()
+
+    try:
+        changed = asyncio.run(go())
+    except AgentUnavailable as e:
+        return fail(args, str(e), 1)
+    # Written on the way out, whether something changed or the window passed: the next wait
+    # compares against what this one actually saw.
+    if latest:
+        write_cursor(caller, latest)
+
+    def prose() -> None:
+        if not changed:
+            print(f"nothing changed in {args.timeout:g}s")
+            return
+        for s in changed:
+            if s.get("gone"):
+                print(f"{s['id']}  gone")
+                continue
+            line = report_line(s)
+            print(f"{s.get('name') or s['id']}  {s.get('state', '?')}" + (f"  {line}" if line else ""))
+
+    return emit(args, changed, prose)
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -886,6 +1036,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("id")
     p.add_argument("keys", nargs="+")
     p.set_defaults(fn=cmd_keys)
+
+    # design §4.8 "Waking a lead" (TD-049): a lead's tick ends here instead of sleeping, so an
+    # event reaches it in a second and a quiet fleet costs one blocked connection, not a poll.
+    p = add("wait", help="block until a session you control changes, or the timeout passes (design §4.8)")
+    p.add_argument("--timeout", type=float, default=600.0, help="seconds to wait; this is also the fallback poll")
+    p.add_argument(
+        "--scope",
+        choices=("controlled", "all"),
+        default="controlled",
+        help="controlled: the sessions whose `controllers` name you (the default, and the same rule as the gate); "
+        "all: every session, which is what a person at a terminal gets either way",
+    )
+    p.set_defaults(fn=cmd_wait)
 
     p = add("explain", help="why a session shows its state: screen, rule, evidence (or classify --file)")
     p.add_argument("id", nargs="?")
