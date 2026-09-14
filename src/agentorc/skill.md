@@ -34,7 +34,13 @@ advisory. `ao explain <id> --json` shows the screen, the rule that fired, and th
 
 ## Commands
 
-Read-only: `ao status [-v]`, `ao tail <id> -n N`, `ao explain <id>`.
+Read-only: `ao status [-v]`, `ao tail <id> -n N`, `ao explain <id>`, `ao wait [--timeout S]`.
+
+Supervising others: **end each tick with `ao wait --timeout 600 --json`** rather than sleeping.
+It blocks until a session you control changes (state, the pending question, a `progress` claim or
+`done --pr`, a new `finding`, or a session going away), returns those records, and returns empty
+at the timeout — which *is* your fallback poll. Output never wakes you; an event fired mid-turn
+is still there next call; silence is not an event, so keep what notices *absence* on the timeout.
 Mutating — each one is a decision, so check the state first:
 
 - `ao new <name> -d <dir> [--worktree <name>] [--prompt …] [--unattended] [--resume <id>]` —

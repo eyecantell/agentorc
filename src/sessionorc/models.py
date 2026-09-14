@@ -115,6 +115,35 @@ def normalize_ref(ref: str) -> str:
     return r
 
 
+# What counts as something worth waking a lead for (design §4.8 "Waking a lead", TD-049). The
+# vocabulary is deliberately short, and the exclusions are the point: `last_output`, `tail`,
+# `since`, `seen_at`, `git`, `subagents` and `model` move on almost every tick of a healthy
+# session, so a digest over the whole record would wake a lead continuously and be worth less
+# than the poll it replaces. What is left is what a lead acts on: the state it may have to answer
+# or restart, the pending thing it would answer, what the session has claimed or finished, what it
+# has filed, and whether it is still this lead's to act on.
+WAKE_FIELDS = ("state", "exit_code")
+
+
+def wake_digest(session: dict[str, Any]) -> str:
+    """A stable string for the parts of a record a lead is waiting on.
+
+    Two records with the same digest are the same *to a lead*, however much else has moved. A
+    session appearing or disappearing is a change in its own right and is handled by the caller,
+    which compares the set of ids as well as the digests.
+    """
+    p = session.get("pending") or {}
+    parts: list[str] = [f"{f}={session.get(f)!r}" for f in WAKE_FIELDS]
+    # A permission's `deadline` counts down every tick, so the countdown is not the event — the
+    # question being asked is.
+    parts.append(f"pending={(p.get('kind'), p.get('text'))!r}")
+    prog = [(x.get("ref"), x.get("status"), x.get("pr")) for x in session.get("progress") or []]
+    parts.append("progress=" + repr(prog))
+    parts.append("findings=" + repr([(x.get("ref"), x.get("priority")) for x in session.get("findings") or []]))
+    parts.append("controllers=" + repr(sorted(session.get("controllers") or [])))
+    return "\n".join(parts)
+
+
 def report_head(session: dict[str, Any]) -> dict[str, Any] | None:
     """The one `progress` entry a one-line report leads with: what the session is on now, else the
     last thing it finished, else whatever it has. One rule, so a card, `ao status -v` and the Focus
