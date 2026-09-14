@@ -120,3 +120,17 @@ def test_no_entry_body_dangles_below_the_entry_it_belongs_to():
             for fld in ("Location", "Why", "Resolved", "Related"):
                 n = len(re.findall(rf"^\*\*{fld}:\*\*", body, re.M))
                 assert n <= 1, f"{path.name}: {id_} has {n} {fld} lines — an unheaded entry is dangling below it"
+
+
+def test_the_open_file_holds_open_work_only():
+    """`technical_debt.md` says of itself: "This file holds open work only."
+
+    An entry whose Status begins Done or Resolved has been finished and belongs in the archive
+    with its summary row deleted (cadence §2). TD-040 and TD-041 sat in the open file for a day
+    after they were finished, which is how a reader counting open work gets the wrong number and
+    how a session picking one up finds the work already merged. A *partly* done entry stays —
+    that is the whole point of the Status field — so this checks only the two words that mean
+    finished, at the start of the line where the convention puts them.
+    """
+    done = [id_ for id_, body in entries(OPEN) if re.search(r"^\*\*Status:\*\*\s*(Done|Resolved)\b", body, re.M)]
+    assert not done, f"finished entries still in the open file (move them to the archive, cadence §2): {done}"
