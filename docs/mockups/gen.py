@@ -454,15 +454,6 @@ def focus():
       <div class="note" style="margin-top: 8px;">Both channels, as the session declared them or the agent derived them from the branch and its PRs (dashed). <b>Drop</b> records the person's decision as a declaration, so the next tick cannot put the claim back.</div>
     </div>
     <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Members</span><span style="flex-grow: 1;"></span><span class="meta">shown for a session holding <span class="mono">orchestrate</span></span></div>
-      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
-        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-1</a>{pill("working")}<span class="meta">TD-301 → #811 · 1/3</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-2</a>{pill("stalled")}<span class="meta">TD-296 → #437 · 2/2</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-3</a>{pill("limited")}<span class="meta">TD-290 · 0/2</span></div>
-      </div>
-      <div class="note" style="margin-top: 8px;">Every session whose <span class="mono">controllers</span> name this one, derived from the records on each tick and never cached.</div>
-    </div>
-    <div class="card" style="padding: 12px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm" style="opacity: .5;">Close</span></div>
       <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
         <div><span style="color: #065f46;">✓</span> tree clean</div>
@@ -472,6 +463,64 @@ def focus():
         <div><span style="color: #991b1b;">✗</span> ledger / attention board updated</div>
       </div>
     </div>
+  </div>
+</div>
+</div>
+''' + TAIL
+
+def focus_orchestrator():
+    """The lead's Focus (§4.8): the **Members** list is drawn here and only here, because the shipped
+    page guards it with `is_orchestrator` and §4.5a's row says the same — a member's screen showing
+    it would teach exactly the false UI TD-037 exists to remove (found by the PR #127 review)."""
+    term = '''<span class="d">● orc-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/orc-1</span>
+
+<span class="p">&gt;</span> Tick: check every member, nudge what is stalled, wrap up what is done.
+
+<span class="d">⏺</span> Bash(ao status -v --json)
+  <span class="g">4 sessions · tdgrind-1 working · tdgrind-2 stalled? · tdgrind-3 limited</span>
+<span class="d">⏺</span> Bash(ao send --wait tdgrind-2 "no output for 47m — say where you are")
+  <span class="g">idle · answered in 31s</span>
+<span class="d">⏺</span> Bash(scripts/check_cadence.py --pr 811)
+  <span class="g">review ✓ · squash ✓ · CI ✓ · ledger ✓ · worktree ✓ · pushed ✓</span>
+<span class="d">▌</span>'''
+    return head("Focus — orchestrator") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <a href="#" class="muted">← Org</a>
+      <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / orc-1</span>
+      {pill("idle")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
+      <span class="badge">samscrape-grind</span><span class="badge">orchestrator</span>
+      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: orchestrate ×</span>
+      <span class="badge" title="the sessions that may act on this one; + adds one">no controller  +</span>
+      <span style="flex-grow: 1;"></span>
+      <span class="btn">{{ICON["term"]}}Open shell here</span><span class="btn">{{ICON["code"]}}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{{ICON["kill"]}}Kill</span>
+    </div>
+    <div class="term" style="height: 520px;">{{term}}</div>
+    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+      <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
+      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">{{ICON["clip"]}}Attach</span><span style="flex-grow: 1;"></span><span class="btn primary">{{ICON["send"]}}Send</span></div>
+    </div>
+  </div>
+  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    <div class="card" style="padding: 12px;">
+      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Members</span><span style="flex-grow: 1;"></span><span class="meta">3 members · 1 needs you</span></div>
+      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
+        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-1</a>{pill("working")}<span class="meta">TD-301 → #811 · 1/3</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-2</a>{pill("stalled")}<span class="meta">TD-296 → #437 · 2/2</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-3</a>{pill("limited")}<span class="meta">TD-290 · 0/2</span></div>
+      </div>
+      <div class="note" style="margin-top: 8px;">Every session whose <span class="mono">controllers</span> name this one, derived from the records on each tick and never cached.</div>
+    </div>
+    <div class="card" style="padding: 12px;">
+      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">last tick 20:10</span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">#811</span><span class="pill s-done">done</span><span class="meta">merged · cadence ✓</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-404</span><span class="badge">filed · medium</span><span class="meta">tdgrind-2 stood down</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+      </div>
+    </div>
+    <div class="note">A lead's own channels read like anyone's: what it claimed, what it filed. Its members are the panel above, derived from their <span class="mono">controllers</span> on each tick and never cached (§4.8). Nothing keys on the <span class="mono">orchestrator</span> role — the panel is there because the session holds the <span class="mono">orchestrate</span> grant (§9 invariant 9).</div>
   </div>
 </div>
 </div>
@@ -783,6 +832,7 @@ files = {
     "MainDark.dc.html": darken(team_desktop()),
     "Phone.dc.html": team_phone(),
     "Focus.dc.html": focus(),
+    "FocusOrc.dc.html": focus_orchestrator(),
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
@@ -797,7 +847,8 @@ canvas = {
         {"file": "Main.dc.html", "title": "Org — desktop", "x": 0, "y": 0, "w": 1440, "h": 1560},
         {"file": "Phone.dc.html", "title": "Org — phone", "x": 1540, "y": 0, "w": 390, "h": 1560},
         {"file": "MainDark.dc.html", "title": "Org — dark", "x": 2040, "y": 0, "w": 1440, "h": 1560},
-        {"file": "Focus.dc.html", "title": "Focus — session", "x": 0, "y": 1660, "w": 1440, "h": 1280},
+        {"file": "Focus.dc.html", "title": "Focus — member", "x": 0, "y": 1660, "w": 1440, "h": 1280},
+        {"file": "FocusOrc.dc.html", "title": "Focus — orchestrator", "x": 0, "y": 3040, "w": 1440, "h": 980},
         {"file": "NewSession.dc.html", "title": "New session", "x": 1540, "y": 1840, "w": 720, "h": 1180},
         {"file": "Legend.dc.html", "title": "States & badges", "x": 0, "y": 2580, "w": 760, "h": 820},
         {"file": "Resumable.dc.html", "title": "Resumable", "x": 0, "y": 3540, "w": 1440, "h": 700},
@@ -805,7 +856,7 @@ canvas = {
         {"file": "Attention.dc.html", "title": "Attention", "x": 0, "y": 4480, "w": 1440, "h": 860},
     ],
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips, the Reports panel and the Members list; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
