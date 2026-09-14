@@ -1,11 +1,11 @@
 ---
 name: agentorc-td-grind-mechanics
-description: "Gotchas for scripted ledger edits and PR merging in agentorc (template headed TD-001, gh merge refused while CI pending, archive-tail conflicts)"
+description: "Gotchas for scripted ledger edits, PR comments and merging in agentorc (template headed TD-001, never guess a PR number, the cadence verdict goes on the comment's first line, archive-tail conflicts)"
 metadata: 
   node_type: memory
   type: project
   originSessionId: 31a6d882-e7d4-40aa-a6a0-3e7bb44d4af9
-  modified: 2026-09-10T16:20:00Z
+  modified: 2026-09-14T18:40:00Z
 ---
 
 Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgrind-ao-1):
@@ -31,6 +31,26 @@ Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgri
   working copy — then the checkout is free to move to the next TD while the review runs.
 - CI runners lag tmux's exit status: a pane can read `dead=1` with no `pane_dead_status` for
   more than 6 s (seen on 3.13 only, PR #52). Do not assert `exit_code` right after `exited`.
+
+Added 2026-09-14 (same session, a later run, ten PRs merged):
+
+- **Never write a PR number into the ledger before the PR exists.** Guessing "the next free
+  number" is wrong whenever another session merges first, and several do. I did it twice in one
+  run — wrote #140 and #146, both of which went to other sessions' PRs — and each needed its own
+  correcting PR. Open the PR, read the number it returns, then write the ledger line. No test can
+  catch this: a PR number is not a ledger id and nothing checks a citation against GitHub.
+- **`scripts/check_cadence.py` reads the `cadence-review:` verdict only on a comment's FIRST
+  line** (`REVIEW_RE` against `body.splitlines()[:1]`), while every reviewer is briefed to *end*
+  its report with that line. A comment written the natural way reads as "no review at all", and
+  once the PR is merged the row can never go green — editing the comment afterwards fails on
+  `updated_at > merged_at`. Put the verdict line first. Ledgered as TD-050.
+- **Post PR comments from a file, and read them back.** `gh pr comment --body "$(...)"` with a
+  command substitution that fails silently posts the *error output* as the comment. I destroyed
+  two real review-evidence comments that way (an `gh api .../issues/$pr/comments/$cid` call that
+  404'd became the comment body). Write the body to a file, POST with `--input`, then
+  `gh api .../issues/comments/$ID -q .body | head -1` to confirm.
+- **Never `git checkout <file>` to undo a test fixture edit** while you have uncommitted work in
+  that file — it silently discards the real change too. Copy the file aside and copy it back.
 
 **Why:** these cost real time and one wrong PR state on the first run.
 **How to apply:** when scripting ledger moves or chaining merges in this repo, reuse these rules;

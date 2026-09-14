@@ -390,6 +390,12 @@ class Adapter(Protocol):
     def composer(self, tail_raw: list[str]) -> str | None  # optional: the text painted in the tool's input line ("" empty,
                                                            # None when no composer is on screen); lets `send` confirm a submit (TD-027)
     def credentials_ok(self, profile: Profile) -> bool | None
+    def mail(self) -> MailDelivery | None   # optional: how a session of this tool is handed inbox entries and
+                                            # woken by them — a command it runs, an injection at the top of a
+                                            # turn, a tool call, or a hook. None means no native path: the core
+                                            # falls back to a pane write, which is a `send`, and §4.10's
+                                            # message/control line is then a convention this adapter's brief
+                                            # keeps rather than a gate the agent enforces (§4.10, 2026-09-14)
 ```
 
 Prompt injection is **core**, not adapter: the composer text goes in with `tmux load-buffer`
@@ -400,6 +406,12 @@ composer emptying, with one `C-m` retry, when the adapter implements `composer` 
 adapters without it get the blind paste + Enter. **Send is disabled** while a permission or question is pending (the pane
 owns a dialog) and, for scraped adapters, while a foreground process runs; otherwise it is
 enabled — Claude Code queues input typed while it works.
+
+**Mail is not prompt injection**, and the split is the same one §4.10 draws: prompt injection
+supplies a turn, mail is handed *to* a turn the session runs itself. Which is why `mail` is the
+adapter's and the paste is core's — the mailbox and its rules are tool-neutral data on a record,
+but how a session of a given tool comes to read an entry is as tool-specific as its hooks, and
+assuming every tool has a shell to run `ao inbox` in would put Claude Code's shape in the core.
 
 A **turn** is one cycle of work, the vocabulary taken from OpenAI's Agents API (§3, [ADR](decisions/2026-09-13-openai-agents-api.md)) because it names a split agentorc already has and could not say in a sentence: a session is durable and outlives any one piece of work, a turn is one piece. So Send does two different things depending on the state, and in one sentence: **to an `idle` session it starts a turn; to a `working` one it steers the turn in flight.** Both are the same paste and the same Enter — the difference is what the person is doing, not what the code does, which is why it belongs in the words and in the label rather than in a second control. Menus and questions are answered *in* the terminal (keys pass
 through); permissions go through the hook decision channel (§4.2). The core never types a menu
@@ -1194,6 +1206,60 @@ perfectly well need to talk. Orc-to-orc is closed today by accident rather than 
 2026-09-13), and that accident is the tell. So the split is the design change: **an act of
 control and a message are different things, with different delivery and different authority.**
 
+**Where the line actually is, since it is thinner than "mailbox versus pane" (Paul, 2026-09-14).**
+Delivery is the mechanism, not the principle, and naming the mechanism made the distinction look
+like an implementation detail. Two properties hold at every point on the scale below, and they are
+what the design is really claiming:
+
+- **Mediation.** A `send` *becomes* the session's next turn: the caller's text is the input, and
+  nothing of the session's own stands between the two. A message is read by a session that then
+  decides, against its brief and its state, what to do about it — including nothing. Control
+  determines behaviour; a message offers information to a judgement that already exists.
+- **Attribution.** Keystrokes arrive with no envelope. A session cannot tell its orchestrator's
+  nudge from the person's typing from its own brief being replayed, so it cannot weigh the source
+  and a reader of the run log cannot either. A message always carries `from`, is persisted on the
+  record, and is auditable after the fact. Anonymous injection and attributed correspondence stay
+  different things however they are delivered.
+
+So the honest shape is a scale of intrusiveness, not two buckets, and the gate is strict where the
+caller determines behaviour and loose where the recipient's judgement mediates:
+
+| | what the caller does | mediated by | gate |
+|---|---|---|---|
+| `progress` / `finding` | states a fact on a record | nothing — nobody is addressed | ungated (§4.8) |
+| a message that lands | puts an attributed entry in an inbox | the recipient's next look | §4.10's graph |
+| a message that wakes | the same, and starts a turn to read it | the recipient's brief and judgement, and the wake budget below | §4.10's graph |
+| `send` / `keys` | supplies the next turn verbatim | nothing | `orchestrate` + `controllers` |
+| `kill`, `close`, `set_mode`, `set_grants`, `set_controllers`, `set_stop`, `create`, `remove` | changes the session or its record without its participation | nothing | `orchestrate` + `controllers` |
+
+The thinnest point is the third row against the fourth, and it is worth stating plainly rather
+than defending: a message that wakes a session and a `send` both cause a turn to happen. What
+separates them is the two properties above — the woken session's turn begins with *you have mail
+from X*, and what it does next is its own, where a `send`'s turn is the caller's text — plus the
+budget, which exists because the third row is the one that spends tokens.
+
+**Portability: the mailbox is core, surfacing it is the adapter's job (Paul, 2026-09-14).**
+The data is neutral — a list on a record in the store, which knows nothing about any tool, and
+`sessionorc` never imports `agentorc` (§4.3). What is *not* neutral is how a session comes to read
+it. `ao inbox` assumes a session that has a shell, runs commands, and follows a brief that tells it
+to look; that is true of Claude Code and of agentic CLIs generally and false of a model driven
+through an API with no shell, or of any tool whose turn we do not compose. So mail joins the
+adapter contract rather than assuming one tool's shape: an adapter declares how a session of its
+tool learns it has mail — a command it can run, an injection at the top of a turn, a tool or
+function call the model may make, or a hook — and the core hands it entries and is told which were
+read. Three consequences, stated because they are the ones that bite:
+
+- **An adapter that cannot surface mail falls back to a pane write**, which *is* a `send`. For
+  that adapter the message/control distinction is a convention its brief keeps, not a gate the
+  agent enforces, and the design should say so rather than imply a guarantee it cannot give for
+  every tool — the same honesty §4.2 applies to scraped state.
+- **Waking is adapter-shaped too.** `ao wait` is a blocking command, which suits a session that
+  drives its own loop; a tool whose turns are composed by a harness is woken by that harness
+  instead. The wake budget below is core either way, because it counts turns, not mechanisms.
+- **Read receipts are best-effort.** `read_at` means *delivered into a turn*, never *understood* —
+  the same limit `send --wait` already has, where a confirmed submit is not a confirmed
+  instruction.
+
 **A message is delivered to a mailbox, never to a pane.** Every session record carries an
 `inbox`, on the same rule as `controllers`: it lives on the *recipient*, is persisted and
 reloaded with the record, and dies when the record is forgotten. An entry is
@@ -1206,12 +1272,40 @@ turn, never races the composer, never needs `send`'s submit-confirmation dance (
 be mistaken by the receiver for its own brief or for the person talking to it — which a `send`
 always can, since it arrives as keystrokes with no envelope.
 
-**Reading is the session's move, not the sender's.** A session reads its inbox when it next
-looks: at the top of a tick, when `ao wait` returns (TD-049), or when a person opens its Focus.
-**A message never starts a turn.** An idle session stays idle with mail waiting; that is the
-single rule that keeps a mailbox from becoming a way for one agent to conscript another's tokens.
-A sender that needs work to start *now* is asking for an act of control and should use `send`,
-whose gate is unchanged.
+**A message may start a turn, and a budget is what keeps that from running away (Paul,
+2026-09-14).** The first draft of this section said a message never starts a turn: an idle session
+stayed idle with mail waiting, and a sender that needed work to begin used `send`. That is too
+blunt. The common case is a session talking to an idle one — a worker telling its lead it finished,
+a lead asking a resting peer a question — and a rule that bans it leaves mail useful only to a
+session already blocked in `ao wait`, which is leads and nobody else. Two workers could message
+each other into inboxes neither would read until something unrelated woke them.
+
+So a message may **wake** its recipient, and the runaway it was meant to prevent is metered
+instead of forbidden:
+
+- **A session has a wake budget**: the number of turns in a row it may start *because of mail*,
+  with no person and no controller intervening. While the budget holds, a message to an idle
+  session starts a turn. When it is spent, mail still **lands** — never dropped, never refused —
+  and stops **waking**; the session drains its inbox on its next natural look, which is exactly the
+  old behaviour, now as the floor rather than the ceiling.
+- **Work resets it.** The budget is restored when the session completes a turn that mail did not
+  start, when a person interacts with it, or when one of its controllers nudges it. That is the
+  property worth having: productive work clears the budget, so only pure correspondence burns it
+  down. A fleet doing its job never meets the limit; a fleet talking to itself meets it quickly.
+- **It counts turns, not messages.** A message that wakes nobody costs nothing and is not
+  metered — which also makes the budget adapter-neutral, since it is counting the thing every tool
+  has rather than a delivery mechanism.
+- **Exhaustion is visible**, on the record and to the sender, because a wake that silently became a
+  landing is exactly the kind of difference that must not be invisible (§4.5 "no silent failure
+  path").
+
+This is deliberately a second bound beside the per-`about` exchange bound below, because they catch
+different failures: the wake budget bounds **cost** — a loop that spends the window — and the
+exchange bound catches **deadlock**, two sessions disagreeing forever in messages that may each be
+cheap. Either alone leaves the other failure open.
+
+A sender that needs the recipient's *next turn to be its text* is still asking for an act of
+control and still uses `send`, whose gate is unchanged.
 
 **The message gate is weaker than `orchestrate`, and reads off the graph that already exists.**
 No new list, no new grant. A session may message:
@@ -1502,10 +1596,12 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 12. Within a scope (repo, or directory), a name identifies at most one session record: a live
     holder refuses a second, an exited or closed holder is superseded by it (§4.1). Suffixes
     exist only for tmux-level accidents and are then shown, never hidden.
-13. A message never starts a turn. It is delivered to the recipient's inbox, read when that
-    session next looks, and an idle session with unread mail stays idle (§4.10, 2026-09-14). A
-    sender that needs work to begin now is asking for an act of control and is bound by
-    invariant 11. Messages are coordination and die with the record; anything that must outlive
+13. A message is delivered to the recipient's inbox and may start a turn there, bounded by the
+    recipient's wake budget: the turns it may start from mail with no person and no controller
+    intervening, restored by any turn mail did not start (§4.10, 2026-09-14). A spent budget makes
+    a message land without waking — never dropped, never refused — and the difference is visible
+    on the record and to the sender. A sender that needs the recipient's next turn to *be* its
+    text is asking for an act of control and is bound by invariant 11. Messages are coordination and die with the record; anything that must outlive
     the run belongs to the ledger, the board or a PR.
 
 ## 10. Open questions
@@ -1698,6 +1794,16 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       in §4.10's bounds — the mailbox depth, the exchange bound, an `ask`'s default — is stated
       as a rule with no value yet, because the right values come from watching a fleet use it,
       the way §4.8's restart ceiling was taken from prior art rather than invented.
+      **Revised the same day, on Paul's three objections to the first draft:** the
+      control/message line was "pretty thin" as written, because it named the delivery mechanism
+      rather than the principle — §4.10 now states the two properties that hold at every point
+      (mediation and attribution), gives the scale of intrusiveness instead of two buckets, and
+      says plainly where it is thinnest; the mailbox was checked for portability across model
+      types and the data is neutral while the *surfacing* was not, so `mail` joins the §4.3
+      adapter contract and the fallback for a tool with no native path is stated honestly as a
+      pane write; and **"a message never starts a turn" is withdrawn as too heavy-handed** — it
+      banned the common case (a session talking to an idle one) to avoid a cost, so the cost is
+      metered instead, by a per-session wake budget restored by any turn mail did not start.
 - [x] **What are the nouns above a session — and is the home page Org?** (2026-09-13, Paul)
       → **Org, Team, Project, Role, Agent**, decided in
       [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md). Org is the whole and the
