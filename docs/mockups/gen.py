@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Emit the agentorc mockup artboards (.dc.html) + canvas.json from one shared style."""
-import json, pathlib
+import json, pathlib, re
 
 OUT = pathlib.Path(__file__).parent
 
@@ -119,8 +119,8 @@ def head(title):
 
 TAIL = "</x-dc>\n</body>\n</html>\n"
 
-def topbar(active="Team", narrow=False):
-    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in ["Team", "Resumable", "Commands", "Attention"])
+def topbar(active="Org", narrow=False):
+    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in ["Org", "Resumable", "Commands", "Attention"])
     return f'''<div class="topbar">
   <span class="wordmark">agent<b>orc</b></span>
   <div style="display: flex; gap: 2px;">{tabs}</div>
@@ -133,6 +133,7 @@ def topbar(active="Team", narrow=False):
 SESS = [
     ("kmaster", "samscrape", "/home/kmaster/samscrape", [
         ("main", "claude-code · paul (max) · opus", "needs", "2m", "main", "", "hook", "Permission: Bash · git push origin td301-fix", ""),
+        ("orc-1", "claude-code · grind (pro) · opus", "idle", "4m", "wt/orc-1", "", "hook", "next tick in 1m", "unattended"),
         ("tdgrind-1", "claude-code · grind (pro) · sonnet", "working", "14s", "wt/tdgrind-1 → td-301", "", "hook", "", "unattended"),
         ("tdgrind-2", "claude-code · grind (pro) · sonnet", "stalled", "47m", "wt/tdgrind-2 → td-296", "3 unpushed", "hook", "no output 47m · creds expire in 0.2h", "unattended"),
         ("tdgrind-3", "claude-code · grind (pro) · sonnet", "limited", "9m", "wt/tdgrind-3 → td-290", "", "hook", "5h window at 100% · resets 02:00 MDT (1h 51m)", "unattended"),
@@ -194,6 +195,65 @@ def due_strip(compact=False):
     {rows}
   </div>'''
 
+# What §4.9 added to a session and §4.8 to its record: the team badge, the controllers edge, and the
+# two report channels. Keyed by session name; a session with no entry is on no team, under nobody,
+# and reporting nothing — which is every session a person starts for themselves.
+EXTRA = {
+    "orc-1":     {"team": "samscrape-grind", "role": "orchestrator", "report": "last tick 20:10 · 2 wrapped up", "grants": "orchestrate"},
+    "tdgrind-1": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-301 → #811 · 1/3 done", "findings": "2 filed"},
+    "tdgrind-2": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-296 → #437 · 2/2 done", "derived": True},
+    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed"},
+    "main":      {"findings": "1 filed"},
+}
+
+# §4.9 team definitions, as the Teams strip reads them: every team in ~/.agentorc/org.yml and in the
+# repos' .agentorc.yml, its source, and how many of its members are live right now.
+TEAMS = [
+    ("samscrape-grind", "org.yml", "orc-1", 4, "samscrape"),
+    ("ao-grind", "org.yml", "orchestrator-ao-1", 0, "agentorc"),
+    ("cadence-sweep", "dev-cadence/.agentorc.yml", "sweeper", 0, "dev-cadence"),
+]
+
+def report_line(name):
+    """design §4.5a card **report line**: only when a channel is non-empty; a derived entry is
+    dashed, like a scraped state."""
+    e = EXTRA.get(name, {})
+    if not (e.get("report") or e.get("findings")):
+        return ""
+    left = f'<span class="meta{" scraped" if e.get("derived") else ""}" style="{"border-bottom: 1px dashed #d9a441;" if e.get("derived") else ""}">{e["report"]}</span>' if e.get("report") else ""
+    right = f'<span class="meta">{e["findings"]}</span>' if e.get("findings") else ""
+    return f'<div style="display: flex; align-items: center; gap: 8px;">{left}<span style="flex-grow: 1;"></span>{right}</div>'
+
+def team_badges(name):
+    """the card's **team** badge (§4.9) and its **under `<orc>`** chip (§4.8)."""
+    e = EXTRA.get(name, {})
+    out = ""
+    if e.get("team"):
+        out += f'<span class="badge" title="click: filter the grid to this team">{e["team"]}</span>'
+    if e.get("role"):
+        out += f'<span class="badge">{e["role"]}</span>'
+    return out
+
+def under_row(name):
+    e = EXTRA.get(name, {})
+    if not e.get("under"):
+        return ""
+    return f'<div><span class="meta">under <span class="badge" title="may act on this session (design §4.8)">{e["under"]}</span></span></div>'
+
+def teams_strip():
+    rows = ""
+    for team, source, lead, live, repo in TEAMS:
+        state = f'<span class="pill s-working">{live} live</span>' if live else '<span class="pill s-idle">not running</span>'
+        acts = ('<span class="btn sm">Stop</span><span class="btn sm danger">Stop now</span>' if live
+                else '<span class="btn sm primary">Start</span>')
+        rows += (f'<div class="due"><span style="font-weight: 600; font-size: 12.5px; width: 150px;">{team}</span>{state}'
+                 f'<span class="meta">lead {lead} · {repo} · {source}</span>'
+                 f'<span style="flex-grow: 1;"></span>{acts}</div>')
+    return f'''<div class="card" style="display: flex; flex-direction: column;">
+    <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Teams</span><span class="muted">3 defined · 1 running · from ~/.agentorc/org.yml and the repos</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
+    {rows}
+  </div>'''
+
 def team_desktop():
     def card(host, repo, s):
         name, tool, state, age, where, flag, conf, pending, tag = s
@@ -223,10 +283,12 @@ def team_desktop():
         return f'''<div class="card sc{" off" if state == "unreachable" else ""}" style="border-color: {border};">
   <div class="sbar" style="background: {BAR[state]};"></div>
   <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="name">{name}</span>{tag_html}<span style="flex-grow: 1;"></span>{pill(state, scraped=(conf == "scraped"))}</div>
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">{name}</span>{tag_html}{team_badges(name)}<span style="flex-grow: 1;"></span>{pill(state, scraped=(conf == "scraped"))}</div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">{place}</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">{age}</span></div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">{where}</span><span style="flex-grow: 1;"></span>{flag_html}</div>
     <div class="meta">{tool}</div>
+    {under_row(name)}
+    {report_line(name)}
   </div>
   <div class="sc-slot">{slot}</div>
   <div class="sc-foot"><span class="btn sm primary">{ICON["focus"]}Focus</span><span class="btn sm ghost">{ICON["code"]}VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;">{ICON["more"]}</span></div>
@@ -236,13 +298,37 @@ def team_desktop():
         for r in rows:
             ordered.append((host, repo, r))
     ordered.sort(key=lambda t: rank(t[0], t[2][2]))
-    cards = "".join(card(h, r, s) for h, r, s in ordered)
-    return head("Team") + f'''<div style="width: 1440px; min-height: 1360px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Team")}
+
+    # design §4.5a Org **team groups** (§4.9): when any live session carries a `team` badge the grid
+    # is grouped — a header per team with its lead, projects and needs-you count, the lead's card
+    # first and its members after; everything else under *No team*, last. Derived on each tick from
+    # the badge and the `controllers` edges, never stored.
+    def group_header(title, sub, needs=0):
+        flag = pill("needs", f"{needs} needs you") if needs else ""
+        return (f'<div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 4px;">'
+                f'<span style="font-weight: 600; font-size: 13.5px;">{title}</span>'
+                f'<span class="meta">{sub}</span>{flag}</div>')
+
+    grid = ""
+    for team, source, lead, live, repo in TEAMS:
+        members = [t for t in ordered if EXTRA.get(t[2][0], {}).get("team") == team]
+        if not members:
+            continue
+        members.sort(key=lambda t: (t[2][0] != lead, rank(t[0], t[2][2])))
+        needs = sum(1 for t in members if t[2][2] == "needs")
+        lead_state = next((t[2][2] for t in members if t[2][0] == lead), "exited")
+        grid += group_header(team, f"lead {lead} ({lead_state}) · project {repo} · {len(members)} sessions", needs)
+        grid += "".join(card(h, r, x) for h, r, x in members)
+    rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
+    grid += group_header("No team", f"{len(rest)} sessions started on their own")
+    grid += "".join(card(h, r, x) for h, r, x in rest)
+    cards = grid
+    return head("Org") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   <div style="display: flex; align-items: center; gap: 10px;">
-    <span style="font-size: 16px; font-weight: 600;">Team</span>
-    <span class="muted">12 sessions · </span>{pill("needs", "1 needs you")}{pill("limited", "1 limited")}{pill("stalled", "1 stalled")}
+    <span style="font-size: 16px; font-weight: 600;">Org</span>
+    <span class="muted">13 sessions · 1 team · </span>{pill("needs", "1 needs you")}{pill("limited", "1 limited")}{pill("stalled", "1 stalled")}
     <span style="flex-grow: 1;"></span>
     <span class="input" style="width: 200px; height: 28px; color: #9ca3af;">filter…</span>
     <span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">profile: all ▾</span><span class="btn ghost" style="color: #9ca3af;">☐ show command runs (2)</span>
@@ -250,9 +336,10 @@ def team_desktop():
     <span style="display: inline-flex; border: 1px solid #cbd0d6; border-radius: 4px; overflow: hidden;"><span class="btn" style="border: 0; border-radius: 0; background: #e5e7eb; color: #111418;">Urgent first</span><span class="btn" style="border: 0; border-radius: 0;">Pinned</span></span>
   </div>
   {due_strip()}
+  {teams_strip()}
   <div class="warn" style="background: #f3f4f6; border-color: #cbd0d6; color: #374151; align-items: center;">{ICON["warn"]}<span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
   <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;">{cards}</div>
-  <div class="note"><b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed; an unreachable host sorts with idle when it is volatile, after stalled? when it is not. <b>Pinned</b> keeps every card where you dragged it and highlights the ones that need you instead. A dashed outline on a state pill means the state was guessed from the screen (shells, tools without hooks). Allow / Deny answer the permission through the tool's hook, so the dialog never reaches the terminal unless the hook times out. Command runs (kind: command) are on the Commands tab and hidden here by default.</div>
+  <div class="note"><b>Teams</b> lists every team defined in <span class="mono">~/.agentorc/org.yml</span> and in the repos' <span class="mono">.agentorc.yml</span>: <b>Start</b> runs the same sequence as <span class="mono">ao team start</span> (every check before any session is created), <b>Stop</b> wraps the members up and then the lead, <b>Stop now</b> kills. The grid groups by the <b>team</b> badge whenever a live session carries one — lead first, members after, everything else under <i>No team</i> — and each card shows who may act on it (<b>under</b>) and what it has reported. <b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed; an unreachable host sorts with idle when it is volatile, after stalled? when it is not. <b>Pinned</b> keeps every card where you dragged it and highlights the ones that need you instead. A dashed outline on a state pill means the state was guessed from the screen (shells, tools without hooks). Allow / Deny answer the permission through the tool's hook, so the dialog never reaches the terminal unless the hook times out. Command runs (kind: command) are on the Commands tab and hidden here by default.</div>
 </div>
 </div>
 ''' + TAIL
@@ -307,14 +394,17 @@ def focus():
 <span class="d">⏺</span> Bash(git push -u origin td301-fix)
 <span class="q">  ⏳ waiting for permission (agentorc hook · answer above, or the terminal dialog appears in 9m 12s)</span>
 <span class="d">▌</span>'''
-    return head("Focus") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Team")}
+    return head("Focus") + f'''<div style="width: 1440px; min-height: 1280px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <a href="#" class="muted">← Team</a>
+      <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
       {pill("needs")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
+      <span class="badge">samscrape-grind</span><span class="badge">grinder</span>
+      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: none</span>
+      <span class="badge" title="the sessions that may act on this one; + adds one">under orc-1 ×  +</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
       <span style="flex-grow: 1;"></span>
       <span class="btn">{ICON["term"]}Open shell here</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{ICON["kill"]}Kill</span>
@@ -353,6 +443,17 @@ def focus():
       <div style="display: flex; gap: 6px; margin-top: 10px;"><span class="btn" style="height: 24px; font-size: 11px;">diff</span><span class="btn" style="height: 24px; font-size: 11px;">log</span><span class="btn" style="height: 24px; font-size: 11px;">PRs</span></div>
     </div>
     <div class="card" style="padding: 12px;">
+      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">1/3 done · 2 filed</span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-301</span><span class="pill s-working">claimed</span><a href="#">#811</a><span class="meta">20:04</span><span style="flex-grow: 1;"></span><span class="badge">declared</span><span class="btn sm ghost">Drop</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-299</span><span class="pill s-done">done</span><a href="#">#809</a><span class="meta">18:40</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-288</span><span class="pill s-idle">dropped</span><span class="meta">held by tdgrind-3</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+        <div style="border-top: 1px solid #eceef1; padding-top: 6px; display: flex; align-items: center; gap: 6px;"><span class="mono">TD-402</span><span class="badge">filed · medium</span><span class="meta">19:12</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-403</span><span class="badge">filed · low</span><span class="meta">19:48</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+      </div>
+      <div class="note" style="margin-top: 8px;">Both channels, as the session declared them or the agent derived them from the branch and its PRs (dashed). <b>Drop</b> records the person's decision as a declaration, so the next tick cannot put the claim back.</div>
+    </div>
+    <div class="card" style="padding: 12px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm" style="opacity: .5;">Close</span></div>
       <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
         <div><span style="color: #065f46;">✓</span> tree clean</div>
@@ -367,36 +468,102 @@ def focus():
 </div>
 ''' + TAIL
 
+def focus_orchestrator():
+    """The lead's Focus (§4.8): the **Members** list is drawn here and only here, because the shipped
+    page guards it with `is_orchestrator` and §4.5a's row says the same — a member's screen showing
+    it would teach exactly the false UI TD-037 exists to remove (found by the PR #127 review)."""
+    term = '''<span class="d">● orc-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/orc-1</span>
+
+<span class="p">&gt;</span> Tick: check every member, nudge what is stalled, wrap up what is done.
+
+<span class="d">⏺</span> Bash(ao status -v --json)
+  <span class="g">4 sessions · tdgrind-1 working · tdgrind-2 stalled? · tdgrind-3 limited</span>
+<span class="d">⏺</span> Bash(ao send --wait tdgrind-2 "no output for 47m — say where you are")
+  <span class="g">idle · answered in 31s</span>
+<span class="d">⏺</span> Bash(scripts/check_cadence.py --pr 811)
+  <span class="g">review ✓ · squash ✓ · CI ✓ · ledger ✓ · worktree ✓ · pushed ✓</span>
+<span class="d">▌</span>'''
+    return head("Focus — orchestrator") + f'''<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <a href="#" class="muted">← Org</a>
+      <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / orc-1</span>
+      {pill("idle")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
+      <span class="badge">samscrape-grind</span><span class="badge">orchestrator</span>
+      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: orchestrate ×</span>
+      <span class="badge" title="the sessions that may act on this one; + adds one">no controller  +</span>
+      <span style="flex-grow: 1;"></span>
+      <span class="btn">{{ICON["term"]}}Open shell here</span><span class="btn">{{ICON["code"]}}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{{ICON["kill"]}}Kill</span>
+    </div>
+    <div class="term" style="height: 520px;">{{term}}</div>
+    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+      <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
+      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">{{ICON["clip"]}}Attach</span><span style="flex-grow: 1;"></span><span class="btn primary">{{ICON["send"]}}Send</span></div>
+    </div>
+  </div>
+  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    <div class="card" style="padding: 12px;">
+      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Members</span><span style="flex-grow: 1;"></span><span class="meta">3 members · 1 needs you</span></div>
+      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
+        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-1</a>{pill("working")}<span class="meta">TD-301 → #811 · 1/3</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-2</a>{pill("stalled")}<span class="meta">TD-296 → #437 · 2/2</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-3</a>{pill("limited")}<span class="meta">TD-290 · 0/2</span></div>
+      </div>
+      <div class="note" style="margin-top: 8px;">Every session whose <span class="mono">controllers</span> name this one, derived from the records on each tick and never cached.</div>
+    </div>
+    <div class="card" style="padding: 12px;">
+      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">last tick 20:10</span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">#811</span><span class="pill s-done">done</span><span class="meta">merged · cadence ✓</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-404</span><span class="badge">filed · medium</span><span class="meta">tdgrind-2 stood down</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+      </div>
+    </div>
+    <div class="note">A lead's own channels read like anyone's: what it claimed, what it filed. Its members are the panel above, derived from their <span class="mono">controllers</span> on each tick and never cached (§4.8). Nothing keys on the <span class="mono">orchestrator</span> role — the panel is there because the session holds the <span class="mono">orchestrate</span> grant (§9 invariant 9).</div>
+  </div>
+</div>
+</div>
+''' + TAIL
+
 def new_session():
-    return head("New session") + f'''<div style="width: 720px; min-height: 960px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Team", narrow=True)}
+    """The shipped form (`src/agentorc/ui/templates/new.html`), field for field. It used to draw a
+    four-way **Where** radio group with an *existing worktree* picker and a separate Fresh/Resume
+    pair; the picker was superseded on 2026-09-06 and §4.5a never carried it (TD-037). The Grants
+    checkboxes are the one §4.5a row still unbuilt, so they stay off the picture."""
+    return head("New session") + f'''<div style="width: 720px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org", narrow=True)}
 <div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 16px;">
   <div style="font-size: 16px; font-weight: 600;">New session</div>
   <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px;">
-    <div class="field"><label>Host</label><span class="input">kmaster<span class="muted">▾</span></span></div>
-    <div class="field"><label>Repo or directory</label><span class="input">samscrape<span class="muted">▾</span></span><span class="note">a registry repo, or type a path (recent: ~/proxmox on host1, /etc/wireguard on vpnmaster)</span></div>
-    <div class="field"><label>Adapter</label><span class="input">claude-code <span class="badge">state: hook</span></span><span class="note">or shell (no hooks, no worktrees)</span></div>
-    <div class="field"><label>Name</label><span class="input mono">td-302</span></div>
+    <div class="field"><label>Host</label><span class="input">kmaster</span></div>
+    <div class="field"><label>Project</label><span class="input">samscrape · 2 repos<span class="muted">▾</span></span><span class="note">optional: narrows Directory to the project's repos on this host, and puts a Project block naming them in front of the brief</span></div>
+    <div class="field"><label>Directory</label><span class="input mono">/home/kmaster/samscrape</span><span class="note">a repo checkout, a worktree, or any directory (registered repos and recent ones offered)</span><span class="note" style="color: #7c3d00;">held by <b>main</b> (idle) — pick a new worktree, or another directory</span></div>
+    <div class="field"><label>Adapter</label><span class="input">claude-code<span class="muted">▾</span></span><span class="note">claude-code: state from hooks · shell: guessed from the screen</span></div>
+    <div class="field"><label>Name</label><span class="input mono">td-302</span><span class="note" style="color: #065f46;">free — nothing holds that name here</span></div>
+    <div class="field"><label>Profile</label><span class="input">the role's, else claude-code · paul (max) · opus (default)<span class="muted">▾</span></span><span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span></div>
+    <div class="field"><label>Role</label><span class="input">grinder [built-in + repo]<span class="muted">▾</span></span><span class="note">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span></div>
+    <div class="field"><label>Lane</label><span class="input mono">TD-027, TD-019</span><span class="note">the references this session is handed, in order; empty: the role's default (free-pick)</span></div>
+    <div class="field"><label>Resume (optional)</label><span class="input mono" style="color: #9ca3af;">the tool's session id</span></div>
   </div>
   <div class="field"><label>Where</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div class="radio" style="opacity: .55;"><span class="rb"></span><span>Main checkout</span><span class="mono muted" style="font-size: 11px;">/home/kmaster/samscrape</span><span style="flex-grow: 1;"></span><span class="pill s-needs">in use by main</span></div>
-      <div class="radio on"><span class="rb"></span><span>New worktree</span><span class="mono muted" style="font-size: 11px;">.claude/worktrees/td-302 from origin/main</span></div>
-      <div class="radio"><span class="rb"></span><span>Existing worktree</span><span class="mono muted" style="font-size: 11px;">td-7 (exited) · td-5 (closed, reaped — recreated from its branch)</span></div>
-      <div class="radio" style="opacity: .55;"><span class="rb"></span><span>errors-alerts</span><span class="mono muted" style="font-size: 11px;">idle, dirty</span><span style="flex-grow: 1;"></span><span class="pill s-idle">in use — resume from the Team</span></div>
-    </div>
-    <div class="warn">{ICON["warn"]}<span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
-  </div>
-  <div class="field"><label>Start</label>
-    <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div class="radio on"><span class="rb"></span><span>Fresh</span></div>
-      <div class="radio"><span class="rb"></span><span>Resume</span><span class="mono muted" style="font-size: 11px;">pick from Resumable (24 transcripts on kmaster/samscrape)</span></div>
+      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>This directory</div><div class="note">the checkout itself, or any directory</div></div><span style="flex-grow: 1;"></span><span class="pill s-idle">in use by main</span></div>
+      <div class="radio on"><span class="rb"></span><div><div>New worktree</div><div class="note">for a git repo: <span class="mono">.claude/worktrees/&lt;name&gt;</span> on branch <span class="mono">&lt;name&gt;</span>, from origin's default branch; reused if it exists</div></div><span class="input mono" style="width: 240px; margin-left: auto;">td-302</span></div>
     </div>
   </div>
-  <div class="field"><label>Opening prompt (optional)</label><span class="input" style="height: 72px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Paste the brief, or leave empty to start at the prompt.</span></div>
+  <div class="field"><label>Opening prompt (optional)</label><span class="input" style="height: 72px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Paste the brief, or leave empty to start at the prompt — a role fills it from its template.</span></div>
   <div class="field">
-    <div class="radio" style="gap: 12px;"><span class="switch"><span class="knob"></span></span><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: run window + usage gate from .agentorc.yml apply; brief file required. Disabled for repos without an unattended block, hidden for directory sessions.</div></div></div>
+    <div class="radio" style="gap: 12px;"><span class="switch"><span class="knob"></span></span><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: run window + usage gate from .agentorc.yml apply. Disabled for repos without an unattended block, hidden for directory sessions.</div></div></div>
   </div>
+  <div class="field"><label>Controllers</label>
+    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>orc-1</div><div class="note mono">ao-samscrape-orc-1</div></div></div>
+      <div class="radio" style="gap: 8px;"><span class="rb"></span><div><div>orchestrator-ao-1</div><div class="note mono">ao-agentorc-orchestrator-ao-1</div></div></div>
+    </div>
+    <span class="note">The sessions that may act on this one (send, wrap up, kill, close) — the ones holding <span class="mono">orchestrate</span>, since nothing else could. None ticked: nobody may, which is the default; add one later from Focus or with <span class="mono">ao control</span>. Ticked in advance: the role's or the repo's <span class="mono">controllers:</span>.</span>
+  </div>
+  <div class="warn">{{ICON["warn"]}}<span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
   <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px;"><span class="btn">Cancel</span><span class="btn primary">Start session</span></div>
 </div>
 </div>
@@ -441,9 +608,9 @@ def direction_b():
         c("dev-cadence/attention-fix", "working", "vps · 1m · gemini"),
     ])
     return head("Alt") + f'''<div style="width: 1100px; min-height: 620px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Team")}
+{topbar("Org")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
-  <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">Team</span><span class="muted">card grid with live tail — alternate to the table</span></div>
+  <div style="display: flex; align-items: center; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">Org</span><span class="muted">card grid with live tail — alternate to the table</span></div>
   <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px;">{cards}</div>
   <div class="note">Trade-off: you see the last lines of every session at once, but fewer sessions fit per screen and host/repo grouping is weaker. The table (Main) scales to 20+ sessions; this scales to ~9.</div>
 </div>
@@ -515,7 +682,7 @@ def resumable():
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   {page_head("Resumable", "31 transcripts · 2 hosts · 3 active now", right)}
   <div class="card"><table><thead><tr><th>Session</th><th>Where</th><th>Start → last</th><th>Started / ended</th><th>Board</th><th></th></tr></thead><tbody>{groups}</tbody></table></div>
-  <div class="note"><b>Resume</b> opens New session with host, repo, and worktree prefilled and Start = Resume; a reaped worktree is recreated from the recorded branch. <b>Switch to</b> jumps to the running card in the Team (same session: the name and the adapter id travel together from birth). A session started by hand shows only its id until you <b>Adopt</b> it (attach, give it a name), which is how it enters the Team. The index is generated on demand from each adapter's transcripts (Claude: the JSONL under ~/.claude/projects, same as list_sessions.py), so crashed and disconnected sessions appear too. Closed sessions are filed here after their day on the Team.</div>
+  <div class="note"><b>Resume</b> opens New session with host, repo, and worktree prefilled and Start = Resume; a reaped worktree is recreated from the recorded branch. <b>Switch to</b> jumps to the running card in the Org (same session: the name and the adapter id travel together from birth). A session started by hand shows only its id until you <b>Adopt</b> it (attach, give it a name), which is how it enters the Org. The index is generated on demand from each adapter's transcripts (Claude: the JSONL under ~/.claude/projects, same as list_sessions.py), so crashed and disconnected sessions appear too. Closed sessions are filed here after their day on the Org.</div>
 </div>
 </div>
 ''' + TAIL
@@ -587,10 +754,10 @@ def commands():
   {page_head("Commands", "5 commands in 2 repos · 1 running", '<span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span>')}
   {groups}
   <div style="display: flex; flex-direction: column; gap: 8px;">
-    <div class="grp" style="padding: 0;"><span>Recent runs</span><span class="path">each run is a session of kind command — same tmux, same log, same Focus; hidden from the Team unless "show command runs" is on</span></div>
+    <div class="grp" style="padding: 0;"><span>Recent runs</span><span class="path">each run is a session of kind command — same tmux, same log, same Focus; hidden from the Org unless "show command runs" is on</span></div>
     <div class="card"><table><tbody>{rows}</tbody></table></div>
   </div>
-  <div class="note">Buttons come from each repo's checked-in <span class="mono">.agentorc.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Team and out of the urgency sort. The Attention tab's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
+  <div class="note">Buttons come from each repo's checked-in <span class="mono">.agentorc.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Org and out of the urgency sort. The Attention tab's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
 </div>
 </div>
 ''' + TAIL
@@ -625,7 +792,7 @@ def attention():
         if repo == "samscrape":
             rows += '''<div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eceef1;">
   <span class="pill s-idle" style="justify-self: start;">undated</span>
-  <div class="muted" style="font-size: 12.5px;">19 more items with no Due date — surfaced only here, never on the Team strip.</div>
+  <div class="muted" style="font-size: 12.5px;">19 more items with no Due date — surfaced only here, never on the Org strip.</div>
   <span class="btn sm ghost">show ▾</span>
 </div>'''
         right += f'''<div class="card" style="padding: 10px 12px 2px; display: flex; flex-direction: column; gap: 6px;">
@@ -638,7 +805,7 @@ def attention():
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   {page_head("Attention", "2 boards · 27 open items · 6 due/overdue · the full dev-cadence board, undated items included", '<span class="mono muted" style="font-size: 11px;">attention command last ran 03:00 MDT</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">overdue · today · this week · undated ▾</span>')}
   {right}
-  <div class="note">The Team shows only what is overdue or due today, in its Due strip. This tab is the whole board: every repo, undated items too, the same rows the repo's <span class="mono">nudge_user_attention.py --report</span> prints. <b>Focus session</b> opens the session that left the item (matched by adapter id; a closed one opens in Resumable). <b>Snooze</b> and <b>Done</b> are one-line edits the host agent makes to user_attention.md and commits with a message naming the session, so the checkout never sits dirty. Sessions that need you are not repeated here — that is the Team.</div>
+  <div class="note">The Org shows only what is overdue or due today, in its Due strip. This tab is the whole board: every repo, undated items too, the same rows the repo's <span class="mono">nudge_user_attention.py --report</span> prints. <b>Focus session</b> opens the session that left the item (matched by adapter id; a closed one opens in Resumable). <b>Snooze</b> and <b>Done</b> are one-line edits the host agent makes to user_attention.md and commits with a message naming the session, so the checkout never sits dirty. Sessions that need you are not repeated here — that is the Org.</div>
 </div>
 </div>
 ''' + TAIL
@@ -665,6 +832,7 @@ files = {
     "MainDark.dc.html": darken(team_desktop()),
     "Phone.dc.html": team_phone(),
     "Focus.dc.html": focus(),
+    "FocusOrc.dc.html": focus_orchestrator(),
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
@@ -674,20 +842,43 @@ files = {
 for n, s in files.items():
     (OUT / n).write_text(s)
 
+# The canvas layout is computed, never typed: an artboard's height comes from the file it was just
+# written to, and each column stacks with a fixed gutter. Two artboards drew on top of each other
+# when Focus grew and a second Focus was inserted (found by the PR #127 review) — a hand-kept `y` is
+# a bug waiting for the next screen to change size.
+LAYOUT = [
+    # (file, title, column)
+    ("Main.dc.html", "Org — desktop", 0),
+    ("Focus.dc.html", "Focus — member", 0),
+    ("FocusOrc.dc.html", "Focus — orchestrator", 0),
+    ("Legend.dc.html", "States & badges", 0),
+    ("Resumable.dc.html", "Resumable", 0),
+    ("Attention.dc.html", "Attention", 0),
+    ("Phone.dc.html", "Org — phone", 1),
+    ("NewSession.dc.html", "New session", 1),
+    ("Commands.dc.html", "Commands", 1),
+    ("MainDark.dc.html", "Org — dark", 2),
+]
+COLUMN_X = {0: 0, 1: 1540, 2: 3120}
+GUTTER = 100
+
+
+def artboards():
+    """Every artboard placed from its own `width` / `min-height`, column by column."""
+    out, y = [], dict.fromkeys(COLUMN_X, 0)
+    for name, title, col in LAYOUT:
+        text = (OUT / name).read_text()
+        m = re.search(r"width: (\d+)px; min-height: (\d+)px", text)
+        w, h = (int(m[1]), int(m[2])) if m else (1440, 900)
+        out.append({"file": name, "title": title, "x": COLUMN_X[col], "y": y[col], "w": w, "h": h})
+        y[col] += h + GUTTER
+    return out
+
+
 canvas = {
-    "artboards": [
-        {"file": "Main.dc.html", "title": "Team — desktop", "x": 0, "y": 0, "w": 1440, "h": 1360},
-        {"file": "Phone.dc.html", "title": "Team — phone", "x": 1540, "y": 0, "w": 390, "h": 1560},
-        {"file": "MainDark.dc.html", "title": "Team — dark", "x": 2040, "y": 0, "w": 1440, "h": 1360},
-        {"file": "Focus.dc.html", "title": "Focus — session", "x": 0, "y": 1460, "w": 1440, "h": 980},
-        {"file": "NewSession.dc.html", "title": "New session", "x": 1540, "y": 1840, "w": 720, "h": 960},
-        {"file": "Legend.dc.html", "title": "States & badges", "x": 0, "y": 2580, "w": 760, "h": 820},
-        {"file": "Resumable.dc.html", "title": "Resumable", "x": 0, "y": 3540, "w": 1440, "h": 700},
-        {"file": "Commands.dc.html", "title": "Commands", "x": 1540, "y": 3540, "w": 1440, "h": 820},
-        {"file": "Attention.dc.html", "title": "Attention", "x": 0, "y": 4480, "w": 1440, "h": 860},
-    ],
+    "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Team, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
