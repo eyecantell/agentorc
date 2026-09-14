@@ -155,7 +155,15 @@ def start(
     # the definition starts interactive carries `controllers: [lead]` that can never fire. The list
     # is set and the start stands — it is a fact about the definition — but it is said out loud.
     out_of_reach = [x.name for x in plan.members if not x.unattended] if lead_id else []
-    return plan, {"team": name, "lead": lead_id or None, "sessions": created, "out_of_reach": out_of_reach}
+    # TD-042: a brief that names one run cannot start the next. The start stands — the brief is
+    # prose and the judgement is the author's — but it is said out loud, like `out_of_reach`.
+    return plan, {
+        "team": name,
+        "lead": lead_id or None,
+        "sessions": created,
+        "out_of_reach": out_of_reach,
+        "unrepeatable": list(plan.warnings),
+    }
 
 
 # ── stop ──────────────────────────────────────────────────────────────────────────────────────

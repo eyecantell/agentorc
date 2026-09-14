@@ -399,3 +399,97 @@ def test_ao_new_project_adds_the_reach_block_and_the_badge(world, capsys):
     write_org(tmp_path, org_doc(tmp_path))
     assert cli.main(["new", "y", "--project", "ao", "--role", "hunter"]) == 0
     assert creates(state)[0]["project"] == "ao" and "## Project" not in creates(state)[0]["prompt"]
+
+
+# ── TD-042: a brief describes the job, not the run ────────────────────────────────────────────
+
+BRIEFS = Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
+REPO_BRIEFS = Path(__file__).parents[1] / "docs" / "briefs"
+
+
+def test_the_packaged_brief_templates_name_no_run_and_no_clock():
+    """Design §4.9 `brief:`: the templates `ao team start` hands out must be repeatable.
+
+    The first real `ao team start ao-grind` brought up two sessions whose brief told them to stop
+    at a time that had already passed, and one did — within 62 seconds it read its lane, found
+    every item merged and stopped taking work. These are the files that would do it again.
+    """
+    templates = sorted(BRIEFS.glob("*.md"))
+    assert templates, "no packaged brief templates found"
+    for t in templates:
+        assert not teams.unrepeatable(t.read_text()), f"{t.name} is written for one run"
+
+
+def test_the_repos_own_briefs_name_no_run_and_no_clock():
+    """The same rule for `docs/briefs/`, which is where a repo keeps the briefs its teams name."""
+    briefs = sorted(REPO_BRIEFS.glob("*.md"))
+    assert briefs, "no briefs found under docs/briefs/"
+    for b in briefs:
+        assert not teams.unrepeatable(b.read_text()), f"{b.name} is written for one run"
+
+
+def test_a_dated_adr_link_is_not_a_run_and_a_fenced_example_is_not_a_clock():
+    """The warning has to be worth reading. A bare date is deliberately not a marker — briefs cite
+    dated ADRs and say what was true on a day — and a clock inside a fenced example is an example."""
+    assert teams.unrepeatable("see [ADR](decisions/2026-09-12-orchestrator-membership-prior-art.md)") == []
+    assert teams.unrepeatable("Since 2026-09-13 the grant is only half the rule.") == []
+    assert teams.unrepeatable("```\nao until 05:30\n```") == []
+    # the two shapes that actually broke a start, both from the briefs of 2026-09-11
+    assert teams.unrepeatable("started 2026-09-11 17:15 MDT (run 5)")
+    assert teams.unrepeatable("**Stop when the list is done, or at 05:30 MDT on 2026-09-12**")
+
+
+def test_a_team_start_says_when_a_brief_names_one_run_and_starts_it_anyway(world, capsys):
+    """A warning, never a refusal: the team starts, and the finding names the session and the line."""
+    tmp_path, state = world
+    (tmp_path / "agentorc" / "docs").mkdir()
+    (tmp_path / "agentorc" / "docs" / "b.md").write_text("You are a worker.\n\nStop at 05:30 on 2026-09-12 (run 5).\n")
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][0]["brief"] = "docs/b.md"
+    write_org(tmp_path, doc)
+
+    assert cli.main(["team", "start", "ao-grind"]) == 0  # started, not refused
+    assert len(creates(state)) == 4  # the whole team started
+    err = capsys.readouterr().err
+    assert "line 3" in err and "TD-042" in err
+    assert "a clock time" in err and "a run number" in err
+
+
+def test_an_unclosed_fence_does_not_hide_the_rest_of_the_brief():
+    """A brief with an unterminated ``` would put every line after it out of reach, so a stale stop
+    time below a typo'd fence would never be found (review of PR #139)."""
+    assert teams.unrepeatable("```\nan example\n\nStop at 05:30 on 2026-09-12.\n")
+    # a *closed* fence still hides its example
+    assert teams.unrepeatable("```\nao until 05:30\n```\n\nplain prose\n") == []
+
+
+def test_a_shell_redirect_is_not_a_run_number():
+    """`pdm run test 2>&1` is a command, not a fifth run (review of PR #139)."""
+    assert teams.unrepeatable("Loop: `pdm run test 2>&1 | tee log`, then `pdm run lint 2>&1`.") == []
+    assert teams.unrepeatable("this is run 2 of the night")
+
+
+def test_a_partial_start_still_says_the_brief_names_one_run(world, capsys, monkeypatch):
+    """The sessions that *did* start are running on that brief, so the warning matters here most."""
+    tmp_path, state = world
+    (tmp_path / "agentorc" / "docs").mkdir()
+    (tmp_path / "agentorc" / "docs" / "b.md").write_text("Stop at 05:30 on 2026-09-12 (run 5).\n")
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["members"][0]["brief"] = "docs/b.md"
+    write_org(tmp_path, doc)
+
+    real = cli.call_sync
+    calls = {"n": 0}
+
+    def flaky(method, **params):
+        if method == "create":
+            calls["n"] += 1
+            if calls["n"] == 3:
+                raise RuntimeError("host went away")
+        return real(method, **params)
+
+    monkeypatch.setattr(cli, "call_sync", flaky)
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    err = capsys.readouterr().err
+    assert "already started" in err
+    assert "TD-042" in err and "a clock time" in err

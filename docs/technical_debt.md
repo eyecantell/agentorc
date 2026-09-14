@@ -28,7 +28,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-039 | Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation | Medium | Open |
 | TD-040 | Team and project definitions: where they live, `ao team start`, a role's `profile`, the Org page's grouped view, a project-aware New session | Medium | Done 2026-09-13 |
 | TD-041 | §9 invariant 5 is convention, not a gate: nothing stops a controller acting on an interactive session | Medium | Done 2026-09-13 |
-| TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Open |
+| TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Partly done |
 | TD-043 | The design has no word for "a message into a session that is already working": adopt session/turn and *steer* so Send can say which of its two jobs it is doing | Low | Open |
 | TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Open |
 
@@ -277,7 +277,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-13
-**Status:** Open — the two agentorc briefs were made repeatable the same day (PR #121); the general rule is not enforced anywhere and the samscrape prompts in `~/.tdgrind/` are still per-run
+**Status:** Partly done — the two agentorc briefs were made repeatable the same day (PR #121). **Steps (1), (2) and (4) landed 2026-09-14 (PR #139):** the rule is stated in §4.8 beside the preset table and in §4.9 beside `brief:`; `teams.unrepeatable()` finds the two markers the real failures carried — a clock time and a run number — and `ao team start` prints one line per finding to stderr and starts the team anyway, the Teams strip toasting the same text; tests assert that no template under `src/agentorc/briefs/` and no brief under `docs/briefs/` carries either (the one hit, a `run 6` in a reference heading, is reworded). A bare date is deliberately *not* a marker: briefs cite dated ADRs and say what was true on a day, and warning about those teaches the reader to ignore the warning. The review of PR #139 added three: the warning is said on the `PartialStart` path too (the sessions that *did* start are running on that brief), a shell redirect (`pdm run test 2>&1`) is not a run number, and an unterminated fence no longer hides every line below it. **Left:** step (3), the samscrape prompts in `~/.tdgrind/tdgrind-*-prompt.md`, which belong in that repo as `docs/briefs/` first (board item 2026-09-13) and are not this repo's to move; and the "Done when" itself — `ao team start ao-grind` on two different days, which needs a live fleet and a restart, so it is a board item rather than a test
 
 **Location:** `docs/briefs/*.md`, `src/agentorc/briefs/` (the package templates), design §4.8 (the preset table's brief column), §4.9 (`brief:` on a lead or member), TD-026 (scheduling)
 
