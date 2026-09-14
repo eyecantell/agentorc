@@ -29,6 +29,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-039 | Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation | Medium | Open |
 | TD-040 | Team and project definitions: where they live, `ao team start`, a role's `profile`, the Org page's grouped view, a project-aware New session | Medium | Open |
 | TD-041 | §9 invariant 5 is convention, not a gate: nothing stops a controller acting on an interactive session | Medium | Done 2026-09-13 |
+| TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Open |
 
 ---
 
@@ -282,3 +283,17 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Rule as landed (2026-09-13):** `kind` is `interactive` for agents and workers alike (`command` is a command run); `unattended` is what says a session is a worker. So the gate keys on both: an acting RPC from a session (caller set) onto a target whose record is `kind: interactive` and `unattended: false` is refused whatever the caller's grant and membership, with a message naming §9 invariant 5, checked before membership since no list edit changes the answer. `set_controllers` is an acting RPC and inherits it: a session cannot put a person's session in a list. A person (no caller) is unaffected on both counts — they may still add a controller to an interactive session (handing their own session to an orchestrator deliberately); the entry is inert until the session is unattended. Existing entries are never dropped: `ao mode <id> interactive` takes a session out of every controller's reach on their next call and leaves the list as it was, live again when a person flips it back (a controller's `mode` onto an interactive session is itself refused). `kind: command` runs and self-action are untouched. One consequence: a session that starts a worker without `--unattended` has started a session it cannot act on. Design §4.8 (a new membership bullet), §4.5a (the badge row), §9 invariants 5 and 11.
 
 **Related:** design §4.8, §9 invariant 5, §6; TD-036 (the membership this rides on); TD-039 (controller conflict).
+
+## TD-042: A brief that names a run number, a date or a fleet cannot be started twice
+
+**Priority:** Medium
+**Added:** 2026-09-13
+**Status:** Open — the two agentorc briefs were made repeatable the same day (PR #121); the general rule is not enforced anywhere and the samscrape prompts in `~/.tdgrind/` are still per-run
+
+**Location:** `docs/briefs/*.md`, `src/agentorc/briefs/` (the package templates), design §4.8 (the preset table's brief column), §4.9 (`brief:` on a lead or member), TD-026 (scheduling)
+
+**Why:** `ao team start` is meant to be the restart as well as the start (§4.9: an exited or closed name holder is superseded). The briefs it hands out were written for one run: `orchestrator-ao-1.md` said "run 2" and "your own stop: 06:30 MDT 2026-09-13", `tdgrind-ao-1.md` said "run 6" and "stop at 05:30 MDT 2026-09-13" and named a four-item lane that was already resolved. The first real `ao team start ao-grind` on 2026-09-13 therefore brought up two sessions whose brief told them to stop immediately, and the grinder did: within 62 seconds it read the lane, found every item merged, wrote an end-of-run summary and stopped taking work. (It sits `idle` at its prompt rather than `exited` — a wrapped-up worker that has not been closed, which is the ordinary end state.) Nothing was broken — the team started exactly as designed — and the result was still an idle fleet, because the brief was a snapshot of a night rather than a description of a job. The orchestrator brief had the same shape in a worse place: it listed its workers by name and suffix (`ao-agentorc-tdgrind-ao-1-4`), which a team definition changes without telling the file.
+
+**Fix:** the rule is that a brief describes the **job**, and the run-specific facts come from the definition or the record: the lane from `--lane` or `lane:`, the members from `ao status -v`, the stop from the usage gate, the lead's wrap-up or `ao team stop`, never a date. Then: (1) say it in §4.8 beside the preset table and in §4.9 beside `brief:`, so the next brief written is repeatable; (2) the three package templates under `src/agentorc/briefs/` already obey it — add a test that no template matches a date or `run \d`; (3) the samscrape prompts in `~/.tdgrind/tdgrind-*-prompt.md` are still per-run and are what `samscrape-grind` would use — they belong in that repo as `docs/briefs/` first (board item 2026-09-13), repeatable when they get there; (4) decide whether `ao team start` should warn when a brief it is about to hand out matches a date, which is cheap and catches the next one. Done when `ao team start ao-grind` twice on two different days produces two sessions that both do work.
+
+**Related:** design §4.8, §4.9; TD-040 (the team definitions this rides on), TD-026 (scheduling, which owns *when* a worker stops), TD-036.
