@@ -732,7 +732,6 @@ def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
     decode the state pill.
     """
     js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
-    assert 'const steering = v.state === "working";' in js
     assert '"→ Steer" : "→ Send"' in js
     assert "steers the turn in flight" in js and "starts a new turn" in js
 
@@ -742,6 +741,15 @@ def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
     dead = js[js.index('} else if (v.state === "exited"') : js.index("design §4.3: one button, two jobs")]
     assert '"closed"' in dead and '"unreachable"' in dead and "compose.disabled = true" in dead
     assert "this session's process has ended" in dead and "cannot be reached" in dead
+    # the banner offers Resume only on `exited` with an adapter id, so the hint must not promise it
+    assert 'v.state === "exited" && v.adapter_id' in dead and "start a new session here" in dead
+
+    # `stalled?` is a working session that stopped producing output (§4.2) — a turn in flight, so
+    # it steers. `limited` must not claim a turn starts now: §4.2 says nothing the person does
+    # unblocks a cap, and §4.5a's controls for it are Switch profile and Wait.
+    assert 'v.state === "working" || v.state === "stalled?"' in js
+    assert "the profile is at its cap: what you send waits" in js
+    assert "this session looks stalled" in js
 
     # and the design says it where §4.5a points: the Send row and the §4.3 rule
     design = (pathlib.Path(__file__).parents[1] / "docs" / "design.md").read_text()

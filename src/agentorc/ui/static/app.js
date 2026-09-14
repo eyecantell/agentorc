@@ -568,19 +568,31 @@
         // the state that has to be excluded from it. The exited banner below offers the two real
         // next steps (Resume this conversation, New session here). TD-047.
         compose.disabled = true;
+        // The banner below offers **Resume this conversation** only on `exited` with an adapter id
+        // (a closed session gets New session here and Forget), so the hint must not promise it.
         $("#composehint").textContent = v.state === "unreachable"
           ? "the host agent cannot be reached: nothing can be sent until it is back"
-          : "this session's process has ended: resume it or start a new one, below";
+          : v.state === "exited" && v.adapter_id
+            ? "this session's process has ended: resume the conversation or start a new one, below"
+            : "this session's process has ended: start a new session here, below";
       } else {
         // design §4.3: one button, two jobs. A message to an `idle` session starts a turn; a
         // message to a `working` one steers the turn in flight. Both are the same paste and the
         // same Enter — only the person's intent differs, so it is said in the label and the hint
         // rather than in a second control (§4.5a still governs what controls exist). TD-047.
         compose.disabled = false;
-        const steering = v.state === "working";
+        // `stalled?` is a `working` session that stopped producing output (§4.2) — a turn already
+        // in flight, not an idle one — so it steers too, and the hint says the state is uncertain
+        // rather than pretending otherwise. `limited` is its own case: §4.2 says nothing the
+        // person does unblocks a cap, so it must not claim a turn starts now; the paste lands and
+        // waits, and §4.5a's controls for it are Switch profile and Wait.
+        compose.disabled = false;
+        const steering = v.state === "working" || v.state === "stalled?";
         $("#send").textContent = steering ? "→ Steer" : "→ Send";
-        $("#composehint").textContent = steering
-          ? "steers the turn in flight — this session is working, and Claude Code queues what you type"
+        $("#composehint").textContent =
+          v.state === "limited" ? "the profile is at its cap: what you send waits until the window resets"
+          : v.state === "stalled?" ? "steers the turn in flight — this session looks stalled, so it may not be read until it moves"
+          : steering ? "steers the turn in flight — this session is working, and Claude Code queues what you type"
           : "starts a new turn";
       }
       $("#fstate").innerHTML = head;
