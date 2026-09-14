@@ -597,6 +597,9 @@ noted). If a control is not in this table it does not exist.
 | Focus header | **controllers** chip | the sessions that may act on this one (§4.8): each controller by name, clicking it removes it; **+** asks for a session id or name and adds it (the `set_controllers` RPC — a person always may, a session only if it already controls this one; the agent refuses, the chip only asks). A controller whose session is gone is shown dim, not dropped. Empty reads *no controller — nobody may act on this session*, which is the default, not a warning — landed 2026-09-13, TD-036 step 3 |
 | card | **under `<orc>`** chip | the session's `controllers` when it has any — the controlling session's name, click to focus it; several are listed. Nothing is shown when the list is empty, which is the common case for a person's own session — landed 2026-09-13, TD-036 step 3 |
 | Focus (orchestrator) | **Members** list | for a session holding `orchestrate`: every session whose `controllers` name it, with state, lane and report line — the orchestrator's central view. Derived from the records on each tick, never cached (§4.8) — landed 2026-09-13, TD-036 step 3 |
+| Focus side panel | **Inbox** | the session's mailbox (§4.10): each entry with its sender, kind, time, `about` reference and whether it is read; an `ask` shows its bound and the `reply` that answered it. A person may **reply** to any entry as themselves, and may delete one. Sits beside **Reports**, which it deliberately is not: Reports are what this session declared about its work, the Inbox is what others addressed to it — design 2026-09-14, TD-052, not built |
+| card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, which is the common case. A person's own session shows it too, since a worker may message them (§4.10) — design 2026-09-14, TD-052, not built |
+| Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a nudge, and the sender reads it when it next looks (§4.10) — design 2026-09-14, TD-052, not built |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `orchestrate` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
@@ -771,7 +774,7 @@ definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every ch
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
-its name until the nested case is built. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052, not built): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target; `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` returns on new mail as well as on a member's state change (TD-049), so a lead's tick ends by blocking rather than sleeping. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -1153,6 +1156,126 @@ own worktree, the grinders' `controllers` naming the orchestrator, the Org page 
 three as one group with the lead first, and `ao team stop ao-grind` wrapping them up in the
 right order.
 
+### 4.10 Messages between sessions (2026-09-14)
+
+Four kinds of session-to-session traffic exist in practice — a lead nudging a worker, a worker
+telling its lead it finished, two leads settling which of them a shared worker should listen to,
+and two workers avoiding each other's reference — and the design had one mechanism for all four:
+`ao send`, which is the agent typing synthetic keystrokes into the target's pane. Only the first
+works. A worker reaches upward through `progress` and `findings`, which are *declarations on its
+own record* read by whoever looks at the card, not messages to anyone; two leads are peers, so
+TD-036's gate refuses them each other; two workers coordinate by side effects — a ledger row, a
+branch name, a PR that already claims the reference.
+
+**The cause is a conflation, not four missing features.** `orchestrate` plus `controllers`
+answers *may A act on B?*, where acting means kill, close, `mode`, `set_controllers`, `send`.
+Messaging was folded into that because keystrokes were the only delivery there was — and typing
+into a session's pane genuinely *is* an act of control, so the gate was right about the mechanism
+it had. It is wrong about the thing underneath: two leads who must never kill each other may
+perfectly well need to talk. Orc-to-orc is closed today by accident rather than by decision (§10,
+2026-09-13), and that accident is the tell. So the split is the design change: **an act of
+control and a message are different things, with different delivery and different authority.**
+
+**A message is delivered to a mailbox, never to a pane.** Every session record carries an
+`inbox`, on the same rule as `controllers`: it lives on the *recipient*, is persisted and
+reloaded with the record, and dies when the record is forgotten. An entry is
+`{id, from, to, at, kind, text, about, read_at, reply_to}` — `from` the sender's session id (or
+the person, when a person sends one), `about` an optional reference (a session id, a `TD-NNN`, a
+PR) that the message concerns. Nothing is typed anywhere. A message therefore never interrupts a
+turn, never races the composer, never needs `send`'s submit-confirmation dance (§4.2), and cannot
+be mistaken by the receiver for its own brief or for the person talking to it — which a `send`
+always can, since it arrives as keystrokes with no envelope.
+
+**Reading is the session's move, not the sender's.** A session reads its inbox when it next
+looks: at the top of a tick, when `ao wait` returns (TD-049), or when a person opens its Focus.
+**A message never starts a turn.** An idle session stays idle with mail waiting; that is the
+single rule that keeps a mailbox from becoming a way for one agent to conscript another's tokens.
+A sender that needs work to start *now* is asking for an act of control and should use `send`,
+whose gate is unchanged.
+
+**The message gate is weaker than `orchestrate`, and reads off the graph that already exists.**
+No new list, no new grant. A session may message:
+
+- **upward** — every session in its own `controllers`; always, and this is the path a worker has
+  never had.
+- **downward** — every session whose `controllers` name it; the same set `ao status -v` prints as
+  `members:`.
+- **sideways** — a session carrying the same `team` badge (§4.9), and a session that shares a
+  controlled target with it: the two leads over one worker, which is exactly TD-039's case.
+- **a person** — see below.
+
+Anything else is refused, naming the rule. The graph is read on every call, like the grant and the
+membership, so nothing is cached and a membership edit changes who may talk on the next call.
+Reads of one's own inbox are never gated; nobody reads another session's inbox (a person does, in
+the UI, because a person is not a session).
+
+**A message may reach an interactive session; an act of control still may not.** §9 invariant 5
+keeps a person's sessions out of every controller's reach because being nudged means having
+keystrokes typed into your pane, being killed, or being flipped to unattended. A mailbox entry is
+none of those: it sits there, inert, until the person looks. So the invariant splits — **control
+onto an interactive session stays refused whatever the caller's grant and membership; a message to
+one is allowed** — and a worker gains a way to ask its author something without spending a
+`user_attention.md` line on it. It buys the person nothing they must act on: an unread message
+changes no state, and the board remains the only channel with a `Due:` date. A person sending a
+message is unaffected, as everywhere else (§4.8): they are not a session and may message anyone.
+
+**Kinds are a small closed set**, because a message whose purpose cannot be read off its envelope
+is a message the receiver must reason about before it can ignore it:
+
+| kind | means | answered by |
+|---|---|---|
+| `note` | something you may want to know; no reply expected | nothing |
+| `ask` | I need an answer to proceed, within a stated bound | a `reply`, or the bound expiring |
+| `reply` | answers one `ask`, carrying its id in `reply_to` | nothing |
+| `conflict` | an `ask` to two or more controllers at once, carrying each instruction verbatim and who it came from (TD-039) | a `reply` from any addressee, or escalation |
+
+**The bounds are part of the design, not a later hardening.** Unattended agents that can talk to
+each other will talk to each other, and the failure is not a crash: it is a fleet that spends its
+window on correspondence and produces a plausible account of work nobody asked for. So:
+
+- **No broadcast.** Recipients are named, at most a handful per message; there is no *all
+  members*, no channel, no room. A message with no addressee is a ledger entry, and the ledger
+  already exists.
+- **A bounded mailbox.** At most a stated number of unread entries; beyond it the *send* is
+  refused with a reason the sender sees, never silently dropped — a lost message and a delivered
+  one must not look the same to the sender.
+- **A bounded exchange.** Messages sharing one `about` reference are counted, and past the bound
+  the exchange stops and becomes a `user_attention.md` line with the thread attached. Two agents
+  that cannot agree in a few turns are not going to agree in fifty, and the person is the
+  tie-break — which is Paul's rule for the two-controller conflict (§10, 2026-09-13) generalised.
+- **An `ask` carries its bound** (turns or wall-clock) and escalates the same way when it expires
+  or when an addressee is gone — §4.8's *controlled by a session that is gone* applies to mail
+  too.
+- **Messages are not the record.** They are coordination and they die with the session record.
+  Anything that must outlive the run goes where it already goes: the ledger, the board, a PR.
+  This is "never strand work" (CLAUDE.md) applied to a new channel before it can strand anything.
+
+**What this settles that briefs were holding.** §4.8 left "keeping two controllers from
+double-nudging" to their briefs, which is no rule at all. With mail it becomes one: **a message
+`about` a session is visible to that session's other controllers**, so the second lead sees the
+first one's instruction rather than discovering it in the worker's behaviour. TD-039's conflict
+object is then a `conflict` message, its exchange is `reply` traffic under one `about`, and its
+escalation is the bound above — three designs collapsing into one.
+
+**Surface.** CLI (§4.7): `ao msg <to> "…" [--kind] [--about] [--reply-to]`, `ao inbox [--json]
+[--unread]`, and `ao wait` returning on mail as well as on a member's state change (TD-049). UI
+(§4.5a): an **Inbox** panel on Focus beside Reports, and an unread count on the card. `ao --skill`
+gains the rules an agent needs to use mail correctly — read before acting, answer an `ask`, never
+broadcast — since that file is how a session learns it has a mailbox at all.
+
+**Alternatives, recorded so they are not re-proposed.** *Widen `send` for peers* (TD-039's stated
+fix) keeps keystrokes as the delivery, so every message is an interruption of a turn, and gives a
+worker no upward path at all — it answers one of the four cases. *A shared bus or room* removes the
+addressee, and with it the bound and the accountability; broadcast is the mechanism by which a
+fleet's spend stops being proportional to its work. *The attention board as the channel* is the
+status quo for upward traffic and is wrong in both directions: it is written for a person, and
+coordination traffic would drown the thing Paul actually reads.
+
+**Done when** a worker can tell its lead it finished without the lead polling; two leads over one
+worker can settle a contradiction between themselves and land a board line when they cannot; two
+workers in a team can each learn the other holds a reference before duplicating it; every one of
+those is refused when the graph does not permit it; and no message ever starts a turn.
+
 ## 5. Configuration
 
 - Hosts: `~/.agentorc/hosts.yml` on the UI host (`name`, `transport: ssh|local`, `ssh`
@@ -1327,7 +1450,10 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    (§4.8; a gate since 2026-09-13, TD-041). Only a person acts on an interactive session, and
    only a person hands one to unattended mode or to a controller. Flipping a session to
    interactive takes it out of every controller's reach on their next call; its `controllers`
-   entries stay, inert.
+   entries stay, inert. A **message** is not an act of control and is not refused
+   by this invariant: it lands in the target's inbox, starts no turn and changes no state until
+   a person reads it (§4.10, 2026-09-14) — the one thing a session may address to a person's
+   session.
 6. The core never types a menu choice into a pane; permissions are answered through the hook,
    everything else in the terminal.
 7. The agent's edits to a repo's board file are always committed, never left in the tree.
@@ -1339,15 +1465,24 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    Org page's grouping is derived from `controllers` and the badge on each tick, never stored.
 10. A report entry the session declared is never overwritten by one the agent derived; a
     derived entry is shown as such, like a scraped state.
-11. A session acts on another session only through the agent, only with the `orchestrate`
+11. A session **acts on** another session only through the agent, only with the `orchestrate`
     grant on its record, and only when the caller is in the target's `controllers` list (an
     empty list means nobody may act on it; the membership half is proposed 2026-09-12, §4.8,
     TD-036) — and never when the target is interactive, whatever the list says (invariant 5). Grant and membership are both read from the records on every call, so a revoke or
     a membership edit takes effect on the session's next call and neither is cached. Reads are
-    never gated, and a person at a terminal or the UI is not a session.
+    never gated, and a person at a terminal or the UI is not a session. Acting is what changes a
+    session — `send`, `keys`, `kill`, `close`, `mode`, `new`, `remove`, `set_grants`,
+    `set_controllers`. **Messaging is not acting** and does not pass through this gate: its own,
+    weaker rule is §4.10's graph (my controllers, my members, my team, a shared target), it needs
+    no grant, and it is refused by naming that rule rather than this one.
 12. Within a scope (repo, or directory), a name identifies at most one session record: a live
     holder refuses a second, an exited or closed holder is superseded by it (§4.1). Suffixes
     exist only for tmux-level accidents and are then shown, never hidden.
+13. A message never starts a turn. It is delivered to the recipient's inbox, read when that
+    session next looks, and an idle session with unread mail stays idle (§4.10, 2026-09-14). A
+    sender that needs work to begin now is asking for an act of control and is bound by
+    invariant 11. Messages are coordination and die with the record; anything that must outlive
+    the run belongs to the ledger, the board or a PR.
 
 ## 10. Open questions
 
@@ -1499,7 +1634,14 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       where an orc-of-orcs' fan-out ceiling sits, which nothing surveyed publishes and agentorc
       can measure on its own workers; whether a clean orchestrator exit and a crash should
       propagate differently. Go/no-go answered 2026-09-13: **go**, TD-036's six steps in order.
-- [ ] **What happens when two controllers of one session disagree?** (raised 2026-09-13 by Paul)
+- [x] **What happens when two controllers of one session disagree?** (raised 2026-09-13 by Paul;
+      **answered 2026-09-14 as §4.10**, which generalises it: the gap was not a conflict feature
+      but a missing concept — sessions had no way to *message* each other at all, only to act on
+      each other. The conflict report is a `conflict` message to both controllers, the exchange
+      is `reply` traffic under one `about`, the escalation is §4.10's exchange bound, and
+      "not double-nudging" stops being a matter for briefs because a message about a session is
+      visible to that session's other controllers. Built as TD-052; TD-039 stays open as the
+      conflict-specific half of it.)
       The flat `controllers` list makes it possible for a ui orc and a backend orc to hand one
       worker contradicting instructions; §4.8 leaves "not double-nudging" to their briefs, which
       is no rule at all. Paul's direction: the worker should be able to put the conflict to both
@@ -1516,6 +1658,22 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       attached when the bound is hit or a controller is gone. Not agreed yet: whether the
       exchange is a session channel or the worker's own Focus thread, and who writes the
       board line.
+- [x] **Should agent-to-agent communication be first class?** (2026-09-14, Paul: *"we have
+      multiple cases for it now: orc → worker, worker → orc, orc ↔ orc. It seems like
+      worker ↔ worker will be desired as well"*) → **yes, as §4.10.** The review found one
+      mechanism (`ao send`, keystrokes into a pane) serving four cases and working for one of
+      them, and the cause a conflation: `orchestrate` + `controllers` answers *may A act on B?*,
+      and messaging was folded in because keystrokes were the only delivery there was. The
+      decision splits them — an act of control and a message are different things, with
+      different delivery (a mailbox on the recipient's record, never a pane) and different
+      authority (a weaker gate read off the controllers graph, no grant). Decided with Paul the
+      same day: a message **may** reach a person's interactive session, where an act of control
+      still may not, because a mailbox entry is inert until read (invariant 5). Four open items
+      collapse into it — TD-039, TD-047's vocabulary, TD-049's wake, and §4.8's admission that
+      double-nudging was "a matter for their briefs". **Still open, deliberately:** every number
+      in §4.10's bounds — the mailbox depth, the exchange bound, an `ask`'s default — is stated
+      as a rule with no value yet, because the right values come from watching a fleet use it,
+      the way §4.8's restart ceiling was taken from prior art rather than invented.
 - [x] **What are the nouns above a session — and is the home page Org?** (2026-09-13, Paul)
       → **Org, Team, Project, Role, Agent**, decided in
       [ADR 2026-09-13](decisions/2026-09-13-org-teams-projects.md). Org is the whole and the

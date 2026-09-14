@@ -30,6 +30,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Open |
 | TD-049 | An orchestrator only learns what its members did on its own timer: there is no way for a worker to say *I finished* and wake its lead | Medium | Open |
 | TD-050 | The cadence check's `review` row reads the verdict only on a comment's first line, so a report that ends with it counts as no review at all | Medium | Open |
+| TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Open |
 
 ---
 
@@ -235,7 +236,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-13
-**Status:** Open — design task, raised by Paul 2026-09-13 with the TD-036 go; not to be coded before it is in design §4.8
+**Status:** Open — design task, raised by Paul 2026-09-13 with the TD-036 go. **Its general half was answered 2026-09-14 by design §4.10** (TD-052): the gap was not a conflict feature but a missing concept — sessions could act on each other and never message each other — so the conflict report is a `conflict` message to both controllers, the exchange is `reply` traffic under one `about`, the escalation is §4.10's exchange bound, and "not double-nudging" stops being a matter for briefs, since a message about a session is visible to that session's other controllers. What stays here: the conflict-specific judgement — what a worker does *while* it waits, whether a resolved conflict becomes a `finding`, and who writes the board line. Not to be coded before TD-052 step 3 sets the bounds
 **Location:** design §4.8 (membership, report channels), §10 (the 2026-09-13 question); later `src/sessionorc/agent.py` (`_gate`, a new report kind), `src/agentorc/cli.py`, the orchestrator brief
 
 **Why:** TD-036 deliberately allows several controllers per session with no privileged member, and says keeping them from double-nudging "is a matter for their briefs". That is fine for nudges and useless for contradictions: a ui orc says "ship the chip now", a backend orc says "wait for the RPC", and the worker has no move but to pick one or stall. Paul's rule is the one a team would use — the worker puts it to both leads, they settle it between themselves, and a person hears about it only if they cannot. Nothing in agentorc supports that today. Upward, a worker has `ao progress` and `ao finding`, which declare claims on references and are read by whoever looks at the card, not delivered to a controller. Sideways, an orchestrator may `ao send` to another only because the `orchestrate` grant is not yet narrowed by membership; once TD-036's gate lands, two peers over a shared worker control neither each other nor anything but their own members, so even that accidental path closes. There is no conflict object, no delivery, no bound, and no escalation.
@@ -287,7 +288,7 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Priority:** Medium
 **Added:** 2026-09-14 (raised by Paul)
 
-**Status:** Open — design task first: the wake and its vocabulary go in design §4.8 and §4.5a before any code. **Filed as TD-047 in PR #140 and renumbered to TD-049 before merge**: the same number was taken on `main` while the PR was open, by the vocabulary entry above (itself renumbered from TD-043 the same day, see TD-048). The PR title and its commits say TD-047; nothing else references it
+**Status:** Open — **absorbed 2026-09-14 by design §4.10 and TD-052 step 4**, which builds `ao wait` to return on new mail as well as on a member's state change: the wake and the mailbox are one mechanism, and (4) below — what happens to an event that arrives while the lead is mid-turn — has to be answered once for both or not at all. This entry stays as the reasoning for the wake; the work is TD-052's. Design task first: the wake goes in §4.8 and §4.5a before any code. **Filed as TD-047 in PR #140 and renumbered to TD-049 before merge**: the same number was taken on `main` while the PR was open, by the vocabulary entry above (itself renumbered from TD-043 the same day, see TD-048). The PR title and its commits say TD-047; nothing else references it
 
 **Location:** `src/sessionorc/agent.py` (`subscribe`, the per-subscriber last-sent map, `_push_changes`), `src/sessionorc/client.py`, `src/agentorc/cli.py` (a new blocking command), `docs/briefs/orchestrator-ao-1.md` (the tick), design §4.8 (the `orchestrator` policy row: *"read `ao --json status` on a cadence"*), §4.6, §4.9
 
@@ -326,3 +327,29 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Fix:** either (a) `docs/cadence.md` §4 says "the verdict must be the comment's first line" where it gives the format, so the rule is visible where it is read; or (b) `REVIEW_RE` scans the whole body rather than the first line, which costs nothing, removes the trap, and matches how the reports are actually written — with (a) as documentation either way. Preference is (b): the check is a detector, and a detector that misses the evidence in front of it is worse than one that is slightly looser. Done when a review comment ending with its verdict line passes the `review` row.
 
 **Related:** cadence §4; PRs #138, #139 (both failed this way), #141 (posted first-line-first and passes); the 2026-09-13 board item on a merged PR's `review` row being unclearable; TD-042.
+
+## TD-052: Messages between sessions — build design §4.10
+
+**Priority:** High
+**Added:** 2026-09-14 (raised by Paul)
+
+**Status:** Open — **the design landed first, as §4.10 (2026-09-14)**, with three rows in §4.5a, a sentence in §4.7, invariants 5 and 11 amended and invariant 13 added, and the §10 question answered. Nothing is built. Code steps below, each its own PR, in order
+
+**Location:** `src/sessionorc/models.py` (the `inbox` on the record), `src/sessionorc/agent.py` (`rpc_msg`, `rpc_inbox`, `rpc_wait`, the message gate beside `_gate`), `src/sessionorc/store.py` (persistence with the record), `src/agentorc/cli.py` (`ao msg`, `ao inbox`, `ao wait`), `src/agentorc/ui/` (the Inbox panel, the unread chip, Reply), `src/agentorc/skill.md`, design §4.10 / §4.5a / §4.7 / §9 invariants 5, 11, 13
+
+**Why:** four kinds of session-to-session traffic exist — lead → worker, worker → lead, lead ↔ lead, worker ↔ worker — and one mechanism served all of them: `ao send`, the agent typing keystrokes into a pane. Only the first works. A worker reaches upward through `progress` and `findings`, which are declarations on its own record, not messages to anyone; two leads are peers, so TD-036's gate refuses them each other; two workers coordinate by side effects — a ledger row, a branch name, a PR that already claims the reference. Paul, 2026-09-14: *"we need to make sure agent to agent comms are first class in our design."* The cause is a conflation, not four missing features: `orchestrate` + `controllers` answers *may A act on B?*, and messaging was folded into it because keystrokes were the only delivery there was — typing into a pane genuinely is an act of control. §4.10 splits the two. This entry builds it.
+
+**Fix, in order — each step is usable on its own:**
+
+1. **The record and the RPCs.** `inbox` on the session record (persisted and reloaded with it, dies when it is forgotten); the `msg` and `inbox` RPCs; the message gate as its own function beside `_gate`, refusing by naming §4.10's graph rather than invariant 11. A test per edge of the graph — upward, downward, same team, shared controlled target — and per refusal. The interactive split is its own test: an acting RPC onto a person's session still refused, a message to it delivered (invariant 5).
+2. **The CLI.** `ao msg <to>… "…" [--kind] [--about] [--reply-to]` and `ao inbox [--unread] [--json]`. `ao --skill` gains the rules a session needs to use mail correctly — read your inbox before acting, answer an `ask`, never broadcast — since that file is how a session learns it has a mailbox at all.
+3. **The bounds**, which are the part that must not be deferred: the mailbox depth, with a **refusal the sender sees** rather than a silent drop; the per-`about` exchange count and its escalation to `user_attention.md` with the thread attached; an `ask`'s bound and what expiry does; the gone-addressee case (§4.8's *controlled by a session that is gone* applies to mail). Every number in §4.10 is deliberately unset — choose them here, write them into the design in the same PR, and say what evidence would change them.
+4. **`ao wait`** (TD-049): returns on new mail as well as on a member's state change, over the agent's existing `subscribe`. This is the step that makes mail useful rather than polled, and TD-049's cursor question — what happens to an event that arrives while the session is mid-turn — is answered here once for both.
+5. **The UI**: the Inbox panel on Focus beside Reports, the unread chip on the card, Reply (§4.5a's three rows).
+6. **The briefs**: the orchestrator's tick reads its inbox at the top; the grinder tells its lead when a reference is done instead of relying on the lead noticing. Neither can be written before step 2.
+
+**Deliberately not in scope:** any broadcast, channel or room; mail as a durable record (the ledger and the board keep that job — invariant 13); and messaging across hosts, which waits on phase 2 like everything else that crosses a host boundary.
+
+**Done when** a worker tells its lead it finished without the lead polling; two leads over one worker settle a contradiction between themselves and land a board line when they cannot; a message to a person's session is delivered where a nudge is refused; every refusal names §4.10's graph; and no message ever starts a turn.
+
+**Related:** design §4.10 (the whole section), §4.5a, §4.7, §9 invariants 5, 11 and 13, §10 (the 2026-09-14 entry, and the 2026-09-13 one it answers); TD-039 (the conflict half — a `conflict` message and its exchange, which step 3 bounds), TD-049 (the wake, absorbed by step 4), TD-036 (the graph the gate reads), TD-028 (the report channels the Inbox sits beside and deliberately is not).
