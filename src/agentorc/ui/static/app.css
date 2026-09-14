@@ -84,6 +84,13 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; font-size: 12px; } .ghead .h2 { font-size: 14px; }
 .ghead .name { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; color: var(--fg); text-decoration: none; }
 .badge.team { cursor: pointer; color: var(--fg); }
+/* Org Teams strip (design §4.5a): one row per definition, Start / Stop / Stop now; a plain line when none is defined */
+.strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.strip .team-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
+.strip .team-row b { font-family: "JetBrains Mono", monospace; font-size: 12.5px; }
+.strip .team-row .meta { max-width: 22ch; } .strip .team-row .live { min-width: 6ch; }
+.strip .warnish { color: var(--warn-fg); }
+.strip .btn[hidden] { display: none; }  /* `.btn` is inline-flex, which would otherwise beat the attribute */
 .sc { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow: hidden; position: relative; } .sc.off { opacity: .55; }
 .sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; } .sc-foot { display: flex; gap: 6px; align-items: center; }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }

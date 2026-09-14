@@ -168,6 +168,7 @@
     const counts = {}; shown.forEach((c) => (counts[c.dataset.state] = (counts[c.dataset.state] || 0) + 1));
     $("#badges").innerHTML = [["needs-you", "needs", "needs you"], ["limited", "limited", "limited"], ["stalled?", "stalled", "stalled"]]
       .filter(([k]) => counts[k]).map(([k, cls, l]) => `<span class="pill s-${cls}"><span class="dot"></span>${counts[k]} ${l}</span>`).join("");
+    syncStrip();
   }
   function applyFilter() {
     const raw = ($("#filter") ? $("#filter").value : "").trim(), cmd = $("#showcmd") && $("#showcmd").checked;
@@ -216,6 +217,66 @@
       sec.remove();
     });
   }
+  // ---- the Teams strip (design §4.5a Org **Teams** strip, §4.9) ----
+  // Live counts come from the cards, never a second request: a team is live when a session carrying
+  // its badge is (there is no team record to ask), and the cards are the fleet already, delta by
+  // delta. So a start or a stop shows up in the strip the moment its sessions do.
+  function syncStrip() {
+    const strip = $("#teams"); if (!strip) return;
+    const live = {};
+    $$("#groups .sc").forEach((c) => {
+      const t = c.dataset.team;
+      if (t && c.dataset.state !== "exited" && c.dataset.state !== "closed") live[t] = (live[t] || 0) + 1;
+    });
+    $$(".team-row", strip).forEach((row) => {
+      const n = live[row.dataset.team] || 0;
+      row.dataset.live = n;
+      $(".live", row).textContent = n ? `${n} live` : "stopped";
+      $(".start", row).hidden = n > 0;          // Start on a stopped team, Stop on a live one
+      $$(".stop", row).forEach((b) => (b.hidden = n === 0));
+    });
+  }
+  // A stop returns before its lead does (design §4.9: the members settle first, which is minutes).
+  // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
+  // rather than leaving a failure nobody ever sees (design §4.5 "Errors"; review of PR #124).
+  async function watchStop(name, lead) {
+    for (let i = 0; i < 90; i++) {
+      await new Promise((r) => setTimeout(r, 5000));
+      let rows = [];
+      try { rows = (await (await fetch("/api/teams")).json()).teams || []; } catch (e) { continue; }
+      const row = rows.find((t) => t.name === name);
+      if (!row) return;
+      if (row.error) { AO.toast(`${name}: ${row.error}`); return; }
+      if (!row.stopping) { AO.toast(`${name}: ${lead} stopped`, true); return; }
+    }
+    AO.toast(`${name}: ${lead} is still stopping — see the agent log`);
+  }
+  async function teamAct(name, what, btn) {
+    const stop = what !== "start";
+    const url = `/api/teams/${encodeURIComponent(name)}/${stop ? "stop" : "start"}`;
+    btn.disabled = true;
+    try {
+      const r = await fetch(url, {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ now: what === "stopnow" }),
+      });
+      let o = {}; try { o = await r.json(); } catch (e) {}
+      // A refused start created nothing (design §4.9): the agent's own message is the whole report,
+      // in a toast, as every other RPC error on this page is (design §4.5 "Errors").
+      if (!r.ok) throw new Error(o.detail || r.statusText);
+      AO.toast(o.text || `${name}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started`, true);
+      // The same two things `ao team start|stop` says and a request could not: a member the
+      // definition starts interactive is out of its lead's reach (design §9 invariant 5), and the
+      // lead's own stop happens after the response (review of PR #124).
+      (o.out_of_reach || []).forEach((who) =>
+        AO.toast(`${name}: ${who} is interactive, so its lead cannot act on it — §9 invariant 5`));
+      if (o.lead) watchStop(name, o.lead);
+    } catch (e) {
+      AO.toast(`${name}: ${e.message}`);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   AO.org = function () {
     $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === sortMode));
     $("#filter").addEventListener("input", layout);
@@ -243,6 +304,11 @@
       store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
     });
     $$("#groups .sc").forEach((c) => (c.draggable = true));
+    const strip = $("#teams");
+    if (strip) strip.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-team-act]");
+      if (b) teamAct(b.dataset.team, b.dataset.teamAct, b);
+    });
     layout();
     connectEvents((ev) => {
       if (ev.event === "session") {
@@ -352,8 +418,35 @@
     nm.addEventListener("change", nameCheck);
     dir.addEventListener("change", nameCheck);
     for (const r of document.querySelectorAll("[name=where]")) r.addEventListener("change", nameCheck);
+    // The Project picker (design §4.5a New session **Project**, §4.9): picking one narrows the
+    // Directory list to that project's repos with their checkouts on this host. The paths came
+    // down with the page — a project's repos do not change as you type, so there is nothing to
+    // ask for. "No project" restores the registered repos and recent directories, unchanged.
+    const proj = $("#project"), datalist = $("#recent"), pnote = $("#projectnote");
+    const allDirs = $$("option", datalist).map((o) => o.value);
+    const options = (vals) => (datalist.innerHTML = vals.map((v) => `<option value="${esc(v)}">`).join(""));
+    function applyProject() {
+      if (!proj) return;
+      const o = proj.selectedOptions[0];
+      let repos = [];
+      try { repos = JSON.parse((o && o.dataset.repos) || "[]"); } catch (e) { repos = []; }
+      if (!o || !o.value) { options(allDirs); pnote.textContent = "optional: the repos in reach, and a Project block naming them in front of the brief"; return; }
+      const here = repos.filter((r) => r.path), away = repos.filter((r) => !r.path);
+      options(here.map((r) => r.path));
+      if (!dir.value.trim() && here.length) { dir.value = here[0].path; check(); loadRoles(); nameCheck(); }
+      const mine = here.some((r) => r.path === dir.value.trim());
+      pnote.textContent =
+        `${here.length} repo${here.length === 1 ? "" : "s"} on this host: ${here.map((r) => r.repo).join(", ") || "none"}`
+        + (away.length ? ` · ${away.map((r) => `${r.repo} is on ${r.hosts.join(", ")} — out of reach until phase 2`).join("; ")}` : "")
+        + (here.length > 1 ? " · the brief gets the Project block naming them" : "")
+        + (mine || !here.length ? "" : " · this directory is not one of them, so none is home");
+    }
+    if (proj) proj.addEventListener("change", applyProject);
+    dir.addEventListener("change", applyProject);
+
     check();  // both once at load: a prefilled directory and a prefilled name are checked too
     nameCheck();
+    applyProject();
     applyRole();  // the ticks the page rendered are the repo's; a role picked later may narrow them
   };
 

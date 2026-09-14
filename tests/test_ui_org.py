@@ -118,6 +118,7 @@ def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
         sessions=vs,
         groups=groups,
         counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
+        strip={"teams": [], "source": "", "notes": []},  # the Teams strip: its own tests are in test_ui_teams.py
         host="kmaster",
         active="Org",
         agent_down=False,

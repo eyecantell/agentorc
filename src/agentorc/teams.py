@@ -135,6 +135,31 @@ def project_block(org: orgmod.Org, projects: list[str], host: str, home: str = "
     return "\n".join([*lines, "", REACH_NOTE, "", ""])
 
 
+def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> tuple[str, str]:
+    """The Project block a *hand-started* session gets from `ao new --project` and the New session
+    form's **Project** picker (design §4.9 "Home and reach"): the same block a team member gets,
+    with home taken to be whichever of the project's repos `here` is. Returns `(block, note)`.
+
+    An undefined project name is not a refusal: the badge is a plain string and nothing keys on it
+    (§9 invariant 9), so the session is still badged and the note says there is no reach to
+    describe. A one-repo project has no block either — there is nothing to name."""
+    if not project:
+        return "", ""
+    if project not in org.projects:
+        known = ", ".join(sorted(org.projects)) or "none"
+        return "", f"project: {project!r} is not defined in {org.path} ({known}) — badge only, no reach block"
+    where = Path(here).expanduser().resolve()
+    home = next(
+        (
+            r
+            for r, by_host in org.projects[project].repos.items()
+            if (p := by_host.get(host)) and Path(p).expanduser().resolve() == where
+        ),
+        "",  # started outside the project's repos: the block still names them, nothing is home
+    )
+    return project_block(org, [project], host, home), ""
+
+
 # A lead and a member are shaped alike where a launch is concerned (§4.9): both name a lane, a
 # brief override, grants, a profile and whether they are unattended. `None` is the person-lead case.
 Spec = orgmod.MemberDef | orgmod.LeadDef | None

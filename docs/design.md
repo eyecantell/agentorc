@@ -586,8 +586,8 @@ noted). If a control is not in this table it does not exist.
 | New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
 | Org | **team groups** | when any live session carries a `team` badge the grid is grouped: a header per team — name, lead (name, state), projects, needs-you count across members — the lead's card first, members after, the sessions on no team under *No team*; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9) — landed 2026-09-13 |
-| Org | **Teams** strip: **Start / Stop** per definition | every team in `org.yml` and the repos' `.agentorc.yml`, its source and live count; Start runs the same sequence as `ao team start` (all checks before any create), Stop the same as `ao team stop` (wrap-up members, then the lead; **Stop now** kills). Collapsed to a count when nothing is defined (§4.9) |
-| New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is what every session was before |
+| Org | **Teams** strip: **Start / Stop** per definition | every team in `org.yml` and the repos' `.agentorc.yml`, its source and live count; Start runs the same sequence as `ao team start` (all checks before any create), Stop the same as `ao team stop` (wrap-up members, then the lead; **Stop now** kills). Collapsed to a count when nothing is defined (§4.9) — landed 2026-09-13; the wrap-up wait runs behind the response, so the page reports what was sent and the state deltas show the members settling, and the strip reports the lead's own outcome when it comes — a failure there is logged and toasted, never dropped |
+| New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is what every session was before — landed 2026-09-13 |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team — landed 2026-09-13 |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
@@ -1067,7 +1067,8 @@ says so in one line per member rather than leaving a list that silently never fi
 a repo in two projects is therefore badged by the first, and a member that wants the other
 names it with its own `project:`.
 
-**The Org page.** The home route and nav item become **Org**; the Team name retires with the
+**The Org page** (landed 2026-09-13, TD-040 step d: the groups and the badge first, then the strip
+and the picker). The home route and nav item become **Org**; the Team name retires with the
 page (the second rename this week, and the last: the noun does not change with what is inside,
 ADR). The page is the card grid of §4.5, flat when no live session carries a team badge. When
 any does, the grid is grouped into **team groups**, each with a header — team name, lead (name,
@@ -1076,9 +1077,16 @@ members' cards after, and the sessions on no team in a *No team* group at the en
 derived on each tick from the badge and the `controllers` edges, never stored, so a session
 attached with `ao control` after the start joins the group and one detached leaves it. Above
 the grid, a **Teams** strip lists every definition with Start / Stop and its live count,
-collapsed to a count when nothing is defined. New session gains a **Project** picker that
-narrows the repo list to the project's repos on this host and adds the Project block to the
-brief. Urgent-first sorting works within a group; Pinned order is per group.
+collapsed to a count when nothing is defined. The page is not *in* a directory the way `ao team`
+is, so its "the repos' own `teams:`" means every repo in this host's registry, and a definition
+that will not parse is a note beside the strip rather than an empty one. Start and Stop are
+`agentorc.teamrun`'s — the sequence `ao team start|stop` runs, one code path, on a worker thread —
+so a refused start reports the agent's own message in a toast and creates nothing. Waiting for the
+members to settle takes minutes, so the second half of a stop runs behind the response: the page
+says what was sent and names the lead that follows, and the state deltas show the members settling, and the strip reports the lead's own outcome when it comes — a failure there is logged and toasted, never dropped. New
+session gains a **Project** picker that narrows the repo list to the project's repos on this host
+and adds the Project block to the brief — `teams.reach_block`, the function behind `ao new
+--project`. Urgent-first sorting works within a group; Pinned order is per group.
 
 **Roles gain a profile** (landed 2026-09-13, TD-040 step c: `org.yml`'s `roles:` is
 `resolve_role`'s overlay layer, and `ao new`, `ao roles` and `ao team start` all read it). A preset may name the profile it runs under, so the pick-list adds an

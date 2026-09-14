@@ -18,6 +18,9 @@ FLEET = [
 
 @pytest.fixture
 def repo(tmp_path, monkeypatch):
+    # A temp AGENTORC_HOME or `orgmod.load()` reads the machine's real `~/.agentorc/org.yml`, whose
+    # `roles:` overlay would change every source label here (found 2026-09-13, once one existed).
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     (tmp_path / ".git").mkdir()
     for s in FLEET:
         s["dir"] = s["repo"] = str(tmp_path)
