@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Org · agentorc{% endblock %}
+{% block body %}
+<div class="page">
+  <div class="row gap wrap">
+    <span class="h1">Org</span>
+    <span class="muted" id="count">{{ sessions | length }} sessions</span>
+    <span id="badges">
+      {% if counts['needs-you'] %}<span class="pill s-needs"><span class="dot"></span>{{ counts['needs-you'] }} needs you</span>{% endif %}
+      {% if counts['limited'] %}<span class="pill s-limited"><span class="dot"></span>{{ counts['limited'] }} limited</span>{% endif %}
+      {% if counts['stalled?'] %}<span class="pill s-stalled"><span class="dot"></span>{{ counts['stalled?'] }} stalled</span>{% endif %}
+    </span>
+    <span class="grow"></span>
+    <input class="input" id="filter" placeholder="filter… (team:name)" style="width: 200px;">
+    <label class="btn ghost"><input type="checkbox" id="showcmd"> show command runs</label>
+    <span class="seg">
+      <button class="btn on" data-sort="urgent">Urgent first</button>
+      <button class="btn" data-sort="pinned">Pinned</button>
+    </span>
+  </div>
+  <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
+  {# design §4.5a Org **team groups** (§4.9): a section per team when any live session carries a
+     badge, each a header plus its own grid; otherwise the one flat grid, no header anywhere. Both
+     shapes are the same element tree (`.tgroup` > `.grid`), so the client's layout code has one
+     path: the flat page is a single unnamed group with its header omitted. #}
+  <div id="groups"{% if groups is none %} class="flat"{% endif %}>
+    {% if groups is none %}
+    <section class="tgroup" data-team="" data-lead=""><div class="grid">
+      {% for s in sessions %}{% include "card.html" %}{% endfor %}
+    </div></section>
+    {% else %}{% for g in groups %}
+    <section class="tgroup" data-team="{{ g.team }}" data-lead="{{ g.lead.id if g.lead else '' }}">
+      <div class="row gap wrap ghead">{% include "group_head.html" %}</div>
+      <div class="grid">{% for s in g.members %}{% include "card.html" %}{% endfor %}</div>
+    </section>
+    {% endfor %}{% endif %}
+  </div>
+  <div class="note" id="empty" {% if sessions %}hidden{% endif %}>No sessions on {{ host }}. Start one with <b>New session</b> or <b>Shell</b>.</div>
+  <div class="note"><b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed. <b>Pinned</b> keeps every card where you dragged it, per team. A dashed pill means the state was guessed from the screen. A <b>team</b> badge on a card filters the page to that team; clear the filter box to see everyone again.</div>
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.org();</script>{% endblock %}

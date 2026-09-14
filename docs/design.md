@@ -1,7 +1,7 @@
 # agentorc — design
 
 Status: **phase 1 in progress** (2026-09-04 design; the last of the original open questions
-closed 2026-09-05; building since 2026-09-05). The host agent, the Claude Code adapter, the Team
+closed 2026-09-05; building since 2026-09-05). The host agent, the Claude Code adapter, the Org
 and Focus pages, New session and the CLI run today; §7 has the phase plan and
 [`technical_debt.md`](technical_debt.md) what is deferred. This document is the requirements and
 architecture agreed in the 2026-09-04 design session and amended since; each open question at the
@@ -52,7 +52,7 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
    Code is the first adapter; Gemini CLI, Codex CLI, and on-prem harnesses are later adapters.
    Share with other devs once it proves useful.
 
-10. **Phone triage**: the Team view works on a phone over a private network or an authenticated tunnel (§4.5) — state, pending question, one-tap
+10. **Phone triage**: the Org view works on a phone over a private network or an authenticated tunnel (§4.5) — state, pending question, one-tap
     answers — so a blocked session can be unblocked from anywhere. The embedded terminal is a
     desktop feature.
 11. **Ready to close, decided by the person**: a per-repo checklist (PR merged, branch pushed,
@@ -119,7 +119,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   Both parts are slugified to `[a-z0-9-]` (tmux treats `:`, `.` and whitespace specially).
   **A name identifies one session within its scope** (the repo, or the directory for a
   repo-less session; decision 2026-09-10, §10, §9 invariant 12): it is what a person types
-  into `ao focus`, `ao send` and the Team filter, so two cards called `aotest` is a defect, not
+  into `ao focus`, `ao send` and the Org filter, so two cards called `aotest` is a defect, not
   a namespace. Every `ao` subcommand that takes an id also takes a **bare name** (landed
   2026-09-11), resolved to the one session of that name *here* — this directory, the directory
   it is under, or a repo it belongs to, which is how a name typed in the checkout finds its
@@ -148,7 +148,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
     killed and its id reused. The name is checked under a lock on the **scope**, not on the
     directory, because one scope spans a repo's worktrees. The suffix therefore survives only for tmux's own
     "duplicate session" verdict, which the agent still handles explicitly rather than trusting
-    its check — and then `-2`, `-3` is shown in the name on the record, so what the Team says is
+    its check — and then `-2`, `-3` is shown in the name on the record, so what the Org says is
     what tmux has.
   - `shell` sessions are named by the agent when the person gives no name (`shell`,
     `shell-2`, …) and follow the same rule under that generated name; registry-only cards
@@ -168,7 +168,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   the channels say what it did, `unattended` says whether
   policies act on it, the schedule says when. Any can be set without the others. Resumable shows the name first and the id under it; a session started by hand
   outside agentorc shows only the id until it is **adopted** (attach to the tmux session, give it
-  a name), which is also how hand-started sessions enter the Team.
+  a name), which is also how hand-started sessions enter the Org.
 - A live session the adapter can see that has **no tmux at all** (`claude` in a VS Code
   terminal; Claude Code's registry `~/.claude/sessions/<pid>.json`) is a **read-only card**
   (landed 2026-09-10, TD-010 a): id `ext-<tool id>`, name and directory from the registry, state
@@ -183,7 +183,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   `idle` at the prompt — a shell waiting for you is the normal state, not an alert — `exited`
   when the pane is gone). Ad-hoc shells are ordinary
   `interactive` cards; the profile line reads `shell`. Predefined command buttons (§4.5) start
-  `kind: command` sessions, which are hidden from the Team unless the "show command runs"
+  `kind: command` sessions, which are hidden from the Org unless the "show command runs"
   filter is on and never rank in the urgency sort.
 - Created **only** by the host agent (one writer per shared resource — see §9). The UI, the CLI,
   and the cron reconcile all call the agent.
@@ -260,7 +260,7 @@ State transitions (Claude Code adapter):
 | host agent unreachable (a property of the **host**; every card on it flips at once) | `unreachable` — card greyed, last known state kept visible |
 
 `unreachable` is shown at the host level first: the host chip in the top bar goes hollow and one
-banner row in the Team says "laptop unreachable since 14:02 · 2 sessions". Where it sorts depends
+banner row in the Org says "laptop unreachable since 14:02 · 2 sessions". Where it sorts depends
 on whether it is expected: a `volatile` host asleep sorts with `idle` (grey); a non-volatile host
 that stops answering sorts right after `stalled?` (red). No new colour.
 
@@ -469,14 +469,14 @@ Screens:
    which is why this is a web UI and not a TUI).
 3. **New session**: pick host → repo *or* directory → adapter → checkout, new worktree, or an
    existing worktree (only `exited`/`closed` ones are offered; an in-use one is greyed with
-   "in use — resume from the Team"; main refused if it already has a session) → fresh or
+   "in use — resume from the Org"; main refused if it already has a session) → fresh or
    resume → optional brief file → **Unattended** switch (off by default; disabled with "no `unattended:` block in
    `.agentorc.yml`" for repos without one; hidden for directory sessions). The same mode can be
    flipped later from the card or Focus header (§4.5a).
 4. **Resumable**: inactive sessions from each adapter's transcript locator (Claude:
    `list_sessions.py`-style index over `~/.claude/projects`), grouped by host/repo, name first
    and adapter id under it, with Resume (prefills New session) or Switch to (a running one), and
-   Adopt for a hand-started session. Closed sessions are filed here after their day on the Team.
+   Adopt for a hand-started session. Closed sessions are filed here after their day on the Org.
 5. **Commands**: per-repo buttons from `.agentorc.yml` (cmdorc command specs where cmdorc fits);
    each press starts an `ao-<repo>-cmd-<name>` session of kind `command` with running/exited
    state, exit code, and a log; a recent-runs list; Focus on a run opens its terminal. The
@@ -484,7 +484,7 @@ Screens:
    run a script.
 6. **Attention**: the full dev-cadence board, every repo, undated items included, with the
    stale-sweep warning the report prints; clicking an item focuses the session that left it
-   (via `adapter_id`); Snooze and Done as on the Due strip. No sessions column — the Team is the
+   (via `adapter_id`); Snooze and Done as on the Due strip. No sessions column — the Org is the
    sessions view.
 
 Security: the UI can type into a shell as you, so it is root-equivalent. **Decision
@@ -503,7 +503,7 @@ Default until one of those is set up: the UI binds to `127.0.0.1` and the laptop
 through `ssh -L 8765:127.0.0.1:8765 kmaster`.
 
 Phone layout (lands in phase 2 with the phone's route in — WireGuard or the tunnel; until then the UI is reachable only over
-`ssh -L`): the Team view collapses to cards sorted `needs-you` first with Allow / Deny on a
+`ssh -L`): the Org view collapses to cards sorted `needs-you` first with Allow / Deny on a
 pending permission (hook channel) and a Focus button, the Due strip on top. Focus gets a
 **narrow mode** below 720px: header, pending text, the terminal full-width with a soft-key row
 (`↑ ↓ ← → Enter Esc Tab 1–9`) so menus and questions are still answered *through the
@@ -518,7 +518,7 @@ Browser mechanics (2026-09-06 review):
   Reconnect with backoff; on reconnect the page reloads its snapshot once.
 - **Pinned layout**: the client owns card order and position (localStorage, by session id);
   pushed data only patches card content. New or adopted cards are inserted at the top in
-  Pinned mode; a card whose session drops out of the Team is removed and its slot forgotten.
+  Pinned mode; a card whose session drops out of the Org is removed and its slot forgotten.
 - **Permission countdown**: the delta carries the deadline once; the browser counts down
   locally. The timeout transition (buttons collapse to Focus) arrives as an ordinary state
   delta, never from the local clock reaching zero.
@@ -530,7 +530,7 @@ Browser mechanics (2026-09-06 review):
   in the composer moves focus to the terminal; `Tab` inside the terminal passes through to the
   pane. A pending permission or question shows a hint on the composer ("answer in the terminal
   above") instead of accepting Send.
-- **Errors**: every RPC-triggered control reports failure the same way — a toast on the Team,
+- **Errors**: every RPC-triggered control reports failure the same way — a toast on the Org,
   an inline banner in the Focus header — with the agent's error text and a Retry where one
   makes sense. There is no silent failure path.
 - **VS Code links** need the `hosts.yml` `ssh` target to be an alias in the *person's own*
@@ -547,9 +547,9 @@ noted). If a control is not in this table it does not exist.
 |---|---|---|
 | top bar | **New session** | opens the New session form |
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
-| Team | **Urgent first / Pinned** | sort mode, remembered per browser |
-| Team | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
-| Team banner | **Retry** | asks the agent on an unreachable host again now instead of on the next tick |
+| Org | **Urgent first / Pinned** | sort mode, remembered per browser |
+| Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
+| Org banner | **Retry** | asks the agent on an unreachable host again now instead of on the next tick |
 | card | **Allow / Deny** | answers a pending permission through the hook channel; shown with the time left |
 | card | **Switch profile…** | re-launches a `limited` session under another profile (resume id carried over) |
 | card | **Wait** | dismisses the limited slot until the reset time |
@@ -585,21 +585,21 @@ noted). If a control is not in this table it does not exist.
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
-| Org | **team groups** | when any live session carries a `team` badge the grid is grouped: a header per team — name, lead (name, state), projects, needs-you count across members — the lead's card first, members after, the sessions on no team under *No team*; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9) |
+| Org | **team groups** | when any live session carries a `team` badge the grid is grouped: a header per team — name, lead (name, state), projects, needs-you count across members — the lead's card first, members after, the sessions on no team under *No team*; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9) — landed 2026-09-13 |
 | Org | **Teams** strip: **Start / Stop** per definition | every team in `org.yml` and the repos' `.agentorc.yml`, its source and live count; Start runs the same sequence as `ao team start` (all checks before any create), Stop the same as `ao team stop` (wrap-up members, then the lead; **Stop now** kills). Collapsed to a count when nothing is defined (§4.9) |
 | New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is what every session was before |
-| card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team |
+| card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team — landed 2026-09-13 |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
 | Resumable | **Resume** | New session prefilled (host, repo, directory, worktree, Start = Resume) |
-| Resumable | **Switch to** | the running card in the Team |
+| Resumable | **Switch to** | the running card in the Org |
 | Resumable | **Adopt…** | attach to a hand-started tmux session and name it |
 | Commands | **Run / Stop** | start a `kind: command` session / kill it |
 | Commands | **log**, **Focus** | the run log; the run's terminal |
 | Commands | **edit yml** | opens `.agentorc.yml` in VS Code |
 | Focus header | **VS Code** | same `vscode://` link as the card |
-| Team top bar | **filter…** text box | matches name, repo, directory, branch; client-side |
+| Org top bar | **filter…** text box | matches name, repo, directory, branch; client-side |
 | Resumable | **search transcripts…**, Recent / Closed / With board items, date range | filters over the transcript index — *phase 4 polish; phases 1–3 ship the plain list* |
 | Commands | host / repo filters | client-side filters — *phase 4* |
 | Attention | repo filter, overdue · today · this week · undated | client-side filters — *phase 4* |
@@ -662,7 +662,7 @@ Decisions taken from a review of the `sessionorc` layer before build:
 - **One long-lived ssh per host, JSON lines over it.** The UI keeps `ssh host agentorc-agent
   serve` open and speaks newline-delimited JSON requests/responses on its stdin/stdout (the
   same protocol the CLI speaks to the Unix socket locally). No per-call ssh handshake, so a
-  Team refresh across hosts is one round trip, and no argument ever reaches a remote shell —
+  Org refresh across hosts is one round trip, and no argument ever reaches a remote shell —
   ssh's argv-joining is never used for data. The connection is re-opened with backoff when it
   drops. Terminal attaches (`ssh -tt host tmux attach -t <name>`) are separate ssh processes
   and reuse the same master via `ControlMaster auto` / `ControlPersist` in a config file the
@@ -769,7 +769,7 @@ session was called rather than what it did).
 
 Two kinds of capability, deliberately different:
 
-**Report channels** — ungated, any session may write them, the Team renders whichever are
+**Report channels** — ungated, any session may write them, the Org renders whichever are
 non-empty. Two channels cover every worker seen so far and the person's own sessions too:
 
 - `progress`: references the session set out to resolve. Entries
@@ -1202,7 +1202,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 2. **Second host.** `hosts.yml`, ssh transport, agent install script, the VPS added and a
    session started there from the UI. (Confirmed as the plan 2026-09-10: herdr does not replace
    this step — [ADR](decisions/2026-09-10-herdr-spike.md).) Laptop closed for an hour; session still there.
-   The phone's route in (WireGuard client, or the Cloudflare tunnel) and the phone layout (Team
+   The phone's route in (WireGuard client, or the Cloudflare tunnel) and the phone layout (Org
    + narrow Focus) land here.
    Attachment upload over ssh (drag and drop, picker, paste) lands here, since the copy path is
    the same plumbing.
@@ -1212,14 +1212,14 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    agentorc run logs; then delete `tdgrind.sh` from samscrape (ledger a TD there for the
    swap and the cron line in `infra/kmaster/crontab`).
    **Capabilities, report channels and presets** (§4.8) land at the start of this phase,
-   because the migration is the first time several workers run at once and the Team has to say
+   because the migration is the first time several workers run at once and the Org has to say
    what each is doing and keep them off each other: the caller check and the `orchestrate`
    grant first, then `progress` / `findings` with `ao progress` / `ao finding`, the derived
    source on the tick, the card's report line and the Focus Reports panel, and last the
    presets — with an orchestrator run as a session for a few evenings before its mechanical
    rules become policies here.
 4. **Commands + board.** `.agentorc.yml` buttons (cmdorc where it fits), command-kind sessions
-   and the Commands tab, the Due strip on the Team and the Attention tab with Snooze/Done
+   and the Commands tab, the Due strip on the Org and the Attention tab with Snooze/Done
    write-back, stranded-work flags.
 5. **Second adapter.** Gemini CLI (hook-fed if the OSC 9 / hooks story verifies) or a scraped
    plain-shell adapter, whichever proves the contract better. Publish to PyPI, write the
