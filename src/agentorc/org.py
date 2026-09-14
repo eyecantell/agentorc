@@ -49,6 +49,10 @@ class LeadDef:
     name: str = ""  # default `<team>-lead`, filled by the loader
     home: str = ""  # a repo name from the team's projects
     profile: str | None = None  # overrides the role's
+    lane: list[str] = field(default_factory=list)
+    brief: str | None = None  # overrides the role's template — the orchestrator brief a repo keeps
+    grants: list[str] | None = None  # None: the role's (`orchestrate` for `orchestrator`)
+    unattended: bool = True
 
 
 @dataclass
@@ -222,6 +226,19 @@ def _grants(raw: Any, key: str) -> list[str] | None:
     return [_str(g, key) for g in raw]
 
 
+LEAD_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
+MEMBER_KEYS = (*LEAD_KEYS, "count", "team")
+TEAM_KEYS = ("projects", "lead", "members")
+
+
+def _no_stray(raw: dict[str, Any], known: tuple[str, ...], key: str) -> None:
+    """A key nobody reads is a typo, and silence about it is how a lead's `brief:` disappears into
+    a file that looks right (found while writing the first real org.yml, 2026-09-13)."""
+    stray = sorted(k for k in raw if k not in known)
+    if stray:
+        raise ValueError(f"{key}: unknown key(s) {stray}; known: {list(known)}")
+
+
 def _member(raw: Any, key: str) -> MemberDef:
     raw = _mapping(raw, key)
     if "team" in raw:
@@ -229,6 +246,7 @@ def _member(raw: Any, key: str) -> MemberDef:
         if extra:
             raise ValueError(f"{key}: a nested team member is `{{team: <name>}}` alone; unexpected {extra}")
         return MemberDef(team=_str(raw["team"], f"{key}.team"))
+    _no_stray(raw, MEMBER_KEYS, key)
     role = _str(raw.get("role"), f"{key}.role")
     if not role:
         raise ValueError(f"{key}.role is required (or `team:` for a nested team)")
@@ -247,6 +265,7 @@ def _member(raw: Any, key: str) -> MemberDef:
 
 def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
     raw = _mapping(raw, key)
+    _no_stray(raw, TEAM_KEYS, key)
     projects = raw.get("projects")
     if projects is None:
         projects = []
@@ -255,11 +274,16 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
     if not isinstance(projects, list):
         raise ValueError(f"{key}.projects must be a list of project names")
     lead_raw = _mapping(raw.get("lead"), f"{key}.lead")
+    _no_stray(lead_raw, LEAD_KEYS, f"{key}.lead")
     lead = LeadDef(
         role=_str(lead_raw.get("role"), f"{key}.lead.role", default=DEFAULT_LEAD_ROLE),
         name=_str(lead_raw.get("name"), f"{key}.lead.name", default=f"{name}-lead"),
         home=_str(lead_raw.get("home"), f"{key}.lead.home"),
         profile=_opt_str(lead_raw.get("profile"), f"{key}.lead.profile"),
+        lane=_lane(lead_raw.get("lane"), f"{key}.lead.lane"),
+        brief=_opt_str(lead_raw.get("brief"), f"{key}.lead.brief"),
+        grants=_grants(lead_raw.get("grants"), f"{key}.lead.grants"),
+        unattended=_flag(lead_raw.get("unattended"), f"{key}.lead.unattended", default=True),
     )
     members_raw = raw.get("members")
     if members_raw is None:

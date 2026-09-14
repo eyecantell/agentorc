@@ -243,3 +243,36 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     doc = dict(ORG, projects={**ORG["projects"], "myrepo": {"repos": {"myrepo": {"elsewhere": "/x"}}}})
     merged = org.merge_repo_teams(org.load(write(tmp_path, doc)), repo, repo_teams)
     assert merged.projects["myrepo"].repos == {"myrepo": {"elsewhere": Path("/x")}}
+
+
+def test_a_lead_may_name_its_own_brief_lane_grants_and_mode(tmp_path):
+    """§4.9's lead had only role, name, home and profile, so a `brief:` on it was read by nobody —
+    and an orchestrator's brief is the one a repo most often keeps its own copy of. Found while
+    writing the first real org.yml (2026-09-13)."""
+    doc = {
+        "projects": {"p": {"repos": {"r": {"kmaster": str(tmp_path)}}}},
+        "teams": {
+            "t": {
+                "projects": ["p"],
+                "lead": {"role": "orchestrator", "brief": "docs/briefs/orc.md", "lane": "TD-1", "unattended": False},
+            }
+        },
+    }
+    (tmp_path / "org.yml").write_text(yaml.safe_dump(doc))
+    lead = org.load(tmp_path / "org.yml").teams["t"].lead
+    assert lead.brief == "docs/briefs/orc.md" and lead.lane == ["TD-1"] and lead.unattended is False
+    assert lead.grants is None  # unsaid: the role's, as for a member
+
+
+def test_a_key_nobody_reads_is_an_error_naming_it(tmp_path):
+    """Silence about a stray key is how a lead's `brief:` disappeared into a file that looked
+    right. A typo must stop the load, not be ignored (2026-09-13)."""
+    base = {"projects": {"p": {"repos": {"r": {"kmaster": str(tmp_path)}}}}}
+    for block, bad in (
+        ({"projects": ["p"], "leed": {}}, "leed"),
+        ({"projects": ["p"], "lead": {"role": "orchestrator", "breif": "x"}}, "breif"),
+        ({"projects": ["p"], "members": [{"role": "grinder", "profil": "grind"}]}, "profil"),
+    ):
+        (tmp_path / "org.yml").write_text(yaml.safe_dump({**base, "teams": {"t": block}}))
+        with pytest.raises(ValueError, match=bad):
+            org.load(tmp_path / "org.yml")

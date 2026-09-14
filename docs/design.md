@@ -1008,7 +1008,13 @@ teams:
 `lead`: `role` (default `orchestrator`; **`person`** means the person leads — no session is
 started and members get an empty `controllers` list plus the team badge), `name` (default
 `<team>-lead`), `home` (a repo name from the team's projects — required when the projects list
-more than one repo, defaulted to the only one otherwise), `profile` (overrides the role's).
+more than one repo, defaulted to the only one otherwise), `profile` (overrides the role's), and
+the same `lane`, `brief`, `grants` and `unattended` a member may carry — an orchestrator's brief
+is the one a repo most often keeps its own copy of (2026-09-13). Unsaid, `grants` means the
+role's; an explicit `grants: []` on an orchestrator lead means *none*, which leaves it unable to
+act on its own members, and is a thing to write only on purpose. **A key nobody reads is an
+error naming it**, in a team, a lead or a member: silence about a typo is how a lead's `brief:`
+disappears into a file that looks right.
 Each member: `role`, `count` (default 1; a count above one suffixes the name `-1`, `-2`, …),
 `name` (the prefix; default the role), `home`, `lane`, `brief` (overrides the role's template),
 `profile`, `grants` (default the role's), `unattended` (default **true** — a team is what runs
@@ -1035,8 +1041,9 @@ because the badge is a plain string nothing keys on).
 profile resolves, and every session name is free under §4.1's rule — a live holder refuses the
 whole start and names it, so there is never half a team; exited or closed holders are
 superseded as §4.1 says, which makes `ao team start` after a night's exit the restart too. Then
-it creates the lead (the role's grants — `orchestrate` for `orchestrator` — its profile, a
-worktree, unattended), and each member with `controllers: [lead id]`, its role, lane, brief
+it creates the lead (its grants, profile and mode — the role's `orchestrate`, the host's
+profile and unattended, unless the definition overrides any of them — in a
+worktree), and each member with `controllers: [lead id]`, its role, lane, brief
 (the role's template with `{lane}` filled, the Project block in front, a `brief:` override
 instead), profile and worktree. A person runs it, so no attenuation applies (§4.8 create rule);
 an orchestrator running it is subject to it as for any create. It prints one line per session

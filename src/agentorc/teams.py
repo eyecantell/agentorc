@@ -135,9 +135,15 @@ def project_block(org: orgmod.Org, projects: list[str], host: str, home: str = "
     return "\n".join([*lines, "", REACH_NOTE, "", ""])
 
 
-def _brief(role: repoconfig.Role, member: orgmod.MemberDef | None, checkout: Path, lane: list[str]) -> str | None:
+# A lead and a member are shaped alike where a launch is concerned (§4.9): both name a lane, a
+# brief override, grants, a profile and whether they are unattended. `None` is the person-lead case.
+Spec = orgmod.MemberDef | orgmod.LeadDef | None
+
+
+def _brief(role: repoconfig.Role, member: Spec, checkout: Path, lane: list[str]) -> str | None:
     """The role's template with `{lane}` filled, or the member's `brief:` override read from its
-    home checkout."""
+    home checkout. A lead may override its brief too — an orchestrator's is the one a repo most
+    often keeps its own copy of (2026-09-13)."""
     if member is not None and member.brief:
         override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
         return override.brief_text(lane)
@@ -153,7 +159,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     home: str,
     host: str,
     profile_override: str | None,
-    member: orgmod.MemberDef | None,
+    member: Spec,  # the lead's own definition or a member's: both carry lane, brief, grants, profile
     lead: bool,
     block: str,
 ) -> Launch:
@@ -198,7 +204,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         prompt=prompt,
         grants=grants,
         lane=lane,
-        unattended=member.unattended if member is not None else True,
+        unattended=member.unattended if member is not None else True,  # a lead may ask to be watched
         lead=lead,
         ledger=cfg.ledger,
     )
@@ -221,7 +227,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -
             home=team.lead.home,
             host=host,
             profile_override=profile or team.lead.profile,
-            member=None,
+            member=team.lead,  # its lane, brief, grants and unattended read like a member's
             lead=True,
             block=project_block(org, team.projects, host, team.lead.home) if reach else "",
         )
