@@ -29,8 +29,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-040 | Team and project definitions: where they live, `ao team start`, a role's `profile`, the Org page's grouped view, a project-aware New session | Medium | Done 2026-09-13 |
 | TD-041 | §9 invariant 5 is convention, not a gate: nothing stops a controller acting on an interactive session | Medium | Done 2026-09-13 |
 | TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Partly done |
-| TD-043 | The design has no word for "a message into a session that is already working": adopt session/turn and *steer* so Send can say which of its two jobs it is doing | Low | Open |
 | TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Open |
+| TD-047 | The design has no word for "a message into a session that is already working": adopt session/turn and *steer* so Send can say which of its two jobs it is doing | Low | Open |
 
 ---
 
@@ -287,20 +287,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Related:** design §4.8, §4.9; TD-040 (the team definitions this rides on), TD-026 (scheduling, which owns *when* a worker stops), TD-036.
 
-## TD-043: The design has no word for "a message into a session that is already working"
-
-**Priority:** Low
-**Added:** 2026-09-13
-**Status:** Open — vocabulary and wording only, no behaviour change
-
-**Location:** design §4.3 (prompt injection and the Send rule), §4.5 (the Focus composer), §4.5a (the control table), `src/agentorc/` wherever the composer's Send is labelled
-
-**Why:** §4.3 gets the behaviour right and never names it. Send is disabled while a permission or question is pending (and, for scraped adapters, while a foreground process runs), and otherwise enabled — including while the agent is working, because a hook-fed tool like Claude Code queues input typed at it. So one button does two different things depending on the session's state: it starts a new piece of work, or it redirects work already in flight. The person cannot tell which from the button, and the design cannot say which in a sentence without a paragraph. OpenAI's Agents API (surveyed 2026-09-13, [ADR](decisions/2026-09-13-openai-agents-api.md)) names exactly this split: a session is durable, a **turn** is one cycle of work, a message to an idle session starts a turn and a message during an active turn **steers** it. That is the missing word, and it costs nothing to adopt — agentorc's states already carry the information the distinction needs (`working` vs `idle`/`needs-you`).
-
-**Fix:** adopt *turn* and *steer* as design vocabulary: say it once in §4.3 beside the Send rule, use it in §4.5's composer description and §4.5a's row for Send, and reflect it in the UI where it is free — the composer's Send affordance reading as steering when the session is `working` and as a new prompt when it is `idle` (a label or a hint line, not a second control; §4.5a still governs what controls exist). Done when a reader of §4.3 can say in one sentence what Send does in each state, and the Focus composer tells them the same thing without their having to read the state pill.
-
-**Related:** design §4.3, §4.5, §4.5a; TD-027 (the composer confirmation that makes a submit observable at all); [ADR 2026-09-13](decisions/2026-09-13-openai-agents-api.md).
-
 ## TD-046: A session cannot be popped out into its own browser window, so switching between agents needs the mouse
 
 **Priority:** Medium
@@ -324,3 +310,17 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 Done when two agents can be open in two OS windows at once, alt-tab moves between them, each window's title names its session and its state, and popping out the same session twice raises the first window instead of opening another.
 
 **Related:** design §4.5 screen 2 (Focus), §4.5a, §4.5 (its screens intro: one pty per open terminal), §4.6 (transport and terminal mechanics), §4.5b (reachability: a popped-out window is the same origin, so the tunnel or private network carries it unchanged); TD-029 (a closed session's terminal reconnecting), TD-038 (the terminal's look).
+
+## TD-047: The design has no word for "a message into a session that is already working"
+
+**Priority:** Low
+**Added:** 2026-09-13
+**Status:** Open — vocabulary and wording only, no behaviour change. **Filed 2026-09-13 as TD-043 and renumbered to TD-047 on 2026-09-14**: TD-043 was already taken by a tmux paste-buffer race fixed the same day (PR #122, now archived), so the number pointed at two different problems for a day. Nothing outside this file referenced the vocabulary entry; every `TD-043` in the code, the tests and the board means the paste-buffer fix. See TD-048
+
+**Location:** design §4.3 (prompt injection and the Send rule), §4.5 (the Focus composer), §4.5a (the control table), `src/agentorc/` wherever the composer's Send is labelled
+
+**Why:** §4.3 gets the behaviour right and never names it. Send is disabled while a permission or question is pending (and, for scraped adapters, while a foreground process runs), and otherwise enabled — including while the agent is working, because a hook-fed tool like Claude Code queues input typed at it. So one button does two different things depending on the session's state: it starts a new piece of work, or it redirects work already in flight. The person cannot tell which from the button, and the design cannot say which in a sentence without a paragraph. OpenAI's Agents API (surveyed 2026-09-13, [ADR](decisions/2026-09-13-openai-agents-api.md)) names exactly this split: a session is durable, a **turn** is one cycle of work, a message to an idle session starts a turn and a message during an active turn **steers** it. That is the missing word, and it costs nothing to adopt — agentorc's states already carry the information the distinction needs (`working` vs `idle`/`needs-you`).
+
+**Fix:** adopt *turn* and *steer* as design vocabulary: say it once in §4.3 beside the Send rule, use it in §4.5's composer description and §4.5a's row for Send, and reflect it in the UI where it is free — the composer's Send affordance reading as steering when the session is `working` and as a new prompt when it is `idle` (a label or a hint line, not a second control; §4.5a still governs what controls exist). Done when a reader of §4.3 can say in one sentence what Send does in each state, and the Focus composer tells them the same thing without their having to read the state pill.
+
+**Related:** design §4.3, §4.5, §4.5a; TD-027 (the composer confirmation that makes a submit observable at all); [ADR 2026-09-13](decisions/2026-09-13-openai-agents-api.md).
