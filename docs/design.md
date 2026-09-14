@@ -670,7 +670,7 @@ idle) and agentorc's own Ready to close get exercised unattended first. Sequence
 managed host on demand → cadence-as-a-product. Nothing here changes what phase 2 builds; it
 says why the terminal must ride the agent's pipe and why the adapter contract stays neutral.
 
-Amendment 2026-09-13: that last paragraph is no longer a prediction. OpenAI's Agents API (public beta 2026-09-10), Anthropic's Managed Agents, AWS Bedrock AgentCore and Microsoft's Foundry Agent Service now all sell a managed cloud agent runtime on token billing with no infrastructure fee. The runtime is commodity; what none of them sells is one neutral view across tools, on machines you own, with a cadence that never strands work. The relay sells that, not a runtime ([ADR](decisions/2026-09-13-openai-agents-api.md)).
+Amendment 2026-09-13: the two paragraphs above — that a hosted "run Claude Code for you" is what every model supplier already sells, and that neutrality is the moat — are no longer a prediction. OpenAI's Agents API (public beta 2026-09-10), Anthropic's Managed Agents, AWS Bedrock AgentCore and Microsoft's Foundry Agent Service now all sell a managed cloud agent runtime on token billing with no infrastructure fee. The runtime is commodity; what none of them sells is one neutral view across tools, on machines you own, with a cadence that never strands work. The relay sells that, not a runtime ([ADR](decisions/2026-09-13-openai-agents-api.md)).
 
 ### 4.6 Transport and terminal mechanics (2026-09-05 review)
 

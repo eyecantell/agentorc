@@ -53,7 +53,7 @@ Sources: <https://developers.openai.com/api/docs/guides/agents-api/overview>,
 
 ## Why it is not the substrate
 
-**It solves the other half of the problem.** Goals 2, 6, 7 and 14 and §4.1 are about
+**It solves the other half of the problem.** Goals 2, 4, 6, 7 and 14 and §4.1 are about
 *interactive sessions on machines you own*: a tmux pane you attach to, a keyboard that passes
 through so menus and questions are answered in the terminal exactly as in VS Code, a VS Code
 link into the same directory, a git worktree, a continuous run log. An Agents API session has no
@@ -86,7 +86,7 @@ Four, all cheap, and three of them confirmations of decisions already made:
 
 1. **`session` / `turn`, and *steer* as the verb.** "A message to an idle session starts a turn;
    a message during an active turn steers it" is a better name for the rule §4.3 already
-   implements — Send stays enabled while the agent works, because Claude Code queues input.
+   implements — Send stays enabled while the agent works, because a hook-fed tool like Claude Code queues input (scraped adapters also disable it while a foreground process runs).
    **Take the vocabulary**: the Focus composer and the card should distinguish steering a
    running turn from starting a new one. Ledgered as a design-wording item, not a behaviour
    change.
