@@ -78,3 +78,37 @@ def test_every_entry_has_a_body_and_not_someone_elses():
             assert "**Why:**" in body, f"{path.name} {id_} has no **Why:**"
         for id_, body in entries(ARCHIVE):
             assert "**Resolved:**" in body, f"an archived entry records how it was resolved: {id_}"
+
+
+def test_no_two_entries_share_a_body():
+    """Corruption #3 in isolation: a well-formed body pasted under the wrong title.
+
+    TD-015 and TD-016 were each archived with TD-017's seen-state body beneath them. Every entry
+    was then structurally perfect — a Priority, a Why, a Resolved — and the archive still said
+    `send --wait` was a phone-triage seen mark. Nothing about the *shape* of such an entry is
+    wrong, so the signal is that two ids carry the same prose.
+    """
+    for path in (OPEN, ARCHIVE):
+        whys: dict[str, str] = {}
+        for id_, body in entries(path):
+            why = body[body.index("**Why:**") :].split("\n\n")[0].strip() if "**Why:**" in body else ""
+            if why and why in whys.values():
+                other = next(k for k, v in whys.items() if v == why)
+                raise AssertionError(f"{path.name}: {id_} and {other} have the same **Why:** — one is under the wrong title")
+            whys[id_] = why
+
+
+def test_no_entry_body_dangles_below_the_entry_it_belongs_to():
+    """The other half of the stacking bug, and what a bad repair leaves behind: a `Location`/`Why`/
+    `Resolved` block with no heading over it, adopted by whichever entry happens to sit above it.
+
+    Two of these had been hanging off TD-001 since 2026-09-09 — they were TD-015's and TD-016's
+    real bodies — and reading the file top to bottom does not reveal them, because they look like
+    a continuation of the entry above.
+    """
+    for path in (OPEN, ARCHIVE):
+        for id_, body in entries(path):
+            # Anchored to the line start: an entry may legitimately name these fields in its prose.
+            for fld in ("Location", "Why"):
+                n = len(re.findall(rf"^\*\*{fld}:\*\*", body, re.M))
+                assert n <= 1, f"{path.name}: {id_} has {n} {fld} lines — an unheaded entry is dangling below it"

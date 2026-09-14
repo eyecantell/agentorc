@@ -141,9 +141,9 @@ failure modes worth copying: nothing starts working within a few seconds (`agent
 and the caller's timeout passes before a settled state. Phase 3's supervisor (§6: wrap-up prompt,
 then kill) needs exactly this to know the wrap-up request landed.
 
-**Resolved:** 2026-09-09 (PR #42) — `send(id, text, wait=…, timeout=…)` returns the settled record, erroring `prompt-stalled` when nothing starts within `SEND_STALL_SECONDS` (5 s), `timeout` when the caller's window passes first, and `removed` when the record goes away; `ao send --wait`. The wrap-up path in `agentorc/teams.py` and the `ao` skill both read those error names. *(Body reconstructed 2026-09-14 from the pre-archive entry — see TD-048.)*
+**Resolved:** 2026-09-10 (PR #42) — `rpc_send(id, text, wait=False, timeout=None)`: with `wait` it returns the record once the session has started on *this* prompt (a transition off `idle`; a busy session first has its current turn end — a stop on anything but `idle` is returned as is, prompt still queued — then the next turn must start) and then reached one of `SETTLED` (`idle`, `needs-you`, `exited`, `closed`, `limited`, `stalled?`); errors `prompt-stalled` after `SEND_STALL_SECONDS` (5 s, or the remaining `timeout` if shorter) of nothing, `timeout` after `timeout` seconds in total, `removed` if the record goes away. `ao send --wait [--timeout N]` prints the settled state. Nothing is ever re-sent. Tests: `tests/test_agent.py::test_send_wait_three_outcomes`, `tests/test_cli.py::test_send_wait`. Phase 3's wrap-up policy is the intended caller (design §6).
 
-**Related:** design §4.2, §6, §9 invariant 6; TD-015, TD-017.
+**Related:** design §4.2 (the never-re-send rule), §4.4, §6; ADR 2026-09-10.
 
 ## TD-014: herdr spike: can it be the `sessionorc` substrate under phase 2? (design §10)
 
@@ -182,9 +182,9 @@ fallback reason when nothing did. Three things agentorc wants rest on the same m
 trust dialog and any future dialog no hook covers, `limited` from the tool's own limit message
 before TD-001's usage polling exists, and a `stalled?` that can say *why* it is unsure.
 
-**Resolved:** 2026-09-09 (PR #47) — `src/sessionorc/screen.py` evaluates one TOML manifest per tool (`screen_rules.toml` beside the adapter: `id`, `state`, `region`, `any`/`all`/`not`, `priority`, an optional `pending`), the tick writes the verdict as scraped so it never outranks a fresh hook state, and `ao explain <session>` (or `--file` over a saved capture) prints the screen, the rule that fired and its evidence. Tests: `tests/test_screen.py`. *(Body reconstructed 2026-09-14 from the pre-archive entry — see TD-048.)*
+**Resolved:** 2026-09-10 (PR #47) — `sessionorc.screen` (`Rule`, `Manifest`, `Match`): one versioned TOML manifest per tool, rules with `any`/`all`/`not` regexes over the last `region` lines, a priority, and an optional pending (`$line` = the matched line); the highest-priority match wins with its evidence. Claude Code ships `adapters/claude_code/screen_rules.toml` (trust dialog → `needs-you`; the spike's three usage-limit screens → `limited`) and `explain(tail)`. The agent applies a hook-fed adapter's verdict as `scraped` only when no hook has reported within `STALL_AFTER` (`_last_hook`; a session no hook has reported on yet takes it at once), never over a fresh hook state. `rpc_explain` and `ao explain <id>` / `ao explain --file <screen> [-a adapter]` print the screen, the rule, the evidence and whether it applies. Fixtures under `tests/fixtures/screens/`; tests `tests/test_screen.py`, `tests/test_agent_paths.py::test_screen_rule_is_a_labelled_fallback_that_a_fresh_hook_outranks`, `tests/test_cli.py::test_explain_file_and_session`. Not done here: a per-adapter stall window and a `stalled?` rule with a reason (the manifest can carry one when a screen for it exists).
 
-**Related:** design §4.2, §4.3, §10; [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md); TD-001, TD-032 (a rule added later).
+**Related:** design §4.2, §9 invariant 4; TD-001 (`limited` from the usage endpoint); ADR 2026-09-10.
 
 ## TD-001: `limited` state: wire adapter `usage()` into the agent tick
 
@@ -198,35 +198,6 @@ before TD-001's usage polling exists, and a `stalled?` that can say *why* it is 
 **Resolved:** 2026-09-10 (PR #44) — `HostAgent._refresh_usage` (a detached task started by the tick, one at a time) asks each live agent session's adapter `usage_for(profile)` in a thread at most once per `USAGE_EVERY` (60 s), caches per profile (`rpc_usage`), streams `{"event": "usage", …}` to subscribers (also on subscribe), and applies the `limited` rule: an interactive session on a profile at 100% of a window gets `limited` with `Pending(kind="limit", text="5-hour cap · resets HH:MMZ")` (never over `needs-you`), and returns to the state it had before the cap once the window resets (a `resets_at` already past is not a cap). `ClaudeCodeAdapter.usage_for` is the name-keyed wrapper of `usage()`. The top bar carries a per-profile chip (`#usagechip`, red at a cap). Switch profile / Wait (§4.5a) are still to build. Design §4.3/§4.4 updated. Tests: `tests/test_agent.py::test_limited_from_usage_cap`, `tests/test_claude_adapter.py::test_usage_for_by_profile_name`.
 
 **Related:** design §4.2, §4.2a, §6 usage gate (phase 3).
-
-**Location:** `src/sessionorc/agent.py` (`rpc_send`), `src/agentorc/cli.py` (`send`)
-
-**Why:** `send` already refuses while a permission or question is pending (the right half of the
-rule). It then writes the text and Enter and returns, so a policy that nudges an unattended
-worker cannot tell whether the prompt was taken, swallowed by a dialog that appeared in between,
-or typed into a pane whose agent had just exited. herdr's `agent prompt --wait` names the two
-failure modes worth copying: nothing starts working within a few seconds (`agent_prompt_stalled`),
-and the caller's timeout passes before a settled state. Phase 3's supervisor (§6: wrap-up prompt,
-then kill) needs exactly this to know the wrap-up request landed.
-
-**Resolved:** 2026-09-10 (PR #42) — `rpc_send(id, text, wait=False, timeout=None)`: with `wait` it returns the record once the session has started on *this* prompt (a transition off `idle`; a busy session first has its current turn end — a stop on anything but `idle` is returned as is, prompt still queued — then the next turn must start) and then reached one of `SETTLED` (`idle`, `needs-you`, `exited`, `closed`, `limited`, `stalled?`); errors `prompt-stalled` after `SEND_STALL_SECONDS` (5 s, or the remaining `timeout` if shorter) of nothing, `timeout` after `timeout` seconds in total, `removed` if the record goes away. `ao send --wait [--timeout N]` prints the settled state. Nothing is ever re-sent. Tests: `tests/test_agent.py::test_send_wait_three_outcomes`, `tests/test_cli.py::test_send_wait`. Phase 3's wrap-up policy is the intended caller (design §6).
-
-**Related:** design §4.2 (the never-re-send rule), §4.4, §6; ADR 2026-09-10.
-
-**Location:** `src/sessionorc/adapters.py` (`classify`), `src/agentorc/adapters/claude_code/__init__.py`, `src/sessionorc/agent.py` (tick)
-
-**Why:** Design §4.2 allows a pane classifier as a labelled fallback, and today the only scraped
-verdicts are the shell/command adapters' foreground-process check and the agent's liveness
-cross-check; the Claude Code adapter's `classify` returns nothing. The herdr spike ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md))
-showed what the fallback is for: its screen detector caught the trust dialog, which no Claude Code
-hook reports, and its `agent explain` printed the rule that fired, the region it matched and the
-fallback reason when nothing did. Three things agentorc wants rest on the same mechanism: the
-trust dialog and any future dialog no hook covers, `limited` from the tool's own limit message
-before TD-001's usage polling exists, and a `stalled?` that can say *why* it is unsure.
-
-**Resolved:** 2026-09-10 (PR #47) — `sessionorc.screen` (`Rule`, `Manifest`, `Match`): one versioned TOML manifest per tool, rules with `any`/`all`/`not` regexes over the last `region` lines, a priority, and an optional pending (`$line` = the matched line); the highest-priority match wins with its evidence. Claude Code ships `adapters/claude_code/screen_rules.toml` (trust dialog → `needs-you`; the spike's three usage-limit screens → `limited`) and `explain(tail)`. The agent applies a hook-fed adapter's verdict as `scraped` only when no hook has reported within `STALL_AFTER` (`_last_hook`; a session no hook has reported on yet takes it at once), never over a fresh hook state. `rpc_explain` and `ao explain <id>` / `ao explain --file <screen> [-a adapter]` print the screen, the rule, the evidence and whether it applies. Fixtures under `tests/fixtures/screens/`; tests `tests/test_screen.py`, `tests/test_agent_paths.py::test_screen_rule_is_a_labelled_fallback_that_a_fresh_hook_outranks`, `tests/test_cli.py::test_explain_file_and_session`. Not done here: a per-adapter stall window and a `stalled?` rule with a reason (the manifest can carry one when a screen for it exists).
-
-**Related:** design §4.2, §9 invariant 4; TD-001 (`limited` from the usage endpoint); ADR 2026-09-10.
 
 ## TD-022: Focus terminal cannot scroll back: wheel/PageUp show nothing above the live screen
 
@@ -478,11 +449,11 @@ The three test-side waits went in anyway (PR #89), as cheap insurance rather tha
 
 1. **A reused id.** TD-043 was assigned on 2026-09-13 to a tmux paste-buffer race (PR #122), resolved and archived the same day; hours later another session, reading the open file alone, assigned TD-043 again to a vocabulary entry. For a day the number meant two things, and the code, the tests and the board all pointed at the archived one.
 2. **Four entries with no body.** Archiving TD-012 (PR #38) inserted its heading directly after TD-009's *heading* rather than after TD-009's body; PRs #39 and #40 stacked TD-013 and TD-007 on the same spot. The result was four headings in a row followed by four bodies under the last of them, and the metadata lines of three entries were dropped entirely.
-3. **Two entries archived under someone else's text.** TD-016 (PR #42) and TD-015 (PR #47) were each archived with TD-017's seen-state body pasted beneath their titles. The archive therefore described `send --wait` and the screen-rule manifests as a phone-triage seen mark — wrong in a way that reads as plausible, which is the dangerous kind. Both bodies had never been correct in the archive; TD-017's own body appeared three times.
+3. **Two entries archived under someone else's text, and their real bodies left dangling.** TD-016 (PR #42) and TD-015 (PR #47) were each archived with TD-017's seen-state body pasted beneath their titles, so the archive described `send --wait` and the screen-rule manifests as a phone-triage seen mark — wrong in a way that reads as plausible, which is the dangerous kind. TD-017's body appeared twice; TD-017's own heading had none. Their **real** bodies were in the file the whole time, as two unheaded `Location`/`Why`/`Resolved` blocks dangling below TD-001, where reading top to bottom makes them look like a continuation of the entry above.
 
 Every one of these is what a concurrent fleet does to a shared text file: the merges were clean, the conflicts were resolved by keeping both sides, and no reader ever compared the two files.
 
-**Resolved:** 2026-09-14 (PR #138) — the duplicate TD-043 renumbered to TD-047 and moved into id order; the four stacked entries given back their own bodies and their `Priority`/`Added`/`Status` lines, recovered from `git show 872d6a8`, `59ce382^`, `272084e^` and `1a4fd31^`; TD-015's and TD-016's real bodies recovered from the open ledger as it stood before each was archived, each with a `**Resolved:**` line written from what the code actually ships today (`src/sessionorc/screen.py` + `ao explain`; `send(wait=…)` with `prompt-stalled`/`timeout`/`removed`) and marked as reconstructed. `tests/test_ledger.py` now enforces what the prose claims: no id is used twice across both files, no id is open and archived at once, the summary table and the entries match exactly, the open file is in id order, and every entry has a body of its own (a `**Priority:**` and a `**Why:**`, plus a `**Resolved:**` in the archive) — which is the shape both the stacking and the wrong-body bugs break.
+**Resolved:** 2026-09-14 (PR #138) — the duplicate TD-043 renumbered to TD-047 and moved into id order; the four stacked entries given back their own bodies and their `Priority`/`Added`/`Status` lines, recovered from `git show 872d6a8`, `59ce382^`, `272084e^` and `1a4fd31^`; TD-015's and TD-016's own bodies restored from the orphaned blocks under TD-001, which are the authentic text with their real PR numbers and test names — so no sentence in this repair is invented, and the orphans are gone rather than duplicated. `tests/test_ledger.py` enforces what the prose claims, in seven checks: no id used twice across both files, none open and archived at once, the summary table and the entries matching exactly, the open file in id order, every entry having a body of its own, **no two entries sharing a `Why` paragraph** (the wrong-body bug is structurally perfect otherwise — that duplicate prose is its only signal), and **no entry carrying a second `Location` line** (an unheaded entry dangling below it, which is how the two real bodies hid for five days).
 
 **Related:** TD-047 (the renumbered entry); PRs #38, #39, #40, #42, #47 (where the damage was introduced), #122 (the first TD-043); cadence §2 (the archive rule).
 
