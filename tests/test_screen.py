@@ -122,6 +122,24 @@ def test_the_standdown_rule_needs_both_of_the_banners_markers():
     assert m.explain(para) is None and m.explain([" ".join(para)]) is None
 
 
+def test_the_rules_own_sources_do_not_trip_the_rule_they_describe():
+    """The fourth review of PR #125: `all` and `any` may be satisfied by different lines of the
+    window, so the rule's own comment — which quoted both counter-examples a line apart — fired on
+    itself. Any pane showing that file (a `cat`, a `git show`, a review of this very change) read as
+    a stood-down worker. The footer marker is anchored to end-of-line, which is where a pane's
+    footer puts it and where prose never does; this test is the standing check, over the three files
+    that talk about the rule, in the same 20-line windows the tick would hand it.
+    """
+    m = Manifest.load(RULES_FILE)
+    root = pathlib.Path(__file__).parents[1]
+    for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
+                root / "docs" / "design.md"):  # fmt: skip
+        lines = pathlib.Path(rel).read_text().splitlines()
+        for i in range(max(1, len(lines) - 19)):
+            got = m.explain(lines[i : i + 20])
+            assert not (got and got.rule == "remote-control-standdown"), f"{rel} line {i + 1}"
+
+
 def test_a_stood_down_pane_that_is_also_rate_limited_reads_as_limited():
     """Priority 70, below `rate-limited-429`'s 80: both can be on one screen (the device that took
     over hits a cap on its first call back), and the limit is the more actionable of the two."""

@@ -40,9 +40,12 @@ pending = { kind = "limit", text = "$line" }
 # BOTH markers are required — the close code (`all`) and the `/rc` failure (`any`) — because three
 # reviews of PR #125 broke every looser form in turn: `any` and `all` may match *different* lines,
 # so a pair of loose phrases fires on a screen that merely mentions both; two phrases joined by `.*`
-# fire on one line of prose *about* a stand-down; and each marker alone is ordinary text elsewhere
-# ("/etc/rc failed" is a boot-script message, "stands down (code 503)" is any circuit breaker). The
-# pair is what the one observed incident showed, and nothing else plausibly carries both.
+# fire on one line of prose *about* a stand-down; and each marker alone is ordinary text elsewhere —
+# a boot script reports a failed rc file, and any circuit breaker stands down with a numeric code.
+# The pair is what the one observed incident showed, and nothing else plausibly carries both.
+# The footer marker is anchored to the end of its line, which is where a pane's footer puts it and
+# where prose about the rule never does — including this comment, the entry and the tests, each of
+# which would otherwise have tripped the rule it documents (found by the fourth PR #125 review).
 # The cost is a stand-down showing only one of them, which would be missed — the right way round for
 # a scraped rule, and the cheap half to loosen once someone captures a real pane: this is written
 # from a sentence quoted in TD-032, not from a screen anyone saved.
@@ -55,5 +58,5 @@ state = "stalled?"
 priority = 70
 region = 20
 all = ["stand(s|ing)? down \\(code \\d+\\)"]
-any = ["/rc failed"]
+any = ["/rc failed\\s*$"]
 pending = { kind = "note", text = "stood down: another device took over this session" }
