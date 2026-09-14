@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import os
 import pathlib
@@ -92,11 +93,6 @@ def emit(args: argparse.Namespace, result: Any, prose: Callable[[], None]) -> in
 # ── ao wait: a lead blocks instead of sleeping (design §4.8 "Waking a lead", TD-049) ──────────
 
 
-# How long a quiet stream means the opening snapshot is complete. Generous next to a burst of
-# local writes on a unix socket, and it only ever costs one extra moment before the first answer.
-SNAPSHOT_GAP = 0.4
-
-
 def wait_scope(sessions: list[dict[str, Any]], caller: str | None, scope: str) -> list[dict[str, Any]]:
     """Which sessions a waiter is watching. The default reuses the authority rule (§4.8): a lead
     waits on exactly the sessions it may act on — the ones whose `controllers` name it — so the
@@ -108,15 +104,30 @@ def wait_scope(sessions: list[dict[str, Any]], caller: str | None, scope: str) -
 
 
 def _cursor_file(caller: str | None) -> pathlib.Path:
-    return paths.waits_dir() / f"{naming.slug(caller or 'person')}.json"
+    # `slug` truncates, so two ids differing only past its limit would share one cursor and
+    # cross-pollinate each other's history (review of PR #145). The digest makes the name unique;
+    # the slug keeps it readable for whoever opens the directory.
+    who = caller or "person"
+    return paths.waits_dir() / f"{naming.slug(who)}-{hashlib.sha256(who.encode()).hexdigest()[:8]}.json"
 
 
-def read_cursor(caller: str | None) -> dict[str, str]:
-    try:
-        got = json.loads(_cursor_file(caller).read_text())
-    except (OSError, ValueError):
+def read_cursor(caller: str | None) -> dict[str, str] | None:
+    """What this caller last saw, `{}` for a caller that has never waited, and **None** for a
+    cursor that exists but cannot be read.
+
+    The three are not the same thing (review of PR #145). An empty cursor wakes on nothing, which
+    is right for a first wait and exactly wrong for a corrupt one: it would swallow everything
+    that changed since the last good write, silently, which is the one failure this command must
+    not have. `None` means *unknown*, and unknown wakes on everything in scope — a redundant wake,
+    never a missed one, which is the trade this whole mechanism is built on."""
+    f = _cursor_file(caller)
+    if not f.exists():
         return {}
-    return got if isinstance(got, dict) else {}
+    try:
+        got = json.loads(f.read_text())
+    except (OSError, ValueError):
+        return None
+    return got if isinstance(got, dict) else None
 
 
 def write_cursor(caller: str | None, cursor: dict[str, str]) -> None:
@@ -125,19 +136,35 @@ def write_cursor(caller: str | None, cursor: dict[str, str]) -> None:
         f.parent.mkdir(parents=True, exist_ok=True)
         tmp = f.with_suffix(".tmp")
         tmp.write_text(json.dumps(cursor))
-        tmp.replace(f)  # atomic: a half-written cursor would wake on everything, or on nothing
+        # Atomic, so a cursor is never half-written. Two waits for one caller at once (a lead's
+        # tick overlapping a person's `ao wait` in another pane) still race on *which* complete
+        # cursor lands, and the loser costs one redundant wake next time — self-healing, and the
+        # reason this is a replace rather than a lock (review of PR #145).
+        tmp.replace(f)
     except OSError:
         pass  # a cursor that cannot be saved costs one redundant wake, never a missed one
 
 
-def wake_changes(before: dict[str, str], now: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, str]]:
+def wake_changes(
+    before: dict[str, str] | None, now: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
     """The sessions whose wake digest differs from what this waiter last saw, and the new cursor.
 
-    A session that has gone is a change too, and the one a lead most needs: `{"id": …, "gone":
-    true}` stands in for the record that is no longer there. A *first* wait (no cursor) reports
-    nothing and simply records where it is — otherwise the first call of every lead's life would
-    return its whole fleet and it would learn to ignore the result."""
+    `now` must be the **complete** set in scope: a session in `before` and not in `now` is
+    reported gone, so a partial view would report a healthy fleet as vanished and then drop it
+    from the cursor. That is why the snapshot is a `list` call and not a timed burst.
+
+    Three cursors, three different answers (review of PR #145):
+
+    - `{}` — never waited. Report nothing and record where we are, or the first call of every
+      lead's life returns its whole fleet and it learns to ignore the result.
+    - `None` — a cursor exists and could not be read. We do not know what was seen, so everything
+      in scope is reported: a redundant wake, never a missed one.
+    - anything else — the digests to compare against.
+    """
     cursor = {s["id"]: wake_digest(s) for s in now}
+    if before is None:
+        return list(now), cursor
     if not before:
         return [], cursor
     changed = [s for s in now if before.get(s["id"]) != cursor[s["id"]]]
@@ -166,9 +193,20 @@ def cmd_wait(args: argparse.Namespace) -> int:
     async def go() -> list[dict[str, Any]]:
         deadline = asyncio.get_running_loop().time() + max(args.timeout, 0.0)
         async with LocalClient(caller=caller) as c:
+            # The snapshot is `list`, not the burst `subscribe` opens with. A burst has no end
+            # marker, so the only way to know it is complete is to time it — and a gap in a slow
+            # or large one would be read as "that is all", reporting every record not yet received
+            # as *gone* and dropping it from the cursor. `list` has a definite answer.
+            seen: dict[str, dict[str, Any]] = {s["id"]: s for s in await c.call("list")}
+            changed, cursor = wake_changes(before, wait_scope(list(seen.values()), caller, args.scope))
+            latest.clear()
+            latest.update(cursor)
+            if changed:
+                return changed  # it happened while this caller was busy; no need to listen at all
+
+            # Nothing moved while we were away, so the cursor now equals what we last saw and the
+            # snapshot `subscribe` repeats is judged as unchanged — no special case needed for it.
             events = c.subscribe().__aiter__()
-            seen: dict[str, dict[str, Any]] = {}
-            snapshot_done = False
             # `asyncio.wait`, not `wait_for`: a timeout has to leave the pending read alone.
             # `wait_for` cancels it, and a cancelled `__anext__` ends the generator — so the next
             # read raised StopAsyncIteration at once and every wait returned immediately.
@@ -180,35 +218,25 @@ def cmd_wait(args: argparse.Namespace) -> int:
                         return []
                     if read is None:
                         read = asyncio.ensure_future(events.__anext__())
-                    # The opening snapshot arrives as a burst; a gap in it means it is complete.
-                    # After that every line is a live delta, judged as it lands.
-                    window = min(SNAPSHOT_GAP, left) if not snapshot_done else left
-                    done, _ = await asyncio.wait({read}, timeout=window)
-                    ev = None
-                    if done:
-                        try:
-                            ev = read.result()
-                        except StopAsyncIteration:
-                            return []
-                        finally:
-                            read = None
-                    elif snapshot_done:
+                    done, _ = await asyncio.wait({read}, timeout=left)
+                    if not done:
                         return []
+                    try:
+                        ev = read.result()
+                    except StopAsyncIteration:
+                        return []  # the agent went away; the cursor stands and the next wait re-reads
+                    finally:
+                        read = None
+                    if ev.get("event") == "session":
+                        seen[ev["session"]["id"]] = ev["session"]
+                    elif ev.get("event") == "gone":
+                        seen.pop(ev["id"], None)
                     else:
-                        snapshot_done = True  # the burst has stopped: judge what it said
-                    if ev is not None:
-                        if ev.get("event") == "session":
-                            seen[ev["session"]["id"]] = ev["session"]
-                        elif ev.get("event") == "gone":
-                            seen.pop(ev["id"], None)
-                        else:
-                            continue
-                        if not snapshot_done:
-                            continue  # still reading the snapshot; half of it would be noise
+                        continue
                     watched = wait_scope(list(seen.values()), caller, args.scope)
-                    changed, latest_cursor = wake_changes(before, watched)
+                    changed, cursor = wake_changes(before, watched)
                     latest.clear()
-                    latest.update(latest_cursor)
+                    latest.update(cursor)
                     if changed:
                         return changed
             finally:

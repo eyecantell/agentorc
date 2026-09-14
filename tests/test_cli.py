@@ -4,7 +4,10 @@
 import argparse
 import datetime
 import json
+import os
 import pathlib
+import subprocess
+import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -691,47 +694,120 @@ def test_wait_returns_at_the_timeout_when_nothing_changes(subprocess_agent, caps
 
 
 def test_a_worker_marking_done_wakes_a_waiting_lead_within_seconds(subprocess_agent, tmp_path, capsys):
-    """The "Done when" of TD-049: a worker marking `done --pr N` has its lead awake in seconds
-    rather than within a tick. The wait runs in a thread because it blocks, which is the point."""
-    import threading
+    """TD-049's own "Done when": a worker marking `done --pr N` reaches a *blocked* lead in
+    seconds rather than within a tick. This is the stream half — the snapshot half is the test
+    below — so the waiter has to be blocked before the change is made.
+
+    It runs as a subprocess, not a thread: `ao wait` blocks, and a thread sharing this process's
+    stdout would race `capsys` with the main thread. It waits in the **default** scope, under a
+    real lead that controls exactly this worker, which is both how a lead uses it and what keeps
+    the rest of the suite's churn in this shared agent out of the result.
+    """
+    (tmp_path / "lead").mkdir()
+    assert cli.main(["--json", "shell", "-d", str(tmp_path / "lead"), "lead1"]) == 0
+    lead = json.loads(capsys.readouterr().out)["id"]
+    assert cli.main(["--json", "shell", "-d", str(tmp_path), "w1"]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    assert cli.main(["control", lead, "add", sid]) == 0
+    env = {**os.environ, "AGENTORC_SESSION": lead}
+
+    def wait_once(timeout: str) -> subprocess.Popen:
+        return subprocess.Popen(
+            [sys.executable, "-c", "from agentorc.cli import main; raise SystemExit(main())",
+             "--json", "wait", "--timeout", timeout],
+            stdout=subprocess.PIPE, text=True, env=env,
+        )
+
+    wait_once("2").communicate(timeout=20)  # the lead's first wait: records the cursor, wakes on nothing
+    waiter = wait_once("25")
+    try:
+        time.sleep(1.5)  # let it get past `list` and settle into the stream
+        t0 = time.monotonic()
+        assert cli.main(["progress", "done", "TD-999", "--pr", "7", "--id", sid]) == 0
+        out, _ = waiter.communicate(timeout=30)
+        assert time.monotonic() - t0 < 20.0  # seconds, not a tick
+        woke = json.loads(out or "[]")
+        assert any(
+            r.get("id") == sid and any(p.get("ref") == "TD-999" and p.get("pr") == 7 for p in r.get("progress") or [])
+            for r in woke
+        ), f"the lead did not wake on the worker's done: {out!r}"
+    finally:
+        if waiter.poll() is None:
+            waiter.kill()
+        for x in (sid, lead):
+            cli.main(["kill", x])
+
+
+def test_the_snapshot_is_a_list_call_not_a_timed_burst(subprocess_agent, tmp_path, capsys):
+    """The first shape of this was a heuristic: read `subscribe`'s opening burst until it goes
+    quiet for 0.4 s, then judge it. A burst has no end marker, so a gap in a slow or large one
+    reads as "that is all" — and `wake_changes` then reports every record not yet received as
+    **gone** and drops it from the cursor. A lead would be told its whole fleet had vanished.
+
+    `list` has a definite answer, so there is no window to get wrong. This pins the shape: a wait
+    that returns immediately because something changed while the caller was busy must do so
+    without ever reading the stream.
+    """
+    from agentorc.cli import wake_changes
+
+    # the bug itself, at the level it bit: a partial view is not an empty fleet
+    changed, cursor = wake_changes({"m1": "A", "m2": "B"}, [{"id": "m1", "state": "working"}])
+    assert {c["id"] for c in changed if c.get("gone")} == {"m2"}, "a missing record still reads as gone"
+    assert "m2" not in cursor, "and is dropped from the cursor — which is why the input must be complete"
+
+    # end to end: a change made before the wait starts returns at once, from `list`
+    assert cli.main(["--json", "shell", "-d", str(tmp_path), "w2"]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    assert cli.main(["wait", "--timeout", "1", "--scope", "all"]) == 0  # record the cursor
+    capsys.readouterr()
+    assert cli.main(["progress", "claim", "TD-998", "--id", sid]) == 0
     import time
 
-    r = cli.main(["--json", "shell", "-d", str(tmp_path), "w1"])
-    assert r == 0
-    sid = json.loads(capsys.readouterr().out)["id"]
-    # the waiter is a person here (no AGENTORC_SESSION in the test process), so --scope all is
-    # the same set; what is being tested is the wake, not the scope
-    assert cli.main(["wait", "--timeout", "1", "--scope", "all"]) == 0  # first call records the cursor
-    capsys.readouterr()
-
-    out: dict = {}
-
-    def waiter() -> None:
-        out["code"] = cli.main(["--json", "wait", "--timeout", "20", "--scope", "all"])
-
-    t = threading.Thread(target=waiter)
-    t.start()
-    time.sleep(1.0)  # let it get past the snapshot and settle into the stream
     t0 = time.monotonic()
-    assert cli.main(["progress", "done", "TD-999", "--pr", "7", "--id", sid]) == 0
-    t.join(timeout=25)
-    assert not t.is_alive() and out["code"] == 0
-    assert time.monotonic() - t0 < 15.0  # seconds, not a tick
-    woke = [x for x in json.loads(capsys.readouterr().out.split("\n", 1)[-1] or "[]") if x.get("id") == sid]
-    assert woke and any(p["ref"] == "TD-999" and p["pr"] == 7 for p in woke[0]["progress"])
+    assert cli.main(["--json", "wait", "--timeout", "30", "--scope", "all"]) == 0
+    assert time.monotonic() - t0 < 5.0, "a change already in the record needs no stream at all"
+    assert "TD-998" in capsys.readouterr().out
     cli.main(["kill", sid])
 
 
-def test_the_design_describes_the_wake_before_the_code_does_it():
-    """A behaviour change is a change to the design first (CLAUDE.md, §4.5a's rule for controls).
+def test_a_cursor_that_cannot_be_read_wakes_on_everything_rather_than_on_nothing(tmp_path, monkeypatch):
+    """Three cursors, three answers (review of PR #145).
 
-    `ao wait` is not a UI control, so it earns no §4.5a row — but §4.8's orchestrator row said the
-    lead reads status *on a cadence*, and that sentence is what this changes.
+    The dangerous one is the middle: a corrupt cursor that read as `{}` would look like a first
+    wait and *swallow* everything that changed since the last good write — silently, which is the
+    one failure this command must not have. Unknown has to mean "wake on everything".
     """
-    design = pathlib.Path(__file__).parents[1] / "docs" / "design.md"
-    text = design.read_text()
-    assert "**Waking a lead**" in text
-    row = next(ln for ln in text.split("\n") if ln.startswith("| `orchestrator` |"))
-    assert "ao wait" in row, "§4.8's orchestrator row still says the lead only polls"
-    for promise in ("the authority rule", "The timer stays", "Nothing is sent into the lead's pane"):
-        assert promise in text, promise
+    from agentorc.cli import read_cursor, wake_changes, write_cursor
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    rec = [{"id": "m1", "state": "working", "controllers": ["lead"]}]
+
+    assert read_cursor("lead") == {}  # never waited
+    assert wake_changes({}, rec) == ([], {"m1": wake_digest_of(rec[0])})
+
+    write_cursor("lead", {"m1": wake_digest_of(rec[0])})
+    assert read_cursor("lead") == {"m1": wake_digest_of(rec[0])}
+    assert wake_changes(read_cursor("lead"), rec)[0] == []  # nothing moved
+
+    # a cursor that exists and is unreadable is *unknown*, not empty
+    from agentorc.cli import _cursor_file
+
+    _cursor_file("lead").write_text("{ truncated")
+    assert read_cursor("lead") is None
+    assert wake_changes(None, rec)[0] == rec
+
+
+def wake_digest_of(s):
+    from sessionorc.models import wake_digest
+
+    return wake_digest(s)
+
+
+def test_two_callers_whose_ids_differ_only_past_the_slug_do_not_share_a_cursor(tmp_path, monkeypatch):
+    """`naming.slug` truncates, so a digest keeps the filename unique (review of PR #145)."""
+    from agentorc.cli import _cursor_file
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    a = "ao-agentorc-a-very-long-orchestrator-session-name-one"
+    b = "ao-agentorc-a-very-long-orchestrator-session-name-two"
+    assert _cursor_file(a) != _cursor_file(b)
