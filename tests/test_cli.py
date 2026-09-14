@@ -620,8 +620,13 @@ def test_the_wake_vocabulary_ignores_what_moves_every_tick_and_notices_what_a_le
     from sessionorc.models import wake_digest
 
     base = {
-        "id": "a", "state": "working", "exit_code": None, "pending": None,
-        "progress": [], "findings": [], "controllers": ["lead"],
+        "id": "a",
+        "state": "working",
+        "exit_code": None,
+        "pending": None,
+        "progress": [],
+        "findings": [],
+        "controllers": ["lead"],
     }
     same = wake_digest(base)
     for noise in ("last_output", "tail", "since", "seen_at", "git", "subagents", "model", "name"):
@@ -713,9 +718,18 @@ def test_a_worker_marking_done_wakes_a_waiting_lead_within_seconds(subprocess_ag
 
     def wait_once(timeout: str) -> subprocess.Popen:
         return subprocess.Popen(
-            [sys.executable, "-c", "from agentorc.cli import main; raise SystemExit(main())",
-             "--json", "wait", "--timeout", timeout],
-            stdout=subprocess.PIPE, text=True, env=env,
+            [
+                sys.executable,
+                "-c",
+                "from agentorc.cli import main; raise SystemExit(main())",
+                "--json",
+                "wait",
+                "--timeout",
+                timeout,
+            ],
+            stdout=subprocess.PIPE,
+            text=True,
+            env=env,
         )
 
     wait_once("2").communicate(timeout=20)  # the lead's first wait: records the cursor, wakes on nothing

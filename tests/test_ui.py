@@ -756,3 +756,49 @@ def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
     send_row = next(ln for ln in design.split("\n") if ln.startswith("| Focus composer | **Send** |"))
     assert "Steer" in send_row and "starts a new turn" in send_row
     assert "to an `idle` session it starts a turn; to a `working` one it steers the turn in flight" in design
+
+
+def test_a_stop_time_can_be_set_and_cleared_from_focus(client, tmp_path):
+    """Design §4.5a card/Focus **stops** note, its editing half (§6, TD-026).
+
+    The stop time was settable at New session and from `ao until`, and nowhere else: a person who
+    set `+8h` and wanted another hour had to leave the page for the CLI. The agent already had the
+    RPC; this is the control. Clearing it is a decision made out loud — the alternative was
+    restarting the session.
+    """
+    r = client.post(
+        "/new",
+        data={"name": "st", "dir": str(tmp_path), "adapter": "hookstub", "unattended": "on", "until": "+8h"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    assert "stops " in client.get(f"/focus/{sid}").text
+
+    # move it
+    got = client.post(f"/api/sessions/{sid}/stop", json={"until": "+2h"}).json()
+    assert got["ok"] and got["stop_note"].startswith("stops ") and got["run_until"]
+
+    # clear it: the fact a person most needs is that nothing will stop it
+    got = client.post(f"/api/sessions/{sid}/stop", json={"until": ""}).json()
+    assert got["run_until"] is None and got["stop_note"] == ""
+    page = client.get(f"/focus/{sid}").text
+    assert "no stop time" in page and 'data-act="stop"' in page
+
+    # a time the agent cannot parse is refused, not stored
+    assert client.post(f"/api/sessions/{sid}/stop", json={"until": "half six"}).status_code == 400
+    assert client.get(f"/api/sessions/{sid}/stop").status_code in (404, 405)  # it is a POST action
+    client.post(f"/api/sessions/{sid}/kill")
+
+
+def test_focus_offers_no_stop_control_on_an_interactive_session(client, tmp_path):
+    """A stop time is a policy and policies leave interactive sessions alone (§4.2): the agent
+    refuses one either way, and a control that is always refused is worse than none."""
+    other = tmp_path / "interactive"
+    other.mkdir()
+    r = client.post("/new", data={"name": "si", "dir": str(other), "adapter": "hookstub"}, follow_redirects=False)
+    assert r.status_code == 303
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    assert 'data-act="stop"' not in client.get(f"/focus/{sid}").text
+    assert client.post(f"/api/sessions/{sid}/stop", json={"until": "+1h"}).status_code >= 400
+    client.post(f"/api/sessions/{sid}/kill")
