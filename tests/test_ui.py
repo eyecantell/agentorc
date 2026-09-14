@@ -802,3 +802,32 @@ def test_focus_offers_no_stop_control_on_an_interactive_session(client, tmp_path
     assert 'data-act="stop"' not in client.get(f"/focus/{sid}").text
     assert client.post(f"/api/sessions/{sid}/stop", json={"until": "+1h"}).status_code >= 400
     client.post(f"/api/sessions/{sid}/kill")
+
+
+def test_the_stop_control_round_trips_and_can_actually_be_hidden():
+    """Two traps this walked into, both caught before merge.
+
+    The edit box used to be filled from the badge's own text. `stop_note` reads *stops Mon 06:00*
+    once the stop is not today and gains *· wrap-up sent* after the agent has asked, and both come
+    back as a time `stop_time` refuses — so editing a stop time on any day but today would have
+    failed with "not a time". It is filled from the record's own value instead.
+
+    And `.badge` is `display: inline-block`, which beats the `hidden` attribute — exactly the trap
+    the stylesheet already documents for `.btn`.
+    """
+    root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui"
+    js = (root / "static" / "app.js").read_text()
+    css = (root / "static" / "app.css").read_text()
+    assert "b.dataset.until" in js and "el.dataset.until = v.run_until" in js
+    assert "textContent.slice" not in js, "the edit box must not be filled from the badge's text"
+    assert ".badge[hidden]" in css
+
+    # the two formats that would have come back refused
+    from agentorc.cli import stop_time
+    from sessionorc.client import AgentError
+    from sessionorc.models import stop_note
+
+    note = stop_note({"run_until": "2030-01-07T06:00:00Z", "wrapup_sent_at": "2030-01-07T05:50:00Z"})
+    assert note.startswith("stops ") and "wrap-up sent" in note
+    with pytest.raises(AgentError):
+        stop_time(note[len("stops ") :])
