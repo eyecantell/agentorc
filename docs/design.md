@@ -806,7 +806,17 @@ merge, a claim on a PR older than the one page `gh` is asked for: fewer entries,
 and never a guess, on a five-minute cadence detached from the tick, so nothing waits on it; **scraped** — a
 `TD-NNN` on the screen, a TD-015 rule, fallback only. A declared entry is never overwritten by a
 derived one (§9 invariant 10); a derived entry is replaced the moment the session declares the
-same reference. A reference is a ledger id (`TD-NNN`), an attention-board line, or a PR number;
+same reference. A derived claim also records the branch it came from, and once the session has
+moved off that branch the claim is looked up one last time by branch name: a PR from it makes the
+claim real, and no PR at all **retires** it — the one delete in either channel, and the only way a
+claim that never grew a PR can ever leave a record (TD-045). That last look is its own `gh` query for
+that branch, which answers *could not ask* distinctly from *no PR*: everywhere else a failure means
+fewer entries and no harm, but a delete must never be made on an outage. A `done` entry, an entry carrying a PR
+number, and anything the session declared are all out of its reach. This matters beyond a wrong
+card: a branch created and abandoned before its PR existed — what a grinder does the moment it
+finds a neighbour already holds that reference — would otherwise leave a permanent false `claimed`,
+and the idle-with-open-work rule (§6, the orchestrator's brief until it lands) fires on exactly
+that. A reference is a ledger id (`TD-NNN`), an attention-board line, or a PR number;
 the repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references, not prose:
 "refactor the UI module" is not a lane until it has an entry a card can link to.
 

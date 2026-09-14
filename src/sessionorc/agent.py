@@ -81,6 +81,12 @@ class RpcError(Exception):
         self.data = data
 
 
+def _is_branch_claim(e: Any) -> bool:
+    """A derived `claimed` entry with no PR: only the branch it came from ever supported it, so it
+    is the one kind of report entry the tick may retire (TD-045)."""
+    return e.source != "declared" and e.status == "claimed" and not e.pr
+
+
 class HostAgent:
     def __init__(
         self, *, tmux: Tmux | None = None, store: SessionStore | None = None, events: EventQueue | None = None
@@ -252,9 +258,15 @@ class HostAgent:
         an exited predecessor sharing the `dir` would otherwise be credited with its successor's
         branch and PRs. Every record keeps the `pending`-by-PR re-check, which is attributed by a PR
         the record itself claimed, so a merge still lands on a worker that has since exited
-        (TD-032)."""
+        (TD-032).
+
+        A branch-only claim the session has moved off is looked up one last time by the branch it
+        came from and then *retired* if that branch never grew a PR (TD-045): nothing else could
+        ever remove one — the re-check above works by PR number, the upsert has no delete branch,
+        and invariant 10 only replaces a derived entry when the session declares the same reference
+        — and a permanent false `claimed` is exactly what the idle-with-open-work nudge fires on."""
         holders = reports.holds_directory(self.sessions.values())
-        due: list[tuple[Session, str | None, list[tuple[str, int]]]] = []
+        due: list[tuple[Session, str | None, list[tuple[str, int]], list[tuple[str, str | None]]]] = []
         for s in self.sessions.values():
             if not s.dir or s.external or s.state == "closed":
                 continue
@@ -262,21 +274,29 @@ class HostAgent:
                 continue
             branch = (s.git or {}).get("branch") if s.id in holders else None
             pending = [e for e in s.progress if e.source != "declared" and e.status == "claimed" and e.pr]
-            if not branch and not pending:
+            # Branch-only claims from a branch this record is no longer on (TD-045). Only for a
+            # record that still holds its directory: what is checked out elsewhere says nothing
+            # about this one, and an exited worker's claims are its history, not a live question.
+            left = (
+                [(e.ref, e.branch) for e in s.progress if _is_branch_claim(e) and e.branch != branch]
+                if s.id in holders
+                else []
+            )
+            if not branch and not pending and not left:
                 continue
-            due.append((s, branch, [(e.ref, e.pr) for e in pending if e.pr]))
+            due.append((s, branch, [(e.ref, e.pr) for e in pending if e.pr], left))
         if not due:
             return
         results = await asyncio.gather(
             *(
                 # the ledger path the client read from the repo's config at create (design §5
                 # `ledger:`), else the default — this package never reads `.agentorc.yml` itself
-                asyncio.to_thread(reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT)
-                for s, branch, pend in due
+                asyncio.to_thread(reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT, left)
+                for s, branch, pend, left in due
             ),
             return_exceptions=True,
         )
-        for (s, _branch, _pending), result in zip(due, results, strict=True):
+        for (s, _branch, _pending, _left), result in zip(due, results, strict=True):
             self._derived_at[s.id] = now
             live = self.sessions.get(s.id)
             if live is None:
@@ -284,11 +304,11 @@ class HostAgent:
             if isinstance(result, BaseException):
                 log.warning("deriving reports for %s failed: %s", s.id, result)
                 continue
-            progress, findings = result
+            progress, findings, retire = result
             # Lists, not generators: these upserts are the write, and `any()` over a generator
             # would stop at the first change and silently drop every later entry (review 2026-09-11).
             applied = [live.report_progress(e) for e in progress] + [live.report_finding(e) for e in findings]
-            changed = any(applied)
+            changed = any(applied) | live.retire_branch_claims(retire)
             if changed:
                 self.store.save(live)
 
