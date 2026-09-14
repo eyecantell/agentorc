@@ -20,11 +20,13 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from agentorc import org as orgmod
 from agentorc import profiles as profiles_mod
-from agentorc import repoconfig, teams
+from agentorc import repoconfig, teamrun, teams
 from sessionorc import hosts, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
+from sessionorc.client import call_sync as _call_sync
 from sessionorc.models import GRANTS, STATE_RANK, report_head, report_line
 
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
@@ -70,6 +72,53 @@ WRAPUP_PROMPT = teams.WRAPUP_PROMPT  # the card's Wrap up and `ao team stop` sen
 
 def host_name() -> str:
     return hosts.local_host().name
+
+
+def rpc(method: str, **params: Any) -> Any:
+    """The **blocking** RPC, for `agentorc.teamrun` only. A team start or stop is a sequence of
+    calls with waits in it, so the runner is written blocking and shared with `ao team`; the routes
+    run it on a worker thread (`asyncio.to_thread`), where this opens and closes its own connection
+    and never touches the event loop. Every other route uses the async `call` inside `create_app`."""
+    return _call_sync(method, **params)
+
+
+def org_here() -> tuple[orgmod.Org, list[str]]:
+    """The definitions the Org page acts on (design §4.9): `~/.agentorc/org.yml`, plus the `teams:`
+    of every repo in this host's registry — the page is not *in* a directory the way `ao team` is,
+    so "a repo's own teams" means every repo the host knows about. The org file wins a name
+    collision. Read on every use and cached nowhere; a malformed file is a note beside the strip,
+    never a 500 — the rest of the page is still the fleet."""
+    try:
+        org = orgmod.load()
+    except ValueError as e:
+        return orgmod.Org(path=orgmod.org_file()), [str(e)]
+    return teamrun.org_with_repo_teams(org, list(hosts.local_host().repos()))
+
+
+def projects_view() -> list[dict[str, Any]]:
+    """The projects defined for this host, for New session's **Project** picker (design §4.5a,
+    §4.9): each with its repos and their checkouts *here*. A repo whose entry names another host
+    is listed with an empty path and the hosts that do have it — phase 2's transport reaches it,
+    and until then the picker says so rather than offering a path that is not there."""
+    try:
+        org = orgmod.load()
+    except ValueError:
+        return []  # a malformed org.yml leaves the form exactly as it was before projects existed
+    host = host_name()
+    return [
+        {
+            "name": name,
+            "repos": [{"repo": r, "path": str(by.get(host) or ""), "hosts": sorted(by)} for r, by in p.repos.items()],
+        }
+        for name, p in org.projects.items()
+    ]
+
+
+def teams_view(sessions: list[dict[str, Any]]) -> dict[str, Any]:
+    """The **Teams** strip's contents (design §4.5a): every definition with its source, projects,
+    member count and live count — `teamrun.rows`, the very rows `ao team list` prints."""
+    org, notes = org_here()
+    return {"teams": teamrun.rows(org, sessions), "source": str(org.path or ""), "notes": notes}
 
 
 def vscode_url(directory: str) -> str:
@@ -362,12 +411,14 @@ def create_app() -> FastAPI:
             sessions, agent_down = [], True
         vs = sorted((view(s, sessions) for s in sessions), key=lambda v: (v["rank"], v["name"]))
         counts = {k: sum(1 for v in vs if v["state"] == k) for k in ("needs-you", "limited", "stalled?")}
+        strip = teams_view(sessions)
         return templates.TemplateResponse(
             request,
             "org.html",
             {
                 "sessions": vs,
                 "groups": team_groups(vs),
+                "strip": strip,
                 "counts": counts,
                 "host": host_name(),
                 "active": "Org",
@@ -394,7 +445,9 @@ def create_app() -> FastAPI:
         )
 
     @app.get("/new", response_class=HTMLResponse)
-    async def new_form(request: Request, dir: str = "", adapter: str = "claude-code", resume: str = ""):
+    async def new_form(
+        request: Request, dir: str = "", adapter: str = "claude-code", resume: str = "", project: str = ""
+    ):
         profs, default = profiles_mod.load()
         # registered repos (design §5: the dev-cadence registry, `repos_registry` in hosts.yml) first,
         # then recent directories; phase 1 reads the local host's file directly
@@ -424,7 +477,12 @@ def create_app() -> FastAPI:
                 "orchestrators": orchestrators,
                 "roles": roles["roles"],
                 "default_controllers": roles.get("controllers") or [],
-                "prefill": {"dir": dir, "adapter": adapter, "resume": resume},
+                # design §4.5a New session **Project** picker (§4.9): the projects defined on this
+                # host, each carrying its repos' checkouts so the form can narrow the directory
+                # list without another round trip. "No project" is the default and is what every
+                # session was before.
+                "projects": projects_view(),
+                "prefill": {"dir": dir, "adapter": adapter, "resume": resume, "project": project},
             },
         )
 
@@ -457,6 +515,7 @@ def create_app() -> FastAPI:
         worktree: str = Form(""),
         role: str = Form(""),
         lane: str = Form(""),
+        project: str = Form(""),
         controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
     ):
         wt = None
@@ -477,13 +536,22 @@ def create_app() -> FastAPI:
                     brief = preset.brief_text(refs or None)
             except (KeyError, ValueError) as e:
                 raise HTTPException(400, str(e).strip('"')) from None
+        # design §4.5a New session **Project** picker (§4.9 "Home and reach"): the same block
+        # `ao new --project` puts in front of the brief, from the same function — each of the
+        # project's repos on this host and which one is home. A one-repo project adds nothing, and
+        # a name with no definition still badges the session: nothing keys on the badge.
+        text = prompt.strip() or brief
+        if project.strip():
+            block, _note = teams.reach_block(orgmod.load(), project.strip(), dir.strip() or os.getcwd(), host_name())
+            if block:
+                text = block + text if text else block
         s = await call(
             "create",
             name=name.strip() or "session",
             dir=dir.strip(),
             adapter=adapter,
             profile=profile or (preset.profile if preset else None) or "",
-            prompt=prompt.strip() or brief,
+            prompt=text,
             resume=resume.strip() or None,
             unattended=unattended == "on",
             worktree=wt,
@@ -493,6 +561,7 @@ def create_app() -> FastAPI:
             role=preset.name if preset else "",
             ledger=ledger,
             controllers=[c for c in controller if c.strip()],
+            project=project.strip(),  # a badge, exactly as `ao new --project` sets it (§9 invariant 9)
         )
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
@@ -582,6 +651,60 @@ def create_app() -> FastAPI:
         if not (dir.strip() and name.strip()):
             return {"id": "", "name": name, "verdict": "free", "holder": None, "message": ""}
         return await call("name_check", dir=dir.strip(), name=name.strip(), repo=dir.strip() if worktree else None)
+
+    # -- the Teams strip (design §4.5a Org **Teams** strip, §4.9) --------------------------------
+    # Start and Stop are `agentorc.teamrun`'s, the sequence `ao team start|stop` runs: every
+    # pre-flight check before any create, and the wrap-up order on the way down. The runner blocks
+    # (it waits on states), so it goes to a worker thread and the event loop stays free.
+
+    background: set[asyncio.Task[Any]] = set()  # strong refs: a bare create_task may be collected
+
+    def _team_http(e: Exception) -> HTTPException:
+        """One mapping for every way a start or a stop can fail, so the strip reports the agent's
+        own message the way every other control does — a toast (design §4.5 "Errors")."""
+        if isinstance(e, AgentUnavailable):
+            return HTTPException(503, f"host agent unreachable: {e}")
+        if isinstance(e, teamrun.PartialStart):
+            return HTTPException(409, str(e))
+        return HTTPException(400, str(e).strip('"'))
+
+    @app.get("/api/teams")
+    async def api_teams():
+        return teams_view(await call("list"))
+
+    @app.post("/api/teams/{name}/start")
+    async def api_team_start(name: str):
+        org, _notes = org_here()
+        try:
+            _plan, result = await asyncio.to_thread(teamrun.start, rpc, org, name, host_name())
+        except (teams.TeamError, ValueError, AgentError, AgentUnavailable) as e:
+            # A failed pre-flight check created nothing (§4.9): the toast is the whole outcome.
+            raise _team_http(e) from None
+        return JSONResponse({"ok": True, **result})
+
+    @app.post("/api/teams/{name}/stop")
+    async def api_team_stop(name: str, request: Request):
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        now = bool(body.get("now"))
+        org, _notes = org_here()
+        try:
+            st = await asyncio.to_thread(teamrun.stop_members, rpc, org, name, now=now)
+        except (teams.TeamError, ValueError, AgentError, AgentUnavailable) as e:
+            raise _team_http(e) from None
+        pending = None
+        if st.lead is not None:
+            # §4.9's order is members, then the lead once they settle — up to the wrap-up window,
+            # which is minutes. The page must not hold a request open that long, so the second half
+            # runs behind the response and the state deltas on /events show it happening.
+            pending = st.lead.get("name") or st.lead["id"]
+            task = asyncio.create_task(asyncio.to_thread(teamrun.stop_lead, rpc, st))
+            background.add(task)
+            task.add_done_callback(background.discard)
+        sent = len(st.acted)
+        msg = f"{name}: {'killed' if now else 'wrap-up sent to'} {sent} session{'' if sent == 1 else 's'}"
+        if pending:
+            msg += f" — {pending} follows when they settle"
+        return JSONResponse({"ok": True, "team": name, "now": now, "sessions": st.acted, "lead": pending, "text": msg})
 
     @app.get("/api/sessions")
     async def api_sessions():

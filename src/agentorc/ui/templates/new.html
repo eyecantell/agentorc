@@ -6,6 +6,17 @@
   <form method="post" action="/new" class="col gap">
     <div class="grid2">
       <div class="field"><label>Host</label><span class="input">{{ host }}</span></div>
+      {# design §4.5a New session **Project** picker (§4.9): picking one narrows the Directory list
+         to that project's repos with their checkouts on this host, badges the session, and puts the
+         same **Project** block in front of the brief that `ao new --project` does. "No project" is
+         the default and behaves exactly as the form did before projects existed. #}
+      <div class="field"><label>Project</label>
+        <select class="input" name="project" id="project">
+          <option value="">No project</option>
+          {% for p in projects %}<option value="{{ p.name }}"{% if p.name == prefill.project %} selected{% endif %} data-repos='{{ p.repos | tojson }}'>{{ p.name }} · {{ p.repos | length }} repo{{ '' if p.repos | length == 1 else 's' }}</option>{% endfor %}
+        </select>
+        <span class="note" id="projectnote">{% if projects %}optional: the repos in reach, and a Project block naming them in front of the brief{% else %}no project defined in ~/.agentorc/org.yml — a session without one is what every session was before{% endif %}</span>
+      </div>
       <div class="field"><label>Directory</label>
         <input class="input mono" name="dir" list="recent" value="{{ prefill.dir }}" placeholder="/path/to/repo or worktree" required>
         <datalist id="recent">{% for r in recent %}<option value="{{ r }}">{% endfor %}</datalist>
