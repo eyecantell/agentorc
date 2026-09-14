@@ -20,7 +20,7 @@ from sessionorc import hosts, naming
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_line
+from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note
 from sessionorc.tmux import attach_argv
 
 
@@ -606,16 +606,6 @@ def cmd_until(args: argparse.Namespace) -> int:
     when = None if args.clear else stop_time(args.when or "")
     s = call_sync("set_stop", id=resolve(args.id), run_until=when, wrapup_prompt=teams.WRAPUP_PROMPT)
     return emit(args, s, lambda: print(f"{s['id']}: {stop_note(s) or 'no stop time'}"))
-
-
-def stop_note(s: dict[str, Any]) -> str:
-    """"stops 06:00" for a display, in the reader's own local time — the record keeps UTC."""
-    if not s.get("run_until"):
-        return ""
-    when = datetime.fromisoformat(str(s["run_until"]).replace("Z", "+00:00")).astimezone()
-    day = "" if when.date() == datetime.now().astimezone().date() else when.strftime("%a ")
-    sent = " · wrap-up sent" if s.get("wrapup_sent_at") else ""
-    return f"stops {day}{when:%H:%M}{sent}"
 
 
 def cmd_control(args: argparse.Namespace) -> int:

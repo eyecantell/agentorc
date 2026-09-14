@@ -10,6 +10,7 @@ import os
 import subprocess
 import sys
 import time
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import wait_for_sync as wait_for
@@ -345,6 +346,53 @@ def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
     assert "started outside agentorc" in html
     html = templates.get_template("card.html").render(s=view({**s, "state": "idle"}))
     assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
+
+
+def test_a_card_says_when_the_session_stops_and_only_then(tmp_path, monkeypatch):
+    """design §4.5a **stops** note (§6, TD-026): a session with a stop time says so on its card and
+    in its Focus header, in the host's local clock; every session without one says nothing, which is
+    most of them."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-2", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "idle", "since": "2026-09-13T16:00:00Z", "confidence": "hook", "pane": True, "tail": [],
+        "unattended": True,
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    assert "stops" not in card.render(s=view(base))
+    when = datetime.now().astimezone() + timedelta(hours=3)
+    stopping = {**base, "run_until": when.astimezone(UTC).isoformat().replace("+00:00", "Z")}
+    html = card.render(s=view(stopping))
+    assert f"stops {when:%H:%M}" in html  # the reader's clock, never the record's UTC
+    assert "wrap-up sent" not in html
+    asked = {**stopping, "wrapup_sent_at": "2026-09-13T16:00:00Z"}
+    assert "wrap-up sent" in card.render(s=view(asked))
+    # a record whose `run_until` is not a time costs that card its note and nothing else: `view` runs
+    # for every session on the grid, so a raise here would take down the page (PR #131 review)
+    assert "stops" not in card.render(s=view({**base, "run_until": "half six"}))
+    assert view({**base, "run_until": "half six"})["stop_note"] == ""
+
+
+def test_the_new_session_form_refuses_a_stop_time_on_an_interactive_session(tmp_path, monkeypatch):
+    """The form's half of `--until`'s rule (design §6): a stop time is a policy, policies leave
+    interactive sessions alone (§4.2), and storing one nothing acts on is TD-026's failure
+    inverted."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from fastapi import HTTPException
+
+    from agentorc.ui.app import stop_fields
+
+    assert stop_fields("", False) == {} and stop_fields("   ", True) == {}
+    with pytest.raises(HTTPException) as bad:
+        stop_fields("06:00", False)
+    assert bad.value.status_code == 400 and "Unattended" in bad.value.detail
+    with pytest.raises(HTTPException) as nonsense:
+        stop_fields("half six", True)
+    assert nonsense.value.status_code == 400
+    sent = stop_fields("+2h", True)
+    assert sent["run_until"].endswith("Z") and sent["wrapup_prompt"]
 
 
 def test_a_stalled_card_says_why_when_a_screen_rule_explained_it(tmp_path, monkeypatch):

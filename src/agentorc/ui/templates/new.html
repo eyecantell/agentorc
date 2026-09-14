@@ -55,6 +55,13 @@
       </div>
     </div>
     <div class="field"><label>Opening prompt (optional)</label><textarea class="input tall" name="prompt" placeholder="Paste the brief, or leave empty to start at the prompt."></textarea></div>
+    {# design §6 / §4.5a New session **Until** field (TD-026): a session started here with no stop
+       time is exactly the hand-started worker nothing ever stopped, so the field sits beside the
+       switch that makes it one. Empty means what it has always meant: it runs until someone ends it. #}
+    <div class="field"><label>Until (optional)</label>
+      <input class="input mono" name="until" placeholder="06:00 · +8h · an ISO time">
+      <span class="note">when an <b>unattended</b> session stops: at it the agent asks it to wrap up and stops it once it settles, ten minutes at the outside. Empty: nothing stops it.</span>
+    </div>
     <label class="radio gap"><input type="checkbox" name="unattended"><div><div>Unattended</div><div class="note">off: interactive — never paused, nudged, or killed by a policy. on: policies apply (phase 3).</div></div></label>
     {# design §4.5a New session **Controllers** picker (§4.8, TD-036): which sessions may act on
        this one once it starts. The candidates are the sessions holding `orchestrate` — nothing
