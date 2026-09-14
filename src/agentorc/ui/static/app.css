@@ -91,6 +91,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .strip .team-row .meta { max-width: 22ch; } .strip .team-row .live { min-width: 6ch; }
 .strip .warnish { color: var(--warn-fg); }
 .strip .btn[hidden] { display: none; }  /* `.btn` is inline-flex, which would otherwise beat the attribute */
+.badge[hidden] { display: none; }      /* same trap: `.badge` is inline-block (TD-026's Focus stop control) */
 .sc { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow: hidden; position: relative; } .sc.off { opacity: .55; }
 .sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; } .sc-foot { display: flex; gap: 6px; align-items: center; }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }

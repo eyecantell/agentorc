@@ -1128,10 +1128,18 @@ class HostAgent:
         when = _stop_time(run_until)  # a malformed time is an error before anything else is judged
         if when and not s.unattended:
             raise RpcError(f"{id} is interactive: a stop time is a policy, and policies leave it alone (§4.2)")
+        if when != s.run_until:
+            # A *new* time is a new run, so whatever was asked before is spent. Re-confirming the
+            # same one is not: it used to reset this unconditionally, so a session already asked to
+            # wrap up and sitting inside its grace would be asked again on the next tick — and,
+            # because the ask happens before the grace check, touching the stop time repeatedly
+            # deferred the forced kill indefinitely. That is the failure TD-026 gap 1 exists to
+            # close, and the Focus control (TD-026, PR #147) put a button in front of it whose
+            # pre-fill is exactly this value. Found in that PR's review.
+            s.wrapup_sent_at = None
         s.run_until = when
         if wrapup_prompt is not None:
             s.wrapup_prompt = str(wrapup_prompt).strip() or None
-        s.wrapup_sent_at = None  # a new time is a new run: whatever was asked before is spent
         self.store.save(s)
         await self._push_changes()
         return s.to_dict()

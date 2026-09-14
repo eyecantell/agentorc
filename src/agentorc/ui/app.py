@@ -653,6 +653,20 @@ def create_app() -> FastAPI:
             if not ref:
                 raise HTTPException(400, "drop needs the reference to drop")
             await call("progress", id=sid, ref=ref, status="dropped", why=body.get("why") or "dropped from Focus")
+        elif action == "stop":
+            # design §4.5a Focus header **stops** badge → click to edit (§6, TD-026). The stop time
+            # was settable at New session and from `ao until` and nowhere else, so a person who set
+            # `+8h` and wanted another hour had to reach for the CLI. An empty time clears it, which
+            # is the decision to let a session run on, made out loud rather than by restarting it.
+            when = str(body.get("until") or "").strip()
+            try:
+                run_until = clistop(when) if when else None
+            except AgentError as e:
+                raise HTTPException(400, str(e)) from None
+            s = await call("set_stop", id=sid, run_until=run_until, wrapup_prompt=WRAPUP_PROMPT if run_until else None)
+            with contextlib.suppress(HTTPException):
+                await call("seen", id=sid)
+            return JSONResponse({"ok": True, "stop_note": stop_note(s), "run_until": s.get("run_until")})
         elif action == "grants":
             s = await call("set_grants", id=sid, add=_str_list(body, "add"), remove=_str_list(body, "remove"))
             with contextlib.suppress(HTTPException):

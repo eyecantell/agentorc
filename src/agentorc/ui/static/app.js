@@ -80,6 +80,24 @@
       // design §4.5a Focus **controllers** chip (§4.8, TD-036): remove one by clicking it, add one
       // by id. The agent decides what is allowed; a refusal comes back as the toast below.
       if (action === "uncontrol") { action2 = "controllers"; body = { remove: [b.dataset.who] }; }
+      // design §4.5a Focus header **stops** badge (§6, TD-026): the same shape — the person types
+      // a time, the agent parses it and says no if it cannot. Empty clears it, deliberately: a
+      // session that should run on is a decision, not a restart.
+      if (action === "stop") {
+        // Filled from the record, not from the badge: the badge reads "stops Mon 06:00" once the
+        // stop is not today and gains "· wrap-up sent" after the agent has asked, and both of
+        // those come back as a time the agent refuses. The record's UTC instant, shown in the
+        // person's own clock as a local ISO string, round-trips exactly.
+        const iso = b.dataset.until;
+        let now = "";
+        if (iso) {
+          const d = new Date(iso);
+          if (!isNaN(d)) now = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        }
+        const when = prompt("Stop this session at… (06:00, +8h, an ISO time; empty to clear)", now);
+        if (when === null) return;
+        body = { until: when.trim() };
+      }
       if (action === "control-add") {
         const who = prompt("Which session may act on this one? (its id or name from ao status)");
         if (!who) return;
@@ -91,6 +109,7 @@
       if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
+      if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
       if (action2 === "controllers") {
         AO.toast(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
         if (typeof AO.refreshMembership === "function") AO.refreshMembership();
@@ -616,6 +635,7 @@
       }
       renderReports(v);
       renderGrants(v);
+      renderStop(v);
       renderMembership(v);
       const checks = v.ready || [];
       $("#checks").innerHTML = checks.map(([n, ok]) => `<div class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✗"} ${esc(n)}</div>`).join("");
@@ -679,6 +699,16 @@
           if (mine) renderMembership(mine);
         } catch (e) { /* the banner already covers a down agent */ }
       }, 400);
+    }
+    // design §4.5a Focus header **stops** badge (§6, TD-026): the one place a stop time can be
+    // changed after the session started. The agent parses the time and refuses an interactive
+    // session, so this only asks — the same division as the grants and controllers chips.
+    function renderStop(v) {
+      const el = $("#fstop"); if (!el) return;
+      el.hidden = !v.unattended;  // a flip to interactive takes the control away, not just the time
+      el.textContent = v.stop_note || "no stop time";
+      el.classList.toggle("off", !v.stop_note);
+      el.dataset.until = v.run_until || "";  // the record's own value: what the edit box is filled from
     }
     function renderGrants(v) {
       const el = $("#fgrants"); if (!el) return;
