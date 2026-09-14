@@ -430,6 +430,7 @@ The three test-side waits went in anyway (PR #89), as cheap insurance rather tha
 
 **Related:** design §4.3 (the paste channel), TD-027 (the Enter after the paste), the board item of 2026-09-11 this closes.
 
+
 ## TD-045: A derived claim with no PR number was immortal — nothing in the system could retire one
 
 **Priority:** Medium
@@ -444,4 +445,17 @@ The three test-side waits went in anyway (PR #89), as cheap insurance rather tha
 **Not fixed, deliberately:** the *attribution* in the reported case. `tdgrind-1` did have that branch checked out when the claim was derived, and if its PR later exists the claim is kept on both records. TD-034 settled attribution as occupancy in time; this entry is about immortality, and a claim that resolves to `done` at the merge is no longer immortal.
 
 **Related:** design §4.8 (derived source, the `pending` re-check, the retirement), §9 invariant 10; TD-034 (attribution by occupancy), TD-032 (the idle-with-open-work nudge that fires on a stale claim), TD-028 step 3 (the derived source).
+## TD-037: The mockups are a week stale: three controls that landed are undrawn, and the New session screen draws two controls that do not exist
 
+**Priority:** Low
+**Added:** 2026-09-12
+**Status:** Resolved
+**Location:** `docs/mockups/gen.py` (`row()` / `team_desktop()` card renderer, `focus()`, `new_session()`)
+
+**Why:** `gen.py` was last touched 2026-09-05 and the UI has moved twice since. Undrawn but shipped: the card's **report line**, the Focus header **grants** chip, and the Focus **Reports** side panel (all landed 2026-09-12, `src/agentorc/ui/templates/card.html`, `focus.html`; §4.5a). Drawn but nonexistent: `new_session()` renders a four-way **Where** radio group with an *existing worktree* picker and a separate Fresh/Resume pair, while the shipped form (`src/agentorc/ui/templates/new.html`) has the two-option this-directory/new-worktree control and a plain Resume field — the picker was superseded on 2026-09-06 (§10, noted 2026-09-12) and §4.5a never carried it. That second half is the one that matters: mockups are what a person reads to learn what the product does, so a screen showing a control that does not exist teaches a false UI, and §4.5a's rule ("a control not in this table does not exist") cannot defend itself against a picture. The membership controls (§4.5a, TD-036) are correctly absent — they are proposed, not built — and should stay absent until they ship.
+
+**Resolved:** 2026-09-13 (PR #PRNUM) — regenerated from `gen.py`, which now carries the team layer as data (`EXTRA`, `TEAMS`) rather than as markup: the **Org** rename through the tab strip, the titles, the artboard names and the prose; **team groups** with a header per team (name, lead and its state, project, needs-you count) with the lead's card first and *No team* last; the **Teams** strip with Start / Stop / Stop now per definition and its source; the card's **team** and **role** badges, its **under** chip and its **report line** (dashed when derived); Focus's **grants** and **controllers** chips, its **Reports** panel with **Drop**, and the **Members** list (labelled as the orchestrator-only panel it is); and `new_session()` redrawn field for field from `new.html` — Project picker, Role, Lane, Profile, Resume, the two-option Where with its worktree name, and the Controllers picker. The **Grants** checkboxes stay undrawn: they are the one §4.5a row still unbuilt (TD-028 step 5), and TD-036's membership controls that had not shipped are now drawn because they did.
+
+**Not done here:** no rendered check. `shot.sh` needs a Chromium, and the session that did this pass had none — the artboards were verified by reading the generated HTML (tag balance, group order, the counts in the headers). Anyone with a browser should run `docs/mockups/shot.sh` once and re-seed the canvas.
+
+**Related:** design §4.5a, §10 (the superseded existing-worktree picker); TD-036 (whose controls must *not* be drawn yet); `docs/mockups/README.md`.

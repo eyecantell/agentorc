@@ -2,15 +2,15 @@
   "artboards": [
     {
       "file": "Main.dc.html",
-      "title": "Team \u2014 desktop",
+      "title": "Org \u2014 desktop",
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 1360
+      "h": 1560
     },
     {
       "file": "Phone.dc.html",
-      "title": "Team \u2014 phone",
+      "title": "Org \u2014 phone",
       "x": 1540,
       "y": 0,
       "w": 390,
@@ -18,19 +18,19 @@
     },
     {
       "file": "MainDark.dc.html",
-      "title": "Team \u2014 dark",
+      "title": "Org \u2014 dark",
       "x": 2040,
       "y": 0,
       "w": 1440,
-      "h": 1360
+      "h": 1560
     },
     {
       "file": "Focus.dc.html",
       "title": "Focus \u2014 session",
       "x": 0,
-      "y": 1460,
+      "y": 1660,
       "w": 1440,
-      "h": 980
+      "h": 1280
     },
     {
       "file": "NewSession.dc.html",
@@ -38,7 +38,7 @@
       "x": 1540,
       "y": 1840,
       "w": 720,
-      "h": 960
+      "h": 1180
     },
     {
       "file": "Legend.dc.html",
@@ -79,7 +79,7 @@
       "x": 0,
       "y": -150,
       "w": 520,
-      "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' \u2192 'Ready to close' + user-driven Close \u2192 closed state; dark artboard added; laptop shown as a volatile host (\u25d0).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass \u2014 renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Team, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions."
+      "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' \u2192 'Ready to close' + user-driven Close \u2192 closed state; dark artboard added; laptop shown as a volatile host (\u25d0).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass \u2014 renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI \u2014 the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips, the Reports panel and the Members list; New session is redrawn field for field from the shipped form \u2014 the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."
     }
   ],
   "launch": {
