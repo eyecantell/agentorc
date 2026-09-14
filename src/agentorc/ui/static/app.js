@@ -16,6 +16,22 @@
   }
   applyTheme();
 
+  // ---- the terminal's look (design goal 12, §4.6, TD-038) ----
+  // One place, because it was three: the pane's font and size are here, not repeated at the call
+  // site. The palette is VS Code's Dark Modern terminal, so the same Claude Code output is the same
+  // colour in Focus as in the editor's terminal beside it — which is the point of goal 2, driving
+  // the session in place. Goal 12 keeps the pane dark whatever the page theme is, so these are
+  // literals rather than tokens: `--term` follows the theme and this must not.
+  AO.TERM_OPTS = { cursorBlink: true, fontFamily: '"JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace', fontSize: 13, lineHeight: 1.2, letterSpacing: 0 };
+  AO.TERM_THEME = {
+    background: "#0b0e12",  // the app's own dark, not VS Code's #1f1f1f: the pane sits in this chrome
+    foreground: "#cccccc", cursor: "#aeafad", cursorAccent: "#0b0e12", selectionBackground: "#264f78",
+    black: "#000000", red: "#cd3131", green: "#0dbc79", yellow: "#e5e510",
+    blue: "#2472c8", magenta: "#bc3fbc", cyan: "#11a8cd", white: "#e5e5e5",
+    brightBlack: "#666666", brightRed: "#f14c4c", brightGreen: "#23d18b", brightYellow: "#f5f543",
+    brightBlue: "#3b8eea", brightMagenta: "#d670d6", brightCyan: "#29b8db", brightWhite: "#e5e5e5",
+  };
+
   // ---- toasts: the one error surface (design §4.5) ----
   AO.toast = function (text, ok) {
     const el = document.createElement("div");
@@ -457,7 +473,7 @@
     // tmux asks for mouse tracking and xterm.js forwards the wheel to it (copy mode, its history);
     // a local buffer would only ever hold stale repaints for the wheel to land on when tmux is not
     // tracking. Shift+PageUp/PageDown below are the keyboard path; Shift+drag selects locally.
-    const term = new Terminal({ cursorBlink: true, fontFamily: '"JetBrains Mono", Menlo, monospace', fontSize: 13, theme: { background: "#0b0e12" }, scrollback: 0 });
+    const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     term.open($("#term")); fit.fit();
     let ws, delay = 500, paneGone = false;
