@@ -917,7 +917,7 @@ orchestrator controls.** The prior-art survey behind the rules below is
 - **Scope is the authority rule.** By default a lead waits on exactly the sessions it may act on — those whose `controllers` name it — so the wake and the authority cannot drift apart. A person at a terminal has no caller and sees everything, which is what `ao status` gives them anyway.
 - **The vocabulary is short, and the exclusions are the point.** A wake is a change to a session's `state`, its `exit_code`, the pending thing it is asking (the question, never the permission's countdown), what it has claimed or marked `done` and with which PR, what it has filed, or who controls it. Explicitly **not** `last_output`, `tail`, `since`, `seen_at` or `git`: those move on almost every tick of a healthy session, and a lead woken continuously is worth less than the poll it replaces.
 - **A lead that was busy still sees it.** Mid-turn a lead is not blocked on anything, and a lead that misses the one event it existed for is worse than a poll. So the first thing `ao wait` does is take a **complete** snapshot — an ordinary `list`, which has a definite answer — and compare it against what this caller last *saw*, a cursor it keeps per caller, returning at once if anything moved while it was away. Only then does it listen. The snapshot is not `subscribe`'s opening burst: a burst has no end marker, so the only way to judge it complete is to time it, and a gap in a slow or large one would be read as *that is all* — reporting every record not yet received as gone. A cursor that exists and cannot be read means *unknown*, and unknown wakes on everything in scope: a redundant wake, never a missed one, which is the trade the whole mechanism is built on. A first wait records where it is and wakes on nothing, so no lead's first call returns its whole fleet.
-- **Nothing is sent into the lead's pane.** The obvious reading — a worker *sending* to its lead — is the wrong one and is recorded here so it is not re-proposed: an acting RPC is gated on the *target's* `controllers`, so a worker acting on its lead would need the edge the design deliberately leaves empty (§4.9), and `send` is keys into a pane, which for a lead mid-turn is an interruption rather than a message. (What was wrong with it was the *delivery*, not the direction: since 2026-09-14 a worker may **message** its lead, into a mailbox that types nothing and starts no turn — §4.10, which is where that conclusion led once the same gap was found in three more places. `ao wait` returns on mail as well, so a lead needs one wait, not two.) The worker already declares what matters through `ao progress` and `ao finding`; the agent, the one process that sees every record, is what turns a declaration into a wake.
+- **Nothing is sent into the lead's pane.** The obvious reading — a worker *sending* to its lead — is the wrong one and is recorded here so it is not re-proposed: an acting RPC is gated on the *target's* `controllers`, so a worker acting on its lead would need the edge the design deliberately leaves empty (§4.9), and `send` is keys into a pane, which for a lead mid-turn is an interruption rather than a message. (What was wrong with it was the *delivery*, not the direction: since 2026-09-14 a worker may **message** its lead, into a mailbox that types nothing and whose read is mediated by the worker's own judgement rather than supplied as its next turn — §4.10, which is where that conclusion led once the same gap was found in three more places. `ao wait` returns on mail as well, so a lead needs one wait, not two.) The worker already declares what matters through `ao progress` and `ao finding`; the agent, the one process that sees every record, is what turns a declaration into a wake.
 
 **The timer stays.** Silence is not an event: a worker sitting at an empty prompt after a `/compact` emits nothing, and no wake fires. The fallback interval is for exactly what no record delta can see — a PR merged from a worker's branch, a new `docs/cadence-changes.md` entry, a dropped subscription after an agent restart, and a session that has gone quiet when it should not have. Events shorten the tail on activity; they do not replace the timer's job of noticing absence.
 
@@ -961,8 +961,9 @@ orchestrator controls.** The prior-art survey behind the rules below is
   before membership, because no edit to the list can change the answer. `set_controllers` from a
   session onto such a target is refused the same way, so a session cannot put a person's session
   in a list at all. Everything in this bullet is about *acting*: since 2026-09-14 a **message** to an
-  interactive session is delivered (§4.10), because a mailbox entry types nothing, starts no turn
-  and changes no state until the person reads it — so "out of reach" means nobody may act on it,
+  interactive session is delivered (§4.10), because a mailbox entry types nothing and changes no
+  state until the person reads it — and it never wakes one, which is the carve-out invariant 5
+  states: a session may be woken by mail within its budget, a person's session never is — so "out of reach" means nobody may act on it,
   not that nobody may address it. A person (no caller) is unaffected on both counts: they act on any session,
   and they may add a controller to their own interactive session — handing it to an orchestrator
   deliberately is theirs to do, and the entry does nothing until the session is unattended. Like
@@ -1392,7 +1393,7 @@ coordination traffic would drown the thing Paul actually reads.
 **Done when** a worker can tell its lead it finished without the lead polling; two leads over one
 worker can settle a contradiction between themselves and land a board line when they cannot; two
 workers in a team can each learn the other holds a reference before duplicating it; every one of
-those is refused when the graph does not permit it; and no message ever starts a turn.
+those is refused when the graph does not permit it; a session out of wake budget receives mail that lands without waking it, visibly to itself and to the sender; and a person's session is never woken by mail at all.
 
 ## 5. Configuration
 
@@ -1569,9 +1570,10 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    only a person hands one to unattended mode or to a controller. Flipping a session to
    interactive takes it out of every controller's reach on their next call; its `controllers`
    entries stay, inert. A **message** is not an act of control and is not refused
-   by this invariant: it lands in the target's inbox, starts no turn and changes no state until
-   a person reads it (§4.10, 2026-09-14) — the one thing a session may address to a person's
-   session.
+   by this invariant: it lands in the target's inbox and changes no state until a person reads it
+   (§4.10, 2026-09-14) — the one thing a session may address to a person's session. Mail to an
+   interactive target **lands and never wakes**, whatever wake budget the general rule would
+   allow: the mediator there is a person, and nothing starts a turn in their session but them.
 6. The core never types a menu choice into a pane; permissions are answered through the hook,
    everything else in the terminal.
 7. The agent's edits to a repo's board file are always committed, never left in the tree.
