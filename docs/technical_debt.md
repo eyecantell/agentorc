@@ -31,6 +31,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Partly done |
 | TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Open |
 | TD-047 | The design has no word for "a message into a session that is already working": adopt session/turn and *steer* so Send can say which of its two jobs it is doing | Low | Open |
+| TD-049 | An orchestrator only learns what its members did on its own timer: there is no way for a worker to say *I finished* and wake its lead | Medium | Open |
 
 ---
 
@@ -324,3 +325,34 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Fix:** adopt *turn* and *steer* as design vocabulary: say it once in §4.3 beside the Send rule, use it in §4.5's composer description and §4.5a's row for Send, and reflect it in the UI where it is free — the composer's Send affordance reading as steering when the session is `working` and as a new prompt when it is `idle` (a label or a hint line, not a second control; §4.5a still governs what controls exist). Done when a reader of §4.3 can say in one sentence what Send does in each state, and the Focus composer tells them the same thing without their having to read the state pill.
 
 **Related:** design §4.3, §4.5, §4.5a; TD-027 (the composer confirmation that makes a submit observable at all); [ADR 2026-09-13](decisions/2026-09-13-openai-agents-api.md).
+
+---
+
+## TD-049: An orchestrator only learns what its members did on its own timer
+
+**Priority:** Medium
+**Added:** 2026-09-14 (raised by Paul)
+
+**Status:** Open — design task first: the wake and its vocabulary go in design §4.8 and §4.5a before any code. **Filed as TD-047 in PR #140 and renumbered to TD-049 before merge**: the same number was taken on `main` while the PR was open, by the vocabulary entry above (itself renumbered from TD-043 the same day, see TD-048). The PR title and its commits say TD-047; nothing else references it
+
+**Location:** `src/sessionorc/agent.py` (`subscribe`, the per-subscriber last-sent map, `_push_changes`), `src/sessionorc/client.py`, `src/agentorc/cli.py` (a new blocking command), `docs/briefs/orchestrator-ao-1.md` (the tick), design §4.8 (the `orchestrator` policy row: *"read `ao --json status` on a cadence"*), §4.6, §4.9
+
+**Why:** everything a lead knows, it learns by asking. Its brief is a tick every 10 minutes over `ao status --json` (`loop`, dynamic — and a quiet lead self-paces longer: on 2026-09-14 orchestrator-ao-1 was running a 30-minute heartbeat). So the lead is up to a tick stale on every event that matters: a worker marking `done` with a PR waits a tick for its cadence check, a worker that exited waits a tick for its restart, a `needs-you` permission waits a tick for its answer — and a quiet fleet pays for a poll that finds nothing, every tick, on the same usage budget as the work. Paul (2026-09-14): *"we would be better served adding a way for the workers to report changes to the orchestrators when work is finished ... we would keep the timer as a backup, but the orchestrators would be more responsive."*
+
+The substrate is already there and unused by sessions: the agent's `subscribe` turns a connection into a stream of `{"event": "session", ...}` / `{"event": "gone", ...}` lines, with a per-subscriber map of what each has been sent (§4.6, TD-009). That is what the Org page's `/events` consumes. Nothing gives a **session** — a CLI process, not a browser — a way to consume it.
+
+**Fix (design first, then code), the pieces that need deciding:**
+
+1. **The lead blocks instead of sleeping.** `ao wait [--timeout N]`: a blocking command over the existing `subscribe`, returning as soon as something in the caller's scope changes, or empty at the timeout. A lead's tick then *ends* with `ao wait --timeout 600` in place of a `ScheduleWakeup` — an event returns in a second, a quiet window returns at the timeout, and that timeout **is** the backup timer. Nothing is sent into the lead's pane, so there is no interrupt semantics to invent and no keystrokes landing mid-turn.
+2. **Scope: what wakes a lead.** The natural default is exactly what it may act on — sessions whose `controllers` name it (§4.8, TD-036) — so the wake and the authority share one rule. Decide the event vocabulary: state transitions (`→ idle`, `→ exited`, `→ needs-you`, `→ limited`), `progress` changes (a claim, and a `done` with a PR, which is what triggers the cadence check), a new `finding`. Explicitly **not** `last_output` moving, which is the false-liveness signal the board already carries.
+3. **What it returns.** Decide whether `ao wait` hands back the changed records — so the tick's first `ao status` is free — or only *something changed, go look*. The former is one round trip and one prompt's worth of context; the latter cannot go stale between the two calls.
+4. **A lead is not always waiting.** Mid-turn — running a cadence check, writing a board line — it is not blocked on anything, and events that arrive then must still be there when it comes back. So either the subscription is per-caller and resumable, or `ao wait` takes a **cursor** and returns immediately when anything changed after it. Decide which, and where the cursor lives across a tick; a lead that misses the one event it existed for is worse than a poll.
+5. **The timer stays, and its interval can go up.** If events carry the urgent cases, the fallback poll is for what no record delta can see: a PR merged from a worker's branch, a new `docs/cadence-changes.md` entry, an agent restart that dropped the subscription, and the wrap-up window. Decide the fallback interval and, more importantly, the short list of things the lead must still do on it *regardless* of events.
+6. **What it changes in the brief and the design.** §4.8's orchestrator row says "read `ao --json status` on a cadence"; if a lead waits, that sentence and the `loop` / `ScheduleWakeup` instruction in every lead brief change with it. §4.5a gains nothing unless the Org page shows a lead's wake state.
+7. **Why not the literal reading — a worker sending its lead.** Recorded so it is not re-proposed: an acting RPC is gated on the **target's** `controllers` (§4.8, TD-036), so a worker acting on its lead needs its own id in the **lead's** list — and a lead deliberately starts with an empty one (§4.9), so the edge would have to be opened in the direction the design just closed; and `ao send` is send-keys into a pane, which for a lead mid-turn is an interruption, not a message. The worker already *declares* what matters through `ao progress` and `ao finding`. The agent — the one process that sees every record and already computes deltas — is the right thing to turn a declaration into a wake.
+
+**A limit worth recording up front:** this makes a lead responsive to things that *happen*, and silence is not an event. The case that prompted the conversation was a worker sitting at an empty prompt after a manual `/compact` — it emitted nothing, so no wake would have fired, and only the fallback poll's stale-state rule catches it. Events shorten the tail on activity; they do not replace the timer's job of noticing absence. That is the strongest argument for keeping both, and for deciding (5) carefully rather than treating the poll as vestigial.
+
+**Done when:** a worker marking `done --pr N` has its cadence check start within seconds rather than within a tick; a worker that exits is restarted within seconds; a quiet fleet wakes its lead only at the fallback interval; and a lead that was busy when an event fired still sees it on its next wait.
+
+**Related:** design §4.8 (the orchestrator policy row, its cadence and its `progress` per tick), §4.6 (`subscribe`, the delta stream, one connection per subscriber), §4.2 (the states a wake would name), §4.9 (a lead's `controllers` are empty by design — the reason for (7)); TD-026 (scheduling inside the tick: a lead's schedule and its wakes are the same mechanism and should be designed together); TD-036 (the `controllers` edge the scope in (2) reuses).
