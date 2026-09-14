@@ -399,7 +399,9 @@ pane may not be a readline line. The Enter waits for the paste to paint and is c
 composer emptying, with one `C-m` retry, when the adapter implements `composer` (§4.2, TD-027);
 adapters without it get the blind paste + Enter. **Send is disabled** while a permission or question is pending (the pane
 owns a dialog) and, for scraped adapters, while a foreground process runs; otherwise it is
-enabled — Claude Code queues input typed while it works. Menus and questions are answered *in* the terminal (keys pass
+enabled — Claude Code queues input typed while it works.
+
+A **turn** is one cycle of work, the vocabulary taken from OpenAI's Agents API (§3, [ADR](decisions/2026-09-13-openai-agents-api.md)) because it names a split agentorc already has and could not say in a sentence: a session is durable and outlives any one piece of work, a turn is one piece. So Send does two different things depending on the state, and in one sentence: **to an `idle` session it starts a turn; to a `working` one it steers the turn in flight.** Both are the same paste and the same Enter — the difference is what the person is doing, not what the code does, which is why it belongs in the words and in the label rather than in a second control. Menus and questions are answered *in* the terminal (keys pass
 through); permissions go through the hook decision channel (§4.2). The core never types a menu
 choice into a pane.
 
@@ -474,7 +476,8 @@ Screens:
    questions are answered exactly as in VS Code — there are no answer buttons under the
    terminal; a pending permission shows Allow / Deny in the Focus header, same hook channel as
    the card, because the hook holds the dialog back from the terminal until it times out), a
-   **composer** (multi-line prompt box; Send delivers to the pane; the reason it
+   **composer** (multi-line prompt box; Send delivers to the pane — starting a turn on an
+   `idle` session, steering the turn in flight on a `working` one, §4.3, and saying which; the reason it
    exists beside the terminal is pastes, composing while the session is busy, and phone typing)
    with **Attach**, git status side panel, Ready-to-close panel, run-log download, Wrap up
    (sends the same wrap-up prompt the policy uses — one code path), Kill, "open in VS Code"
@@ -583,7 +586,7 @@ noted). If a control is not in this table it does not exist.
 | Focus (exited / closed) | **Resume this conversation** / **New session here** / **Forget** | the exited banner: New session prefilled with the directory and, for Resume, the tool's session id; Forget removes the record (the pane and its run log stay readable until then); CLI: `ao forget <id>` (the `remove` RPC; refuses a live record) |
 | Focus | **Copy / Paste** | terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
-| Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027) |
+| Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027). Reads **Steer** with the hint "steers the turn in flight" while the session is `working`, and **Send** with "starts a new turn" when it is idle (§4.3) — one control, labelled for the job it is doing, since the person cannot otherwise tell which of the two they are about to do — landed 2026-09-14 (TD-047) |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
 | New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `orchestrator`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule — landed 2026-09-13, TD-040 step a: the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked since 2026-09-14 (the row below), so nothing it grants applies unseen |

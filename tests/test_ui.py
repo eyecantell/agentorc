@@ -720,3 +720,24 @@ def test_every_grant_has_the_one_line_warning_the_control_table_promises():
 
     assert set(GRANT_NOTES) == set(GRANTS)
     assert all(GRANT_NOTES[g].strip() for g in GRANTS)
+
+
+def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
+    """Design §4.3/§4.5a (TD-047): one button does two jobs and the person cannot tell which.
+
+    Send is enabled while the agent works — Claude Code queues input typed at it — so the same
+    button starts a new piece of work on an idle session and redirects work already in flight on a
+    working one. The design had the behaviour right and no word for it; `turn` and `steer` are the
+    words, and the composer has to say the same thing the prose does without the reader having to
+    decode the state pill.
+    """
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert 'const steering = v.state === "working";' in js
+    assert '"→ Steer" : "→ Send"' in js
+    assert "steers the turn in flight" in js and "starts a new turn" in js
+
+    # and the design says it where §4.5a points: the Send row and the §4.3 rule
+    design = (pathlib.Path(__file__).parents[1] / "docs" / "design.md").read_text()
+    send_row = next(ln for ln in design.split("\n") if ln.startswith("| Focus composer | **Send** |"))
+    assert "Steer" in send_row and "starts a new turn" in send_row
+    assert "to an `idle` session it starts a turn; to a `working` one it steers the turn in flight" in design
