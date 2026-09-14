@@ -405,3 +405,17 @@ The three test-side waits went in anyway (PR #89), as cheap insurance rather tha
 `tests/README.md` rule 2 carries the rule and the "run the suspect modules three at a time" recipe — which is how the harness bug surfaced in the first place.
 
 **Related:** TD-025 (the same class and, as it turned out, the same cause; `wait_screen` came from this entry and is there for it), TD-015 (screen rules), design §4.2.
+
+## TD-044: Unit tests read this machine's real `~/.agentorc`, so the suite broke the day the fleet got an `org.yml`
+
+**Priority:** Medium
+**Added:** 2026-09-13
+**Status:** Resolved
+**Location:** `tests/conftest.py` (the agent fixtures' `AGENTORC_HOME`), `src/sessionorc/paths.py` (`home`)
+
+**Why:** `pdm run test` failed on kmaster with `test_cli_roles.py::test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source`: it asserts `orchestrator  [built-in]` and got `orchestrator  [built-in + org]`. Nothing was wrong with `ao roles` — the test was reading **Paul's own `~/.agentorc/org.yml`**, written the same day when the fleet became a team (TD-040). Only the *agent* fixtures set `AGENTORC_HOME`; a unit test that calls `agentorc.cli` directly sets nothing, and `paths.home()` falls back to `~/.agentorc`, so every unit test on this machine was reading live fleet state. CI never saw it (no `org.yml` there) and it would have gone on breaking every worker's suite silently — the suite is the only way a worker exercises the agent, so a test that depends on the operator's machine is worse than a failing one. CLAUDE.md's promise is "never the user's server"; this is the same promise for `AGENTORC_HOME`.
+
+**Resolved:** 2026-09-13 (PR #PRNUM) — a session-scoped autouse fixture (`_never_this_machines_home`) points `AGENTORC_HOME` and `CLAUDE_CONFIG_DIR` at temp directories and clears `AGENTORC_SESSION` for the whole run. Session scope is deliberate: it is set up before the module-scoped `subprocess_agent` and the function-scoped `agent`, which then override it with their own temp home, so the tests that need a real agent home are untouched.
+
+**Related:** TD-040 (the `org.yml` that exposed it), TD-025/TD-033 (the other "the suite must not depend on the machine" fixes), CLAUDE.md "Run the thing".
+
