@@ -40,6 +40,17 @@ templates = Jinja2Templates(directory=str(HERE / "templates"))
 # act on the session, which is design §4.8's explicit default. Module-level so the signature keeps
 # no mutable default and no call in its arguments.
 NO_CONTROLLERS: list[str] = []
+NO_GRANTS: list[str] = []
+
+# design §4.5a New session **Grants** checkboxes: "shown with a one-line warning of what the grant
+# allows". Keyed by the grant, so a grant added to `GRANTS` without a line here is visible as a
+# missing note rather than silently shipping an unexplained checkbox (a test pins it).
+GRANT_NOTES: dict[str, str] = {
+    "orchestrate": (
+        "lets this session act on other sessions — send to them, wrap them up, kill them — "
+        "for the sessions that name it a controller (§4.8)"
+    ),
+}
 
 
 def _as_session_id(ident: str, fleet: list[dict[str, Any]], *, must_exist: bool = True) -> str:
@@ -495,6 +506,11 @@ def create_app() -> FastAPI:
                 "recent": recent,
                 "adapters": adapters,
                 "orchestrators": orchestrators,
+                # design §4.5a New session **Grants** checkboxes: the grants a record may hold
+                # (`sessionorc.models.GRANTS`, the same list `ao new --grant` offers), each with
+                # the one-line warning the row asks for.
+                "grants_all": list(GRANTS),
+                "grant_notes": GRANT_NOTES,
                 "roles": roles["roles"],
                 "default_controllers": roles.get("controllers") or [],
                 # design §4.5a New session **Project** picker (§4.9): the projects defined on this
@@ -538,6 +554,7 @@ def create_app() -> FastAPI:
         project: str = Form(""),
         until: str = Form(""),
         controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
+        grant: Annotated[list[str], Form()] = NO_GRANTS,
     ):
         wt = None
         if where == "worktree":
@@ -577,7 +594,10 @@ def create_app() -> FastAPI:
             unattended=unattended == "on",
             worktree=wt,
             repo=dir.strip() if wt else None,
-            capabilities=list(preset.grants) if preset else [],
+            # The Grants checkboxes were ticked from the preset when the page loaded and as the
+            # Role changed (design §4.5a), so what is ticked is what was meant — including an
+            # untick, which is a person deciding this session does not get the grant.
+            capabilities=[g for g in grant if g in GRANTS],
             lane=refs or (list(preset.lane) if preset else []),
             role=preset.name if preset else "",
             ledger=ledger,

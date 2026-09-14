@@ -379,15 +379,22 @@
     // name who may act on a session started there. The list is rebuilt from /api/roles as the
     // directory changes; the picker's ticks come from the role's `controllers:` when it has any,
     // else the repo's, and a person's untick after that is a decision the form keeps.
-    const role = $("#role"), rnote = $("#rolenote"), picker = $("#controllers");
+    const role = $("#role"), rnote = $("#rolenote"), picker = $("#controllers"), grants = $("#grants");
     let rseq = 0;
     function tickControllers(names) {
       for (const c of picker.querySelectorAll("[name=controller]")) c.checked = names.includes(c.dataset.name) || names.includes(c.value);
+    }
+    // design §4.5a New session **Grants** checkboxes: the preset's grants used to apply unseen.
+    // Ticked from the role, so a person sees the one power in the system before pressing Start —
+    // and an untick after that is a decision the form keeps, exactly as Controllers works.
+    function tickGrants(names) {
+      if (grants) for (const g of grants.querySelectorAll("[name=grant]")) g.checked = names.includes(g.value);
     }
     function applyRole() {
       const o = role.selectedOptions[0]; if (!o) return;
       const own = (o.dataset.controllers || "").split(",").filter(Boolean);
       tickControllers(own.length ? own : (picker.dataset.default || "").split(",").filter(Boolean));
+      tickGrants((o.dataset.grants || "").split(",").filter(Boolean));
       $("[name=lane]").placeholder = o.dataset.lane || "TD-027, TD-019 · or free-pick";
     }
     async function loadRoles() {
@@ -400,6 +407,7 @@
         for (const r of o.roles) {
           const opt = document.createElement("option");
           opt.value = r.name; opt.dataset.lane = r.lane.join(", "); opt.dataset.controllers = r.controllers.join(",");
+          opt.dataset.grants = (r.grants || []).join(",");
           opt.textContent = `${r.name} [${r.source}]` + (r.grants.length ? ` · grants ${r.grants.join(", ")}` : "");
           role.appendChild(opt);
         }
