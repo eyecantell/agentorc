@@ -28,10 +28,10 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-039 | Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation | Medium | Open |
 | TD-040 | Team and project definitions: where they live, `ao team start`, a role's `profile`, the Org page's grouped view, a project-aware New session | Medium | Done 2026-09-13 |
 | TD-041 | §9 invariant 5 is convention, not a gate: nothing stops a controller acting on an interactive session | Medium | Done 2026-09-13 |
-| TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Open |
-| TD-043 | The design has no word for "a message into a session that is already working": adopt session/turn and *steer* so Send can say which of its two jobs it is doing | Low | Open |
+| TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Partly done |
 | TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Open |
-| TD-047 | An orchestrator only learns what its members did on its own timer: there is no way for a worker to say *I finished* and wake its lead | Medium | Open |
+| TD-047 | The design has no word for "a message into a session that is already working": adopt session/turn and *steer* so Send can say which of its two jobs it is doing | Low | Open |
+| TD-049 | An orchestrator only learns what its members did on its own timer: there is no way for a worker to say *I finished* and wake its lead | Medium | Open |
 
 ---
 
@@ -278,7 +278,7 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-13
-**Status:** Open — the two agentorc briefs were made repeatable the same day (PR #121); the general rule is not enforced anywhere and the samscrape prompts in `~/.tdgrind/` are still per-run
+**Status:** Partly done — the two agentorc briefs were made repeatable the same day (PR #121). **Steps (1), (2) and (4) landed 2026-09-14 (PR #139):** the rule is stated in §4.8 beside the preset table and in §4.9 beside `brief:`; `teams.unrepeatable()` finds the two markers the real failures carried — a clock time and a run number — and `ao team start` prints one line per finding to stderr and starts the team anyway, the Teams strip toasting the same text; tests assert that no template under `src/agentorc/briefs/` and no brief under `docs/briefs/` carries either (the one hit, a `run 6` in a reference heading, is reworded). A bare date is deliberately *not* a marker: briefs cite dated ADRs and say what was true on a day, and warning about those teaches the reader to ignore the warning. The review of PR #139 added three: the warning is said on the `PartialStart` path too (the sessions that *did* start are running on that brief), a shell redirect (`pdm run test 2>&1`) is not a run number, and an unterminated fence no longer hides every line below it. **Left:** step (3), the samscrape prompts in `~/.tdgrind/tdgrind-*-prompt.md`, which belong in that repo as `docs/briefs/` first (board item 2026-09-13) and are not this repo's to move; and the "Done when" itself — `ao team start ao-grind` on two different days, which needs a live fleet and a restart, so it is a board item rather than a test
 
 **Location:** `docs/briefs/*.md`, `src/agentorc/briefs/` (the package templates), design §4.8 (the preset table's brief column), §4.9 (`brief:` on a lead or member), TD-026 (scheduling)
 
@@ -287,20 +287,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** the rule is that a brief describes the **job**, and the run-specific facts come from the definition or the record: the lane from `--lane` or `lane:`, the members from `ao status -v`, the stop from the usage gate, the lead's wrap-up or `ao team stop`, never a date. Then: (1) say it in §4.8 beside the preset table and in §4.9 beside `brief:`, so the next brief written is repeatable; (2) the three package templates under `src/agentorc/briefs/` already obey it — add a test that no template matches a date or `run \d`; (3) the samscrape prompts in `~/.tdgrind/tdgrind-*-prompt.md` are still per-run and are what `samscrape-grind` would use — they belong in that repo as `docs/briefs/` first (board item 2026-09-13), repeatable when they get there; (4) decide whether `ao team start` should warn when a brief it is about to hand out matches a date, which is cheap and catches the next one. Done when `ao team start ao-grind` twice on two different days produces two sessions that both do work.
 
 **Related:** design §4.8, §4.9; TD-040 (the team definitions this rides on), TD-026 (scheduling, which owns *when* a worker stops), TD-036.
-
-## TD-043: The design has no word for "a message into a session that is already working"
-
-**Priority:** Low
-**Added:** 2026-09-13
-**Status:** Open — vocabulary and wording only, no behaviour change
-
-**Location:** design §4.3 (prompt injection and the Send rule), §4.5 (the Focus composer), §4.5a (the control table), `src/agentorc/` wherever the composer's Send is labelled
-
-**Why:** §4.3 gets the behaviour right and never names it. Send is disabled while a permission or question is pending (and, for scraped adapters, while a foreground process runs), and otherwise enabled — including while the agent is working, because a hook-fed tool like Claude Code queues input typed at it. So one button does two different things depending on the session's state: it starts a new piece of work, or it redirects work already in flight. The person cannot tell which from the button, and the design cannot say which in a sentence without a paragraph. OpenAI's Agents API (surveyed 2026-09-13, [ADR](decisions/2026-09-13-openai-agents-api.md)) names exactly this split: a session is durable, a **turn** is one cycle of work, a message to an idle session starts a turn and a message during an active turn **steers** it. That is the missing word, and it costs nothing to adopt — agentorc's states already carry the information the distinction needs (`working` vs `idle`/`needs-you`).
-
-**Fix:** adopt *turn* and *steer* as design vocabulary: say it once in §4.3 beside the Send rule, use it in §4.5's composer description and §4.5a's row for Send, and reflect it in the UI where it is free — the composer's Send affordance reading as steering when the session is `working` and as a new prompt when it is `idle` (a label or a hint line, not a second control; §4.5a still governs what controls exist). Done when a reader of §4.3 can say in one sentence what Send does in each state, and the Focus composer tells them the same thing without their having to read the state pill.
-
-**Related:** design §4.3, §4.5, §4.5a; TD-027 (the composer confirmation that makes a submit observable at all); [ADR 2026-09-13](decisions/2026-09-13-openai-agents-api.md).
 
 ## TD-046: A session cannot be popped out into its own browser window, so switching between agents needs the mouse
 
@@ -326,12 +312,28 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 
 **Related:** design §4.5 screen 2 (Focus), §4.5a, §4.5 (its screens intro: one pty per open terminal), §4.6 (transport and terminal mechanics), §4.5b (reachability: a popped-out window is the same origin, so the tunnel or private network carries it unchanged); TD-029 (a closed session's terminal reconnecting), TD-038 (the terminal's look).
 
-## TD-047: An orchestrator only learns what its members did on its own timer
+## TD-047: The design has no word for "a message into a session that is already working"
+
+**Priority:** Low
+**Added:** 2026-09-13
+**Status:** Open — vocabulary and wording only, no behaviour change. **Filed 2026-09-13 as TD-043 and renumbered to TD-047 on 2026-09-14**: TD-043 was already taken by a tmux paste-buffer race fixed the same day (PR #122, now archived), so the number pointed at two different problems for a day. Nothing outside this file referenced the vocabulary entry; every `TD-043` in the code, the tests and the board means the paste-buffer fix. See TD-048
+
+**Location:** design §4.3 (prompt injection and the Send rule), §4.5 (the Focus composer), §4.5a (the control table), `src/agentorc/` wherever the composer's Send is labelled
+
+**Why:** §4.3 gets the behaviour right and never names it. Send is disabled while a permission or question is pending (and, for scraped adapters, while a foreground process runs), and otherwise enabled — including while the agent is working, because a hook-fed tool like Claude Code queues input typed at it. So one button does two different things depending on the session's state: it starts a new piece of work, or it redirects work already in flight. The person cannot tell which from the button, and the design cannot say which in a sentence without a paragraph. OpenAI's Agents API (surveyed 2026-09-13, [ADR](decisions/2026-09-13-openai-agents-api.md)) names exactly this split: a session is durable, a **turn** is one cycle of work, a message to an idle session starts a turn and a message during an active turn **steers** it. That is the missing word, and it costs nothing to adopt — agentorc's states already carry the information the distinction needs (`working` vs `idle`/`needs-you`).
+
+**Fix:** adopt *turn* and *steer* as design vocabulary: say it once in §4.3 beside the Send rule, use it in §4.5's composer description and §4.5a's row for Send, and reflect it in the UI where it is free — the composer's Send affordance reading as steering when the session is `working` and as a new prompt when it is `idle` (a label or a hint line, not a second control; §4.5a still governs what controls exist). Done when a reader of §4.3 can say in one sentence what Send does in each state, and the Focus composer tells them the same thing without their having to read the state pill.
+
+**Related:** design §4.3, §4.5, §4.5a; TD-027 (the composer confirmation that makes a submit observable at all); [ADR 2026-09-13](decisions/2026-09-13-openai-agents-api.md).
+
+---
+
+## TD-049: An orchestrator only learns what its members did on its own timer
 
 **Priority:** Medium
 **Added:** 2026-09-14 (raised by Paul)
 
-**Status:** Open — design task first: the wake and its vocabulary go in design §4.8 and §4.5a before any code
+**Status:** Open — design task first: the wake and its vocabulary go in design §4.8 and §4.5a before any code. **Filed as TD-047 in PR #140 and renumbered to TD-049 before merge**: the same number was taken on `main` while the PR was open, by the vocabulary entry above (itself renumbered from TD-043 the same day, see TD-048). The PR title and its commits say TD-047; nothing else references it
 
 **Location:** `src/sessionorc/agent.py` (`subscribe`, the per-subscriber last-sent map, `_push_changes`), `src/sessionorc/client.py`, `src/agentorc/cli.py` (a new blocking command), `docs/briefs/orchestrator-ao-1.md` (the tick), design §4.8 (the `orchestrator` policy row: *"read `ao --json status` on a cadence"*), §4.6, §4.9
 

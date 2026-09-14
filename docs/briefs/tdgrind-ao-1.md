@@ -5,7 +5,7 @@ You run in your own git worktree at `.claude/worktrees/tdgrind-ao-1` (branch `td
 ## Lane: free-pick, unless the team definition or Paul hands you a list
 Read `docs/technical_debt.md` and pick open entries suited to autonomous completion — small and medium code fixes, test-coverage gaps, tooling, and doc corrections verifiable against the code. Announce each pick with `ao progress claim <ref>` before your first edit and `ao progress done <ref> --pr N` when it merges (§4.8); that is what your card and your lead read. When a lane *was* handed to you (`ao new --lane`, or `lane:` in the team definition), work it in order and stop at its end rather than free-picking past it.
 
-### The list run 6 was handed, kept for reference — every item is resolved
+### A list an earlier run was handed, kept for reference — every item is resolved
 
 1. **TD-034** — derived report entries land on every record sharing a directory: attribute by occupancy in time (the live record, or the most recently created when none is live), keep the `pending`-by-PR re-check for everyone; the two-records-one-directory test in the entry.
 2. **TD-028 step (4)** — the card report line, the Focus Reports panel with Drop, the grants chip (design §4.5a — add the controls to that table in the same PR; a control not in it does not exist).

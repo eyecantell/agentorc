@@ -14,6 +14,7 @@ reported as out of reach until phase 2's transport.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,45 @@ REACH_NOTE = (
     "permission comes with it. Your home is the one marked above — the anchor rule holds there — "
     "and you never work in another session's worktree."
 )
+
+
+# A brief describes the **job**, not the night it was written (design §4.9 `brief:`, TD-042). The
+# run-specific facts come from the definition or the record — the lane from `--lane` or `lane:`, the
+# members from `ao status -v`, the stop from the usage gate or the lead — so a brief that names one
+# run cannot start the next. The two markers below are what the real failures carried, every time:
+# `started 2026-09-11 17:15 MDT (run 5 …)` and `Stop … at 05:30 MDT (11:30 UTC) on 2026-09-12`. A
+# bare date is deliberately *not* a marker — briefs cite dated ADRs and say what was true on a day,
+# and warning about those would teach the reader to ignore the warning.
+_CLOCK = re.compile(r"\b\d{1,2}:\d{2}\b")
+# `pdm run test 2>&1` is a command, not a fifth run: a digit that opens a shell redirect is not one.
+_RUN = re.compile(r"\bruns?\s+\d+\b(?!\s*[>&|])", re.I)
+_FENCE = re.compile(r"^\s*(```|~~~)")
+
+
+def unrepeatable(text: str) -> list[str]:
+    """The lines in a brief that tie it to one run, as findings a person can act on.
+
+    A warning, never an error: a brief is prose and the judgement is the author's. `ao team start`
+    says it once and starts the team anyway — the alternative, refusing, would make a team
+    unstartable over a sentence."""
+    found, fenced = [], False
+    lines = text.split("\n")
+    # An unterminated fence would put every line after it out of reach, so a brief with an unclosed
+    # ``` would be silently unchecked (review of PR #139). An odd number of fence lines means the
+    # file does not close what it opens; check the whole text rather than trusting the toggle.
+    if sum(1 for line in lines if _FENCE.match(line)) % 2:
+        fenced = None  # skip the fence logic entirely: check every line
+    for n, line in enumerate(lines, 1):
+        if fenced is not None:
+            if _FENCE.match(line):  # an example command may legitimately show a clock time
+                fenced = not fenced
+                continue
+            if fenced:
+                continue
+        for what, hit in (("a clock time", _CLOCK.search(line)), ("a run number", _RUN.search(line))):
+            if hit:
+                found.append(f"line {n}: {what} ({hit.group(0)!r}) — {line.strip()[:80]}")
+    return found
 
 
 class TeamError(Exception):
@@ -90,6 +130,8 @@ class Plan:
     source: Path | None = None
     lead: Launch | None = None
     members: list[Launch] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+    """Briefs that name one run (TD-042). Said out loud, like `out_of_reach`; never a refusal."""
 
     @property
     def launches(self) -> list[Launch]:
@@ -282,4 +324,12 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -
                     block=block,
                 )
             )
+    # One line per finding, not per session: a team's members share a brief, and four copies of
+    # the same sentence is how a warning gets ignored.
+    by_finding: dict[str, list[str]] = {}
+    for x in p.launches:
+        for finding in unrepeatable(x.prompt or ""):
+            by_finding.setdefault(finding, []).append(x.name)
+    for finding, who in by_finding.items():
+        p.warnings.append(f"{', '.join(who)}: the brief names one run — {finding}")
     return p
