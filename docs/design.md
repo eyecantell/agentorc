@@ -809,7 +809,9 @@ derived one (§9 invariant 10); a derived entry is replaced the moment the sessi
 same reference. A derived claim also records the branch it came from, and once the session has
 moved off that branch the claim is looked up one last time by branch name: a PR from it makes the
 claim real, and no PR at all **retires** it — the one delete in either channel, and the only way a
-claim that never grew a PR can ever leave a record (TD-045). A `done` entry, an entry carrying a PR
+claim that never grew a PR can ever leave a record (TD-045). That last look is its own `gh` query for
+that branch, which answers *could not ask* distinctly from *no PR*: everywhere else a failure means
+fewer entries and no harm, but a delete must never be made on an outage. A `done` entry, an entry carrying a PR
 number, and anything the session declared are all out of its reach. This matters beyond a wrong
 card: a branch created and abandoned before its PR existed — what a grinder does the moment it
 finds a neighbour already holds that reference — would otherwise leave a permanent false `claimed`,

@@ -36,8 +36,18 @@ def repo(tmp_path):
     return work
 
 
-def stub_prs(monkeypatch, prs):
+def stub_prs(monkeypatch, prs, *, head=...):
+    """`_prs` answers the repo-wide query; `_prs_for_head` answers the by-branch one TD-045's
+    retirement asks, where `None` means "`gh` could not be asked" and `[]` means "no PR, ever"."""
     monkeypatch.setattr(reports, "_prs", lambda directory, **kw: prs)
+    found = prs if head is ... else head
+    monkeypatch.setattr(
+        reports,
+        "_prs_for_head",
+        lambda directory, branch, **kw: (
+            None if found is None else [p for p in found if p.get("headRefName") == branch]
+        ),
+    )
 
 
 def test_branch_ref_reads_only_the_work_branch_shape():
@@ -167,4 +177,21 @@ def test_a_branch_only_claim_the_session_left_is_re_checked_and_then_retired(rep
     assert [(p.ref, p.status, p.pr) for p in progress] == [("TD-077", "done", 77)] and retire == []
     # an entry written before the branch was recorded has nothing to re-check: it is the immortal one
     assert reports.derive(repo, "main", left=[("TD-077", None)]) == ([], [], ["TD-077"])
+
+
+def test_an_unreachable_gh_retires_nothing(repo, monkeypatch):
+    """The PR #126 review's finding: `_prs` answers every failure — no `gh`, no auth, no network, a
+    timeout — with an empty list, which is right for a source that only fills things in and fatal
+    for one that deletes. An outage would have retired every branch-only claim on every session at
+    once. Retirement asks `_prs_for_head`, which says *could not ask* and is obeyed."""
+    git(repo, "checkout", "-q", "main")
+    stub_prs(monkeypatch, [], head=None)  # gh unreachable
+    assert reports.derive(repo, "main", left=[("TD-077", "td077-cap")]) == ([], [], [])
+    # a PR older than the page `_prs` fetches is found by the by-branch query, so it is not retired
+    stub_prs(monkeypatch, [], head=[{"number": 77, "state": "OPEN", "mergedAt": None, "headRefName": "td077-cap"}])
+    progress, _, retire = reports.derive(repo, "main", left=[("TD-077", "td077-cap")])
+    assert [(p.ref, p.pr) for p in progress] == [("TD-077", 77)] and retire == []
+    # and a genuine "no PR from that branch" still retires
+    stub_prs(monkeypatch, [], head=[])
+    assert reports.derive(repo, "main", left=[("TD-077", "td077-cap")]) == ([], [], ["TD-077"])
 

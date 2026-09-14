@@ -80,10 +80,13 @@ def derive(
       branch (GitHub deletes a merged head, and the session checks out something else next).
 
     `left` is the branch-only claims the session has since moved off — `(ref, the branch it came
-    from)`. Each is looked up one last time by branch name: a PR from it makes the claim real (and
-    merged makes it `done`), and no PR at all puts its reference in the third return value, the
-    refs to retire. That is the whole answer to TD-045: a branch created and abandoned before its
-    PR existed used to leave a `claimed` entry nothing could ever remove. A claim with no branch
+    from)`. Each is looked up one last time by branch name (`_prs_for_head`, which asks `gh` about
+    that one branch and says so when it cannot be asked at all): a PR from it makes the claim real
+    (and merged makes it `done`), and no PR at all puts its reference in the third return value, the
+    refs to retire — while an unreachable `gh` retires nothing, because this is the one delete in
+    either channel and an outage must never look like an answer. That is the whole answer to
+    TD-045: a branch created and abandoned before its PR existed used to leave a `claimed` entry
+    nothing could ever remove. A claim with no branch
     recorded is retired too — those are the entries written before the field existed, and they are
     the immortal ones already on the records.
     """
@@ -105,6 +108,13 @@ def derive(
             merged[number] = ref
     for ref, from_branch in left or []:
         pr = by_head.get(from_branch) if from_branch else None
+        if pr is None and from_branch:
+            # Ask about this branch by name rather than trusting the one page above: a PR older than
+            # that page would otherwise read as "no PR ever", and retiring is a delete.
+            found = _prs_for_head(directory, from_branch)
+            if found is None:
+                continue  # `gh` could not be asked at all — an outage retires nothing (PR #126 review)
+            pr = found[0] if found else None
         if pr is None:
             retire.append(ref)
             continue
@@ -173,6 +183,40 @@ def _prs(directory: Path | str, limit: int = 100, timeout: float = 20.0) -> list
     except json.JSONDecodeError:
         return []
     return [p for p in out if isinstance(p, dict)] if isinstance(out, list) else []
+
+
+def _prs_for_head(directory: Path | str, branch: str, timeout: float = 10.0) -> list[dict[str, Any]] | None:
+    """The PRs whose head is exactly `branch`, or **None when `gh` could not be asked**.
+
+    The distinction matters only here. Retirement is the one delete in the report channels (TD-045),
+    and `_prs`'s "any failure is an empty list" contract — right for a source that only ever fills
+    things in — would turn a `gh` outage, a lapsed token or an offline laptop into "that branch
+    never had a PR", deleting a live claim on every session at once (found by the PR #126 review).
+    Asking by name closes the other half of the same hole: a PR older than the single page `_prs`
+    fetches is found here, where for the fill-in half it was only ever a delay."""
+    try:
+        cp = subprocess.run(
+            [
+                "gh", "pr", "list",
+                "--head", branch,
+                "--state", "all",
+                "--json", "number,state,mergedAt,headRefName",
+                "--limit", "20",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if cp.returncode != 0:
+        return None
+    try:
+        out = json.loads(cp.stdout or "[]")
+    except json.JSONDecodeError:
+        return None
+    return [x for x in out if isinstance(x, dict)] if isinstance(out, list) else None
 
 
 def _default_ref(directory: Path | str) -> str | None:

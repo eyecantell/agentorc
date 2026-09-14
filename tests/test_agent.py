@@ -846,6 +846,9 @@ async def test_the_tick_retires_a_branch_claim_the_session_abandoned(agent, tmp_
     subprocess.run(["git", "-C", str(repo), "commit", "-qm", "one"], check=True)
     subprocess.run(["git", "-C", str(repo), "checkout", "-qb", "td077-cap"], check=True)
     monkeypatch.setattr(reports, "_prs", lambda directory, **kw: [])  # the branch never grew a PR
+    # and `gh` answers the by-branch question too: `[]` is "no PR, ever", where `None` would be
+    # "could not ask", which retires nothing (TD-045)
+    monkeypatch.setattr(reports, "_prs_for_head", lambda directory, branch, **kw: [])
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
         await agent.tick()
