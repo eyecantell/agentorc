@@ -32,14 +32,25 @@ any = ["rate.?limit", "retry", "overloaded", "too many requests"]
 pending = { kind = "limit", text = "$line" }
 
 [[rules]]
-# A Remote Control takeover: another device connected to this session and Claude Code stood this
-# one down, so the pane is alive and nothing is driving it. It happened to an unattended worker on
-# 2026-09-10 and left it `idle` for 20 h with its PR unmerged (TD-032) — `idle` is the resting
-# state of a session waiting on a person, which is exactly what this is not.
+# A Remote Control takeover: another device connected to this session and Claude Code stood this one
+# down, so the pane is alive and nothing is driving it. It happened to an unattended worker on
+# 2026-09-10 and left it `idle` for 20 h with its PR unmerged (TD-032) — `idle` is the resting state
+# of a session waiting on a person, which is exactly what this is not.
+# Every pattern must match the banner on ONE line: `any` and `all` may match *different* lines, so a
+# pair of loose halves ("remote control" here, "standing down" there) would fire on any screen that
+# mentions both — this repo's own design.md and ledger, for two (found by the PR #125 review).
+# Like every screen rule this reads what the pane shows, so a pane displaying the banner *as text*
+# reads as the banner; that is the usage-limit rule's property too, and what bounds it is the same:
+# a scraped verdict never outranks a fresh hook, and a session reading a file is reporting hooks.
+# Priority below `rate-limited-429`: a pane that is also rate limited has the more actionable answer.
 id = "remote-control-standdown"
 state = "stalled?"
-priority = 85
+priority = 70
 region = 20
-any = ["standing down", "stand(s|ing)? down \\(code 4090\\)", "/rc failed"]
-all = ["remote control|/rc failed"]  # "standing down" alone is ordinary prose in a transcript
+any = [
+  "remote control disconnected.*stand(s|ing)? down",
+  "(another (connection|device) )?took over this session.*stand(s|ing)? down",
+  "stand(s|ing)? down \\(code \\d+\\)",
+  "/rc failed\\s*$",
+]
 pending = { kind = "note", text = "stood down: another device took over this session" }

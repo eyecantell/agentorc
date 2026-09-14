@@ -1,6 +1,7 @@
 """Screen rules (design §4.2, TD-015): the manifest format, matching, priority, evidence, and the
 Claude Code manifest against the saved screens from the herdr spike."""
 
+import pathlib
 from pathlib import Path
 
 import pytest
@@ -89,10 +90,37 @@ def test_painted_text_drops_faint_runs():
     assert painted_text("\x1b]0;title\x07x\x1b[Ky") == "xy"
 
 
-def test_the_standdown_rule_needs_more_than_the_words_standing_down():
-    """TD-032: a worker whose pane merely *says* "standing down" — quoting this entry, say — is not
-    stood down. The rule requires Claude Code's own banner or the `/rc failed` footer beside it."""
+def test_the_standdown_rule_needs_the_banner_on_one_line(tmp_path):
+    """TD-032, and the PR #125 review that found the first version of this rule too loose: `any` and
+    `all` may match *different* lines of the window, so a rule split into loose halves fires on any
+    screen that mentions both — `docs/design.md`'s own paragraph about this did. Every pattern here
+    must match the banner on one line.
+
+    What the rule does *not* claim: that a pane showing the banner as text is safe. It is not, and
+    neither is the usage-limit rule — reading the pane is what a screen rule is. What bounds it is
+    that a scraped verdict never outranks a fresh hook (§4.2), and a session reading a file is
+    reporting hooks.
+    """
     m = Manifest.load(RULES_FILE)
-    assert m.explain(["  I read TD-032: the device is standing down and nothing noticed.", "  \u276f "]) is None
-    assert m.explain(["  Remote Control disconnected.", "  This device is standing down (code 4090)."]) is not None
+    prose = [
+        "  Remote Control is how a phone drives one of these panes.",
+        "  The worker was standing down by then, or so the ledger says.",
+        "  I checked whether /rc failed anywhere in the log.",
+    ]
+    assert m.explain(prose) is None  # the halves are there, no line carries the banner
+    assert m.explain(["  the device is standing down and nothing noticed"]) is None
+    assert m.explain(["  Remote Control disconnected, so this device is standing down."]) is not None
     assert m.explain(["  ? for shortcuts                       /rc failed"]) is not None
+    # design §4.2's own paragraph, as it is wrapped in the file, must stay quiet
+    design = pathlib.Path(__file__).parents[1] / "docs" / "design.md"
+    para = [ln for ln in design.read_text().splitlines() if "Remote Control" in ln or "standing down" in ln]
+    assert not any((got := m.explain([ln])) and got.rule == "remote-control-standdown" for ln in para)
+
+
+def test_a_stood_down_pane_that_is_also_rate_limited_reads_as_limited():
+    """Priority 70, below `rate-limited-429`'s 80: both can be on one screen (the device that took
+    over hits a cap on its first call back), and the limit is the more actionable of the two."""
+    m = Manifest.load(RULES_FILE)
+    both = ["  Remote Control disconnected, standing down (code 4090)", "  429 rate limit, retry later"]
+    got = m.explain(both)
+    assert got is not None and (got.rule, got.state) == ("rate-limited-429", "limited")
