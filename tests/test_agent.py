@@ -11,7 +11,7 @@ from conftest import FAST_TICK, wait_state
 from sessionorc import adapters, naming, paths, reports
 from sessionorc.agent import WRAPUP_GRACE
 from sessionorc.client import AgentError, LocalClient
-from sessionorc.models import FindingEntry, ProgressEntry
+from sessionorc.models import FindingEntry, Pending, ProgressEntry
 
 pytestmark = pytest.mark.integration
 
@@ -857,6 +857,22 @@ async def test_a_session_past_its_stop_time_is_wrapped_up_then_killed(agent, tmp
         assert s["state"] == "exited" and s["wrapup_sent_at"] == first_ask
         # the words were the client's, not this package's: they are on the pane the tick captured
         assert any("wrap up and exit" in line for line in s["tail"]), s["tail"]
+        await person.call("remove", id=sid)
+
+
+async def test_a_session_stopped_on_a_dialog_is_not_typed_at(agent, tmp_path):
+    """A worker sitting on a permission prompt at its stop time cannot wrap up, and typing at it
+    would answer the dialog rather than reach the composer — which is why `send` refuses too (§4.2).
+    Nobody is coming to answer it, so it is stopped instead of asked."""
+    async with LocalClient() as person:
+        sid = (await person.call(
+            "create", name="w3", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc", "--noprofile"],
+            unattended=True, run_until="2026-09-13T06:00:00Z", wrapup_prompt="wrap up",
+        ))["id"]  # fmt: skip
+        rec = agent.sessions[sid]
+        rec.set_state("needs-you", confidence="hook", pending=Pending(kind="permission", text="Bash · rm -rf"))
+        await agent._enforce_stop_times(datetime.now(UTC))
+        assert rec.state == "exited" and rec.wrapup_sent_at is None, "stopped without being asked"
         await person.call("remove", id=sid)
 
 

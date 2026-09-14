@@ -223,6 +223,14 @@ class HostAgent:
             if now < _parse(s.run_until):
                 continue
             if not s.wrapup_sent_at:
+                if s.pending and s.pending.kind in ("permission", "question"):
+                    # A session stopped on a dialog cannot wrap up, and typing at it would answer
+                    # the dialog rather than reach the composer (`send` refuses for this reason,
+                    # §4.2). Nobody is coming to answer it either — that is what unattended means —
+                    # so it is stopped now rather than asked something it cannot hear.
+                    log.info("%s reached its run_until on a pending %s; stopping it", s.id, s.pending.kind)
+                    await self.rpc_kill(s.id)
+                    continue
                 if not s.wrapup_prompt:
                     # Nothing to say, so say nothing and stop it: a stop time with no wrap-up text is
                     # still a stop time, and silently running past it is the failure this fixes.

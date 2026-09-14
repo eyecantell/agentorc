@@ -1216,7 +1216,9 @@ the block. A policy is agent code and needs no grant; a session doing the same w
   time. At the instant, the agent sends the wrap-up prompt **once** and then kills the session when
   it settles or ten minutes later, whichever comes first — the same two steps, and the same words,
   as `ao team stop`. The wording travels on the record because `sessionorc` must not know what a
-  brief is, the way `ledger` does. This is the general form the rest of this section's schedules
+  brief is, the way `ledger` does. A session sitting on a permission or a question at its stop time is
+  stopped without being asked: typing at it would answer the dialog rather than reach the composer (which is
+  why `send` refuses too), and nobody is coming to answer it — that is what unattended means. This is the general form the rest of this section's schedules
   reduce to: the run window below sets a stop time rather than being a second mechanism, and the
   gap it closes first is that a session started by hand with `--unattended` had **no stopper at
   all** — nothing wrapped it up at 06:00, at a cap, or when its token lapsed, so "start it now so I
