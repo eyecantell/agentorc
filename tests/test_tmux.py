@@ -2,6 +2,7 @@
 
 import os
 import subprocess
+import threading
 
 import conftest
 import pytest
@@ -43,6 +44,40 @@ def test_env_pipe_pane_and_paste(tmux, tmp_path):
     assert any("two" in row for row in tail)
     info = {p.session: p for p in tmux.list_panes()}["ao-t-b"]
     assert info.current_command == "bash" and not info.dead
+
+
+def test_concurrent_pastes_do_not_share_one_buffer(tmux, tmp_path):
+    """TD-043: a fixed buffer name made two concurrent pastes fight over one server-wide buffer —
+    the first `paste-buffer -d` deleted it and the others failed `no buffer ao-paste`."""
+    logs = {}
+    for n in ("d", "e", "f", "g"):
+        name = f"ao-t-{n}"
+        logs[name] = tmp_path / f"{name}.log"
+        tmux.new_session(name, str(tmp_path), ["bash", "--norc", "--noprofile"], {})
+        tmux.pipe_pane(name, logs[name])
+
+    errors: list[BaseException] = []
+
+    def paste(name: str) -> None:
+        try:
+            tmux.paste(name, f"echo mine={name}")
+            tmux.send_enter(name)
+        except BaseException as exc:  # noqa: BLE001 - reported through `errors`
+            errors.append(exc)
+
+    threads = [threading.Thread(target=paste, args=(name,)) for name in logs]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert errors == []
+    for name, log in logs.items():
+        assert wait_for(lambda log=log, name=name: f"mine={name}" in log.read_text())
+        # Nobody received anybody else's text.
+        text = log.read_text()
+        assert not [other for other in logs if other != name and f"mine={other}" in text]
+    assert tmux.run("list-buffers", check=False).stdout.strip() == ""
 
 
 def test_exit_status_readable(tmux):
