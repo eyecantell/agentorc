@@ -1,0 +1,254 @@
+"""`ao team`: turning a team definition (§4.9) into the sequence of `create` calls that starts it.
+
+The definitions are read by the clients (`agentorc.org`, `agentorc.repoconfig`); this module holds
+what a start *means* — which session runs where, under which role, profile and brief — and nothing
+about the transport: `plan` touches no RPC and no tmux, so every check it makes is testable on its
+own. `agentorc.cli` runs the plan: the name checks (the `name_check` RPC, §4.1), then the lead,
+then each member with `controllers: [lead id]`.
+
+Design §4.9 "Starting and stopping" and "Home and reach". Two things that section describes are
+deliberately not built here and say so rather than pretending: a member that is `{team: <name>}` (a
+nested team) is refused with its name, and a repo whose checkout entry names another host is
+reported as out of reach until phase 2's transport.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from agentorc import org as orgmod
+from agentorc import profiles, repoconfig
+
+WRAPUP_PROMPT = (
+    "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
+    "is in flight, make sure the ledger and user_attention.md reflect any undone steps (ledger before "
+    "idle), then stop."
+)
+"""The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`). The UI imports it from here,
+so the card and the CLI send the same words — one code path, not two."""
+
+REACH_NOTE = (
+    "These checkouts exist on this host and that is the whole of the reach: no credential and no "
+    "permission comes with it. Your home is the one marked above — the anchor rule holds there — "
+    "and you never work in another session's worktree."
+)
+
+
+class TeamError(Exception):
+    """A definition that cannot start: the message names the thing that stopped it."""
+
+
+@dataclass
+class Launch:
+    """One session a team start creates, with everything `create` needs but the controllers."""
+
+    name: str
+    role: str
+    home: str  # the repo name in the team's projects
+    dir: Path  # its checkout on this host; the session runs in a worktree of it
+    team: str
+    project: str  # the badge: the project the home repo came from
+    profile: str = ""
+    prompt: str | None = None
+    grants: list[str] = field(default_factory=list)
+    lane: list[str] = field(default_factory=list)
+    unattended: bool = True
+    lead: bool = False
+    ledger: str | None = None
+
+    def create_params(self, controllers: list[str]) -> dict[str, Any]:
+        """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
+        session lives in `<repo>/.claude/worktrees/<name>`, so the main checkout stays the
+        person's and the anchor rule (§9 invariant 2) holds per member without anyone counting."""
+        return {
+            "name": self.name,
+            "dir": str(self.dir),
+            "adapter": repoconfig.DEFAULT_ADAPTER,
+            "repo": str(self.dir),
+            "worktree": self.name,
+            "unattended": self.unattended,
+            "resume": None,
+            "profile": self.profile,
+            "prompt": self.prompt,
+            "capabilities": list(self.grants),
+            "controllers": list(controllers),
+            "lane": list(self.lane),
+            "role": self.role,
+            "ledger": self.ledger,
+            "team": self.team,
+            "project": self.project,
+        }
+
+
+@dataclass
+class Plan:
+    """What `ao team start` would do: the lead (None when a person leads) and the members in order."""
+
+    team: str
+    source: Path | None = None
+    lead: Launch | None = None
+    members: list[Launch] = field(default_factory=list)
+
+    @property
+    def launches(self) -> list[Launch]:
+        return ([self.lead] if self.lead else []) + list(self.members)
+
+
+def find(org: orgmod.Org, name: str) -> orgmod.TeamDef:
+    try:
+        return org.teams[name]
+    except KeyError:
+        known = ", ".join(sorted(org.teams)) or "none defined"
+        raise TeamError(f"unknown team {name!r}; defined: {known}") from None
+
+
+def project_of(org: orgmod.Org, projects: list[str], repo: str) -> str:
+    """The badge a session whose home is `repo` carries: the first project that lists that repo."""
+    for pname in projects:
+        if repo in (org.projects.get(pname) or orgmod.Project(pname)).repos:
+            return pname
+    return ""
+
+
+def project_block(org: orgmod.Org, projects: list[str], host: str, home: str = "") -> str:
+    """The **Project** block that prefixes a brief when the reach is more than one repo (§4.9 "Home
+    and reach"): each repo's checkout on this host and which one is home. Reach is that and nothing
+    else. Empty when one repo (or none) is in reach, which is why a one-repo team's brief is
+    untouched."""
+    repos: dict[str, dict[str, Path]] = {}
+    for pname in projects:
+        for rname, by_host in (org.projects.get(pname) or orgmod.Project(pname)).repos.items():
+            repos.setdefault(rname, by_host)
+    if len(repos) < 2:
+        return ""
+    lines = [f"## Project: {', '.join(projects)}", ""]
+    for rname, by_host in repos.items():
+        path = by_host.get(host)
+        if path is None:
+            # §4.9: an entry for another host is noted, not an error — phase 2's transport reaches it
+            elsewhere = ", ".join(sorted(by_host)) or "nowhere"
+            lines.append(f"- {rname}: not checked out on {host} (declared on {elsewhere}) — out of reach until phase 2")
+        else:
+            lines.append(f"- {rname}: {path}" + ("  — your home" if rname == home else ""))
+    return "\n".join([*lines, "", REACH_NOTE, "", ""])
+
+
+def _brief(role: repoconfig.Role, member: orgmod.MemberDef | None, checkout: Path, lane: list[str]) -> str | None:
+    """The role's template with `{lane}` filled, or the member's `brief:` override read from its
+    home checkout."""
+    if member is not None and member.brief:
+        override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
+        return override.brief_text(lane)
+    return role.brief_text(lane)
+
+
+def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
+    *,
+    org: orgmod.Org,
+    team: orgmod.TeamDef,
+    name: str,
+    role_name: str,
+    home: str,
+    host: str,
+    profile_override: str | None,
+    member: orgmod.MemberDef | None,
+    lead: bool,
+    block: str,
+) -> Launch:
+    where = f"team {team.name}: {name}"
+    project = project_of(org, team.projects, home)
+    checkout = org.checkout(project, home, host)
+    if checkout is None:
+        raise TeamError(f"{where}: repo {home!r} has no checkout on {host} — its project names another host (phase 2)")
+    checkout = Path(checkout).expanduser()
+    if not checkout.is_dir():
+        raise TeamError(f"{where}: {checkout} does not exist on {host} (repo {home!r}) — nothing was started")
+    try:
+        cfg = repoconfig.load(checkout)
+        role = repoconfig.resolve_role(cfg, role_name, org.roles)
+    except (KeyError, ValueError) as e:
+        raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
+    lane = list(member.lane) if member is not None and member.lane else list(role.lane)
+    grants = list(member.grants) if member is not None and member.grants is not None else list(role.grants)
+    # Profile precedence (§4.9 "Roles gain a profile"), lowest first: the package's built-ins,
+    # `org.yml`'s `roles:` and the repo's `.agentorc.yml` (those three inside `resolve_role`), the
+    # member's own `profile`, then `--profile` on the command line.
+    profile = profile_override or (member.profile if member is not None else None) or role.profile or ""
+    if profile:
+        try:
+            profiles.get(profile)  # checked here so a typo stops the start rather than one session
+        except (KeyError, ValueError) as e:
+            raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
+    try:
+        prompt = _brief(role, member, checkout, lane)
+    except ValueError as e:
+        raise TeamError(f"{where}: {e}") from None
+    if block:
+        prompt = block + prompt if prompt else block
+    return Launch(
+        name=name,
+        role=role_name,
+        home=home,
+        dir=checkout,
+        team=team.name,
+        project=project,
+        profile=profile,
+        prompt=prompt,
+        grants=grants,
+        lane=lane,
+        unattended=member.unattended if member is not None else True,
+        lead=lead,
+        ledger=cfg.ledger,
+    )
+
+
+def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -> Plan:
+    """Resolve a definition into the sessions it starts, checking everything that can be checked
+    without the agent: the checkouts exist on this host, every role, profile and brief resolves,
+    and no member asks for something this phase does not build. Raises `TeamError` on the first
+    thing that would have stopped the start — nothing is created here (§4.9: never half a team)."""
+    team = find(org, name)
+    p = Plan(team=team.name, source=team.source)
+    reach = bool(project_block(org, team.projects, host))
+    if team.lead.role != orgmod.PERSON:
+        p.lead = _launch(
+            org=org,
+            team=team,
+            name=team.lead.name,
+            role_name=team.lead.role,
+            home=team.lead.home,
+            host=host,
+            profile_override=profile or team.lead.profile,
+            member=None,
+            lead=True,
+            block=project_block(org, team.projects, host, team.lead.home) if reach else "",
+        )
+    seen: set[str] = {p.lead.name} if p.lead else set()
+    for member in team.members:
+        if member.team is not None:
+            raise TeamError(
+                f"team {team.name}: member {{team: {member.team}}} is a nested team, which is not built yet "
+                f"(design §4.9: the flat case ships first) — start it on its own with `ao team start {member.team}`"
+            )
+        block = project_block(org, team.projects, host, member.home) if reach else ""
+        for mname in member.names():
+            if mname in seen:
+                raise TeamError(f"team {team.name}: two sessions would be called {mname!r} — a name is one session")
+            seen.add(mname)
+            p.members.append(
+                _launch(
+                    org=org,
+                    team=team,
+                    name=mname,
+                    role_name=member.role,
+                    home=member.home,
+                    host=host,
+                    profile_override=profile,
+                    member=member,
+                    lead=False,
+                    block=block,
+                )
+            )
+    return p

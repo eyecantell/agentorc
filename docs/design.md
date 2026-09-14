@@ -746,11 +746,12 @@ how a person thinks about it, *this orc controls these sessions*, while the list
 each target — one `set_controllers` call per target, so a refusal names the session it refused and
 the rest still stand. `ao new --controller <id>…` sets it at create, and `ao new` prints one line
 when a session starts with nobody able to act on it. `ao status -v` prints both directions:
-`under:` from the record, `members:` derived across the records, never stored. Teams (§4.9): `ao team start <name>` launches a
+`under:` from the record, `members:` derived across the records, never stored. Teams (§4.9; landed 2026-09-13, TD-040 step c): `ao team start <name>` launches a
 definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every check first, then the lead, then each member with
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
-`ao new --project <name>` gives a hand-started session the project's reach block. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+`ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
+its name until the nested case is built. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -1024,9 +1025,12 @@ anyone counting. The record's `dir` and `repo` are the home, as for every sessio
 the ADR's phase-1 meaning: when a project has more than one repo, the session's brief is
 prefixed with a **Project** block that names each repo's checkout on this host and which one is
 home. That is the whole of it — no credential, no permission — and `ao new --project <name>`
-gives a hand-started session the same block.
+gives a hand-started session the same block (landed 2026-09-13, TD-040 step c; a project name
+with no definition still badges the session, with one line saying there is no reach to describe,
+because the badge is a plain string nothing keys on).
 
-**Starting and stopping.** `ao team start <name>` resolves the definition, then checks
+**Starting and stopping** (landed 2026-09-13, TD-040 step c — `agentorc/teams.py` plans a start and
+`ao team` runs it; the exceptions are named at the end of this paragraph). `ao team start <name>` resolves the definition, then checks
 *everything before launching anything*: every checkout exists on this host, every role and
 profile resolves, and every session name is free under §4.1's rule — a live holder refuses the
 whole start and names it, so there is never half a team; exited or closed holders are
@@ -1042,7 +1046,13 @@ pass, then to the lead; `--now` kills instead of asking. `ao team status <name>`
 Members view for a terminal: each member with state, lane and report line. `ao team list` shows
 every definition, its source file, and whether it is live. A team is **live** when any session
 carrying its badge is live; there is no team record — a team that is stopped is only its
-definition.
+definition. **What step (c) did not build, and says so rather than claiming:** a `{team: …}`
+member is refused by name (the flat case ships first, as above); a repo whose checkout entry
+names another host is a note inside the Project block, not a start, until phase 2's transport;
+and `ao team stop` waits on each member's *state* (idle, exited or closed, or a `--timeout`
+window, default 300 s), which is what a client can see — "wrapped up" is not a state the record
+carries. The lead is started with an empty `controllers` list: the definition, not a repo
+default, is the authority over a team session, and it is a person who runs the start.
 
 **The Org page.** The home route and nav item become **Org**; the Team name retires with the
 page (the second rename this week, and the last: the noun does not change with what is inside,
@@ -1057,7 +1067,8 @@ collapsed to a count when nothing is defined. New session gains a **Project** pi
 narrows the repo list to the project's repos on this host and adds the Project block to the
 brief. Urgent-first sorting works within a group; Pinned order is per group.
 
-**Roles gain a profile.** A preset may name the profile it runs under, so the pick-list adds an
+**Roles gain a profile** (landed 2026-09-13, TD-040 step c: `org.yml`'s `roles:` is
+`resolve_role`'s overlay layer, and `ao new`, `ao roles` and `ao team start` all read it). A preset may name the profile it runs under, so the pick-list adds an
 agent by skillset in one choice: `roles.<name>.profile` in `.agentorc.yml`, in `org.yml`'s
 `roles:`, or nowhere (then the host's default profile). Precedence, lowest first: the package's
 built-ins, `org.yml`, the repo's `.agentorc.yml`, a team member's own `profile`, `--profile` on

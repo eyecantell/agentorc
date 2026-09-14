@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from agentorc import profiles as profiles_mod
-from agentorc import repoconfig
+from agentorc import repoconfig, teams
 from sessionorc import hosts, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
@@ -65,11 +65,7 @@ def _str_list(body: dict[str, Any], key: str) -> list[str]:
     return [x.strip() for x in v]
 
 
-WRAPUP_PROMPT = (
-    "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
-    "is in flight, make sure the ledger and user_attention.md reflect any undone steps (ledger before "
-    "idle), then stop."
-)
+WRAPUP_PROMPT = teams.WRAPUP_PROMPT  # the card's Wrap up and `ao team stop` send the one text (§4.9)
 
 
 def host_name() -> str:

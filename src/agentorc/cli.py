@@ -8,13 +8,15 @@ import os
 import pathlib
 import subprocess
 import sys
+import time
 from collections.abc import Callable
 from datetime import UTC, datetime
 from importlib import resources
 from typing import Any
 
-from agentorc import repoconfig
-from sessionorc import naming
+from agentorc import org as orgmod
+from agentorc import repoconfig, teams
+from sessionorc import hosts, naming
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
@@ -153,12 +155,41 @@ def cmd_focus(args: argparse.Namespace) -> int:
     return _attach(args, args.id, s)
 
 
+def _same(a: pathlib.Path, b: pathlib.Path) -> bool:
+    return a.expanduser().resolve() == b.expanduser().resolve()
+
+
+def _project_block(project: str | None, cfg: repoconfig.RepoConfig, directory: pathlib.Path) -> str:
+    """`ao new --project <name>`: the same reach block a team member gets (design §4.9 "Home and
+    reach") — each of the project's repos on this host, and which one this session is home to.
+    Empty for a one-repo project, as it is for a team: there is no reach to describe."""
+    if not project:
+        return ""
+    o = orgmod.load()
+    if project not in o.projects:
+        # The badge is a plain string and nothing keys on it (§4.9, §9 invariant 9) — landed in step
+        # (b) and not taken back here: an undefined name still badges the session, it just has no
+        # reach to describe, and one line says so rather than refusing the start.
+        known = ", ".join(sorted(o.projects)) or "none"
+        note = f"project: {project!r} is not defined in {o.path} ({known}) — badge only, no reach block"
+        print(note, file=sys.stderr)
+        return ""
+    host = hosts.local_host().name
+    here = (cfg.root or directory).expanduser().resolve()
+    home = next(
+        (r for r, by_host in o.projects[project].repos.items() if (p := by_host.get(host)) and _same(p, here)),
+        "",  # started outside the project's repos: the block still names them, nothing is home
+    )
+    return teams.project_block(o, [project], host, home)
+
+
 def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     """What the repo's `.agentorc.yml` and the `--role` preset fill in for `ao new` (design §4.8,
     §5): the brief from the role's template with `{lane}` filled, its lane, its grants (plus any
     `--grant`), its profile unless `--profile` says otherwise, and — when `--controller` is not
     given — the preset's `controllers:`, else the repo's, resolved from names to session ids here.
-    The flags always win; the role's name and the repo's `ledger:` ride along on the record."""
+    The flags always win; the role's name and the repo's `ledger:` ride along on the record.
+    `--project` adds §4.9's Project block to the brief, as a team start does for its members."""
     directory = pathlib.Path(args.dir or os.getcwd())
     try:
         if args.adapter == "shell":
@@ -167,9 +198,18 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
             cfg, role = repoconfig.RepoConfig(), repoconfig.Role(name="")
         else:
             cfg = repoconfig.discover(pathlib.Path(args.repo) if args.repo else directory)
-            role = repoconfig.resolve_role(cfg, args.role) if getattr(args, "role", None) else repoconfig.Role(name="")
+            # `org.yml`'s `roles:` is the overlay between the built-ins and the repo's file — the
+            # profile precedence of §4.9, wired through `resolve_role`'s existing hook.
+            overlay = orgmod.load().roles if args.adapter != "shell" else {}
+            role = (
+                repoconfig.resolve_role(cfg, args.role, overlay)
+                if getattr(args, "role", None)
+                else repoconfig.Role(name="")
+            )
         lane = args.lane or list(role.lane)
         prompt = args.prompt or role.brief_text(lane)
+        if block := _project_block(getattr(args, "project", None), cfg, directory):
+            prompt = block + prompt if prompt else block
     except (KeyError, ValueError) as e:
         raise AgentError(str(e).strip('"')) from None
     controllers = list(args.controller or [])
@@ -254,7 +294,7 @@ def cmd_roles(args: argparse.Namespace) -> int:
     built-ins and what the repo's `.agentorc.yml` redefines or adds — with where each came from."""
     try:
         cfg = repoconfig.discover(pathlib.Path(args.dir or os.getcwd()))
-        found = repoconfig.roles(cfg)
+        found = repoconfig.roles(cfg, orgmod.load().roles)  # built-in < org.yml < the repo (§4.9)
     except ValueError as e:
         return fail(args, str(e), 1)
     result = {"file": str(cfg.path) if cfg.path else None, "controllers": cfg.controllers, "roles": []}
@@ -274,6 +314,217 @@ def cmd_roles(args: argparse.Namespace) -> int:
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
 
     return emit(args, result, prose)
+
+
+# ── ao team (design §4.9) ─────────────────────────────────────────────────────────────────────
+
+SETTLED = ("idle", "exited", "closed")  # what "wrapped up" looks like from outside (design §4.2)
+WRAPUP_POLL = 2.0  # seconds between reads while `ao team stop` waits
+
+
+def _org_here(directory: pathlib.Path) -> orgmod.Org:
+    """`~/.agentorc/org.yml`, plus a repo's own `teams:` when the command is run inside one — the
+    org file wins a name collision (design §4.9). Read on every use and cached nowhere."""
+    o = orgmod.load()
+    cfg = repoconfig.discover(directory)
+    if cfg.teams and cfg.root:
+        o = orgmod.merge_repo_teams(o, cfg.root, cfg.teams)
+    return o
+
+
+def _badged(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [s for s in sessions if s.get("team") == name]
+
+
+def _live(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [s for s in sessions if s["state"] not in ("exited", "closed")]
+
+
+def _split(name: str, sessions: list[dict[str, Any]], org: orgmod.Org) -> tuple[dict | None, list[dict]]:
+    """The lead and the members among the sessions carrying a team's badge: the lead is the session
+    the definition names (a team with a `person` lead has none), the rest are members in name order."""
+    team = org.teams.get(name)
+    lead_name = team.lead.name if team and team.lead.role != orgmod.PERSON else None
+    lead = next((s for s in sessions if s.get("name") == lead_name), None)
+    return lead, sorted((s for s in sessions if s is not lead), key=lambda s: s.get("name") or s["id"])
+
+
+def cmd_team_start(args: argparse.Namespace) -> int:
+    """`ao team start <name>` (design §4.9): resolve the definition, check *everything* — checkouts,
+    roles, profiles, briefs, and every name under §4.1's rule — then create the lead and each member
+    with `controllers: [lead id]`. A live name holder refuses the whole start, so there is never
+    half a team; an exited or closed holder is superseded, which makes this the restart too."""
+    directory = pathlib.Path(args.dir or os.getcwd())
+    try:
+        p = teams.plan(_org_here(directory), args.name, hosts.local_host().name, profile=args.profile)
+    except (teams.TeamError, ValueError) as e:
+        return fail(args, str(e), 1)
+    if not p.launches:
+        return fail(args, f"team {args.name} starts nothing: a person leads it and it has no members", 1)
+    # §4.1's rule, asked of the agent rather than reimplemented here (`name_check`, the same verdict
+    # `create` and the New session form use), for every session before any of them exists.
+    held = [
+        v
+        for v in (call_sync("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir)) for x in p.launches)
+        if v.get("verdict") == "live"
+    ]
+    if held:
+        names = "; ".join(f"{v['name']} is {v.get('holder_state', 'running')} as {v['holder']}" for v in held)
+        return fail(args, f"team {args.name} was not started — {names}", 1, holders=held)
+    created: list[dict[str, Any]] = []
+    lead_id = ""
+    try:
+        if p.lead:
+            rec = call_sync("create", **p.lead.create_params([]))
+            created.append(rec)
+            lead_id = str(rec["id"])
+        for m in p.members:
+            # A person runs `ao team start`, so no attenuation applies (§4.8 create rule); an
+            # orchestrator running it is subject to it as for any create, in the agent.
+            created.append(call_sync("create", **m.create_params([lead_id] if lead_id else [])))
+    except AgentError as e:
+        for rec in created:
+            print(_team_line(rec, args.name, p), file=sys.stderr)
+        return fail(args, f"team {args.name}: {e} — {len(created)} session(s) already started (above)", 1)
+    result = {"team": args.name, "lead": lead_id or None, "sessions": created}
+
+    def prose() -> None:
+        for rec in created:
+            print(_team_line(rec, args.name, p))
+
+    return emit(args, result, prose)
+
+
+def _team_line(rec: dict[str, Any], team: str, p: teams.Plan) -> str:
+    launch = next((x for x in p.launches if x.name == rec.get("name")), None)
+    what = "lead" if launch and launch.lead else "member"
+    role = f" {launch.role}" if launch and launch.role else ""
+    return f"{rec['id']}  {what}{role}  {rec.get('dir', '')}"
+
+
+def _wait_settled(ids: list[str], timeout: float) -> dict[str, str]:
+    """Read the records until every id is idle, exited or closed, or the window passes (design §4.9:
+    *waits for each to go idle or the wrap-up window to pass*). Returns each id's last state."""
+    end = time.monotonic() + max(timeout, 0.0)
+    while True:
+        states = {s["id"]: s["state"] for s in call_sync("list") if s["id"] in ids}
+        if all(st in SETTLED for st in states.values()) or time.monotonic() >= end:
+            return states
+        time.sleep(min(WRAPUP_POLL, max(end - time.monotonic(), 0.0)) or WRAPUP_POLL)
+
+
+def cmd_team_stop(args: argparse.Namespace) -> int:
+    """`ao team stop <name>` (design §4.9): the wrap-up prompt — the one the card's **Wrap up**
+    sends, `agentorc.teams.WRAPUP_PROMPT` — to each member, wait for each to go idle or the window
+    to pass, then the lead. `--now` kills instead of asking."""
+    directory = pathlib.Path(args.dir or os.getcwd())
+    try:
+        org = _org_here(directory)
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    live = _live(_badged(args.name, call_sync("list")))
+    if not live:
+        return fail(args, f"no live session carries the team {args.name} badge — nothing to stop", 1)
+    lead, members = _split(args.name, live, org)
+
+    def stop(s: dict[str, Any], role: str) -> dict[str, Any]:
+        if args.now:
+            call_sync("kill", id=s["id"])
+        else:
+            call_sync("send", id=s["id"], text=teams.WRAPUP_PROMPT)
+        return {"id": s["id"], "role": role, "action": "killed" if args.now else "wrap-up sent"}
+
+    acted = [stop(s, "member") for s in members]
+    states = {} if args.now else _wait_settled([s["id"] for s in members], args.timeout)
+    for entry in acted:
+        entry["state"] = states.get(entry["id"], "killed" if args.now else "?")
+    if lead:
+        acted.append(stop(lead, "lead"))
+    result = {"team": args.name, "now": bool(args.now), "sessions": acted}
+
+    def prose() -> None:
+        for e in acted:
+            state = f"  ({e['state']})" if e.get("state") and e["state"] != "?" else ""
+            print(f"{e['id']}  {e['role']}: {e['action']}{state}")
+        waiting = [e["id"] for e in acted if e.get("state") not in (*SETTLED, "killed", None)]
+        if waiting:
+            print(f"still working when the {args.timeout:g}s window passed: {', '.join(waiting)}")
+
+    return emit(args, result, prose)
+
+
+def cmd_team_status(args: argparse.Namespace) -> int:
+    """`ao team status <name>` (design §4.9): the lead's Members view for a terminal — each session
+    carrying the badge with its state, lane and report line, the lead first, and every name the
+    definition expects that is not running said to be so."""
+    directory = pathlib.Path(args.dir or os.getcwd())
+    org, expected = orgmod.Org(), []
+    try:
+        org = _org_here(directory)
+        # the names the definition would start; a definition that cannot start (a checkout gone,
+        # say) is not an error here — status reads what is running, and says what is not
+        expected = [x.name for x in teams.plan(org, args.name, hosts.local_host().name).launches]
+    except (teams.TeamError, ValueError):
+        pass
+    found = _badged(args.name, call_sync("list"))
+    lead, members = _split(args.name, found, org)
+    rows = [
+        {**{k: s.get(k) for k in ("id", "name", "state", "lane", "role")}, "report": report_line(s), "running": True}
+        for s in ([lead] if lead else []) + members
+    ]
+    rows += [
+        {"id": None, "name": n, "state": "not started", "lane": [], "role": "", "report": "", "running": False}
+        for n in expected
+        if n not in {s.get("name") for s in found}
+    ]
+    if not rows:
+        return fail(args, f"team {args.name}: no session carries the badge and no definition names one", 1)
+
+    def prose() -> None:
+        w = max(len(str(r["id"] or r["name"])) for r in rows)
+        for r in rows:
+            lane = f"  lane: {', '.join(r['lane'] or []) or '-'}"
+            report = f"  report: {r['report']}" if r["report"] else ""
+            print(f"{str(r['id'] or r['name']):<{w}}  {r['state']:<11}{lane}{report}")
+
+    return emit(args, {"team": args.name, "sessions": rows}, prose)
+
+
+def cmd_team_list(args: argparse.Namespace) -> int:
+    """`ao team list` (design §4.9): every definition, its source file, and whether it is live — a
+    team is live when any session carrying its badge is live. There is no team record: a team that
+    is stopped is only its definition."""
+    directory = pathlib.Path(args.dir or os.getcwd())
+    try:
+        org = _org_here(directory)
+    except ValueError as e:
+        return fail(args, str(e), 1)
+    sessions = _live(call_sync("list"))
+    rows = [
+        {
+            "name": t.name,
+            "source": str(t.source) if t.source else None,
+            "projects": list(t.projects),
+            "lead": t.lead.name if t.lead.role != orgmod.PERSON else "person",
+            "members": sum(len(m.names()) for m in t.members if m.team is None),
+            "live": len(_badged(t.name, sessions)),
+        }
+        for t in org.teams.values()
+    ]
+
+    def prose() -> None:
+        if not rows:
+            print(f"no team defined in {org.path}" + (f" or {directory}/{repoconfig.FILE}" if directory else ""))
+            return
+        w = max(len(r["name"]) for r in rows)
+        for r in rows:
+            live = f"{r['live']} live" if r["live"] else "stopped"
+            print(
+                f"{r['name']:<{w}}  {live:<8}  lead: {r['lead']}  members: {r['members']}  "
+                f"projects: {', '.join(r['projects'])}  [{r['source']}]"
+            )
+
+    return emit(args, {"teams": rows}, prose)
 
 
 def cmd_kill(args: argparse.Namespace) -> int:
@@ -571,13 +822,44 @@ def build_parser() -> argparse.ArgumentParser:
         help="a preset (design §4.8): fills the brief, lane, grants, profile and controllers; `ao roles` lists them",
     )
     p.add_argument("--team", help="the team this session is started under (design §4.9): a badge, nothing keys on it")
-    p.add_argument("--project", help="the project it is started under (design §4.9): a badge, like --team")
+    p.add_argument(
+        "--project",
+        help="the project it is started under (design §4.9): the badge, and the Project block in front of the brief "
+        "naming each of the project's repos on this host when there is more than one",
+    )
     p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_new)
 
     p = add("roles", help="list the role presets this repo resolves: built-in and from .agentorc.yml (design §4.8)")
     p.add_argument("-d", "--dir", help="the repo or directory to read (default: cwd)")
     p.set_defaults(fn=cmd_roles)
+
+    p = add("team", help="start, stop, inspect and list the team definitions of §4.9")
+    tsub = p.add_subparsers(dest="action", required=True)
+
+    def add_team(name: str, **kw: Any) -> argparse.ArgumentParser:
+        q = tsub.add_parser(name, **kw)
+        q.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="print the RPC result as JSON")
+        q.add_argument("-d", "--dir", help="where a repo's own `teams:` is read from (default: cwd)")
+        return q
+
+    q = add_team("start", help="launch a team: every check first, then the lead, then its members")
+    q.add_argument("name")
+    q.add_argument("-p", "--profile", help="a profile for every session in it, over the role's and the member's")
+    q.set_defaults(fn=cmd_team_start)
+
+    q = add_team("stop", help="wrap the members up, then the lead (--now kills instead of asking)")
+    q.add_argument("name")
+    q.add_argument("--now", action="store_true", help="kill each session instead of sending the wrap-up prompt")
+    q.add_argument("--timeout", type=float, default=300.0, help="seconds to wait for the members (default: 300)")
+    q.set_defaults(fn=cmd_team_stop)
+
+    q = add_team("status", help="each member of a live team with its state, lane and report line")
+    q.add_argument("name")
+    q.set_defaults(fn=cmd_team_status)
+
+    q = add_team("list", help="every definition, its source file and whether it is live")
+    q.set_defaults(fn=cmd_team_list)
 
     p = add("shell", help="start a plain shell session here")
     p.add_argument("name", nargs="?")
