@@ -30,3 +30,16 @@ priority = 80
 all = ["\\b429\\b"]
 any = ["rate.?limit", "retry", "overloaded", "too many requests"]
 pending = { kind = "limit", text = "$line" }
+
+[[rules]]
+# A Remote Control takeover: another device connected to this session and Claude Code stood this
+# one down, so the pane is alive and nothing is driving it. It happened to an unattended worker on
+# 2026-09-10 and left it `idle` for 20 h with its PR unmerged (TD-032) — `idle` is the resting
+# state of a session waiting on a person, which is exactly what this is not.
+id = "remote-control-standdown"
+state = "stalled?"
+priority = 85
+region = 20
+any = ["standing down", "stand(s|ing)? down \\(code 4090\\)", "/rc failed"]
+all = ["remote control|/rc failed"]  # "standing down" alone is ordinary prose in a transcript
+pending = { kind = "note", text = "stood down: another device took over this session" }

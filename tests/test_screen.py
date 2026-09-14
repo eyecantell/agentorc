@@ -51,6 +51,7 @@ def test_manifest_load_priority_and_pending(tmp_path):
         ("usage-limit-reached", "usage-limit", "limited"),
         ("usage-limit-hit", "usage-limit", "limited"),
         ("rate-limited-429", "rate-limited-429", "limited"),
+        ("remote-control-standdown", "remote-control-standdown", "stalled?"),
     ],
 )
 def test_claude_code_rules_on_the_spike_screens(name, rule, state):
@@ -59,7 +60,9 @@ def test_claude_code_rules_on_the_spike_screens(name, rule, state):
     assert m.pending is not None and m.pending.text
 
 
-@pytest.mark.parametrize("name", ["trust-dialog", "usage-limit-reached", "usage-limit-hit", "rate-limited-429"])
+@pytest.mark.parametrize(
+    "name", ["trust-dialog", "usage-limit-reached", "usage-limit-hit", "rate-limited-429", "remote-control-standdown"]
+)
 def test_rules_fire_within_the_ticks_tail(name):
     """The tick hands the rules `TAIL_LINES` lines; every fixture's key line must be inside them, or
     the rule would fire under `ao explain` (40 lines) and never on a tick."""
@@ -84,3 +87,12 @@ def test_painted_text_drops_faint_runs():
     assert painted_text("\x1b[1;2mbold faint\x1b[0;1mbold") == "bold"
     assert painted_text("\x1b[2mnever reset") == ""
     assert painted_text("\x1b]0;title\x07x\x1b[Ky") == "xy"
+
+
+def test_the_standdown_rule_needs_more_than_the_words_standing_down():
+    """TD-032: a worker whose pane merely *says* "standing down" — quoting this entry, say — is not
+    stood down. The rule requires Claude Code's own banner or the `/rc failed` footer beside it."""
+    m = Manifest.load(RULES_FILE)
+    assert m.explain(["  I read TD-032: the device is standing down and nothing noticed.", "  \u276f "]) is None
+    assert m.explain(["  Remote Control disconnected.", "  This device is standing down (code 4090)."]) is not None
+    assert m.explain(["  ? for shortcuts                       /rc failed"]) is not None

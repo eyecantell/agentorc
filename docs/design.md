@@ -332,6 +332,14 @@ Liveness cross-check: the agent also watches the pipe-pane log's mtime; a `worki
 output for longer than the adapter's `stall_after` is shown as `stalled?`, which is how a
 credential lapse surfaces without a 401 regex.
 
+**Takeovers happen to worker panes.** A Claude Code pane driven from Anthropic's Remote Control is
+stood down when another device connects to the same session ("Remote Control disconnected — another
+connection took over this session … this device is standing down", and a `/rc failed` footer): the
+pane lives, the tool answers, and nothing is driving it. That is not `idle` — `idle` is a session
+resting between turns, which is why an unattended worker it happened to sat twenty hours with its
+PR unmerged and nothing flagged it (TD-032). A screen rule reads the banner as `stalled?` with a
+note saying so, and a `stalled?` card shows that note above its tail.
+
 ### 4.2a Profiles: tool · account · model
 
 People run more than one account of one tool, and more than one tool. A **profile** is

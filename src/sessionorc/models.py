@@ -49,7 +49,7 @@ def now_iso() -> str:
 class Pending:
     """What a `needs-you` or `limited` session is waiting on."""
 
-    kind: str  # permission | question | prompt | limit
+    kind: str  # permission | question | prompt | limit | note (a screen rule's explanation, TD-032)
     text: str
     deadline: str | None = None  # ISO time the hook falls through to the terminal (permission only)
     tool_use_id: str | None = None
