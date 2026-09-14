@@ -87,6 +87,10 @@ def test_no_two_entries_share_a_body():
     was then structurally perfect — a Priority, a Why, a Resolved — and the archive still said
     `send --wait` was a phone-triage seen mark. Nothing about the *shape* of such an entry is
     wrong, so the signal is that two ids carry the same prose.
+
+    The limit, and it is inherent: two entries whose bodies are *swapped* rather than duplicated
+    leave every paragraph unique and pass this. No shape check can catch that — it is a claim
+    about meaning, and only a reader comparing an entry to the code it describes will see it.
     """
     for path in (OPEN, ARCHIVE):
         whys: dict[str, str] = {}
@@ -111,6 +115,8 @@ def test_no_entry_body_dangles_below_the_entry_it_belongs_to():
     for path in (OPEN, ARCHIVE):
         for id_, body in entries(path):
             # Anchored to the line start: an entry may legitimately name these fields in its prose.
-            for fld in ("Location", "Why"):
+            # `Resolved` and `Related` are counted too: an orphan carrying only those would sit
+            # below an entry unnoticed otherwise (re-review of PR #138).
+            for fld in ("Location", "Why", "Resolved", "Related"):
                 n = len(re.findall(rf"^\*\*{fld}:\*\*", body, re.M))
                 assert n <= 1, f"{path.name}: {id_} has {n} {fld} lines — an unheaded entry is dangling below it"
