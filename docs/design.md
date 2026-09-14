@@ -1008,7 +1008,11 @@ teams:
 `lead`: `role` (default `orchestrator`; **`person`** means the person leads — no session is
 started and members get an empty `controllers` list plus the team badge), `name` (default
 `<team>-lead`), `home` (a repo name from the team's projects — required when the projects list
-more than one repo, defaulted to the only one otherwise), `profile` (overrides the role's).
+more than one repo, defaulted to the only one otherwise), `profile` (overrides the role's), and
+the same `lane`, `brief`, `grants` and `unattended` a member may carry — an orchestrator's brief
+is the one a repo most often keeps its own copy of (2026-09-13). **A key nobody reads is an
+error naming it**, in a team, a lead or a member: silence about a typo is how a lead's `brief:`
+disappears into a file that looks right.
 Each member: `role`, `count` (default 1; a count above one suffixes the name `-1`, `-2`, …),
 `name` (the prefix; default the role), `home`, `lane`, `brief` (overrides the role's template),
 `profile`, `grants` (default the role's), `unattended` (default **true** — a team is what runs
