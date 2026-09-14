@@ -36,20 +36,20 @@ pending = { kind = "limit", text = "$line" }
 # down, so the pane is alive and nothing is driving it. It happened to an unattended worker on
 # 2026-09-10 and left it `idle` for 20 h with its PR unmerged (TD-032) — `idle` is the resting state
 # of a session waiting on a person, which is exactly what this is not.
-# Every pattern must match the banner on ONE line: `any` and `all` may match *different* lines, so a
-# pair of loose halves ("remote control" here, "standing down" there) would fire on any screen that
-# mentions both — this repo's own design.md and ledger, for two (found by the PR #125 review).
-# Like every screen rule this reads what the pane shows, so a pane displaying the banner *as text*
-# reads as the banner; that is the usage-limit rule's property too, and what bounds it is the same:
-# a scraped verdict never outranks a fresh hook, and a session reading a file is reporting hooks.
+# Only the banner's two unambiguous markers are read: the close code and the footer. Two reviews of
+# PR #125 killed the looser forms — `any` and `all` may match *different* lines, and even within one
+# line a pair of phrases joined by `.*` fires on a sentence *about* a stand-down ("when remote
+# control disconnected … the pane kept standing down"), which is what a review comment or an
+# unwrapped paragraph of this repo's own docs looks like.
+# A pane displaying the banner *verbatim* still reads as the banner; so does the usage-limit rule
+# for its message. Reading the pane is what a screen rule is, and what bounds it is that a scraped
+# verdict never outranks a fresh hook (§4.2) — a session reading a file is reporting hooks.
 # Priority below `rate-limited-429`: a pane that is also rate limited has the more actionable answer.
 id = "remote-control-standdown"
 state = "stalled?"
 priority = 70
 region = 20
 any = [
-  "remote control disconnected.*stand(s|ing)? down",
-  "(another (connection|device) )?took over this session.*stand(s|ing)? down",
   "stand(s|ing)? down \\(code \\d+\\)",
   "/rc failed\\s*$",
 ]
