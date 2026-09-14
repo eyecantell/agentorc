@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from agentorc import profiles as profiles_mod
+from agentorc import repoconfig
 from sessionorc import hosts, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
@@ -411,6 +412,9 @@ def create_app() -> FastAPI:
             for o in await call("list")
             if "orchestrate" in (o.get("capabilities") or []) and o.get("state") not in ("closed", "exited")
         ]
+        # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
+        # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
+        roles = _roles_for(dir)
         return templates.TemplateResponse(
             request,
             "new.html",
@@ -422,9 +426,27 @@ def create_app() -> FastAPI:
                 "recent": recent,
                 "adapters": adapters,
                 "orchestrators": orchestrators,
+                "roles": roles["roles"],
+                "default_controllers": roles.get("controllers") or [],
                 "prefill": {"dir": dir, "adapter": adapter, "resume": resume},
             },
         )
+
+    def _roles_for(dir: str) -> dict[str, Any]:
+        """The presets that resolve in `dir`'s repo, and the repo's `controllers:` default, for the
+        form's pick-list and the Controllers picker's prefill (design §4.5a, §4.8 "Defaults fill
+        membership at launch"). A malformed `.agentorc.yml` is reported, not raised: the form still
+        renders with the built-ins, and Start says what is wrong."""
+        try:
+            cfg = repoconfig.discover(dir or os.getcwd())
+            found = [r.to_dict() for r in repoconfig.roles(cfg)]
+        except ValueError as e:
+            return {"roles": [r.to_dict() for r in repoconfig.roles(repoconfig.RepoConfig())], "error": str(e)}
+        return {"roles": found, "controllers": cfg.controllers, "file": str(cfg.path) if cfg.path else None}
+
+    @app.get("/api/roles")
+    async def api_roles(dir: str = ""):
+        return _roles_for(dir)
 
     @app.post("/new")
     async def new_submit(
@@ -437,22 +459,43 @@ def create_app() -> FastAPI:
         unattended: str = Form(""),
         where: str = Form("here"),
         worktree: str = Form(""),
+        role: str = Form(""),
+        lane: str = Form(""),
         controller: Annotated[list[str], Form()] = NO_CONTROLLERS,
     ):
         wt = None
         if where == "worktree":
             wt = worktree.strip() or naming.slug(name.strip() or "session")
+        # The role preset (design §4.5a, §4.8) fills what the form left empty: the brief from its
+        # template, the lane, its grants, and its profile unless one was picked. The Controllers
+        # picker was prefilled from the repo's or preset's `controllers:` when the page loaded, so
+        # what is ticked is what was meant — a person unticking the default is a decision.
+        refs = [r.strip() for r in lane.split(",") if r.strip()]
+        preset = brief = ledger = None
+        if adapter != "shell":
+            try:
+                cfg = repoconfig.discover(dir.strip() or os.getcwd())
+                ledger = cfg.ledger
+                if role.strip():
+                    preset = repoconfig.resolve_role(cfg, role.strip())
+                    brief = preset.brief_text(refs or None)
+            except (KeyError, ValueError) as e:
+                raise HTTPException(400, str(e).strip('"')) from None
         s = await call(
             "create",
             name=name.strip() or "session",
             dir=dir.strip(),
             adapter=adapter,
-            profile=profile,
-            prompt=prompt.strip() or None,
+            profile=profile or (preset.profile if preset else None) or "",
+            prompt=prompt.strip() or brief,
             resume=resume.strip() or None,
             unattended=unattended == "on",
             worktree=wt,
             repo=dir.strip() if wt else None,
+            capabilities=list(preset.grants) if preset else [],
+            lane=refs or (list(preset.lane) if preset else []),
+            role=preset.name if preset else "",
+            ledger=ledger,
             controllers=[c for c in controller if c.strip()],
         )
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)

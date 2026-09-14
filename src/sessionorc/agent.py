@@ -268,7 +268,12 @@ class HostAgent:
         if not due:
             return
         results = await asyncio.gather(
-            *(asyncio.to_thread(reports.derive, s.dir, branch, pend) for s, branch, pend in due),
+            *(
+                # the ledger path the client read from the repo's config at create (design §5
+                # `ledger:`), else the default — this package never reads `.agentorc.yml` itself
+                asyncio.to_thread(reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT)
+                for s, branch, pend in due
+            ),
             return_exceptions=True,
         )
         for (s, _branch, _pending), result in zip(due, results, strict=True):
@@ -560,6 +565,8 @@ class HostAgent:
         capabilities: list[str] | None = None,
         lane: list[str] | None = None,
         controllers: list[str] | None = None,
+        role: str = "",
+        ledger: str | None = None,
         team: str = "",
         project: str = "",
         caller: str | None = None,
@@ -659,6 +666,8 @@ class HostAgent:
                 capabilities=grants,
                 controllers=members,
                 lane=references,
+                role=str(role or ""),
+                ledger=(str(ledger).strip() or None) if ledger else None,
                 team=str(team or ""),  # badges (§4.9): stored as given, never validated here
                 project=str(project or ""),
                 previous_run=previous_run,

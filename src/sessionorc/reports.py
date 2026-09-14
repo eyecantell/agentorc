@@ -28,7 +28,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
 BRANCH_RE = re.compile(r"^td-?(\d{1,4})(?:[-_].*)?$", re.IGNORECASE)
 # A row the ledger gained: an entry body's heading, or its row in the summary table.
 LEDGER_ROW_RE = re.compile(r"^\+(?:#{1,4}\s*(TD-\d+)|\|\s*(TD-\d+)\s*\|)", re.IGNORECASE | re.MULTILINE)
-LEDGER_DEFAULT = "docs/technical_debt.md"  # §5's `ledger:` key overrides this once it lands (step 5)
+LEDGER_DEFAULT = "docs/technical_debt.md"  # §5's `ledger:` key overrides it per record (`Session.ledger`)
 DEFAULT_REFS = ("origin/HEAD", "origin/main", "origin/master")
 
 

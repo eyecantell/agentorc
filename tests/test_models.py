@@ -44,6 +44,10 @@ def test_session_roundtrip_is_lossless():
     s.set_state("needs-you", confidence="hook", pending=Pending(kind="question", text="q"))
     back = Session.from_dict(s.to_dict())
     assert back == s
+    # the role badge and the ledger path the client read at create (design §4.8, §5) ride on the record
+    s = Session(id="b", name="b", kind="interactive", adapter="claude-code", dir="/", role="grinder", ledger="d/l.md")
+    assert Session.from_dict(s.to_dict()) == s
+    assert Session.from_dict({"id": "c", "name": "c", "kind": "interactive", "adapter": "x", "dir": "/"}).role == ""
 
 
 def test_state_rank_covers_every_state():
