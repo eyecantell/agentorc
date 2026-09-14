@@ -323,4 +323,4 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 Done when two agents can be open in two OS windows at once, alt-tab moves between them, each window's title names its session and its state, and popping out the same session twice raises the first window instead of opening another.
 
-**Related:** design §4.5 screen 2 (Focus), §4.5a, §4.6 (transport and terminal mechanics — one pty per open terminal), §4.5b (reachability: a popped-out window is the same origin, so the tunnel or private network carries it unchanged); TD-029 (a closed session's terminal reconnecting), TD-038 (the terminal's look).
+**Related:** design §4.5 screen 2 (Focus), §4.5a, §4.5 (its screens intro: one pty per open terminal), §4.6 (transport and terminal mechanics), §4.5b (reachability: a popped-out window is the same origin, so the tunnel or private network carries it unchanged); TD-029 (a closed session's terminal reconnecting), TD-038 (the terminal's look).
