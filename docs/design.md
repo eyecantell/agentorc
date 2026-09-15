@@ -812,10 +812,12 @@ non-empty. Two channels cover every worker seen so far and the person's own sess
 
 - `progress`: references the session set out to resolve. Entries
   `{ref, status: claimed | done | dropped, pr, why, at, source}` — `why` carries
-  `ao progress drop`'s reason and is empty otherwise. The channel also carries one entry that
-  names no reference: `ao progress none --why` sets `out_of_work: {at, why}` on the record — the
-  session's own word that it searched and found nothing it may pick, which is what tells its lead
-  an exit was an ending rather than a crash (§4.9a, design 2026-09-14, not built). The `lane` on the record is the
+  `ao progress drop`'s reason and is empty otherwise. One RPC on this channel writes no entry at
+  all: `ao progress none --why` sets `out_of_work: {at, why}` as its own field on the record, beside
+  the entry list rather than in it — so the upsert-by-reference rule below is untouched, and a
+  session with no work and no references still has somewhere to say so. It is the session's own word
+  that it searched and found nothing it may pick, which is what tells its lead an exit was an ending
+  rather than a crash (§4.9a, design 2026-09-14, not built). The `lane` on the record is the
   ordered list of references (or `free-pick`) the session was handed, so the card can say
   *1 of 2* without parsing the brief. One reference is one entry: a report upserts by `ref`, in
   the order the references arrived, and a reference is canonical (`td-27` and `TD-027` are one
@@ -1731,7 +1733,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 14. No session is stopped, and no team wound down, for lack of work by anything but the
     sessions' own declarations: the core never infers that work has run out (§4.9a, 2026-09-14).
     `out_of_work` is written only by the session it is about, through the ungated `progress`
-    channel, and is never derived — the one report entry with no derived form, because every
+    channel, and is never derived — alone among what the channels carry, it has no derived form, because every
     clause of the test is a judgement over prose the core cannot read. A worker that exits without
     declaring it is a crash and is restarted.
 
