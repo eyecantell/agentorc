@@ -481,3 +481,4 @@
 21:39  Checked whether any of it binds me yet rather than assuming: it does **not**. `ao progress --help` offers only claim/done/drop -- there is no `none` verb -- `out_of_work` appears nowhere in `src/`, and **TD-053 is Open** ("build design §4.9a"). So §4.9a is a design that has landed and a mechanism that has not; my brief still governs, and its stop conditions are still unmet. Noting for the summary that when TD-053 is built, the `why` on a member's record is what my wind-down line would be written from -- today I would have to read it off a screen.
 22:10  tick 70 (04:10Z). tdgrind-ao-1: `idle` since 18:21:23Z (~9h 50m), unchanged. No merges, no open PRs. ok -- quiet tick.
 22:41  tick 71 (04:41Z). tdgrind-ao-1: `idle` since 18:21:23Z (~10h 20m), unchanged. No merges, no open PRs. ok -- quiet tick.
+23:12  tick 72 (05:12Z). tdgrind-ao-1: `idle` since 18:21:23Z (~10h 50m), unchanged. No merges, no open PRs. ok -- quiet tick.
