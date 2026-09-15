@@ -621,6 +621,8 @@ noted). If a control is not in this table it does not exist.
 | New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is what every session was before — landed 2026-09-13 |
 | card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026) — landed 2026-09-13. On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *no stop time* rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs. Setting a **different** time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill — landed 2026-09-14 |
 | New session | **Until** field | the stop time the session starts with: `06:00` (the next one, in your clock), `+8h`, or an ISO time. Refused on a session that is not **Unattended**, since policies leave interactive sessions alone (§4.2); empty means nothing stops it, which is what every session was before (§6, TD-026) — landed 2026-09-13 |
+| card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a) — design 2026-09-14, TD-053, not built |
+| Org | **Teams** strip: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of a bare zero live count: *nothing running* and *nothing left to run* are different facts about a team (§4.9a) — design 2026-09-14, TD-053, not built |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team — landed 2026-09-13 |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
@@ -763,7 +765,8 @@ previous run's log. Once the rule holds, every subcommand that takes an id also 
 name and resolves it within the current repo or directory (TD-030), so the hint can say
 `ao focus aotest`.
 Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao progress done
-TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, and `ao finding TD-029 --priority low`
+TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, `ao progress none --why "..."` (the
+session found no work it may pick — §4.9a, design 2026-09-14, not built), and `ao finding TD-029 --priority low`
 (each a small RPC on the calling session's own record — `--id` for another's, since the channels
 are ungated; `ao status -v` prints the same report line the card will, and `--json` the entries). Presets are picked at start, `ao new
 --role grinder --lane TD-027,TD-019` (`--lane` landed with TD-028 step 2; `--role` and `ao roles`
@@ -809,7 +812,10 @@ non-empty. Two channels cover every worker seen so far and the person's own sess
 
 - `progress`: references the session set out to resolve. Entries
   `{ref, status: claimed | done | dropped, pr, why, at, source}` — `why` carries
-  `ao progress drop`'s reason and is empty otherwise. The `lane` on the record is the
+  `ao progress drop`'s reason and is empty otherwise. The channel also carries one entry that
+  names no reference: `ao progress none --why` sets `out_of_work: {at, why}` on the record — the
+  session's own word that it searched and found nothing it may pick, which is what tells its lead
+  an exit was an ending rather than a crash (§4.9a, design 2026-09-14, not built). The `lane` on the record is the
   ordered list of references (or `free-pick`) the session was handed, so the card can say
   *1 of 2* without parsing the brief. One reference is one entry: a report upserts by `ref`, in
   the order the references arrived, and a reference is canonical (`td-27` and `TD-027` are one
@@ -1005,6 +1011,9 @@ deliberately not warned about: briefs cite dated ADRs and state what was true on
 | `orchestrator` | read `ao --json status` on a cadence — **ending each tick in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `orchestrate` | `progress` per tick: sessions acted on and what was done |
 | `plain` | — (no template) | — | none | whatever it declares |
 
+Each preset also carries the test for when it has **run out of work**, which is the role's and
+never the core's; the tests and what a lead does with them are §4.9a (design 2026-09-14).
+
 The relay is the third of cadence §3's three delivery paths for a convention change (the sync PR, the SessionStart hook, the relay) and the only one that reaches a session already running; the orchestrator keeps a structured record of what it relayed to whom on its launch branch, so a nightly restart does not resend. The cadence check is the orchestrator's only judgement about the *work* rather than the *session*, and it is borrowed, not owned: the script is a dev-cadence SYNC file that the working session runs before merging (`/cadence`) and the weekly sweep runs over the window, so the orchestrator adds a third caller, not a third rule set. Its `review` row is self-attested (the worker posted the evidence comment itself), so the orchestrator says *recorded*, never *verified*, and a green check is a reason not to nudge, not proof of a good review.
 
 The first orchestrator is a **session, not code**: its brief is the samscrape supervisor's
@@ -1183,6 +1192,119 @@ section changes for that: the host column fills in.
 own worktree, the grinders' `controllers` naming the orchestrator, the Org page showing the
 three as one group with the lead first, and `ao team stop ao-grind` wrapping them up in the
 right order.
+
+### 4.9a Winding down: a team that runs out of work (2026-09-14)
+
+Every stopper in §6 is a clock or a cap — a stop time, a run window, a usage gate, a credential
+lapse, a stall. All of them answer *has this run too long or too expensively?*; none answers *is
+there anything left to do?* And `ao team stop` is a person's command: `agentorc.teamrun` runs the
+stop sequence only when a caller calls it, and no condition ever calls it. So a fleet with nothing
+to do keeps its shape — workers idle in their worktrees, the lead ticking every ten minutes over
+them — until a person notices or the window closes.
+
+A team with a **fixed lane** does wind itself down today, but by three paragraphs of English
+agreeing with each other rather than by anything here: the worker's brief says *stop when your
+lane is done*; the orchestrator restarts a worker that exited **with lane items still open**, so
+one that finished is correctly left alone; and the orchestrator's own brief says *stop when every
+member has exited*. That cascade is real and it works. It is also invisible to the design, to the
+Org page and to the agent — and it does not survive the lane shape the ao-grind team actually
+runs.
+
+**Free-pick is where it breaks.** A free-pick worker has no list to exhaust, so *lane done* never
+becomes true and it stops only on the usage cap or a wrap-up. The lead's idle rule fires on *idle
+with lane items not done*, which a worker with no lane items never matches, so an idle free-pick
+worker matches no rule and nothing notices it. And the cascade inverts: the lead cannot end after
+its members, because its members cannot end, so it outlives work whose absence it has no way to
+detect.
+
+**What "no work" means belongs to the role, not to the core.** The core knows a session's state,
+its lane and its report channels; it does not know what a ledger is (the repo's `.agentorc.yml`
+names the file, §5, and reading it with judgement is the session's job, §4.8). Each preset
+therefore carries its own test, in §4.8's table beside the brief it hands out:
+
+| Preset | Out of work when |
+|---|---|
+| `grinder`, fixed lane | every lane reference is `done` or `dropped` — the case that already works |
+| `grinder`, `free-pick` | the ledger holds no entry it may pick: nothing open that its brief does not exclude, that is not already claimed by a live sibling, and that is not parked on `user_attention.md` waiting for a person |
+| `hunter` | its area is **gone**, not quiet — no such tests, no such path, no such deployment to probe |
+| `orchestrator` | no member is live, and every member that exited declared why |
+
+**Quiet is not empty**, which is the distinction Paul's two examples sit either side of. A role
+that consumes a list ends when the list ends. A role that watches a stream — a hunter on a
+production system, an orchestrator on its members — is *waiting* when its source goes silent, and
+waiting is not finishing. A watcher stops only when the thing it watches is gone. Collapsing the
+two is how a fleet quietly stands down over a slow afternoon.
+
+**Exhaustion is declared, never inferred.** A session that finds no work writes it on its own
+record — `ao progress none --why "<the search that came up empty>"`, one more verb on the ungated
+`progress` channel (§4.8) — which sets `out_of_work: {at, why}` and nothing else. Two reasons it
+must be the session's own word rather than a count the agent makes:
+
+- Only the session can do the search. Every clause of the free-pick test above is a judgement over
+  prose — what the brief excludes, what a sibling holds, what is parked. An agent-side count of
+  open ledger rows would answer a different question and answer it confidently.
+- It makes an exit **legible**. An exited worker is otherwise indistinguishable from a crashed
+  one, and the lead's restart rule is the thing that has to tell them apart. It does that today by
+  *lane items still open*, which free-pick makes permanently false-shaped — a worker that died
+  mid-run and one that ran out both look finished. The declaration is the difference, and a worker
+  that exits without one is treated as a crash and restarted, as it should be.
+
+It is a **fact on the record, not a state** — the session stays `idle` or `exited` in every
+payload, the same shape as unseen idle (§4.2, TD-017). A ninth state for *idle and there is
+nothing to be idle about* would have to be derived by the core, which is the thing this section
+says the core cannot do.
+
+**One member's exhaustion is not the team's.** A grinder out of work sits beside a hunter with
+plenty. The lead winds the team down when **every** member is out of work or exited having said
+so; until then an out-of-work member is simply not nudged and not restarted. The wind-down itself
+is `ao team stop`'s sequence and nothing new — wrap up the members, wait for them to settle, then
+the lead — so there is one code path and the order is the order (§4.9).
+
+**A wind-down is announced.** An empty ledger is a fact about the project, not about the fleet,
+and a team that dissolves quietly is harder to notice than one that says so. The lead's last act
+before its own exit is a line on `docs/user_attention.md`: the team ran out of work at `<t>`, and
+what each member looked for and did not find, taken from the `why` on each record. That line is
+the point of the whole mechanism — the fleet has finished the work a person defined, and the next
+move is a person's.
+
+**False exhaustion is the failure mode to guard.** The dangerous case is not a team that runs on
+too long; it is one that stands down because it looked wrong — a `gh` outage, a moved ledger file,
+a grep that matched nothing because the path changed. Three bounds, with their numbers deliberately
+unset here and chosen in TD-053 against a running fleet: a declaration carries its reason or is
+refused; the lead re-reads the ledger itself before accepting a **team-wide** wind-down, since one
+cheap second opinion catches every mechanical false negative; and an exhaustion declared within a
+short time of a session's start is reported rather than acted on, because a worker that found
+nothing to do in its first minutes more likely failed to look.
+
+**Out of work does not mean out of reach.** An out-of-work session that is still alive keeps its
+inbox, and mail may wake it within the wake budget (§4.10, §9 invariant 13): a message is exactly
+how *there is work now* would arrive, and this is the case where waking an idle session most
+plainly earns its keep. A session that has exited has no inbox, and the way to bring it back is
+the way it started — `ao team start`, which is already the restart (§4.9). A wound-down team is
+only its definition again, which is what a stopped team has always been.
+
+**It does not replace the clock.** A team can reach its stop time with work left, or run out of
+work well inside its window; the two stoppers are orthogonal and neither implies the other. Nor
+is this a scheduler: nothing here restarts a team when work reappears. A fleet that starts itself
+is TD-026's question, and a different one.
+
+**Surface.** `ao progress none --why` on the CLI (§4.7). On the card and the Focus header, an
+**out of work** chip with the reason on hover, beside the report line; on the Org page's Teams
+strip, a definition whose sessions have all wound down reads *wound down <t>* rather than a bare
+zero live count, since *nothing running* and *nothing left to run* are different facts about a
+team (§4.5a — the rows are added there in the same PR).
+
+**Alternatives rejected.** *The agent counts open ledger entries* — it would have to know what a
+ledger row means in a repo whose config only tells it a filename, and it would be wrong with
+confidence. *An exit code says "no work"* — a tool's exit code belongs to the tool, and the fact
+has to survive on the record for the lead to read on its next tick, not in a process that has
+gone. *Treat an empty ledger as an error* — it is the successful end of a run, and the only thing
+it asks for is a person's attention, which the board line already gets.
+
+**Done when** a free-pick grinder with nothing left to pick declares it and exits, its lead leaves
+it alone rather than restarting it, and — once every member has done the same — the lead runs the
+same stop sequence `ao team stop` runs, leaves one board line naming what each member searched,
+and exits; `ao team start ao-grind` then brings the team back.
 
 ### 4.10 Messages between sessions (2026-09-14)
 
@@ -1606,6 +1728,13 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     text is asking for an act of control and is bound by invariant 11. Messages are coordination and die with the record; anything that must outlive
     the run belongs to the ledger, the board or a PR.
 
+14. No session is stopped, and no team wound down, for lack of work by anything but the
+    sessions' own declarations: the core never infers that work has run out (§4.9a, 2026-09-14).
+    `out_of_work` is written only by the session it is about, through the ungated `progress`
+    channel, and is never derived — the one report entry with no derived form, because every
+    clause of the test is a judgement over prose the core cannot read. A worker that exits without
+    declaring it is a crash and is restarted.
+
 ## 10. Open questions
 
 - [x] Reachability (2026-09-06): "Tailscale only" generalised to **never a bare public port** —
@@ -1851,6 +1980,20 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       that is agentorc's own, and running agents are better read as a team than as a herd.
       Every §4.5a row, template, route handler and mockup now says Team; herdr keeps its name
       throughout, since it names something else.
+
+- [x] **Does a team wind down when it runs out of work?** (Paul, 2026-09-14 — "no production
+      system to keep checking, no TDs".) It did not. Every stopper in §6 is a clock or a cap, and
+      `ao team stop` is a person's command no condition calls; what looked like wind-down was
+      three brief paragraphs agreeing with each other — *stop when your lane is done*, restart a
+      worker that exited *with lane items still open*, *stop when every member has exited* — which
+      holds for a fixed lane and fails for free-pick, the lane ao-grind actually runs. → **§4.9a**
+      (2026-09-14): the test for "no work" belongs to the role, quiet is not empty (a watcher
+      waits, a consumer ends), exhaustion is **declared** on the record and never inferred by the
+      core (invariant 14), one member's exhaustion is not the team's, and the lead's last act is a
+      board line — a team that dissolves quietly is harder to notice than one that says so. Built
+      under TD-053; the three guards against a *false* stand-down (a reason required, the lead's
+      second reading, an early declaration reported rather than acted on) carry no numbers yet,
+      deliberately.
 
 ## 11. References
 

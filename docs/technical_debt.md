@@ -31,6 +31,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-049 | An orchestrator only learns what its members did on its own timer: there is no way for a worker to say *I finished* and wake its lead | Medium | Open |
 | TD-050 | The cadence check's `review` row reads the verdict only on a comment's first line, so a report that ends with it counts as no review at all | Medium | Open |
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Open |
+| TD-053 | A team never winds down when it runs out of work: build design §4.9a — the declaration, the role tests, the lead's wind-down and the board line | Medium | Open |
+| TD-054 | `test_a_card_says_when_the_session_stops_and_only_then` fails for every run after 21:00 local: the stop note gains a day prefix the assertion does not expect | Low | Open |
 
 ---
 
@@ -355,3 +357,44 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a worker tells its lead it finished without the lead polling; two leads over one worker settle a contradiction between themselves and land a board line when they cannot; a message to a person's session is delivered where a nudge is refused; every refusal names §4.10's graph; a session out of wake budget receives mail that lands without waking it, visibly to itself and to the sender; and a person's session is never woken by mail at all.
 
 **Related:** design §4.10 (the whole section), §4.5a, §4.7, §9 invariants 5, 11 and 13, §10 (the 2026-09-14 entry, and the 2026-09-13 one it answers); TD-039 (the conflict half — a `conflict` message and its exchange, which step 3 bounds), TD-049 (the wake, absorbed by step 4), TD-036 (the graph the gate reads), TD-028 (the report channels the Inbox sits beside and deliberately is not).
+
+
+## TD-053: A team never winds down when it runs out of work — build design §4.9a
+
+**Priority:** Medium
+**Added:** 2026-09-14 (raised by Paul)
+
+**Status:** Open — **the design landed first, as §4.9a (2026-09-14)**, with two rows in §4.5a, a sentence in §4.7, a paragraph on the `progress` channel and a pointer under the role table in §4.8, invariant 14 added, and the §10 question answered. Nothing is built.
+
+**Location:** `src/sessionorc/models.py` (`out_of_work` on the record), `src/sessionorc/agent.py` (the `progress` RPC's new entry shape), `src/agentorc/cli.py` (`ao progress none`), `src/agentorc/teamrun.py` (the wind-down calls the existing stop sequence), `src/agentorc/ui/` (the chip and the strip note), `agentorc/briefs/*.md` (each role's test), `docs/briefs/orchestrator-ao-1.md`, design §4.9a / §4.5a / §4.7 / §4.8 / §9 invariant 14
+
+**Why:** every stopper in §6 is a clock or a cap — stop time, run window, usage gate, credential lapse, stall — and none of them answers *is there anything left to do?*; `ao team stop` is a person's command that no condition calls (`teamrun.stop_members` runs only when a caller calls it). What looked like wind-down was three brief paragraphs agreeing with each other: the worker's *stop when your lane is done*, the orchestrator's restart rule keyed on *lane items still open*, and the orchestrator's *stop when every member has exited*. That cascade holds for a fixed lane and breaks for `free-pick`, which is the lane the ao-grind team actually runs: *lane done* never becomes true, the lead's idle rule (idle **with lane items not done**) never matches a worker with no lane items, so an idle free-pick worker matches no rule at all and nothing notices it — and the lead cannot end after members that cannot end. Paul, 2026-09-14: *"Does our design also have a team wind down if it runs out of work to do? e.g. no production system to keep checking, no TDs?"* Those two examples sit either side of the distinction §4.9a turns on: a role that consumes a list ends when the list ends; a role that watches a stream is *waiting* when its source goes quiet, and waiting is not finishing.
+
+**Fix, in order — each step is usable on its own:**
+
+1. **The declaration.** `out_of_work: {at, why}` on the session record, written only by `ao progress none --why` on the ungated `progress` channel, persisted and reloaded with the record, never derived (§9 invariant 14 — the one report entry with no derived form). A `why` is required: a declaration without one is refused, naming the rule. Tests: the field survives a reload; a derived-report tick never writes it; `ao status -v` and `--json` show it.
+2. **The role tests, in the briefs.** §4.9a's table written into each `agentorc/briefs/<role>.md` template: what a fixed-lane grinder, a free-pick grinder, a hunter and an orchestrator each have to have searched before they may declare it, and the rule that they declare it *before* exiting rather than just exiting. This is prose, and it is the step that makes the rest mean anything.
+3. **The lead's half.** The orchestrator's tick: an out-of-work member is not nudged and not restarted; a member that exited **without** declaring it is still a crash and is still restarted (that split is the whole value of step 1); and when every member is out of work or exited having said so, the lead runs the wind-down. The wind-down is `teamrun`'s existing stop sequence called with a different trigger — wrap up the members, wait, then the lead — never a second code path.
+4. **The three guards, whose numbers §4.9a deliberately leaves unset:** the lead re-reads the ledger itself before accepting a **team-wide** wind-down (one cheap second opinion catches every mechanical false negative — a `gh` outage, a moved ledger file, a path that changed under a grep); an exhaustion declared within *n* minutes of a session's start is reported rather than acted on; and a member's own re-check interval before it may declare. Choose the numbers here against a running fleet, write them into the design in the same PR, and say what evidence would change them. The failure to guard against is not a team that runs on too long — it is one that stands down because it looked wrong.
+5. **The board line.** The lead's last act before its own exit: one line on `docs/user_attention.md` naming the time and, per member, what it looked for and did not find, taken from each record's `why`. This is the point of the mechanism — the fleet has finished the work a person defined, and the next move is a person's; a team that dissolves quietly is harder to notice than one that says so.
+6. **The surfaces** (§4.5a's two rows): the **out of work** chip on the card and Focus header with the `why` on hover, and the Teams strip reading *wound down <t>* rather than a bare zero live count.
+
+**Deliberately not in scope:** restarting a team when work reappears — a fleet that starts itself is a scheduler, which is TD-026's question and a different one; and any core-side count of open ledger rows, which §4.9a rejects by name.
+
+**Related:** design §4.9a (the whole section), §4.9 (the stop sequence this reuses, and `ao team start` already being the restart), §4.8 (the `progress` channel and the role presets that carry the tests), §6 (the clock-and-cap stoppers this is orthogonal to), §9 invariant 14, §10 (the 2026-09-14 entry); TD-032 (a stood-down worker sitting `idle` for 20 h with nothing noticing — the same blind spot from the other side); TD-042 (a brief describes the job, not the run — why the test lives in a repeatable template); TD-052 (mail is how *there is work now* reaches an out-of-work session that is still alive, §4.10's wake budget); TD-026 (the schedule that would start a wound-down team again).
+
+
+## TD-054: The card stop-note test fails for every run after 21:00 local
+
+**Priority:** Low
+**Added:** 2026-09-14
+
+**Status:** Open — found by a full-suite run at 21:08 MDT while landing §4.9a (a docs-only branch); reproduces on `origin/main`
+
+**Location:** `tests/test_ui.py::test_a_card_says_when_the_session_stops_and_only_then`, against `sessionorc.models.stop_note` (`models.py:157`)
+
+**Why:** the test builds a stop time of `now + 3h` and asserts the card contains `f"stops {when:%H:%M}"`. `stop_note` prefixes the weekday once the stop is **not today** (`models.py:175`, deliberately — *stops Mon 06:00*), so from 21:00 local onwards the rendered text is `stops Tue 00:08` and the bare `stops 00:08` is not in it. The behaviour is correct and the assertion is the thing that is wrong; it simply never runs late enough in a working day to be noticed. It is a wall-clock dependency of the same family as TD-033 and TD-025, and it fails a clean checkout, so it costs a session the ability to tell its own breakage from the suite's.
+
+**Fix:** either freeze the clock for this test, or pick an offset that cannot cross midnight from any start time (a stop earlier the same day, or assert against `stop_note`'s own output rather than a re-derived format string). Done when the test passes at 23:59 as reliably as at 09:00 — check by running it under a faked local time at both.
+
+**Related:** TD-033 and TD-025 (the other load- and clock-sensitive flakes); design §6 / §4.5a (the **stops** note, TD-026), which is correct as built.
