@@ -477,23 +477,47 @@ everything that must touch its own machine — tmux (invariant 1), the pty bridg
 pane classification, `composer()`, run logs, git status, usage — and **dials home** over one
 long-lived link. The home is also a node for its own host's sessions (one process, both roles).
 - **One binary, a line in `hosts.yml`.** An agent whose `hosts.yml` names no `home:` is its own
-  home, which is phase 1 exactly. `home: kmaster` makes it a node.
-- **The UI talks only to the home.** The org's records are there, so an Org refresh is one call
-  wherever the sessions run.
+  home, which is phase 1 exactly. A top-level `home: kmaster` makes it a node.
+- **The UI and the CLI read the org from the home.** The org's records are there, so an Org
+  refresh is one call wherever the sessions run. Two exceptions, stated once: the terminal
+  websocket and attachment copies keep using the UI's own ssh to the session's host (§4.6) until
+  the relay needs them over the link; and **when home is unreachable**, an `ao` command or an
+  `ao ui` started on a node falls back to that node — its own host's sessions only, labelled
+  *offline*, a person able to attach, send and kill as below, and no org graph, mail or other
+  hosts until the link returns (Paul, 2026-09-16: *"won't the inability to reach home mean the UI
+  will not render?"* — it would have). Writes a person makes there are node-owned acts on the
+  node's own sessions; home-owned edits (controllers, grants, stop time) wait for the link.
 - **A node reports and executes; the home decides.** A node reports its sessions' state, hooks and
   pane evidence to the home, which merges them into the records. An act (`send`, `keys`, `kill`,
   `close`, wrap-up, `create`, a doorbell `ring`) is gated at the home and executed by the node that
   owns the session's host, which returns the verdict. The home accepts from a node only reports
-  about, and routes acts only to, records whose `host` is that node's.
-- **Policies run on the node, always.** §6's policies — run window, usage gate, stop time and its
-  wrap-up, stall — are the host agent acting on its own host's sessions with no caller, not one
-  session acting on another, so they are **not** gated at the home and do not wait for it. The
-  home sends each node the policy fields of that node's records (`unattended`, the run window,
-  `run_until`, the profile) as they change, and a node whose link is down keeps applying the last
-  values it received, reporting what it did when the link returns. Stopping on time is the safe
-  direction: an unattended laptop worker past its stop time must be wrapped up whether or not
-  kmaster is reachable. A person's edit to a stop time while the link is down reaches the node
-  when it returns (Sonnet review, 2026-09-16).
+  about, and routes acts only to, records whose `host` is that node's. A `kill` racing a state
+  report resolves on the node, the single tmux writer for its host; the home applies both in
+  arrival order.
+- **Each field has one owner, and merges go by owner, never by last write** (third review,
+  2026-09-16). **The node owns what it observes and enforces on its host:** `state`, `confidence`,
+  `pending`, `pane`, `tail`, `last_output`, `exit_code`, `git`, `model`, usage, the run log and
+  `wrapup_sent_at`. **The home owns the graph and intent:** `controllers`, `capabilities`, `team`,
+  `project`, `role`, `lane`, `unattended`, `run_until`, the wrap-up prompt, reports, the inbox,
+  tallies, wake budgets and `mail_decided`. Example: the link is down, the node wraps a worker up
+  and it exits, and meanwhile a person at the home extends its `run_until`; on reconnect the node's
+  `exited` and `wrapup_sent_at` stand, and so does the home's new `run_until` — which now applies to
+  nothing, because a stopped session is not resurrected.
+- **A node keeps its own host's records on disk**, as every host agent does today — a replica whose
+  home-owned fields the home's copy overrides. That replica is what a person acts through while
+  offline, what the node's policies read, and what rebuilds the home (below).
+- **Policies that stop run on the node; policies that start run at the home** (Sonnet review,
+  narrowed by the third review, 2026-09-16). Stop time and its wrap-up, stall, exit reaping, the
+  usage gate's pause and its resume send, the credential nudge and the stranded flag are the host
+  agent acting on its own host's sessions with no caller, so they run **on the node**, from its
+  replica, **offline included** — stopping on time is the safe direction, and an unattended laptop
+  worker past its stop time must be wrapped up whether or not kmaster is reachable. Usage is fetched
+  on the node from that host's own credentials. The home pushes each node its records' policy
+  fields as they change. Starting a missing worker inside a run window, and any policy that creates
+  a session, is a `create` with `controllers`, a team and the anchor check, so it runs **at the
+  home** and is refused while the host is unreachable. Two harms are accepted and stated: a stop
+  time **extended** at the home during a partition does not resurrect a session the node already
+  stopped, and one **shortened** at the home is not seen by the node until reconnect.
 - **§4.10 and §4.8 do not change.** Every rule stays single-process, because the process holding
   the graph is the home. Routing is not a question: mail goes to one place.
 
@@ -503,7 +527,12 @@ files never contain `@`, and a `controllers`, `to` or `from` entry is stored qua
 names a session on another host. One normalisation function qualifies ids on the way in.
 Invariant 12's name rule stays per scope on one host: two hosts may each hold `ao-agentorc-tdgrind`,
 told apart by `@host`. (Org-unique names were rejected: a laptop that started a session offline
-would collide on reconnect and force a tmux rename.)
+would collide on reconnect and force a tmux rename.) **A request's identity comes from the channel
+it arrived on, never from a field** (third review, 2026-09-16): the home qualifies an arriving
+`caller` with the host of its channel — the home's own socket is the home's host, a link is the
+host bound to that link's key (below) — and ignores any host a client sends. Otherwise a laptop
+session named `ao-agentorc-orc` could pass the gate as kmaster's lead of the same name. A person's
+request arriving over a link (no caller) may act only on that node's records.
 
 **Delivery and time.** The home is the single sequencer: it mints message ids and stamps `at` on
 its own clock, so an `ask`'s bound and the wake budget's rolling window never see clock skew
@@ -511,13 +540,27 @@ between hosts. A request that crosses the link carries a client nonce, so a retr
 reconnect never lands twice. Order is the home's arrival order.
 
 **When a host cannot reach home (Paul, 2026-09-16).** A **person** at that host still acts on its
-sessions through the local node — attach, send, kill — as today, with no caller and no gate. A
-**session** on that host may neither send mail nor act on another session until the link is back
-(the host agent's own policies keep running, above):
-both are **refused**, naming the unreachable home. An ungated spool would deliver mail the gate
+sessions through the local node — attach, send, kill, and **create**: a person's new session on an
+offline node is served by the node, with an id minted on that host as today, `controllers` as the
+person gave them, and hooks bound to the node, and is reported and adopted when the link returns. A
+**session** on that host may neither send mail, act on another session, nor create one until the
+link is back (the host agent's stopping policies keep running, above):
+all are **refused**, naming the unreachable home. An ungated spool would deliver mail the gate
 never saw; spooling with the verdict returned later is a possible later slice, not this one. The
-node keeps observing its sessions while home is away and replays their events when the link
-returns, as hook events already spool to `events/<session>.jsonl` while the agent is down. The
+node keeps observing its sessions while home is away. **On reconnect it sends a full snapshot of
+its records first, then the events it spooled**; the home applies node-owned fields from the
+snapshot and drops replayed events older than it. The spool is bounded — drop the oldest, keep the
+snapshot — which is enough at the rate hooks fire, so nobody builds a queue for it. A report about a
+record the home has never seen (a person's offline create, or a home restored from an old store) is
+**adopted**, as `_reconcile_external` adopts a hand-made pane today, with the replica's
+`controllers` or none. A closed home record with the same id is superseded by it (invariant 12).
+**Permission prompts** follow the same line: the hook blocks on its node's socket and the waiter
+lives there; the home pushes `needs-you` to the UI and routes a person's answer back to the node.
+When the link drops mid-prompt, the home marks the pending *host unreachable* and the card sends the
+person to Focus; the hook keeps blocking until its own timeout, and a person at that host answers
+in the tool's own terminal dialog, which is already up in the pane (§4.2). **Reachability has one
+source**: the home's link state per host, with §4.6's *ssh failed* vs *agent down* diagnosis made
+by that link, shown as an overlay on the host's cards, never as a record state. The
 alternative Paul was offered — the laptop acting as its own home while offline — would make two
 authorities reconcile thread tallies, budgets and copies on reconnect, which is the split-brain
 failure that rules out a mesh.
@@ -530,8 +573,24 @@ idle, the home's next tick decides the wake. An **act** onto an unreachable host
 never queued: a `kill` or a wrap-up that fires hours later is worse than a refusal the caller can
 see.
 
+**When the home is lost.** A reboot costs nothing: sessions keep running under tmux (§4.1), nodes
+spool, and the home rebuilds from its store. A lost or stale store is rebuilt from the nodes'
+replicas, which carry every home-owned field as of their last push, adopted on reconnect as above.
+What is **lost with the home's store and only that**: mail, thread tallies, wake budgets and the
+person inbox — which invariant 13 already declares not durable. Backup is a **nightly tarball of the
+home's store**; replication is not warranted at this scale. **Moving the home** is three things,
+not one line: the store directory, every node's `home:` line, and the link keys authorised on the
+new home.
+
+**Teams across hosts.** `ao team start`'s all-or-nothing check (§4.9) reads *every checkout exists
+on the record's host*, checked by that host's node; a team whose members span two hosts is refused
+while either is unreachable. `org.yml` lives on the home, and clients read it there.
+
 **The link.** The node dials the home over **ssh**, with a key authorised on the home for one
-forced command, `agentorc-agent link`, over WireGuard or any route the person already has. The
+forced command bound to its host name — `command="agentorc-agent link --host laptop"` in the home's
+`authorized_keys` — over WireGuard or any route the person already has. The host name comes from
+that line, never from what the node claims, so a compromised laptop can neither report nor act for
+kmaster's sessions; the home's `hosts.yml` is the list of authorised nodes. The
 home never exposes a port and the laptop never listens (§4.5b). The link multiplexes requests by
 id — unlike a CLI's socket connection, which stays serial (§4.6) — so a `wait` forwarded from a
 node, and its cancellation when the CLI's connection closes, travel beside ordinary requests. It
@@ -707,7 +766,7 @@ noted). If a control is not in this table it does not exist.
 | Focus side panel | **Inbox** | the session's mailbox (§4.10): each entry with its sender, kind, time, `about` reference and whether it is read; an `ask` shows its bound and the `reply` that answered it. A person may **reply** to any entry as themselves, and may delete one. Sits beside **Reports**, which it deliberately is not: Reports are what this session declared about its work, the Inbox is what others addressed to it — design 2026-09-14, TD-052, not built |
 | card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, which is the common case. A person's own session shows it too when the graph reaches it (§4.10); mail meant for the person goes to the top bar's **person inbox**, not here — design 2026-09-14, TD-052, not built |
 | Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (host agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a send, and the sender reads it when it next looks (§4.10) — design 2026-09-14, TD-052, not built |
-| Org top bar | **person inbox** | the host's person inbox (§4.10): unread count, click to open; each entry with its sender session, kind, time and `about`, with **Reply** into the sender's inbox and delete. Sessions reach it with `ao msg person`, ungated. Rings nothing — design 2026-09-16 (Fable review), TD-052, not built |
+| Org top bar | **person inbox** | the org's person inbox (§4.10): unread count, click to open; each entry with its sender session, kind, time and `about`, with **Reply** into the sender's inbox and delete. Sessions reach it with `ao msg person`, ungated. Rings nothing — design 2026-09-16 (Fable review), TD-052, not built |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `orchestrate` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
@@ -756,8 +815,9 @@ runs and who is trusted to run it, which is a product decision, not an architect
 
 Consequences for what gets built now: the agent's RPC stays a plain JSON-lines stream over any
 byte pipe (already true — `agentorc-agent rpc` is a stdio bridge); the terminal bridge, which
-today spawns `tmux attach` locally under `/term/<id>` (phase 1), **must move onto that same pipe
-in phase 2** rather than gain a port of its own; and nothing in the UI may assume it can reach a
+today spawns `tmux attach` locally under `/term/<id>` (phase 1), **must never gain a port of its own**
+— in phase 2 it reaches a session's host over the UI's own ssh (§4.4a), and it moves onto the
+node→home link when the relay needs it; and nothing in the UI may assume it can reach a
 host by address. `relay` itself is not scheduled; it is a phase after 5, and the first
 hosted version can be a single small VPS running the relay and the UI for a handful of people.
 
@@ -889,7 +949,7 @@ definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every ch
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
-its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052, not built): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the host's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — moves into the host agent as the `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052, not built): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — moves into the host agent as the `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -1677,7 +1737,7 @@ No new list, no new grant. A session may message:
   controlled target with it: the two leads over one worker, which is exactly TD-039's case. The
   badge edge is the one place anything keys on `team`, and invariant 9 names it as its exception:
   for a `lead: person` team the badge is the only edge between members there is.
-- **the person** — the host's person inbox, below; ungated.
+- **the person** — the org's person inbox, below; ungated.
 
 Anything else is refused, naming the rule. The graph is read on every call, like the grant and the
 membership, so nothing is cached and a membership edit changes who may talk on the next call.
@@ -1685,7 +1745,7 @@ Reads of one's own inbox are never gated; nobody reads another session's inbox (
 the UI, because a person is not a session). A controller that needs to see mail `about` its
 member gets its own copy (below), not a read of someone else's.
 
-**A session reaches a person through the host's person inbox, not through the person's
+**A session reaches a person through the org's person inbox, not through the person's
 sessions (Fable review, 2026-09-16).** The 2026-09-14 draft let a worker message "a person" and
 amended invariant 5 to allow it, but gave no edge that reached one: a person's session is never in
 a worker's `controllers` (`set_controllers` from a session onto an interactive target is refused),
@@ -1816,8 +1876,8 @@ Outside those stages an entry leaves only with its record or by a person's hand:
   crashed and was resumed would lose the very thread it was answering. **Ids follow the move:**
   `_supersede` rewrites the old id to the new one in the moved entries' `to`, and in every other
   record's pair tallies and pending `ask` addressees that name it — one host agent holds every
-  record in the org — the home, §4.4a — so the rewrite is local even when the successor was
-  resumed on another host.
+  record in the org — the home, §4.4a — so the rewrite is local. (Resume stays on one host: a
+  tool's conversation lives in that host's files, and a resume across hosts is not supported.)
   Entries already delivered keep `from` as it was; instead, **a message addressed to a closed
   record that a live one superseded is forwarded to the successor**, and the sender's reply says
   so. Without it, a lead's Reply to a worker that crashed and was resumed would be refused, the
@@ -2064,7 +2124,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    entries stay, inert. A **message** is not an act of control and is not refused
    by this invariant: it lands in the target's inbox and changes no state
    (§4.10, 2026-09-14), where the graph reaches a person's session at all; a session that wants
-   the *person* writes to the host's person inbox instead (2026-09-16). Mail to an
+   the *person* writes to the org's person inbox instead (2026-09-16). Mail to an
    interactive target **lands and never wakes**, whatever wake budget the general rule would
    allow: the mediator there is a person, and nothing starts a turn in their session but them.
 6. The core never types a menu choice into a pane; permissions are answered through the hook,
@@ -2117,11 +2177,14 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     clause of the test is a judgement over prose the core cannot read. A worker that exits without
     declaring it is a crash and is restarted.
 
-15. The org's session graph and its mail have **one writer, the home host agent** (§4.4a,
-    2026-09-16): records, `controllers`, grants, inboxes, tallies and wake budgets are changed only
-    there, and every gate reads them there. A node owns its host's tmux (invariant 1) and reports
-    to the home; while its link to the home is down, its sessions neither send mail nor act on
-    another session — refused, visibly — while a person at that host may still act through it.
+15. The org's **graph, intent and mail have one writer, the home host agent**; a session's
+    **observed state has one writer, its node** (§4.4a, 2026-09-16). `controllers`, grants, team,
+    `unattended`, stop time, reports, inboxes, tallies and wake budgets change only at the home, and
+    every gate reads them there; `state`, pane, exit code, usage and `wrapup_sent_at` change only on
+    the node that owns the session's tmux (invariant 1). Merges go by owner, never by last write. A
+    request's identity is the channel it arrived on, never a field it carries. While a node's link is
+    down its sessions neither send mail, act on another session nor create one — refused, visibly —
+    its stopping policies keep running, and a person at that host may still act through it.
 
 ## 10. Open questions
 
@@ -2468,6 +2531,20 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       mesh (split tallies after a partition; a laptop that must listen), the relay now. Invariant
       15 added. Built under TD-057; TD-052 step 1 proceeds single-host with the address and
       id-minting choices made now so nothing migrates.
+      **Revised the same day after a Fable review of §4.4a as merged** (verdict *sound with
+      changes*, not overbuilt for kmaster + a laptop), all adopted with Paul: a request's identity
+      comes from its channel, never a field (a same-named laptop session could have passed the gate
+      as kmaster's lead); each field has one owner — the node owns observed state, the home owns the
+      graph and intent — and invariant 15 now says so, since the Sonnet-added policy rule had made
+      the node a second writer; only *stopping* policies run on the node offline, *starting* ones
+      at the home; nodes keep their own records as a replica, the home adopts unknown reports and is
+      rebuilt from replicas, mail and budgets are what a lost store loses, and a nightly tarball is
+      the backup; a person may create a session on an offline node; link keys are bound to a host
+      name; permission prompts wait on the node and fall back to the tool's own dialog when the link
+      drops; one reachability source; reconnect is snapshot then events; cross-host teams refused
+      while a host is down; the terminal and attachments keep the UI's own ssh; and, on Paul's
+      question *"won't the inability to reach home mean the UI will not render?"*, `ao` and `ao ui`
+      on a node fall back to that host's own sessions, labelled *offline*.
 
 ## 11. References
 
