@@ -509,3 +509,20 @@ The reason it happened is worth recording: `TD-048`'s tests checked that the sum
 **Resolved:** 2026-09-14 (PR #143) — TD-040 and TD-041 moved to the archive with their summary rows deleted and their `Fix:` sections replaced by a `Resolved:` line recording what actually shipped (cadence §2); the open file is 19 rows and every one of them is open. `tests/test_ledger.py::test_the_open_file_holds_open_work_only` fails on any entry in the open file whose Status begins `Done` or `Resolved` — a *partly* done entry stays, which is what the Status field is for.
 
 **Related:** cadence §2; TD-048 (the other ledger rules, and the tests this joins); TD-040, TD-041 (the two moved).
+
+## TD-054: The card stop-note test fails for every run after 21:00 local
+
+**Priority:** Low
+**Added:** 2026-09-14
+
+**Status:** Resolved
+
+**Location:** `tests/test_ui.py::test_a_card_says_when_the_session_stops_and_only_then`, against `sessionorc.models.stop_note` (`models.py:157`)
+
+**Why:** the test builds a stop time of `now + 3h` and asserts the card contains `f"stops {when:%H:%M}"`. `stop_note` prefixes the weekday once the stop is **not today** (`models.py:175`, deliberately — *stops Mon 06:00*), so from 21:00 local onwards the rendered text is `stops Tue 00:08` and the bare `stops 00:08` is not in it. The behaviour is correct and the assertion is the thing that is wrong; it simply never runs late enough in a working day to be noticed. It is a wall-clock dependency of the same family as TD-033 and TD-025, and it fails a clean checkout, so it costs a session the ability to tell its own breakage from the suite's.
+
+**Fix:** either freeze the clock for this test, or pick an offset that cannot cross midnight from any start time (a stop earlier the same day, or assert against `stop_note`'s own output rather than a re-derived format string). Done when the test passes at 23:59 as reliably as at 09:00 — check by running it under a faked local time at both.
+
+**Related:** TD-033 and TD-025 (the other load- and clock-sensitive flakes); design §6 / §4.5a (the **stops** note, TD-026), which is correct as built.
+
+**Resolved:** 2026-09-16 (PR #158) — the test asserts `stops ` and the local `HH:MM` separately, as `tests/test_cli.py`'s version already did, and a second stop one day out pins the weekday prefix (`stops Thu 21:57`). Found blocking CI on PR #157 at 21:57 UTC (CI runs on UTC). Verified: the old assertion fails under `TZ=UTC` at 21:57; the new test passes under UTC, Etc/GMT+2, Etc/GMT-2 (23:57), Etc/GMT+10, Etc/GMT-11 (08:57) and America/Denver.
