@@ -384,10 +384,17 @@ def test_a_card_says_when_the_session_stops_and_only_then(tmp_path, monkeypatch)
     }  # fmt: skip
     card = templates.get_template("card.html")
     assert "stops" not in card.render(s=view(base))
-    when = datetime.now().astimezone() + timedelta(hours=3)
+    # the expected local time is the UTC instant converted back, exactly as `stop_note` does it:
+    # local arithmetic on a fixed-offset `astimezone()` would be an hour off across a DST change
+    when = (datetime.now(UTC) + timedelta(hours=3)).astimezone()
     stopping = {**base, "run_until": when.astimezone(UTC).isoformat().replace("+00:00", "Z")}
     html = card.render(s=view(stopping))
-    assert f"stops {when:%H:%M}" in html  # the reader's clock, never the record's UTC
+    # the reader's clock, never the record's UTC; `stop_note` adds a weekday once the stop is not
+    # today, so a run after 21:00 local must not expect the bare time right after "stops" (TD-054)
+    assert re.search(rf"stops (?:[A-Z][a-z]{{2}} )?{when:%H:%M}", html)
+    tomorrow = (datetime.now(UTC) + timedelta(days=1)).astimezone()
+    later = {**base, "run_until": tomorrow.astimezone(UTC).isoformat().replace("+00:00", "Z")}
+    assert f"stops {tomorrow:%a %H:%M}" in card.render(s=view(later))
     assert "wrap-up sent" not in html
     asked = {**stopping, "wrapup_sent_at": "2026-09-13T16:00:00Z"}
     assert "wrap-up sent" in card.render(s=view(asked))
