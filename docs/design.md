@@ -1311,7 +1311,7 @@ and exits; `ao team start ao-grind` then brings the team back.
 
 ### 4.10 Messages between sessions (2026-09-14)
 
-Four kinds of session-to-session traffic exist in practice — a lead prompting a worker, a worker
+Four kinds of session-to-session traffic exist in practice — a lead sending to a worker, a worker
 telling its lead it finished, two leads settling which of them a shared worker should listen to,
 and two workers avoiding each other's reference — and the design had one mechanism for all four:
 `ao send`, which is the host agent typing synthetic keystrokes into the target's pane. Only the first
@@ -1839,7 +1839,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 3. Every session has a run log from its first byte.
 4. A state shown as `hook` came from a hook; `scraped` is visible in the UI.
 5. Interactive sessions (`kind: interactive`, `unattended: false`) are never paused, killed, or
-   prompted by a policy, and never acted on by another session: an acting RPC from a session onto
+   sent to by a policy, and never acted on by another session: an acting RPC from a session onto
    one — `set_controllers` included — is refused whatever the caller's grant and membership
    (§4.8; a gate since 2026-09-13, TD-041). Only a person acts on an interactive session, and
    only a person hands one to unattended mode or to a controller. Flipping a session to
