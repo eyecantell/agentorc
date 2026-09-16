@@ -456,6 +456,90 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   board line each sits on, come from `nudge_user_attention.py --report --json` (dev-cadence
   PR #82); the Due strip, the Attention tab, and the edits all key on that line number.
 
+### 4.4a Home and nodes: one session graph across hosts (2026-09-16)
+
+**The problem is a graph, not a route.** Phase 2 as first planned connected hosts hub-and-spoke:
+the UI host kept one ssh link to each host agent, and host agents never talked to each other. That
+is enough for a *person* acting across hosts (a person is not a session and is not gated), and not
+enough for anything a *session* does across hosts. Almost every rule that relates two sessions
+assumes both records are in one process: the gate (§4.8, invariant 11) reads the target's
+`controllers`; §4.10's message gate, automatic copies, thread tallies, wake budgets, `wait` cursor
+and `_supersede` rewrite all read or write several records at once. A laptop worker whose
+`controllers` name a lead on kmaster could be neither gated for a `send` nor mailed. Mail was
+simply the first feature to need a session graph that spans hosts (Paul, 2026-09-16: *"we need to
+solve the cross-machine design now or the comms between agents are left funky"*; TD-057).
+
+**One host agent is home; the others are nodes (Paul, 2026-09-16).** One always-on host agent —
+**kmaster** — runs in *home* mode and holds the **org's** store: every session record on every
+host, `controllers`, `team`, grants, reports, inboxes, thread tallies, wake budgets, `mail_decided`
+marks, the `wait` cursors and the person inbox. Every other host agent runs in *node* mode: it keeps
+everything that must touch its own machine — tmux (invariant 1), the pty bridge, the hook socket,
+pane classification, `composer()`, run logs, git status, usage — and **dials home** over one
+long-lived link. The home is also a node for its own host's sessions (one process, both roles).
+- **One binary, a line in `hosts.yml`.** An agent whose `hosts.yml` names no `home:` is its own
+  home, which is phase 1 exactly. `home: kmaster` makes it a node.
+- **The UI talks only to the home.** The org's records are there, so an Org refresh is one call
+  wherever the sessions run.
+- **A node reports and executes; the home decides.** A node reports its sessions' state, hooks and
+  pane evidence to the home, which merges them into the records. An act (`send`, `keys`, `kill`,
+  `close`, wrap-up, `create`, a doorbell `ring`) is gated at the home and executed by the node that
+  owns the session's host, which returns the verdict. The home accepts from a node only reports
+  about, and routes acts only to, records whose `host` is that node's.
+- **§4.10 and §4.8 do not change.** Every rule stays single-process, because the process holding
+  the graph is the home. Routing is not a question: mail goes to one place.
+
+**Addresses.** A record gains a **`host`** field. tmux names stay `ao-<scope>-<name>` (§4.1). The
+org-wide address is **`<id>@<host>`**; a bare id means *the record's own host*, so single-host
+files never contain `@`, and a `controllers`, `to` or `from` entry is stored qualified only when it
+names a session on another host. One normalisation function qualifies ids on the way in.
+Invariant 12's name rule stays per scope on one host: two hosts may each hold `ao-agentorc-tdgrind`,
+told apart by `@host`. (Org-unique names were rejected: a laptop that started a session offline
+would collide on reconnect and force a tmux rename.)
+
+**Delivery and time.** The home is the single sequencer: it mints message ids and stamps `at` on
+its own clock, so an `ask`'s bound and the wake budget's rolling window never see clock skew
+between hosts. A request that crosses the link carries a client nonce, so a retry after a
+reconnect never lands twice. Order is the home's arrival order.
+
+**When a host cannot reach home (Paul, 2026-09-16).** A **person** at that host still acts on its
+sessions through the local node — attach, send, kill — as today, with no caller and no gate. A
+**session** on that host may neither send mail nor act on another session until the link is back:
+both are **refused**, naming the unreachable home. An ungated spool would deliver mail the gate
+never saw; spooling with the verdict returned later is a possible later slice, not this one. The
+node keeps observing its sessions while home is away and replays their events when the link
+returns, as hook events already spool to `events/<session>.jsonl` while the agent is down. The
+alternative Paul was offered — the laptop acting as its own home while offline — would make two
+authorities reconcile thread tallies, budgets and copies on reconnect, which is the split-brain
+failure that rules out a mesh.
+
+**When the recipient's host is unreachable.** Mail to its sessions **lands at the home** — nothing
+waits anywhere but the mailbox that already exists — and the sender's `ao` reply and card say
+*landed — host unreachable*. The recipient is not reachable (§4.10: *reachable* includes *its
+node's link is up*), so no wake is decided; when the link returns and the node reports the session
+idle, the home's next tick decides the wake. An **act** onto an unreachable host is **refused**,
+never queued: a `kill` or a wrap-up that fires hours later is worse than a refusal the caller can
+see.
+
+**The link.** The node dials the home over **ssh**, with a key authorised on the home for one
+forced command, `agentorc-agent link`, over WireGuard or any route the person already has. The
+home never exposes a port and the laptop never listens (§4.5b). The link multiplexes requests by
+id — unlike a CLI's socket connection, which stays serial (§4.6) — so a `wait` forwarded from a
+node, and its cancellation when the CLI's connection closes, travel beside ordinary requests. It
+reconnects with backoff; `unreachable` is diagnosed as in §4.6. The link is written as the protocol
+a `relay` (§4.5b) would speak, so a hosted relay later is a home that lives outside the person's
+machines, not a second design; the relay itself is not in scope (Paul, 2026-09-16).
+
+**Considered and rejected.** *The UI host as a store-and-forward router*: the least code, but it
+makes the UI — a client tier that may be a sleeping laptop — a second writer holding state, and it
+leaves unanswered which host gates an act across hosts. *A mesh of host agents dialing each other*:
+every host keeps partial tallies and budgets that disagree after a partition, a sleeping laptop has
+to accept inbound connections (§4.5b forbids it), and a relay cannot be layered on it later. *The
+relay as the bus now*: the home hosted elsewhere, with a hosted service's login, tenancy and
+operations before there is a product. Prior art pointed the same way: a Kubernetes control plane
+with a node agent per machine that keeps running its workloads while the control plane is away;
+NATS leaf nodes dialing out to their hub; and IMAP rather than SMTP — the mailbox lives on the
+always-on server and the laptop is a client of it.
+
 ### 4.5 UI
 
 Single web process (FastAPI + websockets; plain server-rendered pages with a small amount of JS
@@ -651,7 +735,7 @@ dials out; nothing on the host listens.** Three transports, one agent:
 | transport | who runs the UI | how the agent is reached | who it is for |
 |---|---|---|---|
 | `local` | you, on the same host | Unix socket | phase 1, one machine |
-| `ssh` | you, on a host you choose | `ssh host agentorc-agent rpc` (§4.6) | phases 2+, several hosts you own |
+| `ssh` | you, on a host you choose | the UI reaches the home host agent; every other host agent is a node that dials the home over ssh (`agentorc-agent link`, §4.4a, 2026-09-16) | phases 2+, several hosts you own |
 | `relay` | a service (yours or a hosted one) | the agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
 
 The `relay` transport is the hosted service: `pipx install agentorc && agentorc join <token>`
@@ -698,7 +782,11 @@ Amendment 2026-09-13: the two paragraphs above — that a hosted "run Claude Cod
 
 Decisions taken from a review of the `sessionorc` layer before build:
 
-- **One long-lived ssh per host, JSON lines over it.** The UI keeps `ssh host agentorc-agent
+- **One long-lived ssh per host, JSON lines over it.** (Revised 2026-09-16 by §4.4a: the UI
+  holds this link to the **home** host agent only, and every other host agent holds its own link
+  to the home, dialing out; the JSON-lines protocol, the backoff and the `unreachable` diagnosis
+  below carry over to that link, which additionally multiplexes requests by id. Terminal attaches
+  to a session on another host still use their own ssh, as below.) The UI keeps `ssh host agentorc-agent
   serve` open and speaks newline-delimited JSON requests/responses on its stdin/stdout (the
   same protocol the CLI speaks to the Unix socket locally). No per-call ssh handshake, so a
   Org refresh across hosts is one round trip, and no argument ever reaches a remote shell —
@@ -1430,7 +1518,7 @@ instead of forbidden:
   old behaviour, now as the floor rather than the ceiling.
 - **The host agent decides each wake, at the moment the recipient is reachable** (second review,
   2026-09-16). A session is reachable when it is hook-confirmed `idle` (the doorbell's moment) or
-  **blocked in `wait`**. So `ao wait` becomes a host-agent RPC, `wait`, keeping TD-049's snapshot
+  **blocked in `wait`** — and, across hosts, its node's link to the home is up (§4.4a). So `ao wait` becomes a host-agent RPC, `wait`, keeping TD-049's snapshot
   and per-caller cursor exactly: the round-one rule charged `ao wait`'s mail returns, but `ao wait`
   ran wholly in the CLI, watched only the caller's members and never its own inbox, and the host
   agent never learned why it returned — so a lead out of budget would have been woken by every
@@ -1592,8 +1680,8 @@ sessions (Fable review, 2026-09-16).** The 2026-09-14 draft let a worker message
 amended invariant 5 to allow it, but gave no edge that reached one: a person's session is never in
 a worker's `controllers` (`set_controllers` from a session onto an interactive target is refused),
 and a `lead: person` team badges its members, not the person's session. Rather than invent an
-edge — *creator*, say — the person gets an inbox of their own: **one per host, held by the host agent,
-belonging to no session record**, and persisted in the host agent's store beside the records
+edge — *creator*, say — the person gets an inbox of their own: **one per org, held by the home host agent (§4.4a),
+belonging to no session record**, and persisted in its store beside the records
 (its own file, reloaded on restart). `ao msg person "…"` addresses it from any session, ungated,
 under the same kinds and the same bounds (a depth that refuses, and a per-sender depth). The Org
 top bar shows its unread count and opens it; a person replies from there into the sender's inbox,
@@ -1718,7 +1806,8 @@ Outside those stages an entry leaves only with its record or by a person's hand:
   crashed and was resumed would lose the very thread it was answering. **Ids follow the move:**
   `_supersede` rewrites the old id to the new one in the moved entries' `to`, and in every other
   record's pair tallies and pending `ask` addressees that name it — one host agent holds every
-  record on its host, so the rewrite is local (across hosts it waits for phase 2 like the rest).
+  record in the org — the home, §4.4a — so the rewrite is local even when the successor was
+  resumed on another host.
   Entries already delivered keep `from` as it was; instead, **a message addressed to a closed
   record that a live one superseded is forwarded to the successor**, and the sender's reply says
   so. Without it, a lead's Reply to a worker that crashed and was resumed would be refused, the
@@ -1790,7 +1879,9 @@ those is refused when the graph does not permit it; a session out of wake budget
   entry (`name`, `vscode_host`, `local`, `volatile`, `repos_registry`, `runs_keep_days` — landed
   2026-09-10, TD-004; the env-var overrides are gone). A field the *agent* acts on
   (`runs_keep_days`) is read on the session host from its own file's `local` entry, so a phase 2
-  session host carries its own copy; the ssh entries remain phase 2.
+  session host carries its own copy; the ssh entries remain phase 2. **`home:`** (2026-09-16,
+  §4.4a) names the host whose agent holds the org's graph and mail; an agent whose file names no
+  `home:`, or names itself, is the home. On Paul's machines it is `home: kmaster`.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
   duplicated. A repo without dev-cadence can still be listed there. Directories that are not
   repos are not registered anywhere: New session takes a path, and the agent remembers recent
@@ -1904,8 +1995,12 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    Includes the `shell` adapter, the Shell button, and the hook-channel permission answer.
    Success test: every session Paul has open on kmaster shows the right state within 5 s of a
    change, and a permission prompt can be answered from the browser.
-2. **Second host.** `hosts.yml`, ssh transport, agent install script, the VPS added and a
-   session started there from the UI. (Confirmed as the plan 2026-09-10: herdr does not replace
+2. **Second host.** `hosts.yml`, the **home and node** split (§4.4a, 2026-09-16 — it replaces the
+   hub-and-spoke ssh transport first planned here, at about the same cost): the `host` field and
+   `id@host` addresses, home and node modes, the multiplexed node→home link over ssh, nodes
+   reporting records and executing acts the home gates, the UI talking to the home. Agent install
+   script, the VPS or laptop added as a node and a session started there from the UI; then mail
+   from a laptop worker to its kmaster lead through a laptop sleep (TD-057). (Confirmed as the plan 2026-09-10: herdr does not replace
    this step — [ADR](decisions/2026-09-10-herdr-spike.md).) Laptop closed for an hour; session still there.
    The phone's route in (WireGuard client, or the Cloudflare tunnel) and the phone layout (Org
    + narrow Focus) land here.
@@ -2010,6 +2105,12 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     channel, and is never derived — alone among what the channels carry, it has no derived form, because every
     clause of the test is a judgement over prose the core cannot read. A worker that exits without
     declaring it is a crash and is restarted.
+
+15. The org's session graph and its mail have **one writer, the home host agent** (§4.4a,
+    2026-09-16): records, `controllers`, grants, inboxes, tallies and wake budgets are changed only
+    there, and every gate reads them there. A node owns its host's tmux (invariant 1) and reports
+    to the home; while its link to the home is down, its sessions neither send mail nor act on
+    another session — refused, visibly — while a person at that host may still act through it.
 
 ## 10. Open questions
 
@@ -2339,6 +2440,23 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       step 5 records wakes that carried mail *and* a member change separately; the per-`ao` line
       says `(wake budget spent)`; §4.8's *fleet*, *tick* and *the agent* follow the glossary.
       Prior art was then surveyed the same day (`docs/decisions/2026-09-16-agent-messaging-prior-art.md`).
+
+- [x] **How do sessions on different hosts talk?** (Paul, 2026-09-16: *"Seems like we need to
+      solve the cross-machine design now or the comms between agents are left funky"*; TD-057.)
+      Phase 2's hub-and-spoke transport gave mail no route between hosts, and a Fable review
+      reframed the gap: not routing but a **session graph that spans hosts** — the gate, copies,
+      tallies, budgets, `wait` and `_supersede` all assume one process holds every record, so
+      cross-host *control* was equally unanswered. → **§4.4a**: one always-on **home** host agent
+      (kmaster) holds the org's graph and mail; other host agents are **nodes** that keep tmux, the
+      pty and hooks and dial home over ssh (`agentorc-agent link`), and §4.10 stays as written
+      because it runs in one place. Decided with Paul the same day: kmaster is home; a host that
+      cannot reach home lets a person act but refuses its sessions' mail and acts; the relay is out
+      of scope but the link is written as its protocol; addresses are `id@host` with a bare id
+      meaning the record's own host; mail to an unreachable host lands at home, an act onto one is
+      refused. Rejected: the UI host as router (a stateful, sleeping client tier), a host-agent
+      mesh (split tallies after a partition; a laptop that must listen), the relay now. Invariant
+      15 added. Built under TD-057; TD-052 step 1 proceeds single-host with the address and
+      id-minting choices made now so nothing migrates.
 
 ## 11. References
 
