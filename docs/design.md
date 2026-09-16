@@ -790,7 +790,7 @@ definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every ch
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
-its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052, not built): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the host's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052, not built): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the host's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — moves into the host agent as the `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -1941,7 +1941,10 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     decided by the host agent when the recipient is next reachable — it may take in a rolling window, restored by time and by a person, never by anything a session
     does (§4.10, 2026-09-14; refill rule 2026-09-16). A spent budget makes
     a message land without waking — never dropped, never refused — and the difference is visible
-    on the record and to the sender. A sender that needs the recipient's next turn to *be* its
+    on the record and to the sender. That is the *recipient's* budget and *incoming* mail. The one
+    thing a spent budget refuses is outgoing: a controller's `send` made inside a mail-caused turn
+    spends the *controller's* own budget, and is refused when that is spent (§4.10) — an acting RPC
+    of invariant 11 that a budget, not only the gate, can stop. A sender that needs the recipient's next turn to *be* its
     text is asking for an act of control and is bound by invariant 11. Whatever tells a session it
     has mail — a doorbell in its pane, a line on an `ao` reply — is fixed
     text carrying a count, never anything a sender wrote; no doorbell is typed into a person's
