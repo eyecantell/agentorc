@@ -96,6 +96,16 @@ not mix:
   full; never shortened to *agent*. Command and module names are unchanged. — **decided**
   2026-09-16 (Paul).
 - **UI host** — the machine running `agentorc[ui]`. — *proposed*.
+- **home** (host agent) — the one host agent that holds the org's session graph and mail; kmaster
+  on Paul's machines. *Not:* hub, master, server. — **decided** 2026-09-16 (Paul, design §4.4a).
+  (The *home* of an agent — its checkout — is a different, older sense; say *home host agent* when
+  the context could mean either.)
+- **node** — any other host agent: keeps its host's tmux, pty and hooks, and dials the home. —
+  **decided** 2026-09-16 (Paul, design §4.4a).
+- **link** — a node's one long-lived connection to the home (`agentorc-agent link`, over ssh). —
+  **decided** 2026-09-16 (Paul, design §4.4a).
+- **address** — `<id>@<host>`, a session's org-wide name; a bare id means the record's own host. —
+  **decided** 2026-09-16 (Paul, design §4.4a).
 - **adapter** — the per-tool code that knows how a tool reports state and takes input (design
   §4.3). — *proposed*.
 - **hook** — a tool's own event callback (Claude Code's `Stop`, `PreToolUse`…) that reports
