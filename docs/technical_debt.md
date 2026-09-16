@@ -33,6 +33,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Open |
 | TD-053 | A team never winds down when it runs out of work: build design §4.9a — the declaration, the role tests, the lead's wind-down and the board line | Medium | Open |
 | TD-054 | `test_a_card_says_when_the_session_stops_and_only_then` fails for every run after 21:00 local: the stop note gains a day prefix the assertion does not expect | Low | Open |
+| TD-055 | Rename to the glossary's decided words: the `orchestrator` role becomes `lead`, orc-of-orcs becomes conductor, the daemon is always *host agent* | Medium | Open |
 
 ---
 
@@ -400,3 +401,27 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Fix:** either freeze the clock for this test, or pick an offset that cannot cross midnight from any start time (a stop earlier the same day, or assert against `stop_note`'s own output rather than a re-derived format string). Done when the test passes at 23:59 as reliably as at 09:00 — check by running it under a faked local time at both.
 
 **Related:** TD-033 and TD-025 (the other load- and clock-sensitive flakes); design §6 / §4.5a (the **stops** note, TD-026), which is correct as built.
+
+
+## TD-055: Rename to the glossary's decided words — `lead`, `conductor`, `host agent`, `worker`
+
+**Priority:** Medium
+**Added:** 2026-09-16 (raised by Paul)
+
+**Status:** Open — the words were decided 2026-09-16 and recorded in `docs/glossary.md`; nothing is renamed yet
+
+**Location:** `src/agentorc/repoconfig.py` (the built-in `orchestrator` role, the commented example), `src/agentorc/briefs/orchestrator.md`, `src/agentorc/teamrun.py`, `src/agentorc/cli.py` and `src/agentorc/ui/` wherever the role name or "orchestrator" is user-facing text, `tests/`, `docs/design.md` (every live use — not §10 or other dated history), `docs/briefs/` (`orc-of-orcs.md`, `orchestrator-ao-1.md`, `guardians-orchestrator.md`), `CLAUDE.md`
+
+**Why:** "orchestrator" meant a team lead in about 180 places while the top coordinator was called "orc-of-orcs", and bare "the agent" meant the host daemon in about 73 places of a design whose ADR calls an AI session an *agent*. Paul, 2026-09-16: *"having the names nailed down will reduce confusion."* Four decisions, recorded in the glossary: **lead** for the team-level coordinator, with the role preset `orchestrator` renamed `lead`; **conductor** for the coordinator of leads; **host agent** always in full for the daemon, bare *agent* meaning an AI session; **worker** for a member that coordinates nobody.
+
+**Fix, in order — each its own PR:**
+
+1. **Docs.** `docs/design.md` live text: *orchestrator* as a position → *lead*, *orc-of-orcs* → *conductor*, bare *the agent* for the daemon → *the host agent*. Dated history (§10 entries, `docs/decisions/`, the archive) is left as written; the glossary names the retired words. `docs/briefs/orc-of-orcs.md` → `conductor.md`.
+2. **The role preset.** `orchestrator` → `lead` in `repoconfig.py`'s built-ins, the brief template file, tests, and any `.agentorc.yml` or team definition that names `role: orchestrator`. Accept `orchestrator` as a deprecated alias for one release, printing a line that names the new word, so an existing repo config does not break on upgrade.
+3. **Live session and brief names** (`orchestrator-ao-1`, `guardians-orchestrator`) — Paul's call, since renaming a live session changes what its controllers name; do it at the next planned restart, not mid-run.
+
+**Not in scope:** the `orchestrate` grant name, and the glossary's other open questions (*run*, *tick*, *nudge*, *fleet*) — decide those in the glossary first; each decision that renames something joins this entry as a step.
+
+**Done when** no live text in `docs/design.md`, `src/` or the briefs uses *orchestrator* for a position or bare *agent* for the daemon, `ao new --role lead` works, and `--role orchestrator` still works with its deprecation line.
+
+**Related:** `docs/glossary.md`; ADR `docs/decisions/2026-09-13-org-teams-projects.md` (the Org/Team/Project/Role vocabulary this extends); design §4.8 (role presets, *Orc-of-orcs is not a special case*), §4.9 (team definitions), §9 invariants 1 and 9.
