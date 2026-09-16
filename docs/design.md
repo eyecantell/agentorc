@@ -485,6 +485,15 @@ long-lived link. The home is also a node for its own host's sessions (one proces
   `close`, wrap-up, `create`, a doorbell `ring`) is gated at the home and executed by the node that
   owns the session's host, which returns the verdict. The home accepts from a node only reports
   about, and routes acts only to, records whose `host` is that node's.
+- **Policies run on the node, always.** §6's policies — run window, usage gate, stop time and its
+  wrap-up, stall — are the host agent acting on its own host's sessions with no caller, not one
+  session acting on another, so they are **not** gated at the home and do not wait for it. The
+  home sends each node the policy fields of that node's records (`unattended`, the run window,
+  `run_until`, the profile) as they change, and a node whose link is down keeps applying the last
+  values it received, reporting what it did when the link returns. Stopping on time is the safe
+  direction: an unattended laptop worker past its stop time must be wrapped up whether or not
+  kmaster is reachable. A person's edit to a stop time while the link is down reaches the node
+  when it returns (Sonnet review, 2026-09-16).
 - **§4.10 and §4.8 do not change.** Every rule stays single-process, because the process holding
   the graph is the home. Routing is not a question: mail goes to one place.
 
@@ -503,7 +512,8 @@ reconnect never lands twice. Order is the home's arrival order.
 
 **When a host cannot reach home (Paul, 2026-09-16).** A **person** at that host still acts on its
 sessions through the local node — attach, send, kill — as today, with no caller and no gate. A
-**session** on that host may neither send mail nor act on another session until the link is back:
+**session** on that host may neither send mail nor act on another session until the link is back
+(the host agent's own policies keep running, above):
 both are **refused**, naming the unreachable home. An ungated spool would deliver mail the gate
 never saw; spooling with the verdict returned later is a possible later slice, not this one. The
 node keeps observing its sessions while home is away and replays their events when the link
@@ -1872,14 +1882,15 @@ those is refused when the graph does not permit it; a session out of wake budget
 
 ## 5. Configuration
 
-- Hosts: `~/.agentorc/hosts.yml` on the UI host (`name`, `transport: ssh|local`, `ssh`
+- Hosts: `~/.agentorc/hosts.yml` on every host — the UI host's copy lists the hosts, and each
+  host agent's copy carries its own `local` entry and, on a node, `home:` (§4.4a) — (`name`, `transport: ssh|local`, `ssh`
   target, `volatile: true|false`, `repos_registry` path, `runs_keep_days`). The UI process itself may run on a
   laptop; only the session hosts need to stay awake. The parser is `sessionorc.hosts`, shared by
   the UI and the host agent: in phase 1 both run on the one machine and read the same `local`
   entry (`name`, `vscode_host`, `local`, `volatile`, `repos_registry`, `runs_keep_days` — landed
   2026-09-10, TD-004; the env-var overrides are gone). A field the *agent* acts on
   (`runs_keep_days`) is read on the session host from its own file's `local` entry, so a phase 2
-  session host carries its own copy; the ssh entries remain phase 2. **`home:`** (2026-09-16,
+  session host carries its own copy; the ssh entries, now the node→home link of §4.4a, remain phase 2. **`home:`** (2026-09-16,
   §4.4a) names the host whose agent holds the org's graph and mail; an agent whose file names no
   `home:`, or names itself, is the home. On Paul's machines it is `home: kmaster`.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
