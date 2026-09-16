@@ -11,6 +11,25 @@ text stays readable.
 
 Format: **term** — meaning. *Not:* retired or confusable words. Status.
 
+## The rule: two layers, one genre each (Paul, 2026-09-16)
+
+Decided after a Fable review of the whole vocabulary, so names stay intuitive and metaphors do
+not mix:
+
+- **Organisation words are workplace words** — what a person has to learn: who works (person,
+  agent, worker, lead, director), how work is arranged (org, team, project, role, brief, lane,
+  home), and what is handed around (report, message, inbox, board, ledger). A familiar org chart
+  teaches them in one read.
+- **Mechanism words are plain and tool-native** — session, turn, hook, pane, worktree, grant,
+  `controllers`, the state names, tick, wake, run log. They match tmux, git and Claude Code,
+  because the person sees those tools' own words in the same terminal.
+- **No third genre.** No music, nautical, animal, household or driving words, with one named
+  exception: **doorbell**, kept as the proper name of one fixed line. *orc* survives only in
+  product, package and command names (`agentorc`, `sessionorc`, `cmdorc`, `ao`), never for a
+  session or a position.
+- **Record fields, state names and `ao` verbs do not change** for a word's sake; the one
+  exception is the `orchestrate` grant, renamed `control` with an alias (TD-055).
+
 ---
 
 ## Who does the work
@@ -28,23 +47,24 @@ Format: **term** — meaning. *Not:* retired or confusable words. Status.
   — **decided** 2026-09-16 (Paul).
 - **lead** — the session that coordinates one team's workers: the sessions whose `controllers`
   name it. Started from the `lead` role. A person may lead a team instead (`lead: person`), in
-  which case no lead session exists. *Not:* orchestrator, orc (as a position). — **decided**
+  which case no lead session exists. *Not:* orchestrator, orc, supervisor. — **decided**
   2026-09-16 (Paul), with the role preset renamed from `orchestrator` to `lead`.
-- **conductor** — the session that coordinates leads: its members are leads, not workers.
+- **director** — the session that coordinates leads: its members are leads, not workers.
   Agentorc does not treat it specially (design §4.8); the word names a position in the graph, not
-  a kind of session. *Not:* orc-of-orcs, orchestrator of orchestrators, top orc. — **decided**
-  2026-09-16 (Paul).
+  a kind of session. Director > lead > worker. *Not:* conductor (decided and replaced the same
+  day), orc-of-orcs, orchestrator of orchestrators, top orc. — **decided** 2026-09-16 (Paul).
 - **member** — the graph relation, not a position: B is A's member when B's `controllers` name
-  A. A worker is its lead's member; a lead is its conductor's member. — **decided** 2026-09-16
+  A. A worker is its lead's member; a lead is its director's member. — **decided** 2026-09-16
   (Paul), as the relation behind *worker*.
 - **controller** — the inverse: A is B's controller when B's `controllers` list names A. A
-  controller may act on its members if it also holds the `orchestrate` grant (invariant 11).
+  controller may act on its members if it also holds the `control` grant (invariant 11).
   — *proposed* (design §4.8).
 
 ## How work is organised
 
 - **org** — everything one person runs through agentorc, across hosts; also the name of the home
-  page. One per install. *Not:* fleet, herd. — *proposed* (ADR 2026-09-13).
+  page. One per install. *Not:* fleet, herd. — *proposed* (ADR 2026-09-13); retiring *fleet* in
+  prose and UI is **decided** 2026-09-16 (Paul) — code variable names keep it.
 - **team** — a lead (or the person) plus its workers, defined once and started many times.
   A team may contain teams. — *proposed* (ADR 2026-09-13).
 - **project** — a named set of one or more repos that belong together. — *proposed* (ADR
@@ -59,11 +79,14 @@ Format: **term** — meaning. *Not:* retired or confusable words. Status.
   Describes the job, not the run (TD-042). — *proposed*.
 - **lane** — the list of references a worker was handed, or `free-pick`. — *proposed*.
 - **profile** — `(adapter, account, model)` a session runs under (design §4.2a). — *proposed*.
-- **grant** — a capability on a session record; `orchestrate` is the one that lets a session act
-  on its members. — *proposed*. (Open: whether `orchestrate` keeps its name now that
-  *orchestrator* is retired — see below.)
+- **grant** — a capability on a session record (the field is `capabilities`; prose says
+  *grant*). **`control`** is the one that lets a session act on its members, so one word names the
+  whole authority mechanism: the `control` grant, the `controllers` list, `ao control`. *Not:*
+  `orchestrate`, accepted as an alias for one release. — **decided** 2026-09-16 (Paul); rename is
+  TD-055.
 - **home** — the one checkout an agent lives in; **reach** — other repos a project lets it read or
-  change without moving it. — *proposed*.
+  change without moving it. *reach* means only that: a lead's members are its *members*, not its
+  reach. — *proposed*.
 
 ## Machinery
 
@@ -80,6 +103,11 @@ Format: **term** — meaning. *Not:* retired or confusable words. Status.
   `scraped`. — *proposed*.
 - **anchor session** — the first agent in a checkout; every other concurrent agent works in a
   worktree (invariant 2). — *proposed*.
+- **tick** — one pass of the host agent's own loop: derived reports, policies, the doorbell's
+  next check. *Not:* a lead's loop (that is a *round*), pass. — **decided** 2026-09-16 (Paul),
+  matching the code.
+- **policies** — the host agent's rules that act on unattended sessions (run window, usage gate,
+  stall; design §6). *Not:* supervisor. — *proposed*.
 
 ## What a session does
 
@@ -87,8 +115,10 @@ Format: **term** — meaning. *Not:* retired or confusable words. Status.
   turns. — *proposed* (TD-047).
 - **send** — the act of pasting text into a session and pressing Enter. To an idle session it
   **starts a turn**; to a working one it **steers** the turn in flight. — *proposed* (TD-047).
-- **nudge** — a send from a controller to its member. — *proposed*. (Open: keep, or say *send*
-  everywhere.)
+- **round** — one iteration of a lead's or director's loop: read status, act, end in `ao wait`.
+  "A round every 10 minutes." *Not:* tick. — **decided** 2026-09-16 (Paul).
+- *nudge* — **retired** 2026-09-16 (Paul): a controller's send is a **send**. §4.10 splits send
+  (control) from message (mail), and a third verb blurred it.
 - **wrap up** — ask a session to finish and stop, with the fixed wrap-up prompt. — *proposed*.
 - **kill / close / forget / resume** — kill ends the tmux session; close is the person's "done"
   (kill + reap worktree); forget removes the record; resume continues a tool conversation in a
@@ -114,7 +144,8 @@ Format: **term** — meaning. *Not:* retired or confusable words. Status.
 - **wake** — a turn that mail caused: a doorbell starting one, or `ao wait` returning on mail.
   **Wake budget** — how many wakes a session may take in a rolling window. — *proposed*.
 - **doorbell** — the fixed line the host agent types into an idle agent's pane to say it has
-  unread mail; carries a count, never a sender's text. — *proposed*.
+  unread mail; carries a count, never a sender's text. The one word outside the two genres, kept
+  as a proper name. — **decided** 2026-09-16 (Paul).
 
 ## Records a person reads
 
@@ -123,21 +154,35 @@ Format: **term** — meaning. *Not:* retired or confusable words. Status.
 - **ledger** — `docs/technical_debt.md`: known issues and deferred work as `TD-NNN` entries. —
   *proposed*.
 - **run log** — a session's recorded pane output from its first byte (invariant 3). — *proposed*.
+- **run window** — the hours unattended sessions may work (design §6). — *proposed*.
+- **command session** — a session running a predefined shell command. *Not:* command run (as a
+  noun). — **decided** 2026-09-16 (Paul).
+- *run N* — **retired** 2026-09-16 (Paul). One start of a team or brief gets no name and no
+  number: say when it started ("started 09:00"). TD-042 already keeps numbers out of briefs; older
+  board and ledger entries keep theirs.
 
 ---
 
-## Open questions — to work through together
+## Collisions with the tools' own words
 
-1. **"run"** means four things: *run log*, *run window* (when unattended sessions may work),
-   *command run* (a predefined shell command session), and *run 3* (the third start of a brief,
-   which TD-042 says a brief should not name). Proposal: keep the three compounds, retire bare
-   *run N*, and pick a word for "one start of a team or brief".
-2. **"tick"** means a lead's loop iteration *and* the host agent's periodic pass (the
-   derived-report tick). Proposal: *tick* for a lead or conductor, *pass* for the host agent.
-3. **`orchestrate` grant** — keep the name (it describes acting on sessions, which is still
-   true), or rename to match *lead* / *conductor* (e.g. `control`, which pairs with
-   `controllers`).
-4. **nudge vs send** — keep *nudge* as "a controller's send", or retire it.
-5. **fleet** — retire in favour of *org*, or keep it for "every agent currently live".
-6. **Product and page names** — *agentorc* stays for now (ADR 2026-09-13); does *orc* survive
-   anywhere once *orchestrator* is retired as a position?
+- **agent / subagent** — a *subagent* is always Claude Code's, inside one agentorc session; an
+  agentorc session is never called a subagent. The daemon is always *host agent*.
+- **team / teammate** — Claude Code has its own agent teams and *teammates*. Write "Claude Code
+  team" if that feature is meant; never call an agentorc member a *teammate*.
+- **session** — bare *session* is the agentorc record. Say *tmux session* and *the tool's session
+  id* in full when those are meant.
+- **window** — tmux's word. agentorc's *run window* is a time range and is always the compound;
+  never say *window* bare for one.
+- **turn, hook, worktree, branch** — deliberately aligned with Claude Code and git.
+
+## Answered 2026-09-16 (Paul, after the Fable review)
+
+1. **run** — keep *run log* and *run window*; *command session* for the noun; *run N* retired, a
+   start is named by its time.
+2. **tick** — the host agent's loop; a lead's or director's loop is a **round**.
+3. **`orchestrate` grant** — renamed **`control`**, with `orchestrate` as a one-release alias.
+4. **nudge** — retired; it is a **send**. *supervisor* (→ lead, or policies) and *fleet* (→ org)
+   retired with it, in prose and UI only.
+5. **fleet** — retired, as above.
+6. **orc** — only in product, package and command names; never a session or position. Also
+   decided: **conductor → director**, and **doorbell** kept.
