@@ -611,7 +611,7 @@ noted). If a control is not in this table it does not exist.
 | Focus (orchestrator) | **Members** list | for a session holding `orchestrate`: every session whose `controllers` name it, with state, lane and report line — the orchestrator's central view. Derived from the records on each tick, never cached (§4.8) — landed 2026-09-13, TD-036 step 3 |
 | Focus side panel | **Inbox** | the session's mailbox (§4.10): each entry with its sender, kind, time, `about` reference and whether it is read; an `ask` shows its bound and the `reply` that answered it. A person may **reply** to any entry as themselves, and may delete one. Sits beside **Reports**, which it deliberately is not: Reports are what this session declared about its work, the Inbox is what others addressed to it — design 2026-09-14, TD-052, not built |
 | card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, which is the common case. A person's own session shows it too when the graph reaches it (§4.10); mail meant for the person goes to the top bar's **person inbox**, not here — design 2026-09-14, TD-052, not built |
-| Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a nudge, and the sender reads it when it next looks (§4.10) — design 2026-09-14, TD-052, not built |
+| Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (host agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a send, and the sender reads it when it next looks (§4.10) — design 2026-09-14, TD-052, not built |
 | Org top bar | **person inbox** | the host's person inbox (§4.10): unread count, click to open; each entry with its sender session, kind, time and `about`, with **Reply** into the sender's inbox and delete. Sessions reach it with `ao msg person`, ungated. Rings nothing — design 2026-09-16 (Fable review), TD-052, not built |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `orchestrate` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
 | New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
@@ -1311,10 +1311,10 @@ and exits; `ao team start ao-grind` then brings the team back.
 
 ### 4.10 Messages between sessions (2026-09-14)
 
-Four kinds of session-to-session traffic exist in practice — a lead nudging a worker, a worker
+Four kinds of session-to-session traffic exist in practice — a lead sending to a worker, a worker
 telling its lead it finished, two leads settling which of them a shared worker should listen to,
 and two workers avoiding each other's reference — and the design had one mechanism for all four:
-`ao send`, which is the agent typing synthetic keystrokes into the target's pane. Only the first
+`ao send`, which is the host agent typing synthetic keystrokes into the target's pane. Only the first
 works. A worker reaches upward through `progress` and `findings`, which are the wrong shape for
 it: they are *declarations about references* that the Org renders on a card, addressed to nobody
 and delivered to nobody — and being ungated (§4.8: any session may write any record's) is not the
@@ -1323,12 +1323,13 @@ session rather than telling it anything, and nothing carries it to the session t
 two leads are peers, so TD-036's gate refuses them each other; two workers coordinate by side effects — a ledger row, a
 branch name, a PR that already claims the reference.
 
-**The cause is a conflation, not four missing features.** `orchestrate` plus `controllers`
+**The cause is a conflation, not four missing features.** The `control` grant (named `orchestrate`
+until TD-055 renames it) plus `controllers`
 answers *may A act on B?*, where acting means kill, close, `mode`, `set_controllers`, `send`.
 Messaging was folded into that because keystrokes were the only delivery there was — and typing
 into a session's pane genuinely *is* an act of control, so the gate was right about the mechanism
 it had. It is wrong about the thing underneath: two leads who must never kill each other may
-perfectly well need to talk. Orc-to-orc is closed today by accident rather than by decision (§10,
+perfectly well need to talk. Lead-to-lead is closed today by accident rather than by decision (§10,
 2026-09-13), and that accident is the tell. So the split is the design change: **an act of
 control and a message are different things, with different delivery and different authority.**
 
@@ -1341,8 +1342,8 @@ what the design is really claiming:
   nothing of the session's own stands between the two. A message is read by a session that then
   decides, against its brief and its state, what to do about it — including nothing. Control
   determines behaviour; a message offers information to a judgement that already exists.
-- **Attribution.** Keystrokes arrive with no envelope. A session cannot tell its orchestrator's
-  nudge from the person's typing from its own brief being replayed, so it cannot weigh the source
+- **Attribution.** Keystrokes arrive with no envelope. A session cannot tell its lead's
+  send from the person's typing from its own brief being replayed, so it cannot weigh the source
   and a reader of the run log cannot either. A message always carries `from`, is persisted on the
   record, and is auditable after the fact. Anonymous injection and attributed correspondence stay
   different things however they are delivered.
@@ -1355,8 +1356,8 @@ caller determines behaviour and loose where the recipient's judgement mediates:
 | `progress` / `finding` | states a fact on a record | nothing — nobody is addressed | ungated (§4.8) |
 | a message that lands | puts an attributed entry in an inbox | the recipient's next look | §4.10's graph |
 | a message that wakes | the same, and starts a turn to read it | the recipient's brief and judgement, and the wake budget below | §4.10's graph |
-| `send` / `keys` | supplies the next turn verbatim | nothing | `orchestrate` + `controllers` |
-| `kill`, `close`, `set_mode`, `set_grants`, `set_controllers`, `set_stop`, `create`, `remove` | changes the session or its record without its participation | nothing | `orchestrate` + `controllers` |
+| `send` / `keys` | supplies the next turn verbatim | nothing | `control` + `controllers` |
+| `kill`, `close`, `set_mode`, `set_grants`, `set_controllers`, `set_stop`, `create`, `remove` | changes the session or its record without its participation | nothing | `control` + `controllers` |
 
 The thinnest point is the third row against the fourth, and it is worth stating plainly rather
 than defending: a message that wakes a session and a `send` both cause a turn to happen. What
@@ -1377,7 +1378,7 @@ read. Three consequences, stated because they are the ones that bite:
 
 - **An adapter that cannot surface mail falls back to a pane write**, which *is* a `send`. For
   that adapter the message/control distinction is a convention its brief keeps, not a gate the
-  agent enforces, and the design should say so rather than imply a guarantee it cannot give for
+  host agent enforces, and the design should say so rather than imply a guarantee it cannot give for
   every tool — the same honesty §4.2 applies to scraped state.
 - **Waking is adapter-shaped too.** `ao wait` is a blocking command, which suits a session that
   drives its own loop; a tool whose turns are composed by a harness is woken by that harness
@@ -1420,13 +1421,13 @@ instead of forbidden:
   old behaviour, now as the floor rather than the ceiling.
 - **Time and a person restore it; nothing a session does does.** The budget refills as the window
   rolls, and in full when a person interacts with the session. It is **not** restored by a
-  controller's nudge or by a turn mail did not start — the first draft said both, and review found
+  controller's send or by a turn mail did not start — the first draft said both, and review found
   the loop that rule permits: a worker mails its lead, the lead's `ao wait` returns, the lead
   `send`s the worker, the worker's `send`-started turn "resets" it, the worker mails again, and
   every turn in the cycle counts as work. A rule a session can satisfy by its own traffic is not a
   bound. And a `send` a controller makes **during a mail-caused turn** spends from the
-  *controller's* budget, since that `send` is correspondence dressed as control. A fleet doing its
-  job spends a few wakes an hour and never meets the limit; a fleet talking to itself meets it
+  *controller's* budget, since that `send` is correspondence dressed as control. A team doing its
+  job spends a few wakes an hour and never meets the limit; a team talking to itself meets it
   within the window.
 - **It counts turns, not messages.** A message that wakes nobody costs nothing and is not
   metered — which also makes the budget adapter-neutral, since it is counting the thing every tool
@@ -1443,28 +1444,28 @@ cheap. Either alone leaves the other failure open.
 A sender that needs the recipient's *next turn to be its text* is still asking for an act of
 control and still uses `send`, whose gate is unchanged.
 
-**How a Claude Code session is told it has mail: a doorbell the agent rings, never the sender
+**How a Claude Code session is told it has mail: a doorbell the host agent rings, never the sender
 (Paul, 2026-09-16).** The rules above say a message *may wake* an idle recipient, but named no way
 to do it for the one adapter that exists. `ao wait` wakes only a session already blocked in it,
 which is leads; an idle Claude Code session at its prompt starts a turn only when something is
 typed into its pane. So the Claude Code adapter tells a session it has mail in two ways, and in
-both the words the session sees are the agent's, never the sender's:
+both the words the session sees are the host agent's, never the sender's:
 
 - **Idle: the doorbell.** When mail lands for a session whose `idle` came from a hook (confidence
-  `hook`, §4.2), the agent submits one fixed line into its pane through `send`'s own path — paste,
+  `hook`, §4.2), the host agent submits one fixed line into its pane through `send`'s own path — paste,
   Enter, composer confirmation (§4.2, TD-027): `[agentorc] you have N unread messages — run ao
   inbox`. The line carries the count and nothing else: no `from`, no `kind`, no `about`, no body.
   That is what keeps it a message rather than a laundered `send`. `about` is free text the sender
   chose, and anything a sender chose that is pasted and followed by Enter *is* the recipient's
-  next prompt, with no `orchestrate` check — invariant 11 bypassed by the mail system itself. The
+  next prompt, with no `control` check — invariant 11 bypassed by the mail system itself. The
   session learns who wrote what from `ao inbox`, whose output arrives as a tool result the session
   weighs, not as a prompt. The sender gains no authority: the message gate decides whether mail is
   delivered, and ringing is what delivery does next.
 - **Mid-turn: nothing new.** Mail that lands while the session is working waits. When the turn
   ends, the `Stop` hook reports `idle` exactly as it does today, and the doorbell rings on the
-  agent's next pass. (The 2026-09-16 draft had the `Stop` hook *block* the stop while mail was
+  host agent's next tick. (The 2026-09-16 draft had the `Stop` hook *block* the stop while mail was
   unread. Fable's review cut it: it saves one paste and a few seconds, and costs a synchronous
-  round trip to the agent on every `Stop` of every session — today `Stop` is fire-and-forget with a
+  round trip to the host agent on every `Stop` of every session — today `Stop` is fire-and-forget with a
   3 s timeout, `hook.py` — plus `stop_hook_active` handling and the stop-beats-mail checks in a
   second place. It is the one change that could slow every session, for the smallest gain.)
 - **Busy for hours: a line on every `ao` reply.** A worker can spend a long time inside one turn,
@@ -1500,16 +1501,16 @@ The rules that bound both:
   honest form of *falls back to a pane write* above — it applies only where the write can be
   confirmed.
 - **An empty composer only.** The doorbell rings only when `composer()` reads empty; otherwise it
-  waits for the next pass. `_submit` pastes and then waits for the composer to empty, so a
+  waits for the host agent's next tick. `_submit` pastes and then waits for the composer to empty, so a
   doorbell into a composer holding a person's half-typed words — in an unattended session's Focus,
   where people do type without flipping the badge — would submit their fragment with the doorbell
   appended. `send` shares the hazard, but a person chose to press it; the doorbell is unprompted.
 - **A doorbell that fails to submit** (`prompt-stuck`, `prompt-stalled`) is retried once, on the
-  agent's next tick if the session is still idle with mail unread; a second failure is written to
+  host agent's next tick if the session is still idle with mail unread; a second failure is written to
   the record where the sender and the UI can see it, and nothing more is typed until the session's
   state next changes.
 
-**The message gate is weaker than `orchestrate`, and reads off the graph that already exists.**
+**The message gate is weaker than `control`, and reads off the graph that already exists.**
 No new list, no new grant. A session may message:
 
 - **upward** — every session in its own `controllers`; always, and this is the path a worker has
@@ -1533,7 +1534,7 @@ sessions (Fable review, 2026-09-16).** The 2026-09-14 draft let a worker message
 amended invariant 5 to allow it, but gave no edge that reached one: a person's session is never in
 a worker's `controllers` (`set_controllers` from a session onto an interactive target is refused),
 and a `lead: person` team badges its members, not the person's session. Rather than invent an
-edge — *creator*, say — the person gets an inbox of their own: **one per host, held by the agent,
+edge — *creator*, say — the person gets an inbox of their own: **one per host, held by the host agent,
 belonging to no session record**. `ao msg person "…"` addresses it from any session, ungated,
 under the same kinds and the same bounds (a depth that refuses, and a per-sender tally). The Org
 top bar shows its unread count and opens it; a person replies from there into the sender's inbox.
@@ -1560,7 +1561,7 @@ is a message the receiver must reason about before it can ignore it:
 | `conflict` | an `ask` to two or more controllers at once, carrying each instruction verbatim and who it came from (TD-039) | a `reply` from any addressee, or escalation |
 
 **The bounds are part of the design, not a later hardening.** Unattended agents that can talk to
-each other will talk to each other, and the failure is not a crash: it is a fleet that spends its
+each other will talk to each other, and the failure is not a crash: it is a team that spends its
 window on correspondence and produces a plausible account of work nobody asked for. So:
 
 - **No broadcast.** Recipients are named, at most a handful per message — the automatic copies
@@ -1570,9 +1571,9 @@ window on correspondence and produces a plausible account of work nobody asked f
   refused with a reason the sender sees, never silently dropped — a lost message and a delivered
   one must not look the same to the sender.
 - **A bounded exchange, counted by thread.** Messages in one thread are counted, and past the
-  bound the agent **refuses the next send**, naming the bound and the thread. The refused sender
+  bound the host agent **refuses the next send**, naming the bound and the thread. The refused sender
   writes the `user_attention.md` line itself, with the thread attached — it is present by
-  construction, which is TD-039's own argument, and the agent never commits to a board on a
+  construction, which is TD-039's own argument, and the host agent never commits to a board on a
   session's behalf (board write-back, §4.4, is not built). Two agents that cannot agree in a few
   turns are not going to agree in fifty, and the person is the tie-break — Paul's rule for the
   two-controller conflict (§10, 2026-09-13) generalised. **A thread is its root**: the id of the
@@ -1591,7 +1592,7 @@ window on correspondence and produces a plausible account of work nobody asked f
   body is fetched by `inbox`. A `conflict` quoting two instructions verbatim would otherwise ship on
   every tick.
 - **Messages are not the record.** They are coordination and they die with the session record.
-  Anything that must outlive the run goes where it already goes: the ledger, the board, a PR.
+  Anything that must outlive the session goes where it already goes: the ledger, the board, a PR.
   This is "never strand work" (CLAUDE.md) applied to a new channel before it can strand anything.
 
 **The lifecycle of an entry (Paul, 2026-09-16).** Reading does not delete. An entry passes
@@ -1623,14 +1624,15 @@ Outside those stages an entry leaves only with its record or by a person's hand:
   crashed and was resumed would lose the very thread it was answering.
 - **A recipient that exits and is not resumed** has every `ask` addressed to it marked expired at
   once, under the gone-addressee rule above, and its askers told. Its unread `note`s and `reply`s go when the record goes — that is
-  invariant 13 applied, not a leak: nothing that must outlive a run was ever allowed to live only
+  invariant 13 applied, not a leak: nothing that must outlive a session was ever allowed to live only
   in mail. A session started fresh in its place (`ao team start`, New session here) is a different
   record and inherits nothing.
 
-**What this settles that briefs were holding.** §4.8 left "keeping two controllers from
-double-nudging" to their briefs, which is no rule at all. With mail it becomes one: **a message
+**What this settles that briefs were holding.** §4.8 left keeping two controllers from sending
+one member conflicting prompts to their briefs, which is no rule at all. With mail it becomes one:
+**a message
 `about` a session, sent by one of its controllers, is copied to that session's other
-controllers** — the agent expands `to` at send time, as a `conflict` already addresses several,
+controllers** — the host agent expands `to` at send time, as a `conflict` already addresses several,
 and each copy lands in its recipient's own inbox, counts toward its depth and may wake it like any
 other mail. So the second lead sees the first one's instruction rather than discovering it in the
 worker's behaviour, and no session ever reads another's inbox. (The 2026-09-14 text said such mail
@@ -1659,7 +1661,7 @@ from inside.
 fix) keeps keystrokes as the delivery, so every message is an interruption of a turn, and gives a
 worker no upward path at all — it answers one of the four cases. *A shared bus or room* removes the
 addressee, and with it the bound and the accountability; broadcast is the mechanism by which a
-fleet's spend stops being proportional to its work. *The attention board as the channel* is the
+org's spend stops being proportional to its work. *The attention board as the channel* is the
 status quo for upward traffic and is wrong in both directions: it is written for a person, and
 coordination traffic would drown the thing Paul actually reads.
 
@@ -1837,7 +1839,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 3. Every session has a run log from its first byte.
 4. A state shown as `hook` came from a hook; `scraped` is visible in the UI.
 5. Interactive sessions (`kind: interactive`, `unattended: false`) are never paused, killed, or
-   nudged by a policy, and never acted on by another session: an acting RPC from a session onto
+   sent to by a policy, and never acted on by another session: an acting RPC from a session onto
    one — `set_controllers` included — is refused whatever the caller's grant and membership
    (§4.8; a gate since 2026-09-13, TD-041). Only a person acts on an interactive session, and
    only a person hands one to unattended mode or to a controller. Flipping a session to
@@ -1862,13 +1864,13 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    members. It gates mail only; nothing that acts keys on `team`.
 10. A report entry the session declared is never overwritten by one the agent derived; a
     derived entry is shown as such, like a scraped state.
-11. A session **acts on** another session only through the agent, only with the `orchestrate`
-    grant on its record, and only when the caller is in the target's `controllers` list (an
+11. A session **acts on** another session only through the host agent, only with the `control`
+    grant on its record (named `orchestrate` until TD-055), and only when the caller is in the target's `controllers` list (an
     empty list means nobody may act on it; the membership half is proposed 2026-09-12, §4.8,
     TD-036) — and never when the target is interactive, whatever the list says (invariant 5). Grant and membership are both read from the records on every call, so a revoke or
     a membership edit takes effect on the session's next call and neither is cached. Reads are
     never gated, and a person at a terminal or the UI is not a session. Acting is what changes a
-    session — the agent's `ACTING_RPCS`: `send`, `keys`, `kill`, `close`, `set_mode`, `create`,
+    session — the host agent's `ACTING_RPCS`: `send`, `keys`, `kill`, `close`, `set_mode`, `create`,
     `remove`, `set_grants`, `set_controllers` and `set_stop` (`ao until`, §6). **Messaging is not acting** and does not pass through this gate: its own,
     weaker rule is §4.10's graph (my controllers, my members, my team, a shared target), it needs
     no grant, and it is refused by naming that rule rather than this one.
@@ -1886,7 +1888,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     text carrying a count, never anything a sender wrote; no doorbell is typed into a person's
     session or into a pane whose composer cannot be read (2026-09-16). Reading marks an entry read
     and never deletes it. Messages are coordination and die with the record; anything that must outlive
-    the run belongs to the ledger, the board or a PR.
+    the session belongs to the ledger, the board or a PR.
 
 14. No session is stopped, and no team wound down, for lack of work by anything but the
     sessions' own declarations: the core never infers that work has run out (§4.9a, 2026-09-14).
