@@ -32,7 +32,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-050 | The cadence check's `review` row reads the verdict only on a comment's first line, so a report that ends with it counts as no review at all | Medium | Open |
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Open |
 | TD-053 | A team never winds down when it runs out of work: build design §4.9a — the declaration, the role tests, the lead's wind-down and the board line | Medium | Open |
-| TD-054 | `test_a_card_says_when_the_session_stops_and_only_then` fails for every run after 21:00 local: the stop note gains a day prefix the assertion does not expect | Low | Open |
 | TD-055 | Rename to the glossary's decided words: the `orchestrator` role becomes `lead`, the `orchestrate` grant `control`, orc-of-orcs director, a lead's tick a round, the daemon always *host agent*; nudge, supervisor and fleet retired | Medium | Open |
 
 ---
@@ -385,22 +384,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Deliberately not in scope:** restarting a team when work reappears — a fleet that starts itself is a scheduler, which is TD-026's question and a different one; and any core-side count of open ledger rows, which §4.9a rejects by name.
 
 **Related:** design §4.9a (the whole section), §4.9 (the stop sequence this reuses, and `ao team start` already being the restart), §4.8 (the `progress` channel and the role presets that carry the tests), §6 (the clock-and-cap stoppers this is orthogonal to), §9 invariant 14, §10 (the 2026-09-14 entry); TD-032 (a stood-down worker sitting `idle` for 20 h with nothing noticing — the same blind spot from the other side); TD-042 (a brief describes the job, not the run — why the test lives in a repeatable template); TD-052 (mail is how *there is work now* reaches an out-of-work session that is still alive, §4.10's wake budget); TD-026 (the schedule that would start a wound-down team again).
-
-
-## TD-054: The card stop-note test fails for every run after 21:00 local
-
-**Priority:** Low
-**Added:** 2026-09-14
-
-**Status:** Open — found by a full-suite run at 21:08 MDT while landing §4.9a (a docs-only branch); reproduces on `origin/main`
-
-**Location:** `tests/test_ui.py::test_a_card_says_when_the_session_stops_and_only_then`, against `sessionorc.models.stop_note` (`models.py:157`)
-
-**Why:** the test builds a stop time of `now + 3h` and asserts the card contains `f"stops {when:%H:%M}"`. `stop_note` prefixes the weekday once the stop is **not today** (`models.py:175`, deliberately — *stops Mon 06:00*), so from 21:00 local onwards the rendered text is `stops Tue 00:08` and the bare `stops 00:08` is not in it. The behaviour is correct and the assertion is the thing that is wrong; it simply never runs late enough in a working day to be noticed. It is a wall-clock dependency of the same family as TD-033 and TD-025, and it fails a clean checkout, so it costs a session the ability to tell its own breakage from the suite's.
-
-**Fix:** either freeze the clock for this test, or pick an offset that cannot cross midnight from any start time (a stop earlier the same day, or assert against `stop_note`'s own output rather than a re-derived format string). Done when the test passes at 23:59 as reliably as at 09:00 — check by running it under a faked local time at both.
-
-**Related:** TD-033 and TD-025 (the other load- and clock-sensitive flakes); design §6 / §4.5a (the **stops** note, TD-026), which is correct as built.
 
 
 ## TD-055: Rename to the glossary's decided words — `lead`, `director`, the `control` grant, `round`, and the retired synonyms
