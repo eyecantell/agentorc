@@ -1383,7 +1383,8 @@ read. Three consequences, stated because they are the ones that bite:
   instead. The wake budget below is core either way, because it counts turns, not mechanisms.
 - **Read receipts are best-effort.** `read_at` means *delivered into a turn*, never *understood* —
   the same limit `send --wait` already has, where a confirmed submit is not a confirmed
-  instruction.
+  instruction. What sets it is exact, and is in *The lifecycle of an entry* below: `ao inbox`
+  printing the entry, and nothing else.
 
 **A message is delivered to a mailbox, never to a pane.** Every session record carries an
 `inbox`, on the same rule as `controllers`: it lives on the *recipient*, is persisted and
@@ -1431,6 +1432,68 @@ cheap. Either alone leaves the other failure open.
 
 A sender that needs the recipient's *next turn to be its text* is still asking for an act of
 control and still uses `send`, whose gate is unchanged.
+
+**How a Claude Code session is told it has mail: a doorbell the agent rings, never the sender
+(Paul, 2026-09-16).** The rules above say a message *may wake* an idle recipient, but named no way
+to do it for the one adapter that exists. `ao wait` wakes only a session already blocked in it,
+which is leads; an idle Claude Code session at its prompt starts a turn only when something is
+typed into its pane. So the Claude Code adapter tells a session it has mail in three ways, and in
+all three the words the session sees are the agent's, never the sender's:
+
+- **Idle: the doorbell.** When mail lands for a session whose `idle` came from a hook (confidence
+  `hook`, §4.2), the agent submits one fixed line into its pane through `send`'s own path — paste,
+  Enter, composer confirmation (§4.2, TD-027): `[agentorc] you have N unread messages — run ao
+  inbox`. The line carries the count and nothing else: no `from`, no `kind`, no `about`, no body.
+  That is what keeps it a message rather than a laundered `send`. `about` is free text the sender
+  chose, and anything a sender chose that is pasted and followed by Enter *is* the recipient's
+  next prompt, with no `orchestrate` check — invariant 11 bypassed by the mail system itself. The
+  session learns who wrote what from `ao inbox`, whose output arrives as a tool result the session
+  weighs, not as a prompt. The sender gains no authority: the message gate decides whether mail is
+  delivered, and ringing is what delivery does next.
+- **Mid-turn: the Stop hook.** Mail that lands while the session is working waits for the turn
+  to end. At `Stop` the hook asks the agent whether the session has unread mail and, when it does,
+  returns a block decision whose reason is the same fixed line, so the session goes on into its
+  inbox with nothing typed. `Stop` is report-only today (`hook.py` maps it to `idle` and returns
+  nothing); this makes it a round trip, so its timeout rises, and a hook that cannot reach the
+  agent in time lets the stop proceed — the mail then waits for the doorbell. It honours the
+  payload's `stop_hook_active`: a `Stop` that follows a block this hook made is never blocked
+  again, so one turn's end yields at most one continuation and the hook cannot loop.
+- **Busy for hours: a line on every `ao` reply.** A worker can spend a long time inside one turn,
+  reaching neither `Stop` nor idle. Every `ao` command a session runs — any command, not only
+  `progress` and `finding` — ends its output with the same line while the caller has unread mail.
+  It types nothing, starts nothing, needs no counter, and reaches a session at exactly the moment
+  it is reading agentorc's output. (Paul asked for a reminder when a session keeps reporting with
+  mail unread; review reshaped it from a count of reports, which misses a worker that reports only
+  at claim and at done, to every command.)
+
+The rules that bound all three:
+
+- **A pending stop beats mail.** The `Stop` hook checks, in order: a wrap-up under way (stop time,
+  usage gate, run window — §6), `out_of_work` declared (§4.9a), the wake budget, and only then
+  unread mail. Mail never pushes a session past its stop or back out of a wind-down; it lands and
+  waits. The doorbell applies the same checks before it rings.
+- **Coalesced.** One doorbell per idle stretch however many messages arrive in it; the count is
+  read when it rings.
+- **Metered.** A doorbell and a `Stop` continuation each spend one unit of wake budget — each
+  starts a turn mail caused. The per-command line spends nothing, since it starts nothing. A spent
+  budget means no doorbell at all rather than a quieter one, because typing anything is itself the
+  wake.
+- **Hook-confirmed idle only.** Never on a scraped `idle` or on `stalled?`: a Remote Control
+  takeover reads `stalled?` (§4.2), and a doorbell there types into a pane someone else is
+  driving. The known miss runs the other way — a `/compact` can leave a healthy idle session
+  reading `stalled?` (attention board, 2026-09-14) — so that session gets no doorbell; the line on
+  its next `ao` reply and its controller's own timer (§4.8, *silence is not an event*) are what
+  reach it. The doorbell reduces how much a lead must poll; it does not replace the fallback timer.
+- **Never into a pane a person drives, nor one whose composer cannot be read.** A person's
+  session gets the unread chip and the per-command line, and nothing typed or blocked (invariant 5,
+  and *Done when* below). A session whose adapter has no `composer()` (§4.3) gets the chip only:
+  without a submit confirmation a doorbell could land on a half-typed shell command. That is the
+  honest form of *falls back to a pane write* above — it applies only where the write can be
+  confirmed.
+- **A doorbell that fails to submit** (`prompt-stuck`, `prompt-stalled`) is retried once, on the
+  agent's next tick if the session is still idle with mail unread; a second failure is written to
+  the record where the sender and the UI can see it, and nothing more is typed until the session's
+  state next changes.
 
 **The message gate is weaker than `orchestrate`, and reads off the graph that already exists.**
 No new list, no new grant. A session may message:
@@ -1488,6 +1551,39 @@ window on correspondence and produces a plausible account of work nobody asked f
 - **Messages are not the record.** They are coordination and they die with the session record.
   Anything that must outlive the run goes where it already goes: the ledger, the board, a PR.
   This is "never strand work" (CLAUDE.md) applied to a new channel before it can strand anything.
+
+**The lifecycle of an entry (Paul, 2026-09-16).** Reading does not delete. An entry passes
+through three stages:
+
+1. **Unread** from the moment it lands. It never ages out: an unread `note` or `reply` waits as
+   long as the record lives, and an unread `ask` escalates when its bound expires (above). Unread
+   entries are what the mailbox bound counts.
+2. **Read** when, and only when, `ao inbox` prints the entry to its caller — in any form,
+   `--unread` and `--json` included. That is all `read_at` means: delivered into a turn. `ao wait`
+   returning because mail arrived does not set it, since it returns the envelope and never the
+   body; neither does the doorbell, the `Stop` continuation or the per-command line, which name a
+   count; neither does a person opening the Inbox panel, because a person is not the session.
+3. **Pruned.** A read entry is kept for a retention window, so a thread stays legible — to the
+   session, to its other controllers (who see mail `about` it), and to the person in the Inbox
+   panel — and then removed. The window (entries kept per session, or hours after `read_at`) is
+   unset like every number in this section and is chosen with them (TD-052 step 3). The
+   per-`about` exchange count is kept as its own tally on the record, never recounted from the
+   entries that survive, so pruning cannot reset the deadlock bound.
+
+Outside those stages an entry leaves only with its record or by a person's hand:
+
+- **A person deletes it** in the Inbox panel (§4.5a).
+- **Forget removes the record** and its inbox with it; a **closed** record is dropped a day after
+  it closed (`CLOSED_KEEP`), and its inbox with it.
+- **Resume carries mail forward.** Resuming a conversation creates a new record and closes the
+  exited one it supersedes; the unread entries and the exchange tallies move to the new record at
+  that moment, because the conversation they were addressed to is the one continuing. Without it,
+  mail to a worker that exited and was resumed would sit on a closed record for a day and vanish.
+- **A recipient that exits and is not resumed** has its unread `ask`s escalate at once, under
+  the gone-addressee rule above. Its unread `note`s and `reply`s go when the record goes — that is
+  invariant 13 applied, not a leak: nothing that must outlive a run was ever allowed to live only
+  in mail. A session started fresh in its place (`ao team start`, New session here) is a different
+  record and inherits nothing.
 
 **What this settles that briefs were holding.** §4.8 left "keeping two controllers from
 double-nudging" to their briefs, which is no rule at all. With mail it becomes one: **a message
@@ -1727,7 +1823,11 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     intervening, restored by any turn mail did not start (§4.10, 2026-09-14). A spent budget makes
     a message land without waking — never dropped, never refused — and the difference is visible
     on the record and to the sender. A sender that needs the recipient's next turn to *be* its
-    text is asking for an act of control and is bound by invariant 11. Messages are coordination and die with the record; anything that must outlive
+    text is asking for an act of control and is bound by invariant 11. Whatever tells a session it
+    has mail — a doorbell in its pane, a `Stop` hook's reason, a line on an `ao` reply — is fixed
+    text carrying a count, never anything a sender wrote; no doorbell is typed into a person's
+    session or into a pane whose composer cannot be read (2026-09-16). Reading marks an entry read
+    and never deletes it. Messages are coordination and die with the record; anything that must outlive
     the run belongs to the ledger, the board or a PR.
 
 14. No session is stopped, and no team wound down, for lack of work by anything but the
@@ -1996,6 +2096,24 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       under TD-053; the three guards against a *false* stand-down (a reason required, the lead's
       second reading, an early declaration reported rather than acted on) carry no numbers yet,
       deliberately.
+
+- [x] **How does an idle agent learn it has mail, and when is mail deleted?** (Paul,
+      2026-09-16: *"should we have our mail system notify an idle agent … when mail is received
+      for it?"*, and *"do we have a lifecycle for the mail items?"*) §4.10 said a message may
+      wake an idle recipient but named no mechanism for Claude Code, and said entries die with the
+      record without saying what `read_at` meant or whether read mail is ever removed. → **§4.10,
+      two new parts (2026-09-16).** The Claude Code adapter rings a **doorbell**: the agent, not
+      the sender, submits a fixed line carrying only an unread count into a hook-confirmed idle
+      pane; mail that lands mid-turn is surfaced by the `Stop` hook with the same line; and every
+      `ao` reply carries it for a session busy inside one long turn. An independent review
+      (Sonnet, 2026-09-16) shaped five rules: no sender-written text in the line (`about` is free
+      text, and a pasted-and-submitted `about` would be a `send` with no gate); `stop_hook_active`
+      so the hook cannot loop; a pending stop and `out_of_work` beat mail; hook-confirmed idle
+      only; no doorbell where the composer cannot be read. Paul's reminder for a session that
+      keeps reporting with mail unread became the per-command line. **Lifecycle:** unread → read
+      (set only by `ao inbox` printing the entry) → pruned after a retention window; mail also
+      goes with Forget, with a closed record after `CLOSED_KEEP`, or by a person's delete; resume
+      carries unread mail forward. The retention window joins §4.10's other unset numbers.
 
 ## 11. References
 
