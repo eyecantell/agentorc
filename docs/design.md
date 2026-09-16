@@ -1995,7 +1995,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     a message land without waking — never dropped, never refused — and the difference is visible
     on the record and to the sender. That is the *recipient's* budget and *incoming* mail. The one
     thing a spent budget refuses is outgoing: a controller's `send` made inside a mail-caused turn
-    spends the *controller's* own budget, and is refused when that is spent (§4.10) — an acting RPC
+    spends the *controller's* own budget, and is refused when that is spent — except the wrap-up prompt, which ends turns and is exempt (§4.10) — an acting RPC
     of invariant 11 that a budget, not only the gate, can stop. A sender that needs the recipient's next turn to *be* its
     text is asking for an act of control and is bound by invariant 11. Whatever tells a session it
     has mail — a doorbell in its pane, a line on an `ao` reply — is fixed

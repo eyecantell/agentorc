@@ -93,14 +93,14 @@ panes. Nothing beyond the three above.
    **Left open** (Paul: *"we do not want to mess up a flow a user is already leveraging"*). §4.10
    says plainly that the graph governs agentorc's mail and a tool's native channel is ungated by
    agentorc.
-7. **Mail across machines** (raised by Paul with lesson 5). Not solved: phase 2's transport is
-   hub-and-spoke from the UI host, and host agents never talk to each other, so cross-host mail
-   has no route. Claude Code's answer runs through Anthropic's servers for Claude Code only.
-   Ledgered as a design question, TD-057.
-6. **Not taken:** Git-backed human-readable message archives (§4.10: messages are not the record;
+7. **Not taken:** Git-backed human-readable message archives (§4.10: messages are not the record;
    the ledger and board are); contact-request approval (the controllers graph already answers who
    may talk); a shared task list inside the mail system (the ledger is the task list); shutdown as
    a decline-able request (the wrap-up prompt and §6's stop sequence stay).
+6. **Mail across machines** (raised by Paul with lesson 5). Not solved: phase 2's transport is
+   hub-and-spoke from the UI host, and host agents never talk to each other, so cross-host mail
+   has no route. Claude Code's answer runs through Anthropic's servers for Claude Code only.
+   Ledgered as a design question, TD-057.
 
 ## What this ADR does not do
 
