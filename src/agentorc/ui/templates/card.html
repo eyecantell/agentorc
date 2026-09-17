@@ -33,8 +33,12 @@
     {# design §6 / §4.5a: when this session stops (TD-026). Shown only when something will — which
        is every unattended session given a time and no other. #}
     {% if s.stop_note %}<div class="row"><span class="meta" title="the agent asks it to wrap up at this time, then stops it">{{ s.stop_note }}</span></div>{% endif %}
-    {# design §4.5a card **report line**: only when a channel is non-empty (§4.8, TD-028 step 4) #}
-    {% if s.report or s.findings_line %}<div class="row report">
+    {# design §4.5a card **report line**: only when a channel is non-empty (§4.8, TD-028 step 4),
+       and the **out of work** chip beside it (§4.9a, TD-053 step 6) — which is why the row is drawn
+       for a declaration even when neither channel has anything to say. #}
+    {% if s.report or s.findings_line or s.out_of_work %}<div class="row report">
+      {% if s.out_of_work %}<span class="badge oow"
+            title="{{ s.out_of_work.why or 'no reason recorded' }}">out of work{% if s.out_of_work.age %} {{ s.out_of_work.age }}{% endif %}</span>{% endif %}
       {% if s.report %}<span class="meta{% if s.report_derived %} scraped{% endif %}"
             title="{{ 'the agent derived this from the branch and its PRs — the session did not declare it' if s.report_derived else 'declared by the session' }}">{{ s.report }}</span>{% endif %}
       <span class="grow"></span>

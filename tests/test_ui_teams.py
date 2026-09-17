@@ -157,6 +157,37 @@ def test_the_strip_lists_every_definition_with_its_source_projects_members_and_l
     assert live["teams"][0]["live"] == 1
 
 
+def test_a_team_whose_sessions_all_declared_reads_wound_down_not_stopped(world):
+    """design §4.5a **Teams** strip *wound down* note (§4.9a, TD-053 step 6): *nothing running* and
+    *nothing left to run* are different facts about a team, and only the second is an answer — a
+    team stopped by a person, a clock or a crash looks identical otherwise. All-or-nothing on
+    purpose: one member's exhaustion is not the team's (§4.9a)."""
+    tmp_path, fleet = world
+    at, later = "2026-09-17T20:00:00Z", "2026-09-17T21:30:00Z"
+
+    def done(name, when, state="closed"):
+        """A member that declared and was then stopped — `ao team stop --close` (§4.9a step 3) is
+        what makes the team's sessions dead, and the declaration stays on each record."""
+        return {**badged(name, "ao-grind", state=state), "out_of_work": {"at": when, "why": "nothing open"}}
+
+    # nothing has ever carried the badge: never run, not wound down
+    assert uiapp.teams_view([])["teams"][0]["wound_down"] is None
+    # one declared, one did not: the team stopped for some other reason and says so
+    half = uiapp.teams_view([done("orc-ao", at), badged("grind-1", "ao-grind", state="exited")])
+    assert half["teams"][0]["wound_down"] is None
+    # every one of them declared: the strip says when, from the latest instant
+    all_done = uiapp.teams_view([done("orc-ao", at), done("grind-1", later)])
+    row = all_done["teams"][0]
+    assert row["live"] == 0 and row["wound_down"] == later and row["wound_down_age"]
+    assert uiapp.teams_view([done("orc-ao", at), done("grind-1", later, state="exited")])["teams"][0]["wound_down"]
+    # ... and a team still running is described by what it is doing, never by a stale declaration:
+    # a worker that declared but has not been stopped still sits `idle` at its prompt (§4.9a step 3
+    # is what closes it), and until then the team is live and its group card, not the strip, is the
+    # surface — the strip row is hidden for a live definition
+    running = uiapp.teams_view([done("orc-ao", at), done("grind-1", later, state="idle")])
+    assert running["teams"][0]["live"] == 1 and running["teams"][0]["wound_down"] is None
+
+
 def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
     tmp_path, fleet = world
     (tmp_path / "agentorc" / ".agentorc.yml").write_text(
@@ -203,6 +234,25 @@ def test_the_page_renders_a_row_per_team_and_collapses_to_a_line_when_none_is_de
     (tmp_path / "home" / "org.yml").unlink()
     html = client.get("/").text
     assert "Teams: none defined" in html and "data-team-act" not in html
+
+
+def test_the_strip_row_reads_wound_down_where_it_would_have_read_stopped(world, client):
+    """The rendered half of the same row: the words a person actually sees. A wound-down team is
+    startable like any other — `ao team start` is the restart (§4.9) — so **Start** stays, and the
+    row is not hidden: nothing is live."""
+    _tmp, fleet = world
+    assert ">stopped<" in client.get("/").text
+
+    at = "2026-09-17T20:00:00Z"
+    fleet.sessions = [
+        {**badged(n, "ao-grind", state="closed"), "tail": [], "out_of_work": {"at": at, "why": "nothing open"}}
+        for n in ("orc-ao", "grind-1")
+    ]
+    html = client.get("/").text
+    assert "wound down" in html and ">stopped<" not in html
+    assert 'class="team-row" data-team="ao-grind"' in html and "hidden" not in html.split("team-row")[1][:200]
+    assert 'data-team-act="start"' in html  # `ao team start` is the restart (§4.9)
+    assert "declared it was out of work" in html  # the hover says why the word is different
 
 
 def test_a_live_team_leaves_the_strip_and_its_card_carries_stop_and_stop_now(world, client):
