@@ -703,6 +703,45 @@ decided here so both ends are written from one text.
   forwarding this to the home is not built*. Serving such a call locally the moment the link came
   up would be the split-brain this section exists to rule out.
 
+**A node's records at the home (2026-09-17, TD-057 step 3b).** The first thing the link carries.
+
+- **Snapshot, then reports.** As soon as `hello` is answered the node sends `snapshot` — every
+  record of its own host, as the store writes them — and only when that is acknowledged does it
+  start sending `report` (records that changed) and `gone` (ids it forgot). A change to `state`,
+  `pending`, `exit_code` or `pane` is reported at once; anything else that moved — the tail, git,
+  the clock fields — at most once per `REPORT_EVERY` (5 s) per record, because those move on almost
+  every tick of a healthy session. What the node marks as told is exactly what it sent, so a
+  record created while the snapshot is out goes in the first report; and a report that cannot be
+  written within `REPORT_WRITE` (5 s) gives the link up rather than hold the node's tick — the
+  reconnect's snapshot repairs whatever was missed.
+- **The snapshot is the truth about which sessions the host has.** A record the home holds for that
+  host and the snapshot lacks is forgotten at the home: the node is the single tmux writer for its
+  host, so a session it does not know does not exist. It forgets only what the snapshot
+  *omits*: a record that is listed and cannot be taken is kept, mail and all, and logged. The home **adopts** a record it has never
+  seen — whole, the replica's home-owned fields included, which is how a person's offline create
+  arrives and how a lost home store is rebuilt — and applies `apply_node` to one it knows. Two copies
+  are the same session when `id`, `host`, `kind`, `adapter` and `dir` agree; the rest of a record's
+  identity — `adapter_id` from the first hook, a renamed `name`, `profile`, `repo`, `worktree` — is set
+  on the session's own host after it exists, so it travels with the node's report.
+- **Only that host's records.** A record in a snapshot or a report whose `host` is not the name the
+  link's key is bound to is dropped and logged, never stored: a laptop cannot report on kmaster's
+  sessions, whatever it sends.
+- **Held apart, addressed by `id@host`.** The home keeps another host's records in their own map
+  and their own directory (`remote/<host>/`), never among its own: its tick, its anchor rule, its
+  name checks and `create` go on reading only the sessions whose panes are here. To a client they
+  are one org: `list`, `get`, the `subscribe` stream and a `wait` carry them with `id` set to the
+  address `id@host`, which is what the card, the Focus URL and every later act use.
+- **Reachability is an overlay on the view, never the record.** While the host's link is down the
+  view of each of its records reads `state: unreachable`, with `host_link: {up, since, why}` beside
+  it and the last reported state under `last_state`; the stored record keeps what the node last
+  said, and the overlay lifts on the next `hello`. A `wait` sees the overlay like any client, so
+  a lead is woken when a member's host goes away and again when it returns — a member change, which
+  the wake budget does not charge (§4.10). A home that has just started shows them
+  unreachable until their node dials in.
+- **What is not built yet is refused by name.** An act on `id@host` answers *runs on <host>: acts
+  across the link are not built (TD-057 step 4)*; the Focus terminal of such a session has nothing
+  to attach to here. Mail to one waits for step 5 and is refused the same way.
+
 **Considered and rejected.** *The UI host as a store-and-forward router*: the least code, but it
 makes the UI — a client tier that may be a sleeping laptop — a second writer holding state, and it
 leaves unanswered which host gates an act across hosts. *A mesh of host agents dialing each other*:

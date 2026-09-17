@@ -620,8 +620,15 @@ GROWS = frozenset({"sends", "seen_at", "wake_refilled_at"})
 SENDS_KEPT = 20  # the bound `sessionorc.mail.SENDS_KEEP` holds the list to; models cannot import mail
 
 
+# What makes two copies the same session. The rest of `IDENTITY` is set or changed on the session's
+# own host after it exists — `adapter_id` by the first hook, `name` by a rename, `profile`, `repo`,
+# `worktree`, `created` — so it travels with the node's report and is never grounds for refusing one
+# (review of PR #202: a record reported before its first hook would have frozen at the home).
+SAME_SESSION = frozenset({"id", "host", "kind", "adapter", "dir"})
+
+
 def _overlay(record: Session, copy: Mapping[str, Any], owned: frozenset[str]) -> Session:
-    for f in sorted(IDENTITY):
+    for f in sorted(SAME_SESSION):
         if f in copy and copy[f] != getattr(record, f):
             raise NotTheSameSession(f"{record.id}: `{f}` is {getattr(record, f)!r} here and {copy[f]!r} in the copy")
     taken = (owned | GROWS) & copy.keys()
@@ -649,5 +656,6 @@ def apply_home(record: Session, home_copy: Mapping[str, Any]) -> Session:
 
 def apply_node(record: Session, report: Mapping[str, Any]) -> Session:
     """The home's record takes a node's report: exactly the node-owned fields — what the node
-    observes and enforces on its host. The mirror of `apply_home`."""
-    return _overlay(record, report, NODE_OWNED)
+    observes and enforces on its host, and the identity fields that are set there after the session
+    exists. The mirror of `apply_home`."""
+    return _overlay(record, report, NODE_OWNED | (IDENTITY - SAME_SESSION))
