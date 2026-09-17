@@ -521,3 +521,10 @@
 22:35  **Caught at wrap-up: the whole run-3 log was never pushed.** `origin/orchestrator-ao-1` still pointed at `acde9c4` (run 2's final commit) and **112 commits** sat only in this worktree for two days. Pushed now (fast-forward verified, `acde9c4..f107231`), and confirmed `HEAD` is an ancestor of `origin/orchestrator-ao-1`.
 22:35  **Root cause is a gap in this brief, and it will recur on every run.** Step 4 says "commit it to your launch branch ... but do not open a PR for it" -- it never says *push*. I committed every tick faithfully and never pushed once, because nothing told me to and the launch branch tracks `origin/main` rather than its own remote, so `git status` reports `ahead` against main and never looks wrong. That is precisely the stranded-work failure cadence §1 exists to prevent, sitting inside the brief of the session whose job is to catch it in others. One-word fix: "commit **and push** it to your launch branch". Left as a brief edit for Paul rather than made by me -- an orchestrator does not edit its own brief.
 22:35  Final state: working tree clean; 112 commits pushed; both run-3 escalations open on the board (the `/compact` stall, the unclearable `review` row) and now overdue, which is the board doing its job; no PRs of mine open in either repo. The two open PRs on the host (agentorc #173, samscrape #872) postdate this run's close and belong to other sessions -- not touched. Nothing stranded.
+--- RUN 4 (started 2026-09-17 04:43Z, session ao-agentorc-orchestrator-ao-1) ---
+04:45  inbox: empty. members: tdgrind-ao-1, openaiagentapi, td052-step2/3/4/8/8b.
+04:45  tdgrind-ao-1: working (just started, free-pick) → ok
+04:45  openaiagentapi: idle, interactive (unattended: false) → out of reach (§9 inv 5), not touched
+04:45  td052-step2/3/4/8/8b: exited ~1h, lanes 1/1 done (PRs #166/#171/#170/#165/#168) → ok; no restart, no forget (no live successor)
+04:45  cadence: #163 #165 #166 #168 #170 #171 #172 #174 → no fail rows (review rows recorded, self-attested)
+04:45  relay: 4 entries, all landed before tdgrind-ao-1 was created; its settings use cadence_hooks.sh → skip
