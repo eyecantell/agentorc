@@ -499,7 +499,7 @@ long-lived link. The home is also a node for its own host's sessions (one proces
   `pending`, `pane`, `tail`, `last_output`, `exit_code`, `git`, `model`, usage, the run log and
   `wrapup_sent_at`. **The home owns the graph and intent:** `controllers`, `capabilities`, `team`,
   `project`, `role`, `lane`, `unattended`, `run_until`, the wrap-up prompt, reports, the inbox,
-  tallies, wake budgets and `mail_decided`. Example: the link is down, the node wraps a worker up
+  `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and `mail_decided`. Example: the link is down, the node wraps a worker up
   and it exits, and meanwhile a person at the home extends its `run_until`; on reconnect the node's
   `exited` and `wrapup_sent_at` stand, and so does the home's new `run_until` — which now applies to
   nothing, because a stopped session is not resurrected.
@@ -518,7 +518,7 @@ long-lived link. The home is also a node for its own host's sessions (one proces
   home** and is refused while the host is unreachable. Two harms are accepted and stated: a stop
   time **extended** at the home during a partition does not resurrect a session the node already
   stopped, and one **shortened** at the home is not seen by the node until reconnect.
-- **§4.10 and §4.8 do not change.** Every rule stays single-process, because the process holding
+- **§4.10 and §4.8 do not change in kind.** Every rule stays single-process, because the process holding
   the graph is the home. Routing is not a question: mail goes to one place.
 
 **Addresses.** A record gains a **`host`** field. tmux names stay `ao-<scope>-<name>` (§4.1). The
@@ -1789,6 +1789,14 @@ is a message the receiver must reason about before it can ignore it:
 | `reply` | answers one `ask`, carrying its id in `reply_to` | nothing |
 | `conflict` | an `ask` to two or more controllers at once, citing the two `send`s it cannot reconcile by id (below; TD-039) | a `reply` from any addressee, or escalation |
 
+**A `conflict` is an `ask` for every rule in this section** (Sonnet review, 2026-09-16) — it
+carries the same wall-clock bound, its first `reply` closes it uncounted and later replies count
+as `note`s, an addressee that exits leaves it pending, and it is never pruned while open. What
+differs is only its delivery shape: several addressees named by the worker, one entry with one
+id in each of their inboxes. Its **escalation** is not a mechanism of its own: it is the thread's
+`bound_hit`, or the bound expiring, either of which the asker turns into a board line — the
+generic path below, which TD-039 keeps only the conflict-specific judgement of.
+
 **A `send` is recorded on the record it lands on, so a `conflict` can say who said what (fourth
 review, 2026-09-16).** The attribution property above is a fact about the pane: keystrokes carry
 no envelope, so the session cannot tell one controller's `send` from another's or from the person.
@@ -1833,7 +1841,11 @@ window on correspondence and produces a plausible account of work nobody asked f
   construction, which is TD-039's own argument, and the host agent never commits to a board on a
   session's behalf (board write-back, §4.4, is not built). Two agents that cannot agree in a few
   turns are not going to agree in fifty, and the person is the tie-break — Paul's rule for the
-  two-controller conflict (§10, 2026-09-13) generalised. **A thread is its root**: the id of the
+  two-controller conflict (§10, 2026-09-13) generalised. **A person's message into a thread is
+  never counted, and resets that thread** (Sonnet review, 2026-09-16): it clears `bound_hit` and
+  the thread's tally on every record holding it, so the sessions may reply to the person's ruling
+  under the same root rather than opening a fresh one — the same rule as the wake budget, which a
+  person's act refills and nothing a session does restores. **A thread is its root**: the id of the
   first `ask`, `conflict` or `note` a chain replies to. A `reply` belongs to its root's thread
   whatever `about` it carries, so rotating `about` does not start a fresh count; messages between
   one pair that reply to nothing count under that pair, **within a rolling window** (fourth review,
@@ -2222,7 +2234,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 
 15. The org's **graph, intent and mail have one writer, the home host agent**; a session's
     **observed state has one writer, its node** (§4.4a, 2026-09-16). `controllers`, grants, team,
-    `unattended`, stop time, reports, inboxes, tallies and wake budgets change only at the home, and
+    `unattended`, stop time, reports, inboxes, `sends`, tallies and wake budgets change only at the home, and
     every gate reads them there; `state`, pane, exit code, usage and `wrapup_sent_at` change only on
     the node that owns the session's tmux (invariant 1). Merges go by owner, never by last write. A
     request's identity is the channel it arrived on, never a field it carries. While a node's link is
@@ -2559,7 +2571,11 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       Prior art was then surveyed the same day (`docs/decisions/2026-09-16-agent-messaging-prior-art.md`).
       **A fourth Fable review, 2026-09-16, of §4.10 with §4.4a as its substrate** (Paul: *"adopt
       them, then run design reviews with Sonnet until the two of you are in agreement … that it is
-      ready for implementation"*). Ten changes, all adopted: an open `ask` is never pruned (retention
+      ready for implementation"*). Ten changes, all adopted, and then **one Sonnet round** (verdict
+      *ready with changes*, four findings, all adopted): a `conflict` is an `ask` for every rule and
+      its escalation is the generic `bound_hit`/expiry path; `sends` joins §4.4a's home-owned list
+      and invariant 15; a person's message into a thread is uncounted and resets it; *reachable*
+      enters the glossary. The ten: an open `ask` is never pruned (retention
       and the bound were independent, so a read `ask` could be pruned before it was answered and
       the answer refused); the pair tally for reply-less mail is windowed, not lifetime (a daily
       `note` would have made a pair deaf in weeks); a decision not to wake leaves `mail_decided`
@@ -2569,8 +2585,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       `send` charge from round two is **dropped** as redundant with the lead's wake charge and as
       the source of a refusal mode and a `wait --timeout 0` hole; `ao --skill` displaces rather
       than grows past 120 lines; a person gets a **Message** control, not only Reply; an `ask`'s
-      bound is wall-clock only; a person-inbox refusal names the board. Sonnet review rounds on the
-      result are recorded below this entry.
+      bound is wall-clock only; a person-inbox refusal names the board.
 
 - [x] **How do sessions on different hosts talk?** (Paul, 2026-09-16: *"Seems like we need to
       solve the cross-machine design now or the comms between agents are left funky"*; TD-057.)
