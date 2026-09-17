@@ -977,6 +977,8 @@ def test_progress_none_declares_out_of_work(subprocess_agent, tmp_path, capsys, 
     monkeypatch.setenv("AGENTORC_SESSION", sid)
     assert cli.main(["progress", "none", "TD-001", "--why", "x"]) == 2
     assert "takes no reference" in capsys.readouterr().err
+    assert cli.main(["progress", "claim", "TD-900", "--force"]) == 0  # TD-056: --force reaches the RPC
+    capsys.readouterr()
     assert cli.main(["progress", "claim"]) == 2
     assert "needs a reference" in capsys.readouterr().err
     assert cli.main(["progress", "none"]) != 0

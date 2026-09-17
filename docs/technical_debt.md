@@ -33,7 +33,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Partly done |
 | TD-053 | A team never winds down when it runs out of work: build design §4.9a — the declaration, the role tests, the lead's wind-down and the board line | Medium | Partly done |
 | TD-055 | Rename to the glossary's decided words: the `orchestrator` role becomes `lead`, the `orchestrate` grant `control`, orc-of-orcs director, a lead's tick a round, the daemon always *host agent*; nudge, supervisor and fleet retired | Medium | Open |
-| TD-056 | Reference leases: a worker's claim on a `TD-NNN` or a path is an advisory, timed reservation checked at claim, not a note to siblings | Medium | Open |
+| TD-056 | Reference leases: a worker's claim on a `TD-NNN` or a path is an advisory, timed reservation checked at claim, not a note to siblings | Medium | Partly done |
 | TD-057 | Sessions on different hosts cannot talk: build the home and node split — one home host agent holds the org's graph and mail, other hosts dial it (design §4.4a) | Medium | Partly done |
 | TD-058 | `systemctl restart agentorc-agent` hangs for the 90 s stop timeout and ends in SIGKILL: the serve loop waits for every open connection to close | Medium | Partly done — fixed, live check pending |
 | TD-061 | A worktree session's memory write lands uncommitted in the main checkout, where the anchor's next `git commit -a` sweeps it into an unrelated PR | Medium | Open |
@@ -420,7 +420,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Priority:** Medium
 **Added:** 2026-09-16 (raised by Paul, adopting a lesson from mcp_agent_mail)
 
-**Status:** Open — adopted as a direction in ADR `docs/decisions/2026-09-16-agent-messaging-prior-art.md` (lesson 3); not designed or built. The at-claim note it replaces now exists, as its stopgap, in the grinder briefs (`src/agentorc/briefs/grinder.md`, `docs/briefs/tdgrind-ao-1.md`; TD-052 step 4)
+**Status:** Partly done — **designed and built 2026-09-17** (design §4.8 "A claim is a lease"; `rpc_progress`'s `force`, `_lease_holder`, `LEASE_TTL` = 12 h; `ao progress claim --force`; `test_a_claim_is_a_lease_on_its_reference` claims one reference from two sessions in one moment and gets one grant and one refusal naming the holder). Decisions this made: a lease is held only by a *declared* claim on a *live* record (not exited/closed), younger than the TTL; derived claims neither hold nor are checked; a re-claim renews; references only — path globs are not built and wait for a case. **Remaining:** once the running host agent has been restarted onto this build, remove the at-claim `note` from the grinder briefs (below) — until then it is the only protection the live team has. Was: adopted as a direction in ADR `docs/decisions/2026-09-16-agent-messaging-prior-art.md` (lesson 3). The at-claim note it replaces now exists, as its stopgap, in the grinder briefs (`src/agentorc/briefs/grinder.md`, `docs/briefs/tdgrind-ao-1.md`; TD-052 step 4)
 
 **Location:** design §4.8 (the `progress` channel and claims), §4.10 (TD-052 step 4's at-claim note, which this replaces); `src/sessionorc/agent.py` (the `progress` RPC); `src/agentorc/briefs/grinder.md`
 
