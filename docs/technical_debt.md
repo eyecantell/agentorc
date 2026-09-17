@@ -36,6 +36,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-056 | Reference leases: a worker's claim on a `TD-NNN` or a path is an advisory, timed reservation checked at claim, not a note to siblings | Medium | Open |
 | TD-057 | Sessions on different hosts cannot talk: build the home and node split — one home host agent holds the org's graph and mail, other hosts dial it (design §4.4a) | Medium | Partly done |
 | TD-058 | `systemctl restart agentorc-agent` hangs for the 90 s stop timeout and ends in SIGKILL: the serve loop waits for every open connection to close | Medium | Open |
+| TD-061 | A worktree session's memory write lands uncommitted in the main checkout, where the anchor's next `git commit -a` sweeps it into an unrelated PR | Medium | Open |
 
 ---
 
@@ -473,3 +474,20 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** `systemctl --user restart agentorc-agent` returns in a few seconds with the UI open and a lead blocked in `ao wait`, and the journal shows a clean stop.
 
 **Related:** TD-024 (archived: the pending-task traceback on SIGTERM, which made the cancel path clean but did not meet this), TD-052 step 3 (the `wait` RPC's long-lived connections), design §4.4, §4.6.
+
+## TD-061: A worker's memory write lands uncommitted in the anchor's checkout
+
+**Priority:** Medium
+**Added:** 2026-09-16 (observed by the anchor session; Paul asked for the entry). Numbered 061 because PR #173, open from another session, holds TD-059 and TD-060.
+
+**Status:** Open
+
+**Location:** `.claude/settings.local.json` (`autoMemoryDirectory`, an absolute path to the main checkout's `docs/claude-memory/`), `scripts/hydrate_worktree.sh` (symlinks that file into every worktree — a SYNCED FILE, dev-cadence's), `scripts/check_claude_memory.sh` (the guard — also synced), docs/cadence.md §1 and the memory section; design §4.2 (the launch layer agentorc's own sessions get)
+
+**Why:** `autoMemoryDirectory` is `/home/kmaster/agentorc/docs/claude-memory`, and `hydrate_worktree.sh` symlinks `.claude/settings.local.json` into each worktree so a worker keeps the repo's memory path. The path is absolute, so a session working in `.claude/worktrees/<name>` writes its memory files into the **main checkout's** working tree, not its own worktree's. The write is on no branch of the worker's, cannot ride the worker's PR, and sits uncommitted in the anchor's tree until somebody commits there. On 2026-09-16 `tdgrind-ao-1` added a wrap-up lesson to `docs/claude-memory/agentorc-td-grind-mechanics.md` this way; the anchor session's next `git commit -a`, for an unrelated ledger change, swept it into PR #174, where the Sonnet fact-check noticed a file the PR did not describe. It was kept and explained in the PR body. The failure has three faces: a worker's lesson is stranded if the anchor never commits (cadence's *never strand work*, applied to memory); it lands in a PR whose author did not write it and whose review did not cover it; and it breaks the one-agent-per-checkout rule (§9 invariant 2) in spirit — a second session is editing the anchor's tree. `check_claude_memory.sh` guards the opposite failure (memory falling back outside the repo) and so reports nothing here.
+
+**Fix:** decide where a worktree session's memory belongs, in dev-cadence, since the wiring is its synced files: either the memory path resolves **per checkout** (a relative `autoMemoryDirectory`, or the hydrate step writing the worktree's own `docs/claude-memory` path instead of symlinking the anchor's settings), so a worker's memory write is a change on its own branch and rides its own PR; or memory stays shared and the wrap-up rule in every brief becomes *memory changes go through a PR of their own from the session that wrote them*, with `check_claude_memory.sh` reporting uncommitted memory in the main checkout that the running session did not write. The first is mechanical and needs no brief to remember it. Until then: the anchor session stages files by name, never `git commit -a`.
+
+**Done when** a worker's memory write appears in that worker's own PR, and an anchor session's commit cannot pick up a file another session wrote.
+
+**Related:** PR #174 (where it was seen), TD-058; docs/cadence.md §1 (worktrees, hydrate), the memory section; §9 invariant 2; memory `agentorc-td-grind-mechanics`.
