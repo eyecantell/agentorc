@@ -528,3 +528,4 @@
 04:45  td052-step2/3/4/8/8b: exited ~1h, lanes 1/1 done (PRs #166/#171/#170/#165/#168) → ok; no restart, no forget (no live successor)
 04:45  cadence: #163 #165 #166 #168 #170 #171 #172 #174 → no fail rows (review rows recorded, self-attested)
 04:45  relay: 4 entries, all landed before tdgrind-ao-1 was created; its settings use cadence_hooks.sh → skip
+04:55  tdgrind-ao-1: working, claimed TD-058 → ok; exited td052-* unchanged; merged #175 (td061-*) is no member's branch → not checked
