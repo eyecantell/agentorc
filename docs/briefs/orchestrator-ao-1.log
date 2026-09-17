@@ -560,3 +560,4 @@
 20:52  relay: 4 entries, all landed 2026-09-11/12, before the member was created 20:49Z; its worktree settings use the one cadence_hooks.sh line (no per-line hooks) → skip, nothing to send
 21:02  tdgrind-ao-1: working, claimed TD-062 at 20:50 → ok. inbox empty; no new merges since #196.
 21:22  tdgrind-ao-1: working on TD-062, PR #197 (td062-rpc-skew) open → ok; quiet hold 21:02–21:12 (no mail, no merges, no state change)
+21:56  tdgrind-ao-1: working, TD-062 done via #197 (merged 209b23b) → ok; cadence #197 pass on every row (review recorded: FIXED · sonnet-5 · 3 findings, self-attested). Quiet holds 21:22–21:52.
