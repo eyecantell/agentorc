@@ -1530,8 +1530,8 @@ not on kmaster and is not to be cloned there (Paul, 2026-09-12); its project ent
 devenv host, and `ao team start guardians` from kmaster waits for phase 2. Nothing in this
 section changes for that: the host column fills in. A container on the *same* machine as the home
 — contractmatch's devcontainer, 2026-09-17 — is the same shape over a shorter pipe (`docker exec`
-rather than ssh, §4.4a's `link: {command: …}`, §10) and waits only on a node's records reaching
-the home.
+rather than ssh, §4.4a's `link: {command: …}`, §10), and what it waits on is the container, not
+the transport.
 
 **Done when** `ao team start ao-grind` brings up a lead and two grinders, each in its
 own worktree, the grinders' `controllers` naming the lead, the Org page showing the
@@ -2698,20 +2698,20 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       kmaster and its team start waits for phase 2's transport.
       → **Follow-up 2026-09-17** (Paul: contractmatch cannot be ground by a worker on kmaster —
       the Flutter SDK is in its devcontainer, not on the host; *the grinder can wait*). The answer
-      stands, and §4.4a's link already carries it: a node dials with `link: {command: [...]}`,
-      run as given, so a container on the **home's own machine** is dialled
+      stands, and §4.4a's link already carries it: a node dials with `link: {command: [...]}`, run
+      as given, so a container on the **home's own machine** is dialled
       `docker exec -i <container> agentorc-agent link` — no ssh, no keys, no sshd in the image, no
-      network — and needs no transport work. What a container host waits on is TD-057 **step 3b**
-      (a node's records at the home), and contractmatch is where to prove it, before guardians.
-      Two things a container host asks of *this* document, both parked with the grinder:
-      **invariant 2** is enforced per host agent, and a bind-mounted checkout is the same files on
-      two hosts, so a session inside the container and one outside can both hold the repo and
-      neither refuses — registering a repo on exactly one host is the cheap answer and the one to
-      take first, an identity for a directory that survives a mount namespace is the real one;
-      and **`vscode_host`** (§5) is an ssh alias, where a container wants a
+      network — and needs no transport work of its own. What is left is the container, not the
+      pipe, and contractmatch is where to prove it, before guardians. Two things a container host
+      asks of *this* document, both parked with the grinder: **invariant 2** is enforced by each
+      host agent over its own host, and a bind-mounted checkout is the same files on two hosts, so
+      a session inside the container and one outside can both hold the repo and neither refuses —
+      registering a repo on exactly one host is the cheap answer and the one to take first, an
+      identity for a directory that survives a mount namespace is the real one; and
+      **`vscode_host`** (§5) is an ssh alias, where a container wants a
       `vscode-remote://dev-container+…` URI, so the link is absent for a container host until the
       entry can say so. The rest is packaging, not design: the container must outlive VS Code
-      (goal §2.7 — `devcontainer up` or a compose service, not the extension's lifetime), and it
+      (goal 7 — `devcontainer up` or a compose service, not the extension's lifetime), and it
       needs `tmux`, an `agentorc` install, and the profile's `CLAUDE_CONFIG_DIR` inside it.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
