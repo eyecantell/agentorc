@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 import os
+from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -308,7 +309,7 @@ NO_TEAM = ""  # the group key for sessions carrying no `team` badge; rendered as
 DEAD = ("exited", "closed")
 
 
-def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+def team_groups(views: list[dict[str, Any]], defined: Collection[str] = ()) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `None` when no *live*
     session carries a badge — the page then renders the flat grid, with no header anywhere.
@@ -361,6 +362,8 @@ def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
                 "projects": projects,
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "live": sum(1 for m in members if m.get("state") not in DEAD),
+                # a definition exists, so the group's card carries Stop / Stop now (§4.5a, 2026-09-16)
+                "defined": team in defined,
             }
         )
     return groups
@@ -452,7 +455,7 @@ def create_app() -> FastAPI:
             "org.html",
             {
                 "sessions": vs,
-                "groups": team_groups(vs),
+                "groups": team_groups(vs, {t["name"] for t in strip["teams"]}),
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),

@@ -91,6 +91,10 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 /* Org team groups (design §4.5a, §4.9): a header row per team over its own grid; the flat page is one headerless group */
 #groups { display: flex; flex-direction: column; gap: 22px; } .tgroup[hidden] { display: none; }
+/* A team is one card holding its sessions' cards (design §4.5a **team groups**, 2026-09-16); *No
+   team* and the flat grid (`data-team=""`) stay plain sections. */
+.tgroup:not([data-team=""]) { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px 14px; background: var(--line2); }
+.strip[hidden], .strip .team-row[hidden], .ghead .btn[hidden] { display: none; }
 .ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; font-size: 12px; } .ghead .h2 { font-size: 14px; }
 .ghead .name { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; color: var(--fg); text-decoration: none; }
 .badge.team { cursor: pointer; color: var(--fg); }
@@ -104,6 +108,9 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .badge[hidden] { display: none; }      /* same trap: `.badge` is inline-block (TD-026's Focus stop control) */
 .sc { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow: hidden; position: relative; } .sc.off { opacity: .55; }
 .sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; } .sc-foot { display: flex; gap: 6px; align-items: center; }
+/* The head row wraps: a long name plus role and team badges used to push the state pill out past
+   the card's edge, where `overflow: hidden` clipped it (seen live 2026-09-16). */
+.sc-body > .row:first-child { flex-wrap: wrap; row-gap: 4px; } .sc-body > .row:first-child .badge { white-space: nowrap; }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }
 .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--idle); }
 .sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); }

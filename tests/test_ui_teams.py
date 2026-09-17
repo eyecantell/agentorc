@@ -197,11 +197,28 @@ def test_a_malformed_definition_is_a_note_not_a_500(world):
 def test_the_page_renders_a_row_per_team_and_collapses_to_a_line_when_none_is_defined(world, client):
     tmp_path, fleet = world
     html = client.get("/").text
-    assert 'data-team-act="start"' in html and 'data-team-act="stopnow"' in html
+    # Nothing is live: the strip lists the definition with Start, and Stop has no card to sit on.
+    assert 'data-team-act="start"' in html and 'data-team-act="stop' not in html
     assert 'class="team-row" data-team="ao-grind"' in html and "lead orc-ao · 2 members" in html
     (tmp_path / "home" / "org.yml").unlink()
     html = client.get("/").text
     assert "Teams: none defined" in html and "data-team-act" not in html
+
+
+def test_a_live_team_leaves_the_strip_and_its_card_carries_stop_and_stop_now(world, client):
+    """Design §4.5a **team groups** (2026-09-16): the control sits on the thing it stops."""
+    _tmp, fleet = world
+    fleet.sessions = [{**badged("orc-ao", "ao-grind"), "tail": []}, {**badged("adhoc-1", "adhoc"), "tail": []}]
+    html = client.get("/").text
+    assert 'class="team-row" data-team="ao-grind" data-live="1" hidden' in html  # out of the strip
+    head = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
+    head = head[: head.index('<div class="grid">')]
+    assert 'data-team-act="stop" data-team="ao-grind" title' in head  # shown: no `hidden`
+    assert 'data-team-act="stopnow" data-team="ao-grind" title' in head
+    # A badge with no definition has nothing `ao team stop` could read: its buttons stay hidden.
+    adhoc = html[html.index('<section class="tgroup" data-team="adhoc"') :]
+    adhoc = adhoc[: adhoc.index('<div class="grid">')]
+    assert 'data-team-act="stop" data-team="adhoc" hidden' in adhoc
 
 
 # ── Start: the shared planner, every check before any create ──────────────────────────────────

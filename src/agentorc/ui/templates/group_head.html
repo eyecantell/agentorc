@@ -9,4 +9,10 @@
 {% if g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
 <span class="grow"></span>
 <span class="meta">{{ g.live }} live</span>
+{# Stop / Stop now live on the team's own card (design §4.5a **team groups**, 2026-09-16), shown for
+   a team with a definition and something live. The page render knows the definitions; a header
+   re-rendered for a delta does not read them again, so the client reconciles `hidden` from the
+   strip's rows (`syncStrip`). #}
+{% if g.team %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}"{% if not (g.defined and g.live) %} hidden{% endif %} title="wrap up the members, then the lead (`ao team stop`)">Stop</button>
+<button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}"{% if not (g.defined and g.live) %} hidden{% endif %} title="kill every session carrying this badge (`ao team stop --now`)">Stop now</button>{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}
