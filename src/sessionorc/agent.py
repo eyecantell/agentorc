@@ -1036,6 +1036,11 @@ class HostAgent:
         s.set_state("closed", confidence="scraped")
         s.pane = False
         s.closed_at = now_iso()
+        # A `kill` then a `close` before an intervening tick would otherwise strand a `_killed_at`
+        # stamp for `CLOSED_KEEP`: the reconcile skips a closed record before it reaches the guard,
+        # so nothing else would ever clear it. Harmless — a closed record is never observed either
+        # way — but it would make the guard's one-tick bound untrue (review of PR #199).
+        self._killed_at.pop(id, None)
         self.store.save(s)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()

@@ -245,8 +245,7 @@ def test_send_wait(subprocess_agent, tmp_path, capsys):
             assert cli.main(["send", sid, "--wait", "--timeout", "5", "go"]) == 0
         finally:
             done.set()
-        fut.result(timeout=5)
-    wait_for_sync(lambda: call_sync("get", id=sid)["state"] == "idle")
+        fut.result(timeout=5)  # `rpc_hook` applies the event inline, so the last idle is on the record
     assert capsys.readouterr().out.strip() == f"{sid}: idle"
     assert cli.main(["send", sid, "--wait", "--timeout", "1", "nothing happens"]) == 1
     assert "prompt-stalled" in capsys.readouterr().err

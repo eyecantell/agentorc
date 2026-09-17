@@ -223,14 +223,16 @@ async def derived(agent, check, timeout: float = 10.0):
     end = time.monotonic() + timeout
     while True:
         if (t := agent._derive_task) is not None and not t.done():
+            # A derive this helper did not start: whatever it raises belongs to the round that
+            # started it, not to this one, and the round below is the one under test.
             with contextlib.suppress(Exception):
                 await t  # let a tick's in-flight derive finish before asking for a fresh one
         agent._git_checked.clear()  # the branch read has its own cadence; the derive follows it
         agent._derived_at.clear()
         await agent.tick()
         if (t := agent._derive_task) is not None:
-            with contextlib.suppress(Exception):
-                await t
+            await t  # not suppressed: this is the derive the round asked for, and its traceback is
+            # worth more than the generic timeout below (review of PR #199)
         got = check()
         if asyncio.iscoroutine(got):
             got = await got
