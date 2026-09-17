@@ -157,7 +157,7 @@ not mix:
   every participant's card and `ao` replies show it, and a person's message clears it (design
   §4.10). — *proposed* (2026-09-16).
 - **reachable** — the moment the host agent may decide a wake for a session: hook-confirmed
-  `idle`, or blocked in `wait`, and its node's link up (design §4.10, §4.4a). Distinct from the
+  `idle`, or blocked in `wait`, and, across hosts, its node's link up (design §4.10, §4.4a). Distinct from the
   host state `unreachable`, which is the link being down. — *proposed* (2026-09-16).
 - **doorbell** — the fixed line the host agent types into an idle agent's pane to say it has
   unread mail; carries a count, never a sender's text. The one word outside the two genres, kept
