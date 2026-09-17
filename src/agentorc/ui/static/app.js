@@ -348,13 +348,20 @@
       const t = c.dataset.team;
       if (t && c.dataset.state !== "exited" && c.dataset.state !== "closed") live[t] = (live[t] || 0) + 1;
     });
+    // A live team's controls are on its group's card (design §4.5a **team groups**, 2026-09-16),
+    // so the strip shows the definitions with nothing live, and goes away when there are none.
+    const defined = new Set();
     $$(".team-row", strip).forEach((row) => {
       const n = live[row.dataset.team] || 0;
+      defined.add(row.dataset.team);
       row.dataset.live = n;
+      row.hidden = n > 0;
       $(".live", row).textContent = n ? `${n} live` : "stopped";
-      $(".start", row).hidden = n > 0;          // Start on a stopped team, Stop on a live one
-      $$(".stop", row).forEach((b) => (b.hidden = n === 0));
     });
+    if (defined.size) strip.hidden = !$$(".team-row", strip).some((r) => !r.hidden) && !$(".warnish", strip);
+    // A header re-rendered for a delta arrives with its buttons hidden: the definitions are the
+    // page's, read once into the strip's rows, and this is where the two meet.
+    $$("#groups .ghead [data-team-act]").forEach((b) => (b.hidden = !(defined.has(b.dataset.team) && live[b.dataset.team] > 0)));
   }
   // A stop returns before its lead does (design §4.9: the members settle first, which is minutes).
   // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
@@ -426,11 +433,11 @@
       store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
     });
     $$("#groups .sc").forEach((c) => (c.draggable = true));
-    const strip = $("#teams");
-    if (strip) strip.addEventListener("click", (e) => {
+    // Start is in the strip, Stop / Stop now on the team's card: one handler for both places.
+    [$("#teams"), box].forEach((el) => el && el.addEventListener("click", (e) => {
       const b = e.target.closest("[data-team-act]");
       if (b) teamAct(b.dataset.team, b.dataset.teamAct, b);
-    });
+    }));
     layout();
     connectEvents((ev) => {
       if (ev.event === "session") {
