@@ -728,8 +728,8 @@ def cmd_progress(args: argparse.Namespace) -> int:
     if sid is None:
         return 2
     if args.action == "none":
-        if args.ref:
-            return fail(args, 'ao progress none takes no reference, only --why "<the search that came up empty>"', 2)
+        if args.ref or args.pr:
+            return fail(args, 'ao progress none takes no reference and no --pr, only --why "<the search>"', 2)
         s = call_sync("progress", id=sid, status="none", why=args.why)
         return emit(args, s, lambda: print(f"{s['id']}: out of work — {s['out_of_work']['why']}"))
     if not args.ref:

@@ -1347,6 +1347,8 @@ class HostAgent:
         invariant 14)."""
         s = self._get(id)
         if status == "none":
+            if ref or pr is not None:
+                raise RpcError('progress none takes no reference and no PR, only why="<the search that came up empty>"')
             return await self._out_of_work(s, why, source, caller)
         if status not in PROGRESS_STATUSES:
             raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none")

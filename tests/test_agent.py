@@ -855,6 +855,8 @@ async def test_out_of_work_is_the_sessions_own_declared_word(agent, tmp_path):
         async with LocalClient(caller=sid) as me:
             with pytest.raises(AgentError, match="needs --why"):
                 await me.call("progress", id=sid, status="none", why="  ")
+            with pytest.raises(AgentError, match="takes no reference and no PR"):
+                await me.call("progress", id=sid, ref="TD-1", status="none", why="looked")
             with pytest.raises(AgentError, match="never derived"):
                 await me.call("progress", id=sid, status="none", why="looked", source="derived")
             with pytest.raises(AgentError, match="statuses are: claimed, done, dropped, none"):
