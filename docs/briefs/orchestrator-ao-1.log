@@ -571,3 +571,4 @@
 23:05Z  tdgrind-ao-1: TD-053 step 6 done via #203 (merged 13b9ca9) → cadence #203 pass on every row (review recorded: FIXED · sonnet-5 · 3 findings). Quiet holds 22:45–23:00Z. #200 #202 (td057-step3a/3b) are no member's branch → not checked.
 23:12Z  inbox: 1 note [other] from tdgrind-ao-1 (TD-053 step 6 done, both §4.5a rows built; steps 4/5 remain Paul's) → weighed, no reply.
 23:12Z  tdgrind-ao-1: working, claimed TD-065 (PR #206) → ok
+23:17Z  tdgrind-ao-1: working; TD-065 PR #206 merged 8f35f28 → cadence #206 pass on every row (review recorded: FIXED · sonnet-5 · docs · 1 finding). #204 #205 #207 are no member's branch → not checked.
