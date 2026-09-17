@@ -835,6 +835,51 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
         await person.call("kill", id=sid)
 
 
+async def test_out_of_work_is_the_sessions_own_declared_word(agent, tmp_path):
+    """TD-053 step 1, design §4.9a and §9 invariant 14: `progress` with `status="none"` sets
+    `out_of_work: {at, why}` beside the entries, never among them; only the session itself may
+    write it, declared and with a reason; it survives a reload, and a later claim clears it."""
+    from sessionorc.models import wake_digest
+
+    async with LocalClient() as person:
+        s = await person.call("create", name="free", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        sid = s["id"]
+        assert s["out_of_work"] is None
+        before = wake_digest(s)
+        # a person, and any other session, cannot say it for this one: it is the session's own search
+        with pytest.raises(AgentError, match="only .* may declare itself out of work"):
+            await person.call("progress", id=sid, status="none", why="looked")
+        async with LocalClient(caller="ao-stranger") as stranger:
+            with pytest.raises(AgentError, match="only .* may declare itself out of work"):
+                await stranger.call("progress", id=sid, status="none", why="looked")
+        async with LocalClient(caller=sid) as me:
+            with pytest.raises(AgentError, match="needs --why"):
+                await me.call("progress", id=sid, status="none", why="  ")
+            with pytest.raises(AgentError, match="takes no reference and no PR"):
+                await me.call("progress", id=sid, ref="TD-1", status="none", why="looked")
+            with pytest.raises(AgentError, match="never derived"):
+                await me.call("progress", id=sid, status="none", why="looked", source="derived")
+            with pytest.raises(AgentError, match="statuses are: claimed, done, dropped, none"):
+                await me.call("progress", id=sid, ref="TD-1", status="finished")
+            s = await me.call("progress", id=sid, status="none", why="ledger: every open entry excluded or claimed")
+        assert s["out_of_work"] == {"at": s["out_of_work"]["at"], "why": "ledger: every open entry excluded or claimed"}
+        assert s["progress"] == []  # no entry: the upsert-by-reference list is untouched
+        assert wake_digest(s) != before  # a lead waiting on this worker hears it (§4.9a: an ending, not a crash)
+        # persisted, and reloaded with the record
+        on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+        assert on_disk["out_of_work"]["why"].startswith("ledger:")
+        from sessionorc.store import SessionStore
+
+        assert SessionStore(paths.sessions_dir()).load(sid).out_of_work == s["out_of_work"]
+        # a derived claim does not clear it — only the session's own word that it has work again does
+        s = await person.call("progress", id=sid, ref="TD-900", source="derived")
+        assert s["out_of_work"] is not None
+        async with LocalClient(caller=sid) as me:
+            s = await me.call("progress", id=sid, ref="TD-901")
+        assert s["out_of_work"] is None
+        await person.call("kill", id=sid)
+
+
 async def test_a_session_past_its_stop_time_is_wrapped_up_then_killed(agent, tmp_path):
     """TD-026 gap 1, design §6: a session started by hand with `--unattended` had no stopper at all.
     At its `run_until` the agent asks it to wrap up — once, in the client's words — and kills it the

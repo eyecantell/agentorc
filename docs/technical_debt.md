@@ -31,7 +31,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-049 | An orchestrator only learns what its members did on its own timer: there is no way for a worker to say *I finished* and wake its lead | Medium | Open |
 | TD-050 | The cadence check's `review` row reads the verdict only on a comment's first line, so a report that ends with it counts as no review at all | Medium | Open |
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Partly done |
-| TD-053 | A team never winds down when it runs out of work: build design §4.9a — the declaration, the role tests, the lead's wind-down and the board line | Medium | Open |
+| TD-053 | A team never winds down when it runs out of work: build design §4.9a — the declaration, the role tests, the lead's wind-down and the board line | Medium | Partly done |
 | TD-055 | Rename to the glossary's decided words: the `orchestrator` role becomes `lead`, the `orchestrate` grant `control`, orc-of-orcs director, a lead's tick a round, the daemon always *host agent*; nudge, supervisor and fleet retired | Medium | Open |
 | TD-056 | Reference leases: a worker's claim on a `TD-NNN` or a path is an advisory, timed reservation checked at claim, not a note to siblings | Medium | Open |
 | TD-057 | Sessions on different hosts cannot talk: build the home and node split — one home host agent holds the org's graph and mail, other hosts dial it (design §4.4a) | Medium | Partly done |
@@ -370,7 +370,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Priority:** Medium
 **Added:** 2026-09-14 (raised by Paul)
 
-**Status:** Open — **the design landed first, as §4.9a (2026-09-14)**, with two rows in §4.5a, a sentence in §4.7, a paragraph on the `progress` channel and a pointer under the role table in §4.8, invariant 14 added, and the §10 question answered. Nothing is built.
+**Status:** Partly done — **the design landed first, as §4.9a (2026-09-14)**, with two rows in §4.5a, a sentence in §4.7, a paragraph on the `progress` channel and a pointer under the role table in §4.8, invariant 14 added, and the §10 question answered. **Step 1 landed 2026-09-17**: `out_of_work: {at, why}` on the record (home-owned, persisted), written by `progress` with `status="none"` — `ao progress none --why` — refused without a reason, refused as `derived`, and refused from anyone but the session itself (invariant 14's *written only by the session it is about*); a later declared claim clears it (a decision this step had to make: a session that claims has work again); it is in the wake digest, so a lead blocked in `ao wait` hears it; `ao status -v` prints it, and the skill file carries the verb. Steps 2–6 are open.
 
 **Location:** `src/sessionorc/models.py` (`out_of_work` on the record), `src/sessionorc/agent.py` (the `progress` RPC's new entry shape), `src/agentorc/cli.py` (`ao progress none`), `src/agentorc/teamrun.py` (the wind-down calls the existing stop sequence), `src/agentorc/ui/` (the chip and the strip note), `agentorc/briefs/*.md` (each role's test), `docs/briefs/orchestrator-ao-1.md`, design §4.9a / §4.5a / §4.7 / §4.8 / §9 invariant 14
 

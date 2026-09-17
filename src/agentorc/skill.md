@@ -71,12 +71,11 @@ Mutating — each one is a decision, so check the state first:
   session (`unattended: false` — a person's own, or a worker they took over with `ao mode`) is
   out of every session's reach, `ao control … add` included, and the agent names §9 invariant 5.
   A worker you start without `--unattended` is such a session.
-- `ao progress claim <ref>` / `ao progress done <ref> --pr N` / `ao progress drop <ref> --why "…"`
-  and `ao finding <ref> [--priority low]` — the report channels (design §4.8). **Declare a claim
-  before your first edit, and declare the result before you move on to the next reference**: the
-  Team reads these, and what nobody declares the agent has to guess from branches and PRs. A
-  reference is a ledger id (`TD-027`), a PR number, or an attention-board line — never prose.
-  Ungated, on your own record (`--id`: another's); never overwritten by derivation (§9 invariant 10).
+- `ao progress claim|done|drop <ref> [--pr N] [--why "…"]`, `ao finding <ref> [--priority low]` — the
+  report channels (§4.8). **Declare a claim before your first edit and the result before the next
+  reference**; a reference is a ledger id (`TD-027`), a PR number or a board line, never prose. On
+  your own record (`--id`: another's), never overwritten by derivation (§9 invariant 10). Found
+  nothing you may pick? `ao progress none --why "<the search>"` **before** you exit (§4.9a).
 - `ao keys <id> Key…` — raw keys. Not for dialogs, menus, or another agent's composer.
 - `ao focus <id>` attaches a terminal: for people, not for you.
 

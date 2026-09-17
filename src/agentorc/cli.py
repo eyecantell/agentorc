@@ -174,6 +174,8 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):
                 print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
+            if ow := s.get("out_of_work"):
+                print(f"{'':<{w}}      out of work {_age(ow['at'])}: {ow['why']}")
             # Mail (design §4.10): the unread count and the marks — never a body, which `ao inbox`
             # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
             if unread := s.get("unread"):
@@ -719,10 +721,19 @@ def _own_session(args: argparse.Namespace) -> str | None:
 
 def cmd_progress(args: argparse.Namespace) -> int:
     """`ao progress claim|done|drop <ref>` (design §4.8): declare a lane item claimed before the
-    first edit and its result before moving on. Ungated, and lands on this session's own record."""
+    first edit and its result before moving on. Ungated, and lands on this session's own record.
+    `ao progress none --why "…"` (§4.9a) takes no reference: this session searched and found
+    nothing it may pick, which tells its lead an exit is an ending rather than a crash."""
     sid = _own_session(args)
     if sid is None:
         return 2
+    if args.action == "none":
+        if args.ref or args.pr:
+            return fail(args, 'ao progress none takes no reference and no --pr, only --why "<the search>"', 2)
+        s = call_sync("progress", id=sid, status="none", why=args.why)
+        return emit(args, s, lambda: print(f"{s['id']}: out of work — {s['out_of_work']['why']}"))
+    if not args.ref:
+        return fail(args, f"ao progress {args.action} needs a reference", 2)
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
     s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why)
     return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
@@ -1082,11 +1093,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("sessions", nargs="+", metavar="session", help="the sessions it controls (id or name)")
     p.set_defaults(fn=cmd_control)
 
-    p = add("progress", help="declare a reference claimed, done, or dropped (design §4.8)")
-    p.add_argument("action", choices=["claim", "done", "drop"])
-    p.add_argument("ref", help="a ledger id (TD-027), a PR number, or an attention-board line")
+    p = add("progress", help="declare a reference claimed, done, or dropped, or yourself out of work (design §4.8)")
+    p.add_argument("action", choices=["claim", "done", "drop", "none"])
+    p.add_argument("ref", nargs="?", help="a ledger id (TD-027), a PR number, or an attention-board line")
     p.add_argument("--pr", help="the PR the work is on")
-    p.add_argument("--why", help="why it was dropped")
+    p.add_argument("--why", help="why it was dropped; with `none`, the search that came up empty (required)")
     p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
     p.set_defaults(fn=cmd_progress)
 
