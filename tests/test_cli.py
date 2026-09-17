@@ -995,7 +995,10 @@ def test_progress_none_declares_out_of_work(subprocess_agent, tmp_path, capsys, 
 
 def test_progress_sends_force_only_when_asked(monkeypatch, capsys):
     """A host agent older than TD-056 refuses an unknown `force` keyword, and the CLI is routinely
-    newer than the running agent until its restart: a plain claim must not send it (2026-09-17)."""
+    newer than the running agent until its restart: a plain claim must not send it (2026-09-17).
+    The command now says *unset* by passing `None` and the client drops it from the envelope
+    (TD-062 fix (a), tests/test_rpc_skew.py) — one rule for every command instead of one dance
+    per new parameter."""
     sent = []
 
     def fake(method, **params):
@@ -1006,4 +1009,4 @@ def test_progress_sends_force_only_when_asked(monkeypatch, capsys):
     monkeypatch.setenv("AGENTORC_SESSION", "ao-x")
     assert cli.main(["progress", "claim", "TD-900"]) == 0
     assert cli.main(["progress", "claim", "TD-900", "--force"]) == 0
-    assert "force" not in sent[0] and sent[1]["force"] is True
+    assert sent[0]["force"] is None and sent[1]["force"] is True

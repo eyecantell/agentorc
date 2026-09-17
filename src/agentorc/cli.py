@@ -754,10 +754,11 @@ def cmd_progress(args: argparse.Namespace) -> int:
     if not args.ref:
         return fail(args, f"ao progress {args.action} needs a reference", 2)
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
-    # `force` only when asked: a host agent older than TD-056 refuses the unknown keyword, and a
-    # client is routinely newer than the running agent until its next restart
-    extra = {"force": True} if args.force else {}
-    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, **extra)
+    # `force` only when asked (TD-062 fix (a)): unset is `None`, which the client leaves out of the
+    # envelope, so a host agent older than TD-056 still answers every call that does not force
+    s = call_sync(
+        "progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, force=args.force or None
+    )
     if (held := s.get("lease_overridden")) and not args.json:
         print(f"{s['id']}: claimed over {held['session']}'s lease (since {held['at']})", file=sys.stderr)
     return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
@@ -798,7 +799,7 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "bound": args.bound,
         "cites": _refs(args.cites) if args.cites else None,
     }
-    got = call_sync("msg", **{k: v for k, v in params.items() if v is not None})
+    got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
 
     def prose() -> None:
         e = got["entry"]
@@ -1177,9 +1178,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     clientmod.last_mail = None
+    clientmod.last_ignored = []
     try:
         return _run(args)
     finally:
+        skew_line(args)
         unread_line(args)
 
 
@@ -1193,6 +1196,21 @@ def _run(args: argparse.Namespace) -> int:
     except AgentError as e:
         # the holder's id and state under --json (TD-030); `fail`'s own keywords are not overridable
         return fail(args, str(e), 1, **{k: v for k, v in e.data.items() if k not in ("prose", "code", "message")})
+
+
+def skew_line(args: argparse.Namespace) -> None:
+    """TD-062 (b): the running host agent did not know a parameter this command sent, and said so
+    rather than refusing the call. The command worked — without that parameter — so this is a note,
+    never an error: the agent is older than the code, and somebody has to promote it (CLAUDE.md,
+    "The live copy is promoted, not edited"). Always on stderr: a `--json` caller parses stdout."""
+    if not (dropped := clientmod.last_ignored):
+        return
+    sys.stdout.flush()
+    print(
+        f"[agentorc] the host agent ignored {', '.join(dropped)} — it is older than this `ao`; "
+        "promote the live install to pick it up",
+        file=sys.stderr,
+    )
 
 
 def unread_line(args: argparse.Namespace) -> None:
