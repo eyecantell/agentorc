@@ -569,3 +569,5 @@
 22:52Z  inbox: 4 notes [other] from tdgrind-ao-1 — TD-063 done; worktree returned; a correction that check_cadence.py's worktree row keys on the head branch being present in `git worktree list`, not on being on main (weighed, not acted on: the script is not mine to change); claimed TD-053 step 6 only, steps 4/5 left for Paul. → no replies needed.
 22:52Z  tdgrind-ao-1: working on TD-053 step 6 → ok. Its note also flags a host-agent bug (a pane list older than a kill revived an exited record) — its finding to file, watching.
 23:05Z  tdgrind-ao-1: TD-053 step 6 done via #203 (merged 13b9ca9) → cadence #203 pass on every row (review recorded: FIXED · sonnet-5 · 3 findings). Quiet holds 22:45–23:00Z. #200 #202 (td057-step3a/3b) are no member's branch → not checked.
+23:12Z  inbox: 1 note [other] from tdgrind-ao-1 (TD-053 step 6 done, both §4.5a rows built; steps 4/5 remain Paul's) → weighed, no reply.
+23:12Z  tdgrind-ao-1: working, claimed TD-065 (PR #206) → ok
