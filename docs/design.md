@@ -948,7 +948,7 @@ dials out; nothing on the host listens.** Three transports, one agent:
 | transport | who runs the UI | how the host agent is reached | who it is for |
 |---|---|---|---|
 | `local` | you, on the same host | Unix socket | phase 1, one machine |
-| `ssh` | you, on a host you choose | the UI reaches the home host agent; every other host agent is a node that dials the home over ssh (`agentorc-agent link`, §4.4a, 2026-09-16). A node in a **container on the home's own machine** dials out the same way — over ssh, or over the home's bind-mounted socket with `link: {command: …}` (§4.4a, §10, 2026-09-17) | phases 2+, several hosts you own |
+| `ssh` | you, on a host you choose | the UI reaches the home host agent; every other host agent is a node that dials the home over ssh (`agentorc-agent link`, §4.4a, 2026-09-16). A node in a **container on the home's own machine** dials out the same way, over a link socket of its own that is bind-mounted into it (§4.4a, §10, 2026-09-17) | phases 2+, several hosts you own |
 | `relay` | a service (yours or a hosted one) | the host agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
 
 The `relay` transport is the hosted service: `pipx install agentorc && agentorc join <token>`
@@ -1530,7 +1530,8 @@ not on kmaster and is not to be cloned there (Paul, 2026-09-12); its project ent
 devenv host, and `ao team start guardians` from kmaster waits for phase 2. Nothing in this
 section changes for that: the host column fills in. A container on the *same* machine as the home
 — contractmatch's devcontainer, 2026-09-17 — is the same shape, dialling out like any node (§4.4a,
-§10), and what it waits on is the container, not the transport.
+§10), and what it waits on is the container: the checkout at the same absolute path inside, and a
+link socket of its own.
 
 **Done when** `ao team start ao-grind` brings up a lead and two grinders, each in its
 own worktree, the grinders' `controllers` naming the lead, the Org page showing the
@@ -2696,26 +2697,29 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       that runs one is a host, and a project's repo entry names it per host. guardians stays off
       kmaster and its team start waits for phase 2's transport.
       → **Follow-up 2026-09-17** (Paul: contractmatch cannot be ground by a worker on kmaster —
-      the Flutter SDK is in its devcontainer, not on the host; *the grinder can wait*). The answer
-      stands and needs no new transport: **a container is a node like any other and dials out**,
-      either `link: {ssh: <home>}` from inside it — the only shape that keeps this section's rule
-      that the host name comes from `authorized_keys` and never from the node — or, on the home's
-      own machine, over the home's bind-mounted socket with `link: {command: [...]}`, which needs
-      no ssh, keys or network but lets the node's own argv claim its name, moving the trust
-      boundary to the mount. Which of the two a container host uses is a decision §4.4a should
-      make before one is built. (`docker exec` is *not* it: it runs host→container and the link
-      runs container→home.) What is left is the container, not the pipe, and contractmatch is
-      where to prove it, before guardians. Two things a container host asks of *this* document,
-      both parked with the grinder: **invariant 2** is enforced by each host agent over its own
-      host, and a bind-mounted checkout is the same files on two hosts, so a session inside the
-      container and one outside can both hold the repo and neither refuses — registering a repo on
-      exactly one host is the cheap answer and the one to take first, an identity for a directory
-      that survives a mount namespace is the real one; and **`vscode_host`** (§5) is an ssh alias,
-      where a container wants a `vscode-remote://dev-container+…` URI, so the link is absent for a
-      container host until the entry can say so. The rest is packaging, not design: the container
-      must outlive VS Code (goal 7 — `devcontainer up` or a compose service, not the extension's
-      lifetime), and it needs `tmux`, an `agentorc` install, and the profile's
-      `CLAUDE_CONFIG_DIR` inside it.
+      the Flutter SDK is in its devcontainer, not on the host; *the grinder can wait*), **after a
+      Fable review the same day.** The answer stands, and the first question is not the link but
+      the **path**: a container host must mount the checkout at the *same absolute path* it has
+      outside. contractmatch's declares no `workspaceMount`, so the same checkout is
+      `/home/kmaster/contractmatch` and `/workspaces/contractmatch` at once — and git worktrees
+      carry absolute paths, so a worktree made inside is broken outside while the host's own
+      `git worktree prune` deletes it under a live session. Identical paths also shrink invariant
+      2's "identity across a mount namespace" to something `occupants()` already compares.
+      **The link**: a container is a node and dials out; `docker exec` is backwards *for the link*
+      (it runs host→container) though right for §4.6's terminal, which a container with no sshd
+      otherwise lacks — a host entry wants a `reach: {ssh: …} | {exec: […]}` for the pty bridge and
+      the VS Code link. The shape to build is a **per-node link socket** at the home —
+      `~/.agentorc/links/<name>.sock`, 0600, speaking only the link protocol, one per `nodes:`
+      entry, bind-mounted alone into the container — so the node's name comes from the home's
+      config and never from its argv, with no sshd, key or network, and §4.5b intact. Bind-mounting
+      the home's whole `~/.agentorc` was considered and **rejected**: `agent.sock` makes an
+      unqualified caller a person at the home. What stays open: **invariant 2** once paths match —
+      each agent's external-session check reads its own config dir and tests liveness by pid across
+      pid namespaces, so a `claude` in VS Code on the host is invisible inside and the reverse; the
+      direction is a `shares_checkouts_with:` on the host entry and an occupancy check at the home,
+      and the person-at-a-terminal case is closable only by the person; and a **host is now a
+      runtime, not a machine**, named after a repo and deleted with the container, so `nodes:`
+      needs a removal path and `volatile: true`.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 - [x] **Rename the Herd page?** (2026-09-13) → **yes, to Team.** Decided by Paul: "Herd" reads
