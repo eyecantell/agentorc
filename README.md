@@ -103,8 +103,25 @@ takes `volatile: true` (a laptop: an unreachable agent is asleep, not an alert),
 (default `~/.config/dev-cadence/repos.txt`; its repos head the New session directory list) and
 `runs_keep_days` (default 30; run logs of exited/closed sessions older than that are deleted on
 the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`. A top-level `home: <host>` makes this
-host agent a *node* of that home (design §4.4a); leave it out on a single machine — the link a node
-needs is not built yet (TD-057 step 3), so a node today serves only its own host's sessions.
+host agent a *node* of that home (design §4.4a); leave it out on a single machine.
+
+**Linking a second machine to the home** (TD-057 step 3a — the link comes up and stays up; nothing is
+forwarded over it yet, so a node still serves only its own host's sessions):
+
+```bash
+# on the node (say `laptop`): a key used for nothing else
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/agentorc-link
+# on the home (kmaster), one line in ~/.ssh/authorized_keys — the name after --host is the node's
+# name as far as the home is concerned, and it is set HERE, never by the node:
+command="agentorc-agent link --host laptop",restrict ssh-ed25519 AAAA… laptop-link
+# on the home, ~/.agentorc/hosts.yml:      nodes: [laptop]
+# on the node, ~/.agentorc/hosts.yml:      home: kmaster
+#                                          local: {name: laptop}
+#                                          link: {ssh: kmaster-link}   # an alias in ~/.ssh/config using that key
+```
+
+`ao`'s `host` RPC (`agentorc-agent rpc` → `{"method": "host"}`) shows the link's state at both ends,
+with the reason when it is down: *ssh failed*, *agent down on the home*, or *refused: …*.
 
 ## CLI
 

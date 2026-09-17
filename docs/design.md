@@ -650,6 +650,56 @@ reconnects with backoff; `unreachable` is diagnosed as in §4.6. The link is wri
 a `relay` (§4.5b) would speak, so a hosted relay later is a home that lives outside the person's
 machines, not a second design; the relay itself is not in scope (Paul, 2026-09-16).
 
+**The link's protocol (2026-09-17, TD-057 step 3a).** What the paragraph above leaves to the build,
+decided here so both ends are written from one text.
+
+- **Two processes at the home, one at the node.** sshd runs the forced command,
+  `agentorc-agent link --host <name>`, which is a stdio bridge to the home agent's own socket and
+  nothing more: its first line into the socket is `{"link": {"host": "<name>"}}`, and from then on
+  it copies lines both ways. The home agent trusts that line because of where it arrives — its
+  socket is `0600`, so whoever writes to it is already the user — and because the *name* in it came
+  from `authorized_keys`, not from the node. The node's agent runs the dialer as a task: it starts
+  `ssh -T <target> agentorc-agent link` (the forced command replaces whatever it asks for), speaks
+  on that process's stdin and stdout, and starts it again when it ends.
+- **Who may connect.** The home's `hosts.yml` carries `nodes:` — a list of names, or a mapping
+  `name: {volatile: true}` — and a link naming a host that is not in it is answered *not an
+  authorised node* and closed. An agent that is itself a node refuses every link: there is one
+  home. A second link for a host that already has one **replaces** it (the node reconnected before
+  the home noticed the first had died), and the old one is closed.
+- **Where to dial.** On a node, `hosts.yml`'s `link:` — `{ssh: <target>}`, defaulting to the
+  `home:` name as an ssh alias, or `{command: [...]}`, which is run as given and is how the tests
+  dial without an sshd (and how any other transport would).
+- **Frames.** One JSON object per line, in both directions, multiplexed: a request is
+  `{"id": n, "method": m, "params": {…}}`, its reply `{"re": n, "result": …}` or
+  `{"re": n, "error": "…"}`, and a frame with a method and no `id` is a notification that expects
+  nothing. `re` rather than a shared `id` because both ends number their own requests from one, and
+  a reply must never be mistaken for the other side's request of the same number. Requests are
+  served concurrently; a reply may overtake an earlier one. A frame is one line of at most
+  `FRAME_LIMIT` (8 MiB) — every stream it crosses is opened with that limit, since asyncio's 64 KiB
+  default is smaller than a node's snapshot — and a longer one **ends the link with a reason**: the
+  stream cannot be re-framed after it, and an exception there would end the dialer for good.
+- **What step 3a sends.** `hello` from the node — `{protocol: 1, host: <what the node calls
+  itself>}` — answered with `{protocol, home, host: <the name the key is bound to>}`; the node's
+  own name is a diagnostic, and a mismatch is refused in words, because it means a key is
+  authorised under the wrong name. Then `ping` from the node every `LINK_PING` (15 s). The link is
+  **up** at the node from the `hello` reply, and at the home from the `hello` request. Either end
+  takes `LINK_SILENCE` (45 s) without a frame as the link having died and closes it — a laptop that
+  sleeps leaves a TCP connection that nothing else will ever close.
+- **Backoff and diagnosis.** The dialer waits 1 s, doubling to 60 s, with jitter, and starts over
+  at 1 s after a `hello` that succeeded. Why the link is down is kept in words and shown by the
+  `host` RPC, in §4.6's two kinds plus the one this adds: *ssh failed* (the process exited 255, or
+  never produced a frame), *agent down on <home>* (the bridge reached the machine and not the
+  agent's socket), and *refused: <the home's reason>*. A refusal backs off like any other failure:
+  the fix is an edit on the home, and the node finds out by trying. Nothing ends the dialer but the
+  agent stopping — a node with no dialer never comes back — and the transport's stderr is read for
+  as long as it runs, its last lines being the *ssh failed* diagnosis: an unread pipe fills, and a
+  transport blocked on it takes the link with it days after it came up.
+- **What an up link changes, and what it does not yet.** `home_reachable()` is the link's state.
+  But a call the node cannot serve alone is still refused until the step that forwards it lands —
+  the mailbox and a session's acts on others with step 4 and 5 — and says so: *the link is up, but
+  forwarding this to the home is not built*. Serving such a call locally the moment the link came
+  up would be the split-brain this section exists to rule out.
+
 **Considered and rejected.** *The UI host as a store-and-forward router*: the least code, but it
 makes the UI — a client tier that may be a sleeping laptop — a second writer holding state, and it
 leaves unanswered which host gates an act across hosts. *A mesh of host agents dialing each other*:

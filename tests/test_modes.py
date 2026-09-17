@@ -165,7 +165,8 @@ def test_a_copy_that_disagrees_on_identity_is_another_session():
 async def node(tmp_path, monkeypatch):
     home = tmp_path / "home"
     home.mkdir()
-    (home / "hosts.yml").write_text("home: kmaster\nlocal:\n  name: laptop\n")
+    # `link.command`: never the default `ssh kmaster`, which on Paul's machine is the live system
+    (home / "hosts.yml").write_text("home: kmaster\nlocal:\n  name: laptop\nlink: {command: ['false']}\n")
     monkeypatch.setenv("AGENTORC_HOME", str(home))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(tmp_path / "claude"))
     monkeypatch.delenv("AGENTORC_SESSION", raising=False)
@@ -186,7 +187,9 @@ async def node(tmp_path, monkeypatch):
 async def test_a_node_serves_a_person_and_refuses_what_needs_the_home(node, hookstub, tmp_path):
     assert node.mode == "node" and node.home == "kmaster" and not node.home_reachable()
     async with LocalClient() as c:
-        assert await c.call("host") == {"host": "laptop", "home": "kmaster", "mode": "node", "home_reachable": False}
+        me = await c.call("host")
+        assert (me["host"], me["home"], me["mode"], me["home_reachable"]) == ("laptop", "kmaster", "node", False)
+        assert me["link"]["up"] is False  # this fixture's link command is `false`
         s = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name)  # a person's offline create
         assert s["host"] == "laptop" and [x["id"] for x in await c.call("list")] == [s["id"]]
         with pytest.raises(AgentError, match="the mailbox is at the home: kmaster"):

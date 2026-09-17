@@ -14,7 +14,16 @@ local:
 ```
 
 A top-level **`home: <host name>`** (design §4.4a, TD-057 step 2) makes this host agent a *node* of
-that home; without it, or naming this host itself, the agent is the home — phase 1 exactly.
+that home; without it, or naming this host itself, the agent is the home — phase 1 exactly. The
+link between them (step 3a) reads two more top-level keys:
+
+```yaml
+# on the home: who may dial in. A list of names, or a mapping when a node has flags.
+nodes:
+  laptop: {volatile: true}
+# on a node: how to dial. Default: `ssh -T <home>` with the home's name as the ssh alias.
+link: {ssh: kmaster}        # or {command: [...]}, run as given (tests; any other transport)
+```
 
 Without the file the machine's short hostname stands in for `name` and `vscode_host`, and every
 other field takes its default. A malformed file is the same as no file: never a crash.
@@ -93,6 +102,55 @@ def home_name() -> str:
     except OSError:
         named = ""
     return named or local_host().name
+
+
+@functools.lru_cache(maxsize=8)
+def _read_top_cached(path: str, mtime_ns: int) -> dict:
+    try:
+        doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return {}
+    return doc if isinstance(doc, dict) else {}
+
+
+def _top() -> dict:
+    p = hosts_file()
+    try:
+        return _read_top_cached(str(p), p.stat().st_mtime_ns)
+    except OSError:
+        return {}
+
+
+def nodes() -> dict[str, dict]:
+    """The hosts authorised to link to this home (design §4.4a "Who may connect"): `nodes:` as a
+    list of names or a mapping of name → flags. Anything else is nobody — a malformed list never
+    authorises a host by accident."""
+    raw = _top().get("nodes")
+    if isinstance(raw, list):
+        return {n.strip(): {} for n in raw if isinstance(n, str) and n.strip()}
+    if isinstance(raw, dict):
+        return {
+            n.strip(): (v if isinstance(v, dict) else {}) for n, v in raw.items() if isinstance(n, str) and n.strip()
+        }
+    return {}
+
+
+# What keeps an unattended dialer from hanging on a prompt, and notices a dead peer within a minute.
+SSH_OPTIONS = ("-T", "-o", "BatchMode=yes", "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3")
+
+
+def link_command() -> list[str]:
+    """How this node dials its home (design §4.4a "Where to dial"): `link: {command: [...]}` as
+    given, else `ssh -T <target> agentorc-agent link` with `link: {ssh: <target>}` or the home's
+    name as the target. The remote command is decoration — the key's forced command replaces it."""
+    raw = _top().get("link")
+    cfg = raw if isinstance(raw, dict) else {}
+    command = cfg.get("command")
+    if isinstance(command, list) and command and all(isinstance(c, str) for c in command):
+        return list(command)
+    target = cfg.get("ssh")
+    target = target.strip() if isinstance(target, str) and target.strip() else home_name()
+    return ["ssh", *SSH_OPTIONS, target, "agentorc-agent", "link"]
 
 
 def is_node() -> bool:
