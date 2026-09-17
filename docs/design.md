@@ -2582,7 +2582,8 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       enters the glossary. **Round two** (*ready with changes*, three findings, all adopted):
       `sends` moves on resume with the entries that cite it, and a `send` to the superseded id is
       refused where mail forwards; a `conflict`'s first reply closes every addressee's copy;
-      `bound_hit` enters the glossary. The ten: an open `ask` is never pruned (retention
+      `bound_hit` enters the glossary. **Round three: *ready*, no findings** — Fable and Sonnet agree
+      §4.10 is implementable from the text; TD-052 step 1 may start. The ten: an open `ask` is never pruned (retention
       and the bound were independent, so a read `ask` could be pruned before it was answered and
       the answer refused); the pair tally for reply-less mail is windowed, not lifetime (a daily
       `note` would have made a pair deaf in weeks); a decision not to wake leaves `mail_decided`
