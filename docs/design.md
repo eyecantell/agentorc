@@ -68,7 +68,7 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
     (landed 2026-09-13, TD-038).
 13. **Local and volatile hosts**: the person's own laptop is a host too (transport `local`,
     no ssh). A host marked `volatile: true` sleeps with the lid; its sessions show
-    `unreachable` (not `stalled?`) when the agent stops answering, its VS Code links use the
+    `unreachable` (not `stalled?`) when the host agent stops answering, its VS Code links use the
     local `vscode://file/<path>` form, and unattended policies refuse to start workers there
     unless overridden.
 14. **A session is a tmux session, with or without a repo, with or without an agent.** A plain
@@ -97,7 +97,7 @@ on 2026-09-12 for the orchestrator-membership question (§10):
 | ccmanager, claude-squad | TUI session managers, tmux + worktrees, many agent CLIs | ccmanager's launch specs as adapter reference | terminal-only, scraped state, single host |
 | Vibe Kanban (Apache-2.0) | web kanban, per-task terminal, 10+ agents | UI ideas for diff review | task-board model, single machine, own execution tracking |
 | agent-dashboard (bjornjee) | tmux orchestrator + PWA for approvals | same idea at PoC scale | maintenance unverified |
-| Anthropic Remote Control / cloud sessions | single-session sync, Claude only | — | not a fleet view, not self-hosted |
+| Anthropic Remote Control / cloud sessions | single-session sync, Claude only | — | not an org view, not self-hosted |
 | herdr (Apache-2.0, https://herdr.dev) — surveyed 2026-09-09, corrected 2026-09-10, measured 2026-09-10 ([ADR](decisions/2026-09-10-herdr-spike.md)); not in the 2026-09-04 survey | "the runtime coding agents run on": a Rust daemon per machine keeping agent sessions alive in persistent panes, one layout across local and ssh-added machines, restored after a restart; single binary (macOS, Linux, Windows); 21 agent CLIs; 17 *integrations*, of which six (Pi, OMP, Kimi, OpenCode, Kilo, MastraCode) push `idle`/`working`/`blocked` from hooks and the rest — Claude Code, Codex, Copilot, Cursor among them — only report a session id for restore, their state coming from screen-matching manifests; socket API with `events.subscribe`, `agent.*`, `worktree.*`, `plugin.*`; Claude rate-limit and context bars; ~1k community plugins found by a GitHub topic, no review; 36.5k stars, ~770k installs. Herdr, Inc.: $6M seed (Bessemer, YC) announced 2026-09-09; "Herdr Cloud" (no-ssh machines) next; releases 0.5.1 (2026-04) → 0.9.0 (2026-09). **Does not accept unsolicited pull requests** — an allow-list of approved contributors, bugs fixed by the maintainers' own agent, features via Discussions | the closest tool to agentorc found so far; the worktree API shape; a screen-rule fallback for prompts no hook reports (its detector catches the trust dialog); measured as a substrate 2026-09-10 and not taken (§10, ADR) | states are working / blocked / idle / done / unknown — one `blocked`, and the `pane.agent_status_changed` event carries only the state (the `--message` of a report is stored nowhere), so a permission, a question and the trust dialog look alike to anything above it and a usage-limit screen reads as `idle`; an outside source cannot take a Claude pane's state from the screen detector; a server restart ends every pane process (restore = layout + `claude --resume`); panes start through the person's interactive shell (rc files move the cwd); no run log, no exit code, no state for plain shells; the socket API is per machine (multi-host is the TUI over ssh); no `limited` with a reset time, no `stalled?`/`unreachable`; no run windows, usage gates, wrap-up-then-kill or credential-lapse detection found; no anchor rule, Ready to close, per-repo command buttons, VS Code links or first-party phone UI (the TUI over ssh is the mobile story; community mobile apps exist); runtime only, no notion of when work is done |
 | OpenAI **Agents API** (public beta 2026-09-10) — surveyed 2026-09-13 ([ADR](decisions/2026-09-13-openai-agents-api.md)) | OpenAI's managed Codex harness as a service: **Agent** (model, instructions, tools, MCP) · **Environment** (optional sandbox: OpenAI-hosted, your own, or Cloudflare / Vercel / Oracle / E2B / Modal / Daytona / DigitalOcean / Blaxel / Runloop) · **Session** (durable, resumable, carries conversation and saved work) · **events and items**. A *turn* is one cycle: a message to an idle session starts one, a message during an active turn **steers** it. Progress by streaming or webhooks; terminal events `agent.session.turn.completed`/`.failed`/`.cancelled`, `agent.session.failed`, `agent.session.environment.failed`, `error`; a completed turn may carry structured `required_actions`. Managed context compaction, subagent delegation. Token billing, no infrastructure fee. **US-only data residency and no ZDR, even on a self-hosted sandbox.** The Assistants API, its stateful predecessor, sunset 2026-08-26 | the session/turn split and *steer* as the verb for a message into a running turn; `required_actions` as a **structured** needs-you payload rather than a state flag; splitting `session.failed` from `session.environment.failed`; "streams do not replay — retrieve the session and its items", the same rule as §4.6's reconnect contract; item-level rather than token-level stream events | not a substrate and not an adapter: no pty, no pane, no local checkout, OpenAI models only, so it cannot host the Claude Code session phase 1 supervises; §4.3's adapter protocol is built on argv, `classify_pane` and `composer` and none apply; no VS Code link, no `Open shell here`, no tmux scrollback; residency and ZDR limits are disqualifying for the relay direction (§4.5b); a vendor-hosted session object is the least durable place to keep state — see the Assistants sunset |
 | Agent messaging — Claude Code cross-session messaging and agent teams, mcp_agent_mail, muster / agent-mux / muxcode — surveyed 2026-09-16 ([ADR](decisions/2026-09-16-agent-messaging-prior-art.md)) | session-to-session mail: Claude Code's built-in socket delivery with idle wake and loop damping; agent teams' per-agent inbox files and shared task list; mcp_agent_mail's MCP inboxes, threads and advisory file leases | loop damping at delivery, provenance framing where mail is read, claims as leases (TD-056) | Claude-Code-only or poll-only; none reads a supervision graph; agentorc stays tool-neutral and builds §4.10 itself |
@@ -121,7 +121,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
 
 ### 4.1 Session substrate: tmux, one session per conversation
 
-- Session name `ao-<repo-or-dir>-<name>` (prefix lets the agent enumerate its own sessions).
+- Session name `ao-<repo-or-dir>-<name>` (prefix lets the host agent enumerate its own sessions).
   Both parts are slugified to `[a-z0-9-]` (tmux treats `:`, `.` and whitespace specially).
   **A name identifies one session within its scope** (the repo, or the directory for a
   repo-less session; decision 2026-09-10, §10, §9 invariant 12): it is what a person types
@@ -132,7 +132,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   worktree — with a live session winning over an exited one of the same name; two matches are
   "ambiguous — <ids>" and none is "no session named <name> here", never a guess. A full
   `ao-…` id always means itself, so nothing that worked before changes. The rules, in
-  the order the agent applies them at create (all of TD-030 landed 2026-09-11):
+  the order the host agent applies them at create (all of TD-030 landed 2026-09-11):
   - the name is held by a **live** record (any state but `exited` / `closed`) → refused:
     "`aotest` is running — switch to it, or pick another name", with the holder's id, its state
     and the line that switches to it (`ao focus ao-agentorc-tests-aotest`) as error data rather
@@ -146,17 +146,17 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
     since PR #17 — which closes the exited record and keeps it a day — to a fresh start under
     the same name, and goes one step further by forgetting rather than keeping, because the
     name now belongs to the new session. No `-2` card appears.
-  - the id is taken in tmux by a session the agent has **no record of** (hand-made, or a stale
-    pane the tick has not adopted yet) → the agent decides on **tmux's own answer**, not on
+  - the id is taken in tmux by a session the host agent has **no record of** (hand-made, or a stale
+    pane the tick has not adopted yet) → the host agent decides on **tmux's own answer**, not on
     whether the tick has adopted it yet, or the same `ao new` would refuse or suffix depending on
     the second it landed in: a live pane refuses like a live record (and says the card appears
     within a tick, which is when the tick adopts it), a dead pane nobody has a record of is
     killed and its id reused. The name is checked under a lock on the **scope**, not on the
     directory, because one scope spans a repo's worktrees. The suffix therefore survives only for tmux's own
-    "duplicate session" verdict, which the agent still handles explicitly rather than trusting
+    "duplicate session" verdict, which the host agent still handles explicitly rather than trusting
     its check — and then `-2`, `-3` is shown in the name on the record, so what the Org says is
     what tmux has.
-  - `shell` sessions are named by the agent when the person gives no name (`shell`,
+  - `shell` sessions are named by the host agent when the person gives no name (`shell`,
     `shell-2`, …) and follow the same rule under that generated name.
 - Every session record carries: `name` (what the person called it), `kind`
   (`interactive` | `command`), `adapter` (`claude-code`, `shell`, …), `profile` (empty for
@@ -189,13 +189,13 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   `kind: command` sessions, which are hidden from the Org unless the "show command runs"
   filter is on and never rank in the urgency sort.
 - Created **only** by the host agent (one writer per shared resource — see §9). The UI, the CLI,
-  and the cron reconcile all call the agent.
+  and the cron reconcile all call the host agent.
 - The **host agent** runs under a user systemd unit with `loginctl enable-linger`, so a reboot
   restarts it rather than a cron tick noticing later. tmux is not systemd-owned (it daemonises
-  away from whatever spawns it): the agent starts the server idempotently on its own startup and
+  away from whatever spawns it): the host agent starts the server idempotently on its own startup and
   before every create, with `exit-empty off` so the server survives its last session closing
   (see §4.6). Default tmux socket, so hand-started sessions and "Copy tmux command" just work.
-  tmux, not the agent, **owns the processes**: a host-agent restart, upgrade or crash reconciles
+  tmux, not the host agent, **owns the processes**: a host-agent restart, upgrade or crash reconciles
   against live panes and loses no session, where a runtime that holds the ptys itself must kill
   every session to restart and re-launch the tool with `--resume` once a client attaches (measured on herdr,
   [ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)). This is a reason, not an accident.
@@ -233,7 +233,7 @@ Rules and tools stay in the repo — a hand-started session, a human, a clone on
 need them without agentorc; only the wiring for agentorc's own sessions lives here. The hook script (`agentorc-hook`) knows which agentorc session
 it belongs to from `AGENTORC_SESSION`, and which agent to talk to from `AGENTORC_HOME`; the host
 agent sets both on the tmux session at creation — explicitly, because the tmux server may predate
-the agent and carry another environment (decision 2026-09-06,
+the host agent and carry another environment (decision 2026-09-06,
 [ADR](decisions/2026-09-06-adopt-dev-cadence.md)). Claude Code's own session uuid is chosen by
 agentorc at launch (`--session-id`), so `adapter_id` is known from birth; a resume passes
 `--resume <id>` instead. **First-run quirk**: the "trust this folder?" dialog is reported by no
@@ -269,10 +269,10 @@ that stops answering sorts right after `stalled?` (red). No new colour.
 
 **Permissions are answered through the hook, not through keystrokes.** Claude Code's
 `PermissionRequest` hook may return the decision itself. The adapter's hook script asks the host
-agent and blocks; the UI's **Allow** / **Deny** (card, phone) answer the agent. *Measured
+agent and blocks; the UI's **Allow** / **Deny** (card, phone) answer the host agent. *Measured
 2026-09-06 (Claude Code 2.1.263):* the terminal dialog is **not** held back — it appears a few
 seconds into the hook's wait, with a `permission_prompt` notification — but the hook's answer
-still resolves it while the hook is blocking, so both channels work at once and the agent keeps
+still resolves it while the hook is blocking, so both channels work at once and the host agent keeps
 the buttons up (it ignores that notification while its waiter is live). If nobody answers before
 the hook timeout the terminal dialog is the only channel left and the card's buttons collapse to
 **Focus**, because the decision now lives in the terminal. The timeout is per profile (`permission_wait` in
@@ -331,7 +331,7 @@ nothing starts within a few seconds of the moment it could, `timeout` after the 
 and `removed` if the record goes away — so a policy's wrap-up request (§6) is known to have
 landed, and no text is ever re-sent on a guess (TD-016).
 
-Liveness cross-check: the agent also watches the pipe-pane log's mtime; a `working` state with no
+Liveness cross-check: the host agent also watches the pipe-pane log's mtime; a `working` state with no
 output for longer than the adapter's `stall_after` is shown as `stalled?`, which is how a
 credential lapse surfaces without a 401 regex.
 
@@ -393,7 +393,7 @@ class Adapter(Protocol):
                                             # turn, a tool call, or a hook. None means no native path: the core
                                             # falls back to a pane write, which is a `send`, and §4.10's
                                             # message/control line is then a convention this adapter's brief
-                                            # keeps rather than a gate the agent enforces (§4.10, 2026-09-14)
+                                            # keeps rather than a gate the host agent enforces (§4.10, 2026-09-14)
 ```
 
 Prompt injection is **core**, not adapter: the composer text goes in with `tmux load-buffer`
@@ -422,14 +422,14 @@ Adapter status at design time (verify before building each):
 | Claude Code | full hook set incl. `Notification`, `Stop`, `PermissionRequest`; transcripts in `~/.claude/projects/`; live registry `~/.claude/sessions/`; usage via the OAuth usage endpoint (tdgrind `usage`) | hook-fed — **phase 1** |
 | Gemini CLI | hooks since v0.26 + OSC 9 "action required / complete" notifications | hook-fed (verify) |
 | Codex CLI | experimental hooks (Pre/PostToolUse); a "waiting" event unconfirmed | scraped until verified |
-| `shell` (ad-hoc shell, Aider, a cmdorc command run) | none | scraped: foreground process vs prompt vs pane gone, exit code from the marker — **phase 1** |
+| `shell` (ad-hoc shell, Aider, a cmdorc command session) | none | scraped: foreground process vs prompt vs pane gone, exit code from the marker — **phase 1** |
 
 ### 4.4 Host agent
 
 Python, one process per host, started by the same systemd user unit. Responsibilities:
 
 - Enumerate sessions (tmux + state dir), merge, serve JSON over a local Unix socket.
-- Create / kill / nudge / resume sessions (the only writer).
+- Create / kill / send / resume sessions (the only writer).
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
@@ -442,12 +442,12 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file
   picker, and clipboard paste (screenshots) on desktop; the share sheet on the phone.
-- Permission decisions: the `PermissionRequest` hook script asks the agent over the socket and
+- Permission decisions: the `PermissionRequest` hook script asks the host agent over the socket and
   blocks until the UI answers or the hook times out (§4.2).
 - Board write-back: **Snooze** (edit the `Due:` date) and **Done** (check the item off) on a
-  dev-cadence `user_attention.md` item are one-line edits the agent makes and commits with a
+  dev-cadence `user_attention.md` item are one-line edits the host agent makes and commits with a
   fixed message naming the session (`agentorc: snooze <item> to <date> (session <name>)`), so the
-  main checkout never sits dirty and the history is auditable. The agent is the only writer to
+  main checkout never sits dirty and the history is auditable. The host agent is the only writer to
   those files from this system; it never pushes. This is a bounded carve-out from cadence §4's
   branch → PR rule, proposed upstream as dev-cadence PR #83. The items themselves, with the
   board line each sits on, come from `nudge_user_attention.py --report --json` (dev-cadence
@@ -505,7 +505,7 @@ long-lived link. The home is also a node for its own host's sessions (one proces
   offline, what the node's policies read, and what rebuilds the home (below).
 - **Policies that stop run on the node; policies that start run at the home** (Sonnet review,
   narrowed by the third review, 2026-09-16). Stop time and its wrap-up, stall, exit reaping, the
-  usage gate's pause and its resume send, the credential nudge and the stranded flag are the host
+  usage gate's pause and its resume send, the credential send and the stranded flag are the host
   agent acting on its own host's sessions with no caller, so they run **on the node**, from its
   replica, **offline included** — stopping on time is the safe direction, and an unattended laptop
   worker past its stop time must be wrapped up whether or not kmaster is reachable. Usage is fetched
@@ -528,7 +528,7 @@ would collide on reconnect and force a tmux rename.) **A request's identity come
 it arrived on, never from a field** (third review, 2026-09-16): the home qualifies an arriving
 `caller` with the host of its channel — the home's own socket is the home's host, a link is the
 host bound to that link's key (below) — and ignores any host a client sends. Otherwise a laptop
-session named `ao-agentorc-orc` could pass the gate as kmaster's lead of the same name. A person's
+session named `ao-agentorc-lead` could pass the gate as kmaster's lead of the same name. A person's
 request arriving over a link (no caller) may act only on that node's records.
 
 **Delivery and time.** The home is the single sequencer: it mints message ids and stamps `at` on
@@ -710,7 +710,7 @@ Browser mechanics (2026-09-06 review):
   pane. A pending permission or question shows a hint on the composer ("answer in the terminal
   above") instead of accepting Send.
 - **Errors**: every RPC-triggered control reports failure the same way — a toast on the Org,
-  an inline banner in the Focus header — with the agent's error text and a Retry where one
+  an inline banner in the Focus header — with the host agent's error text and a Retry where one
   makes sense. There is no silent failure path.
 - **VS Code links** need the `hosts.yml` `ssh` target to be an alias in the *person's own*
   `~/.ssh/config` (that is what Remote-SSH resolves); agentorc's multiplexing config is
@@ -728,7 +728,7 @@ noted). If a control is not in this table it does not exist.
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
 | Org | **Urgent first / Pinned** | sort mode, remembered per browser |
 | Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
-| Org banner | **Retry** | asks the agent on an unreachable host again now instead of on the next tick |
+| Org banner | **Retry** | asks the host agent on an unreachable host again now instead of on the next tick |
 | card | **Allow / Deny** | answers a pending permission through the hook channel; shown with the time left |
 | card | **Switch profile…** | re-launches a `limited` session under another profile (resume id carried over) |
 | card | **Wait** | dismisses the limited slot until the reset time |
@@ -736,7 +736,7 @@ noted). If a control is not in this table it does not exist.
 | card | **Focus** | opens the Focus screen |
 | card | **VS Code** | `vscode://` link for the session's directory on its host (browser-handled) |
 | card | **more ▾** | Wrap up · Kill (confirms) · Close (as above) · Open shell here · Copy tmux command |
-| card / Focus header | **unattended / interactive** badge | a toggle: click flips the session's mode in its record (agent RPC); policies pick the change up on their next tick. Cards show the badge only when unattended; Focus always shows it. Flipping to interactive is how a person takes over a worker, and takes it out of its controllers' reach on their next call (§9 invariant 5); flipping to unattended hands a session to the run window and usage gate, and needs the repo's `unattended:` block |
+| card / Focus header | **unattended / interactive** badge | a toggle: click flips the session's mode in its record (host-agent RPC); policies pick the change up on their next tick. Cards show the badge only when unattended; Focus always shows it. Flipping to interactive is how a person takes over a worker, and takes it out of its controllers' reach on their next call (§9 invariant 5); flipping to unattended hands a session to the run window and usage gate, and needs the repo's `unattended:` block |
 | Due strip / Attention | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
 | Due strip / Attention | **Done** | agent checks the item off and commits |
 | Due strip / Attention | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
@@ -754,25 +754,25 @@ noted). If a control is not in this table it does not exist.
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
 | New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `orchestrator`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule — landed 2026-09-13, TD-040 step a: the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked since 2026-09-14 (the row below), so nothing it grants applies unseen |
 | New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `orchestrate`). Unchecked by default for every preset but `orchestrator`; shown with a one-line warning of what the grant allows — landed 2026-09-14 (TD-028 step 5): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and **what is ticked is what the session starts with**, so an untick on an `orchestrator` preset means the session does not get the grant |
-| card | **report line** | shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, an orchestrator's `last tick 20:10 · 2 wrapped up`; an entry the agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed` (landed 2026-09-12) |
-| Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (agent RPC, recorded as dropped by the person — a *declaration*, so the tick cannot undo it) (landed 2026-09-12) |
+| card | **report line** | shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, a lead's `last round 20:10 · 2 wrapped up`; an entry the host agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed` (landed 2026-09-12) |
+| Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (host-agent RPC, recorded as dropped by the person — a *declaration*, so the tick cannot undo it) (landed 2026-09-12) |
 | Focus header | **grants** chip | lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes), each with what the grant allows on its confirm (landed 2026-09-12) |
-| Focus header | **controllers** chip | the sessions that may act on this one (§4.8): each controller by name, clicking it removes it; **+** asks for a session id or name and adds it (the `set_controllers` RPC — a person always may, a session only if it already controls this one; the agent refuses, the chip only asks). A controller whose session is gone is shown dim, not dropped. Empty reads *no controller — nobody may act on this session*, which is the default, not a warning — landed 2026-09-13, TD-036 step 3 |
+| Focus header | **controllers** chip | the sessions that may act on this one (§4.8): each controller by name, clicking it removes it; **+** asks for a session id or name and adds it (the `set_controllers` RPC — a person always may, a session only if it already controls this one; the host agent refuses, the chip only asks). A controller whose session is gone is shown dim, not dropped. Empty reads *no controller — nobody may act on this session*, which is the default, not a warning — landed 2026-09-13, TD-036 step 3 |
 | card | **under `<orc>`** chip | the session's `controllers` when it has any — the controlling session's name, click to focus it; several are listed. Nothing is shown when the list is empty, which is the common case for a person's own session — landed 2026-09-13, TD-036 step 3 |
-| Focus (orchestrator) | **Members** list | for a session holding `orchestrate`: every session whose `controllers` name it, with state, lane and report line — the orchestrator's central view. Derived from the records on each tick, never cached (§4.8) — landed 2026-09-13, TD-036 step 3 |
+| Focus (lead) | **Members** list | for a session holding `orchestrate`: every session whose `controllers` name it, with state, lane and report line — the lead's central view. Derived from the records on each tick, never cached (§4.8) — landed 2026-09-13, TD-036 step 3 |
 | Focus side panel | **Inbox** | the session's mailbox (§4.10): each entry with its sender, kind, time, `about` reference and whether it is read; an `ask` shows its bound and the `reply` that answered it. A person may **reply** to any entry as themselves, and may delete one. Sits beside **Reports**, which it deliberately is not: Reports are what this session declared about its work, the Inbox is what others addressed to it — design 2026-09-14, TD-052; built 2026-09-16, PR #165: the panel fetches bodies through `inbox` as a person's read and refetches when the pushed record's `unread` or `mail` marks change, and delete is the `inbox_delete` RPC, a person's only, removing this session's copy and no other |
 | card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, which is the common case. A person's own session shows it too when the graph reaches it (§4.10); mail meant for the person goes to the top bar's **person inbox**, not here — design 2026-09-14, TD-052; built 2026-09-16, PR #165 |
 | Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (host agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a send, and the sender reads it when it next looks (§4.10) — design 2026-09-14, TD-052; built 2026-09-16, PR #165 (no Reply on an entry the person sent: a person does not answer themselves — the session's answer to it lands in the top bar's person inbox, where the person replies) |
 | card `more ▾`, Focus header | **Message** | opens a composer that sends a `note` or `ask` from the person into this session's inbox (host agent RPC, ungated for a person; `from` is the person). Mail, not a send: it lands, may wake the session within its budget as any person's act does, and refills that budget (§4.10). Beside **Send**, which types into the pane and is the act of control — design 2026-09-16 (fourth Fable review), TD-052; built 2026-09-16, PR #165, as one dialog shared with Reply, an `ask` taking the default bound |
 | Org top bar | **person inbox** | the org's person inbox (§4.10): unread count, click to open; each entry with its sender session, kind, time and `about`, with **Reply** into the sender's inbox and delete. Sessions reach it with `ao msg person`, ungated. Rings nothing; the count is polled from the `inbox` RPC, since the pushed stream carries session records and the person inbox belongs to none — design 2026-09-16 (Fable review), TD-052; built 2026-09-16, PR #168 |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `orchestrate` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
-| New session | **Where**: this directory / new worktree | for a git repo, the agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
-| New session | name field → holder | as you type, the form asks the agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
-| New session | directory field → occupancy | as you type, the form asks the agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
+| New session | **Where**: this directory / new worktree | for a git repo, the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
+| New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
+| New session | directory field → occupancy | as you type, the form asks the host agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
 | Org | **team groups** | when any live session carries a `team` badge the grid is grouped: a header per team — name, lead (name, state), projects, needs-you count across members — the lead's card first, members after, the sessions on no team under *No team*; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9) — landed 2026-09-13. Each team's group is drawn as **one card holding its sessions' cards**, and a team that has a definition carries its **Stop** and **Stop now** on that card's header, beside the live count: the control sits on the thing it stops (2026-09-16). *No team* is a plain section, not a card — nothing there stops as one. The filter hides a team's card, Stop included, when none of its sessions match: a filter shows what it matched, and clearing it brings the card back |
 | Org | **Teams** strip: **Start / Stop** per definition | every team in `org.yml` and the repos' `.agentorc.yml`, its source and live count; Start runs the same sequence as `ao team start` (all checks before any create), Stop the same as `ao team stop` (wrap-up members, then the lead; **Stop now** kills). Collapsed to a count when nothing is defined (§4.9) — landed 2026-09-13. A definition with sessions live is not listed in the strip: its group's card carries its Stop and Stop now (row above), so the strip is the definitions with nothing live, each with Start, and it disappears when every definition is live (2026-09-16); the wrap-up wait runs behind the response, so the page reports what was sent and the state deltas show the members settling, and the strip reports the lead's own outcome when it comes — a failure there is logged and toasted, never dropped |
 | New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is what every session was before — landed 2026-09-13 |
-| card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026) — landed 2026-09-13. On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *no stop time* rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs. Setting a **different** time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill — landed 2026-09-14 |
+| card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the host agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026) — landed 2026-09-13. On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the host agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the host agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *no stop time* rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs. Setting a **different** time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill — landed 2026-09-14 |
 | New session | **Until** field | the stop time the session starts with: `06:00` (the next one, in your clock), `+8h`, or an ISO time. Refused on a session that is not **Unattended**, since policies leave interactive sessions alone (§4.2); empty means nothing stops it, which is what every session was before (§6, TD-026) — landed 2026-09-13 |
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a) — design 2026-09-14, TD-053, not built |
 | Org | **Teams** strip: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of a bare zero live count: *nothing running* and *nothing left to run* are different facts about a team (§4.9a) — design 2026-09-14, TD-053, not built |
@@ -798,19 +798,19 @@ question that decides the long-term shape is *how would someone who has never op
 use this?* The answer is the one Tailscale and `cloudflared` themselves use — **the host agent
 dials out; nothing on the host listens.** Three transports, one agent:
 
-| transport | who runs the UI | how the agent is reached | who it is for |
+| transport | who runs the UI | how the host agent is reached | who it is for |
 |---|---|---|---|
 | `local` | you, on the same host | Unix socket | phase 1, one machine |
 | `ssh` | you, on a host you choose | the UI reaches the home host agent; every other host agent is a node that dials the home over ssh (`agentorc-agent link`, §4.4a, 2026-09-16) | phases 2+, several hosts you own |
-| `relay` | a service (yours or a hosted one) | the agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
+| `relay` | a service (yours or a hosted one) | the host agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
 
 The `relay` transport is the hosted service: `pipx install agentorc && agentorc join <token>`
 on a laptop or a server, log in on a web page, done — no port forward, no VPN client, no ssh
-keys. It keeps every invariant in §9: the agent is still the only writer, sessions still live
+keys. It keeps every invariant in §9: the host agent is still the only writer, sessions still live
 on the host, the relay sees only what the UI sees today. What changes is where the UI process
 runs and who is trusted to run it, which is a product decision, not an architecture one.
 
-Consequences for what gets built now: the agent's RPC stays a plain JSON-lines stream over any
+Consequences for what gets built now: the host agent's RPC stays a plain JSON-lines stream over any
 byte pipe (already true — `agentorc-agent rpc` is a stdio bridge); the terminal bridge, which
 today spawns `tmux attach` locally under `/term/<id>` (phase 1), **must never gain a port of its own**
 — in phase 2 it reaches a session's host over the UI's own ssh (§4.4a), and it moves onto the
@@ -822,7 +822,7 @@ hosted version can be a single small VPS running the relay and the UI for a hand
 
 Two products share this architecture and differ only in who owns the host: **bring your own
 machine** (the `relay` transport above: hosted UI, the person's sessions stay on the person's
-host) and **we host your workspace** (a managed host we provision with the agent preinstalled,
+host) and **we host your workspace** (a managed host we provision with the host agent preinstalled,
 reached the same way). Lead with the first. The person's Claude Max login, their repos, their
 tools, and the cost of what their sessions do stay with them; we hold nothing but what the UI
 shows. A managed host is an add-on for someone with no machine, built when someone asks for it,
@@ -838,10 +838,10 @@ The later step, and the strongest one, is **automated context management for peo
 not developers**: every session's work lands as a commit, a branch, a ledger line, and a board
 item without the person knowing what a branch is; they see what changed, what is waiting on
 them, and what would otherwise have been lost. dev-cadence is that system for developers, and
-agentorc's fleet view is where its rules (the anchor rule, stranded-work sweeps, ledger before
+agentorc's org view is where its rules (the anchor rule, stranded-work sweeps, ledger before
 idle) and agentorc's own Ready to close get exercised unattended first. Sequence: self-hosted for developers (now) → relay →
 managed host on demand → cadence-as-a-product. Nothing here changes what phase 2 builds; it
-says why the terminal must ride the agent's pipe and why the adapter contract stays neutral.
+says why the terminal must ride the host agent's pipe and why the adapter contract stays neutral.
 
 Amendment 2026-09-13: the two paragraphs above — that a hosted "run Claude Code for you" is what every model supplier already sells, and that neutrality is the moat — are no longer a prediction. OpenAI's Agents API (public beta 2026-09-10), Anthropic's Managed Agents, AWS Bedrock AgentCore and Microsoft's Foundry Agent Service now all sell a managed cloud agent runtime on token billing with no infrastructure fee. The runtime is commodity; what none of them sells is one neutral view across tools, on machines you own, with a cadence that never strands work. The relay sells that, not a runtime ([ADR](decisions/2026-09-13-openai-agents-api.md)).
 
@@ -882,7 +882,7 @@ Decisions taken from a review of the `sessionorc` layer before build:
   process exits non-zero or without ever painting a screen, and not only when the record already
   says the pane is gone; and a pushed `closed` or `pane: false` delta ends the terminal from the
   page itself, because the push is authoritative and arrives before any reconnect could — `kill`
-  and `close` announce it as they return, rather than waiting for the next tick. `send-keys` is an agent RPC independent of any
+  and `close` announce it as they return, rather than waiting for the next tick. `send-keys` is a host-agent RPC independent of any
   attached pty, so a Send never depends on a Focus being open. The terminal shows tmux's
   scrollback (`history-limit`) only; the run log is a download, never a terminal source.
 - **Scrollback is tmux's, reached through tmux (TD-022, 2026-09-09).** tmux repaints the client
@@ -913,7 +913,7 @@ how a session started from any terminal gets a first-class card: `ao new --attac
 would have typed `claude` (TD-010 b). Every subcommand takes `--json` and prints the RPC result with the ids
 the next call needs (TD-018); `ao explain <id>` prints a session's screen, the rule that fires
 on it and whether it applies, and `ao explain --file` classifies a saved screen (TD-015); `ao --skill` prints the rules an agent driving `ao` from inside a
-session must follow (TD-019 — planned for phase 5, pulled forward and landed 2026-09-10 because an orchestrator session driving `ao` came first; `ao --skill > .claude/skills/ao/SKILL.md` installs it in a repo, the New-session install offer is still phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
+session must follow (TD-019 — planned for phase 5, pulled forward and landed 2026-09-10 because a lead session driving `ao` came first; `ao --skill > .claude/skills/ao/SKILL.md` installs it in a repo, the New-session install offer is still phase 5). Both follow herdr's JSON-first CLI and skill file, which made the spike's
 automation a matter of `jq` ([ADR 2026-09-10](decisions/2026-09-10-herdr-spike.md)).
 `ao new <name>` applies §4.1's name rule and says so: a live holder is refused with
 "`aotest` is running — `ao focus ao-agentorc-tests-aotest`, or pick another name" (exit 1, the
@@ -936,8 +936,8 @@ scan-and-choose; `ao roles` lists what the repo and the package define, marking 
 source; `--grant orchestrate` adds a grant a preset lacks, and works without a preset. `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
 running session's grants (the `set_grants` RPC; `ao status -v` and `--json` show
 `capabilities`). The membership surface beside them (landed 2026-09-13, TD-036 step 2):
-`ao control <orc> add|remove <session>…` edits membership from the orchestrator's side — which is
-how a person thinks about it, *this orc controls these sessions*, while the list itself lives on
+`ao control <orc> add|remove <session>…` edits membership from the lead's side — which is
+how a person thinks about it, *this lead controls these sessions*, while the list itself lives on
 each target — one `set_controllers` call per target, so a refusal names the session it refused and
 the rest still stand. `ao new --controller <id>…` sets it at create, and `ao new` prints one line
 when a session starts with nobody able to act on it. `ao status -v` prints both directions:
@@ -957,8 +957,8 @@ Four unattended workers ran on kmaster the first day the Team showed more than o
 Team could not say which TDs any of them held, had finished, or had filed on the side; nor
 could it stop one worker from `ao kill`-ing another. Both gaps are about what a session *does
 to agentorc*, not what it is called, so the first-class concepts are **capabilities** — verbs
-the agent can see — and **roles** are only presets over them. Considered and rejected: a
-`role` field the agent keys on (a grinder that files a TD while grinding, as run 2 did with
+the host agent can see — and **roles** are only presets over them. Considered and rejected: a
+`role` field the host agent keys on (a grinder that files a TD while grinding, as one grinder did with
 TD-025, is misdescribed by any single label; and a display keyed on a label shows what a
 session was called rather than what it did).
 
@@ -1036,12 +1036,12 @@ fewer entries and no harm, but a delete must never be made on an outage. A `done
 number, and anything the session declared are all out of its reach. This matters beyond a wrong
 card: a branch created and abandoned before its PR existed — what a grinder does the moment it
 finds a neighbour already holds that reference — would otherwise leave a permanent false `claimed`,
-and the idle-with-open-work rule (§6, the orchestrator's brief until it lands) fires on exactly
+and the idle-with-open-work rule (§6, the lead's brief until it lands) fires on exactly
 that. A reference is a ledger id (`TD-NNN`), an attention-board line, or a PR number;
 the repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references, not prose:
 "refactor the UI module" is not a lane until it has an entry a card can link to.
 
-**Grants** — gated, recorded in `capabilities` on the session, checked by the agent on every
+**Grants** — gated, recorded in `capabilities` on the session, checked by the host agent on every
 acting RPC. One exists today:
 
 - `orchestrate`: the session may act on *other* sessions — `send`, `keys`, wrap-up, `kill`,
@@ -1050,7 +1050,7 @@ acting RPC. One exists today:
   whose target is a different session is refused with "needs the orchestrate grant"; reads
   (`status`, `tail`, `explain`) are never gated. The caller is known from the session id the CLI
   sends (§4.7); an RPC with no caller is a person at a terminal or the UI, and is allowed as
-  today; a caller id the agent has no record of is a session too, holding no grant. The agent
+  today; a caller id the host agent has no record of is a session too, holding no grant. The host agent
   checks the gate before the method runs, against the record as it is then, so a grant or a
   revoke takes effect on the session's next call (landed 2026-09-10, TD-028 step 1). This is a
   guard against a confused worker, not a security boundary — the socket is
@@ -1063,18 +1063,18 @@ acting RPC. One exists today:
 **Membership: `controllers` on the target (2026-09-12; approved 2026-09-13, landing step by step
 under TD-036 — the record, the gate, create and `set_controllers` landed 2026-09-13).**
 The grant says a session may act on *other* sessions; it does not say *which*. With one
-orchestrator those were the same sentence. They stop being the same sentence the moment there
-are several — `guardians` gets its own, a large repo may want a ui orc and a backend orc, a
-read-only cross-repo status orc reports and never acts, and an orchestrator-of-orchestrators
+lead those were the same sentence. They stop being the same sentence the moment there
+are several — `guardians` gets its own, a large repo may want a ui lead and a backend lead, a
+read-only cross-repo status session reports and never acts, and a director
 keeps the others running — because each of them would otherwise reach every session on the host.
 Per-repo boundaries were rejected (§10): **the person says explicitly which sessions each
-orchestrator controls.** The prior-art survey behind the rules below is
+lead controls.** The prior-art survey behind the rules below is
 [ADR 2026-09-12](decisions/2026-09-12-orchestrator-membership-prior-art.md).
 
 - **The record.** Every session record carries `controllers: [session ids]`. It lives on the
-  *target*, not on the orchestrator: the gate is then one lookup, there is no second list to keep
+  *target*, not on the lead: the gate is then one lookup, there is no second list to keep
   in step, it is persisted and reloaded with the record it sits on, so it survives an agent
-  restart, and it dies when the record is forgotten. The orchestrator's own member view is *derived* from the records — its Focus
+  restart, and it dies when the record is forgotten. The lead's own member view is *derived* from the records — its Focus
   lists its members with their states, which is the central view a person reads — and must never
   become a cache of them.
 - **The gate.** An acting RPC from session A onto session B passes only if A holds `orchestrate`
@@ -1082,11 +1082,11 @@ orchestrator controls.** The prior-art survey behind the rules below is
   every call, as the grant already is, so a revoke or a membership edit takes effect on the
   session's next call and nothing caches either. An empty list means **nobody may act on this
   session** — the default, explicit, with no `--controller none` to remember. A session may have
-  several controllers (a ui orc and a backend orc over one shared session); the list is flat and
+  several controllers (a ui lead and a backend lead over one shared session); the list is flat and
   no member is privileged, which is a departure from the one-managing-controller shape Kubernetes
-  uses, taken because the two orcs are peers and nothing here needs a tie-break. Keeping them
-  from double-nudging is a matter for their briefs. Reads (`status`, `tail`, `explain`) stay
-  ungated, so a read-only status orc needs no grant and no membership at all.
+  uses, taken because the two leads are peers and nothing here needs a tie-break. Keeping them
+  from both sending to it is a matter for their briefs. Reads (`status`, `tail`, `explain`) stay
+  ungated, so a read-only status session needs no grant and no membership at all.
 - **Create adds the creator.** A grant holder may `create`; the new record's `controllers` are
   the creator plus any `--controller` given, and the child's grants are a subset of the
   creator's. Authority shrinking along a delegation chain is the established capability pattern,
@@ -1107,21 +1107,21 @@ orchestrator controls.** The prior-art survey behind the rules below is
 
 **The timer stays.** Silence is not an event: a worker sitting at an empty prompt after a `/compact` emits nothing, and no wake fires. The fallback interval is for exactly what no record delta can see — a PR merged from a worker's branch, a new `docs/cadence-changes.md` entry, a dropped subscription after an agent restart, and a session that has gone quiet when it should not have. Events shorten the tail on activity; they do not replace the timer's job of noticing absence.
 
-- **Orc-of-orcs is not a special case.** It is a session holding `orchestrate` whose members
-  happen to be orchestrators; nothing in the core treats it differently. What it adds is restart,
+- **A director is not a special case.** It is a session holding `orchestrate` whose members
+  happen to be leads; nothing in the core treats it differently. What it adds is restart,
   and restart needs two rules the design did not have. A restart is **`one_for_one`** — only the
   session that exited, never its siblings — and it is **bounded: at most 3 restarts of one session
   in 2 hours, then stop and escalate to the attention board**, a ceiling OTP, systemd and Circus
   each arrived at separately. The numbers are a starting point written into the briefs
-  (`docs/briefs/`), not a policy yet: §6 takes them when the rule proves mechanical. An orchestrator that exits does **not** take its workers down with it, and its
+  (`docs/briefs/`), not a policy yet: §6 takes them when the rule proves mechanical. A lead that exits does **not** take its workers down with it, and its
   entries in their lists do not silently vanish either: the workers keep running and are surfaced
-  as controlled by a session that is gone, for a person or the orc-of-orcs to re-attach with
+  as controlled by a session that is gone, for a person or the director to re-attach with
   `ao control`. Adoption is an explicit edit, never automatic reparenting — automatic adoption is
   simpler and silently changes who may act, which is the thing this change exists to stop. And
-  the brief rule that makes the rest safe: an orchestrator supervises and does not take on
+  the brief rule that makes the rest safe: a lead supervises and does not take on
   worker-shaped coding work, so a bug in the work cannot break the recovery path.
 - **Defaults fill membership at launch.** `.agentorc.yml` may carry `controllers:` per repo and
-  per preset (§5), so a worker started in a repo that has an orchestrator is a member from its
+  per preset (§5), so a worker started in a repo that has a lead is a member from its
   first byte. `ao new` prints one line when a session starts with no controller at all — not an
   error, just the fact, because an unattended worker nobody may act on is rarely what was meant
   (landed 2026-09-13, TD-036 step 4: the preset's list wins over the repo's, `--controller` over
@@ -1131,15 +1131,15 @@ orchestrator controls.** The prior-art survey behind the rules below is
   `--controller` naming an unknown session still errors, since the person typed it; the New
   session picker is ticked from the same rule).
 - **Surface.** `ao new --controller <id>…`; `ao control <orc> add|remove <session>…`;
-  `ao status -v` shows both directions (a session's controllers, an orchestrator's members); the
-  worker card carries an *under `<orc>`* chip; the orchestrator's Focus lists its members; New
+  `ao status -v` shows both directions (a session's controllers, a lead's members); the
+  worker card carries an *under `<orc>`* chip; the lead's Focus lists its members; New
   session has a controller picker (§4.5a).
 - **What this is not.** As with the grant, a guard against a confused worker, not a security
   boundary: the socket is local and the caller id is an environment variable. What it closes is
-  the gap where one orchestrator's mistake reaches every session on the machine.
+  the gap where one lead's mistake reaches every session on the machine.
 - **Interactive sessions are out of every controller's reach — for *acting*; a message still
   reaches them (§9 invariant 5; a gate since 2026-09-13, TD-041; the message carve-out
-  2026-09-14, §4.10).** `kind` says only whether a record is a conversation or a command run;
+  2026-09-14, §4.10).** `kind` says only whether a record is a conversation or a command session;
   `unattended` is what says a conversation is a worker. An acting RPC from a session onto a
   target whose record is `kind: interactive` and `unattended: false` — a person's session: their
   anchor in a repo's main checkout, a shell, a worker they took over with the badge — is refused
@@ -1151,7 +1151,7 @@ orchestrator controls.** The prior-art survey behind the rules below is
   state until the person reads it — and it never wakes one, which is the carve-out invariant 5
   states: a session may be woken by mail within its budget, a person's session never is — so "out of reach" means nobody may act on it,
   not that nobody may address it. A person (no caller) is unaffected on both counts: they act on any session,
-  and they may add a controller to their own interactive session — handing it to an orchestrator
+  and they may add a controller to their own interactive session — handing it to a lead
   deliberately is theirs to do, and the entry does nothing until the session is unattended. Like
   grant and membership the record is read on every call, so `ao mode <id> interactive` (the
   badge, a person taking over, a controller wrapping up its own worker) takes the session out of
@@ -1188,19 +1188,19 @@ deliberately not warned about: briefs cite dated ADRs and state what was true on
 |---|---|---|---|---|
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
-| `orchestrator` | read `ao --json status` on a cadence — **ending each tick in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `orchestrate` | `progress` per tick: sessions acted on and what was done |
+| `orchestrator` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `orchestrate` | `progress` per tick: sessions acted on and what was done |
 | `plain` | — (no template) | — | none | whatever it declares |
 
 Each preset also carries the test for when it has **run out of work**, which is the role's and
 never the core's; the tests and what a lead does with them are §4.9a (design 2026-09-14).
 
-The relay is the third of cadence §3's three delivery paths for a convention change (the sync PR, the SessionStart hook, the relay) and the only one that reaches a session already running; the orchestrator keeps a structured record of what it relayed to whom on its launch branch, so a nightly restart does not resend. The cadence check is the orchestrator's only judgement about the *work* rather than the *session*, and it is borrowed, not owned: the script is a dev-cadence SYNC file that the working session runs before merging (`/cadence`) and the weekly sweep runs over the window, so the orchestrator adds a third caller, not a third rule set. Its `review` row is self-attested (the worker posted the evidence comment itself), so the orchestrator says *recorded*, never *verified*, and a green check is a reason not to nudge, not proof of a good review.
+The relay is the third of cadence §3's three delivery paths for a convention change (the sync PR, the SessionStart hook, the relay) and the only one that reaches a session already running; the lead keeps a structured record of what it relayed to whom on its launch branch, so a nightly restart does not resend. The cadence check is the lead's only judgement about the *work* rather than the *session*, and it is borrowed, not owned: the script is a dev-cadence SYNC file that the working session runs before merging (`/cadence`) and the weekly sweep runs over the window, so the lead adds a third caller, not a third rule set. Its `review` row is self-attested (the worker posted the evidence comment itself), so the lead says *recorded*, never *verified*, and a green check is a reason not to nudge, not proof of a good review.
 
-The first orchestrator is a **session, not code**: its brief is the samscrape supervisor's
+The first lead is a **session, not code**: its brief is the samscrape supervisor's
 rules written for an agent driving `ao`, and it runs for a few evenings before any rule becomes
 a §6 policy. Rules that prove mechanical (wrap up at the stop time, retry a stalled send) move
 into the tick; those that needed judgement (stuck or thinking? interrupt now?) stay in the
-brief. The grant is what makes this safe to try: the orchestrator's power is a field the person
+brief. The grant is what makes this safe to try: the lead's power is a field the person
 can see on the Focus header and revoke, not a promise in its prompt.
 
 ### 4.9 Org, Team, Project: the definitions above a session (2026-09-13)
@@ -1222,8 +1222,8 @@ team beside its code; on a name collision the org file wins and `ao team list` n
 definition's source. Both files are read on every use and cached nowhere (the profiles rule),
 so editing the file is the whole edit. They are read by the **clients** — `ao team`, `ao new`,
 the UI's New session and Org page — never by the host agent: a team start is an ordinary
-sequence of `create` RPCs, and the agent stores `team` and `project` as two plain strings on the
-record. `sessionorc` stays free of org vocabulary (it never imports `agentorc`), and the agent
+sequence of `create` RPCs, and the host agent stores `team` and `project` as two plain strings on the
+record. `sessionorc` stays free of org vocabulary (it never imports `agentorc`), and the host agent
 needs no restart when a definition changes.
 
 **Projects.** A named set of one or more repos, each with its checkout path per host:
@@ -1269,9 +1269,9 @@ teams:
 started and members get an empty `controllers` list plus the team badge), `name` (default
 `<team>-lead`), `home` (a repo name from the team's projects — required when the projects list
 more than one repo, defaulted to the only one otherwise), `profile` (overrides the role's), and
-the same `lane`, `brief`, `grants` and `unattended` a member may carry — an orchestrator's brief
+the same `lane`, `brief`, `grants` and `unattended` a member may carry — a lead's brief
 is the one a repo most often keeps its own copy of (2026-09-13). Unsaid, `grants` means the
-role's; an explicit `grants: []` on an orchestrator lead means *none*, which leaves it unable to
+role's; an explicit `grants: []` on a lead means *none*, which leaves it unable to
 act on its own members, and is a thing to write only on purpose. **A key nobody reads is an
 error naming it**, in a team, a lead or a member: silence about a typo is how a lead's `brief:`
 disappears into a file that looks right.
@@ -1284,7 +1284,7 @@ Each member: `role`, `count` (default 1; a count above one suffixes the name `-1
 `profile`, `grants` (default the role's), `unattended` (default **true** — a team is what runs
 while the person is elsewhere; an interactive member is the exception and is said so). A member
 that is `{team: <name>}` is a nested team: starting the outer team starts the inner one with
-its lead's `controllers` set to the outer lead, which is the orc-of-orcs shape of §4.8 without a
+its lead's `controllers` set to the outer lead, which is the director shape of §4.8 without a
 special case. The flat case ships first; nesting lands once it works.
 
 **Home and reach.** Every team session's home is a worktree in its home repo named after the
@@ -1310,7 +1310,7 @@ profile and unattended, unless the definition overrides any of them — in a
 worktree), and each member with `controllers: [lead id]`, its role, lane, brief
 (the role's template with `{lane}` filled, the Project block in front, a `brief:` override
 instead), profile and worktree. A person runs it, so no attenuation applies (§4.8 create rule);
-an orchestrator running it is subject to it as for any create. It prints one line per session
+a lead running it is subject to it as for any create. It prints one line per session
 with the id, `--json` the records. `ao team stop <name>` sends the wrap-up prompt (the one the
 card's Wrap up sends, §4.5a) to each member, waits for each to go idle or the wrap-up window to
 pass, then to the lead; `--now` kills instead of asking. `ao team status <name>` is the lead's
@@ -1347,7 +1347,7 @@ collapsed to a count when nothing is defined. The page is not *in* a directory t
 is, so its "the repos' own `teams:`" means every repo in this host's registry, and a definition
 that will not parse is a note beside the strip rather than an empty one. Start and Stop are
 `agentorc.teamrun`'s — the sequence `ao team start|stop` runs, one code path, on a worker thread —
-so a refused start reports the agent's own message in a toast and creates nothing. Waiting for the
+so a refused start reports the host agent's own message in a toast and creates nothing. Waiting for the
 members to settle takes minutes, so the second half of a stop runs behind the response: the page
 says what was sent and names the lead that follows, and the state deltas show the members settling, and the strip reports the lead's own outcome when it comes — a failure there is logged and toasted, never dropped. New
 session gains a **Project** picker that narrows the repo list to the project's repos on this host
@@ -1364,14 +1364,14 @@ person's (§4.2a).
 
 **Guardians, and any project that lives in a container** (settles the §10 question of
 2026-09-13, this session's call, revisable). A project's repo entry is per host, and a host is
-wherever an `agentorc-agent` runs beside a tmux server — a devcontainer that runs the agent
+wherever an `agentorc-agent` runs beside a tmux server — a devcontainer that runs the host agent
 *is* a host, shape (b) in §10, which is phase 2's transport aimed at a container. guardians is
 not on kmaster and is not to be cloned there (Paul, 2026-09-12); its project entry names the
 devenv host, and `ao team start guardians` from kmaster waits for phase 2. Nothing in this
 section changes for that: the host column fills in.
 
-**Done when** `ao team start ao-grind` brings up an orchestrator and two grinders, each in its
-own worktree, the grinders' `controllers` naming the orchestrator, the Org page showing the
+**Done when** `ao team start ao-grind` brings up a lead and two grinders, each in its
+own worktree, the grinders' `controllers` naming the lead, the Org page showing the
 three as one group with the lead first, and `ao team stop ao-grind` wrapping them up in the
 right order.
 
@@ -1380,16 +1380,16 @@ right order.
 Every stopper in §6 is a clock or a cap — a stop time, a run window, a usage gate, a credential
 lapse, a stall. All of them answer *has this run too long or too expensively?*; none answers *is
 there anything left to do?* And `ao team stop` is a person's command: `agentorc.teamrun` runs the
-stop sequence only when a caller calls it, and no condition ever calls it. So a fleet with nothing
-to do keeps its shape — workers idle in their worktrees, the lead ticking every ten minutes over
+stop sequence only when a caller calls it, and no condition ever calls it. So an org with nothing
+to do keeps its shape — workers idle in their worktrees, the lead running a round every ten minutes over
 them — until a person notices or the window closes.
 
 A team with a **fixed lane** does wind itself down today, but by three paragraphs of English
 agreeing with each other rather than by anything here: the worker's brief says *stop when your
-lane is done*; the orchestrator restarts a worker that exited **with lane items still open**, so
-one that finished is correctly left alone; and the orchestrator's own brief says *stop when every
+lane is done*; the lead restarts a worker that exited **with lane items still open**, so
+one that finished is correctly left alone; and the lead's own brief says *stop when every
 member has exited*. That cascade is real and it works. It is also invisible to the design, to the
-Org page and to the agent — and it does not survive the lane shape the ao-grind team actually
+Org page and to the host agent — and it does not survive the lane shape the ao-grind team actually
 runs.
 
 **Free-pick is where it breaks.** A free-pick worker has no list to exhaust, so *lane done* never
@@ -1413,14 +1413,14 @@ therefore carries its own test, in §4.8's table beside the brief it hands out:
 
 **Quiet is not empty**, which is the distinction Paul's two examples sit either side of. A role
 that consumes a list ends when the list ends. A role that watches a stream — a hunter on a
-production system, an orchestrator on its members — is *waiting* when its source goes silent, and
+production system, a lead on its members — is *waiting* when its source goes silent, and
 waiting is not finishing. A watcher stops only when the thing it watches is gone. Collapsing the
-two is how a fleet quietly stands down over a slow afternoon.
+two is how an org quietly stands down over a slow afternoon.
 
 **Exhaustion is declared, never inferred.** A session that finds no work writes it on its own
 record — `ao progress none --why "<the search that came up empty>"`, one more verb on the ungated
 `progress` channel (§4.8) — which sets `out_of_work: {at, why}` and nothing else. Two reasons it
-must be the session's own word rather than a count the agent makes:
+must be the session's own word rather than a count the host agent makes:
 
 - Only the session can do the search. Every clause of the free-pick test above is a judgement over
   prose — what the brief excludes, what a sibling holds, what is parked. An agent-side count of
@@ -1438,21 +1438,21 @@ says the core cannot do.
 
 **One member's exhaustion is not the team's.** A grinder out of work sits beside a hunter with
 plenty. The lead winds the team down when **every** member is out of work or exited having said
-so; until then an out-of-work member is simply not nudged and not restarted. The wind-down itself
+so; until then an out-of-work member is simply not sent to and not restarted. The wind-down itself
 is `ao team stop`'s sequence and nothing new — wrap up the members, wait for them to settle, then
 the lead — so there is one code path and the order is the order (§4.9).
 
-**A wind-down is announced.** An empty ledger is a fact about the project, not about the fleet,
+**A wind-down is announced.** An empty ledger is a fact about the project, not about the org,
 and a team that dissolves quietly is harder to notice than one that says so. The lead's last act
 before its own exit is a line on `docs/user_attention.md`: the team ran out of work at `<t>`, and
 what each member looked for and did not find, taken from the `why` on each record. That line is
-the point of the whole mechanism — the fleet has finished the work a person defined, and the next
+the point of the whole mechanism — the org has finished the work a person defined, and the next
 move is a person's.
 
 **False exhaustion is the failure mode to guard.** The dangerous case is not a team that runs on
 too long; it is one that stands down because it looked wrong — a `gh` outage, a moved ledger file,
 a grep that matched nothing because the path changed. Three bounds, with their numbers deliberately
-unset here and chosen in TD-053 against a running fleet: a declaration carries its reason or is
+unset here and chosen in TD-053 against a running team: a declaration carries its reason or is
 refused; the lead re-reads the ledger itself before accepting a **team-wide** wind-down, since one
 cheap second opinion catches every mechanical false negative; and an exhaustion declared within a
 short time of a session's start is reported rather than acted on, because a worker that found
@@ -1467,7 +1467,7 @@ only its definition again, which is what a stopped team has always been.
 
 **It does not replace the clock.** A team can reach its stop time with work left, or run out of
 work well inside its window; the two stoppers are orthogonal and neither implies the other. Nor
-is this a scheduler: nothing here restarts a team when work reappears. A fleet that starts itself
+is this a scheduler: nothing here restarts a team when work reappears. An org that starts itself
 is TD-026's question, and a different one.
 
 **Surface.** `ao progress none --why` on the CLI (§4.7). On the card and the Focus header, an
@@ -1476,10 +1476,10 @@ strip, a definition whose sessions have all wound down reads *wound down <t>* ra
 zero live count, since *nothing running* and *nothing left to run* are different facts about a
 team (§4.5a — the rows are added there in the same PR).
 
-**Alternatives rejected.** *The agent counts open ledger entries* — it would have to know what a
+**Alternatives rejected.** *The host agent counts open ledger entries* — it would have to know what a
 ledger row means in a repo whose config only tells it a filename, and it would be wrong with
 confidence. *An exit code says "no work"* — a tool's exit code belongs to the tool, and the fact
-has to survive on the record for the lead to read on its next tick, not in a process that has
+has to survive on the record for the lead to read on its next round, not in a process that has
 gone. *Treat an empty ledger as an error* — it is the successful end of a run, and the only thing
 it asks for is a person's attention, which the board line already gets.
 
@@ -2047,7 +2047,7 @@ those is refused when the graph does not permit it; a session out of wake budget
   `home:`, or names itself, is the home. On Paul's machines it is `home: kmaster`.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
   duplicated. A repo without dev-cadence can still be listed there. Directories that are not
-  repos are not registered anywhere: New session takes a path, and the agent remembers recent
+  repos are not registered anywhere: New session takes a path, and the host agent remembers recent
   ones per host in `~/.agentorc/recent_dirs`.
 - Per repo: `.agentorc.yml` (checked in):
 
@@ -2070,7 +2070,7 @@ controllers: [orchestrator-ao-1]      # §4.8: who may act on a session started 
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
 teams:                                # §4.9: teams whose only project is this repo; org.yml wins a name
-  grind: {lead: {role: orchestrator, name: orc}, members: [{role: grinder, count: 2, name: tdgrind}]}
+  grind: {lead: {role: orchestrator, name: lead}, members: [{role: grinder, count: 2, name: tdgrind}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - name: test        ; run: pdm run test
@@ -2080,7 +2080,7 @@ commands:
 
 - Org (§4.9): `~/.agentorc/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own. Read by the clients on every
-  use, never by the agent:
+  use, never by the host agent:
 
 ```yaml
 projects:
@@ -2112,7 +2112,7 @@ field on the session record, never re-derived from the brief or the name, and a 
 effect on the next tick without restarting the session. The brief file is required only when
 a *policy* starts a worker; a session flipped to unattended keeps whatever it was doing.
 Policies key on `unattended` and the session's schedule, never on its role preset or its
-grants (§4.8, §9 invariant 9): an orchestrator session left running past the window is wrapped
+grants (§4.8, §9 invariant 9): a lead session left running past the window is wrapped
 up like any worker, and a plain session with a stop time is stopped like any worker. A policy
 that starts a worker names the preset and lane it starts it with (`workers: [{role: grinder,
 lane: free-pick}, …]` replaces the bare `workers: 3` once §4.8 lands); the schedule stays on
@@ -2121,7 +2121,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 - **Stop time** (`run_until`, landed 2026-09-13, TD-026): a session may carry the instant it must
   stop, set at start (`ao new --unattended --until 06:00 | +8h | <ISO>`) or after it (`ao until
   <session> <when>`, `--clear`), shown by `ao status -v` as *stops 06:00* in the reader's own local
-  time. At the instant, the agent sends the wrap-up prompt **once** and then kills the session when
+  time. At the instant, the host agent sends the wrap-up prompt **once** and then kills the session when
   it settles or ten minutes later, whichever comes first — the same two steps, and the same words,
   as `ao team stop`. The wording travels on the record because `sessionorc` must not know what a
   brief is, the way `ledger` does. A session sitting on a permission or a question at its stop time is
@@ -2141,8 +2141,8 @@ the block. A policy is agent code and needs no grant; a session doing the same w
   weekly thresholds; resume when usage drops; a fetch failure never pauses. Interactive
   sessions on a capped profile are shown `limited`, never paused.
 - **Credential lapse**: adapter `credentials_ok()` false → don't start; running workers get a
-  nudge when fresh credentials land (tdgrind's `.nudged` marker).
-- **Stall**: `working` with no output past `stall_after` → flag `stalled?`, nudge once, then
+  send when fresh credentials land (tdgrind's `.nudged` marker).
+- **Stall**: `working` with no output past `stall_after` → flag `stalled?`, send one prompt, then
   wrap up.
 - **Exit reap**: a worker whose tool exited sits on a sleep; reap it and keep the run log.
 - **Worktree reap**: run `reap_worktrees.sh` (or its generalized form) between lifecycles.
@@ -2171,7 +2171,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    the same plumbing.
 3. **tdgrind migration.** Port tdgrind's supervisor into policies (§6) driven by
    samscrape's `.agentorc.yml`; run both side by side for one window with tdgrind's cron
-   disabled and the agent's policies enabled; compare `tdgrind runs` reports against
+   disabled and the host agent's policies enabled; compare `tdgrind runs` reports against
    agentorc run logs; then delete `tdgrind.sh` from samscrape (ledger a TD there for the
    swap and the cron line in `infra/kmaster/crontab`).
    **Capabilities, report channels and presets** (§4.8) land at the start of this phase,
@@ -2179,7 +2179,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    what each is doing and keep them off each other: the caller check and the `orchestrate`
    grant first, then `progress` / `findings` with `ao progress` / `ao finding`, the derived
    source on the tick, the card's report line and the Focus Reports panel, and last the
-   presets — with an orchestrator run as a session for a few evenings before its mechanical
+   presets — with a lead run as a session for a few evenings before its mechanical
    rules become policies here.
 4. **Commands + board.** `.agentorc.yml` buttons (cmdorc where it fits), command-kind sessions
    and the Commands tab, the Due strip on the Org and the Attention tab with Snooze/Done
@@ -2204,7 +2204,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 
 1. Only the host agent creates, kills, or sends keys to an `ao-*` tmux session.
 2. A directory has at most one agent session (`kind: interactive`, adapter other than `shell`;
-   main checkout, worktree, or plain directory). Shells and command runs are exempt.
+   main checkout, worktree, or plain directory). Shells and command sessions are exempt.
 3. Every session has a run log from its first byte.
 4. A state shown as `hook` came from a hook; `scraped` is visible in the UI.
 5. Interactive sessions (`kind: interactive`, `unattended: false`) are never paused, killed, or
@@ -2221,9 +2221,9 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    allow: the mediator there is a person, and nothing starts a turn in their session but them.
 6. The core never types a menu choice into a pane; permissions are answered through the hook,
    everything else in the terminal.
-7. The agent's edits to a repo's board file are always committed, never left in the tree.
+7. The host agent's edits to a repo's board file are always committed, never left in the tree.
 8. A session's process is launched as the adapter's argv, never through the person's
-   interactive shell (§4.1); tmux, not the agent, holds the process.
+   interactive shell (§4.1); tmux, not the host agent, holds the process.
 9. Nothing keys on a session's role, team or project: policies key on `unattended` and the schedule, acting
    RPCs key on grants and `controllers`, displays key on the report channels (§4.8). A preset sets defaults at
    start and is a badge afterwards; `team` and `project` are badges from the start (§4.9), and the
@@ -2231,7 +2231,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    **One named exception:** the message gate's sideways edge admits a session carrying the same
    `team` badge (§4.10, 2026-09-16) — for a `lead: person` team there is no other edge between
    members. It gates mail only; nothing that acts keys on `team`.
-10. A report entry the session declared is never overwritten by one the agent derived; a
+10. A report entry the session declared is never overwritten by one the host agent derived; a
     derived entry is shown as such, like a scraped state.
 11. A session **acts on** another session only through the host agent, only with the `control`
     grant on its record (named `orchestrate` until TD-055), and only when the caller is in the target's `controllers` list (an

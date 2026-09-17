@@ -25,7 +25,7 @@ Print this text again with `ao --skill`.
 | `idle` | at the composer, waiting for a prompt | send the next prompt |
 | `needs-you` | `pending.kind` is `permission` or `question`, `pending.text` says what | permission: `ao allow <id> [reason]` / `ao deny <id> reason` — only for a session you were asked to supervise. question or menu: a human answers in the terminal; never type a choice |
 | `limited` | usage cap; the record carries the reset time | wait for the reset; never retry into it |
-| `stalled?` | working with no output past the adapter's stall window | `ao tail` / `ao explain`; report, do not nudge |
+| `stalled?` | working with no output past the adapter's stall window | `ao tail` / `ao explain`; report, do not send to it |
 | `exited` / `closed` | the process ended / the person closed it | `ao new … --resume <adapter_id>` if it is yours to resume |
 | `unreachable` | the host is not answering | wait |
 
@@ -35,7 +35,7 @@ advisory. `ao explain <id> --json` shows the screen, the rule that fired, and th
 ## Commands
 
 Read-only: `ao status [-v]`, `ao tail <id> -n N`, `ao explain <id>`, `ao wait [--timeout S]`
-(supervising: end a tick with it instead of sleeping — your brief says how; silence is not an event).
+(leading a team: end a round with it instead of sleeping — your brief says how; silence is not an event).
 
 ## Mail (design §4.10)
 
@@ -67,9 +67,9 @@ Mutating — each one is a decision, so check the state first:
   `controllers`: a person, or one of its current controllers, does it with `ao grant <id>
   orchestrate` and `ao control <orc> add|remove <session>…`. Sessions you create list you as a
   controller from birth. `ao status -v` prints `under:` (who may act on a session) and `members:`
-  (what an orchestrator may act on). A third refusal has no cure on your side: an interactive
+  (what a lead may act on). A third refusal has no cure on your side: an interactive
   session (`unattended: false` — a person's own, or a worker they took over with `ao mode`) is
-  out of every session's reach, `ao control … add` included, and the agent names §9 invariant 5.
+  out of every session's reach, `ao control … add` included, and the host agent names §9 invariant 5.
   A worker you start without `--unattended` is such a session.
 - `ao progress claim|done|drop <ref> [--pr N] [--why "…"]`, `ao finding <ref> [--priority low]` — the
   report channels (§4.8). **Declare a claim before your first edit and the result before the next
@@ -82,7 +82,7 @@ Mutating — each one is a decision, so check the state first:
 Every command that takes an id also takes a bare **name** (design §4.1), resolved to the one
 session of that name in this directory or its repo — `ao send w --wait` where `w` is the card's
 name. Prefer the full id from `ao status --json` when you have it: a name is ambiguous the moment
-two scopes share it, and the agent then answers "ambiguous — <ids>" rather than picking one.
+two scopes share it, and the host agent then answers "ambiguous — <ids>" rather than picking one.
 
 ## Verify every send (the TD-027 lesson)
 
@@ -97,15 +97,15 @@ state to change before concluding anything.
 
 - Never run `tmux` against an `ao-*` session yourself (§9 invariant 1): `ao` is the only writer.
 - Never answer another session's question, menu, or trust dialog (§9 invariant 6). Permissions
-  only through `ao allow`/`ao deny`, only when supervising that session is your job.
+  only through `ao allow`/`ao deny`, only when that session is your member.
 - Never `send`, `kill`, or `close` a session you did not start unless your brief names it; the
   session in a repo's main checkout is the person's anchor — leave it alone.
-- Never nudge, pause, or kill an interactive session (§9 invariant 5), including "are you done?";
-  the agent refuses it, so a refusal naming invariant 5 means stop, not retry.
+- Never send to, pause, or kill an interactive session (§9 invariant 5), including "are you done?";
+  the host agent refuses it, so a refusal naming invariant 5 means stop, not retry.
 - Never `send` into `needs-you` (refused while a permission or question is pending), `limited`
   (nothing stops you, and the prompt fails or queues behind the cap), or `unreachable` (exit 3).
 - Never edit `~/.claude/settings.json`, `~/.claude.json`, or anything under `~/.agentorc`; never
-  start, stop, or restart `agentorc-agent` / `agentorc-ui`. The agent's state is not yours.
+  start, stop, or restart `agentorc-agent` / `agentorc-ui`. The host agent's state is not yours.
 - Never leave a session you started without a record: its work pushed, its ledger touched, then
   `ao close` once it is `idle` and its `ready_when` checks pass.
 
