@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import pytest
 
@@ -20,38 +22,51 @@ from sessionorc import client as clientmod
 from sessionorc.client import LocalClient
 
 
-async def recording_server(path, reply: dict) -> tuple[asyncio.Server, list[dict]]:
-    """A stand-in host agent that records the envelope it was handed and answers `reply`."""
+@asynccontextmanager
+async def recording_server(path, reply: dict) -> AsyncIterator[list[dict]]:
+    """A stand-in host agent that records the envelope it was handed and answers `reply`.
+
+    Torn down by hand rather than with `async with server`: on 3.12 `Server.close()` does not
+    cancel the tasks running the handlers and `wait_closed()` then waits for them, so a handler
+    still sitting in `readline()` hangs the test — a 15-minute CI hang on 3.12 while 3.13, which
+    does cancel them, passed the same commit. Nothing here needs to await the handler: the client
+    has its replies, and the test process is about to end.
+    """
     seen: list[dict] = []
 
     async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         while line := await reader.readline():
-            seen.append(json.loads(line))
-            writer.write((json.dumps({"id": json.loads(line)["id"], **reply}) + "\n").encode())
+            req = json.loads(line)
+            seen.append(req)
+            writer.write((json.dumps({"id": req["id"], **reply}) + "\n").encode())
             await writer.drain()
 
-    return await asyncio.start_unix_server(handle, str(path)), seen
+    server = await asyncio.start_unix_server(handle, str(path))
+    try:
+        yield seen
+    finally:
+        server.close()
 
 
 # ── the client half: a parameter that is not set is not sent ──────────────────────────────────
 
 
 async def test_unset_parameters_are_left_out_of_the_envelope(tmp_path):
-    server, seen = await recording_server(tmp_path / "sock", {"result": None})
-    async with server, LocalClient(sock=tmp_path / "sock") as c:
-        await c.call("progress", id="ao-x", ref="TD-062", status="claimed", pr=None, why=None, force=None)
-    assert seen[0]["params"] == {"id": "ao-x", "ref": "TD-062", "status": "claimed"}
+    async with recording_server(tmp_path / "sock", {"result": None}) as seen:
+        async with LocalClient(sock=tmp_path / "sock") as c:
+            await c.call("progress", id="ao-x", ref="TD-062", status="claimed", pr=None, why=None, force=None)
+        assert seen[0]["params"] == {"id": "ao-x", "ref": "TD-062", "status": "claimed"}
 
 
 async def test_a_set_but_falsy_parameter_is_still_sent(tmp_path):
     """The rule is *unset*, not *falsy*: `--lines 0`, `wait=False` and an empty string are choices
     the caller made, and an agent that defaults them differently must hear them."""
-    server, seen = await recording_server(tmp_path / "sock", {"result": None})
-    async with server, LocalClient(sock=tmp_path / "sock") as c:
-        await c.call("send", id="ao-x", text="", wait=False, timeout=0)
-        await c.call("tail", id="ao-x", lines=0)
-    assert seen[0]["params"] == {"id": "ao-x", "text": "", "wait": False, "timeout": 0}
-    assert seen[1]["params"] == {"id": "ao-x", "lines": 0}  # not the agent's default of 40
+    async with recording_server(tmp_path / "sock", {"result": None}) as seen:
+        async with LocalClient(sock=tmp_path / "sock") as c:
+            await c.call("send", id="ao-x", text="", wait=False, timeout=0)
+            await c.call("tail", id="ao-x", lines=0)
+        assert seen[0]["params"] == {"id": "ao-x", "text": "", "wait": False, "timeout": 0}
+        assert seen[1]["params"] == {"id": "ao-x", "lines": 0}  # not the agent's default of 40
 
 
 def test_progress_leaves_force_unset_unless_asked(monkeypatch, tmp_path):
