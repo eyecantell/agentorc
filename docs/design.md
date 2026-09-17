@@ -293,7 +293,11 @@ goes `idle` or `exited`:
 `git status --porcelain` empty, branch pushed (a branch with no upstream is *not* pushed — that is
 exactly the stranded work the check exists for), `gh pr view --json state` merged (when the branch
 has a PR), no live subagents (Claude Code: `SubagentStop` balances `SubagentStart`; other
-adapters: nothing running under the pane), and the ledger/attention board touched since the
+adapters: nothing running under the pane), **no live member** (2026-09-17: for a session that
+other sessions list in `controllers`, none of them is live — read from the control graph, so it
+covers a lead, a director and a hand-attached controller alike, and a session that controls
+nothing never sees the item; closing a lead over working members orphans them, and the way to end
+a team is its Stop, §4.9), and the ledger/attention board touched since the
 session started (dev-cadence repos). Each item is a named check in `.agentorc.yml` so other
 repos can pick their own subset. The Focus view shows the checklist live with a **Close** button
 that enables when it passes; an idle card that passes shows "ready to close ✓" and a one-click

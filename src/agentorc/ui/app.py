@@ -246,7 +246,6 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         d["profile_line"] = line
     pend = s.get("pending") or {}
     d["deadline"] = pend.get("deadline") or ""
-    d["ready"] = ready_to_close(s)
     # The report channels (design §4.8, §4.5a card **report line**, TD-028 step 4). One line, shown
     # only when a channel is non-empty: `report_line` is the same text `ao status -v` prints — one
     # formatter, so the card and the CLI cannot drift — and the findings count rides beside it. The
@@ -286,17 +285,27 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         if s.get("id") in (o.get("controllers") or [])
     ]
     d["holds_control"] = has_control(s.get("capabilities"))
+    d["ready"] = ready_to_close(s, d["members"])
     return d
 
 
-def ready_to_close(s: dict[str, Any]) -> list[tuple[str, bool]]:
-    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents."""
+def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = None) -> list[tuple[str, bool]]:
+    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents — and,
+    for a session other sessions list as a controller, no live member. That last one comes from the
+    control graph, not from a role: it covers a lead, a director over leads, and a session attached
+    by hand with `ao control`, and a session that controls nothing never sees it. A lead idle
+    between rounds with its log pushed used to read *ready to close ✓* over three working members,
+    one click from orphaning them (seen 2026-09-17)."""
     git = s.get("git") or {}
     checks = []
     if s.get("dir") and git:
         checks.append(("tree clean", git.get("dirty", 0) == 0))
         checks.append(("branch pushed", git.get("ahead", 0) == 0 and bool(git.get("upstream"))))
     checks.append(("no subagents running", (s.get("subagents") or 0) == 0))
+    if members:
+        up = [m["name"] for m in members if m.get("state") not in DEAD]
+        label = f"no live members ({', '.join(up)} — stop the team first)" if up else "no live members"
+        checks.append((label, not up))
     return checks
 
 
