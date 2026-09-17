@@ -735,7 +735,10 @@ def cmd_progress(args: argparse.Namespace) -> int:
     if not args.ref:
         return fail(args, f"ao progress {args.action} needs a reference", 2)
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
-    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, force=args.force)
+    # `force` only when asked: a host agent older than TD-056 refuses the unknown keyword, and a
+    # client is routinely newer than the running agent until its next restart
+    extra = {"force": True} if args.force else {}
+    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, **extra)
     if (held := s.get("lease_overridden")) and not args.json:
         print(f"{s['id']}: claimed over {held['session']}'s lease (since {held['at']})", file=sys.stderr)
     return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
