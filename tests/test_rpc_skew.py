@@ -49,7 +49,9 @@ async def test_a_set_but_falsy_parameter_is_still_sent(tmp_path):
     server, seen = await recording_server(tmp_path / "sock", {"result": None})
     async with server, LocalClient(sock=tmp_path / "sock") as c:
         await c.call("send", id="ao-x", text="", wait=False, timeout=0)
+        await c.call("tail", id="ao-x", lines=0)
     assert seen[0]["params"] == {"id": "ao-x", "text": "", "wait": False, "timeout": 0}
+    assert seen[1]["params"] == {"id": "ao-x", "lines": 0}  # not the agent's default of 40
 
 
 def test_progress_leaves_force_unset_unless_asked(monkeypatch, tmp_path):
@@ -72,14 +74,21 @@ def test_progress_leaves_force_unset_unless_asked(monkeypatch, tmp_path):
 @pytest.mark.integration
 async def test_agent_ignores_a_parameter_its_method_does_not_take(agent, tmp_path):
     """A client newer than this agent calls `progress` with a parameter added after it started."""
+    clientmod.last_ignored = []
     async with LocalClient() as c:
         s = await c.call("create", name="skew", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         got = await c.call("progress", id=s["id"], ref="TD-062", status="claimed", from_the_future=True)
         assert got["progress"][0]["ref"] == "TD-062"
         assert clientmod.last_ignored == ["from_the_future"]
-        # and a call that mentions nothing unknown says nothing
+        # A later call in the same command that has nothing ignored must not clear it: the warning
+        # belongs to the command, not to its last RPC (review of PR #197). `ao team start` and
+        # `ao control … add <many>` are several calls, and the first is the one that skews.
         await c.call("get", id=s["id"])
-        assert clientmod.last_ignored == []
+        assert clientmod.last_ignored == ["from_the_future"]
+        await c.call("get", id=s["id"], also_from_the_future=1)
+        assert clientmod.last_ignored == ["from_the_future", "also_from_the_future"]
+        await c.call("get", id=s["id"], also_from_the_future=1)  # deduped, so a long-lived client is bounded
+        assert clientmod.last_ignored == ["from_the_future", "also_from_the_future"]
         await c.call("kill", id=s["id"])
 
 
@@ -87,6 +96,7 @@ async def test_agent_ignores_a_parameter_its_method_does_not_take(agent, tmp_pat
 async def test_a_refusal_still_names_what_was_ignored(agent):
     """The drop happens before the gate, so an unknown parameter never turns a refusal into a
     `bad params` error that hides why the call was refused."""
+    clientmod.last_ignored = []
     async with LocalClient() as c:
         with pytest.raises(Exception, match="no session ao-nope"):
             await c.call("get", id="ao-nope", from_the_future=True)
@@ -97,6 +107,7 @@ async def test_a_refusal_still_names_what_was_ignored(agent):
 async def test_a_method_taking_kwargs_keeps_everything(agent, tmp_path):
     """`rpc_hook` takes `**event`: every field of a hook payload is meant for it, so nothing is
     dropped and nothing is reported."""
+    clientmod.last_ignored = []
     async with LocalClient() as c:
         s = await c.call("create", name="skewhook", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         await c.call("hook", session=s["id"], event="Stop", anything="kept")

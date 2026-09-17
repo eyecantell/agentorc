@@ -32,9 +32,13 @@ class AgentUnavailable(AgentError):
 # from the last of them, after its own output.
 last_mail: dict[str, Any] | None = None
 
-# The `ignored` field of the last response any client in this process read (design §4.4, TD-062):
-# the parameter names the running host agent's method did not take, dropped rather than refused.
-# Non-empty means the agent is older than this client; a CLI prints one line from it.
+# Every parameter name the running host agent did not take, across every call this process has made
+# since it last reset this (design §4.4, TD-062): dropped by the agent rather than refused. Non-empty
+# means the agent is older than this client and a CLI prints one line from it. **Accumulated**, not
+# last-call-wins like `last_mail`: a command that makes several calls — `ao team start` (a
+# `name_check` and a `create` per member), `ao control … add <many>` — would otherwise have the
+# warning from its first call cleared by its last, which is exactly where an operator most needs it.
+# Deduped, so a long-lived client (the UI) is bounded by the number of distinct parameter names.
 last_ignored: list[str] = []
 
 
@@ -87,7 +91,9 @@ class LocalClient:
         resp = json.loads(line)
         global last_mail, last_ignored
         last_mail = resp.get("mail") if isinstance(resp, dict) else None
-        last_ignored = list(resp.get("ignored") or []) if isinstance(resp, dict) else []
+        for name in (resp.get("ignored") or []) if isinstance(resp, dict) else []:
+            if name not in last_ignored:
+                last_ignored.append(name)
         if "error" in resp:
             raise AgentError(resp["error"], resp.get("error_data"))
         return resp.get("result")

@@ -1201,14 +1201,17 @@ def _run(args: argparse.Namespace) -> int:
 def skew_line(args: argparse.Namespace) -> None:
     """TD-062 (b): the running host agent did not know a parameter this command sent, and said so
     rather than refusing the call. The command worked — without that parameter — so this is a note,
-    never an error: the agent is older than the code, and somebody has to promote it (CLAUDE.md,
-    "The live copy is promoted, not edited"). Always on stderr: a `--json` caller parses stdout."""
+    never an error. Skew is the usual cause and promoting the live install is the usual answer
+    (CLAUDE.md, "The live copy is promoted, not edited"), but a caller bug against an agent of the
+    same age looks identical from here, so the line says what happened before it says why. The
+    agent logs the same thing with the method name, which is what tells the two apart. Accumulated
+    across every call the command made, and always on stderr: a `--json` caller parses stdout."""
     if not (dropped := clientmod.last_ignored):
         return
     sys.stdout.flush()
     print(
-        f"[agentorc] the host agent ignored {', '.join(dropped)} — it is older than this `ao`; "
-        "promote the live install to pick it up",
+        f"[agentorc] the host agent does not know {', '.join(dropped)}: it ran the call without "
+        "them. If this `ao` is newer than the running agent, promote the live install.",
         file=sys.stderr,
     )
 

@@ -2164,7 +2164,10 @@ class HostAgent:
         if method is None:
             return {"id": rid, "error": f"unknown method {name!r}"}
         params = dict(req.get("params") or {})
-        ignored = _drop_unknown(method, params)
+        if ignored := _drop_unknown(method, params):
+            # logged with the method, because the reply cannot tell a client newer than this agent
+            # from a caller bug of the same age, and the second is worth finding in a log
+            log.warning("rpc %s: ignored unknown params %s", name, ", ".join(ignored))
         caller = req.get("caller")
         if not mail.is_person(caller):
             # A request's identity comes from the channel it arrived on, never from a field it

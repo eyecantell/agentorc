@@ -455,7 +455,10 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   the same absent as `None`, so the client drops the `None`s in one place, and a call that does not
   use a new feature cannot be refused for mentioning it; and the agent **drops a parameter its
   method does not take** rather than refusing the call, naming them in the reply's `ignored: [...]`,
-  which `ao` prints as one line saying the agent is older than the code. A method taking `**kwargs`
+  which `ao` prints as one line — accumulated across every call the command made, since the call
+  that skews is rarely the last one. The line says what happened before it says why: a caller bug
+  against an agent of the same age looks identical from the client, and it is the agent's log line,
+  which names the method, that tells the two apart. A method taking `**kwargs`
   (`hook`) keeps everything. The drop happens before the gate, so a refusal still says why it
   refused. What this does not cover is a *new method* or a changed meaning, which still needs the
   promotion.
