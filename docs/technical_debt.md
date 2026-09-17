@@ -38,6 +38,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-058 | `systemctl restart agentorc-agent` hangs for the 90 s stop timeout and ends in SIGKILL: the serve loop waits for every open connection to close | Medium | Partly done — fixed, live check pending |
 | TD-061 | A worktree session's memory write lands uncommitted in the main checkout, where the anchor's next `git commit -a` sweeps it into an unrelated PR | Medium | Open |
 | TD-062 | A merge that changes an RPC's parameters breaks the `ao` CLI on the live system until the host agent restarts: the install is editable, so the client is new at once and the agent is not | Medium | Open |
+| TD-063 | Two CI-only flakes seen once each on the 3.12 runner: `test_send_wait` (prompt-stalled) and `test_the_tick_retires_a_branch_claim_the_session_abandoned` | Low | Open |
 
 ---
 
@@ -510,3 +511,19 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a merge that adds an RPC parameter leaves every existing `ao` call working against the running agent, and a person is told the agent is older than the code.
 
 **Related:** TD-058 (the restart this forces was a 90 s hang until #176 loaded), TD-052 (mail carried the claims while progress was down), design §4.4 (the RPC envelope).
+
+## TD-063: Two CI-only flakes, each seen once on the 3.12 runner
+
+**Priority:** Low
+**Added:** 2026-09-17 (session `tdgrind-ao-1`, both on PRs whose diffs did not touch the code under test)
+
+**Status:** Open — observed, not diagnosed; each passed on a re-run of the failed job and locally
+
+**Location:** `tests/test_cli.py::test_send_wait`, `tests/test_agent.py::test_the_tick_retires_a_branch_claim_the_session_abandoned`
+
+**Why:** (1) PR #180's first CI run (2026-09-17 ~05:29Z, run 35185832437, test (3.12)): `ao send sw --wait --timeout 5 go` returned `prompt-stalled: … showed no activity within 4.69821 s` against a `hookstub` session — the send path was untouched by that PR, and the job passed on re-run. (2) PR #189's CI run (2026-09-17 ~06:37Z, test (3.12)): the tick had not yet retired a derived `TD-077` `claimed` entry when the test asserted `progress == []`; PR #189 renamed a grant and did not touch `sessionorc.reports` or the tick. Passed on re-run and three times locally. Both are timing-shaped (a bound a slow runner can miss), the kind TD-033 fixed for two other tests by waiting on the real signal instead of a duration.
+
+**Fix:** for each, read the test's wait: if it asserts after a fixed sleep or a bound shorter than a slow runner's tick, wait on the condition itself (as TD-033 did); if it already waits on the condition, capture the record and tail on failure so the next occurrence explains itself. Done when each has either a deterministic wait or failure diagnostics, and neither fails in ten consecutive CI runs.
+
+**Related:** TD-033 (archived: the same class, two other tests), TD-025 (archived: `test_cli.py` idle-wait diagnostics).
+
