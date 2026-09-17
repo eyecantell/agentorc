@@ -139,6 +139,14 @@ def cmd_wait(args: argparse.Namespace) -> int:
 
 def cmd_status(args: argparse.Namespace) -> int:
     sessions = call_sync("list")
+    if hosts.is_node():
+        # design §4.4a: on a node out of reach of its home, this host's sessions only, labelled.
+        # stderr, so `--json` stays the records and nothing else.
+        print(
+            f"offline — {hosts.local_host().name} is a node of {hosts.home_name()}, which is unreachable: "
+            "this host's sessions only; no mail, no org",
+            file=sys.stderr,
+        )
     if args.json:
         print(json.dumps(sessions, indent=1))
         return 0
@@ -415,7 +423,16 @@ def cmd_roles(args: argparse.Namespace) -> int:
 
 def _org_here(directory: pathlib.Path) -> orgmod.Org:
     """`~/.agentorc/org.yml`, plus a repo's own `teams:` when the command is run inside one — the
-    org file wins a name collision (design §4.9). Read on every use and cached nowhere."""
+    org file wins a name collision (design §4.9). Read on every use and cached nowhere.
+
+    On a node the org is not here (design §4.4a: `org.yml` lives on the home), and a local file
+    that disagreed with the home's would start a team the home knows nothing about."""
+    if hosts.is_node():
+        raise ValueError(
+            f"the org lives on {hosts.home_name()} (home): run `ao team` there — "
+            f"{hosts.local_host().name} is a node, and the link that would read it from here is not built "
+            "(TD-057 step 3)"
+        )
     o = orgmod.load()
     cfg = repoconfig.discover(directory)
     if cfg.teams and cfg.root:

@@ -6,7 +6,7 @@ A session is a tmux session, with or without a repo, with or without an agent (d
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -602,3 +602,36 @@ def _upsert(entries: list[Any], entry: Any) -> bool:
         return True
     entries.append(entry)
     return True
+
+
+# -- the replica's merge, in both directions (design §4.4a, TD-057 step 2) --------------------------
+
+
+class NotTheSameSession(ValueError):
+    """A copy that disagrees with the record on an identity field describes another session."""
+
+
+def _overlay(record: Session, copy: Mapping[str, Any], owned: frozenset[str]) -> Session:
+    for f in sorted(IDENTITY):
+        if f in copy and copy[f] != getattr(record, f):
+            raise NotTheSameSession(f"{record.id}: `{f}` is {getattr(record, f)!r} here and {copy[f]!r} in the copy")
+    parsed = Session.from_dict({**record.to_dict(), **{k: v for k, v in copy.items() if k in owned}})
+    for f in owned:
+        if f in copy:
+            setattr(record, f, getattr(parsed, f))
+    return record
+
+
+def apply_home(record: Session, home_copy: Mapping[str, Any]) -> Session:
+    """A node's replica takes the home's copy: exactly the home-owned fields are overlaid — the
+    graph and intent — and nothing the node observes is touched. Merges go by owner, never by last
+    write (§4.4a): the link was down, the node wrapped a worker up and it exited, and meanwhile a
+    person at the home extended its `run_until`; the node's `exited` stands, and so does the new
+    `run_until`. `home_copy` is a record as `to_dict()` writes it; fields it omits are left alone."""
+    return _overlay(record, home_copy, HOME_OWNED)
+
+
+def apply_node(record: Session, report: Mapping[str, Any]) -> Session:
+    """The home's record takes a node's report: exactly the node-owned fields — what the node
+    observes and enforces on its host. The mirror of `apply_home`."""
+    return _overlay(record, report, NODE_OWNED)

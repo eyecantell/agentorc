@@ -13,6 +13,9 @@ local:
   runs_keep_days: 30       # run logs of exited/closed sessions older than this are deleted; 0 keeps all
 ```
 
+A top-level **`home: <host name>`** (design §4.4a, TD-057 step 2) makes this host agent a *node* of
+that home; without it, or naming this host itself, the agent is the home — phase 1 exactly.
+
 Without the file the machine's short hostname stands in for `name` and `vscode_host`, and every
 other field takes its default. A malformed file is the same as no file: never a crash.
 """
@@ -68,6 +71,33 @@ def _read_local_cached(path: str, mtime_ns: int) -> dict:
         return {}
     local = doc.get("local") if isinstance(doc, dict) else None
     return local if isinstance(local, dict) else {}  # `local: true` / a list: not a mapping → ignore
+
+
+@functools.lru_cache(maxsize=8)
+def _read_home_cached(path: str, mtime_ns: int) -> str:
+    try:
+        doc = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return ""
+    v = doc.get("home") if isinstance(doc, dict) else None
+    return v.strip() if isinstance(v, str) else ""  # `home: true` / a mapping: not a name → ignored
+
+
+def home_name() -> str:
+    """The host that holds the org's session graph (design §4.4a): the file's top-level `home:`,
+    else this host. A malformed value is the same as none — never a crash, and never a node by
+    accident."""
+    p = hosts_file()
+    try:
+        named = _read_home_cached(str(p), p.stat().st_mtime_ns)
+    except OSError:
+        named = ""
+    return named or local_host().name
+
+
+def is_node() -> bool:
+    """This host agent dials a home that is not itself."""
+    return home_name() != local_host().name
 
 
 def _read_local(p: Path) -> dict:

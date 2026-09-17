@@ -102,7 +102,12 @@ def org_here() -> tuple[orgmod.Org, list[str]]:
     of every repo in this host's registry — the page is not *in* a directory the way `ao team` is,
     so "a repo's own teams" means every repo the host knows about. The org file wins a name
     collision. Read on every use and cached nowhere; a malformed file is a note beside the strip,
-    never a 500 — the rest of the page is still the fleet."""
+    never a 500 — the rest of the page is still the fleet. On a node the org is not here (design
+    §4.4a: `org.yml` lives on the home), which is a note too."""
+    if hosts.is_node():
+        return orgmod.Org(path=orgmod.org_file()), [
+            f"the org lives on {hosts.home_name()} (home); {hosts.local_host().name} is a node and cannot read it yet"
+        ]
     try:
         org = orgmod.load()
     except ValueError as e:
