@@ -88,7 +88,7 @@ def org_doc(root: Path) -> dict:
         "teams": {
             "ao-grind": {
                 "projects": ["ao"],
-                "lead": {"role": "orchestrator", "name": "orc-ao"},
+                "lead": {"role": "lead", "name": "orc-ao"},
                 "members": [{"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick"}],
             }
         },

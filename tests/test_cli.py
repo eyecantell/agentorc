@@ -384,7 +384,7 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
 
 def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-036 step 2: `ao control <orc> add|remove <session>…` edits membership from the
-    orchestrator's side, `ao new --controller` sets it at create, `ao status -v` prints both
+    lead's side, `ao new --controller` sets it at create, `ao status -v` prints both
     directions, and `ao new` says so when a session starts with nobody able to act on it."""
 
     def out():
@@ -407,7 +407,7 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     assert cli.main(["control", "orc", "add", "w1"]) == 0
     assert capsys.readouterr().out.strip() == f"{w1}: under {orc}"
     assert call_sync("get", id=w1)["controllers"] == [orc]
-    # …so the orchestrator can now act on it — once it is a worker. Interactive, it is a person's
+    # …so the lead can now act on it — once it is a worker. Interactive, it is a person's
     # session and out of reach whatever the list says (§9 invariant 5, TD-041); `ao mode` is how
     # a person hands it over, and the CLI shows the refusal as it came
     monkeypatch.setenv("AGENTORC_SESSION", orc)
@@ -434,7 +434,7 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     assert [s_["id"] for s_ in res["sessions"]] == [w1]
     # one entry per attempt, not per name: the same bad name twice is two answers
     assert [r["session"] for r in res["refused"]] == ["nosuchsession", "nosuchsession"]
-    # an orchestrator may not be made to control itself — refused by the agent, not by the CLI
+    # a lead may not be made to control itself — refused by the agent, not by the CLI
     assert cli.main(["control", "orc", "add", "orc"]) == 1
     assert "cannot be its own controller" in capsys.readouterr().err
 
@@ -541,7 +541,7 @@ def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tm
     # `shell` has no opinion on how a model name shortens, so it prints as observed (TD-031)
     assert "model:  claude-opus-5" in shown
     monkeypatch.delenv("AGENTORC_SESSION")
-    assert cli.main(["--json", "finding", "#67", "--id", sid]) == 0  # a person, or an orchestrator, for a worker
+    assert cli.main(["--json", "finding", "#67", "--id", sid]) == 0  # a person, or a lead, for a worker
     assert [f["ref"] for f in out()["findings"]] == ["TD-029", "#67"]
     call_sync("kill", id=sid)
 

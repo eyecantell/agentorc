@@ -385,7 +385,7 @@ class Session:
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
     capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)
     # Membership (design §4.8, TD-036): the session ids that may act on *this* session. The list
-    # lives on the target, not on the orchestrator, so the gate is one lookup and nothing has to be
+    # lives on the target, not on the lead, so the gate is one lookup and nothing has to be
     # kept in step; empty — the default — means nobody may act on it. A grant says a session may
     # act on others at all; this says on which. Several controllers are allowed and none is
     # privileged.

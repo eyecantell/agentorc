@@ -146,8 +146,8 @@ def start(
             created.append(rec)
             lead_id = str(rec["id"])
         for m in plan.members:
-            # A person runs a team start, so no attenuation applies (§4.8 create rule); an
-            # orchestrator running it is subject to it as for any create, in the agent.
+            # A person runs a team start, so no attenuation applies (§4.8 create rule); a
+            # lead running it is subject to it as for any create, in the host agent.
             created.append(call("create", **m.create_params([lead_id] if lead_id else [])))
     except Exception as e:
         raise PartialStart(name, created, plan, e) from e

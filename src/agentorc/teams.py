@@ -209,7 +209,7 @@ Spec = orgmod.MemberDef | orgmod.LeadDef | None
 
 def _brief(role: repoconfig.Role, member: Spec, checkout: Path, lane: list[str]) -> str | None:
     """The role's template with `{lane}` filled, or the member's `brief:` override read from its
-    home checkout. A lead may override its brief too — an orchestrator's is the one a repo most
+    home checkout. A lead may override its brief too — a lead's is the one a repo most
     often keeps its own copy of (2026-09-13)."""
     if member is not None and member.brief:
         override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
@@ -262,7 +262,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         prompt = block + prompt if prompt else block
     return Launch(
         name=name,
-        role=role_name,
+        role=role.name,  # the current name, even when the definition still says `orchestrator` (TD-055)
         home=home,
         dir=checkout,
         team=team.name,

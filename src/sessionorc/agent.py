@@ -2193,7 +2193,7 @@ _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset,
 def _controllers(ids: list[Any]) -> list[str]:
     """Session ids for a `controllers` list (design §4.8): stripped, deduped, order kept. Ids are
     not checked against live records on purpose — a controller that has exited keeps its entry
-    (§4.8: an exited orchestrator's workers are surfaced, not silently released), and a list may
+    (§4.8: an exited lead's workers are surfaced, not silently released), and a list may
     be set before the session it names is created."""
     out: list[str] = []
     for raw in ids:

@@ -26,7 +26,7 @@ def org_doc(root: Path, *, two_repos: bool = False) -> dict:
         "teams": {
             "ao-grind": {
                 "projects": ["ao"],
-                "lead": {"role": "orchestrator", "name": "orc-ao", "home": "agentorc"},
+                "lead": {"role": "lead", "name": "orc-ao", "home": "agentorc"},
                 "members": [
                     {"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick", "home": "agentorc"},
                     {"role": "hunter", "name": "hunt", "lane": "ui", "home": "agentorc"},
@@ -176,7 +176,7 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "grind-1", "grind-2", "hunt"]
     lead, grind1, hunt = made[0], made[1], made[3]
-    assert lead["controllers"] == [] and lead["capabilities"] == ["orchestrate"] and lead["role"] == "orchestrator"
+    assert lead["controllers"] == [] and lead["capabilities"] == ["orchestrate"] and lead["role"] == "lead"
     lead_id = "ao-agentorc-orc-ao"
     assert all(p["controllers"] == [lead_id] for p in made[1:])
     # a worktree per session in its home repo (§4.9 "Home and reach"), and both badges
@@ -186,8 +186,27 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert "## Lane: free-pick" in grind1["prompt"] and "## Area: ui" in hunt["prompt"]
     assert "## Project:" not in grind1["prompt"]  # one repo: no reach to describe
     out = capsys.readouterr().out
-    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  lead orchestrator")
+    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  lead lead")
     assert "member grinder" in out
+
+
+def test_a_definition_still_naming_role_orchestrator_starts_a_lead(world, capsys, monkeypatch):
+    """TD-055 step 2: an `org.yml` written before the rename — `lead: {role: orchestrator}` and a
+    `roles: orchestrator:` overlay, the live shape — starts the lead with the lead brief, grants and
+    the overlay's profile, records `role: lead`, and says once that the name changed."""
+    from agentorc import repoconfig
+
+    monkeypatch.setattr(repoconfig, "_warned", set())
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["lead"]["role"] = "orchestrator"
+    doc["roles"]["orchestrator"] = {"profile": "org-grind"}
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    lead = creates(state)[0]
+    assert lead["role"] == "lead" and lead["capabilities"] == ["orchestrate"] and lead["profile"] == "org-grind"
+    assert "You are a **lead**" in lead["prompt"]
+    assert capsys.readouterr().err.count("role `orchestrator` is now `lead`") == 1
 
 
 def test_an_interactive_member_is_started_but_said_to_be_out_of_its_leads_reach(world, capsys):
