@@ -197,6 +197,8 @@
   if ($("#personinbox")) {
     $("#personinbox").addEventListener("click", () => { $("#personbox").showModal(); AO.refreshPersonInbox(true); });
     $("#personclose").addEventListener("click", () => $("#personbox").close());
+    // only the Org page renders the count server-side: every other page reads it at load
+    if (location.pathname !== "/") AO.refreshPersonInbox(false);
     setInterval(() => AO.refreshPersonInbox($("#personbox").open), 20000);
   }
 
