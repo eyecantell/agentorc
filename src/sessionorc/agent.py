@@ -28,7 +28,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, hosts, mail, modes, naming, paths, reports, waits
+from sessionorc import adapters, hosts, link, mail, modes, naming, paths, reports, waits
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
@@ -130,10 +130,17 @@ class HostAgent:
         # everything that touches its machine and its own host's records on disk — the replica.
         self.home = hosts.home_name()
         self.mode = "node" if self.home != self.host else "home"
+        # The link (§4.4a "The link's protocol", TD-057 step 3a). At the home: one entry per node
+        # that has ever connected — `{up, since, why}` — and the live `Mux` while it is up. At a
+        # node: the same shape for its one link to the home.
+        self.links: dict[str, dict[str, Any]] = {}
+        self._link_muxes: dict[str, link.Mux] = {}
+        self.home_link: dict[str, Any] = {"up": False, "since": now_iso(), "why": "not dialed yet"}
+        self._home_mux: link.Mux | None = None
         if self.mode == "node":
             log.warning(
-                "node of %s: the link (TD-057 step 3) is not built, so home is unreachable — this host's "
-                "sessions only; mail, reports, home-owned edits and sessions' acts on others are refused. "
+                "node of %s: this host's sessions only until the link is up, and until TD-057 steps 4–5 "
+                "forward them — mail, reports, home-owned edits and sessions' acts on others are refused. "
                 "This host calls itself %s: if this machine IS %s, set `local: {name: %s}` in hosts.yml — without "
                 "it the name is the machine's hostname, and a home that does not recognise its own name is a node.",
                 self.home,
@@ -211,6 +218,7 @@ class HostAgent:
         os.chmod(sock, 0o600)
         log.info("listening on %s", sock)
         ticker = asyncio.create_task(self._tick_loop())
+        dialer = asyncio.create_task(self._dial_home()) if self.mode == "node" else None
         try:
             async with server:
                 # `start_unix_server` is already serving. Not `serve_forever()`: cancelled, it awaits
@@ -226,6 +234,10 @@ class HostAgent:
                         w.close()
         finally:
             ticker.cancel()
+            if dialer is not None:
+                dialer.cancel()
+            for m in list(self._link_muxes.values()):
+                m.close("the home is stopping")
             with contextlib.suppress(FileNotFoundError):
                 sock.unlink()
 
@@ -2033,12 +2045,97 @@ class HostAgent:
         """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
         whether the home can be reached — which a client on a node needs before it labels what it
         shows *offline*."""
-        return {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
+        out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
+        if self.mode == "home":
+            out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
+        else:
+            out["link"] = dict(self.home_link)
+        return out
 
     def home_reachable(self) -> bool:
-        """The home is always in reach of itself. A node reaches it over the link, which step 3
-        builds: until then a node never does, and this is the one line that step changes."""
-        return self.mode == "home"
+        """The home is always in reach of itself; a node reaches it while its link is up (§4.4a)."""
+        return self.mode == "home" or bool(self.home_link["up"])
+
+    # -- the link (design §4.4a "The link's protocol", TD-057 step 3a) ---------------------------
+
+    async def _dial_home(self) -> None:
+        """A node's dialer: keeps one link to the home up, forever, with backoff."""
+
+        def on_state(up: bool, why: str, mux: link.Mux | None) -> None:
+            if up != self.home_link["up"] or why != self.home_link["why"]:
+                (log.info if up else log.warning)("link to %s: %s", self.home, why)
+            self.home_link = {"up": up, "since": now_iso(), "why": why}
+            self._home_mux = mux
+
+        await link.dial(
+            hosts.link_command(),
+            host=self.host,
+            handler=self._from_home,
+            on_state=on_state,
+            first=link.BACKOFF_FIRST,
+            top=link.BACKOFF_MAX,
+        )
+
+    async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
+        """What the home may ask of this node. Step 3a: nothing but a ping; acts arrive with step 4."""
+        if method == "ping":
+            return "pong"
+        raise link.LinkError(f"unknown link method {method!r}")
+
+    async def _serve_link(self, info: Any, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        """One node's link, for as long as it lasts. The host name is the one sshd's forced command
+        announced — it came from `authorized_keys`, never from the node — and everything the link
+        may do is decided against that name."""
+        host = str((info or {}).get("host") or "").strip() if isinstance(info, dict) else ""
+        said_hello = False
+
+        async def from_node(method: str, params: dict[str, Any]) -> Any:
+            nonlocal said_hello
+            if method == "hello":
+                refusal = self._link_refusal(host, params)
+                if refusal:
+                    asyncio.get_running_loop().call_later(0.2, mux.close, refusal)  # after the reply is written
+                    raise link.LinkError(refusal)
+                old = self._link_muxes.get(host)
+                if old is not None and old is not mux:
+                    old.close("replaced by a newer link from the same host")
+                self._link_muxes[host] = mux
+                self.links[host] = {"up": True, "since": now_iso(), "why": "linked"}
+                said_hello = True
+                log.info("link from %s: up", host)
+                return {"protocol": link.PROTOCOL, "home": self.host, "host": host}
+            if not said_hello:
+                raise link.LinkError("say hello first")
+            if method == "ping":
+                return "pong"
+            raise link.LinkError(f"unknown link method {method!r}")
+
+        mux = link.Mux(reader, writer, from_node)
+        why = await mux.run()
+        if self._link_muxes.get(host) is mux:
+            del self._link_muxes[host]
+            self.links[host] = {"up": False, "since": now_iso(), "why": why}
+            log.warning("link from %s: down — %s", host, why)
+
+    def _link_refusal(self, host: str, hello: dict[str, Any]) -> str | None:
+        """Why this home does not take a link from `host`, or None (§4.4a "Who may connect")."""
+        if self.mode != "home":
+            return f"{self.host} is a node of {self.home}, not a home: there is one home, and a node takes no links"
+        if not host:
+            return "the forced command named no host (`agentorc-agent link --host <name>` in authorized_keys)"
+        if host == self.host:
+            return f"{host} is this home's own name: a node's key must be bound to the node's name"
+        if host not in hosts.nodes():
+            return f"{host} is not an authorised node: add it under `nodes:` in {self.host}'s hosts.yml"
+        claimed = str(hello.get("host") or "")
+        if claimed and claimed != host:
+            return (
+                f"this key is bound to {host}, and the node calls itself {claimed}: the `--host` in "
+                "authorized_keys and the node's `local: {name: …}` must agree"
+            )
+        if hello.get("protocol") != link.PROTOCOL:
+            return f"link protocol {hello.get('protocol')!r} here is {link.PROTOCOL}: promote both ends to one build"
+        return None
 
     # -- helpers ---------------------------------------------------------------------------------
 
@@ -2110,6 +2207,11 @@ class HostAgent:
                 except ValueError:
                     writer.write(b'{"error": "bad json"}\n')
                     continue
+                if "link" in req and "method" not in req:
+                    # sshd's forced command, announcing the host its key is bound to (§4.4a): from
+                    # here on this connection is a link, not a client.
+                    await self._serve_link(req["link"], reader, writer)
+                    return
                 if req.get("method") == "wait":
                     if writer in self._subscribers:
                         writer.write(b'{"error": "a wait runs on its own connection, never a subscribed one"}\n')
@@ -2202,10 +2304,13 @@ class HostAgent:
             # is dropped and the caller is this host's bare id.
             caller = naming.split_address(str(caller))[0]
         try:
-            if not self.home_reachable():
-                # A node out of reach of its home (design §4.4a, the call-by-call table): decided
-                # before the gate, because the gate's graph is the thing that is out of reach.
-                refusal = modes.offline_refusal(str(name), caller, params, host=self.host, home=self.home)
+            if self.mode == "node":
+                # A node (design §4.4a, the call-by-call table): decided before the gate, because
+                # the gate's graph is at the home. With the link down these are refused as
+                # unreachable; with it up, as not forwarded yet — never served from the replica.
+                refusal = modes.offline_refusal(
+                    str(name), caller, params, host=self.host, home=self.home, reachable=self.home_reachable()
+                )
                 if refusal:
                     raise RpcError(refusal)
             self._gate(caller, str(name), params)
@@ -2397,6 +2502,11 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("serve", help="run the host agent (foreground)")
     sub.add_parser("rpc", help="stdin/stdout JSON-lines bridge to the local socket (used over ssh)")
+    lk = sub.add_parser(
+        "link",
+        help="a node's link into this home: the forced command of the node's key in authorized_keys (design §4.4a)",
+    )
+    lk.add_argument("--host", default="", help="the node's host name — set in authorized_keys, never by the node")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if args.cmd == "serve":
@@ -2406,6 +2516,8 @@ def main(argv: list[str] | None = None) -> int:
         from sessionorc.client import bridge_stdio
 
         return asyncio.run(bridge_stdio())
+    if args.cmd == "link":
+        return asyncio.run(link.bridge(args.host))
     return 2
 
 

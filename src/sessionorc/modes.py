@@ -27,12 +27,22 @@ REPORTS = frozenset({"progress", "finding"})
 NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})
 
 
-def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str) -> str | None:
+def offline_refusal(
+    method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str, reachable: bool = False
+) -> str | None:
     """Why a node that cannot reach `home` refuses this call, or None when it serves it (design
     §4.4a, the call-by-call table). `caller` is None for a person. Reads are never listed and never
     refused. Every refusal names the home and says nothing was queued: a refusal the caller can
     see, never a delivery that is not coming."""
-    tail = f"{home} (home) is unreachable from {host}; refused, not queued (design §4.4a)"
+    if reachable:
+        # Step 3a: the link is up, and nothing forwards over it yet. Serving these locally the moment
+        # it came up would be the split-brain §4.4a exists to rule out, so the table still holds.
+        tail = (
+            f"the link to {home} (home) is up, but forwarding this from {host} is not built "
+            "(TD-057 steps 4–5); refused, not queued (design §4.4a)"
+        )
+    else:
+        tail = f"{home} (home) is unreachable from {host}; refused, not queued (design §4.4a)"
     if method in MAILBOX:
         return f"the mailbox is at the home: {tail}"
     if method in REPORTS:
