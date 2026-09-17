@@ -572,3 +572,7 @@
 23:12Z  inbox: 1 note [other] from tdgrind-ao-1 (TD-053 step 6 done, both §4.5a rows built; steps 4/5 remain Paul's) → weighed, no reply.
 23:12Z  tdgrind-ao-1: working, claimed TD-065 (PR #206) → ok
 23:17Z  tdgrind-ao-1: working; TD-065 PR #206 merged 8f35f28 → cadence #206 pass on every row (review recorded: FIXED · sonnet-5 · docs · 1 finding). #204 #205 #207 are no member's branch → not checked.
+23:20Z  tdgrind-ao-1: declared **out of work** 23:16:15Z (ao progress none) and settled `idle` → finished: nothing sent, no restart. inbox: 2 further notes [other] (TD-065 filed; the out-of-work declaration) → weighed.
+23:20Z  Final sweep, `--since 12h`: **agentorc pass**, no fail or unknown rows. **samscrape #872 fails `worktree`** (/home/kmaster/samscrape, the person's anchor checkout, has commits on td418-post-upgrade-state not on origin/main) — not my member and not my team's repo, and `ao msg` cannot reach orchestrator-sam-1 (not my controller, member or team), so: reported here, not sent, not escalated over another lead's lane.
+23:20Z  Out of work: every member finished. `ao team stop ao-grind --close --timeout 90` → tdgrind-ao-1 "finished (out of work), nothing sent, closed"; no member left open, nothing uncommitted or unpushed. `ao progress none` recorded on my record.
+23:20Z  RUN 5 CLOSED. 25 rounds, 20:49Z–23:20Z. 4 member PRs cadence-checked (#197 #199 #203 #206), one fail found and cleared (#199 `worktree`), one send (queued, timed out while the member worked; the member had already fixed it), no restarts, no forgets, no escalations filed.
