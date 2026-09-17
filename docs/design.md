@@ -674,7 +674,10 @@ decided here so both ends are written from one text.
   `{"re": n, "error": "…"}`, and a frame with a method and no `id` is a notification that expects
   nothing. `re` rather than a shared `id` because both ends number their own requests from one, and
   a reply must never be mistaken for the other side's request of the same number. Requests are
-  served concurrently; a reply may overtake an earlier one.
+  served concurrently; a reply may overtake an earlier one. A frame is one line of at most
+  `FRAME_LIMIT` (8 MiB) — every stream it crosses is opened with that limit, since asyncio's 64 KiB
+  default is smaller than a node's snapshot — and a longer one **ends the link with a reason**: the
+  stream cannot be re-framed after it, and an exception there would end the dialer for good.
 - **What step 3a sends.** `hello` from the node — `{protocol: 1, host: <what the node calls
   itself>}` — answered with `{protocol, home, host: <the name the key is bound to>}`; the node's
   own name is a diagnostic, and a mismatch is refused in words, because it means a key is
@@ -687,7 +690,10 @@ decided here so both ends are written from one text.
   `host` RPC, in §4.6's two kinds plus the one this adds: *ssh failed* (the process exited 255, or
   never produced a frame), *agent down on <home>* (the bridge reached the machine and not the
   agent's socket), and *refused: <the home's reason>*. A refusal backs off like any other failure:
-  the fix is an edit on the home, and the node finds out by trying.
+  the fix is an edit on the home, and the node finds out by trying. Nothing ends the dialer but the
+  agent stopping — a node with no dialer never comes back — and the transport's stderr is read for
+  as long as it runs, its last lines being the *ssh failed* diagnosis: an unread pipe fills, and a
+  transport blocked on it takes the link with it days after it came up.
 - **What an up link changes, and what it does not yet.** `home_reachable()` is the link's state.
   But a call the node cannot serve alone is still refused until the step that forwards it lands —
   the mailbox and a session's acts on others with step 4 and 5 — and says so: *the link is up, but

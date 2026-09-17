@@ -214,7 +214,8 @@ class HostAgent:
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
         self.tmux.ensure_server()
-        server = await asyncio.start_unix_server(self._handle_conn, path=str(sock))
+        # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
+        server = await asyncio.start_unix_server(self._handle_conn, path=str(sock), limit=link.FRAME_LIMIT)
         os.chmod(sock, 0o600)
         log.info("listening on %s", sock)
         ticker = asyncio.create_task(self._tick_loop())
@@ -2111,11 +2112,14 @@ class HostAgent:
             raise link.LinkError(f"unknown link method {method!r}")
 
         mux = link.Mux(reader, writer, from_node)
-        why = await mux.run()
-        if self._link_muxes.get(host) is mux:
-            del self._link_muxes[host]
-            self.links[host] = {"up": False, "since": now_iso(), "why": why}
-            log.warning("link from %s: down — %s", host, why)
+        why = "the link's reader failed"
+        try:
+            why = await mux.run()
+        finally:  # however it ended: a link the home still calls up after it has gone is the worst answer
+            if self._link_muxes.get(host) is mux:
+                del self._link_muxes[host]
+                self.links[host] = {"up": False, "since": now_iso(), "why": why}
+                log.warning("link from %s: down — %s", host, why)
 
     def _link_refusal(self, host: str, hello: dict[str, Any]) -> str | None:
         """Why this home does not take a link from `host`, or None (§4.4a "Who may connect")."""

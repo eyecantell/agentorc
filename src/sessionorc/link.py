@@ -33,6 +33,10 @@ LINK_PING = 15.0  # seconds between a node's pings
 LINK_SILENCE = 45.0  # seconds without a frame before either end gives the link up
 BACKOFF_FIRST = 1.0
 BACKOFF_MAX = 60.0
+# One frame is one line, and asyncio's default line limit is 64 KiB — a node's snapshot of its
+# records (step 3b) is larger than that. Every stream a frame crosses is opened with this limit.
+FRAME_LIMIT = 8 * 1024 * 1024
+STDERR_KEPT = 20  # lines of the transport's stderr kept for the diagnosis
 
 Handler = Callable[[str, dict[str, Any]], Awaitable[Any]]
 
@@ -78,6 +82,11 @@ class Mux:
                     line = await asyncio.wait_for(self.reader.readline(), timeout=max(left, 0.05))
                 except TimeoutError:
                     why = f"no frame for {self.silence:g} s"
+                    break
+                except ValueError:
+                    # a line past `FRAME_LIMIT`: the stream cannot be re-framed after it, so the link
+                    # ends — with a reason, never an exception that would end the dialer for good
+                    why = f"a frame longer than {FRAME_LIMIT} bytes"
                     break
                 if not line:
                     break
@@ -172,7 +181,7 @@ async def bridge(host: str) -> int:
     Exit 1 with one error frame when the agent's socket cannot be reached, which is how the node
     tells *agent down* from *ssh failed*."""
     try:
-        reader, writer = await asyncio.open_unix_connection(str(paths.socket_path()))
+        reader, writer = await asyncio.open_unix_connection(str(paths.socket_path()), limit=FRAME_LIMIT)
     except (ConnectionError, FileNotFoundError, OSError) as e:
         sys.stdout.write(json.dumps({"link_error": "agent down", "detail": str(e)}) + "\n")
         sys.stdout.flush()
@@ -180,18 +189,20 @@ async def bridge(host: str) -> int:
     writer.write((json.dumps({"link": {"host": host}}) + "\n").encode())
     await writer.drain()
     loop = asyncio.get_running_loop()
-    stdin = asyncio.StreamReader()
+    stdin = asyncio.StreamReader(limit=FRAME_LIMIT)
     await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(stdin), sys.stdin)
 
     async def up() -> None:
-        while line := await stdin.readline():
-            writer.write(line)
-            await writer.drain()
+        with contextlib.suppress(ValueError):  # a line past the limit ends the bridge, and so the link
+            while line := await stdin.readline():
+                writer.write(line)
+                await writer.drain()
 
     async def down() -> None:
-        while line := await reader.readline():
-            sys.stdout.buffer.write(line)
-            sys.stdout.buffer.flush()
+        with contextlib.suppress(ValueError):
+            while line := await reader.readline():
+                sys.stdout.buffer.write(line)
+                sys.stdout.buffer.flush()
 
     # Either direction ending ends the link: the node went away, or the home closed it.
     tasks = [asyncio.ensure_future(up()), asyncio.ensure_future(down())]
@@ -248,10 +259,18 @@ async def dial(
     why and try again. `on_state(up, why, mux)` is called on every change. Runs until cancelled."""
     delays = backoff_delays(first, top)
     while True:
-        why = await _dial_once(command, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence)
-        if why is None:  # the link was up and ended: start the backoff over
+        try:
+            was_up, why = await _dial_once(
+                command, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:  # noqa: BLE001 — nothing may end the dialer: a node with no dialer never returns
+            log.exception("link attempt failed")
+            was_up, why = False, f"dialer error: {type(e).__name__}: {e}"
+        if was_up:  # the link had been up: start the backoff over
             delays = backoff_delays(first, top)
-            why = "the link dropped"
+            why = f"the link dropped: {why}"
         on_state(False, why, None)
         await asyncio.sleep(next(delays))
 
@@ -264,15 +283,23 @@ async def _dial_once(
     on_state: Callable[[bool, str, Mux | None], None],
     ping: float | None,
     silence: float | None,
-) -> str | None:
-    """One attempt. Returns why it failed, or None when the link came up and later ended."""
+) -> tuple[bool, str]:
+    """One attempt: whether the link came up, and why it is down now."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            *command, stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+            *command,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            limit=FRAME_LIMIT,
         )
     except OSError as e:
-        return f"ssh failed: cannot run {command[0]}: {e}"
+        return False, f"ssh failed: cannot run {command[0]}: {e}"
     assert proc.stdout is not None
+    # Read for as long as the process lives: a transport that fills an unread stderr pipe blocks,
+    # and the link with it, days after it came up. The last lines are the diagnosis.
+    errors: list[str] = []
+    drain = asyncio.ensure_future(_drain_stderr(proc, errors))
     refusal: list[str] = []
 
     def stray(frame: dict[str, Any]) -> None:
@@ -282,35 +309,33 @@ async def _dial_once(
 
     mux = Mux(proc.stdout, _PipeWriter(proc), handler, silence=silence, stray=stray)
     runner = asyncio.ensure_future(mux.run())
-    up = False
     try:
         try:
             answer = await mux.request("hello", timeout=silence or LINK_SILENCE, protocol=PROTOCOL, host=host)
         except LinkError as e:
-            return f"refused: {e}"
+            return False, f"refused: {e}"
         except (LinkClosed, TimeoutError):
             if refusal:
-                return refusal[0]
-            await asyncio.wait({asyncio.ensure_future(proc.wait())}, timeout=2)
-            err = (await _stderr(proc)).strip().splitlines()
-            return "ssh failed" + (f": {err[-1]}" if err else f" (exit {proc.returncode})")
-        up = True
+                return False, refusal[0]
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(proc.wait(), timeout=2)
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(asyncio.shield(drain), timeout=1)
+            return False, "ssh failed" + (f": {errors[-1]}" if errors else f" (exit {proc.returncode})")
         on_state(True, f"linked to {(answer or {}).get('home', 'home')} as {(answer or {}).get('host', host)}", mux)
         pinger = asyncio.ensure_future(_ping(mux, LINK_PING if ping is None else ping))
         try:
-            await runner
+            return True, await runner
         finally:
             pinger.cancel()
-        return None
     finally:
         mux.close()
         runner.cancel()
+        drain.cancel()
         with contextlib.suppress(ProcessLookupError, OSError):
             proc.kill()
         with contextlib.suppress(Exception):
             await proc.wait()
-        if not up:
-            log.debug("link attempt ended before hello")
 
 
 async def _ping(mux: Mux, every: float) -> None:
@@ -320,10 +345,12 @@ async def _ping(mux: Mux, every: float) -> None:
             await mux.request("ping", timeout=mux.silence)
 
 
-async def _stderr(proc: asyncio.subprocess.Process) -> str:
+async def _drain_stderr(proc: asyncio.subprocess.Process, kept: list[str]) -> None:
     if proc.stderr is None:
-        return ""
-    try:
-        return (await asyncio.wait_for(proc.stderr.read(4096), timeout=1)).decode(errors="replace")
-    except TimeoutError:
-        return ""
+        return
+    with contextlib.suppress(ValueError, ConnectionError):
+        while line := await proc.stderr.readline():
+            text = line.decode(errors="replace").strip()
+            if text:
+                kept.append(text)
+                del kept[:-STDERR_KEPT]

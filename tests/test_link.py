@@ -37,8 +37,7 @@ async def pair(tmp_path, a_handler, b_handler, **kw):
         a.close()
         b.close()
         server.close()
-        for t in tasks:
-            t.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)  # both end on the close; none left pending
 
 
 async def nothing(method, params):
@@ -75,6 +74,23 @@ async def test_silence_ends_the_link_and_fails_what_was_outstanding(tmp_path):
         with pytest.raises(link.LinkClosed):
             await a.request("anything")
         assert "no frame for 0.3 s" in await tasks[0]
+
+
+async def test_a_frame_past_the_limit_ends_the_link_with_a_reason_never_an_exception(tmp_path, monkeypatch):
+    """Review of PR #200: `readline` raises `ValueError` past the stream's limit. Uncaught, it ended
+    the node's dialer for good and left the home calling a dead link up."""
+    path, ready = str(tmp_path / "small.sock"), asyncio.get_running_loop().create_future()
+    server = await asyncio.start_unix_server(lambda r, w: ready.set_result((r, w)), path=path, limit=1024)
+    _r1, w1 = await asyncio.open_unix_connection(path)
+    r2, w2 = await ready
+    monkeypatch.setattr(link, "FRAME_LIMIT", 1024)
+    mux = link.Mux(r2, w2, nothing)
+    w1.write(b'{"method": "x", "params": {"pad": "' + b"a" * 4096 + b'"}}\n')
+    await w1.drain()
+    assert await asyncio.wait_for(mux.run(), timeout=5) == "a frame longer than 1024 bytes"
+    assert mux.closed
+    server.close()
+    w1.close()
 
 
 def test_backoff_doubles_to_a_ceiling_with_jitter():
@@ -134,10 +150,12 @@ class Home:
 @pytest.fixture
 async def home(tmp_path):
     h = Home(tmp_path, ["laptop"])
-    await h.start()
-    yield h
-    h.stop()
-    kill_private_server(Tmux(socket_name=h.sock_name))
+    try:  # around the start too: a home that never came up is still a process and a tmux server
+        await h.start()
+        yield h
+    finally:
+        h.stop()
+        kill_private_server(Tmux(socket_name=h.sock_name))
 
 
 @contextlib.asynccontextmanager
@@ -156,8 +174,8 @@ async def node_agent(tmp_path, monkeypatch, command, name="laptop"):
     tmux = Tmux(socket_name=sock_name)
     a = HostAgent(tmux=tmux)
     task = asyncio.create_task(a.serve(paths.socket_path()))
-    assert await wait_for(lambda: paths.socket_path().exists(), timeout=5.0, step=0.05)
     try:
+        assert await wait_for(lambda: paths.socket_path().exists(), timeout=5.0, step=0.05)
         yield a
     finally:
         task.cancel()
@@ -177,6 +195,11 @@ async def test_the_link_comes_up_drops_with_the_home_and_comes_back(home, tmp_pa
         async with LocalClient() as c:
             mine = await c.call("host")
             assert mine["home_reachable"] is True and mine["link"]["up"] is True
+            # a frame well past asyncio's 64 KiB default crosses the whole path — subprocess pipe,
+            # bridge, the home's socket — and the link is still there afterwards (step 3b's snapshot)
+            with pytest.raises(link.LinkError, match="unknown link method"):
+                await node._home_mux.request("not-a-method", timeout=10, pad="x" * 200_000)
+            assert await node._home_mux.request("ping", timeout=10) == "pong"
             # up, and still not served from the replica: nothing forwards yet (steps 4–5)
             with pytest.raises(AgentError, match="the link to kmaster .home. is up, but forwarding"):
                 await c.call("msg", to=["ao-x-w"], text="hi")
