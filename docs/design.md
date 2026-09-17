@@ -1790,8 +1790,9 @@ is a message the receiver must reason about before it can ignore it:
 | `conflict` | an `ask` to two or more controllers at once, citing the two `send`s it cannot reconcile by id (below; TD-039) | a `reply` from any addressee, or escalation |
 
 **A `conflict` is an `ask` for every rule in this section** (Sonnet review, 2026-09-16) — it
-carries the same wall-clock bound, its first `reply` closes it uncounted and later replies count
-as `note`s, an addressee that exits leaves it pending, and it is never pruned while open. What
+carries the same wall-clock bound, its first `reply` closes it uncounted — on **every**
+addressee's copy at that moment, the home being the one writer, not only the replier's — and
+later replies count as `note`s, an addressee that exits leaves it pending, and it is never pruned while open. What
 differs is only its delivery shape: several addressees named by the worker, one entry with one
 id in each of their inboxes. Its **escalation** is not a mechanism of its own: it is the thread's
 `bound_hit`, or the bound expiring, either of which the asker turns into a board line — the
@@ -1923,7 +1924,10 @@ Outside those stages an entry leaves only with its record or by a person's hand:
 - **Resume carries mail forward.** Resuming a conversation creates a new record and closes the
   exited one it supersedes; **every entry still inside the retention window**, read or unread, and
   the exchange tallies move to the new record at that moment, because the conversation they were
-  addressed to is the one continuing. Unread alone is not enough: a worker that read an `ask`,
+  addressed to is the one continuing — and so does **`sends`** (Sonnet round two, 2026-09-16): a
+  `conflict` cites its entries by id, and the instructions it records still bind the resumed
+  conversation. A `send` addressed to the superseded id is **refused**, as any act on a closed
+  record is; only mail is forwarded (below). Unread alone is not enough: a worker that read an `ask`,
   crashed and was resumed would lose the very thread it was answering. **Ids follow the move:**
   `_supersede` rewrites the old id to the new one in the moved entries' `to`, and in every other
   record's pair tallies and pending `ask` addressees that name it — one host agent holds every
@@ -2575,7 +2579,10 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       *ready with changes*, four findings, all adopted): a `conflict` is an `ask` for every rule and
       its escalation is the generic `bound_hit`/expiry path; `sends` joins §4.4a's home-owned list
       and invariant 15; a person's message into a thread is uncounted and resets it; *reachable*
-      enters the glossary. The ten: an open `ask` is never pruned (retention
+      enters the glossary. **Round two** (*ready with changes*, three findings, all adopted):
+      `sends` moves on resume with the entries that cite it, and a `send` to the superseded id is
+      refused where mail forwards; a `conflict`'s first reply closes every addressee's copy;
+      `bound_hit` enters the glossary. The ten: an open `ask` is never pruned (retention
       and the bound were independent, so a read `ask` could be pruned before it was answered and
       the answer refused); the pair tally for reply-less mail is windowed, not lifetime (a daily
       `note` would have made a pair deaf in weeks); a decision not to wake leaves `mail_decided`
