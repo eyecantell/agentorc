@@ -901,64 +901,83 @@ def create_app() -> FastAPI:
     @app.websocket("/events")
     async def events(ws: WebSocket):
         await ws.accept()
+
+        async def gone() -> None:
+            # The page never sends on this socket, so the next message is its disconnect. Without
+            # this watch the handler noticed a closed tab only when the next event's send failed —
+            # and uvicorn's shutdown waits on the handler, which is the UI's 40 s stop (TD-058).
+            while (await ws.receive()).get("type") != "websocket.disconnect":
+                pass
+
+        async def stream(c: LocalClient) -> None:
+            # A delta carries one record, but membership is read across records (design §4.8):
+            # a card's *under* chip names its controllers, which live on other records. So the
+            # loop keeps the fleet it has already been told about — seeded once, then updated
+            # by the very deltas it is rendering — rather than re-listing per event.
+            known: dict[str, dict[str, Any]] = {}
+            with contextlib.suppress(Exception):
+                known = {o["id"]: o for o in await call("list")}
+            async for ev in c.subscribe():
+                if ev.get("event") == "session":
+                    s = ev["session"]
+                    known[s["id"]] = s
+                    v = view(s, list(known.values()))
+                    # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
+                    # `controllers` change on one record can move a card, change a lead, or turn
+                    # grouping on or off for the whole page, and only the server sees the fleet.
+                    await ws.send_text(
+                        json.dumps(
+                            {
+                                "event": "session",
+                                "id": s["id"],
+                                "state": s["state"],
+                                "rank": v["rank"],  # the view's: unseen idle sorts above idle
+                                "html": render_card(v),
+                                "session": v,
+                                "groups": group_heads(known),
+                            }
+                        )
+                    )
+                elif ev.get("event") in ("gone", "usage"):
+                    if ev.get("event") == "gone":
+                        # only a `gone` names a session; a `usage` event carries a profile, and
+                        # popping on it would one day evict a live session by coincidence
+                        went = str(ev.get("id") or "")
+                        known.pop(went, None)
+                        await ws.send_text(json.dumps({**ev, "groups": group_heads(known)}))
+                        # A card's *under* chip names another record, so the session that went
+                        # is not the only card now out of date: every card listing it as a
+                        # controller has to be redrawn, or it keeps naming and linking to a
+                        # session that is gone until the page is reloaded (review 2026-09-13).
+                        for other in list(known.values()):
+                            if went in (other.get("controllers") or []):
+                                ov = view(other, list(known.values()))
+                                await ws.send_text(
+                                    json.dumps(
+                                        {
+                                            "event": "session",
+                                            "id": other["id"],
+                                            "state": other["state"],
+                                            "rank": ov["rank"],
+                                            "html": render_card(ov),
+                                            "session": ov,
+                                        }
+                                    )
+                                )
+                        continue
+                    await ws.send_text(json.dumps(ev))
+
         try:
             async with LocalClient() as c:
-                # A delta carries one record, but membership is read across records (design §4.8):
-                # a card's *under* chip names its controllers, which live on other records. So the
-                # loop keeps the fleet it has already been told about — seeded once, then updated
-                # by the very deltas it is rendering — rather than re-listing per event.
-                known: dict[str, dict[str, Any]] = {}
-                with contextlib.suppress(Exception):
-                    known = {o["id"]: o for o in await call("list")}
-                async for ev in c.subscribe():
-                    if ev.get("event") == "session":
-                        s = ev["session"]
-                        known[s["id"]] = s
-                        v = view(s, list(known.values()))
-                        # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
-                        # `controllers` change on one record can move a card, change a lead, or turn
-                        # grouping on or off for the whole page, and only the server sees the fleet.
-                        await ws.send_text(
-                            json.dumps(
-                                {
-                                    "event": "session",
-                                    "id": s["id"],
-                                    "state": s["state"],
-                                    "rank": v["rank"],  # the view's: unseen idle sorts above idle
-                                    "html": render_card(v),
-                                    "session": v,
-                                    "groups": group_heads(known),
-                                }
-                            )
-                        )
-                    elif ev.get("event") in ("gone", "usage"):
-                        if ev.get("event") == "gone":
-                            # only a `gone` names a session; a `usage` event carries a profile, and
-                            # popping on it would one day evict a live session by coincidence
-                            went = str(ev.get("id") or "")
-                            known.pop(went, None)
-                            await ws.send_text(json.dumps({**ev, "groups": group_heads(known)}))
-                            # A card's *under* chip names another record, so the session that went
-                            # is not the only card now out of date: every card listing it as a
-                            # controller has to be redrawn, or it keeps naming and linking to a
-                            # session that is gone until the page is reloaded (review 2026-09-13).
-                            for other in list(known.values()):
-                                if went in (other.get("controllers") or []):
-                                    ov = view(other, list(known.values()))
-                                    await ws.send_text(
-                                        json.dumps(
-                                            {
-                                                "event": "session",
-                                                "id": other["id"],
-                                                "state": other["state"],
-                                                "rank": ov["rank"],
-                                                "html": render_card(ov),
-                                                "session": ov,
-                                            }
-                                        )
-                                    )
-                            continue
-                        await ws.send_text(json.dumps(ev))
+                tasks = {asyncio.ensure_future(stream(c)), asyncio.ensure_future(gone())}
+                try:
+                    done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    for t in tasks:
+                        t.cancel()
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                for t in done:
+                    t.result()  # the stream's own failure is handled below, as it always was
         except (WebSocketDisconnect, AgentUnavailable, ConnectionError):
             pass
         except Exception:  # noqa: BLE001
