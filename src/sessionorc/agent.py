@@ -1330,20 +1330,47 @@ class HostAgent:
     async def rpc_progress(
         self,
         id: str,
-        ref: str,
+        ref: str = "",
         status: str = "claimed",
         pr: int | None = None,
         why: str | None = None,
         source: str = "declared",
+        caller: Any = None,
     ) -> dict[str, Any]:
         """`ao progress claim|done|drop <ref>` (design §4.8): what this session set out to resolve
         and how it went. A report channel is **ungated** — any session may write any record's, the
-        Org renders whichever are non-empty — and one reference is one entry, upserted in place."""
+        Org renders whichever are non-empty — and one reference is one entry, upserted in place.
+
+        `status="none"` is `ao progress none --why` (design §4.9a): no reference and no entry, but
+        `out_of_work: {at, why}` on the record. It is the one write on this channel that is not
+        open to everyone — only the session itself may make it, declared, with a reason (§9
+        invariant 14)."""
         s = self._get(id)
+        if status == "none":
+            return await self._out_of_work(s, why, source, caller)
         if status not in PROGRESS_STATUSES:
-            raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}")
+            raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none")
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
-        return await self._report(s, s.report_progress(entry), entry)
+        applied = s.report_progress(entry)
+        if applied and status == "claimed" and entry.source == "declared":
+            s.out_of_work = None  # a session that claims something has work again
+        return await self._report(s, applied, entry)
+
+    async def _out_of_work(self, s: Session, why: str | None, source: str, caller: Any) -> dict[str, Any]:
+        if _source(source) != "declared":
+            raise RpcError("out of work is declared, never derived (design §9 invariant 14)")
+        if mail.is_person(caller) or str(caller) != s.id:
+            raise RpcError(
+                f"only {s.id} may declare itself out of work: it is the session's own word that it searched "
+                "(design §9 invariant 14)"
+            )
+        if not (why or "").strip():
+            raise RpcError(
+                'ao progress none needs --why "<the search that came up empty>": a declaration without its '
+                "reason is refused (design §4.9a)"
+            )
+        s.out_of_work = {"at": now_iso(), "why": why.strip()}
+        return await self._report(s, True, None)
 
     async def rpc_finding(
         self, id: str, ref: str, priority: str | None = None, source: str = "declared"

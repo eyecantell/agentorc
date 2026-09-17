@@ -6,6 +6,7 @@ import datetime
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
 import time
@@ -328,6 +329,7 @@ def test_skill_prints_the_rules(capsys):
         "answer an `ask`",
         "never broadcast",
         "ao msg person",
+        "ao progress none",  # TD-053 step 1: declared before exiting, or the exit reads as a crash
     ):
         assert must in out.lower() or must in out, must
     assert out.count("\n") <= 120
@@ -965,3 +967,25 @@ def test_ao_wait_against_an_agent_without_the_wait_rpc_says_so_and_exits(monkeyp
     assert cli.main(["wait", "--timeout", "1"]) == 1
     err = capsys.readouterr().err
     assert "predates the wait RPC" in err and err.count("\n") == 1
+
+
+def test_progress_none_declares_out_of_work(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-053 step 1 (design §4.9a): `ao progress none --why` takes no reference, needs its reason,
+    and shows in `ao status -v` and `--json`."""
+    assert cli.main(["--json", "shell", "oow", "-d", str(tmp_path)]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["progress", "none", "TD-001", "--why", "x"]) == 2
+    assert "takes no reference" in capsys.readouterr().err
+    assert cli.main(["progress", "claim"]) == 2
+    assert "needs a reference" in capsys.readouterr().err
+    assert cli.main(["progress", "none"]) != 0
+    assert "needs --why" in capsys.readouterr().err
+    assert cli.main(["progress", "none", "--why", "no open entry I may pick"]) == 0
+    assert capsys.readouterr().out.strip() == f"{sid}: out of work — no open entry I may pick"
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["status", "-v"]) == 0
+    assert re.search(r"out of work \S+: no open entry I may pick", capsys.readouterr().out)
+    assert cli.main(["--json", "status"]) == 0
+    assert next(x for x in json.loads(capsys.readouterr().out) if x["id"] == sid)["out_of_work"]["why"]
+    call_sync("kill", id=sid)

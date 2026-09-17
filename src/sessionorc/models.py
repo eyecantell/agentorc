@@ -73,6 +73,7 @@ HOME_OWNED = frozenset(
         "wrapup_prompt",
         "progress",
         "findings",
+        "out_of_work",
         "ledger",
         "seen_at",
         "inbox",
@@ -294,6 +295,8 @@ def wake_digest(session: dict[str, Any]) -> str:
     parts.append("progress=" + repr(prog))
     parts.append("findings=" + repr([(x.get("ref"), x.get("priority")) for x in session.get("findings") or []]))
     parts.append("controllers=" + repr(sorted(session.get("controllers") or [])))
+    ow = session.get("out_of_work") or {}
+    parts.append(f"out_of_work={(ow.get('at'), ow.get('why'))!r}")  # an ending, not a crash (§4.9a)
     return "\n".join(parts)
 
 
@@ -405,6 +408,11 @@ class Session:
     lane: list[str] = field(default_factory=list)
     progress: list[ProgressEntry] = field(default_factory=list)
     findings: list[FindingEntry] = field(default_factory=list)
+    # `{at, why}` once the session has declared it searched and found nothing it may pick
+    # (`ao progress none --why`, design §4.9a): beside `progress`, never an entry in it. Only the
+    # session itself writes it and nothing derives it (§9 invariant 14); a later declared claim
+    # clears it, since the session has work again.
+    out_of_work: dict[str, str] | None = None
     # The preset the session was started under (design §4.8): a badge, and nothing keys on it
     # (§9 invariant 9). Empty for a session started without one.
     role: str = ""
