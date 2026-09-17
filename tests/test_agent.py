@@ -835,6 +835,57 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
         await person.call("kill", id=sid)
 
 
+async def test_a_claim_is_a_lease_on_its_reference(agent, tmp_path):
+    """TD-056, design §4.8: a declared claim on a reference another live record holds is refused
+    naming the holder; two claims in one moment get one grant; `force` overrides and says whose;
+    done, the holder exiting, or the TTL releases it; derived claims neither hold nor are checked."""
+    async with LocalClient() as person:
+        ids = []
+        for name in ("wa", "wb"):
+            (tmp_path / name).mkdir()
+            r = await person.call(
+                "create", name=name, dir=str(tmp_path / name), adapter="shell", argv=["bash", "--norc"]
+            )
+            ids.append(r["id"])
+        a, b = ids
+        async with LocalClient(caller=a) as ca, LocalClient(caller=b) as cb:
+            got = await asyncio.gather(
+                ca.call("progress", id=a, ref="td-56"), cb.call("progress", id=b, ref="TD-056"), return_exceptions=True
+            )
+            errors = [g for g in got if isinstance(g, Exception)]
+            assert len(errors) == 1 and "is claimed by" in str(errors[0])  # one grant, one refusal
+            holder, other = (a, b) if not isinstance(got[0], Exception) else (b, a)
+            oc = cb if other == b else ca
+            with pytest.raises(AgentError, match=f"TD-056 is claimed by {holder} since .*--force"):
+                await oc.call("progress", id=other, ref="TD-056")
+            # the holder re-claims (a renewal), and other references are free
+            assert (await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056"))["progress"]
+            assert (await oc.call("progress", id=other, ref="TD-057"))["progress"][0]["ref"] == "TD-057"
+            # a derived claim is neither refused nor a lease
+            assert (await person.call("progress", id=other, ref="TD-056", source="derived"))["progress"]
+            # force overrides, and says whose lease it was
+            forced = await oc.call("progress", id=other, ref="TD-056", force=True)
+            assert forced["lease_overridden"]["session"] == holder
+            await oc.call("progress", id=other, ref="TD-056", status="dropped", why="theirs")
+            # done releases
+            await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056", status="done", pr=1)
+            assert "lease_overridden" not in await oc.call("progress", id=other, ref="TD-056")
+            # the TTL releases: other's claim is now the lease, and an expired one holds nothing
+            with pytest.raises(AgentError, match=f"claimed by {other}"):
+                await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056")
+            next(e for e in agent.sessions[other].progress if e.ref == "TD-056").at = "2020-01-01T00:00:00Z"
+            assert await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056")
+        # the holder's record ending releases it
+        async with LocalClient(caller=other) as oc:
+            with pytest.raises(AgentError, match=f"claimed by {holder}"):
+                await oc.call("progress", id=other, ref="TD-056")
+        await person.call("kill", id=holder)
+        await wait_state(person, holder, "exited")
+        async with LocalClient(caller=other) as oc:
+            assert await oc.call("progress", id=other, ref="TD-056")
+        await person.call("kill", id=other)
+
+
 async def test_out_of_work_is_the_sessions_own_declared_word(agent, tmp_path):
     """TD-053 step 1, design §4.9a and §9 invariant 14: `progress` with `status="none"` sets
     `out_of_work: {at, why}` beside the entries, never among them; only the session itself may

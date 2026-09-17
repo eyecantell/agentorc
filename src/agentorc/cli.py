@@ -735,7 +735,9 @@ def cmd_progress(args: argparse.Namespace) -> int:
     if not args.ref:
         return fail(args, f"ao progress {args.action} needs a reference", 2)
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
-    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why)
+    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, force=args.force)
+    if (held := s.get("lease_overridden")) and not args.json:
+        print(f"{s['id']}: claimed over {held['session']}'s lease (since {held['at']})", file=sys.stderr)
     return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
 
 
@@ -1098,6 +1100,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("ref", nargs="?", help="a ledger id (TD-027), a PR number, or an attention-board line")
     p.add_argument("--pr", help="the PR the work is on")
     p.add_argument("--why", help="why it was dropped; with `none`, the search that came up empty (required)")
+    p.add_argument("--force", action="store_true", help="claim a reference another live session holds (design §4.8)")
     p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
     p.set_defaults(fn=cmd_progress)
 

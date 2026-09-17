@@ -987,6 +987,25 @@ non-empty. Two channels cover every worker seen so far and the person's own sess
   entry; a bare number is a PR, `#59`). The two RPCs are `progress` and `finding`, ungated like
   the channels themselves — an entry invariant 10 refuses is not an error, the reply carries the
   record as it stands and names the `refused` entry (landed 2026-09-11, TD-028 step 2).
+  **A claim is a lease** (2026-09-17, TD-056; the lesson from mcp_agent_mail in the
+  [messaging ADR](decisions/2026-09-16-agent-messaging-prior-art.md)). A *declared* `claimed` on a
+  reference is checked, in the same step that writes it, against every **other live** record on
+  the host (not `exited` or `closed`): if one holds a declared `claimed` entry on the same
+  canonical reference whose `at` is younger than the lease (`LEASE_TTL`, 12 h), the claim is
+  refused and the refusal names the holder and when it claimed. This is not a gate in §4.8's sense —
+  it restricts no caller, only a second claim on a held reference, and it is an error rather than a
+  soft `refused` because the claimer has to choose again. It is advisory — `--force` (the
+  RPC's `force`) writes the claim anyway and the reply says whose lease it overrode. A lease is
+  renewed by claiming the reference again, and released by `done` or `dropped` on it, by the
+  holder's record exiting or closing, or by the TTL running out, so a crashed or stood-down worker
+  cannot hold a reference past a restart or half a day. Because the host agent runs every RPC on
+  one loop, two claims on one reference a moment apart get one grant and one refusal. Derived
+  claims neither hold a lease nor are checked (they are the tick's guess from a branch, §9
+  invariant 10), and neither are `done` / `dropped` writes. What a lease covers is exactly a
+  reference as canonicalised above — a `TD-NNN`, a PR, a board line; **path reservations**
+  (mcp_agent_mail's globs, and how two globs overlap) are not built and wait for a case that needs
+  them. The at-claim `note` to siblings (TD-052 step 4) stays in the briefs until the running host
+  agent enforces leases, then goes.
 - `findings`: references the session filed. Entries `{ref, priority, at, source}`.
 
 Each entry has a **source**, on the same rule as state (§4.2): **declared** — the session said

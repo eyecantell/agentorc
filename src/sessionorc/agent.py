@@ -58,6 +58,11 @@ TICK_SECONDS = float(os.environ.get("AGENTORC_TICK", "2"))
 TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
+# How long a declared claim holds its reference against another live session's claim (design §4.8
+# "A claim is a lease", TD-056). Renewed by claiming again; released sooner by done/dropped or the
+# holder's record ending. Long enough for one medium TD without a renewal, short enough that a
+# stood-down worker does not hold a reference into the next day.
+LEASE_TTL = timedelta(hours=12)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
 # Derived report entries per session (design §4.8, TD-028 step 3): a `gh` call and a little git, so
 # a slow cadence. Nothing waits on it and a failure derives nothing (`sessionorc.reports`).
@@ -1335,6 +1340,7 @@ class HostAgent:
         pr: int | None = None,
         why: str | None = None,
         source: str = "declared",
+        force: bool = False,
         caller: Any = None,
     ) -> dict[str, Any]:
         """`ao progress claim|done|drop <ref>` (design §4.8): what this session set out to resolve
@@ -1344,7 +1350,11 @@ class HostAgent:
         `status="none"` is `ao progress none --why` (design §4.9a): no reference and no entry, but
         `out_of_work: {at, why}` on the record. It is the one write on this channel that is not
         open to everyone — only the session itself may make it, declared, with a reason (§9
-        invariant 14)."""
+        invariant 14).
+
+        A declared claim is a **lease** (§4.8, TD-056): refused while another live record holds an
+        unexpired declared claim on the same reference, naming the holder; `force` claims anyway and
+        the reply carries `lease_overridden`."""
         s = self._get(id)
         if status == "none":
             if ref or pr is not None:
@@ -1353,10 +1363,34 @@ class HostAgent:
         if status not in PROGRESS_STATUSES:
             raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none")
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
+        holder = self._lease_holder(s, entry) if status == "claimed" and entry.source == "declared" else None
+        if holder is not None and not force:
+            raise RpcError(
+                f"{entry.ref} is claimed by {holder['session']} since {holder['at']} (a lease, design §4.8): pick "
+                "another reference, or claim it anyway with --force",
+                holder=holder,
+            )
         applied = s.report_progress(entry)
         if applied and status == "claimed" and entry.source == "declared":
             s.out_of_work = None  # a session that claims something has work again
-        return await self._report(s, applied, entry)
+        out = await self._report(s, applied, entry)
+        if holder is not None and applied:
+            out["lease_overridden"] = holder
+        return out
+
+    def _lease_holder(self, s: Session, entry: ProgressEntry) -> dict[str, str] | None:
+        """The other live record holding an unexpired declared claim on `entry.ref`, if any. Read and
+        acted on in one loop step, so two claims a moment apart get one grant and one refusal."""
+        now = datetime.now(UTC)
+        for o in self.sessions.values():
+            if o.id == s.id or o.state in ("exited", "closed"):
+                continue
+            for e in o.progress:
+                if e.ref == entry.ref and e.status == "claimed" and e.source == "declared":
+                    with contextlib.suppress(ValueError):
+                        if now - _parse(e.at) < LEASE_TTL:
+                            return {"session": o.id, "at": e.at}
+        return None
 
     async def _out_of_work(self, s: Session, why: str | None, source: str, caller: Any) -> dict[str, Any]:
         if _source(source) != "declared":
