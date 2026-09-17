@@ -361,7 +361,10 @@
     if (defined.size) strip.hidden = !$$(".team-row", strip).some((r) => !r.hidden) && !$(".warnish", strip);
     // A header re-rendered for a delta arrives with its buttons hidden: the definitions are the
     // page's, read once into the strip's rows, and this is where the two meet.
-    $$("#groups .ghead [data-team-act]").forEach((b) => (b.hidden = !(defined.has(b.dataset.team) && live[b.dataset.team] > 0)));
+    $$("#groups .ghead [data-team-act]").forEach((b) => {
+      b.hidden = !(defined.has(b.dataset.team) && live[b.dataset.team] > 0);
+      b.disabled = pendingTeams.has(b.dataset.team);  // a fresh header must not re-arm a request in flight
+    });
   }
   // A stop returns before its lead does (design §4.9: the members settle first, which is minutes).
   // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
@@ -378,7 +381,13 @@
     }
     AO.toast(`${name}: ${lead} is still stopping — see the agent log`);
   }
+  // The button is not the guard: a stop moves its members' states at once, each delta re-renders
+  // the header, and the fresh Stop would be pressable while the first request is still out — a
+  // second wrap-up prompt to every member (review of PR #183). The team's name is the guard.
+  const pendingTeams = new Set();
   async function teamAct(name, what, btn) {
+    if (pendingTeams.has(name)) return;
+    pendingTeams.add(name);
     const stop = what !== "start";
     const url = `/api/teams/${encodeURIComponent(name)}/${stop ? "stop" : "start"}`;
     btn.disabled = true;
@@ -402,7 +411,9 @@
     } catch (e) {
       AO.toast(`${name}: ${e.message}`);
     } finally {
+      pendingTeams.delete(name);
       btn.disabled = false;
+      syncStrip();  // the button on the page now may not be the one that was pressed
     }
   }
 
