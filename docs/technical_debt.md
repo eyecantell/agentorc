@@ -40,6 +40,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-062 | A merge that changes an RPC's parameters breaks the `ao` CLI on the live system until the host agent restarts: the install is editable, so the client is new at once and the agent is not | Medium | Partly done |
 | TD-063 | CI-only flakes on the 3.12 runner: the two timing-shaped tests and the record-revive race are fixed; the 26-minute hang of PR #192 is still unattributed | Low | Partly done |
 | TD-064 | Claude Code's own session-to-session messages reach an agentorc session around the mail gates, and an unattended session blocks on their approval prompt until a person answers | Medium | Open |
+| TD-065 | The controllers chips on the card and the Focus header ask for a `.chip` class that no stylesheet defines, so the one control that says who may act on a session is drawn as bare text | Low | Open |
 
 ---
 
@@ -553,3 +554,20 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** an unattended session started by agentorc cannot be stopped by another Claude Code session's message, and §4.10 names the channel and the policy.
 
 **Related:** TD-052 (mail), design §9 invariant 13, ADR 2026-09-16 (why agentorc builds its own messaging rather than using Claude Code's — this is the other half of that decision: what to do about theirs).
+
+## TD-065: The `chip` class the controllers chips use is not defined in any stylesheet
+
+**Priority:** Low
+**Added:** 2026-09-17 (session `tdgrind-ao-1`, found while building TD-053 step 6 — looking for the class a new chip should use)
+
+**Status:** Open — the defect is established by reading the files; **how wrong it looks is not**, because this session has no browser. That is the same bar TD-038 sets for its own remaining parts.
+
+**Location:** `src/agentorc/ui/templates/card.html` (the *under `<controller>`* chips), `src/agentorc/ui/templates/focus.html` (the Focus header's controllers chips), `src/agentorc/ui/static/app.js` (which re-renders the same chips on a live delta and repeats the class), `src/agentorc/ui/static/app.css`
+
+**Why:** both templates render the membership chips as `class="chip"` (`card.html`, the `s.under` loop; `focus.html`, the `fcontrollers` block), and `app.css` defines no `.chip` rule at all — its only four matches for the word are `#hostchip`, `#usagechip`, a comment, and a media query on `#hostchip`. The class does nothing. What those elements get instead is whatever their tag carries: an `<a>` on the card, a `<button>` in the Focus header — so the two halves of one control are drawn differently from each other *and* differently from every other chip on the page, all of which use `.badge` (`app.css`, the `.badge` rule: a bordered, rounded, 10px monospace pill, which is what the grants chip, the unread chip and the team badges are). `chip scraped`, for a controller whose session is gone, is worse than the same problem: `.scraped` *is* in `app.css`, but only as `.pill.scraped` and `.meta.scraped` — compound rules that need `.pill` or `.meta` as well, and the chip carries neither. So both halves of that class list are inert on this element, and the one visual cue that says *this controller's session is gone* — the cue the chip's own `title` promises — is not drawn at all.
+
+It matters more than a Low priority suggests in one narrow way: design §4.5a's rows for the card *under* chip and the Focus controllers chip are the surface for **who may act on a session** (§4.8, TD-036), and a control that reads as bare text does not look like a control. Nothing is broken — the click handlers key on `data-act`, never on the class (`app.js`), so removing or restyling the class cannot break the behaviour.
+
+**Fix:** either give `.chip` a rule, or — the cheaper and more consistent answer — use `.badge` on both, as every other chip on the page does, keeping `chip` only where a test or the JS needs a hook (neither does today; `app.js` selects by `data-act` and by id). Whichever is chosen, **three** places change together, not two: `card.html`, `focus.html`, and the line in `app.js` that rebuilds the Focus chips on a live delta — the card and the Focus header are two halves of one §4.5a row, and the page rewrites the second of them itself, so a fix that misses the JS looks right until the first state change. **Done when** the controllers chips are drawn as chips in both places, and a stylesheet rule exists for whatever class they name.
+
+**Related:** design §4.5a (the card *under* chip and the Focus controllers chip), §4.8 / TD-036 (what the control is for), TD-038 (the terminal's look — the same class of "it works and reads badly", and the same reason this entry stops at reading the files: judging it wants a browser), TD-053 step 6 (the out-of-work chip, which used `.badge` for exactly this reason).
