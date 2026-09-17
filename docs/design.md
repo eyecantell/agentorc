@@ -157,8 +157,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
     its check — and then `-2`, `-3` is shown in the name on the record, so what the Org says is
     what tmux has.
   - `shell` sessions are named by the agent when the person gives no name (`shell`,
-    `shell-2`, …) and follow the same rule under that generated name; registry-only cards
-    (`ext-*`, below) are outside it, their ids come from the tool.
+    `shell-2`, …) and follow the same rule under that generated name.
 - Every session record carries: `name` (what the person called it), `kind`
   (`interactive` | `command`), `adapter` (`claude-code`, `shell`, …), `profile` (empty for
   `shell`), `dir`, `repo` (optional), `worktree` (optional), `adapter_id` once known (Claude
@@ -176,15 +175,13 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   outside agentorc shows only the id until it is **adopted** (attach to the tmux session, give it
   a name), which is also how hand-started sessions enter the Org.
 - A live session the adapter can see that has **no tmux at all** (`claude` in a VS Code
-  terminal; Claude Code's registry `~/.claude/sessions/<pid>.json`) is a **read-only card**
-  (landed 2026-09-10, TD-010 a): id `ext-<tool id>`, name and directory from the registry, state
-  from its status (`busy` → `working`, `idle` → `idle`, `shell` → `working`), always `scraped`,
-  no pane and no controls — the card offers Details, the badge reads *registry*, and every
-  acting RPC (kill, close, send, mode) refuses with "started outside agentorc". Never stored:
-  rebuilt on every tick and gone when the process is. Not doubled: a registry entry whose tool id
-  one of our records carries, or whose directory one of our live agent sessions holds (our own
-  pane before its first hook), is skipped. Allow/Deny on such a card would need the person to
-  launch with agentorc's hooks layer, which is not wired (the hook needs an `AGENTORC_SESSION`).
+  terminal; Claude Code's registry `~/.claude/sessions/<pid>.json`) is **not shown**. It was a
+  read-only card from 2026-09-10 (TD-010 a) until 2026-09-17, when Paul had them removed: a card
+  for a session a person started by hand, outside agentorc, reads as being watched, and it
+  offered nothing to do. The Org is what agentorc started or adopted. The registry is still read
+  in the one place the anchor rule needs it — `occupancy` (§9 invariant 2): New session and
+  `ao new` name a hand-started session that holds the checkout, so nobody starts a second agent
+  on top of it.
 - A **plain shell is an adapter** (`shell`, scraped: `working` while a foreground process runs,
   `idle` at the prompt — a shell waiting for you is the normal state, not an alert — `exited`
   when the pane is gone). Ad-hoc shells are ordinary
@@ -781,7 +778,6 @@ noted). If a control is not in this table it does not exist.
 | Org | **Teams** strip: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of a bare zero live count: *nothing running* and *nothing left to run* are different facts about a team (§4.9a) — design 2026-09-14, TD-053, not built |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team — landed 2026-09-13 |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
-| card (registry-only, badge *registry*) | **Details** | the Focus page without a terminal or composer (§4.1: a session started outside agentorc with no tmux); VS Code link only — no mode toggle, no ⋯ menu |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
 | Resumable | **Resume** | New session prefilled (host, repo, directory, worktree, Start = Resume) |
 | Resumable | **Switch to** | the running card in the Org |

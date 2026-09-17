@@ -331,25 +331,6 @@ def test_unseen_idle_until_focused(client, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
-def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
-    """TD-010 (a): a card built from the tool's registry (no tmux) offers Details and nothing that
-    acts — no mode toggle, no ⋯ menu — and says where it came from."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
-
-    s = {
-        "id": "ext-u-1", "name": "editor", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
-        "state": "working", "since": "2026-09-10T16:00:00Z", "confidence": "scraped", "external": True,
-        "pane": False, "adapter_id": "u-1", "tail": [],
-    }  # fmt: skip
-    html = templates.get_template("card.html").render(s=view(s))
-    assert "▣ Details" in html and "▣ Focus" not in html
-    assert ">registry<" in html and 'data-act="mode"' not in html and 'data-act="kill"' not in html
-    assert "started outside agentorc" in html
-    html = templates.get_template("card.html").render(s=view({**s, "state": "idle"}))
-    assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
-
-
 def test_the_terminal_palette_is_complete_and_dark(tmp_path):
     """TD-038 (b), design goal 12 and §4.6: the pane carries VS Code's Dark Modern terminal palette,
     so the same Claude Code output is the same colour in Focus as in the editor's terminal beside

@@ -10,7 +10,7 @@ Two agents are on offer:
   pumps that fixture's loop.
 
 Both use a private tmux server (`-L ao-test-<uuid>`), a temp `AGENTORC_HOME` and a temp
-`CLAUDE_CONFIG_DIR` (the default profile's registry; registry-only cards would otherwise show this
+`CLAUDE_CONFIG_DIR` (the default profile's registry; the occupancy check would otherwise see this
 machine's live Claude sessions, TD-010 a), never the
 user's. `subprocess_agent` sets the env in the test process too: the UI under `TestClient` runs
 here and reads `paths.socket_path()` and `AGENTORC_TMUX_SOCKET` from `os.environ` at call time.
