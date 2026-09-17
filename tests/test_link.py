@@ -256,3 +256,90 @@ async def test_ssh_failed_and_agent_down_are_told_apart(tmp_path, monkeypatch):
 async def test_a_node_takes_no_links_and_a_home_not_its_own_name(tmp_path, monkeypatch):
     async with node_agent(tmp_path, monkeypatch, ["false"]) as node:
         assert "not a home" in node._link_refusal("desk", {"protocol": link.PROTOCOL})
+
+
+# -- a node's records at the home (step 3b) -------------------------------------------------------------
+
+
+def record(rid="ao-x-w", host="laptop", **kw):
+    from sessionorc.models import Session
+
+    base = dict(id=rid, name="w", kind="agent", adapter="claude-code", dir="/tmp/x", host=host, state="working")
+    return Session(**{**base, **kw}).to_dict()
+
+
+async def test_the_home_adopts_applies_by_owner_and_a_snapshot_is_the_truth(agent):
+    """`_take_records`, without a link: adoption whole, `apply_node` on a known record, another
+    host's record dropped, and a snapshot forgetting what it does not list."""
+    assert agent._take_records("laptop", [record(team="grind", controllers=["ao-x-lead"])], whole=True) == 1
+    held = agent.remote["laptop"]["ao-x-w"]
+    assert held.team == "grind" and held.controllers == ["ao-x-lead"]  # adopted whole, home-owned fields too
+    held.team = "renamed-at-home"
+    agent._take_records("laptop", [record(state="idle", team="the-nodes-stale-copy")], whole=False)
+    assert held.state == "idle" and held.team == "renamed-at-home"  # a report moves only what the node owns
+    # a laptop cannot report on kmaster's sessions, or on anyone's but its own
+    assert (
+        agent._take_records(
+            "laptop", [record("ao-evil", host=agent.host), record("ao-evil2", host="desk")], whole=False
+        )
+        == 0
+    )
+    assert set(agent.remote["laptop"]) == {"ao-x-w"} and "ao-evil" not in agent.sessions
+    agent._take_records("laptop", [record("ao-x-other")], whole=True)  # the snapshot lacks ao-x-w
+    assert set(agent.remote["laptop"]) == {"ao-x-other"}
+    assert "ao-x-w@laptop" in agent._gone and not paths.remote_dir("laptop").joinpath("ao-x-w.json").exists()
+
+
+async def test_another_hosts_record_is_addressed_unreachable_until_its_node_dials_and_never_acted_on(agent):
+    agent._take_records("laptop", [record()], whole=True)
+    async with LocalClient() as c:
+        (v,) = await c.call("list")
+        assert v["id"] == "ao-x-w@laptop" and v["host"] == "laptop"
+        assert v["state"] == "unreachable" and v["last_state"] == "working" and v["host_link"]["up"] is False
+        assert agent.remote["laptop"]["ao-x-w"].state == "working"  # an overlay on the view, never the record
+        agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
+        assert (await c.call("get", id="ao-x-w@laptop"))["state"] == "working"
+        assert (await c.call("seen", id="ao-x-w@laptop"))["seen_at"]  # a look is the home's to record
+        with pytest.raises(AgentError, match="runs on laptop: acts across the link are not built"):
+            await c.call("kill", id="ao-x-w@laptop")
+    # a restarted home still has them, from `remote/laptop/`
+    again = HostAgent(tmux=agent.tmux)
+    assert (
+        again.remote["laptop"]["ao-x-w"].seen_at
+        and again._view(again.remote["laptop"]["ao-x-w"])["state"] == "unreachable"
+    )
+
+
+async def test_laptop_closed_its_cards_go_unreachable_and_come_back(home, hookstub, tmp_path, monkeypatch):
+    """TD-057 step 3's test. The lid closes: the link drops while the node's sessions live on. The
+    home's cards for that host read `unreachable` with the reason, keep what was last known, and
+    lift by themselves when the node dials back in — its snapshot first."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        async with LocalClient() as c:
+            s = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name)
+        address = f"{s['id']}@laptop"
+
+        async def at_home():
+            async with LocalClient(sock=home.dir / "agent.sock") as h:
+                return {v["id"]: v for v in await h.call("list")}.get(address)
+
+        async def until(pred, timeout=15.0):
+            for _ in range(int(timeout / 0.1)):
+                v = await at_home()
+                if pred(v):
+                    return v
+                await asyncio.sleep(0.1)
+            raise AssertionError(f"never: {await at_home()}")
+
+        v = await until(lambda v: v is not None and v["state"] != "unreachable")
+        assert v["host"] == "laptop" and v["host_link"]["up"] is True and v["name"] == "w"
+        monkeypatch.setattr(link, "BACKOFF_FIRST", 2.0)  # the lid stays shut long enough to be seen
+        monkeypatch.setattr(link, "BACKOFF_MAX", 2.0)
+        node._home_mux.close("the lid closed")
+        v = await until(lambda v: v is not None and v["state"] == "unreachable")
+        assert v["last_state"] in ("working", "idle") and v["host_link"]["why"]
+        v = await until(lambda v: v is not None and v["state"] != "unreachable")  # nobody did anything
+        assert v["host_link"]["up"] is True
+        async with LocalClient() as c:
+            await c.call("kill", id=s["id"])  # and a change on the node reaches the home
+        await until(lambda v: v is not None and v["state"] == "exited")

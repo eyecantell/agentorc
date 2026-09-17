@@ -26,6 +26,12 @@ def attachments_dir() -> Path:
     return home() / "attachments"
 
 
+def remote_dir(host: str) -> Path:
+    """Where the home keeps another host's records (design §4.4a "A node's records at the home"):
+    apart from its own `sessions/`, one directory per node, so two hosts may hold one id."""
+    return home() / "remote" / host
+
+
 def person_inbox_file() -> Path:
     """The org's person inbox (design §4.10 "A session reaches a person"): one per org, held by the
     home host agent and belonging to no session record, so it is its own file beside `sessions/`."""

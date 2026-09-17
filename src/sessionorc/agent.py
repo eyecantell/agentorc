@@ -40,12 +40,14 @@ from sessionorc.models import (
     SOURCES,
     FindingEntry,
     MailEntry,
+    NotTheSameSession,
     Pending,
     ProgressEntry,
     SendEntry,
     Session,
     State,
     Tally,
+    apply_node,
     canonical_grants,
     normalize_ref,
     now_iso,
@@ -85,6 +87,7 @@ PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
 # killed anyway, because the whole point is that nobody is watching.
 WRAPUP_GRACE = timedelta(minutes=10)
+REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
@@ -137,6 +140,20 @@ class HostAgent:
         self._link_muxes: dict[str, link.Mux] = {}
         self.home_link: dict[str, Any] = {"up": False, "since": now_iso(), "why": "not dialed yet"}
         self._home_mux: link.Mux | None = None
+        # Other hosts' records, at the home (§4.4a "A node's records at the home", step 3b): held
+        # apart from `self.sessions` — host → id → record — so nothing that reads this host's panes
+        # ever meets one. Loaded from `remote/<host>/`, so a restarted home still shows them,
+        # unreachable, until their node dials in.
+        self.remote: dict[str, dict[str, Session]] = {}
+        self._remote_stores: dict[str, SessionStore] = {}
+        if self.mode == "home" and paths.home().joinpath("remote").is_dir():
+            for d in sorted(paths.home().joinpath("remote").iterdir()):
+                if d.is_dir():
+                    self.remote[d.name] = self._remote_store(d.name).load_all()
+        # A node's side of the same: what it last told the home about each record, and when.
+        self._reported: dict[str, tuple[str, str, float]] = {}
+        self._snapshot_sent = False
+        self._bg: set[asyncio.Task[None]] = set()  # fire-and-forget tasks, held so they are not collected
         if self.mode == "node":
             log.warning(
                 "node of %s: this host's sessions only until the link is up, and until TD-057 steps 4–5 "
@@ -688,10 +705,10 @@ class HostAgent:
     # -- RPC methods -----------------------------------------------------------------------------
 
     async def rpc_list(self) -> list[dict[str, Any]]:
-        return [s.view() for s in self.sessions.values()]
+        return self._views()
 
     async def rpc_get(self, id: str) -> dict[str, Any]:
-        return self._get(id).view()
+        return self._view(self._find(id))
 
     async def rpc_create(
         self,
@@ -1263,9 +1280,9 @@ class HostAgent:
     async def rpc_seen(self, id: str) -> dict[str, Any]:
         """A person looked at this session (Focus opened, a card control used). The UI reads
         `since > seen_at` on an `idle` record as "finished while you were away" (design §4.2)."""
-        s = self._get(id)
+        s = self._find(id)  # a person may look at another host's session: `seen_at` is the home's
         s.seen_at = now_iso()
-        self.store.save(s)
+        self._save(s)
         await self._push_changes()
         return s.view()
 
@@ -1919,7 +1936,7 @@ class HostAgent:
         try:
             while True:
                 me.poke.clear()
-                views = [x.view() for x in self.sessions.values()]
+                views = self._views()
                 changed, cursor = waits.wake_changes(before, waits.wait_scope(views, who, scope))
                 s = self.sessions.get(who) if who is not None else None
                 wake = self._decide_wake(s, member_change=bool(changed)) if s is not None else None
@@ -2096,6 +2113,11 @@ class HostAgent:
                 (log.info if up else log.warning)("link to %s: %s", self.home, why)
             self.home_link = {"up": up, "since": now_iso(), "why": why}
             self._home_mux = mux
+            self._snapshot_sent = False
+            if up:
+                task = asyncio.ensure_future(self._send_snapshot(mux))
+                self._bg.add(task)
+                task.add_done_callback(self._bg.discard)
 
         await link.dial(
             hosts.link_command(),
@@ -2105,6 +2127,47 @@ class HostAgent:
             first=link.BACKOFF_FIRST,
             top=link.BACKOFF_MAX,
         )
+
+    async def _send_snapshot(self, mux: link.Mux | None) -> None:
+        """First thing on a new link (§4.4a): every record of this host, whole. Reports start only
+        once it is acknowledged, so the home never applies a change to a record it has not got."""
+        if mux is None:
+            return
+        records = [s.to_dict() for s in self.sessions.values()]
+        try:
+            await mux.request("snapshot", timeout=link.LINK_SILENCE, records=records)
+        except (link.LinkClosed, link.LinkError, TimeoutError) as e:
+            log.warning("snapshot to %s failed: %s", self.home, e)
+            mux.close(f"snapshot failed: {e}")  # start over: a link whose snapshot did not land reports into a void
+            return
+        now = time.monotonic()
+        self._reported = {
+            s.id: (_urgent(s), json.dumps(s.to_dict(), sort_keys=True), now) for s in self.sessions.values()
+        }
+        self._snapshot_sent = True
+
+    async def _report_home(self) -> None:
+        """What changed since the home was last told (§4.4a "Snapshot, then reports"): at once when
+        `state`, `pending`, `exit_code` or `pane` moved, else at most every `REPORT_EVERY` per
+        record; and the ids this node has forgotten."""
+        mux = self._home_mux
+        if self.mode != "node" or mux is None or not self._snapshot_sent:
+            return
+        now, changed = time.monotonic(), []
+        for s in self.sessions.values():
+            urgent, payload = _urgent(s), json.dumps(s.to_dict(), sort_keys=True)
+            was = self._reported.get(s.id)
+            if was is None or was[0] != urgent or (was[1] != payload and now - was[2] >= REPORT_EVERY):
+                self._reported[s.id] = (urgent, payload, now)
+                changed.append(s.to_dict())
+        forgotten = [sid for sid in self._reported if sid not in self.sessions]
+        for sid in forgotten:
+            del self._reported[sid]
+        with contextlib.suppress(link.LinkClosed):
+            if changed:
+                await mux.notify("report", records=changed)
+            if forgotten:
+                await mux.notify("gone", ids=forgotten)
 
     async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
         """What the home may ask of this node. Step 3a: nothing but a ping; acts arrive with step 4."""
@@ -2133,11 +2196,21 @@ class HostAgent:
                 self.links[host] = {"up": True, "since": now_iso(), "why": "linked"}
                 said_hello = True
                 log.info("link from %s: up", host)
+                await self._push_changes()  # the overlay lifts on its cards
                 return {"protocol": link.PROTOCOL, "home": self.host, "host": host}
             if not said_hello:
                 raise link.LinkError("say hello first")
             if method == "ping":
                 return "pong"
+            if method in ("snapshot", "report"):
+                taken = self._take_records(host, params.get("records") or [], whole=method == "snapshot")
+                await self._push_changes()
+                return {"taken": taken}
+            if method == "gone":
+                for rid in params.get("ids") or []:
+                    self._forget_remote(host, str(rid))
+                await self._push_changes()
+                return None
             raise link.LinkError(f"unknown link method {method!r}")
 
         mux = link.Mux(reader, writer, from_node)
@@ -2149,6 +2222,45 @@ class HostAgent:
                 del self._link_muxes[host]
                 self.links[host] = {"up": False, "since": now_iso(), "why": why}
                 log.warning("link from %s: down — %s", host, why)
+                with contextlib.suppress(Exception):
+                    await self._push_changes()  # its cards go `unreachable` now, not at the next tick
+
+    def _take_records(self, host: str, records: list[Any], *, whole: bool) -> int:
+        """A node's snapshot or report (§4.4a): only records whose `host` is the name this link's
+        key is bound to; a known one takes the node-owned fields, an unknown one is adopted whole;
+        and a snapshot is the truth about which sessions that host has."""
+        mine = self.remote.setdefault(host, {})
+        seen: set[str] = set()
+        for raw in records:
+            if not isinstance(raw, dict) or not raw.get("id"):
+                continue
+            if raw.get("host") != host:
+                log.warning("link from %s: dropped a report about %s@%s", host, raw.get("id"), raw.get("host"))
+                continue
+            rid = str(raw["id"])
+            try:
+                if rid in mine:
+                    apply_node(mine[rid], raw)
+                else:
+                    mine[rid] = Session.from_dict(raw)  # adopted, the replica's home-owned fields and all
+            except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
+                log.warning("link from %s: could not take %s: %s", host, rid, e)
+                continue
+            seen.add(rid)
+            self._remote_store(host).save(mine[rid])
+        if whole:
+            for rid in [r for r in mine if r not in seen]:
+                self._forget_remote(host, rid)
+        return len(seen)
+
+    def _forget_remote(self, host: str, rid: str) -> None:
+        if self.remote.get(host, {}).pop(rid, None) is None:
+            return
+        self._remote_store(host).delete(rid)
+        address = f"{rid}@{host}"
+        for last in self._subscribers.values():
+            last.pop(address, None)
+        self._gone.append(address)
 
     def _link_refusal(self, host: str, hello: dict[str, Any]) -> str | None:
         """Why this home does not take a link from `host`, or None (§4.4a "Who may connect")."""
@@ -2190,7 +2302,50 @@ class HostAgent:
         try:
             return self.sessions[sid]
         except KeyError:
+            rid, host = naming.split_address(sid)
+            if host and rid in self.remote.get(host, {}):
+                raise RpcError(f"{sid} runs on {host}: acts across the link are not built (TD-057 step 4)") from None
             raise RpcError(f"no session {sid}") from None
+
+    def _find(self, sid: str) -> Session:
+        """A record by id or by address — this host's, or another host's as the home holds it. For
+        reads and for what the home owns; `_get` is for everything that touches a pane."""
+        rid, host = naming.split_address(sid)
+        if host and host != self.host:
+            try:
+                return self.remote[host][rid]
+            except KeyError:
+                raise RpcError(f"no session {sid}") from None
+        return self._get(rid)
+
+    def _save(self, s: Session) -> None:
+        (self.store if s.host == self.host else self._remote_store(s.host)).save(s)
+
+    def _remote_store(self, host: str) -> SessionStore:
+        if host not in self._remote_stores:
+            self._remote_stores[host] = SessionStore(paths.remote_dir(host))
+        return self._remote_stores[host]
+
+    # -- one org, to a client (design §4.4a "A node's records at the home") -----------------------
+
+    def _view(self, s: Session) -> dict[str, Any]:
+        """The view a client gets. This host's record is `s.view()`. Another host's carries its
+        address as `id`, and while that host's link is down reads `unreachable` — an overlay on the
+        view, never a state on the record."""
+        v = s.view()
+        if s.host == self.host:
+            return v
+        v["id"] = f"{s.id}@{s.host}"
+        state = self.links.get(s.host) or {"up": False, "since": None, "why": "not connected since the home started"}
+        v["host_link"] = dict(state)
+        if not state["up"]:
+            v["last_state"], v["state"] = v["state"], "unreachable"
+        return v
+
+    def _views(self) -> list[dict[str, Any]]:
+        return [
+            self._view(s) for s in (*self.sessions.values(), *(r for h in self.remote.values() for r in h.values()))
+        ]
 
     def _remember_dir(self, directory: Path) -> None:
         p = paths.recent_dirs_file()
@@ -2204,11 +2359,12 @@ class HostAgent:
         """Send each subscriber what changed since *it* was last told. One payload per session is
         serialised once; the per-subscriber comparison is a string compare."""
         self._poke_waits()
+        await self._report_home()  # a node tells its home, whether or not a browser is watching
         gone, self._gone = self._gone, []
         if not self._subscribers:
             return
         # sort_keys: the payload is the comparison key too (the UI reads fields by name, never order)
-        payloads = {sid: json.dumps(s.view(), sort_keys=True) for sid, s in self.sessions.items()}
+        payloads = {v["id"]: json.dumps(v, sort_keys=True) for v in self._views()}
         for w, last in list(self._subscribers.items()):
             for sid, payload in payloads.items():
                 if last.get(sid) != payload:
@@ -2389,6 +2545,11 @@ def _drop_unknown(method: Any, params: dict[str, Any]) -> list[str]:
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
 _CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
+
+
+def _urgent(s: Session) -> str:
+    """What a node reports at once when it moves (§4.4a): the rest waits for `REPORT_EVERY`."""
+    return json.dumps([s.state, s.exit_code, s.pane, s.pending.to_dict() if s.pending else None])
 
 
 def _controllers(ids: list[Any]) -> list[str]:

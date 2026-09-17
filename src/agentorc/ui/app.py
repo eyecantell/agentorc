@@ -215,8 +215,11 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
         d["rank"] = STATE_RANK["idle"] - 0.5
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
-    d["host"] = host_name()
-    d["vscode"] = vscode_url(s["dir"]) if s.get("dir") else ""
+    # Another host's record, as the home shows it (design §4.4a): its own host on the card, and no
+    # VS Code link — that URL is built from *this* host's ssh alias, which would open the wrong machine.
+    d["host"] = s.get("host") or host_name()
+    here = d["host"] == host_name()
+    d["vscode"] = vscode_url(s["dir"]) if s.get("dir") and here else ""
     d["place"] = f"{d['host']} / {Path(s['repo']).name}" if s.get("repo") else f"{d['host']} / {s.get('dir', '')}"
     git = s.get("git") or {}
     where = s.get("dir", "")
