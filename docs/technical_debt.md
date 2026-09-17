@@ -525,7 +525,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Why:** (1) PR #180's first CI run (2026-09-17 ~05:29Z, run 35185832437, test (3.12)): `ao send sw --wait --timeout 5 go` returned `prompt-stalled: … showed no activity within 4.69821 s` against a `hookstub` session — the send path was untouched by that PR, and the job passed on re-run. (2) PR #189's CI run (2026-09-17 ~06:37Z, test (3.12)): the tick had not yet retired a derived `TD-077` `claimed` entry when the test asserted `progress == []`; PR #189 renamed a grant and did not touch `sessionorc.reports` or the tick. Passed on re-run and three times locally. Both are timing-shaped (a bound a slow runner can miss), the kind TD-033 fixed for two other tests by waiting on the real signal instead of a duration.
 
-**Fix:** ✅ both, 2026-09-17 (PR #PRNUM), each by waiting on the real signal rather than on a duration or on a task's identity.
+**Fix:** ✅ both, 2026-09-17 (PR #199), each by waiting on the real signal rather than on a duration or on a task's identity.
 
 (1) `test_send_wait` posted one `working`/`idle` pair on a 0.3 s and a 0.6 s sleep. `rpc_send` captures the revision it waits for **after** `_submit` — a paste, a settle and a composer check — so on a slow runner both transitions can land before that read: the record is idle, its revision is already past, nothing else ever moves it, and the stall window expires. That is `showed no activity within 4.69821 s` exactly. The thread now produces turns *until the send returns*, so whichever cycle lands after the read satisfies both waits at any load, and it ends on idle so the settled state the command prints is unchanged.
 
