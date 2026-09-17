@@ -38,7 +38,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-058 | `systemctl restart agentorc-agent` hangs for the 90 s stop timeout and ends in SIGKILL: the serve loop waits for every open connection to close | Medium | Partly done — fixed, live check pending |
 | TD-061 | A worktree session's memory write lands uncommitted in the main checkout, where the anchor's next `git commit -a` sweeps it into an unrelated PR | Medium | Open |
 | TD-062 | A merge that changes an RPC's parameters breaks the `ao` CLI on the live system until the host agent restarts: the install is editable, so the client is new at once and the agent is not | Medium | Open |
-| TD-063 | Two CI-only flakes seen once each on the 3.12 runner: `test_send_wait` (prompt-stalled) and `test_the_tick_retires_a_branch_claim_the_session_abandoned` | Low | Open |
+| TD-063 | Three CI-only flakes on the 3.12 runner — a 26-minute hang in an unnamed test (2026-09-17, PR #192), and two seen once each: `test_send_wait` (prompt-stalled) and `test_the_tick_retires_a_branch_claim_the_session_abandoned` | Low | Open |
 
 ---
 
@@ -512,12 +512,12 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-058 (the restart this forces was a 90 s hang until #176 loaded), TD-052 (mail carried the claims while progress was down), design §4.4 (the RPC envelope).
 
-## TD-063: Two CI-only flakes, each seen once on the 3.12 runner
+## TD-063: Three CI-only flakes on the 3.12 runner — two failures and a hang
 
 **Priority:** Low
 **Added:** 2026-09-17 (session `tdgrind-ao-1`, both on PRs whose diffs did not touch the code under test)
 
-**Status:** Open — observed, not diagnosed; each passed on a re-run of the failed job and locally
+**Status:** Open — observed, not diagnosed; each passed on a re-run of the failed job and locally. **A third, 2026-09-17 (PR #192, run 35249162968):** test (3.12) hung in the Test step for 26 minutes until cancelled, with `pytest` and a `tmux: server` still alive at cleanup; test (3.13) passed the same commit in 1m23s and the re-run passed in 1m36s. Which test hung is not known — the run used `-q`, which prints nothing until the end, and the workflow had no timeout. The same PR that records this gives the job `timeout-minutes: 15` and runs the suite with `-vv` (`pytest -q -vv`, one line per test), so the next hang ends itself and names its test.
 
 **Location:** `tests/test_cli.py::test_send_wait`, `tests/test_agent.py::test_the_tick_retires_a_branch_claim_the_session_abandoned`
 

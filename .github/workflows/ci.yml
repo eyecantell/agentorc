@@ -8,6 +8,9 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # The suite takes under two minutes. Without this a hung test holds the job for GitHub's six
+    # hours and a PR with it (TD-063: test (3.12) sat in the Test step for 26 min on 2026-09-17).
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -25,7 +28,9 @@ jobs:
       - name: Lint
         run: pdm run lint
       - name: Test
-        run: pdm run test
+        # `test` is `pytest -q`; -vv nets to one line per test as it finishes, so a hang names the
+        # test it stopped in (TD-063)
+        run: pdm run test -vv
         env:
           # the pty bridge tests need a terminal-ish environment
           TERM: xterm-256color
