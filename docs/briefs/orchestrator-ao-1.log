@@ -561,3 +561,5 @@
 21:02  tdgrind-ao-1: working, claimed TD-062 at 20:50 → ok. inbox empty; no new merges since #196.
 21:22  tdgrind-ao-1: working on TD-062, PR #197 (td062-rpc-skew) open → ok; quiet hold 21:02–21:12 (no mail, no merges, no state change)
 21:56  tdgrind-ao-1: working, TD-062 done via #197 (merged 209b23b) → ok; cadence #197 pass on every row (review recorded: FIXED · sonnet-5 · 3 findings, self-attested). Quiet holds 21:22–21:52.
+22:08  inbox: 1 note [other] from tdgrind-ao-1 (TD-062 done #197; says the live host agent predates fix (b) so the next promotion is a hard cut, and flags it "for the board") → weighed, no reply needed; the board line is its own to file, watching whether it lands.
+22:08  tdgrind-ao-1: working, claimed TD-063 at 21:52 → ok
