@@ -144,6 +144,9 @@ class HostAgent:
         self._subscribers: dict[asyncio.StreamWriter, dict[str, str]] = {}
         self._gone: list[str] = []  # forgotten ids not yet announced (`_forget` → `_push_changes`)
         self._waits: set[_Wait] = set()  # every `wait` blocked right now, each on its own connection
+        # every open client connection: a stop closes them, or `Server.wait_closed()` waits on the
+        # UI's subscription and each blocked `wait` forever (TD-058)
+        self._conns: set[asyncio.StreamWriter] = set()
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
@@ -190,7 +193,17 @@ class HostAgent:
         ticker = asyncio.create_task(self._tick_loop())
         try:
             async with server:
-                await server.serve_forever()
+                # `start_unix_server` is already serving. Not `serve_forever()`: cancelled, it awaits
+                # `wait_closed()` itself, which since Python 3.12 waits for every client connection
+                # to end — and a subscriber or a blocked `wait` never does on its own, so a stop hung
+                # until systemd's SIGKILL. Close them first, then let `async with` wait: a `wait`
+                # sees the close, is cancelled and writes its cursor on the way out (TD-058).
+                try:
+                    await asyncio.get_running_loop().create_future()
+                finally:
+                    server.close()
+                    for w in list(self._conns):
+                        w.close()
         finally:
             ticker.cancel()
             with contextlib.suppress(FileNotFoundError):
@@ -2056,6 +2069,7 @@ class HostAgent:
     # -- connection handling ---------------------------------------------------------------------
 
     async def _handle_conn(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        self._conns.add(writer)
         try:
             while line := await reader.readline():
                 try:
@@ -2082,6 +2096,7 @@ class HostAgent:
         except (ConnectionError, asyncio.IncompleteReadError):
             pass
         finally:
+            self._conns.discard(writer)
             self._subscribers.pop(writer, None)
             writer.close()
 
