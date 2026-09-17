@@ -1259,7 +1259,7 @@ teams:
       - {role: hunter, name: hunter-ao, lane: ui}
   guardians:
     projects: [guardians]
-    lead: {role: orchestrator, name: guardians-orc, home: guardians}
+    lead: {role: orchestrator, name: guardians-lead, home: guardians}
     members:
       - {role: grinder, home: guardians-api, brief: docs/briefs/api-grinder.md}
       - {team: guardians-ui}          # a nested team: its lead's controllers name this lead
