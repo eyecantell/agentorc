@@ -60,12 +60,12 @@ Mutating — each one is a decision, so check the state first:
 - `ao allow|deny <id> [reason]` — the pending permission, through the hook channel.
 - `ao mode <id> unattended|interactive`; `ao kill <id>` (worktree kept); `ao close <id>`.
 - Acting on a session other than your own (`send`, `keys`, `kill`, `close`, `mode`, `new`) needs
-  **two** things (design §4.8): the `orchestrate` grant on your record, and your id in *that
+  **two** things (design §4.8): the `control` grant on your record, and your id in *that
   session's* `controllers` (`ao status --json` → `capabilities` and `controllers`). The refusals
-  differ — "needs the orchestrate grant", or "not in its controllers" saying whether the list is
+  differ — "needs the control grant", or "not in its controllers" saying whether the list is
   empty or who holds it — so read which one you got. You cannot grant yourself or edit your own
   `controllers`: a person, or one of its current controllers, does it with `ao grant <id>
-  orchestrate` and `ao control <orc> add|remove <session>…`. Sessions you create list you as a
+  control` and `ao control <controller> add|remove <session>…`. Sessions you create list you as a
   controller from birth. `ao status -v` prints `under:` (who may act on a session) and `members:`
   (what a lead may act on). A third refusal has no cure on your side: an interactive
   session (`unattended: false` — a person's own, or a worker they took over with `ao mode`) is

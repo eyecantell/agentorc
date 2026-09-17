@@ -49,7 +49,7 @@ def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
     # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
-    assert 'name="role"' in r.text and "lead [built-in] · grants orchestrate" in r.text
+    assert 'name="role"' in r.text and "lead [built-in] · grants control" in r.text
     (tmp_path / ".agentorc.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
     r = client.get(f"/new?dir={tmp_path}")
     assert "reviewer [repo]" in r.text and 'data-default="orc"' in r.text
@@ -527,7 +527,7 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     sid = r.headers["location"].rsplit("/", 1)[-1]
     page = client.get(f"/focus/{sid}").text
     assert 'id="reportscard"' in page and 'id="progresslist"' in page and 'id="findinglist"' in page
-    assert 'id="fgrants"' in page and 'data-grants="orchestrate"' in page
+    assert 'id="fgrants"' in page and 'data-grants="control"' in page
     # Drop is the person letting a claim go: it lands as a *declaration*, so the tick cannot undo it
     assert client.post(f"/api/sessions/{sid}/nonsense", json={}).status_code == 404
     assert client.post(f"/api/sessions/{sid}/drop", json={}).status_code == 400  # a drop needs a reference
@@ -538,16 +538,14 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     ]
     assert s["report"] == "TD-027 · 0/1 done" and s["report_derived"] is False
     # the grants chip: one click grants, the next revokes, and the record is what answers
-    assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["orchestrate"]}).json()["capabilities"] == [
-        "orchestrate"
-    ]
-    assert client.post(f"/api/sessions/{sid}/grants", json={"remove": ["orchestrate"]}).json()["capabilities"] == []
+    assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["control"]}).json()["capabilities"] == ["control"]
+    assert client.post(f"/api/sessions/{sid}/grants", json={"remove": ["control"]}).json()["capabilities"] == []
     assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["sudo"]}).status_code == 400  # unknown grant
     client.post(f"/api/sessions/{sid}/kill")
 
 
 def test_the_membership_controls(client, tmp_path):
-    """TD-036 step 3, design §4.5a: the card's **under `<orc>`** chip, the Focus **controllers**
+    """TD-036 step 3, design §4.5a: the card's **under `<controller>`** chip, the Focus **controllers**
     chip, the lead's **Members** list, and the New session **Controllers** picker. Both
     directions are derived from the fleet on render, never stored, so the assertions go through
     the real pages rather than a hand-built view."""
@@ -557,7 +555,7 @@ def test_the_membership_controls(client, tmp_path):
         "id": "ao-w", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
         "state": "working", "since": "2026-09-12T10:00:00Z", "confidence": "hook", "tail": [],
     }  # fmt: skip
-    orc = {**base, "id": "ao-orc", "name": "orc", "capabilities": ["orchestrate"]}
+    orc = {**base, "id": "ao-orc", "name": "orc", "capabilities": ["control"]}
     card = templates.get_template("card.html")
     # no controllers: no chip at all — a person's own session has none, and that is the common case
     assert "under" not in card.render(s=view(base, [base]))
@@ -590,7 +588,7 @@ def test_the_membership_controls(client, tmp_path):
     assert ">morc ×<" in page
 
     # the Members list appears once the session holds the grant, and lists what names it
-    client.post(f"/api/sessions/{orc_id}/grants", json={"add": ["orchestrate"]})
+    client.post(f"/api/sessions/{orc_id}/grants", json={"add": ["control"]})
     page = client.get(f"/focus/{orc_id}").text
     assert 'id="members"' in page and f'href="/focus/{worker}"' in page and ">mw<" in page
     # the card of the worker now says who is over it
@@ -613,7 +611,7 @@ def test_the_membership_controls(client, tmp_path):
     # the body is validated: a bare string would otherwise become one controller per character
     for bad in ({"add": "ao-x"}, {"add": [None]}, {"add": [""]}):
         assert client.post(f"/api/sessions/{worker}/controllers", json=bad).status_code == 400
-    assert client.post(f"/api/sessions/{worker}/grants", json={"add": "orchestrate"}).status_code == 400
+    assert client.post(f"/api/sessions/{worker}/grants", json={"add": "control"}).status_code == 400
 
     # the picker's tick reaches the created session (the form round trip, not just its rendering)
     r = client.post(
@@ -665,7 +663,7 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
         assert f'name="grant" value="{g}"' in r.text
         assert GRANT_NOTES[g] in r.text  # §4.5a: "a one-line warning of what the grant allows"
     # the role options carry their grants, which is what ticks the boxes as the Role changes
-    assert 'data-grants="orchestrate"' in r.text and 'data-grants=""' in r.text
+    assert 'data-grants="control"' in r.text and 'data-grants=""' in r.text
 
     # ticked: the session gets it
     r = client.post(
@@ -675,14 +673,14 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
             "dir": str(tmp_path),
             "adapter": "hookstub",
             "role": "lead",
-            "grant": "orchestrate",
+            "grant": "control",
         },
         follow_redirects=False,
     )
     assert r.status_code == 303
     sid = r.headers["location"].rsplit("/", 1)[-1]
     got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
-    assert "orchestrate" in (got.get("capabilities") or [])
+    assert "control" in (got.get("capabilities") or [])
 
     # unticked on a `lead` preset: the person's decision stands over the preset's grants.
     # A second directory, since one agent session per directory is refused (§9 invariant 2).

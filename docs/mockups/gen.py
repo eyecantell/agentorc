@@ -225,7 +225,7 @@ def report_line(name):
     return f'<div style="display: flex; align-items: center; gap: 8px;">{left}<span style="flex-grow: 1;"></span>{right}</div>'
 
 def team_badges(name):
-    """the card's **team** badge (§4.9) and its **under `<orc>`** chip (§4.8)."""
+    """the card's **team** badge (§4.9) and its **under `<controller>`** chip (§4.8)."""
     e = EXTRA.get(name, {})
     out = ""
     if e.get("team"):

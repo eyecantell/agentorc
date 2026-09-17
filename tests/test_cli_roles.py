@@ -12,7 +12,7 @@ pytestmark = pytest.mark.unit
 
 ORC = "ao-repo-orc"
 FLEET = [
-    {"id": ORC, "name": "orc", "state": "idle", "dir": "", "repo": "", "capabilities": ["orchestrate"]},
+    {"id": ORC, "name": "orc", "state": "idle", "dir": "", "repo": "", "capabilities": ["control"]},
     {"id": "ao-repo-w1", "name": "w1", "state": "idle", "dir": "", "repo": ""},
 ]
 
@@ -57,9 +57,9 @@ def test_role_fills_brief_lane_grants_profile_and_the_record(repo, capsys):
 
     calls.clear()
     # the flags win: --profile, --prompt, --lane; --grant adds to the preset's grants
-    assert cli.main(["new", "o1", "--role", "lead", "-p", "paul", "--prompt", "hi", "--grant", "orchestrate"]) == 0
+    assert cli.main(["new", "o1", "--role", "lead", "-p", "paul", "--prompt", "hi", "--grant", "control"]) == 0
     p = created(calls)
-    assert p["profile"] == "paul" and p["prompt"] == "hi" and p["capabilities"] == ["orchestrate"]
+    assert p["profile"] == "paul" and p["prompt"] == "hi" and p["capabilities"] == ["control"]
     assert p["role"] == "lead" and p["lane"] == []
 
     calls.clear()
@@ -81,8 +81,16 @@ def test_role_orchestrator_still_starts_a_lead_and_says_so(repo, capsys, monkeyp
     _, calls = repo
     assert cli.main(["new", "o2", "--role", "orchestrator"]) == 0
     p = created(calls)
-    assert p["role"] == "lead" and p["capabilities"] == ["orchestrate"] and "**lead**" in p["prompt"]
+    assert p["role"] == "lead" and p["capabilities"] == ["control"] and "**lead**" in p["prompt"]
     assert "role `orchestrator` is now `lead`" in capsys.readouterr().err
+
+
+def test_grant_orchestrate_on_the_command_line_is_sent_as_control(repo, capsys):
+    """TD-055 step 3: `--grant orchestrate` is accepted for a release, sent as `control`, and named."""
+    _, calls = repo
+    assert cli.main(["new", "o3", "--grant", "orchestrate"]) == 0
+    assert created(calls)["capabilities"] == ["control"]
+    assert "grant `orchestrate` is now `control`" in capsys.readouterr().err
 
 
 def test_controllers_default_from_the_role_then_the_repo_and_names_resolve(repo, capsys):
@@ -153,7 +161,7 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     assert (
         out.startswith("roles: built-in only")
         and re.search(r"^lead +\[built-in\]", out, re.M)
-        and "grants: orchestrate" in out
+        and "grants: control" in out
     )
     (root / ".agentorc.yml").write_text(
         "controllers: [orc]\nroles:\n  grinder: {profile: grind, brief: docs/briefs/g.md}\n  reviewer: {lane: [ui]}\n"

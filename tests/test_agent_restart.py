@@ -81,6 +81,37 @@ async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
         kill_private_server(tmux)
 
 
+async def test_a_record_holding_orchestrate_is_read_as_control_and_rewritten(tmp_path, monkeypatch, caplog):
+    """TD-055 step 3: the `orchestrate` grant is `control`. A record stored before the rename is
+    normalised on load, saved with the new name, and logged once; the gate honours it; a request
+    that still says `orchestrate` is read as `control`."""
+    import json
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    paths.ensure_layout()
+    store = SessionStore()
+    old = Session(id="ao-old-lead", name="old-lead", kind="interactive", adapter="shell", dir=str(tmp_path))
+    old.capabilities = ["orchestrate"]
+    store.save(old)
+    raw = json.loads((paths.sessions_dir() / "ao-old-lead.json").read_text())
+    assert raw["capabilities"] == ["orchestrate"]  # really stored under the old name
+    tmux = Tmux(socket_name=private_socket_name())
+    try:
+        with caplog.at_level("WARNING"):
+            a = HostAgent(tmux=tmux)
+        assert a.sessions["ao-old-lead"].capabilities == ["control"]
+        assert json.loads((paths.sessions_dir() / "ao-old-lead.json").read_text())["capabilities"] == ["control"]
+        assert "grant orchestrate is now `control`" in caplog.text
+        other = Session(id="ao-w", name="w", kind="interactive", adapter="shell", dir=str(tmp_path))
+        a.sessions["ao-w"] = other
+        await a.rpc_set_grants("ao-w", add=["orchestrate"])
+        assert other.capabilities == ["control"]
+        await a.rpc_set_grants("ao-w", remove=["orchestrate"])
+        assert other.capabilities == []
+    finally:
+        kill_private_server(tmux)
+
+
 def test_restart_seeds_hook_freshness(tmp_path, monkeypatch):
     """TD-015: after a restart a hook-confirmed record counts as freshly reported (as of the load),
     so a screen rule cannot outrank it until the stall window passes; a scraped record is cold."""

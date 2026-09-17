@@ -7,7 +7,7 @@ anchor: main-checkout-single
 unattended: {workers: 3, ...}         # kept as a block; the loader only knows it is present
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}
-  lead: {grants: [orchestrate], controllers: []}
+  lead: {grants: [control], controllers: []}
 controllers: [orchestrator-ao-1]      # who may act on a session started here; omitted = nobody
 ledger: docs/technical_debt.md
 teams: {...}                          # §4.9; passed through for the team step
@@ -33,7 +33,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc.models import GRANTS
+from sessionorc.models import GRANT_ALIASES, GRANTS
 
 FILE = ".agentorc.yml"
 DEFAULT_ADAPTER = "claude-code"
@@ -50,7 +50,7 @@ LANE_PLACEHOLDER = "{lane}"
 PRESETS: dict[str, dict[str, Any]] = {
     "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": []},
     "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": []},
-    "lead": {"brief": "lead.md", "lane": [], "grants": ["orchestrate"]},
+    "lead": {"brief": "lead.md", "lane": [], "grants": ["control"]},
     "plain": {"brief": None, "lane": [], "grants": []},
 }
 DEFAULT_ROLE = "plain"
@@ -75,6 +75,15 @@ def _deprecated(old: str, new: str) -> None:
         _warned.add(old)
         print(
             f"role `{old}` is now `{new}` (TD-055); `{old}` is still accepted for one release — rename it",
+            file=sys.stderr,
+        )
+
+
+def deprecated_grant(old: str, where: str) -> None:
+    if f"grant:{old}" not in _warned:
+        _warned.add(f"grant:{old}")
+        print(
+            f"{where}: grant `{old}` is now `{GRANT_ALIASES[old]}` (TD-055); `{old}` is still accepted for one release",
             file=sys.stderr,
         )
 
@@ -269,6 +278,9 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             out[k] = v.strip() if isinstance(v, str) else None
         elif k == "grants":
             grants = _str_list(v, f"{here}.grants")
+            for old in dict.fromkeys(g for g in grants if g in GRANT_ALIASES):
+                deprecated_grant(old, f"{here}.grants")
+            grants = list(dict.fromkeys(GRANT_ALIASES.get(g, g) for g in grants))
             if bad := [g for g in grants if g not in GRANTS]:
                 raise ValueError(f"{here}.grants: unknown grant {bad[0]!r} (known: {', '.join(GRANTS)})")
             out[k] = grants

@@ -23,9 +23,25 @@ SOURCES = ("declared", "derived", "scraped")
 ProgressStatus = Literal["claimed", "done", "dropped"]
 PROGRESS_STATUSES = ("claimed", "done", "dropped")
 
-# Grants a session record can hold in `capabilities` (design §4.8). `orchestrate`: the session may
-# act on other sessions through the agent (§9 invariant 11).
-GRANTS = ("orchestrate",)
+# Grants a session record can hold in `capabilities` (design §4.8). `control`: the session may
+# act on other sessions through the host agent (§9 invariant 11).
+GRANTS = ("control",)
+# Renamed grants, old → new (TD-055, docs/glossary.md). For one release the old name is read
+# wherever a grant is named — a stored record (normalised on load, so its next save writes the new
+# name), a request, a role's `grants:` — and never written.
+GRANT_ALIASES: dict[str, str] = {"orchestrate": "control"}
+
+
+def canonical_grants(names: list[str]) -> list[str]:
+    """`names` with renamed grants under their current names, each once, in the order given."""
+    return list(dict.fromkeys(GRANT_ALIASES.get(n, n) for n in names))
+
+
+def has_control(capabilities: list[str] | None) -> bool:
+    """Whether a record's grants include `control`, under either name — a client can be newer than
+    the host agent whose records it reads until that agent restarts (TD-062)."""
+    return "control" in canonical_grants(list(capabilities or []))
+
 
 # Message kinds (design §4.10): a small closed set, so a message's purpose is read off its envelope.
 MailKind = Literal["note", "ask", "reply", "conflict"]
@@ -517,6 +533,9 @@ class Session:
         known = {f for f in cls.__dataclass_fields__}
         obj = cls(**{k: v for k, v in d.items() if k in known})
         obj.pending = Pending.from_dict(pending) if pending else None
+        if renamed := [g for g in obj.capabilities if g in GRANT_ALIASES]:
+            obj.capabilities = canonical_grants(obj.capabilities)
+            obj.renamed_grants = renamed  # not a field: tells the loader to save and say so (TD-055)
         obj.progress = [ProgressEntry.from_dict(p) for p in progress]
         obj.findings = [FindingEntry.from_dict(f) for f in findings]
         obj.inbox = [MailEntry.from_dict(e) for e in inbox]
@@ -554,7 +573,7 @@ class Session:
         the upsert has no delete branch, and invariant 10 means a derived entry is replaced only
         when the session *declares* the same reference. So a `tdNNN-*` branch created and abandoned
         before its PR existed — what a grinder does the moment it finds a neighbour already holds
-        that TD — left a `claimed` entry forever, and the idle-with-open-work nudge (§4.8, §6) fires
+        that TD — left a `claimed` entry forever, and the idle-with-open-work send (§4.8, §6) fires
         on exactly that (TD-045). Who is retireable is decided by `sessionorc.reports.derive`, which
         is the half that can see whether the branch ever grew a PR.
 

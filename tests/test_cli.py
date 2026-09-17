@@ -320,7 +320,7 @@ def test_skill_prints_the_rules(capsys):
         # the membership half of the gate (TD-036 step 2): both refusals, and who may hand control
         # on — a session that already controls the target, not only a person (review 2026-09-13)
         "not in its controllers",
-        "needs the orchestrate grant",
+        "needs the control grant",
         "or one of its current controllers",
         "ao control",
         # the mail rules (design §4.10, TD-052 step 2), the instructions rule above the rest
@@ -353,17 +353,17 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     call_sync("set_mode", id=b, unattended=True)  # a worker; an interactive b is §9 invariant 5's case
     monkeypatch.setenv("AGENTORC_SESSION", a)  # now `ao` runs inside session a
     assert cli.main(["kill", b]) == 1
-    assert "needs the orchestrate grant" in capsys.readouterr().err
-    assert cli.main(["--json", "grant", a, "orchestrate"]) == 1  # no self-grant
-    assert "needs the orchestrate grant" in out()["error"]
+    assert "needs the control grant" in capsys.readouterr().err
+    assert cli.main(["--json", "grant", a, "control"]) == 1  # no self-grant
+    assert "needs the control grant" in out()["error"]
     assert cli.main(["--json", "status"]) == 0  # reads pass
     assert {s["id"] for s in out()} >= {a, b}
     assert cli.main(["send", a, "echo", "self-ok"]) == 0  # self passes
     monkeypatch.delenv("AGENTORC_SESSION")  # a person at a terminal
-    assert cli.main(["grant", a, "orchestrate"]) == 0
-    assert capsys.readouterr().out.strip() == f"{a}: grants orchestrate"
+    assert cli.main(["grant", a, "control"]) == 0
+    assert capsys.readouterr().out.strip() == f"{a}: grants control"
     assert cli.main(["status", "-v"]) == 0
-    assert "grants: orchestrate" in capsys.readouterr().out
+    assert "grants: control" in capsys.readouterr().out
     monkeypatch.setenv("AGENTORC_SESSION", a)
     # The grant alone is no longer enough (TD-036): a is not in b's controllers, and an empty list
     # means nobody may act. `ao control` lands in step 2; here the RPC stands in for it.
@@ -373,17 +373,17 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     assert cli.main(["--json", "kill", b]) == 0
     assert out()["state"] == "exited"
     monkeypatch.delenv("AGENTORC_SESSION")
-    assert cli.main(["--json", "revoke", a, "orchestrate"]) == 0
+    assert cli.main(["--json", "revoke", a, "control"]) == 0
     assert out()["capabilities"] == []
-    assert cli.main(["--json", "new", "gc", "-a", "shell", "-d", str(tmp_path), "--grant", "orchestrate"]) == 0
+    assert cli.main(["--json", "new", "gc", "-a", "shell", "-d", str(tmp_path), "--grant", "control"]) == 0
     c = out()
-    assert c["capabilities"] == ["orchestrate"]
+    assert c["capabilities"] == ["control"]
     for sid in (a, c["id"]):
         call_sync("kill", id=sid)
 
 
 def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypatch):
-    """TD-036 step 2: `ao control <orc> add|remove <session>…` edits membership from the
+    """TD-036 step 2: `ao control <controller> add|remove <session>…` edits membership from the
     lead's side, `ao new --controller` sets it at create, `ao status -v` prints both
     directions, and `ao new` says so when a session starts with nobody able to act on it."""
 
@@ -401,7 +401,7 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     w1 = next(s_["id"] for s_ in w1 if s_["name"] == "w1")
     wait_state(orc, "idle")
     wait_state(w1, "idle")
-    call_sync("set_grants", id=orc, add=["orchestrate"])
+    call_sync("set_grants", id=orc, add=["control"])
 
     # a bare name works on both sides (design §4.1), and the output says who is over the session
     assert cli.main(["control", "orc", "add", "w1"]) == 0

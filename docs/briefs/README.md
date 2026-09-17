@@ -13,13 +13,13 @@ in the brief before relaunching. The samscrape workers still run under samscrape
 `scripts/tdgrind.sh` supervisor; moving them into agentorc is the phase 3 work.
 
 `orchestrator-ao-1.md` is the first lead (design §4.8): a session holding the
-`orchestrate` grant that keeps the unattended workers going and runs the cadence check
+`control` grant that keeps the unattended workers going and runs the cadence check
 (`scripts/check_cadence.py`, cadence §4) on what they call done. Launch it **after** the workers,
 then attach it to them in the same step — see Membership below, which is the part that is easy to
 forget and looks like a broken lead when it is:
 
 ```
-pdm run ao new -d ~/agentorc -w orchestrator-ao-1 --unattended -p grind --grant orchestrate --prompt "$(cat docs/briefs/orchestrator-ao-1.md)" orchestrator-ao-1
+pdm run ao new -d ~/agentorc -w orchestrator-ao-1 --unattended -p grind --grant control --prompt "$(cat docs/briefs/orchestrator-ao-1.md)" orchestrator-ao-1
 ```
 
 **Membership (design §4.8, TD-036).** The grant lets a lead act on other sessions; it

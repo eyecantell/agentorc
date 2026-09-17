@@ -31,7 +31,9 @@ from typing import Any
 
 import yaml
 
+from agentorc.repoconfig import deprecated_grant
 from sessionorc import hosts, paths
+from sessionorc.models import GRANT_ALIASES
 
 DEFAULT_LEAD_ROLE = "lead"
 PERSON = "person"  # a lead role meaning the person leads: no lead session is started (§4.9)
@@ -51,7 +53,7 @@ class LeadDef:
     profile: str | None = None  # overrides the role's
     lane: list[str] = field(default_factory=list)
     brief: str | None = None  # overrides the role's template — the lead brief a repo keeps
-    grants: list[str] | None = None  # None: the role's (`orchestrate` for `lead`)
+    grants: list[str] | None = None  # None: the role's (`control` for `lead`)
     unattended: bool = True
 
 
@@ -223,7 +225,11 @@ def _grants(raw: Any, key: str) -> list[str] | None:
         return None
     if not isinstance(raw, list):
         raise ValueError(f"{key} must be a list of grants")
-    return [_str(g, key) for g in raw]
+    grants = [_str(g, key) for g in raw]
+    # TD-055: a renamed grant is read under its new name for one release, saying so where it is met
+    for old in dict.fromkeys(g for g in grants if g in GRANT_ALIASES):
+        deprecated_grant(old, key)
+    return list(dict.fromkeys(GRANT_ALIASES.get(g, g) for g in grants))
 
 
 LEAD_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")

@@ -433,7 +433,7 @@ async def test_send_confirms_the_submit(agent, composerstubs, tmp_path, monkeypa
 
 
 async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
-    """Design §4.8, §9 invariant 11: a session acting on another session needs `orchestrate`;
+    """Design §4.8, §9 invariant 11: a session acting on another session needs `control`;
     self, no caller, and every read pass; `set_grants` is a person's (or a granted session's)."""
     async with LocalClient() as person:
         a = (await person.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
@@ -455,10 +455,10 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
                 ("set_mode", {"id": b, "unattended": True}),
                 ("remove", {"id": b}),
                 ("create", {"name": "c", "dir": str(tmp_path), "adapter": "shell"}),
-                ("set_grants", {"id": a, "add": ["orchestrate"]}),  # no self-grant
-                ("set_grants", {"id": b, "add": ["orchestrate"]}),
+                ("set_grants", {"id": a, "add": ["control"]}),  # no self-grant
+                ("set_grants", {"id": b, "add": ["control"]}),
             ):
-                with pytest.raises(AgentError, match="needs the orchestrate grant"):
+                with pytest.raises(AgentError, match="needs the control grant"):
                     await worker.call(method, **params)
             assert (await person.call("get", id=b))["state"] != "closed"
             # session → self: allowed
@@ -471,13 +471,13 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             assert (await worker.call("explain", id=b, lines=3))["id"] == b
             # unknown caller: a session this agent never started holds no grant
             async with LocalClient(caller="ao-stranger") as stranger:
-                with pytest.raises(AgentError, match="needs the orchestrate grant"):
+                with pytest.raises(AgentError, match="needs the control grant"):
                     await stranger.call("kill", id=b)
             # a person grants; the next call the session makes sees it
             with pytest.raises(AgentError, match="unknown grant"):
                 await person.call("set_grants", id=a, add=["root"])
-            granted = await person.call("set_grants", id=a, add=["orchestrate"])
-            assert granted["capabilities"] == ["orchestrate"]
+            granted = await person.call("set_grants", id=a, add=["control"])
+            assert granted["capabilities"] == ["control"]
             # …and the grant alone is still not enough (TD-036): the second half of the gate is
             # membership, and b's list is empty, which means nobody may act on it.
             with pytest.raises(AgentError, match="not in its controllers — nobody may act on it"):
@@ -494,8 +494,8 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             killed = await worker.call("kill", id=b)
             assert killed["state"] == "exited"
             # revoked: refused again on the very next call, and the grant half is reported first
-            assert (await person.call("set_grants", id=a, remove=["orchestrate"]))["capabilities"] == []
-            with pytest.raises(AgentError, match="needs the orchestrate grant"):
+            assert (await person.call("set_grants", id=a, remove=["control"]))["capabilities"] == []
+            with pytest.raises(AgentError, match="needs the control grant"):
                 await worker.call("kill", id=c["id"])
         # `capabilities` at create, and it survives the store round trip
         d = await person.call(
@@ -504,10 +504,10 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             dir=str(tmp_path),
             adapter="shell",
             argv=["bash", "--norc"],
-            capabilities=["orchestrate"],
+            capabilities=["control"],
         )
-        assert d["capabilities"] == ["orchestrate"]
-        assert json.loads((paths.sessions_dir() / f"{d['id']}.json").read_text())["capabilities"] == ["orchestrate"]
+        assert d["capabilities"] == ["control"]
+        assert json.loads((paths.sessions_dir() / f"{d['id']}.json").read_text())["capabilities"] == ["control"]
         with pytest.raises(AgentError, match="unknown grant"):
             await person.call("create", name="e", dir=str(tmp_path), adapter="shell", capabilities=["sudo"])
         for sid in (a, c["id"], d["id"]):
@@ -515,7 +515,7 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
 
 
 async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
-    """Design §4.8, §9 invariant 11, TD-036 step 1: an acting RPC needs the `orchestrate` grant
+    """Design §4.8, §9 invariant 11, TD-036 step 1: an acting RPC needs the `control` grant
     *and* the caller in the target's `controllers`. Empty (the default) means nobody may act;
     several controllers are allowed and none is privileged; a session may not edit its own list;
     create adds the creator and may not hand out a grant it does not hold; a person is unaffected
@@ -528,7 +528,7 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
         ui, backend, shared = [(await mk(n))["id"] for n in ("ui", "backend", "shared")]
         await person.call("set_mode", id=shared, unattended=True)  # a worker: §9 invariant 5 is tested apart
         for orc in (ui, backend):
-            await person.call("set_grants", id=orc, add=["orchestrate"])
+            await person.call("set_grants", id=orc, add=["control"])
         # the empty default: granted, but a member of nothing
         assert (await person.call("get", id=shared))["controllers"] == []
         async with LocalClient(caller=ui) as ui_orc, LocalClient(caller=backend) as backend_orc:
@@ -550,7 +550,7 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
             # session that controls nothing here may not add itself
             await backend_orc.call("set_controllers", id=shared, add=[ui])
             rogue = (await mk("rogue"))["id"]
-            await person.call("set_grants", id=rogue, add=["orchestrate"])
+            await person.call("set_grants", id=rogue, add=["control"])
             async with LocalClient(caller=rogue) as rogue_orc:
                 with pytest.raises(AgentError, match="not in its controllers"):
                     await rogue_orc.call("set_controllers", id=shared, add=[rogue])
@@ -558,7 +558,7 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
         # a session may not edit its own controllers, even holding the grant: it could drop the
         # controller watching it, which is the one thing membership exists to prevent
         async with LocalClient(caller=shared) as itself:
-            await person.call("set_grants", id=shared, add=["orchestrate"])
+            await person.call("set_grants", id=shared, add=["control"])
             with pytest.raises(AgentError, match="not in its controllers"):
                 await itself.call("set_controllers", id=shared, remove=[ui, backend])
             with pytest.raises(AgentError, match="cannot be its own controller"):
@@ -577,14 +577,14 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
                 dir=str(tmp_path),
                 adapter="shell",
                 argv=["bash", "--norc"],
-                capabilities=["orchestrate"],
+                capabilities=["control"],
                 controllers=[backend],
             )
-            assert grandchild_ok["capabilities"] == ["orchestrate"]  # ui holds it, so it may pass it on
+            assert grandchild_ok["capabilities"] == ["control"]  # ui holds it, so it may pass it on
             assert grandchild_ok["controllers"] == [ui, backend]  # creator first, then what was asked for
         async with LocalClient(caller=shared) as ungranted:
-            await person.call("set_grants", id=shared, remove=["orchestrate"])
-            with pytest.raises(AgentError, match="needs the orchestrate grant"):
+            await person.call("set_grants", id=shared, remove=["control"])
+            with pytest.raises(AgentError, match="needs the control grant"):
                 await ungranted.call("create", name="nope", dir=str(tmp_path), adapter="shell")
         # a person's create has no caller, so the new record starts with only what was asked for
         lone = await person.call("create", name="lone", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
@@ -614,13 +614,13 @@ async def test_a_present_caller_is_a_session_however_odd_its_type(agent, tmp_pat
 
         for odd in (0, "", [], {}, False):
             resp = await raw({"id": 1, "method": "kill", "params": {"id": vid}, "caller": odd})
-            assert "needs the orchestrate grant" in resp.get("error", ""), odd
+            assert "needs the control grant" in resp.get("error", ""), odd
         assert (await person.call("get", id=vid))["state"] != "exited"
         # absent: a person, and allowed exactly as before
         assert (await raw({"id": 2, "method": "set_mode", "params": {"id": vid, "unattended": True}}))["result"]
         # a granted non-member still cannot reach it through an odd caller either
         orc = (await person.call("create", name="o", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
-        await person.call("set_grants", id=orc, add=["orchestrate"])
+        await person.call("set_grants", id=orc, add=["control"])
         async with LocalClient(caller=orc) as orc_client:
             with pytest.raises(AgentError, match="not in its controllers"):
                 await orc_client.call("kill", id=vid)
@@ -645,7 +645,7 @@ async def test_interactive_sessions_are_out_of_every_controller_s_reach(agent, t
             return person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw)
 
         orc = (await mk("orc"))["id"]
-        await person.call("set_grants", id=orc, add=["orchestrate"])
+        await person.call("set_grants", id=orc, add=["control"])
         anchor = (await mk("anchor"))["id"]  # the person's own session: interactive by default
         worker = (await mk("worker", unattended=True))["id"]
         run = (await mk("run", kind="command"))["id"]
@@ -714,10 +714,8 @@ async def test_set_controllers_remove_wins_over_add(agent, tmp_path):
         got = await person.call("set_controllers", id=sid, add=["ao-three"], remove=["ao-three", "ao-one"])
         assert got["controllers"] == ["ao-two"]
         # and the same call shape on grants still agrees
-        await person.call("set_grants", id=sid, add=["orchestrate"])
-        assert (await person.call("set_grants", id=sid, add=["orchestrate"], remove=["orchestrate"]))[
-            "capabilities"
-        ] == []
+        await person.call("set_grants", id=sid, add=["control"])
+        assert (await person.call("set_grants", id=sid, add=["control"], remove=["control"]))["capabilities"] == []
         await person.call("kill", id=sid)
 
 

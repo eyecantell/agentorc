@@ -176,7 +176,7 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "grind-1", "grind-2", "hunt"]
     lead, grind1, hunt = made[0], made[1], made[3]
-    assert lead["controllers"] == [] and lead["capabilities"] == ["orchestrate"] and lead["role"] == "lead"
+    assert lead["controllers"] == [] and lead["capabilities"] == ["control"] and lead["role"] == "lead"
     lead_id = "ao-agentorc-orc-ao"
     assert all(p["controllers"] == [lead_id] for p in made[1:])
     # a worktree per session in its home repo (§4.9 "Home and reach"), and both badges
@@ -204,7 +204,7 @@ def test_a_definition_still_naming_role_orchestrator_starts_a_lead(world, capsys
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 0
     lead = creates(state)[0]
-    assert lead["role"] == "lead" and lead["capabilities"] == ["orchestrate"] and lead["profile"] == "org-grind"
+    assert lead["role"] == "lead" and lead["capabilities"] == ["control"] and lead["profile"] == "org-grind"
     assert "You are a **lead**" in lead["prompt"]
     assert capsys.readouterr().err.count("role `orchestrator` is now `lead`") == 1
 

@@ -30,7 +30,7 @@ unattended:
 roles:
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}
   hunter: {brief: docs/briefs/hunter.md}
-  lead: {brief: docs/briefs/orchestrator.md, grants: [orchestrate]}
+  lead: {brief: docs/briefs/orchestrator.md, grants: [control]}
   reviewer: {grants: [], lane: [ui, tests], controllers: [ui-orc]}
 controllers: [orchestrator-ao-1]
 ledger: docs/debt.md
@@ -54,7 +54,7 @@ commands:
     )  # fmt: skip
     assert g.source == "built-in + repo"
     o = repoconfig.resolve_role(cfg, "lead")
-    assert o.grants == ["orchestrate"] and o.lane == [] and o.controllers == []
+    assert o.grants == ["control"] and o.lane == [] and o.controllers == []
     r = repoconfig.resolve_role(cfg, "reviewer")
     assert r.source == "repo" and r.brief is None and r.lane == ["ui", "tests"] and r.controllers == ["ui-orc"]
     assert [x.name for x in repoconfig.roles(cfg)] == ["grinder", "hunter", "lead", "plain", "reviewer"]
@@ -65,7 +65,7 @@ commands:
 def test_the_org_overlay_sits_between_built_in_and_repo(tmp_path):
     (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {lane: [TD-001]}}\n")
     cfg = repoconfig.load(tmp_path)
-    overlay = {"grinder": {"profile": "grind", "lane": ["free-pick"]}, "auditor": {"grants": ["orchestrate"]}}
+    overlay = {"grinder": {"profile": "grind", "lane": ["free-pick"]}, "auditor": {"grants": ["control"]}}
     g = repoconfig.resolve_role(cfg, "grinder", roles_overlay=overlay)
     assert g.profile == "grind" and g.lane == ["TD-001"] and g.source == "built-in + org + repo"
     assert repoconfig.resolve_role(cfg, "auditor", roles_overlay=overlay).source == "org"
@@ -106,7 +106,7 @@ def test_built_in_briefs_fill_the_lane_and_plain_has_none(tmp_path):
     assert "## Lane: free-pick" in repoconfig.resolve_role(cfg, "grinder").brief_text()  # the role's default
     assert "## Area: free" in repoconfig.resolve_role(cfg, "hunter").brief_text()
     orc = repoconfig.resolve_role(cfg, "lead").brief_text()
-    assert "## Members: (none given)" in orc and "orchestrate" in orc
+    assert "## Members: (none given)" in orc and "control" in orc
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
     for name in ("grinder", "hunter", "lead"):  # one screen each
         assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 40
@@ -149,7 +149,7 @@ def test_orchestrator_is_a_deprecated_alias_for_lead(tmp_path, capsys, monkeypat
     role = repoconfig.resolve_role(
         cfg, "orchestrator", {"orchestrator": {"lane": ["TD-1"]}, "lead": {"profile": "org"}}
     )
-    assert role.name == "lead" and role.grants == ["orchestrate"] and role.brief == "lead.md"
+    assert role.name == "lead" and role.grants == ["control"] and role.brief == "lead.md"
     assert role.lane == ["TD-1"]  # the org overlay's old key folded into `lead`
     assert role.profile == "repo-prof"  # the repo layer still wins over the org layer
     assert "orchestrator" not in repoconfig.role_names(cfg, {"orchestrator": {}})
@@ -160,3 +160,12 @@ def test_orchestrator_is_a_deprecated_alias_for_lead(tmp_path, capsys, monkeypat
         repoconfig.RepoConfig(), "lead", {"orchestrator": {"profile": "old", "lane": ["x"]}, "lead": {"profile": "new"}}
     )
     assert both.profile == "new" and both.lane == ["x"]
+
+
+def test_grants_orchestrate_in_a_role_is_read_as_control(tmp_path, capsys, monkeypatch):
+    """TD-055 step 3: `grants: [orchestrate]` in a `roles:` block still loads, as `control`, and says so."""
+    monkeypatch.setattr(repoconfig, "_warned", set())
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  reviewer: {grants: [orchestrate, control]}\n")
+    role = repoconfig.resolve_role(repoconfig.load(tmp_path), "reviewer")
+    assert role.grants == ["control"]
+    assert "grant `orchestrate` is now `control`" in capsys.readouterr().err
