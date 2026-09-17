@@ -992,7 +992,9 @@ non-empty. Two channels cover every worker seen so far and the person's own sess
   reference is checked, in the same step that writes it, against every **other live** record on
   the host (not `exited` or `closed`): if one holds a declared `claimed` entry on the same
   canonical reference whose `at` is younger than the lease (`LEASE_TTL`, 12 h), the claim is
-  refused and the refusal names the holder and when it claimed. It is advisory — `--force` (the
+  refused and the refusal names the holder and when it claimed. This is not a gate in §4.8's sense —
+  it restricts no caller, only a second claim on a held reference, and it is an error rather than a
+  soft `refused` because the claimer has to choose again. It is advisory — `--force` (the
   RPC's `force`) writes the claim anyway and the reply says whose lease it overrode. A lease is
   renewed by claiming the reference again, and released by `done` or `dropped` on it, by the
   holder's record exiting or closing, or by the TTL running out, so a crashed or stood-down worker

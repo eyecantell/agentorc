@@ -839,8 +839,6 @@ async def test_a_claim_is_a_lease_on_its_reference(agent, tmp_path):
     """TD-056, design §4.8: a declared claim on a reference another live record holds is refused
     naming the holder; two claims in one moment get one grant; `force` overrides and says whose;
     done, the holder exiting, or the TTL releases it; derived claims neither hold nor are checked."""
-    import sessionorc.agent as agent_mod
-
     async with LocalClient() as person:
         ids = []
         for name in ("wa", "wb"):
@@ -875,8 +873,7 @@ async def test_a_claim_is_a_lease_on_its_reference(agent, tmp_path):
             # the TTL releases: other's claim is now the lease, and an expired one holds nothing
             with pytest.raises(AgentError, match=f"claimed by {other}"):
                 await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056")
-            agent.sessions[other].progress[-1].at = "2020-01-01T00:00:00Z"
-            assert agent_mod.LEASE_TTL.total_seconds() > 0
+            next(e for e in agent.sessions[other].progress if e.ref == "TD-056").at = "2020-01-01T00:00:00Z"
             assert await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056")
         # the holder's record ending releases it
         async with LocalClient(caller=other) as oc:
