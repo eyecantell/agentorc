@@ -57,6 +57,9 @@ class Stopping:
     now: bool
     acted: list[dict[str, Any]] = field(default_factory=list)
     lead: dict[str, Any] | None = None  # the record, until `stop_lead` acts on it
+    # The lead ran the stop itself — the wind-down of §4.9a. It cannot be typed at mid-command, and
+    # killing it would kill the command: it is told what is left, and ends itself.
+    lead_is_caller: bool = False
 
     @property
     def member_ids(self) -> list[str]:
@@ -169,38 +172,82 @@ def start(
 # ── stop ──────────────────────────────────────────────────────────────────────────────────────
 
 
-def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False) -> Stopping:
+def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, caller: str | None = None) -> Stopping:
     """The first half of `ao team stop` (design §4.9): the wrap-up prompt — the one the card's
     **Wrap up** sends — to every member, or a kill with `--now`. The lead is stopped by `stop_lead`
     once the members have settled, which is what makes the order the design's one.
 
     Split in two so a caller that must not block (the Org page) can send this half and let the rest
-    run behind it, while `ao team` runs both in a row."""
+    run behind it, while `ao team` runs both in a row.
+
+    `caller` is the session running the command, if one is (`AGENTORC_SESSION`). When it is the
+    team's own lead this is the wind-down (design §4.9a): the same sequence under a different
+    trigger, except that the lead is never typed at or killed by its own command."""
     up = live(badged(name, call("list")))
     if not up:
         raise teams.TeamError(f"no live session carries the team {name} badge — nothing to stop")
     lead, members = split(name, up, org)
-    st = Stopping(team=name, now=now, lead=lead)
+    st = Stopping(team=name, now=now, lead=lead, lead_is_caller=bool(caller and lead and lead["id"] == caller))
     for s in members:
+        if not now and s.get("out_of_work") and s["state"] in SETTLED:
+            # Finished (§4.9a): it declared, and it is not mid-turn. There is nothing to wrap up, and
+            # a prompt would only start a turn that `--close` could then land in the middle of.
+            st.acted.append(
+                {**_entry(s, "member"), "action": "finished (out of work), nothing sent", "state": s["state"]}
+            )
+            continue
         st.acted.append(_stop_one(call, s, "member", now=now))
     if now and lead is not None:  # a kill has nothing to wait for: the lead goes with them
-        st.acted.append(_stop_one(call, lead, "lead", now=True))
+        st.acted.append(_own_end(lead) if st.lead_is_caller else _stop_one(call, lead, "lead", now=True))
         st.lead = None
     return st
 
 
-def stop_lead(call: Call, st: Stopping, *, timeout: float = STOP_TIMEOUT) -> Stopping:
+def stop_lead(call: Call, st: Stopping, *, timeout: float = STOP_TIMEOUT, close: bool = False) -> Stopping:
     """The second half: wait for each member to go idle, exited or closed — or for the wrap-up
-    window to pass — and then stop the lead. A no-op when `--now` already killed everything."""
+    window to pass — and then stop the lead. A no-op when `--now` already killed everything.
+
+    `close` also closes each member that settled with nothing to lose (design §4.9a, 2026-09-17: a
+    wrapped-up Claude Code session sits `idle` rather than leaving, and `ao team start` refuses
+    while it does). A member still working, or holding uncommitted or unpushed work, is left open
+    and named: a stop never strands work to look finished."""
     if st.now and st.lead is None:
         return st
     states = wait_settled(call, st.member_ids, timeout)
     for entry in st.acted:
         entry["state"] = states.get(entry["id"], entry.get("state") or "?")
+    if close and not st.now:
+        records = {s["id"]: s for s in call("list")}
+        for entry in st.acted:
+            if entry["role"] == "member":
+                _close_settled(call, entry, records.get(entry["id"]))
     if st.lead is not None:
-        st.acted.append(_stop_one(call, st.lead, "lead", now=st.now))
+        st.acted.append(_own_end(st.lead) if st.lead_is_caller else _stop_one(call, st.lead, "lead", now=st.now))
         st.lead = None
     return st
+
+
+def _close_settled(call: Call, entry: dict[str, Any], record: dict[str, Any] | None) -> None:
+    if record is None or record["state"] == "closed":
+        return
+    git = record.get("git") or {}
+    if record["state"] not in SETTLED:
+        entry["left_open"] = f"still {record['state']}"
+    elif git.get("dirty") or git.get("ahead"):
+        entry["left_open"] = f"{git.get('dirty', 0)} uncommitted, {git.get('ahead', 0)} unpushed"
+    else:
+        call("close", id=entry["id"])
+        entry["action"] += ", closed"
+        entry["state"] = "closed"
+
+
+def _own_end(lead: dict[str, Any]) -> dict[str, Any]:
+    """The lead's entry when the lead is the one running the stop: nothing is sent to it."""
+    return {
+        **_entry(lead, "lead"),
+        "action": f"is you — finish your last acts, then `ao close {lead['id']}`",
+        "state": lead.get("state") or "?",
+    }
 
 
 def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[str, Any]:
@@ -208,13 +255,11 @@ def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[st
         call("kill", id=s["id"])
     else:
         call("send", id=s["id"], text=teams.WRAPUP_PROMPT)
-    return {
-        "id": s["id"],
-        "name": s.get("name") or s["id"],
-        "role": role,
-        "action": "killed" if now else "wrap-up sent",
-        "state": "killed" if now else "?",
-    }
+    return {**_entry(s, role), "action": "killed" if now else "wrap-up sent", "state": "killed" if now else "?"}
+
+
+def _entry(s: dict[str, Any], role: str) -> dict[str, Any]:
+    return {"id": s["id"], "name": s.get("name") or s["id"], "role": role}
 
 
 def wait_settled(call: Call, ids: list[str], timeout: float) -> dict[str, str]:

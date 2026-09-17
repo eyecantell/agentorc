@@ -943,7 +943,7 @@ the rest still stand. `ao new --controller <id>…` sets it at create, and `ao n
 when a session starts with nobody able to act on it. `ao status -v` prints both directions:
 `under:` from the record, `members:` derived across the records, never stored. Teams (§4.9; landed 2026-09-13, TD-040 step c): `ao team start <name>` launches a
 definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every check first, then the lead, then each member with
-`controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills);
+`controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills; `--close` also closes each member that settled clean and pushed, §4.9a);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
 its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC built 2026-09-16 by step 3): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — is a thin call to the host agent's `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
@@ -1321,7 +1321,10 @@ instead), profile and worktree. A person runs it, so no attenuation applies (§4
 a lead running it is subject to it as for any create. It prints one line per session
 with the id, `--json` the records. `ao team stop <name>` sends the wrap-up prompt (the one the
 card's Wrap up sends, §4.5a) to each member, waits for each to go idle or the wrap-up window to
-pass, then to the lead; `--now` kills instead of asking. `ao team status <name>` is the lead's
+pass, then to the lead; `--now` kills instead of asking. `--close` (2026-09-17, §4.9a) also closes
+each member that settled with nothing to lose — no uncommitted file, no unpushed commit — and
+names any it left open: a wrapped-up Claude Code session sits `idle` rather than leaving, and
+`ao team start` refuses while a session holds a member's name. `ao team status <name>` is the lead's
 Members view for a terminal: each member with state, lane and report line. `ao team list` shows
 every definition, its source file, and whether it is live. A team is **live** when any session
 carrying its badge is live; there is no team record — a team that is stopped is only its
@@ -1417,7 +1420,7 @@ therefore carries its own test, in §4.8's table beside the brief it hands out:
 | `grinder`, fixed lane | every lane reference is `done` or `dropped` — the case that already works |
 | `grinder`, `free-pick` | the ledger holds no entry it may pick: nothing open that its brief does not exclude, that is not already claimed by a live sibling, and that is not parked on `user_attention.md` waiting for a person |
 | `hunter` | its area is **gone**, not quiet — no such tests, no such path, no such deployment to probe |
-| `lead` | no member is live, and every member that exited declared why |
+| `lead` | every member is **finished** (below): none is working or waiting on something, and none exited without saying why |
 
 **Quiet is not empty**, which is the distinction Paul's two examples sit either side of. A role
 that consumes a list ends when the list ends. A role that watches a stream — a hunter on a
@@ -1445,10 +1448,29 @@ nothing to be idle about* would have to be derived by the core, which is the thi
 says the core cannot do.
 
 **One member's exhaustion is not the team's.** A grinder out of work sits beside a hunter with
-plenty. The lead winds the team down when **every** member is out of work or exited having said
-so; until then an out-of-work member is simply not sent to and not restarted. The wind-down itself
-is `ao team stop`'s sequence and nothing new — wrap up the members, wait for them to settle, then
-the lead — so there is one code path and the order is the order (§4.9).
+plenty. The lead winds the team down when **every** member is finished; until then an out-of-work
+member is simply not sent to and not restarted. The wind-down itself is `ao team stop`'s sequence
+and nothing new — wrap up the members, wait for them to settle, then the lead — so there is one
+code path and the order is the order (§4.9).
+
+**Finished means declared, not gone** (2026-09-17, TD-053 step 3). A member is *finished* when
+`out_of_work` is on its record and it is `idle`, `exited` or `closed`. The first draft of this
+section asked for the exit too, and the first live run showed why that cannot be the test: a
+Claude Code worker's `/exit` does not leave — all three samscrape grinders declared, typed it, and
+sat `idle` for seven hours while their lead logged *out of work, not closing* every ten minutes,
+because its brief let it close only a member past a stop time. The declaration is the fact;
+whether the process also went is the tool's business. The other half is unchanged: a member that
+`exited` **without** declaring is a crash and is restarted, and one that is idle without
+declaring is merely idle.
+
+**The lead runs the stop itself.** The trigger is the lead's own `ao team stop <team> --close`
+(§4.9). When the session running the command is the team's lead, the sequence is the same up to
+the last step: the members get the wrap-up and are waited on (a finished member gets no prompt — it has
+nothing to wrap up, from anyone's stop), each one that settled clean and pushed is closed, and the lead — which cannot be typed at in the middle of its own command, and
+would take the command with it if killed — is told what is left instead: its last acts (the
+declaration, the board line), then `ao close` on its own id, which a session may always run on
+itself (§4.8). A member left open because it holds unpushed work is a board item, not a reason to
+keep the round going.
 
 **A wind-down is announced.** An empty ledger is a fact about the project, not about the org,
 and a team that dissolves quietly is harder to notice than one that says so. The lead's last act
@@ -1491,7 +1513,7 @@ has to survive on the record for the lead to read on its next round, not in a pr
 gone. *Treat an empty ledger as an error* — it is the successful end of a run, and the only thing
 it asks for is a person's attention, which the board line already gets.
 
-**Done when** a free-pick grinder with nothing left to pick declares it and exits, its lead leaves
+**Done when** a free-pick grinder with nothing left to pick declares it and stops, its lead leaves
 it alone rather than restarting it, and — once every member has done the same — the lead runs the
 same stop sequence `ao team stop` runs, leaves one board line naming what each member searched,
 and exits; `ao team start ao-grind` then brings the team back.
