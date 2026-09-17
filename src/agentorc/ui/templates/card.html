@@ -13,6 +13,9 @@
       {# design §4.5a card **team** badge (§4.9): the team the session was started under; a badge,
          nothing keys on it (§9 invariant 9). Click filters the grid to that team, client-side. #}
       {% if s.team %}<button class="badge team" data-team="{{ s.team }}" title="team {{ s.team }} — click: show only this team">{{ s.team }}</button>{% endif %}
+      {# design §4.5a card **unread** chip (§4.10): the record's count, never a body; nothing at
+         zero, which is the common case. Opens the Focus Inbox panel. #}
+      {% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ 'guessed from the screen' if s.scraped else 'reported by the tool' }}"><span class="dot"></span>{{ s.state_label }}</span>
@@ -76,6 +79,7 @@
     {% if not s.external %}<details class="more">
       <summary class="btn sm ghost" title="more">⋯</summary>
       <div class="menu">
+        <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail into its inbox — lands, types nothing">Message…</button>
         <button data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
         <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">Kill</button>
         <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?">Close</button>

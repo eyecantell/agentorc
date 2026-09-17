@@ -62,6 +62,23 @@
     AO.toast("opening in VS Code…", true);
   });
 
+  // design §4.5a **Message** / Focus Inbox **Reply** (§4.10): one composer for both, a <dialog>.
+  // Resolves to what to mail, or null on Cancel / an empty body.
+  AO.compose = function (o) {
+    const dlg = $("#mailbox");
+    $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
+    $("#mailkindrow").hidden = !!o.reply;
+    $("#mailquote").textContent = o.quote ? `re: “${o.quote.length > 160 ? o.quote.slice(0, 160) + "…" : o.quote}”` : "";
+    $("#mailkind").value = "note"; $("#mailabout").value = ""; $("#mailtext").value = "";
+    return new Promise((resolve) => {
+      dlg.addEventListener("close", () => {
+        const text = $("#mailtext").value;
+        resolve(dlg.returnValue === "send" && text.trim() ? { text, kind: $("#mailkind").value, about: $("#mailabout").value.trim() } : null);
+      }, { once: true });
+      dlg.returnValue = ""; dlg.showModal(); $("#mailtext").focus();
+    });
+  };
+
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy], [data-sort]");
     if (!b) return;
@@ -98,6 +115,13 @@
         if (when === null) return;
         body = { until: when.trim() };
       }
+      // design §4.5a **Message**, Focus Inbox **Reply** and delete (§4.10): mail, never a send
+      if (action === "message" || action === "reply") {
+        const m = await AO.compose({ to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote });
+        if (!m) return;
+        body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
+      }
+      if (action === "unmail") body = { msg: b.dataset.msg };
       if (action === "control-add") {
         const who = prompt("Which session may act on this one? (its id or name from ao status)");
         if (!who) return;
@@ -108,6 +132,9 @@
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/")) location.href = "/"; }
       if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
+      if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
+      if (action === "unmail") AO.toast("deleted from this inbox", true);
+      if (["message", "reply", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
       if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
       if (action2 === "controllers") {
@@ -634,6 +661,7 @@
         $("#gitfiles").innerHTML = v.git.files.length ? v.git.files.map((f) => `<div>${esc(f)}</div>`).join("") : '<div class="muted">clean</div>';
       }
       renderReports(v);
+      renderInbox(v);
       renderGrants(v);
       renderStop(v);
       renderMembership(v);
@@ -662,6 +690,53 @@
         return `<div class="rep${derived ? " derived" : ""}"><span class="ref">${esc(f.ref)}</span><span class="st">filed</span>${pri}`
           + `<span class="grow"></span><span class="st age" data-since="${esc(f.at || "")}">${fmtAge(f.at)}</span></div>`;
       }).join("");
+    }
+    // design §4.5a Focus side panel **Inbox** (§4.10). Bodies never ride the pushed record ("A
+    // bounded body"): the record carries `unread` and the `mail` marks, and when those change the
+    // panel fetches the entries again through the `inbox` RPC — a person's read, which marks nothing.
+    let inboxSig = null, inboxSoon = null, inboxFirst = true;
+    function renderInbox(v) {
+      const sig = JSON.stringify([v.unread || 0, v.mail || {}]);
+      if (sig === inboxSig) return;
+      inboxSig = sig; refreshInbox();
+    }
+    AO.refreshInbox = refreshInbox;
+    function refreshInbox() {
+      clearTimeout(inboxSoon);
+      inboxSoon = setTimeout(async () => {
+        let got;
+        try {
+          const r = await fetch(`/api/sessions/${encodeURIComponent(id)}/inbox`);
+          if (!r.ok) return;
+          got = await r.json();
+        } catch (e) { return; }
+        const es = got.entries || [];
+        $("#inboxcard").classList.toggle("hidden", !es.length);
+        $("#inboxcount").textContent = es.length ? `${got.unread} unread · ${es.length}` : "";
+        $("#inboxlist").innerHTML = es.slice().reverse().map((e) => {
+          const ask = e.kind === "ask" || e.kind === "conflict";
+          let st = "";
+          if (ask) {
+            st = e.closed_by ? `answered by ${esc(e.closed_by)}`
+              : e.expired_at ? "expired"
+              : (e.pending || []).length ? "addressee exited · pending"
+              : e.bound ? `open · bound ${esc(new Date(e.bound).toLocaleString())}` : "open";
+          }
+          const reply = e.from === "person" ? ""
+            : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(id)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}">Reply</button>`;
+          return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
+            + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
+            + `<span class="st kind">${esc(e.kind)}</span>${e.about ? `<span class="st">re ${esc(e.about)}</span>` : ""}`
+            + `<span class="grow"></span><span class="st">${e.read_at ? "read" : "unread"}</span>`
+            + `<span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
+            + (e.reply_to ? `<div class="st">reply to ${esc(e.reply_to)}</div>` : "")
+            + `<div class="body">${esc(e.text)}</div>`
+            + `<div class="row gap">${st ? `<span class="st${e.expired_at ? " expired" : ""}">${st}</span>` : ""}<span class="grow"></span>${reply}`
+            + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(id)}" data-msg="${esc(e.id)}" data-confirm="Delete this entry from this session's inbox? The sender keeps its copy.">Delete</button></div></div>`;
+        }).join("");
+        if (inboxFirst && location.hash === "#inbox" && es.length) $("#inboxcard").scrollIntoView({ block: "nearest" });
+        inboxFirst = false;
+      }, 150);
     }
     // design §4.5a controllers chip + Members list (§4.8, TD-036). Both are membership, which is
     // read *across* records: this session's delta carries them, but a change on another session

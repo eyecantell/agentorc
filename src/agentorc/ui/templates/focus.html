@@ -32,6 +32,7 @@
       {% if s.vscode %}<a class="btn" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
       <button class="btn ghost" id="tcopy" title="copy the terminal selection — Shift+drag to select (Ctrl+Shift+C, or Ctrl+C with a selection). Wheel or Shift+PageUp scrolls history; Shift+PageDown, q or Esc returns">⧉ Copy</button>
       <button class="btn ghost" id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click)">⎘ Paste</button>
+      <button class="btn" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail a note or an ask into this session's inbox — it lands and types nothing (Send, below, types)">✉ Message</button>
       <button class="btn" data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
       <button class="btn danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">✕ Kill</button>
     </div>
@@ -70,6 +71,14 @@
       <div id="progresslist"></div>
       <div id="findinglist"></div>
       <div class="note">What the session declared, plus what the agent derived from its branch and PRs (dashed). Drop records that a claim was let go.</div>
+    </div>
+    {# design §4.5a Focus side panel **Inbox** (§4.10): what others addressed to this session,
+       beside Reports (what it declared). Bodies are fetched through the `inbox` RPC as a person's
+       read, which marks nothing; the pushed record only says when to fetch again. #}
+    <div class="card pad inbox hidden" id="inboxcard">
+      <div class="row gap"><span class="h2">Inbox</span><span class="meta" id="inboxcount"></span></div>
+      <div id="inboxlist"></div>
+      <div class="note">Mail addressed to this session. Opening it here marks nothing read — only the session's own <code>ao inbox</code> does. Reply goes to the sender's inbox; delete removes this session's copy only.</div>
     </div>
     {# design §4.5a Focus (orchestrator) **Members** list (§4.8, TD-036): every session whose
        `controllers` name this one — the orchestrator's central view. Derived from the records on

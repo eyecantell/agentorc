@@ -67,6 +67,15 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .reports .rep .st { font-size: 10.5px; color: var(--muted); }
 .reports .rep .st.done { color: var(--done); }
 .reports .rep .st.dropped { text-decoration: line-through; }
+/* the Focus Inbox panel, the card's unread chip and the mail composer (design §4.5a, §4.10) */
+.inbox .mail { padding: 6px 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 3px; }
+.inbox .mail .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+.inbox .mail.unread .ref { font-weight: 600; }
+.inbox .mail .st { font-size: 10.5px; color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
+.inbox .mail .body { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+.badge.unread { color: var(--working-fg); background: var(--working-bg); border-color: var(--working); text-decoration: none; }
+.maildlg { width: min(560px, 92vw); color: var(--fg); } .maildlg::backdrop { background: rgba(0,0,0,.35); }
+.maildlg .row[hidden] { display: none; }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
