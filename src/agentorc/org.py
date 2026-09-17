@@ -31,6 +31,7 @@ from typing import Any
 
 import yaml
 
+from agentorc.repoconfig import deprecated_grant
 from sessionorc import hosts, paths
 from sessionorc.models import GRANT_ALIASES
 
@@ -226,10 +227,8 @@ def _grants(raw: Any, key: str) -> list[str] | None:
         raise ValueError(f"{key} must be a list of grants")
     grants = [_str(g, key) for g in raw]
     # TD-055: a renamed grant is read under its new name for one release, saying so where it is met
-    from agentorc.repoconfig import _deprecated_grant
-
     for old in dict.fromkeys(g for g in grants if g in GRANT_ALIASES):
-        _deprecated_grant(old, key)
+        deprecated_grant(old, key)
     return list(dict.fromkeys(GRANT_ALIASES.get(g, g) for g in grants))
 
 

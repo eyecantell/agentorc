@@ -79,7 +79,7 @@ def _deprecated(old: str, new: str) -> None:
         )
 
 
-def _deprecated_grant(old: str, where: str) -> None:
+def deprecated_grant(old: str, where: str) -> None:
     if f"grant:{old}" not in _warned:
         _warned.add(f"grant:{old}")
         print(
@@ -279,7 +279,7 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
         elif k == "grants":
             grants = _str_list(v, f"{here}.grants")
             for old in dict.fromkeys(g for g in grants if g in GRANT_ALIASES):
-                _deprecated_grant(old, f"{here}.grants")
+                deprecated_grant(old, f"{here}.grants")
             grants = list(dict.fromkeys(GRANT_ALIASES.get(g, g) for g in grants))
             if bad := [g for g in grants if g not in GRANTS]:
                 raise ValueError(f"{here}.grants: unknown grant {bad[0]!r} (known: {', '.join(GRANTS)})")

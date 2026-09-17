@@ -276,3 +276,21 @@ def test_a_key_nobody_reads_is_an_error_naming_it(tmp_path):
         (tmp_path / "org.yml").write_text(yaml.safe_dump({**base, "teams": {"t": block}}))
         with pytest.raises(ValueError, match=bad):
             org.load(tmp_path / "org.yml")
+
+
+def test_grants_orchestrate_in_a_team_is_read_as_control(tmp_path, capsys, monkeypatch):
+    """TD-055 step 3: `grants: [orchestrate]` on a team's lead or member still loads, as `control`,
+    and says so once."""
+    from agentorc import repoconfig
+
+    monkeypatch.setattr(repoconfig, "_warned", set())
+    f = tmp_path / "org.yml"
+    f.write_text(
+        "projects: {p: {repos: {r: {kmaster: /tmp}}}}\n"
+        "teams:\n"
+        "  t: {projects: [p], lead: {grants: [orchestrate]},\n"
+        "      members: [{role: grinder, grants: [orchestrate, control]}]}\n"
+    )
+    g = org.load(f).teams["t"]
+    assert g.lead.grants == ["control"] and g.members[0].grants == ["control"]
+    assert capsys.readouterr().err.count("grant `orchestrate` is now `control`") == 1
