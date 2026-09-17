@@ -186,7 +186,7 @@ def stop_fields(until: str, unattended: bool) -> dict[str, str]:
         raise HTTPException(400, str(e)) from None
 
 
-def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_known: bool = True) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
     a lead — which sessions it controls. Without it both come back empty, which is what a
@@ -246,7 +246,6 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         d["profile_line"] = line
     pend = s.get("pending") or {}
     d["deadline"] = pend.get("deadline") or ""
-    d["ready"] = ready_to_close(s)
     # The report channels (design §4.8, §4.5a card **report line**, TD-028 step 4). One line, shown
     # only when a channel is non-empty: `report_line` is the same text `ao status -v` prints — one
     # formatter, so the card and the CLI cannot drift — and the findings count rides beside it. The
@@ -286,17 +285,31 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         if s.get("id") in (o.get("controllers") or [])
     ]
     d["holds_control"] = has_control(s.get("capabilities"))
+    # `fleet_known=False`: the caller asked for the fleet and did not get it. An empty members list
+    # then means *unknown*, and Ready to close must not read it as *none* (review of PR #195).
+    d["ready"] = ready_to_close(s, d["members"] if fleet_known else None)
     return d
 
 
-def ready_to_close(s: dict[str, Any]) -> list[tuple[str, bool]]:
-    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents."""
+def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ()) -> list[tuple[str, bool]]:
+    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents — and,
+    for a session other sessions list as a controller, no live member. That last one comes from the
+    control graph, not from a role: it covers a lead, a director over leads, and a session attached
+    by hand with `ao control`, and a session that controls nothing never sees it. A lead idle
+    between rounds with its log pushed used to read *ready to close ✓* over three working members,
+    one click from orphaning them (seen 2026-09-17)."""
     git = s.get("git") or {}
     checks = []
     if s.get("dir") and git:
         checks.append(("tree clean", git.get("dirty", 0) == 0))
         checks.append(("branch pushed", git.get("ahead", 0) == 0 and bool(git.get("upstream"))))
     checks.append(("no subagents running", (s.get("subagents") or 0) == 0))
+    if members is None:
+        checks.append(("members unknown — the host agent did not list the sessions; reload", False))
+    elif members:
+        up = [m["name"] for m in members if m.get("state") not in DEAD]
+        label = f"no live members ({', '.join(up)} — stop the team first)" if up else "no live members"
+        checks.append((label, not up))
     return checks
 
 
@@ -470,12 +483,13 @@ def create_app() -> FastAPI:
             if e.status_code == 503:
                 return RedirectResponse("/", status_code=303)  # the Org shows the down banner
             raise
+        known = True
         try:
             fleet = await call("list")
         except HTTPException:  # the record we already have still renders; membership just empties
-            fleet = [s]
+            fleet, known = [s], False  # …and Ready to close says it does not know, rather than pass
         return templates.TemplateResponse(
-            request, "focus.html", {"s": view(s, fleet), "host": host_name(), "active": "Org"}
+            request, "focus.html", {"s": view(s, fleet, fleet_known=known), "host": host_name(), "active": "Org"}
         )
 
     @app.get("/new", response_class=HTMLResponse)

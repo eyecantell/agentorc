@@ -171,3 +171,32 @@ def test_the_top_bar_person_inbox_shows_its_count_only_above_zero(monkeypatch, t
         assert 'id="personinbox"' in html and 'id="personbox"' in html and 'id="personlist"' in html
     assert 'class="badge unread hidden" id="personunread"></span>' in zero
     assert 'class="badge unread" id="personunread">1</span>' in one
+
+
+def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph(monkeypatch, tmp_path):
+    """Design §4.2 (2026-09-17): a lead idle between rounds, log pushed, used to read *ready to
+    close ✓* over working members. The item comes from `controllers`, not a role — and a session
+    that controls nothing never sees it."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    clean = {"dirty": 0, "ahead": 0, "upstream": "origin/x", "branch": "x"}
+    lead = {"id": "ao-orc", "name": "orc", "state": "idle", "dir": "/tmp/a", "kind": "agent", "git": clean, "tail": []}
+    worker = {"id": "ao-g1", "name": "g1", "state": "working", "dir": "/tmp/b", "kind": "agent", "git": clean,
+              "controllers": ["ao-orc"], "tail": []}  # fmt: skip
+    fleet = [lead, worker]
+    v = view(lead, fleet)
+    assert v["ready"][-1] == ("no live members (g1 — stop the team first)", False)
+    assert "ready to close ✓" not in templates.get_template("card.html").render(s=v)
+    # a plain worker's checklist is what it always was
+    assert [n for n, _ in view(worker, fleet)["ready"]] == ["tree clean", "branch pushed", "no subagents running"]
+    # the member gone: the item passes, and the card says so
+    worker["state"] = "closed"
+    v = view(lead, fleet)
+    assert v["ready"][-1] == ("no live members", True)
+    assert "ready to close ✓" in templates.get_template("card.html").render(s=v)
+    # no role and no grant involved: any session a live one lists as a controller
+    assert view({**lead, "id": "ao-x"}, [{**worker, "state": "idle", "controllers": ["ao-x"]}])["ready"][-1][1] is False
+    # the fleet asked for and not got: unknown is not none (review of PR #195)
+    unknown = view(lead, [lead], fleet_known=False)["ready"][-1]
+    assert unknown[1] is False and unknown[0].startswith("members unknown")
