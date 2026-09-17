@@ -1517,8 +1517,9 @@ class HostAgent:
                 r.threads.setdefault(root, Tally()).count += 1
             if replied is None and me is not None:  # replying to nothing: counted under the pair too
                 for sid in named:
-                    self._pair(me, sid, now).at.append(at)
-                    self._pair(records[sid], sender, now).at.append(at)
+                    for t in (self._pair(me, sid, now), self._pair(records[sid], sender, now)):
+                        t.at.append(at)
+                        t.count = len(t.at)  # the window's count, kept as a field so pruning cannot reset it
         if closes and replied is not None:
             self._mark(replied.id, closed_by=mid, closed_at=at)
         if sender == PERSON and reply_to:
