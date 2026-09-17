@@ -55,6 +55,14 @@ def test_shell_send_tail_status_kill_close(subprocess_agent, tmp_path, capsys):
     assert cli.main(["status", "-v"]) == 0
     out = capsys.readouterr().out
     assert sid in out and "shell" in out and "│" in out  # the verbose tail rows
+    # the send above is on the record with who typed it (design §4.10 `sends`), and `-v` prints it
+    sends = call_sync("get", id=sid)["sends"]
+    assert [(e["from"], e["text"]) for e in sends] == [("person", "echo CLI-$((20+1))")]
+    assert f"send {sends[0]['id']} from person" in out and "unread" not in out
+    call_sync("msg", to=sid, text="a person's note")  # lands; the unread count shows, the body never
+    assert cli.main(["status", "-v"]) == 0
+    out = capsys.readouterr().out
+    assert "mail:   1 unread" in out and "a person's note" not in out
     assert cli.main(["status", "--json"]) == 0
     rows = json.loads(capsys.readouterr().out)
     assert [r["id"] for r in rows] == [sid] and rows[0]["state"] == "idle"

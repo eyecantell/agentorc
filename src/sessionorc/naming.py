@@ -46,3 +46,29 @@ def session_id(directory: str | Path, repo: str | None, name: str, existing: Ite
 
 def is_ours(tmux_session_name: str) -> bool:
     return tmux_session_name.startswith(PREFIX)
+
+
+# -- addresses (design §4.4a, TD-057 step 1) --------------------------------------------------------
+#
+# The org-wide address of a record is `<id>@<host>`. A bare id means *the record's own host*, so a
+# single-host store never contains `@`, and a `controllers`, `to` or `from` entry is stored
+# qualified only when it names a session on another host. `qualify` is the one normaliser every
+# id passes through on the way in; nothing else in the tree parses an address.
+
+
+def split_address(address: str) -> tuple[str, str | None]:
+    """`ao-x@laptop` → `("ao-x", "laptop")`; a bare id → `(id, None)`. Whitespace stripped."""
+    text = str(address).strip()
+    sid, sep, host = text.rpartition("@")
+    if not sep:
+        return text, None
+    return sid.strip(), (host.strip() or None)
+
+
+def qualify(address: str, *, local: str) -> str:
+    """The stored form of an address seen from host `local`: bare for a session on this host,
+    `id@host` for one elsewhere. `ao-x@kmaster` on kmaster is `ao-x`; `ao-x@laptop` stays."""
+    sid, host = split_address(address)
+    if host is None or host == local:
+        return sid
+    return f"{sid}@{host}"

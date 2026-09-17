@@ -27,6 +27,65 @@ PROGRESS_STATUSES = ("claimed", "done", "dropped")
 # act on other sessions through the agent (§9 invariant 11).
 GRANTS = ("orchestrate",)
 
+# Message kinds (design §4.10): a small closed set, so a message's purpose is read off its envelope.
+MailKind = Literal["note", "ask", "reply", "conflict"]
+MAIL_KINDS = ("note", "ask", "reply", "conflict")
+# The two kinds that pose a question and so carry a bound, may be closed by a reply, are left
+# pending by an addressee's exit, and are never pruned while open. A `conflict` is an `ask` for
+# every rule in §4.10; only its delivery shape differs.
+ASK_KINDS = ("ask", "conflict")
+PERSON = "person"  # `from` when a person sent the entry; never a session id
+
+# Who owns which field of a record (design §4.4a, §9 invariant 15): the node observes and enforces
+# on its host, the home holds the graph and intent, and identity is set once at create. Merges go
+# by owner, never by last write, so a field belongs to exactly one set — `test_models` pins that
+# every field of `Session` is in one and only one of the three.
+NODE_OWNED = frozenset(
+    {
+        "state",
+        "since",
+        "pending",
+        "confidence",
+        "pane",
+        "tail",
+        "last_output",
+        "exit_code",
+        "git",
+        "model",
+        "subagents",
+        "wrapup_sent_at",
+        "run_log",
+        "previous_run",
+        "closed_at",
+        "external",
+    }
+)
+HOME_OWNED = frozenset(
+    {
+        "controllers",
+        "capabilities",
+        "team",
+        "project",
+        "role",
+        "lane",
+        "unattended",
+        "run_until",
+        "wrapup_prompt",
+        "progress",
+        "findings",
+        "ledger",
+        "seen_at",
+        "inbox",
+        "outbox",
+        "threads",
+        "sends",
+        "superseded_by",
+    }
+)
+IDENTITY = frozenset(
+    {"id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "created", "host"}
+)
+
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
 # depending on whether the host is volatile, so it gets two slots.
 STATE_RANK: dict[str, int] = {
@@ -99,6 +158,97 @@ class FindingEntry:
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> FindingEntry:
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class MailEntry:
+    """One message as it sits in an inbox — or, the same entry, in its sender's `outbox`
+    (design §4.10 "A message is delivered to a mailbox"). Every copy of one message carries the
+    same `id`, which is what makes a thread one thread; the fields the home writes later
+    (`read_at`, `closed_by`, `expired_at`, `pending`, `copies_failed`) are written on every record
+    holding the id, so both cards show the same fact."""
+
+    id: str  # minted by the home: `m-<hex>`
+    from_: str  # the sender's session id, or PERSON; serialised as `from`
+    to: list[str]  # the addressees the *sender* named (the recipient cap counts these)
+    at: str  # stamped by the home on its own clock (§4.4a)
+    kind: str  # one of MAIL_KINDS
+    text: str
+    about: str | None = None  # a session id, a `TD-NNN`, a PR — free text the sender chose
+    read_at: str | None = None  # set only when `inbox` returned the entry to its caller (lifecycle stage 2)
+    reply_to: str | None = None  # a `reply`: the entry it answers, one in the replier's own inbox
+    root: str = ""  # the thread: the id of the first `ask`, `conflict` or `note` a chain replies to
+    copies: list[str] = field(default_factory=list)  # the other controllers this landed with, expanded at send
+    copies_failed: list[str] = field(default_factory=list)  # copies that could not land, dropped (§4.10)
+    bound: str | None = None  # an `ask`'s expiry, wall-clock on the home's clock, running from `at` read or not
+    closed_by: str | None = None  # the first `reply` that answered an `ask`; closes it uncounted
+    closed_at: str | None = None  # when it did: retention for a closed `ask` runs from here
+    expired_at: str | None = None  # the bound ran out, or an addressee was closed or forgotten
+    pending: list[str] = field(default_factory=list)  # addressees that exited with the `ask` open (may resume)
+    cites: list[str] = field(default_factory=list)  # a `conflict`: the `sends` ids it cannot reconcile
+
+    def __post_init__(self) -> None:
+        self.root = self.root or self.id  # a message replying to nothing is its own thread's root
+
+    @property
+    def open(self) -> bool:
+        """An `ask` or `conflict` nobody has answered and whose bound has not run out — never
+        pruned, and the one thing a first `reply` closes for free."""
+        return self.kind in ASK_KINDS and not self.closed_by and not self.expired_at
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["from"] = d.pop("from_")
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> MailEntry:
+        d = dict(d)
+        d["from_"] = d.pop("from", d.pop("from_", ""))
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class Tally:
+    """The exchange count of one thread — or of one pair, for messages that reply to nothing —
+    kept as its own field on every record holding an entry of it, never recounted from the entries
+    that survive pruning (design §4.10 "How the count works, exactly"). A pair's count is the
+    entries inside a rolling window, so `at` keeps their times; a thread's is a plain count."""
+
+    count: int = 0
+    bound_hit: bool = False
+    at: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> Tally:
+        return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+@dataclass
+class SendEntry:
+    """One `send` or `keys` that reached this session's pane (design §4.10 "A `send` is recorded
+    on the record it lands on"): who typed what, minted and stamped at the home like a message, so
+    a `conflict` can cite two of them by id instead of guessing at the keystrokes."""
+
+    id: str  # `s-<hex>`
+    from_: str  # the caller's session id, or PERSON
+    at: str
+    text: str
+    verdict: str = "submitted"  # or the submit error (`prompt-stuck`, …): the paste still reached the pane
+
+    def to_dict(self) -> dict[str, Any]:
+        d = asdict(self)
+        d["from"] = d.pop("from_")
+        return d
+
+    @classmethod
+    def from_dict(cls, d: dict[str, Any]) -> SendEntry:
+        d = dict(d)
+        d["from_"] = d.pop("from", d.pop("from_", ""))
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
@@ -269,12 +419,65 @@ class Session:
     run_until: str | None = None
     wrapup_prompt: str | None = None
     wrapup_sent_at: str | None = None
+    # The host this record's tmux session runs on (design §4.4a, TD-057 step 1). Ids naming a
+    # session on this same host are stored bare; only another host's are stored `id@host`
+    # (`naming.qualify`). The host agent fills it at create and backfills it on load.
+    host: str = ""
+    # Mail (design §4.10, TD-052 step 1). `inbox` lives on the *recipient*, on the same rule as
+    # `controllers`: persisted with the record, dies when it is forgotten, moves with a resume.
+    # `outbox` is the sender's own copy of what it sent, so "the sender's entry" — the one that
+    # carries `copies_failed`, the expired mark, *addressee exited* — is a real entry and not a
+    # scan of other records' inboxes. `threads` is the exchange tally per thread root (and per
+    # pair, keyed `pair:<other>`), a field so pruning cannot reset the deadlock bound. `sends` is
+    # what was typed into this pane and by whom. All home-owned (§4.4a).
+    inbox: list[MailEntry] = field(default_factory=list)
+    outbox: list[MailEntry] = field(default_factory=list)
+    threads: dict[str, Tally] = field(default_factory=dict)
+    sends: list[SendEntry] = field(default_factory=list)
+    # Set on the closed record a resume left behind: the id continuing its conversation. Mail
+    # addressed to this record is forwarded there; an act on it is refused as on any closed record.
+    superseded_by: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """The whole record, as the store writes it."""
         d = asdict(self)
         d.pop("rev")
         d["pending"] = self.pending.to_dict() if self.pending else None
+        d["inbox"] = [e.to_dict() for e in self.inbox]
+        d["outbox"] = [e.to_dict() for e in self.outbox]
+        d["threads"] = {k: t.to_dict() for k, t in self.threads.items()}
+        d["sends"] = [e.to_dict() for e in self.sends]
         return d
+
+    def view(self) -> dict[str, Any]:
+        """The record as `list`, `get` and the `subscribe` deltas hand it out: message bodies never
+        ride the push that reaches the Org page on every change (design §4.10 "A bounded body") —
+        those carry counts, and a body is fetched by `inbox`. `threads` (the `bound_hit` marks a
+        card shows) and `sends` (what `ao status` prints) stay."""
+        d = self.to_dict()
+        d.pop("inbox")
+        d.pop("outbox")
+        d["unread"] = self.unread()
+        d["mail"] = self.mail_marks()
+        return d
+
+    def unread(self) -> int:
+        return sum(1 for e in self.inbox if not e.read_at)
+
+    def mail_marks(self) -> dict[str, Any]:
+        """What a card and an `ao` reply say about this session's mail without a body: open `ask`s
+        it holds, its own `ask`s that expired or whose addressee exited, and copies that failed."""
+        return {
+            "open_asks": [e.id for e in self.inbox if e.open],
+            "expired": [e.id for e in self.outbox if e.expired_at],
+            "addressee_exited": [e.id for e in self.outbox if e.pending and e.open],
+            "copies_failed": [e.id for e in self.outbox if e.copies_failed],
+            "bound_hit": [k for k, t in self.threads.items() if t.bound_hit],
+        }
+
+    def holds(self, msg_id: str) -> list[MailEntry]:
+        """Every copy of a message this record holds: at most one in the inbox, one in the outbox."""
+        return [e for e in (*self.inbox, *self.outbox) if e.id == msg_id]
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> Session:
@@ -282,11 +485,19 @@ class Session:
         pending = d.pop("pending", None)
         progress = d.pop("progress", None) or []
         findings = d.pop("findings", None) or []
+        inbox = d.pop("inbox", None) or []
+        outbox = d.pop("outbox", None) or []
+        threads = d.pop("threads", None) or {}
+        sends = d.pop("sends", None) or []
         known = {f for f in cls.__dataclass_fields__}
         obj = cls(**{k: v for k, v in d.items() if k in known})
         obj.pending = Pending.from_dict(pending) if pending else None
         obj.progress = [ProgressEntry.from_dict(p) for p in progress]
         obj.findings = [FindingEntry.from_dict(f) for f in findings]
+        obj.inbox = [MailEntry.from_dict(e) for e in inbox]
+        obj.outbox = [MailEntry.from_dict(e) for e in outbox]
+        obj.threads = {k: Tally.from_dict(t) for k, t in threads.items()}
+        obj.sends = [SendEntry.from_dict(e) for e in sends]
         return obj
 
     # Transition counter, in memory only (dropped by `to_dict`, so 0 on load): `since` is whole

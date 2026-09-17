@@ -147,7 +147,9 @@ not mix:
 - **report** — what a session declares about its work on its own record: **progress** (per
   reference) and **findings**. Addressed to nobody. — *proposed* (design §4.8).
 - **message** (**mail**) — an attributed entry delivered to a recipient's **inbox**, never typed
-  into a pane (design §4.10). Kinds: `note`, `ask`, `reply`, `conflict`. — *proposed*.
+  into a pane (design §4.10). Kinds: `note`, `ask`, `reply`, `conflict`. The sender keeps its own
+  copy in its **outbox**, which is where the marks it must see live. — *proposed*; built 2026-09-17
+  (TD-052 step 1).
 - **person inbox** — the host's inbox for the person; sessions reach it with `ao msg person`. —
   *proposed* (design §4.10, 2026-09-16).
 - **thread** — a root message and every `reply` chained to it. — *proposed*.

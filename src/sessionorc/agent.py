@@ -10,29 +10,39 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import inspect
 import json
 import logging
 import os
 import re
+import secrets
 import signal
 import sys
 import time
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, hosts, naming, paths, reports
+from sessionorc import adapters, hosts, mail, naming, paths, reports
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
+from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
+    ASK_KINDS,
     GRANTS,
+    MAIL_KINDS,
+    PERSON,
     PROGRESS_STATUSES,
     SOURCES,
     FindingEntry,
+    MailEntry,
     Pending,
     ProgressEntry,
+    SendEntry,
     Session,
     State,
+    Tally,
     normalize_ref,
     now_iso,
 )
@@ -57,13 +67,8 @@ PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in t
 SUBMIT_SECONDS = 1.5  # `send`: how long the composer gets to empty after Enter, per try (TD-027)
 COMPOSER_LINES = 12  # raw rows an adapter's `composer` reads (the composer sits above a status line or two)
 SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends
-# RPCs that act on a session (design §4.8): a caller that is a session needs the `orchestrate`
-# grant to run one of these on a session other than itself (§9 invariant 11). `create` targets a
-# session that is by definition not the caller; `set_grants` is gated so a session cannot grant
-# itself. Reads are never listed here.
-ACTING_RPCS = frozenset(
-    {"send", "keys", "kill", "close", "set_mode", "remove", "create", "set_grants", "set_controllers", "set_stop"}
-)
+# `ACTING_RPCS` lives in `sessionorc.mail` beside the gates, and is re-exported here for the
+# callers that always read it from the agent.
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs_keep_days`)
 # A session past its `run_until` is asked to wrap up and then killed (design §6, TD-026): this is how
@@ -100,6 +105,9 @@ class HostAgent:
         self.tmux = tmux or Tmux()
         self.store = store or SessionStore()
         self.events = events or EventQueue()
+        # This host's name (design §4.4a): what `host` on every record holds, and what an address
+        # is qualified against — `ao-x@<this host>` is stored bare (`naming.qualify`).
+        self.host = hosts.local_host().name
         self.sessions: dict[str, Session] = self.store.load_all()
         for s in self.sessions.values():
             # `prompt` pendings (Claude's idle_prompt) stopped being an alert on 2026-09-06; a record
@@ -107,6 +115,13 @@ class HostAgent:
             if s.pending and s.pending.kind == "prompt":
                 s.set_state("idle", confidence="hook")
                 self.store.save(s)
+            if not s.host:  # a record written before TD-057 step 1: it ran here, so it is this host's
+                s.host = self.host
+                self.store.save(s)
+        # (sender, client nonce) → the verdict its first send got (design §4.4a "Delivery and
+        # time"): a retry after a reconnect never lands twice and is not an identical repeat —
+        # it returns the original verdict. Bounded, oldest out, in memory only.
+        self._nonces: OrderedDict[tuple[str, str], tuple[dict[str, Any] | None, RpcError | None]] = OrderedDict()
         self._dir_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         # subscriber → what it was last sent, per session (TD-009: a new tab gets its own snapshot
         # without every other tab being re-sent everything)
@@ -201,6 +216,7 @@ class HostAgent:
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
         await self._enforce_stop_times(snapshot_at)
+        await self._sweep_mail(snapshot_at)
 
     async def _enforce_stop_times(self, now: datetime) -> None:
         """Stop the unattended sessions whose time is up (design §6, TD-026 gap 1).
@@ -468,7 +484,14 @@ class HostAgent:
         # store was lost): adopt them minimally as shells so they appear in the Org.
         for name, pane in panes.items():
             if name not in self.sessions and not self._is_removed_pane(name, pane):
-                s = Session(id=name, name=name[len(naming.PREFIX) :], kind="interactive", adapter="shell", dir="")
+                s = Session(
+                    id=name,
+                    name=name[len(naming.PREFIX) :],
+                    kind="interactive",
+                    adapter="shell",
+                    dir="",
+                    host=self.host,
+                )
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
                 self._observe(s, pane, tails.get(name, []), now)
@@ -605,8 +628,15 @@ class HostAgent:
             side.pop(sid, None)
 
     def _forget(self, sid: str) -> None:
-        if self.sessions.pop(sid, None) is None:
+        gone = self.sessions.get(sid)
+        if gone is None:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
+        # Its open `ask`s expire with it (design §4.10 lifecycle): the record and its inbox go, and
+        # every other holder of those asks — the askers — is told so. Done while it is still in the
+        # map so `_mark` reaches it, harmlessly, along with the rest.
+        for e in [e for e in gone.inbox if e.open]:
+            self._mark(e.id, expired_at=now_iso())
+        self.sessions.pop(sid, None)
         self.store.delete(sid)
         # Scrub the id from every subscriber's map and queue the one `gone`: whichever
         # `_push_changes` runs next (the caller's or a tick's) announces it exactly once.
@@ -618,10 +648,10 @@ class HostAgent:
     # -- RPC methods -----------------------------------------------------------------------------
 
     async def rpc_list(self) -> list[dict[str, Any]]:
-        return [s.to_dict() for s in (*self.sessions.values(), *self._external.values())]
+        return [s.view() for s in (*self.sessions.values(), *self._external.values())]
 
     async def rpc_get(self, id: str) -> dict[str, Any]:
-        return self._get(id, external=True).to_dict()
+        return self._get(id, external=True).view()
 
     async def rpc_create(
         self,
@@ -657,7 +687,7 @@ class HostAgent:
         # envelope's, injected by the dispatcher — a person's create has none, and then the new
         # session begins with only whatever `--controller` asked for (often nothing, which means
         # nobody may act on it: the explicit default).
-        members = _controllers(controllers or [])
+        members = [self._addr(c) for c in _controllers(controllers or [])]
         if caller and caller not in members:
             members.insert(0, str(caller))
         try:
@@ -750,13 +780,14 @@ class HostAgent:
                 run_until=_stop_time(run_until),
                 wrapup_prompt=(str(wrapup_prompt).strip() or None) if wrapup_prompt else None,
                 previous_run=previous_run,
+                host=self.host,
             )
             self.sessions[sid] = s
             self.store.save(s)
             self._remember_dir(directory)
             if resume:
                 await self._supersede(resume, sid)
-        return s.to_dict()
+        return s.view()
 
     async def rpc_name_check(self, dir: str, name: str, repo: str | None = None) -> dict[str, Any]:
         """What §4.1's name rule would do to this name, without doing it: the New session form's
@@ -856,13 +887,59 @@ class HostAgent:
 
     async def _supersede(self, adapter_id: str, new_sid: str) -> None:
         """A resumed conversation continues in the new session: the exited record it came from is
-        closed (kept a day, sorted last) and its dead pane dropped, so the Org shows one card."""
+        closed (kept a day, sorted last) and its dead pane dropped, so the Org shows one card.
+
+        **Resume carries mail forward** (design §4.10 lifecycle): every entry still inside the
+        retention window, read or unread, the exchange tallies and `sends` move to the new record,
+        because the conversation they were addressed to is the one continuing — a worker that read
+        an `ask`, crashed and was resumed must not lose the thread it was answering. Ids follow the
+        move: the old id is rewritten to the new one in the moved entries' `to`, and in every other
+        record's pair tallies and pending-`ask` addressees; an `ask` left pending by the exit is
+        open again. The old record remembers its successor, so a message addressed to it is
+        forwarded there (`rpc_msg`) while an act on it is refused, as on any closed record."""
+        new = self.sessions.get(new_sid)
         for other in list(self.sessions.values()):
             if other.id != new_sid and other.adapter_id == adapter_id and other.state == "exited":
                 await asyncio.to_thread(self.tmux.kill_session, other.id)
                 other.set_state("closed", confidence=other.confidence)
                 other.closed_at = now_iso()
+                other.superseded_by = new_sid
+                if new is not None:
+                    self._move_mail(other, new)
                 self.store.save(other)
+        if new is not None:
+            self.store.save(new)
+
+    def _move_mail(self, old: Session, new: Session) -> None:
+        now = datetime.now(UTC)
+        new.inbox = self._rename([self._copy(e) for e in old.inbox if self._keep(e, now, inbox=True)], old.id, new.id)
+        new.outbox = self._rename(
+            [self._copy(e) for e in old.outbox if self._keep(e, now, inbox=False)], old.id, new.id
+        )
+        new.threads = {k.replace(f"pair:{old.id}", f"pair:{new.id}"): t for k, t in old.threads.items()}
+        new.sends = list(old.sends)
+        old.inbox, old.outbox, old.threads, old.sends = [], [], {}, []
+        for r in self.sessions.values():
+            if r.id in (old.id, new.id):
+                continue
+            touched = False
+            if f"pair:{old.id}" in r.threads:
+                r.threads[f"pair:{new.id}"] = r.threads.pop(f"pair:{old.id}")
+                touched = True
+            pending = [e for e in (*r.inbox, *r.outbox) if old.id in e.pending]
+            if pending:  # the addressee that exited is back: its ask is open again, addressed to it
+                self._rename(pending, old.id, new.id)
+                touched = True
+            if touched:
+                self.store.save(r)
+
+    @staticmethod
+    def _rename(entries: list[MailEntry], old: str, new: str) -> list[MailEntry]:
+        for e in entries:
+            e.to = [new if x == old else x for x in e.to]
+            e.copies = [new if x == old else x for x in e.copies]
+            e.pending = [x for x in e.pending if x != old]
+        return entries
 
     def occupants(self, directory: Path) -> list[str]:
         """Who holds the agent slot for `directory` (design §9 invariant 2): agentorc's own live
@@ -920,7 +997,7 @@ class HostAgent:
         s.pane = False  # unlike a natural exit, a kill destroys the pane (TD-023)
         self.store.save(s)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
-        return s.to_dict()
+        return s.view()
 
     async def rpc_close(self, id: str) -> dict[str, Any]:
         s = self._get(id)
@@ -930,7 +1007,7 @@ class HostAgent:
         s.closed_at = now_iso()
         self.store.save(s)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
-        return s.to_dict()
+        return s.view()
 
     async def rpc_remove(self, id: str) -> None:
         s = self._get(id)
@@ -945,17 +1022,28 @@ class HostAgent:
         self._removed[id] = (pane.created if pane else None, time.monotonic())
         await self._push_changes()
 
-    async def rpc_send(self, id: str, text: str, wait: bool = False, timeout: float | None = None) -> dict | None:
+    async def rpc_send(
+        self, id: str, text: str, wait: bool = False, timeout: float | None = None, caller: Any = None
+    ) -> dict | None:
         """Type a prompt. With `wait` (TD-016, design §4.2): return the record once the session has
         started on *this* prompt and settled again (`SETTLED`). A session that is busy queues the
         prompt behind its current turn, so the wait first lets that turn end, then looks for the
         next one to start. Errors: `prompt-stalled` when nothing starts within `SEND_STALL_SECONDS`
         of the moment it could, `timeout` after `timeout` seconds in total, `removed` if the record
-        goes away. Nothing is ever re-sent on a guess (design §4.2)."""
+        goes away. Nothing is ever re-sent on a guess (design §4.2). `caller` is the envelope's,
+        injected by the dispatcher: every send that reaches the pane is recorded on the record as
+        `sends`, with who typed it (design §4.10)."""
         s = self._get(id)
+        self._refuse_closed(s)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
-        await self._submit(id, adapters.get(s.adapter), text)
+        entry = self._record_send(s, caller, text)
+        try:
+            await self._submit(id, adapters.get(s.adapter), text)
+        except RpcError as e:
+            entry.verdict = str(e)
+            self.store.save(s)
+            raise
         if not wait:
             return None
         end = None if timeout is None else time.monotonic() + timeout
@@ -972,12 +1060,12 @@ class HostAgent:
                 self._raise_not_settled(id, timeout)
             s = self._get(id)
             if s.state != "idle":
-                return s.to_dict()
+                return s.view()
             if s.rev - rev_sent >= 3:
                 # working → idle → working → idle inside one poll: the queued turn already ran.
                 # Accepted residual: a permission answered *and* the rest of that same turn finishing
                 # inside one 0.1 s poll would look the same; a turn does not end that fast.
-                return s.to_dict()
+                return s.view()
         rev_before = s.rev
         # Started: any transition off this idle (a hook's UserPromptSubmit → working, a scraped
         # working, even an exit) within the stall window.
@@ -988,7 +1076,26 @@ class HostAgent:
             raise RpcError(f"prompt-stalled: {id} showed no activity within {stall:g} s")
         if not await self._wait_state(id, lambda x: x.state in SETTLED and x.rev != rev_before, left()):
             self._raise_not_settled(id, timeout)
-        return self._get(id).to_dict()
+        return self._get(id).view()
+
+    @staticmethod
+    def _refuse_closed(s: Session) -> None:
+        """An act on a closed record is refused (design §4.10 lifecycle) — a resumed conversation's
+        old id in particular: only mail is forwarded to the successor, never keystrokes."""
+        if s.state == "closed":
+            where = f"; it was resumed as {s.superseded_by}" if s.superseded_by else ""
+            raise RpcError(f"{s.id} is closed{where}: nothing is typed into a closed session")
+
+    def _record_send(self, s: Session, caller: Any, text: str) -> SendEntry:
+        """`sends` (design §4.10): what was typed into this pane and by whom, minted and stamped
+        here like a message, bounded to the last `SENDS_KEEP`. Written at the gate — before the
+        paste, since a paste that then sticks still reached the pane — and its verdict amended if
+        the submit fails."""
+        who = PERSON if mail.is_person(caller) else str(caller)
+        entry = SendEntry(id="s-" + secrets.token_hex(6), from_=who, at=now_iso(), text=text)
+        s.sends = (s.sends + [entry])[-mail.SENDS_KEEP :]
+        self.store.save(s)
+        return entry
 
     async def _submit(self, sid: str, adapter: Any, text: str) -> None:
         """Paste, Enter, and confirm the prompt left the composer (TD-027, design §4.2). Only an
@@ -1053,8 +1160,10 @@ class HostAgent:
                 return False
             await asyncio.sleep(0.1)
 
-    async def rpc_keys(self, id: str, keys: list[str]) -> None:
-        self._get(id)
+    async def rpc_keys(self, id: str, keys: list[str], caller: Any = None) -> None:
+        s = self._get(id)
+        self._refuse_closed(s)
+        self._record_send(s, caller, " ".join(str(k) for k in keys))
         await asyncio.to_thread(lambda: self.tmux.run("send-keys", "-t", f"={id}:", *keys))
 
     async def rpc_explain(self, id: str, lines: int = 40) -> dict[str, Any]:
@@ -1106,13 +1215,13 @@ class HostAgent:
         if not s.external:
             self.store.save(s)
         await self._push_changes()
-        return s.to_dict()
+        return s.view()
 
     async def rpc_set_mode(self, id: str, unattended: bool) -> dict[str, Any]:
         s = self._get(id)
         s.unattended = bool(unattended)
         self.store.save(s)
-        return s.to_dict()
+        return s.view()
 
     async def rpc_set_stop(
         self, id: str, run_until: str | None = None, wrapup_prompt: str | None = None
@@ -1142,7 +1251,7 @@ class HostAgent:
             s.wrapup_prompt = str(wrapup_prompt).strip() or None
         self.store.save(s)
         await self._push_changes()
-        return s.to_dict()
+        return s.view()
 
     async def rpc_set_grants(
         self, id: str, add: list[str] | None = None, remove: list[str] | None = None
@@ -1154,7 +1263,7 @@ class HostAgent:
         s.capabilities = [g for g in GRANTS if (g in s.capabilities or g in adding) and g not in removing]
         self.store.save(s)
         await self._push_changes()
-        return s.to_dict()
+        return s.view()
 
     async def rpc_set_controllers(
         self, id: str, add: list[str] | None = None, remove: list[str] | None = None
@@ -1167,7 +1276,8 @@ class HostAgent:
         their own session to a controller deliberately. Takes effect on the next call the
         controller makes: the gate reads the record, not a cached copy."""
         s = self._get(id)
-        adding, removing = _controllers(add or []), _controllers(remove or [])
+        adding = [self._addr(c) for c in _controllers(add or [])]
+        removing = [self._addr(c) for c in _controllers(remove or [])]
         if s.id in adding:
             raise RpcError(f"{s.id} cannot be its own controller: it could then drop the ones watching it")
         # One call naming an id in both `add` and `remove` drops it: remove wins, as it already
@@ -1177,7 +1287,7 @@ class HostAgent:
         s.controllers = _controllers([c for c in s.controllers + adding if c not in removing])
         self.store.save(s)
         await self._push_changes()
-        return s.to_dict()
+        return s.view()
 
     async def rpc_progress(
         self,
@@ -1213,10 +1323,365 @@ class HostAgent:
         if applied:
             self.store.save(s)
             await self._push_changes()
-        out = s.to_dict()
+        out = s.view()
         if not applied:
             out["refused"] = entry.to_dict()
         return out
+
+    # -- mail (design §4.10, TD-052 step 1) ------------------------------------------------------
+
+    async def rpc_msg(
+        self,
+        text: str,
+        to: list[str] | str | None = None,
+        kind: str = "note",
+        about: str | None = None,
+        reply_to: str | None = None,
+        bound: float | None = None,
+        cites: list[str] | None = None,
+        nonce: str | None = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
+        entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
+        by invariant 11 — messaging is not acting — and bounded as that section lists: a recipient
+        cap on the addressees the sender named, all or nothing across them, a copy to the other
+        controllers of the session it is `about` (exempt from both), the exchange bound per thread
+        and per pair, the mailbox depth, the body cap, and an `ask`'s wall-clock bound. `bound` is
+        the `ask`'s, in seconds, else `mail.ASK_BOUND`. A retry carrying the same `nonce` returns
+        the first send's verdict. The reply names what landed, what was copied, and what was
+        forwarded to a resumed successor."""
+        sender = PERSON if mail.is_person(caller) else str(caller)
+        key = (sender, str(nonce)) if nonce else None
+        if key and key in self._nonces:
+            result, error = self._nonces[key]
+            if error is not None:
+                raise error
+            return dict(result or {})
+        try:
+            result = await self._msg(sender, text, to, kind, about, reply_to, bound, cites)
+        except RpcError as e:
+            if key:
+                self._remember_nonce(key, (None, e))
+            raise
+        if key:
+            self._remember_nonce(key, (result, None))
+        return result
+
+    def _remember_nonce(self, key: tuple[str, str], verdict: Any) -> None:
+        self._nonces[key] = verdict
+        while len(self._nonces) > mail.NONCES_KEEP:
+            self._nonces.popitem(last=False)
+
+    async def _msg(
+        self,
+        sender: str,
+        text: str,
+        to: list[str] | str | None,
+        kind: str,
+        about: str | None,
+        reply_to: str | None,
+        bound: float | None,
+        cites: list[str] | None,
+    ) -> dict[str, Any]:
+        """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
+        the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land)."""
+        records = self.sessions
+        if kind not in MAIL_KINDS:
+            raise RpcError(f"unknown message kind {kind!r}; kinds are: {', '.join(MAIL_KINDS)}")
+        text = str(text or "").strip()
+        if not text:
+            raise RpcError("a message needs a body")
+        if len(text.encode()) > mail.TEXT_CAP:
+            raise RpcError(
+                f"message body over {mail.TEXT_CAP} bytes: cite a `sends` id or a reference instead (design §4.10)"
+            )
+        me = records.get(sender) if sender != PERSON else None
+        if sender != PERSON and me is None:
+            raise RpcError(f"{sender} cannot send mail: this host agent has no record of it (design §4.10)")
+        named = [self._addr(x) for x in ([to] if isinstance(to, str) else list(to or [])) if str(x).strip()]
+        named = list(dict.fromkeys(named))
+        if PERSON in named:
+            raise RpcError(
+                "the person inbox is not built yet (TD-052 step 2); a person is reached through "
+                "user_attention.md with a Due: date"
+            )
+        # -- a reply belongs to its root's thread, and answers an entry the replier holds ----------
+        replied: MailEntry | None = None
+        copies: list[str] = []
+        if kind == "reply" and not reply_to:
+            raise RpcError("a reply names the entry it answers: --reply-to <id> (design §4.10)")
+        if reply_to:
+            held = [e for e in me.inbox if e.id == reply_to] if me is not None else self._holders(reply_to)
+            if not held:
+                raise RpcError(
+                    f"{sender} holds no entry {reply_to} in its inbox: a reply names one it was addressed or "
+                    f"copied (design §4.10)"
+                )
+            replied = held[0]
+            if not named:
+                if replied.from_ == PERSON:
+                    raise RpcError("the person inbox is not built yet (TD-052 step 2): name the addressee")
+                named = [replied.from_]
+            # replies in a copied thread are copied to the same set (design §4.10): the thread's
+            # copies — a copy that failed to land included, so the set is the one meant — and its
+            # other addressees, so the other lead of a `conflict` sees how it was settled
+            same_set = dict.fromkeys([*replied.copies, *replied.copies_failed, *replied.to, replied.from_])
+            copies = [x for x in same_set if x not in (sender, PERSON, *named)]
+        if not named:
+            raise RpcError("a message names its addressees: there is no broadcast (design §4.10)")
+        if len(named) > mail.RECIPIENT_CAP:
+            raise RpcError(
+                f"{len(named)} addressees is more than the cap of {mail.RECIPIENT_CAP} (design §4.10: no broadcast)"
+            )
+        # -- forwarding: a closed record a live one superseded hands its mail on -------------------
+        forwarded: dict[str, str] = {}
+        resolved: list[str] = []
+        for asked in named:
+            sid, seen = asked, {asked}
+            while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
+                sid = r.superseded_by
+                if sid in seen:
+                    break
+                seen.add(sid)
+            if sid != asked:
+                forwarded[asked] = sid  # the id the sender wrote → the record continuing it, however many hops
+            if sid not in resolved:
+                resolved.append(sid)
+        named = resolved
+        # -- the gate, per addressee, all or nothing ------------------------------------------------
+        for sid in named:
+            if sid not in records:
+                raise RpcError(f"no session {sid}")
+            if (reason := mail.message_gate(records, sender, sid)) is not None:
+                raise RpcError(reason)
+        cited: list[str] = []
+        if kind == "conflict":
+            if len(named) < 2:
+                raise RpcError("a conflict is an ask to two or more controllers at once (design §4.10)")
+            cited = [str(c) for c in (cites or [])]
+            known = {e.id for e in me.sends} if me is not None else set()
+            if not cited or any(c not in known for c in cited):
+                raise RpcError(
+                    "a conflict cites the `sends` it cannot reconcile by id — the ids `ao status` prints for this "
+                    "session (design §4.10)"
+                )
+        # -- copies: a controller's mail `about` its member reaches the member's other controllers --
+        subject = records.get(self._addr(about)) if about and not reply_to and me is not None else None
+        if subject is not None and sender in subject.controllers:
+            copies = [c for c in subject.controllers if c not in (sender, *named)]
+        copies = [c for c in copies if c in records]
+        # -- what this message counts as ------------------------------------------------------------
+        closes = replied is not None and kind == "reply" and replied.open
+        counts = sender != PERSON and not closes  # a person's message is never counted; a first reply is free
+        root = replied.root if replied is not None else ""
+        now = datetime.now(UTC)
+        if counts and mail.THREAD_BOUND is not None:
+            self._check_bounds(sender, named, root, now)
+        if mail.MAILBOX_DEPTH is not None:
+            for sid in named:
+                if records[sid].unread() >= mail.MAILBOX_DEPTH:
+                    raise RpcError(
+                        f"{sid}'s inbox holds {mail.MAILBOX_DEPTH} unread entries: the send is refused, not dropped "
+                        f"(design §4.10)"
+                    )
+        # -- land it ----------------------------------------------------------------------------------
+        mid = "m-" + secrets.token_hex(6)
+        root = root or mid
+        at = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        entry = MailEntry(
+            id=mid, from_=sender, to=list(named), at=at, kind=kind, text=text, about=about, reply_to=reply_to, root=root
+        )
+        entry.cites = cited
+        if kind in ASK_KINDS:
+            span = timedelta(seconds=float(bound)) if bound is not None else mail.ASK_BOUND
+            entry.bound = (now + span).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        landed: list[str] = []
+        failed: list[str] = []
+        for sid in copies:
+            if mail.MAILBOX_DEPTH is not None and records[sid].unread() >= mail.MAILBOX_DEPTH:
+                failed.append(sid)  # a copy never sinks a send: dropped and recorded (design §4.10)
+            else:
+                landed.append(sid)
+        entry.copies, entry.copies_failed = landed, failed
+        touched: list[Session] = []
+        for sid in (*named, *landed):
+            r = records[sid]
+            r.inbox.append(self._copy(entry))
+            touched.append(r)
+        if me is not None:
+            me.outbox.append(self._copy(entry))
+            touched.append(me)
+        if counts:
+            for r in touched:
+                r.threads.setdefault(root, Tally()).count += 1
+            if replied is None and me is not None:  # replying to nothing: counted under the pair too
+                for sid in named:
+                    for t in (self._pair(me, sid, now), self._pair(records[sid], sender, now)):
+                        t.at.append(at)
+                        t.count = len(t.at)  # the window's count, kept as a field so pruning cannot reset it
+        if closes and replied is not None:
+            self._mark(replied.id, closed_by=mid, closed_at=at)
+        if sender == PERSON and reply_to:
+            # A person's message into a thread resets it (design §4.10): tally and `bound_hit`
+            # cleared on every record holding it, so the sessions may reply to the ruling.
+            for r in records.values():
+                if root in r.threads:
+                    r.threads[root] = Tally()
+                    if r not in touched:
+                        touched.append(r)
+        for r in touched:
+            self.store.save(r)
+        await self._push_changes()
+        return {
+            "entry": entry.to_dict(),
+            "delivered": list(named),
+            "copies": landed,
+            "copies_failed": failed,
+            "forwarded": forwarded,
+            "closed": replied.id if closes and replied is not None else None,
+        }
+
+    @staticmethod
+    def _copy(entry: MailEntry) -> MailEntry:
+        """A record's own copy of an entry: same values, no shared lists."""
+        return replace(
+            entry,
+            to=list(entry.to),
+            copies=list(entry.copies),
+            copies_failed=list(entry.copies_failed),
+            pending=list(entry.pending),
+            cites=list(entry.cites),
+        )
+
+    def _pair(self, r: Session, other: str, now: datetime) -> Tally:
+        """The pair tally `r` keeps for `other`, its window rolled forward: entries older than
+        `PAIR_WINDOW` fall out, and `count` is what is left."""
+        t = r.threads.setdefault(f"pair:{other}", Tally())
+        cutoff = now - mail.PAIR_WINDOW
+        t.at = [x for x in t.at if _parse(x) >= cutoff]
+        t.count = len(t.at)
+        return t
+
+    def _check_bounds(self, sender: str, named: list[str], root: str, now: datetime) -> None:
+        """A send is refused when the sender's tally, or any named addressee's, is at the bound —
+        never a copy recipient's — and `bound_hit` is written on every record holding the thread
+        so the other side learns the exchange stopped (design §4.10 "A bounded exchange")."""
+        limit = mail.THREAD_BOUND
+        assert limit is not None
+        records = self.sessions
+        me = records[sender]
+        if root:
+            at_bound = [sid for sid in (sender, *named) if records[sid].threads.get(root, Tally()).count >= limit]
+            if at_bound:
+                for r in records.values():
+                    if root in r.threads:
+                        r.threads[root].bound_hit = True
+                        self.store.save(r)
+                raise RpcError(
+                    f"thread {root} is at its bound of {limit} entries ({', '.join(at_bound)}): the send is "
+                    f"refused — write the user_attention.md line yourself, with the thread attached (design §4.10)"
+                )
+            return
+        for sid in named:
+            mine, theirs = self._pair(me, sid, now), self._pair(records[sid], sender, now)
+            if mine.count >= limit or theirs.count >= limit:
+                mine.bound_hit = theirs.bound_hit = True
+                self.store.save(me)
+                self.store.save(records[sid])
+                raise RpcError(
+                    f"{sender} and {sid} have exchanged {limit} messages replying to nothing inside "
+                    f"{mail.PAIR_WINDOW}: the send is refused — write the user_attention.md line yourself "
+                    f"(design §4.10)"
+                )
+
+    def _holders(self, msg_id: str) -> list[MailEntry]:
+        return [e for r in self.sessions.values() for e in r.holds(msg_id)]
+
+    def _mark(self, msg_id: str, **fields: Any) -> None:
+        """Write the same fact on every copy of one message, so both cards show it: the home is
+        the one writer (design §4.4a). `pending=<id>` appends to the list; anything else is set."""
+        for r in self.sessions.values():
+            copies = r.holds(msg_id)
+            if not copies:
+                continue
+            for e in copies:
+                for k, v in fields.items():
+                    if k == "pending":
+                        if v not in e.pending:
+                            e.pending.append(v)
+                    else:
+                        setattr(e, k, v)
+            self.store.save(r)
+
+    async def rpc_inbox(self, id: str | None = None, unread: bool = False, caller: Any = None) -> dict[str, Any]:
+        """`ao inbox [--unread]` (design §4.10): a session reads its own inbox and nobody else's;
+        that read — and nothing else — sets `read_at` (lifecycle stage 2: delivered into a turn).
+        A person (no caller) reads any session's inbox, as the Inbox panel does, and sets nothing:
+        a person is not the session. Each entry says whether its sender is one of the reader's
+        controllers, a person, or neither — the rule stated where the mail is read."""
+        if mail.is_person(caller):
+            if not id:
+                raise RpcError("the person inbox is not built yet (TD-052 step 2): name a session, ao inbox <id>")
+            s = self._get(self._addr(id))
+            mark = False
+        else:
+            me = self._addr(caller)
+            if id and self._addr(id) != me:
+                raise RpcError(f"{me} cannot read {id}'s inbox: nobody reads another session's inbox (design §4.10)")
+            s = self._get(me)
+            mark = True
+        entries = [e for e in s.inbox if not (unread and e.read_at)]
+        if mark and any(not e.read_at for e in entries):
+            at = now_iso()
+            for e in entries:
+                e.read_at = e.read_at or at
+            self.store.save(s)
+            await self._push_changes()
+        return {
+            "id": s.id,
+            "entries": [{**e.to_dict(), "from_role": mail.from_role(self.sessions, s.id, e.from_)} for e in entries],
+            "threads": {k: t.to_dict() for k, t in s.threads.items()},
+            "sends": [e.to_dict() for e in s.sends[-3:]],
+            "unread": s.unread(),
+        }
+
+    async def _sweep_mail(self, now: datetime) -> None:
+        """Once a tick: an `ask` past its bound expires on every copy; an addressee that exited
+        leaves the `ask`s addressed to it pending, a closed one expires them (design §4.10
+        lifecycle); read entries past retention are pruned, open asks exempt."""
+        stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        for r in list(self.sessions.values()):
+            for e in list(r.inbox):
+                if not e.open:
+                    continue
+                if (e.bound and _parse(e.bound) <= now) or r.state == "closed":
+                    self._mark(e.id, expired_at=stamp)
+                elif r.state == "exited" and r.id not in e.pending:
+                    self._mark(e.id, pending=r.id)
+            for e in list(r.outbox):
+                if e.open and e.bound and _parse(e.bound) <= now:
+                    self._mark(e.id, expired_at=stamp)
+        if mail.MAIL_RETENTION is None:
+            return
+        for r in self.sessions.values():
+            inbox = [e for e in r.inbox if self._keep(e, now, inbox=True)]
+            outbox = [e for e in r.outbox if self._keep(e, now, inbox=False)]
+            if len(inbox) != len(r.inbox) or len(outbox) != len(r.outbox):
+                r.inbox, r.outbox = inbox, outbox
+                self.store.save(r)
+
+    @staticmethod
+    def _keep(e: MailEntry, now: datetime, *, inbox: bool) -> bool:
+        """Lifecycle stage 3 (design §4.10): a read entry is kept for the retention window from
+        `read_at` — or, for an `ask`, from when it closed or expired — and an open `ask` is never
+        pruned. An unread inbox entry never ages out. The sender's copy runs from `at`."""
+        if e.open or mail.MAIL_RETENTION is None:
+            return True
+        since = e.expired_at or e.closed_at or (e.read_at if inbox else e.at)
+        if since is None:
+            return True
+        return _parse(since) + mail.MAIL_RETENTION > now
 
     async def rpc_hook(self, session: str, **event: Any) -> dict[str, Any] | None:
         """Called by an adapter's hook script. A `permission` event blocks until answered or timed out."""
@@ -1287,69 +1752,18 @@ class HostAgent:
     # -- helpers ---------------------------------------------------------------------------------
 
     def _gate(self, caller: Any, method: str, params: dict[str, Any]) -> None:
-        """Design §4.8, §9 invariant 11: an acting RPC from a session onto a *different* session
-        needs the `orchestrate` grant on the caller's record **and** the caller in the target's
-        `controllers` (TD-036). Both halves are read from the records here, on every call, so a
-        revoke or a membership edit takes effect on the session's next call and neither is cached.
-        No caller (a person's terminal, the UI) passes; a session acting on itself passes, except
-        for the two RPCs that edit authority — a session may no more hand itself a grant than
-        remove the controller watching it. A caller this agent does not know is a session (the id
-        came from `AGENTORC_SESSION`) and holds no grant. Reads are never gated; this is a guard
-        against a confused worker, not a security boundary.
+        """`mail.act_gate` over this agent's records (design §4.8, §9 invariants 5 and 11): a
+        function over a record map, so a node can forward and the home can answer (§4.4a)."""
+        if method == "create" and params.get("capabilities"):
+            _grants(params["capabilities"])  # an unknown grant name is refused before the gate reads it
+        reason = mail.act_gate(self.sessions, caller, method, params)
+        if reason:
+            raise RpcError(reason)
 
-        Third, §9 invariant 5 (TD-041): a target that is a person's session (`kind: interactive`
-        and not `unattended`) is refused to every session, grant and membership notwithstanding.
-
-        `caller is None` — the field absent from the envelope — is the only thing that reads as a
-        person. Anything else present is a session, however odd its type: `not caller` would have
-        let `"caller": 0` (or `""`, `[]`, `{}`) past both halves of the gate, since the socket
-        takes raw JSON from any local process and only `LocalClient` bothers to send a real id
-        (review 2026-09-13)."""
-        if caller is None or method not in ACTING_RPCS:
-            return
-        if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller:
-            return
-        me = self.sessions.get(str(caller))
-        if me is None or "orchestrate" not in me.capabilities:
-            target = "a new session" if method == "create" else params.get("id", "?")
-            raise RpcError(f"{caller} cannot {method} {target}: needs the orchestrate grant (design §4.8)")
-        if method == "create":
-            # No target to be a member of yet. What create is gated on instead is attenuation: the
-            # child's grants must be a subset of the creator's (design §4.8, capability attenuation).
-            excess = [g for g in _grants(params.get("capabilities") or []) if g not in me.capabilities]
-            if excess:
-                raise RpcError(
-                    f"{caller} cannot create a session holding {', '.join(excess)}: "
-                    f"a session it creates gets no grant it does not hold itself (design §4.8)"
-                )
-            return
-        target_id = str(params.get("id", ""))
-        target = self.sessions.get(target_id)
-        # An id this agent has no record of falls through to the method, which answers "no session
-        # <id>" — a membership refusal here would say more about the fleet than the caller may read.
-        # Two other ids land here as `None` and are refused by the method rather than by this gate:
-        # a registry-only record (`self._external`), which every acting RPC rejects through `_get`
-        # without `external=True`, and a missing `id`, which is a required argument on all of them
-        # and so fails as bad params. Both are pinned by tests; an acting RPC that ever took
-        # `external=True` or gave `id` a default would need its own membership check here.
-        if target is not None and target.kind == "interactive" and not target.unattended:
-            # §9 invariant 5 (TD-041): a person's session — `kind: interactive` says conversation,
-            # `unattended: false` says not a worker — is out of every session's reach, whatever the
-            # grant and whatever `controllers` says, `set_controllers` included. Checked before
-            # membership because no edit to the list changes the answer; read from the record on
-            # every call, so `ao mode <id> interactive` takes effect on the controller's next call
-            # and its list entry merely goes inert. A person (no caller) never reaches this line.
-            raise RpcError(
-                f"{caller} cannot {method} {target_id}: it is interactive, and no session acts on an "
-                f"interactive session — only a person does (design §9 invariant 5)"
-            )
-        if target is not None and str(caller) not in target.controllers:
-            how = (
-                "nobody may act on it"
-                if not target.controllers
-                else "it is controlled by " + ", ".join(target.controllers)
-            )
-            raise RpcError(f"{caller} cannot {method} {target_id}: not in its controllers — {how} (design §4.8)")
+    def _addr(self, address: Any) -> str:
+        """One normaliser for every id on the way in (design §4.4a, TD-057 step 1): a session on
+        this host is stored bare, another host's as `id@host`."""
+        return naming.qualify(str(address), local=self.host)
 
     def _get(self, sid: str, *, external: bool = False) -> Session:
         """A record by id. A registry-only card (`external`) is returned only to callers that
@@ -1379,7 +1793,7 @@ class HostAgent:
             return
         # sort_keys: the payload is the comparison key too (the UI reads fields by name, never order)
         payloads = {
-            sid: json.dumps(s.to_dict(), sort_keys=True) for sid, s in (*self.sessions.items(), *self._external.items())
+            sid: json.dumps(s.view(), sort_keys=True) for sid, s in (*self.sessions.items(), *self._external.items())
         }
         for w, last in list(self._subscribers.items()):
             for sid, payload in payloads.items():
@@ -1434,13 +1848,21 @@ class HostAgent:
         if method is None:
             return {"id": rid, "error": f"unknown method {name!r}"}
         params = req.get("params") or {}
+        caller = req.get("caller")
+        if not mail.is_person(caller):
+            # A request's identity comes from the channel it arrived on, never from a field it
+            # carries (design §4.4a): this socket is this host's, so any `@host` a client wrote
+            # is dropped and the caller is this host's bare id.
+            caller = naming.split_address(str(caller))[0]
         try:
-            self._gate(req.get("caller"), str(name), params)
-            if name == "create":
-                # `create` seeds the new record's controllers with its creator (design §4.8), so it
-                # needs the envelope's caller. Set unconditionally, after the gate: a client that
-                # put its own `caller` in `params` does not get to choose who it is.
-                params["caller"] = req.get("caller")
+            self._gate(caller, str(name), params)
+            if "caller" in inspect.signature(method).parameters:
+                # The methods that need to know who called (`create` seeds the new record's
+                # controllers with its creator; `send` and `keys` record who typed; `msg` and
+                # `inbox` are the caller's own) get the envelope's caller, set unconditionally and
+                # after the gate: a client that put its own `caller` in `params` does not get to
+                # choose who it is.
+                params["caller"] = caller
             return {"id": rid, "result": await method(**params)}
         except RpcError as e:
             return {"id": rid, "error": str(e), **({"error_data": e.data} if e.data else {})}
