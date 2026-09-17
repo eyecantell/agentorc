@@ -110,9 +110,11 @@ def wound_down(sessions: list[dict[str, Any]]) -> str | None:
     single session that never declared means the team stopped for some other reason. A team with no
     session carrying its badge has never run, or has been forgotten, and is neither.
     """
-    seen = [s.get("out_of_work") or {} for s in sessions]
+    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions]
     if not seen or not all(d.get("at") for d in seen):
         return None
+    # `str` before `max`: two declarations of different types would otherwise be a TypeError, and
+    # the strip is on the same page as every card (review of PR #203)
     return max(str(d["at"]) for d in seen)
 
 

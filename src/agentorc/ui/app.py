@@ -166,7 +166,14 @@ def vscode_url(directory: str) -> str:
 
 
 def _age(iso: str | None, now: datetime) -> str:
-    if not iso:
+    """An instant off a record as *2h 5m*, or "" for anything this cannot read.
+
+    Anything: `view` runs for every session on the grid, so a raise here takes down the page rather
+    than the one card — the failure PR #131's review caught for a `run_until` of *half six*. A
+    record's timestamps are written by the agent and are well-formed, but a state file that a
+    different build, a bug or a hand repair left holding a number or a dict must cost its card a
+    line and nothing more, so the shape is checked rather than trusted (review of PR #203)."""
+    if not isinstance(iso, str) or not iso:
         return ""
     try:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
@@ -274,7 +281,8 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
     # the reason is a paragraph naming every entry the session looked at: a card cannot hold it, and
     # a card that tried would push the report line off. Dropped the moment the session claims again,
     # which is the record's own rule (§4.9a: a session that claims has work again).
-    oow = s.get("out_of_work") or {}
+    oow = s.get("out_of_work")
+    oow = oow if isinstance(oow, dict) else {}  # one malformed record must not empty the grid
     d["out_of_work"] = (
         {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
     )

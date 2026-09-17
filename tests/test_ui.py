@@ -976,6 +976,15 @@ def test_a_declaration_of_no_work_is_a_chip_on_the_card_and_the_focus_header(tmp
     # and a record whose declaration has no instant is not one (the agent refuses to write it)
     assert view({**base, "out_of_work": {"why": why}})["out_of_work"] is None
 
+    # A malformed declaration costs that card its chip and nothing else. `view` runs for every
+    # session on the grid, so a raise here would take down the page rather than the one card — the
+    # failure PR #131's review caught for a `run_until` of *half six*, and the same guard is owed to
+    # a field a different build or a hand repair could leave in any shape (review of PR #203).
+    for junk in ("out of work", ["nope"], 7, {"at": 12345}, {"at": "half six"}, {"at": {"nested": 1}}):
+        d = view({**base, "out_of_work": junk})
+        assert d["out_of_work"] is None or d["out_of_work"]["age"] == ""
+        assert "out of work" not in card.render(s=d) or d["out_of_work"] is not None
+
 
 def test_the_focus_header_carries_the_out_of_work_chip_from_the_record(client, tmp_path):
     """The other half of §4.5a's row (§4.9a, TD-053 step 6), on the live page: the declaration the

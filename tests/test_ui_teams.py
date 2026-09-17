@@ -180,6 +180,10 @@ def test_a_team_whose_sessions_all_declared_reads_wound_down_not_stopped(world):
     row = all_done["teams"][0]
     assert row["live"] == 0 and row["wound_down"] == later and row["wound_down_age"]
     assert uiapp.teams_view([done("orc-ao", at), done("grind-1", later, state="exited")])["teams"][0]["wound_down"]
+    # a declaration in any other shape is not one — the strip is on the same page as every card,
+    # so a raise here would empty the grid rather than one row (review of PR #203)
+    junk = [{**badged("orc-ao", "ao-grind", state="closed"), "out_of_work": j} for j in ("x", ["y"], 7)]
+    assert all(uiapp.teams_view([s])["teams"][0]["wound_down"] is None for s in junk)
     # ... and a team still running is described by what it is doing, never by a stale declaration:
     # a worker that declared but has not been stopped still sits `idle` at its prompt (§4.9a step 3
     # is what closes it), and until then the team is live and its group card, not the strip, is the
