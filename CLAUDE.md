@@ -51,9 +51,9 @@ $V/pip install --upgrade '/home/kmaster/agentorc[ui]' && $V/ao service install
 
 — pip rebuilds a local directory even at an unchanged version and picks up a new dependency; the
 pair replaces client and host agent together and restarts both units (sessions live in tmux and
-survive it). Never promote from a feature branch; a lead or a worker never promotes. Still read
-from the checkout at team start, so still exposed to the branch checked out here: a team's
-`brief:` files under `docs/briefs/`.
+survive it). Never promote from a feature branch; a lead or a worker never promotes. One thing
+is still read from the checkout: a team's `brief:` files under `docs/briefs/`, at team start, so
+a team still follows the branch checked out here at that moment.
 
 ## Session Hygiene — Never Strand Work
 
