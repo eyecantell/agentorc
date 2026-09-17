@@ -991,3 +991,19 @@ def test_progress_none_declares_out_of_work(subprocess_agent, tmp_path, capsys, 
     assert cli.main(["--json", "status"]) == 0
     assert next(x for x in json.loads(capsys.readouterr().out) if x["id"] == sid)["out_of_work"]["why"]
     call_sync("kill", id=sid)
+
+
+def test_progress_sends_force_only_when_asked(monkeypatch, capsys):
+    """A host agent older than TD-056 refuses an unknown `force` keyword, and the CLI is routinely
+    newer than the running agent until its restart: a plain claim must not send it (2026-09-17)."""
+    sent = []
+
+    def fake(method, **params):
+        sent.append(params)
+        return {"id": "ao-x", "progress": [], "lane": []}
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-x")
+    assert cli.main(["progress", "claim", "TD-900"]) == 0
+    assert cli.main(["progress", "claim", "TD-900", "--force"]) == 0
+    assert "force" not in sent[0] and sent[1]["force"] is True
