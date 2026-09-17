@@ -190,6 +190,25 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert "member grinder" in out
 
 
+def test_a_definition_still_naming_role_orchestrator_starts_a_lead(world, capsys, monkeypatch):
+    """TD-055 step 2: an `org.yml` written before the rename — `lead: {role: orchestrator}` and a
+    `roles: orchestrator:` overlay, the live shape — starts the lead with the lead brief, grants and
+    the overlay's profile, records `role: lead`, and says once that the name changed."""
+    from agentorc import repoconfig
+
+    monkeypatch.setattr(repoconfig, "_warned", set())
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["lead"]["role"] = "orchestrator"
+    doc["roles"]["orchestrator"] = {"profile": "org-grind"}
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    lead = creates(state)[0]
+    assert lead["role"] == "lead" and lead["capabilities"] == ["orchestrate"] and lead["profile"] == "org-grind"
+    assert "You are a **lead**" in lead["prompt"]
+    assert capsys.readouterr().err.count("role `orchestrator` is now `lead`") == 1
+
+
 def test_an_interactive_member_is_started_but_said_to_be_out_of_its_leads_reach(world, capsys):
     """§9 invariant 5 is a gate since TD-041: no session acts on an interactive one. A member the
     definition starts interactive keeps its `controllers: [lead]`, and they are inert until someone
