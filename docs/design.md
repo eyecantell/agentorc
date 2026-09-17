@@ -948,7 +948,7 @@ dials out; nothing on the host listens.** Three transports, one agent:
 | transport | who runs the UI | how the host agent is reached | who it is for |
 |---|---|---|---|
 | `local` | you, on the same host | Unix socket | phase 1, one machine |
-| `ssh` | you, on a host you choose | the UI reaches the home host agent; every other host agent is a node that dials the home over ssh (`agentorc-agent link`, §4.4a, 2026-09-16) | phases 2+, several hosts you own |
+| `ssh` | you, on a host you choose | the UI reaches the home host agent; every other host agent is a node that dials the home over ssh (`agentorc-agent link`, §4.4a, 2026-09-16). A node in a **container on the home's own machine** is the same link over `docker exec -i` — the pipe is any byte pipe (§10, 2026-09-17) | phases 2+, several hosts you own |
 | `relay` | a service (yours or a hosted one) | the host agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
 
 The `relay` transport is the hosted service: `pipx install agentorc && agentorc join <token>`
@@ -1528,7 +1528,9 @@ wherever an `agentorc-agent` runs beside a tmux server — a devcontainer that r
 *is* a host, shape (b) in §10, which is phase 2's transport aimed at a container. guardians is
 not on kmaster and is not to be cloned there (Paul, 2026-09-12); its project entry names the
 devenv host, and `ao team start guardians` from kmaster waits for phase 2. Nothing in this
-section changes for that: the host column fills in.
+section changes for that: the host column fills in. A container on the *same* machine as the home
+— contractmatch's devcontainer, 2026-09-17 — is the same shape over a shorter pipe (`docker exec`
+rather than ssh, §10) and is where that transport is proved.
 
 **Done when** `ao team start ao-grind` brings up a lead and two grinders, each in its
 own worktree, the grinders' `controllers` naming the lead, the Org page showing the
@@ -2693,6 +2695,22 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       revisable): a host is wherever an `agentorc-agent` runs beside a tmux server, a devcontainer
       that runs one is a host, and a project's repo entry names it per host. guardians stays off
       kmaster and its team start waits for phase 2's transport.
+      → **Follow-up 2026-09-17** (Paul: contractmatch cannot be ground by a worker on kmaster —
+      the Flutter SDK is in its devcontainer, not on the host; *the grinder can wait*). The answer
+      stands; what changes is the cost and the order. A container on the **same machine** needs no
+      ssh: §4.5b's rule that the RPC is a plain JSON-lines stream over any byte pipe makes
+      `docker exec -i <container> agentorc-agent link` a transport beside `ssh <host> …`, so
+      TD-057 step 3 builds the link behind a transport seam and proves it on contractmatch before
+      guardians. Two things a container host asks of *this* document, both parked with the grinder:
+      **invariant 2** is enforced per host agent, and a bind-mounted checkout is the same files on
+      two hosts, so a session inside the container and one outside can both hold the repo and
+      neither refuses — registering a repo on exactly one host is the cheap answer and the one to
+      take first, an identity for a directory that survives a mount namespace is the real one;
+      and **`vscode_host`** (§5) assumes Remote-SSH, where a container wants a
+      `vscode-remote://dev-container+…` URI, so the link is absent for a container host until the
+      entry can say so. The rest is packaging, not design: the container must outlive VS Code
+      (goal §2.7 — `devcontainer up` or a compose service, not the extension's lifetime), and it
+      needs `tmux`, an `agentorc` install, and the profile's `CLAUDE_CONFIG_DIR` inside it.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 - [x] **Rename the Herd page?** (2026-09-13) → **yes, to Team.** Decided by Paul: "Herd" reads
