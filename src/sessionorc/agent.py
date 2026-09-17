@@ -28,7 +28,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, hosts, mail, naming, paths, reports, waits
+from sessionorc import adapters, hosts, mail, modes, naming, paths, reports, waits
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
@@ -125,6 +125,22 @@ class HostAgent:
         # This host's name (design §4.4a): what `host` on every record holds, and what an address
         # is qualified against — `ao-x@<this host>` is stored bare (`naming.qualify`).
         self.host = hosts.local_host().name
+        # Home or node (design §4.4a, TD-057 step 2). With no `home:` in hosts.yml, or one naming
+        # this host, this agent is the home and nothing below differs from phase 1. A node keeps
+        # everything that touches its machine and its own host's records on disk — the replica.
+        self.home = hosts.home_name()
+        self.mode = "node" if self.home != self.host else "home"
+        if self.mode == "node":
+            log.warning(
+                "node of %s: the link (TD-057 step 3) is not built, so home is unreachable — this host's "
+                "sessions only; mail, reports, home-owned edits and sessions' acts on others are refused. "
+                "This host calls itself %s: if this machine IS %s, set `local: {name: %s}` in hosts.yml — without "
+                "it the name is the machine's hostname, and a home that does not recognise its own name is a node.",
+                self.home,
+                self.host,
+                self.home,
+                self.home,
+            )
         self.sessions: dict[str, Session] = self.store.load_all()
         # The org's person inbox (design §4.10): held here, on no session record, in its own file.
         self.person_store = PersonInboxStore()
@@ -2013,6 +2029,17 @@ class HostAgent:
     async def rpc_ping(self) -> str:
         return "pong"
 
+    async def rpc_host(self) -> dict[str, Any]:
+        """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
+        whether the home can be reached — which a client on a node needs before it labels what it
+        shows *offline*."""
+        return {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
+
+    def home_reachable(self) -> bool:
+        """The home is always in reach of itself. A node reaches it over the link, which step 3
+        builds: until then a node never does, and this is the one line that step changes."""
+        return self.mode == "home"
+
     # -- helpers ---------------------------------------------------------------------------------
 
     def _gate(self, caller: Any, method: str, params: dict[str, Any]) -> None:
@@ -2175,6 +2202,12 @@ class HostAgent:
             # is dropped and the caller is this host's bare id.
             caller = naming.split_address(str(caller))[0]
         try:
+            if not self.home_reachable():
+                # A node out of reach of its home (design §4.4a, the call-by-call table): decided
+                # before the gate, because the gate's graph is the thing that is out of reach.
+                refusal = modes.offline_refusal(str(name), caller, params, host=self.host, home=self.home)
+                if refusal:
+                    raise RpcError(refusal)
             self._gate(caller, str(name), params)
             if "caller" in inspect.signature(method).parameters:
                 # The methods that need to know who called (`create` seeds the new record's

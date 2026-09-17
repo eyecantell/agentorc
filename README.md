@@ -102,7 +102,9 @@ file the machine's hostname is used, which is rarely what VS Code can resolve. T
 takes `volatile: true` (a laptop: an unreachable agent is asleep, not an alert), `repos_registry`
 (default `~/.config/dev-cadence/repos.txt`; its repos head the New session directory list) and
 `runs_keep_days` (default 30; run logs of exited/closed sessions older than that are deleted on
-the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`.
+the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`. A top-level `home: <host>` makes this
+host agent a *node* of that home (design §4.4a); leave it out on a single machine — the link a node
+needs is not built yet (TD-057 step 3), so a node today serves only its own host's sessions.
 
 ## CLI
 

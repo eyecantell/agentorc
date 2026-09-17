@@ -580,6 +580,43 @@ alternative Paul was offered — the laptop acting as its own home while offline
 authorities reconcile thread tallies, budgets and copies on reconnect, which is the split-brain
 failure that rules out a mesh.
 
+**What a node answers while it cannot reach home, call by call (2026-09-17, TD-057 step 2).** The
+paragraph above is the rule; this is the rule applied to every RPC, because step 2 builds the node
+before step 3 builds the link, so until then a node is *always* out of reach of its home and this
+table is its whole behaviour. One function decides it (`sessionorc.modes.offline_refusal`), read
+before the gate, and a home never calls it.
+
+| Call | From a person | From a session |
+|---|---|---|
+| reads — `list`, `get`, `tail`, `explain`, `occupancy`, `name_check`, `recent_dirs`, `usage`, `adapters`, `ping`, `wait` | served: this host's sessions only | served; a `wait` sees only this host's records and no mail |
+| node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served. On another session, and any `create`: **refused** — except `seen`, `decide` and `hook`, which the gate has never covered (§4.8) and which are the node's own socket |
+| home-owned edits — `set_controllers`, `set_grants`, `set_stop`, `set_mode` | **refused**: they wait for the link | refused |
+| the mailbox — `msg`, `inbox`, `inbox_delete` | **refused**: the mailbox is at the home | refused |
+| reports — `progress`, `finding` | — | **refused** |
+
+Two of those rows are decisions the rule did not make. **Reports are refused, not kept locally.**
+They are home-owned, so a claim written to the replica would be overwritten by the home's copy on
+reconnect; and a claim is a lease checked against every sibling (§4.8, TD-056), which a node cannot
+check alone. A worker that cannot declare keeps working — its branch, its PR and the ledger are the
+durable record, and the tick still derives what it can see. **A person's mail is refused too**,
+although a person is never gated: the refusal is not a gate's, it is that the inbox they would
+write to is not on this machine. Every refusal names the home and says *refused, not queued*, so
+nobody waits for a delivery that is not coming. What the node does **not** stop doing offline: its
+tick, state and pane observation, hooks, permission prompts, run logs, git status, usage, and every
+stopping policy (above).
+
+**The replica, and the merge in both directions.** `models.apply_home(record, home_copy)` overlays
+exactly the home-owned fields and `models.apply_node(record, report)` exactly the node-owned ones;
+identity fields are never overlaid, and a copy that disagrees on one is refused rather than
+merged — it is a different session. **Three home-owned fields are merged, not overlaid, in both
+directions** (review of PR #198): `sends`, `seen_at` and `wake_refilled_at` are written on a node
+while it is offline — a person typed there, looked there — and each only ever grows (a list keyed
+by id; two times that only move forward), so the union and the later time lose nothing and
+resurrect nothing, where an overlay would erase the offline half and say it had worked. Step 2 builds and tests the two functions; step 4 is what
+calls them across the link. **`org.yml` lives on the home**: on a node `ao team …` and the Org
+page's Teams strip say so and name the home instead of reading a local file that would disagree
+with it.
+
 **When the recipient's host is unreachable.** Mail to its sessions **lands at the home** — nothing
 waits anywhere but the mailbox that already exists — and the sender's `ao` reply and card say
 *landed — host unreachable*. The recipient is not reachable (§4.10: *reachable* includes *its
