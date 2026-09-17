@@ -533,3 +533,6 @@
 05:17  tdgrind-ao-1: working on TD-053 (re-claimed 05:15) → ok; cadence #178 (td053-*) no fail rows (review recorded)
 05:28  tdgrind-ao-1: working, TD-053 done → claimed TD-056 → ok; cadence #179 no fail rows (review recorded)
 05:39  tdgrind-ao-1: working, TD-056 done (#180, #181) → ok; cadence #180 #181 no fail rows (review recorded)
+05:50  tdgrind-ao-1: idle since 05:39 after writing its end-of-run summary ("free-pick lane has nothing left I may pick"; note m-… 05:39Z) → not idle-with-open-work, no nudge; composer shows `❯ /exit` (likely ghost suggestion, not submitted). Watching; no restart when it exits (lane free-pick, run declared ended).
+05:50  cadence: #182 (td053-*) no fail rows (review recorded); #183 org-team-cards is no member's branch → not checked
+05:50  inbox: 5 notes from tdgrind-ao-1 (done TD-058, TD-053 steps 1-2, TD-056; run ending) → weighed, no reply needed
