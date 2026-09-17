@@ -1,7 +1,7 @@
-# TD-036 step 6: attaching orchestrator-ao-1 to the sessions it already supervises
+# TD-036 step 6: attaching orchestrator-ao-1 to the sessions it already leads
 
-**Run this in the same sitting as the agent upgrade, not after it.** Until it is done, the
-orchestrator holds the `orchestrate` grant and can act on nothing: every nudge it makes is
+**Run this in the same sitting as the host agent upgrade, not after it.** Until it is done, the
+lead holds the `orchestrate` grant and can act on nothing: every send it makes is
 refused with `not in its controllers`, and its own log is the only place that says why.
 
 ## Why it is needed
@@ -11,9 +11,9 @@ an acting RPC need both the grant and a place in that list. An empty list means 
 the explicit default. Records written before the change have no list at all, which reads as
 empty. A person's `ao new` sets no controller either, because there is no caller to add (only a
 session that creates another is added automatically). So every session now running was launched
-into a world where the grant was the whole gate, and none of them names the orchestrator.
+into a world where the grant was the whole gate, and none of them names the lead.
 
-## The fleet this applies to (read 2026-09-13, `ao status --json`)
+## The org this applies to (read 2026-09-13, `ao status --json`)
 
 | session | state | grant | controllers |
 |---|---|---|---|
@@ -53,12 +53,12 @@ name has been reused (§4.1).
 
    ```sh
    ao status -v      # each worker shows `under: ao-agentorc-orchestrator-ao-1`
-                     # the orchestrator shows `members:` with all five
+                     # the lead shows `members:` with all five
    ```
 
-   The orchestrator's Focus page shows the same thing as its **Members** list.
+   The lead's Focus page shows the same thing as its **Members** list.
 5. **Prove it end to end** with one real act, rather than trusting the display: from the
-   orchestrator, `ao send <a worker> --wait "orchestrator: membership check, no action needed"`.
+   lead, `ao send <a worker> --wait "lead: membership check, no action needed"`.
    Before step 3 this is refused; after it, it lands.
 
 ## What *not* to do
@@ -68,10 +68,10 @@ name has been reused (§4.1).
   gate, and it is worth knowing before you lean on it. `_gate` checks the grant and membership and
   never looks at the target's `kind`; `set_controllers` will happily add an interactive session to
   a list, and a `send` from its controller will then land. §9 invariant 5 constrains *policies*
-  (§6), and the policy engine does not exist yet, so today the only thing keeping an orchestrator
+  (§6), and the policy engine does not exist yet, so today the only thing keeping a lead
   off an interactive session is its brief. TD-041 is filed to make the invariant real; until it
   lands, attach only the unattended workers above.
-- Do not attach a session to two orchestrators today. It is allowed by design and is the reason
+- Do not attach a session to two leads today. It is allowed by design and is the reason
   the list is flat, but what two controllers do when they disagree is an open question (TD-039),
   and the first time it happens should not be unattended overnight.
 - Do not grant `orchestrate` to anything else while doing this. The grant is still the one
