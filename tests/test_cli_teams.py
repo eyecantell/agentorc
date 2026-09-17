@@ -79,10 +79,10 @@ def world(tmp_path, monkeypatch):
             }
             state["sessions"].append(rec)
             return rec
-        if method in ("send", "kill"):
+        if method in ("send", "kill", "close"):
             for s in state["sessions"]:
                 if s["id"] == params["id"]:
-                    s["state"] = "closed" if method == "kill" else "idle"
+                    s["state"] = "idle" if method == "send" else "closed"
             return None
         raise AssertionError(method)
 
@@ -313,6 +313,92 @@ def test_stop_wraps_the_members_up_before_the_lead_and_now_kills(world, capsys):
     killed = [p["id"] for m, p in state["calls"] if m == "kill"]
     assert killed[-1] == "ao-agentorc-orc-ao" and len(killed) == 4
     assert not [m for m, _ in state["calls"] if m == "send"]
+
+
+def test_a_lead_stopping_its_own_team_is_the_wind_down_and_is_never_typed_at(world, capsys, monkeypatch):
+    """Design §4.9a, TD-053 step 3: the same sequence under a different trigger. The lead's own
+    command never sends to the lead or kills it, and `--close` closes what settled with nothing to
+    lose — a member holding unpushed work is left open and named."""
+    tmp_path, state = world
+    started(state)
+    capsys.readouterr()
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")
+    by_id = {s["id"]: s for s in state["sessions"]}
+    pushed = {"dirty": 0, "ahead": 0, "upstream": "origin/x"}
+    by_id["ao-agentorc-grind-1"]["git"] = pushed
+    by_id["ao-agentorc-hunt"]["git"] = pushed
+    by_id["ao-agentorc-grind-2"]["git"] = {"dirty": 0, "ahead": 2, "upstream": "origin/x"}
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "send"] == [
+        "ao-agentorc-grind-1", "ao-agentorc-grind-2", "ao-agentorc-hunt",
+    ]  # fmt: skip
+    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1", "ao-agentorc-hunt"]
+    out = capsys.readouterr().out
+    assert "lead: is you" in out and "ao close ao-agentorc-orc-ao" in out
+    assert "left open: 2 unpushed" in out
+    assert "still working" not in out  # the lead's own line is not a member that missed the window
+    assert by_id["ao-agentorc-orc-ao"]["state"] == "working"  # untouched by its own command
+    # `--now` from the lead kills the members and still spares the caller
+    state["calls"].clear()
+    by_id["ao-agentorc-grind-2"]["state"] = "working"
+    assert cli.main(["team", "stop", "ao-grind", "--now"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "kill"] == ["ao-agentorc-grind-2"]
+
+
+def test_a_finished_member_gets_no_wrap_up_prompt_and_is_closed(world, capsys, monkeypatch):
+    """§4.9a *Finished means declared, not gone*: out of work and settled — nothing to wrap up."""
+    tmp_path, state = world
+    started(state)
+    by_id = {s["id"]: s for s in state["sessions"]}
+    by_id["ao-agentorc-grind-1"].update(
+        state="idle",
+        out_of_work={"at": "2026-09-17T06:00:00Z", "why": "ledger empty"},
+        git={"dirty": 0, "ahead": 0, "upstream": "origin/x"},
+    )
+    by_id["ao-agentorc-grind-2"]["out_of_work"] = {"at": "2026-09-17T06:00:00Z", "why": "x"}  # declared, still working
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "send"] == ["ao-agentorc-grind-2", "ao-agentorc-hunt"]
+    assert "ao-agentorc-grind-1" in [p["id"] for m, p in state["calls"] if m == "close"]
+    assert "finished (out of work), nothing sent, closed" in capsys.readouterr().out
+
+
+def test_close_needs_proof_of_pushed_not_an_absent_count(world, capsys, tmp_path_factory):
+    """Review of PR #192: `ahead: 0` with no upstream is what a never-pushed branch looks like, and
+    a record with no `git` yet is unknown, not clean. With no upstream the commit is looked for on
+    the remote branches — a merged worker on a detached `origin/main` is pushed."""
+    import subprocess
+
+    tmp_path, state = world
+    started(state)
+    by_id = {s["id"]: s for s in state["sessions"]}
+    repo = tmp_path_factory.mktemp("wt")
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "merged"], check=True)
+    subprocess.run([*git, "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
+    no_upstream = {"dirty": 0, "ahead": 0, "upstream": None}
+    by_id["ao-agentorc-grind-1"].update(dir=str(repo), git=no_upstream)  # detached on what origin has
+    by_id["ao-agentorc-hunt"].pop("git", None)  # unknown
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1"]
+    out = capsys.readouterr().out
+    assert out.count("left open: git state unknown") == 2  # grind-2 and hunt
+    # the same checkout with a commit origin has never seen
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "never pushed"], check=True)
+    by_id["ao-agentorc-grind-1"]["state"] = "idle"
+    state["calls"].clear()
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert not [m for m, _ in state["calls"] if m == "close"]
+    assert "no upstream, and its commit is on no remote branch" in capsys.readouterr().out
+
+
+def test_a_persons_stop_without_close_closes_nothing(world, capsys):
+    tmp_path, state = world
+    started(state)
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0"]) == 0
+    assert not [m for m, _ in state["calls"] if m == "close"]
+    assert "still working" not in capsys.readouterr().out  # every member settled; the lead's `?` is not a miss
 
 
 def test_stop_with_no_live_session_says_so(world, capsys):

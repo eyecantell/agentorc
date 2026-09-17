@@ -481,17 +481,24 @@ def cmd_team_stop(args: argparse.Namespace) -> int:
     directory = pathlib.Path(args.dir or os.getcwd())
     try:
         org = _org_here(directory)
-        st = teamrun.stop_members(call_sync, org, args.name, now=args.now)
+        # A lead stopping its own team is the wind-down of §4.9a: same sequence, never typed at.
+        st = teamrun.stop_members(call_sync, org, args.name, now=args.now, caller=os.environ.get("AGENTORC_SESSION"))
     except (teams.TeamError, ValueError) as e:
         return fail(args, str(e), 1)
-    acted = teamrun.stop_lead(call_sync, st, timeout=args.timeout).acted
+    acted = teamrun.stop_lead(call_sync, st, timeout=args.timeout, close=args.close).acted
     result = {"team": args.name, "now": bool(args.now), "sessions": acted}
 
     def prose() -> None:
         for e in acted:
             state = f"  ({e['state']})" if e.get("state") and e["state"] != "?" else ""
             print(f"{e['id']}  {e['role']}: {e['action']}{state}")
-        waiting = [e["id"] for e in acted if e.get("state") not in (*teamrun.SETTLED, "killed", None)]
+            if e.get("left_open"):
+                print(f"    left open: {e['left_open']}")
+        # Members only: the window is theirs. The lead's wrap-up is sent after it and nothing waits
+        # on it, so its `?` used to be printed as *still working* on every stop (seen 2026-09-17).
+        waiting = [
+            e["id"] for e in acted if e["role"] == "member" and e.get("state") not in (*teamrun.SETTLED, "killed", None)
+        ]
         if waiting:
             print(f"still working when the {args.timeout:g}s window passed: {', '.join(waiting)}")
 
@@ -1014,6 +1021,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("name")
     q.add_argument("--now", action="store_true", help="kill each session instead of sending the wrap-up prompt")
     q.add_argument("--timeout", type=float, default=300.0, help="seconds to wait for the members (default: 300)")
+    q.add_argument(
+        "--close",
+        action="store_true",
+        help="also close each member that settled clean and pushed, so `ao team start` can run again",
+    )
     q.set_defaults(fn=cmd_team_stop)
 
     q = add_team("status", help="each member of a live team with its state, lane and report line")
