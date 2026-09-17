@@ -153,6 +153,12 @@ not mix:
 - **thread** — a root message and every `reply` chained to it. — *proposed*.
 - **wake** — a turn that mail caused: a doorbell starting one, or `ao wait` returning on mail.
   **Wake budget** — how many wakes a session may take in a rolling window. — *proposed*.
+- **bound_hit** — the mark the home writes on a thread when its exchange bound refuses a send;
+  every participant's card and `ao` replies show it, and a person's message clears it (design
+  §4.10). — *proposed* (2026-09-16).
+- **reachable** — the moment the host agent may decide a wake for a session: hook-confirmed
+  `idle`, or blocked in `wait`, and, across hosts, its node's link up (design §4.10, §4.4a). Distinct from the
+  host state `unreachable`, which is the link being down. — *proposed* (2026-09-16).
 - **doorbell** — the fixed line the host agent types into an idle agent's pane to say it has
   unread mail; carries a count, never a sender's text. The one word outside the two genres, kept
   as a proper name. — **decided** 2026-09-16 (Paul).
