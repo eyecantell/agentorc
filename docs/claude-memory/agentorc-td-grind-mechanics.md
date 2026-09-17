@@ -49,6 +49,12 @@ Added 2026-09-14 (same session, a later run, ten PRs merged):
   two real review-evidence comments that way (an `gh api .../issues/$pr/comments/$cid` call that
   404'd became the comment body). Write the body to a file, POST with `--input`, then
   `gh api .../issues/comments/$ID -q .body | head -1` to confirm.
+- **`gh pr list --author @me` is not "my PRs".** Every session on this machine pushes as the same
+  GitHub account, so that lists *every* session's open PRs. At wrap-up I took one for my own
+  in-flight work, commissioned a review of it, and only found the owner when `git checkout` said
+  the branch was already used by another worktree. Identify ownership first: `git worktree list`
+  (a branch checked out elsewhere is someone else's), and the branch name against your own
+  `ao progress` claims.
 - **Never `git checkout <file>` to undo a test fixture edit** while you have uncommitted work in
   that file — it silently discards the real change too. Copy the file aside and copy it back.
 

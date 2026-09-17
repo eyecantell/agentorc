@@ -462,9 +462,9 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Priority:** Medium
 **Added:** 2026-09-16 (observed by the anchor session restarting the units for TD-052's live check)
 
-**Status:** Open
+**Status:** Open — **cause confirmed 2026-09-16 22:36 MDT**: with `agentorc-ui` stopped first (closing its `subscribe` connection) and no `wait` blocked, `systemctl --user stop agentorc-agent` returned in under a second and the journal shows a clean `Stopped`, no timeout and no SIGKILL. The same run found a second, separate hang: `systemctl --user stop agentorc-ui` took 40 s to return, so the UI has a slow stop of its own (open terminal websockets or the agent subscription held through uvicorn's graceful shutdown are the likely holders — not diagnosed). Until this is fixed, stop the UI before the agent
 
-**Location:** `src/sessionorc/agent.py` (`HostAgent.serve`: `async with server: await server.serve_forever()`; `serve_until_signal`), `src/agentorc/service.py` (the unit: `KillMode=process`, no `TimeoutStopSec`)
+**Location:** `src/agentorc/ui/app.py` (the UI's shutdown), `src/sessionorc/agent.py` (`HostAgent.serve`: `async with server: await server.serve_forever()`; `serve_until_signal`), `src/agentorc/service.py` (the unit: `KillMode=process`, no `TimeoutStopSec`)
 
 **Why:** on 2026-09-16 21:24 MDT `systemctl --user restart agentorc-agent` sat in `stop-sigterm` for 90 s, then systemd logged `State 'stop-sigterm' timed out. Killing.` and sent SIGKILL (`journalctl --user -u agentorc-agent`). SIGTERM cancels the serve task (TD-024), and leaving `async with server` calls `Server.wait_closed()`, which since Python 3.12 waits for **every open client connection** to finish — and the UI's `subscribe` connection never does, nor does a CLI blocked in the `wait` RPC (TD-052 step 3, which makes long-lived connections the normal case for every lead). So a stop never completes on its own. Nothing is lost today — tmux holds the sessions, the store is written on every change, and the unit restarts — but the socket file is not unlinked by the `finally`, in-flight permission waiters die without an answer, every restart costs 90 s during which hooks queue to disk, and a SIGKILL is the wrong default for a process that will soon hold the org's mail.
 
