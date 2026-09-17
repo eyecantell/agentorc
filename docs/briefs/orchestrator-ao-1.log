@@ -536,3 +536,6 @@
 05:50  tdgrind-ao-1: idle since 05:39 after writing its end-of-run summary ("free-pick lane has nothing left I may pick"; note m-… 05:39Z) → not idle-with-open-work, no nudge; composer shows `❯ /exit` (likely ghost suggestion, not submitted). Watching; no restart when it exits (lane free-pick, run declared ended).
 05:50  cadence: #182 (td053-*) no fail rows (review recorded); #183 org-team-cards is no member's branch → not checked
 05:50  inbox: 5 notes from tdgrind-ao-1 (done TD-058, TD-053 steps 1-2, TD-056; run ending) → weighed, no reply needed
+06:01  inbox: [person] Paul via anchor — tdgrind-ao-1 handed lane TD-055 steps 1-3 (glossary rename), keep rounds, cadence-check its PRs; step 4 stays with Paul → acknowledged, continuing
+06:01  tdgrind-ao-1: working (claimed TD-055 steps 1-3 at 06:00) → ok
+06:01  samscrape tdgrind-1/2/3: started 05:51 under ao-samscrape-orchestrator-sam-1 → not my members, not touched
