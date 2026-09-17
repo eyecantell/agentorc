@@ -7,7 +7,7 @@ anchor: main-checkout-single
 unattended: {workers: 3, ...}         # kept as a block; the loader only knows it is present
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}
-  orchestrator: {grants: [orchestrate], controllers: []}
+  lead: {grants: [orchestrate], controllers: []}
 controllers: [orchestrator-ao-1]      # who may act on a session started here; omitted = nobody
 ledger: docs/technical_debt.md
 teams: {...}                          # §4.9; passed through for the team step
@@ -25,6 +25,7 @@ repo's own `roles:`, each overriding per key.
 
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -49,10 +50,46 @@ LANE_PLACEHOLDER = "{lane}"
 PRESETS: dict[str, dict[str, Any]] = {
     "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": []},
     "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": []},
-    "orchestrator": {"brief": "orchestrator.md", "lane": [], "grants": ["orchestrate"]},
+    "lead": {"brief": "lead.md", "lane": [], "grants": ["orchestrate"]},
     "plain": {"brief": None, "lane": [], "grants": []},
 }
 DEFAULT_ROLE = "plain"
+# Renamed roles, old → new (TD-055, docs/glossary.md): the old name still resolves for one release,
+# wherever a role is named — `--role`, a team definition, an `org.yml` or `.agentorc.yml` `roles:`
+# key — and says so once per process, naming the new word.
+ROLE_ALIASES: dict[str, str] = {"orchestrator": "lead"}
+_warned: set[str] = set()
+
+
+def canonical_role(name: str) -> str:
+    """The role's current name; an old one is accepted with a deprecation line on stderr."""
+    new = ROLE_ALIASES.get(name)
+    if new is None:
+        return name
+    _deprecated(name, new)
+    return new
+
+
+def _deprecated(old: str, new: str) -> None:
+    if old not in _warned:
+        _warned.add(old)
+        print(
+            f"role `{old}` is now `{new}` (TD-055); `{old}` is still accepted for one release — rename it",
+            file=sys.stderr,
+        )
+
+
+def _aliased(blocks: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """A `roles:` mapping with old keys folded into their new names. When a layer spells both, the
+    new key's values win per key: it is the one the person wrote since the rename."""
+    if not any(old in blocks for old in ROLE_ALIASES):
+        return blocks
+    out = {k: v for k, v in blocks.items() if k not in ROLE_ALIASES}
+    for old, new in ROLE_ALIASES.items():
+        if old in blocks:
+            _deprecated(old, new)
+            out[new] = {**(blocks[old] or {}), **(blocks.get(new) or {})}
+    return out
 
 
 @dataclass
@@ -242,16 +279,18 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
 
 def role_names(cfg: RepoConfig, roles_overlay: dict[str, dict[str, Any]] | None = None) -> list[str]:
     """Every role that resolves here: the built-ins first, then what the layers add, each once."""
-    return list(dict.fromkeys([*PRESETS, *(roles_overlay or {}), *cfg.roles]))
+    return list(dict.fromkeys([*PRESETS, *_aliased(roles_overlay or {}), *_aliased(cfg.roles)]))
 
 
 def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, Any]] | None = None) -> Role:
     """Built-in < `roles_overlay` (the org layer, a later step) < the repo's `roles:`, per key.
-    An unknown name is a `KeyError` naming it and what would have resolved."""
+    An unknown name is a `KeyError` naming it and what would have resolved. A renamed role's old
+    name resolves to the new one (`ROLE_ALIASES`), and the returned `Role` carries the new name."""
+    name = canonical_role(name)
     layers = [
         ("built-in", PRESETS.get(name)),
-        ("org", (roles_overlay or {}).get(name)),
-        ("repo", cfg.roles.get(name)),
+        ("org", _aliased(roles_overlay or {}).get(name)),
+        ("repo", _aliased(cfg.roles).get(name)),
     ]
     spoke = [(src, block) for src, block in layers if block is not None]
     if not spoke:

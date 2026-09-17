@@ -49,7 +49,7 @@ def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
     # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
-    assert 'name="role"' in r.text and "orchestrator [built-in] · grants orchestrate" in r.text
+    assert 'name="role"' in r.text and "lead [built-in] · grants orchestrate" in r.text
     (tmp_path / ".agentorc.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
     r = client.get(f"/new?dir={tmp_path}")
     assert "reviewer [repo]" in r.text and 'data-default="orc"' in r.text
@@ -548,7 +548,7 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
 
 def test_the_membership_controls(client, tmp_path):
     """TD-036 step 3, design §4.5a: the card's **under `<orc>`** chip, the Focus **controllers**
-    chip, the orchestrator's **Members** list, and the New session **Controllers** picker. Both
+    chip, the lead's **Members** list, and the New session **Controllers** picker. Both
     directions are derived from the fleet on render, never stored, so the assertions go through
     the real pages rather than a hand-built view."""
     from agentorc.ui.app import templates, view
@@ -577,7 +577,7 @@ def test_the_membership_controls(client, tmp_path):
 
     page = client.get(f"/focus/{worker}").text
     assert 'id="fcontrollers"' in page and "no controller — nobody may act on this session" in page
-    assert 'id="members"' not in page  # not an orchestrator: no member list
+    assert 'id="members"' not in page  # not a lead: no member list
 
     # the chip adds one, and the agent is what actually decides
     assert client.post(f"/api/sessions/{worker}/controllers", json={"add": [orc_id]}).json() == {
@@ -651,7 +651,7 @@ def test_the_membership_controls(client, tmp_path):
 def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_what_is_ticked(client, tmp_path):
     """Design §4.5a New session **Grants** checkboxes (TD-028 step 5).
 
-    A preset's grants used to apply unseen: picking `orchestrator` in the form started a session
+    A preset's grants used to apply unseen: picking `lead` in the form started a session
     that could send to, wrap up and kill other sessions, and nothing on the page said so. That is
     the one power in the system a person should never acquire without seeing it — and the reverse
     matters as much: a tick the person removed has to be honoured, not overridden by the preset.
@@ -674,7 +674,7 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
             "name": "g1",
             "dir": str(tmp_path),
             "adapter": "hookstub",
-            "role": "orchestrator",
+            "role": "lead",
             "grant": "orchestrate",
         },
         follow_redirects=False,
@@ -684,13 +684,13 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
     got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert "orchestrate" in (got.get("capabilities") or [])
 
-    # unticked on an `orchestrator` preset: the person's decision stands over the preset's grants.
+    # unticked on a `lead` preset: the person's decision stands over the preset's grants.
     # A second directory, since one agent session per directory is refused (§9 invariant 2).
     other = tmp_path / "other"
     other.mkdir()
     r = client.post(
         "/new",
-        data={"name": "g2", "dir": str(other), "adapter": "hookstub", "role": "orchestrator"},
+        data={"name": "g2", "dir": str(other), "adapter": "hookstub", "role": "lead"},
         follow_redirects=False,
     )
     assert r.status_code == 303

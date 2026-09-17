@@ -71,7 +71,7 @@ not mix:
   2026-09-13).
 - **role** — a skillset preset an agent is started from: brief template, lane shape, grants,
   profile. Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `lead`,
-  `plain` (`lead` is `orchestrator` in the code until TD-055 renames it). *Not:* type, kind. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
+  `plain` (renamed from `orchestrator` 2026-09-17, TD-055 step 2; the old name is an alias for one release). *Not:* type, kind. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
 - **grinder** — a role: resolves each lane item to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.

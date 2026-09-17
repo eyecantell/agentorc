@@ -8,7 +8,7 @@ projects:
 teams:
   ao-grind:
     projects: [agentorc]
-    lead: {role: orchestrator, name: orchestrator-ao-1}
+    lead: {role: lead, name: orchestrator-ao-1}
     members:
       - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
       - {team: ao-ui}                 # a nested team
@@ -33,7 +33,7 @@ import yaml
 
 from sessionorc import hosts, paths
 
-DEFAULT_LEAD_ROLE = "orchestrator"
+DEFAULT_LEAD_ROLE = "lead"
 PERSON = "person"  # a lead role meaning the person leads: no lead session is started (§4.9)
 
 
@@ -50,8 +50,8 @@ class LeadDef:
     home: str = ""  # a repo name from the team's projects
     profile: str | None = None  # overrides the role's
     lane: list[str] = field(default_factory=list)
-    brief: str | None = None  # overrides the role's template — the orchestrator brief a repo keeps
-    grants: list[str] | None = None  # None: the role's (`orchestrate` for `orchestrator`)
+    brief: str | None = None  # overrides the role's template — the lead brief a repo keeps
+    grants: list[str] | None = None  # None: the role's (`orchestrate` for `lead`)
     unattended: bool = True
 
 

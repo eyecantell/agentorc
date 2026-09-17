@@ -26,7 +26,7 @@ def org_doc(root: Path, *, two_repos: bool = False) -> dict:
         "teams": {
             "ao-grind": {
                 "projects": ["ao"],
-                "lead": {"role": "orchestrator", "name": "orc-ao", "home": "agentorc"},
+                "lead": {"role": "lead", "name": "orc-ao", "home": "agentorc"},
                 "members": [
                     {"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick", "home": "agentorc"},
                     {"role": "hunter", "name": "hunt", "lane": "ui", "home": "agentorc"},
@@ -176,7 +176,7 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "grind-1", "grind-2", "hunt"]
     lead, grind1, hunt = made[0], made[1], made[3]
-    assert lead["controllers"] == [] and lead["capabilities"] == ["orchestrate"] and lead["role"] == "orchestrator"
+    assert lead["controllers"] == [] and lead["capabilities"] == ["orchestrate"] and lead["role"] == "lead"
     lead_id = "ao-agentorc-orc-ao"
     assert all(p["controllers"] == [lead_id] for p in made[1:])
     # a worktree per session in its home repo (§4.9 "Home and reach"), and both badges
@@ -186,7 +186,7 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert "## Lane: free-pick" in grind1["prompt"] and "## Area: ui" in hunt["prompt"]
     assert "## Project:" not in grind1["prompt"]  # one repo: no reach to describe
     out = capsys.readouterr().out
-    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  lead orchestrator")
+    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  lead lead")
     assert "member grinder" in out
 
 

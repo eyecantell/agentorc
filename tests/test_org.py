@@ -23,7 +23,7 @@ ORG = {
     "teams": {
         "ao-grind": {
             "projects": ["agentorc"],
-            "lead": {"role": "orchestrator", "name": "orchestrator-ao-1"},
+            "lead": {"role": "lead", "name": "orchestrator-ao-1"},
             "members": [
                 {"role": "grinder", "count": 2, "name": "tdgrind-ao", "lane": "free-pick"},
                 {"role": "hunter", "name": "hunter-ao", "lane": "ui"},
@@ -75,16 +75,16 @@ def test_every_default_of_section_4_9(tmp_path):
     o = org.load(write(tmp_path, ORG))
     grind = o.teams["ao-grind"]
     assert grind.source == tmp_path / "org.yml" and grind.projects == ["agentorc"]
-    assert grind.lead == org.LeadDef(role="orchestrator", name="orchestrator-ao-1", home="agentorc", profile=None)
+    assert grind.lead == org.LeadDef(role="lead", name="orchestrator-ao-1", home="agentorc", profile=None)
     two, one = grind.members
     # count 1, name = the role, unattended true, grants/brief/profile = the role's, home = the only repo
     assert one == org.MemberDef(role="hunter", name="hunter-ao", home="agentorc", lane=["ui"])
     assert one.count == 1 and one.unattended is True and one.grants is None and one.brief is None
     assert two.count == 2 and two.lane == ["free-pick"] and two.names() == ["tdgrind-ao-1", "tdgrind-ao-2"]
     assert one.names() == ["hunter-ao"]
-    # lead defaults: role orchestrator, name <team>-lead
+    # lead defaults: role lead, name <team>-lead
     g = o.teams["guardians"]
-    assert g.lead.role == "orchestrator" and g.lead.name == "guardians-lead" and g.lead.profile == "orc"
+    assert g.lead.role == "lead" and g.lead.name == "guardians-lead" and g.lead.profile == "orc"
     assert g.members[0].home == "guardians-api" and g.members[0].brief == "docs/briefs/api-grinder.md"
     assert g.members[1] == org.MemberDef(team="guardians-ui")
     ui = o.teams["guardians-ui"]
@@ -225,7 +225,7 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     assert merged.checkout("myrepo", "myrepo", local_host().name) == repo.resolve()
     g = merged.teams["grind"]
     assert g.projects == ["myrepo"] and g.source == repo / ".agentorc.yml"
-    assert g.lead == org.LeadDef(role="orchestrator", name="orc", home="myrepo")
+    assert g.lead == org.LeadDef(role="lead", name="orc", home="myrepo")
     assert g.members[0].names() == ["tdgrind-1", "tdgrind-2"] and g.members[0].home == "myrepo"
     assert merged.teams["ao-grind"] is base.teams["ao-grind"]  # org wins, source still org.yml
     assert merged.teams["ao-grind"].source == tmp_path / "org.yml"
@@ -247,14 +247,14 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
 
 def test_a_lead_may_name_its_own_brief_lane_grants_and_mode(tmp_path):
     """§4.9's lead had only role, name, home and profile, so a `brief:` on it was read by nobody —
-    and an orchestrator's brief is the one a repo most often keeps its own copy of. Found while
+    and a lead's brief is the one a repo most often keeps its own copy of. Found while
     writing the first real org.yml (2026-09-13)."""
     doc = {
         "projects": {"p": {"repos": {"r": {"kmaster": str(tmp_path)}}}},
         "teams": {
             "t": {
                 "projects": ["p"],
-                "lead": {"role": "orchestrator", "brief": "docs/briefs/orc.md", "lane": "TD-1", "unattended": False},
+                "lead": {"role": "lead", "brief": "docs/briefs/orc.md", "lane": "TD-1", "unattended": False},
             }
         },
     }
@@ -270,7 +270,7 @@ def test_a_key_nobody_reads_is_an_error_naming_it(tmp_path):
     base = {"projects": {"p": {"repos": {"r": {"kmaster": str(tmp_path)}}}}}
     for block, bad in (
         ({"projects": ["p"], "leed": {}}, "leed"),
-        ({"projects": ["p"], "lead": {"role": "orchestrator", "breif": "x"}}, "breif"),
+        ({"projects": ["p"], "lead": {"role": "lead", "breif": "x"}}, "breif"),
         ({"projects": ["p"], "members": [{"role": "grinder", "profil": "grind"}]}, "profil"),
     ):
         (tmp_path / "org.yml").write_text(yaml.safe_dump({**base, "teams": {"t": block}}))

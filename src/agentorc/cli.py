@@ -160,7 +160,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             if s.get("project"):
                 print(f"{'':<{w}}      project: {s['project']}")
             # Both directions of membership (design §4.8): what may act on this session, and — for
-            # an orchestrator — what it may act on. The second is derived from the records here,
+            # a lead — what it may act on. The second is derived from the records here,
             # never stored, which is the same rule the Focus member list follows.
             if s.get("controllers"):
                 print(f"{'':<{w}}      under:  {', '.join(s['controllers'])}")

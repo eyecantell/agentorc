@@ -2,6 +2,7 @@
 `.agentorc.yml` fill in, with the RPC mocked — the agent's side of `create` is tested elsewhere."""
 
 import json
+import re
 
 import pytest
 
@@ -56,12 +57,10 @@ def test_role_fills_brief_lane_grants_profile_and_the_record(repo, capsys):
 
     calls.clear()
     # the flags win: --profile, --prompt, --lane; --grant adds to the preset's grants
-    assert (
-        cli.main(["new", "o1", "--role", "orchestrator", "-p", "paul", "--prompt", "hi", "--grant", "orchestrate"]) == 0
-    )
+    assert cli.main(["new", "o1", "--role", "lead", "-p", "paul", "--prompt", "hi", "--grant", "orchestrate"]) == 0
     p = created(calls)
     assert p["profile"] == "paul" and p["prompt"] == "hi" and p["capabilities"] == ["orchestrate"]
-    assert p["role"] == "orchestrator" and p["lane"] == []
+    assert p["role"] == "lead" and p["lane"] == []
 
     calls.clear()
     assert cli.main(["new", "h1", "--role", "hunter"]) == 0
@@ -71,6 +70,19 @@ def test_role_fills_brief_lane_grants_profile_and_the_record(repo, capsys):
     assert cli.main(["new", "p1"]) == 0  # no role: nothing filled, as before
     p = created(calls)
     assert p["role"] == "" and p["prompt"] is None and p["capabilities"] == [] and p["ledger"] == "docs/debt.md"
+
+
+def test_role_orchestrator_still_starts_a_lead_and_says_so(repo, capsys, monkeypatch):
+    """TD-055 step 2: `--role orchestrator` is a deprecated alias for one release — the session is
+    started as `lead`, with the lead brief and grants, and stderr names the new word."""
+    from agentorc import repoconfig
+
+    monkeypatch.setattr(repoconfig, "_warned", set())
+    _, calls = repo
+    assert cli.main(["new", "o2", "--role", "orchestrator"]) == 0
+    p = created(calls)
+    assert p["role"] == "lead" and p["capabilities"] == ["orchestrate"] and "**lead**" in p["prompt"]
+    assert "role `orchestrator` is now `lead`" in capsys.readouterr().err
 
 
 def test_controllers_default_from_the_role_then_the_repo_and_names_resolve(repo, capsys):
@@ -138,15 +150,19 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     root, calls = repo
     assert cli.main(["roles"]) == 0
     out = capsys.readouterr().out
-    assert out.startswith("roles: built-in only") and "orchestrator  [built-in]" in out and "grants: orchestrate" in out
+    assert (
+        out.startswith("roles: built-in only")
+        and re.search(r"^lead +\[built-in\]", out, re.M)
+        and "grants: orchestrate" in out
+    )
     (root / ".agentorc.yml").write_text(
         "controllers: [orc]\nroles:\n  grinder: {profile: grind, brief: docs/briefs/g.md}\n  reviewer: {lane: [ui]}\n"
     )
     assert cli.main(["roles"]) == 0
     out = capsys.readouterr().out
     assert out.splitlines()[0] == f"roles from {root / '.agentorc.yml'}"
-    assert "grinder       [built-in + repo]  lane: free-pick  grants: none  profile: grind  controllers: orc" in out
-    assert "brief: docs/briefs/g.md" in out and "reviewer      [repo]  lane: ui" in out
+    assert "grinder   [built-in + repo]  lane: free-pick  grants: none  profile: grind  controllers: orc" in out
+    assert "brief: docs/briefs/g.md" in out and "reviewer  [repo]  lane: ui" in out
     assert cli.main(["roles", "--json", "-d", str(root)]) == 0
     data = json.loads(capsys.readouterr().out)
     assert data["controllers"] == ["orc"] and [r["name"] for r in data["roles"]][-1] == "reviewer"

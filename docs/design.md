@@ -752,8 +752,8 @@ noted). If a control is not in this table it does not exist.
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027). Reads **Steer** with the hint "steers the turn in flight" while the session is `working`, and **Send** with "starts a new turn" when it is idle (§4.3) — one control, labelled for the job it is doing, since the person cannot otherwise tell which of the two they are about to do. `stalled?` steers too — it is a `working` session that stopped producing output (§4.2), a turn in flight — while `limited` says the cap holds what you send rather than claiming a turn starts, since nothing the person does clears a cap (§4.2; its controls are **Switch profile** and **Wait**). Disabled with a reason on `exited`, `closed` and `unreachable`, where there is no turn at all — landed 2026-09-14 (TD-047) |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
-| New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `orchestrator`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule — landed 2026-09-13, TD-040 step a: the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked since 2026-09-14 (the row below), so nothing it grants applies unseen |
-| New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `orchestrate`). Unchecked by default for every preset but `orchestrator`; shown with a one-line warning of what the grant allows — landed 2026-09-14 (TD-028 step 5): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and **what is ticked is what the session starts with**, so an untick on an `orchestrator` preset means the session does not get the grant |
+| New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `lead`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule — landed 2026-09-13, TD-040 step a: the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked since 2026-09-14 (the row below), so nothing it grants applies unseen |
+| New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `orchestrate`). Unchecked by default for every preset but `lead`; shown with a one-line warning of what the grant allows — landed 2026-09-14 (TD-028 step 5): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and **what is ticked is what the session starts with**, so an untick on an `orchestrator` preset means the session does not get the grant |
 | card | **report line** | shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, a lead's `last round 20:10 · 2 wrapped up`; an entry the host agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed` (landed 2026-09-12) |
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (host-agent RPC, recorded as dropped by the person — a *declaration*, so the tick cannot undo it) (landed 2026-09-12) |
 | Focus header | **grants** chip | lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes), each with what the grant allows on its confirm (landed 2026-09-12) |
@@ -1188,8 +1188,14 @@ deliberately not warned about: briefs cite dated ADRs and state what was true on
 |---|---|---|---|---|
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
-| `orchestrator` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `orchestrate` | `progress` per tick: sessions acted on and what was done |
+| `lead` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `orchestrate` | `progress` per round: sessions acted on and what was done |
 | `plain` | — (no template) | — | none | whatever it declares |
+
+The lead preset was called `orchestrator` until 2026-09-17 (TD-055 step 2, `docs/glossary.md`).
+For one release the old name still resolves wherever a role is named — `--role`, a team
+definition's `role:`, a `roles:` key in `org.yml` or `.agentorc.yml` — to `lead`, and the client
+prints one line per process naming the new word; the record is written with `lead`. Records
+started before the rename keep `role: orchestrator` as a badge, which nothing keys on.
 
 Each preset also carries the test for when it has **run out of work**, which is the role's and
 never the core's; the tests and what a lead does with them are §4.9a (design 2026-09-14).
@@ -1253,19 +1259,19 @@ refuses with the missing path rather than cloning anything. In phase 1 the only 
 teams:
   ao-grind:
     projects: [agentorc]
-    lead: {role: orchestrator, name: orchestrator-ao-1}
+    lead: {role: lead, name: orchestrator-ao-1}
     members:
       - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
       - {role: hunter, name: hunter-ao, lane: ui}
   guardians:
     projects: [guardians]
-    lead: {role: orchestrator, name: guardians-lead, home: guardians}
+    lead: {role: lead, name: guardians-lead, home: guardians}
     members:
       - {role: grinder, home: guardians-api, brief: docs/briefs/api-grinder.md}
       - {team: guardians-ui}          # a nested team: its lead's controllers name this lead
 ```
 
-`lead`: `role` (default `orchestrator`; **`person`** means the person leads — no session is
+`lead`: `role` (default `lead`; **`person`** means the person leads — no session is
 started and members get an empty `controllers` list plus the team badge), `name` (default
 `<team>-lead`), `home` (a repo name from the team's projects — required when the projects list
 more than one repo, defaulted to the only one otherwise), `profile` (overrides the role's), and
@@ -1409,7 +1415,7 @@ therefore carries its own test, in §4.8's table beside the brief it hands out:
 | `grinder`, fixed lane | every lane reference is `done` or `dropped` — the case that already works |
 | `grinder`, `free-pick` | the ledger holds no entry it may pick: nothing open that its brief does not exclude, that is not already claimed by a live sibling, and that is not parked on `user_attention.md` waiting for a person |
 | `hunter` | its area is **gone**, not quiet — no such tests, no such path, no such deployment to probe |
-| `orchestrator` | no member is live, and every member that exited declared why |
+| `lead` | no member is live, and every member that exited declared why |
 
 **Quiet is not empty**, which is the distinction Paul's two examples sit either side of. A role
 that consumes a list ends when the list ends. A role that watches a stream — a hunter on a
@@ -2065,12 +2071,12 @@ unattended:
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}   # profile: §4.9
   hunter: {brief: docs/briefs/hunter.md}
-  orchestrator: {brief: docs/briefs/orchestrator.md, grants: [orchestrate]}
+  lead: {brief: docs/briefs/lead.md, grants: [orchestrate]}
 controllers: [orchestrator-ao-1]      # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
 teams:                                # §4.9: teams whose only project is this repo; org.yml wins a name
-  grind: {lead: {role: orchestrator, name: lead}, members: [{role: grinder, count: 2, name: tdgrind}]}
+  grind: {lead: {role: lead, name: lead}, members: [{role: grinder, count: 2, name: tdgrind}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - name: test        ; run: pdm run test
@@ -2089,7 +2095,7 @@ projects:
 teams:
   ao-grind:
     projects: [agentorc]
-    lead: {role: orchestrator, name: orchestrator-ao-1}
+    lead: {role: lead, name: orchestrator-ao-1}
     members:
       - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
 roles:

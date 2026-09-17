@@ -189,7 +189,7 @@ def stop_fields(until: str, unattended: bool) -> dict[str, str]:
 def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
-    an orchestrator — which sessions it controls. Without it both come back empty, which is what a
+    a lead — which sessions it controls. Without it both come back empty, which is what a
     caller that has only one record should show."""
     now = datetime.now(UTC)
     d = dict(s)

@@ -15,7 +15,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
     assert cfg.ready_when == ["tree_clean", "branch_pushed", "no_subagents"]
     assert cfg.commands == [] and cfg.unattended is None and cfg.controllers == [] and cfg.teams == {}
     assert cfg.ledger == "docs/technical_debt.md"
-    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "orchestrator", "plain"]
+    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "lead", "plain"]
 
 
 def test_the_section_5_example_loads(tmp_path):
@@ -30,12 +30,12 @@ unattended:
 roles:
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}
   hunter: {brief: docs/briefs/hunter.md}
-  orchestrator: {brief: docs/briefs/orchestrator.md, grants: [orchestrate]}
+  lead: {brief: docs/briefs/orchestrator.md, grants: [orchestrate]}
   reviewer: {grants: [], lane: [ui, tests], controllers: [ui-orc]}
 controllers: [orchestrator-ao-1]
 ledger: docs/debt.md
 teams:
-  grind: {lead: {role: orchestrator, name: orc}, members: [{role: grinder, count: 2}]}
+  grind: {lead: {role: lead, name: orc}, members: [{role: grinder, count: 2}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - {name: test, run: pdm run test}
@@ -45,7 +45,7 @@ commands:
     assert cfg.path == tmp_path / ".agentorc.yml"
     assert cfg.unattended == {"workers": 3, "window": {"weekday": "20:00-06:00", "weekend": "all"}}
     assert cfg.controllers == ["orchestrator-ao-1"] and cfg.ledger == "docs/debt.md"
-    assert cfg.teams["grind"]["lead"] == {"role": "orchestrator", "name": "orc"}
+    assert cfg.teams["grind"]["lead"] == {"role": "lead", "name": "orc"}
     assert cfg.ready_when[2] == "pr_merged" and cfg.commands == [{"name": "test", "run": "pdm run test"}]
     # a repo's `roles:` overrides per key: what it does not say stays built-in
     g = repoconfig.resolve_role(cfg, "grinder")
@@ -53,11 +53,11 @@ commands:
         "docs/briefs/grinder.md", "repo", ["free-pick"], [], "grind"
     )  # fmt: skip
     assert g.source == "built-in + repo"
-    o = repoconfig.resolve_role(cfg, "orchestrator")
+    o = repoconfig.resolve_role(cfg, "lead")
     assert o.grants == ["orchestrate"] and o.lane == [] and o.controllers == []
     r = repoconfig.resolve_role(cfg, "reviewer")
     assert r.source == "repo" and r.brief is None and r.lane == ["ui", "tests"] and r.controllers == ["ui-orc"]
-    assert [x.name for x in repoconfig.roles(cfg)] == ["grinder", "hunter", "orchestrator", "plain", "reviewer"]
+    assert [x.name for x in repoconfig.roles(cfg)] == ["grinder", "hunter", "lead", "plain", "reviewer"]
     with pytest.raises(KeyError, match="unknown role 'nope'; known: grinder, hunter"):
         repoconfig.resolve_role(cfg, "nope")
 
@@ -105,10 +105,10 @@ def test_built_in_briefs_fill_the_lane_and_plain_has_none(tmp_path):
     assert "## Lane: TD-027, TD-019" in text and "{lane}" not in text
     assert "## Lane: free-pick" in repoconfig.resolve_role(cfg, "grinder").brief_text()  # the role's default
     assert "## Area: free" in repoconfig.resolve_role(cfg, "hunter").brief_text()
-    orc = repoconfig.resolve_role(cfg, "orchestrator").brief_text()
+    orc = repoconfig.resolve_role(cfg, "lead").brief_text()
     assert "## Members: (none given)" in orc and "orchestrate" in orc
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
-    for name in ("grinder", "hunter", "orchestrator"):  # one screen each
+    for name in ("grinder", "hunter", "lead"):  # one screen each
         assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 40
 
 
@@ -137,3 +137,26 @@ def test_discover_walks_up_to_the_file_or_the_git_root(tmp_path):
     plain = tmp_path / "plain"
     plain.mkdir()
     assert repoconfig.discover(plain).root == plain
+
+
+def test_orchestrator_is_a_deprecated_alias_for_lead(tmp_path, capsys, monkeypatch):
+    """TD-055 step 2: the `orchestrator` role is `lead`. The old name still resolves for one release —
+    as a name and as a `roles:` key in the org overlay or the repo's file — with one line naming the
+    new word, and nothing lists or records `orchestrator` any more."""
+    monkeypatch.setattr(repoconfig, "_warned", set())
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  orchestrator: {profile: repo-prof}\n")
+    cfg = repoconfig.load(tmp_path)
+    role = repoconfig.resolve_role(
+        cfg, "orchestrator", {"orchestrator": {"lane": ["TD-1"]}, "lead": {"profile": "org"}}
+    )
+    assert role.name == "lead" and role.grants == ["orchestrate"] and role.brief == "lead.md"
+    assert role.lane == ["TD-1"]  # the org overlay's old key folded into `lead`
+    assert role.profile == "repo-prof"  # the repo layer still wins over the org layer
+    assert "orchestrator" not in repoconfig.role_names(cfg, {"orchestrator": {}})
+    err = capsys.readouterr().err
+    assert err.count("role `orchestrator` is now `lead`") == 1  # once per process, however often it is met
+    # within one layer, a new key the person wrote beside the old one wins per key
+    both = repoconfig.resolve_role(
+        repoconfig.RepoConfig(), "lead", {"orchestrator": {"profile": "old", "lane": ["x"]}, "lead": {"profile": "new"}}
+    )
+    assert both.profile == "new" and both.lane == ["x"]

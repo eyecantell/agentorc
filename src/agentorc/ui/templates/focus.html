@@ -80,10 +80,10 @@
       <div id="inboxlist"></div>
       <div class="note">Mail addressed to this session. Opening it here marks nothing read — only the session's own <code>ao inbox</code> does. Reply goes to the sender's inbox; delete removes this session's copy only.</div>
     </div>
-    {# design §4.5a Focus (orchestrator) **Members** list (§4.8, TD-036): every session whose
-       `controllers` name this one — the orchestrator's central view. Derived from the records on
+    {# design §4.5a Focus (lead) **Members** list (§4.8, TD-036): every session whose
+       `controllers` name this one — the lead's central view. Derived from the records on
        each render, never stored. Shown for a session holding `orchestrate`, even with no members
-       yet, because "none" is the answer a person opening an orchestrator most needs to see. #}
+       yet, because "none" is the answer a person opening a lead most needs to see. #}
     {% if s.is_orchestrator %}<div class="card pad" id="members">
       <div class="h2">Members</div>
       {% for m in s.members %}<div class="row gap">
