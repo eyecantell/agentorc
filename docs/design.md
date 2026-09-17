@@ -950,7 +950,7 @@ definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every ch
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
-its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052, not built): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — moves into the host agent as the `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC not yet): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — moves into the host agent as the `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -1767,7 +1767,10 @@ top bar shows its unread count and opens it; a person replies from there into th
 and that reply is a person acting toward the session — it may wake the sender and refills its wake
 budget, since the person is the mediator. `ao inbox` run with no calling session (a person at a
 terminal, no `AGENTORC_SESSION`) reads the person inbox. An `ask` to the person expires read or not,
-like any other; the board stays the only channel with a `Due:` date, so nothing rings for it.
+like any other; the board stays the only channel with a `Due:` date, so nothing rings for it. The person
+inbox keeps no exchange tally of its own — only the sending session's record counts, and the two
+depths bound the rest — and a session's `reply` to a person's message, naming no addressee, lands
+in the person inbox (TD-052 step 2, 2026-09-16).
 It also dissolves a question the session-addressed form could not answer — *which of the person's
 five open sessions should the worker write to?* — and it buys the person nothing they must act on:
 an unread message changes no state. It is read when the person looks.

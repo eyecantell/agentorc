@@ -46,7 +46,7 @@ from sessionorc.models import (
     normalize_ref,
     now_iso,
 )
-from sessionorc.store import EventQueue, SessionStore
+from sessionorc.store import EventQueue, PersonInboxStore, SessionStore
 from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 
 log = logging.getLogger("agentorc.agent")
@@ -109,6 +109,9 @@ class HostAgent:
         # is qualified against — `ao-x@<this host>` is stored bare (`naming.qualify`).
         self.host = hosts.local_host().name
         self.sessions: dict[str, Session] = self.store.load_all()
+        # The org's person inbox (design §4.10): held here, on no session record, in its own file.
+        self.person_store = PersonInboxStore()
+        self.person_inbox: list[MailEntry] = self.person_store.load()
         for s in self.sessions.values():
             # `prompt` pendings (Claude's idle_prompt) stopped being an alert on 2026-09-06; a record
             # written before that would otherwise show needs-you until the next hook event.
@@ -1401,18 +1404,15 @@ class HostAgent:
             raise RpcError(f"{sender} cannot send mail: this host agent has no record of it (design §4.10)")
         named = [self._addr(x) for x in ([to] if isinstance(to, str) else list(to or [])) if str(x).strip()]
         named = list(dict.fromkeys(named))
-        if PERSON in named:
-            raise RpcError(
-                "the person inbox is not built yet (TD-052 step 2); a person is reached through "
-                "user_attention.md with a Due: date"
-            )
+        if PERSON in named and sender == PERSON:
+            raise RpcError("the person inbox is how a session reaches a person; a person's own note is a board line")
         # -- a reply belongs to its root's thread, and answers an entry the replier holds ----------
         replied: MailEntry | None = None
         copies: list[str] = []
         if kind == "reply" and not reply_to:
             raise RpcError("a reply names the entry it answers: --reply-to <id> (design §4.10)")
         if reply_to:
-            held = [e for e in me.inbox if e.id == reply_to] if me is not None else self._holders(reply_to)
+            held = [e for e in me.inbox if e.id == reply_to] if me is not None else self._person_holds(reply_to)
             if not held:
                 raise RpcError(
                     f"{sender} holds no entry {reply_to} in its inbox: a reply names one it was addressed or "
@@ -1420,9 +1420,9 @@ class HostAgent:
                 )
             replied = held[0]
             if not named:
-                if replied.from_ == PERSON:
-                    raise RpcError("the person inbox is not built yet (TD-052 step 2): name the addressee")
-                named = [replied.from_]
+                if replied.from_ == PERSON and sender == PERSON:
+                    raise RpcError(f"{reply_to} is a person's own message: name the addressee")
+                named = [replied.from_]  # a session answering a person answers into the person inbox
             # replies in a copied thread are copied to the same set (design §4.10): the thread's
             # copies — a copy that failed to land included, so the set is the one meant — and its
             # other addressees, so the other lead of a `conflict` sees how it was settled
@@ -1451,7 +1451,7 @@ class HostAgent:
         named = resolved
         # -- the gate, per addressee, all or nothing ------------------------------------------------
         for sid in named:
-            if sid not in records:
+            if sid not in records and sid != PERSON:
                 raise RpcError(f"no session {sid}")
             if (reason := mail.message_gate(records, sender, sid)) is not None:
                 raise RpcError(reason)
@@ -1478,9 +1478,11 @@ class HostAgent:
         now = datetime.now(UTC)
         if counts and mail.THREAD_BOUND is not None:
             self._check_bounds(sender, named, root, now)
+        if PERSON in named:
+            self._check_person_depth(sender)
         if mail.MAILBOX_DEPTH is not None:
             for sid in named:
-                if records[sid].unread() >= mail.MAILBOX_DEPTH:
+                if sid != PERSON and records[sid].unread() >= mail.MAILBOX_DEPTH:
                     raise RpcError(
                         f"{sid}'s inbox holds {mail.MAILBOX_DEPTH} unread entries: the send is refused, not dropped "
                         f"(design §4.10)"
@@ -1506,6 +1508,10 @@ class HostAgent:
         entry.copies, entry.copies_failed = landed, failed
         touched: list[Session] = []
         for sid in (*named, *landed):
+            if sid == PERSON:
+                self.person_inbox.append(self._copy(entry))
+                self.person_store.save(self.person_inbox)
+                continue
             r = records[sid]
             r.inbox.append(self._copy(entry))
             touched.append(r)
@@ -1517,6 +1523,8 @@ class HostAgent:
                 r.threads.setdefault(root, Tally()).count += 1
             if replied is None and me is not None:  # replying to nothing: counted under the pair too
                 for sid in named:
+                    if sid == PERSON:
+                        continue  # the person inbox keeps no tally: its depths bound it instead
                     for t in (self._pair(me, sid, now), self._pair(records[sid], sender, now)):
                         t.at.append(at)
                         t.count = len(t.at)  # the window's count, kept as a field so pruning cannot reset it
@@ -1572,7 +1580,11 @@ class HostAgent:
         records = self.sessions
         me = records[sender]
         if root:
-            at_bound = [sid for sid in (sender, *named) if records[sid].threads.get(root, Tally()).count >= limit]
+            at_bound = [
+                sid
+                for sid in (sender, *named)
+                if sid != PERSON and records[sid].threads.get(root, Tally()).count >= limit
+            ]
             if at_bound:
                 for r in records.values():
                     if root in r.threads:
@@ -1584,6 +1596,8 @@ class HostAgent:
                 )
             return
         for sid in named:
+            if sid == PERSON:
+                continue
             mine, theirs = self._pair(me, sid, now), self._pair(records[sid], sender, now)
             if mine.count >= limit or theirs.count >= limit:
                 mine.bound_hit = theirs.bound_hit = True
@@ -1595,8 +1609,29 @@ class HostAgent:
                     f"(design §4.10)"
                 )
 
-    def _holders(self, msg_id: str) -> list[MailEntry]:
-        return [e for r in self.sessions.values() for e in r.holds(msg_id)]
+    def _person_holds(self, msg_id: str) -> list[MailEntry]:
+        """Where a person's `--reply-to` looks: the person inbox first (a session's message to the
+        person), then every session's copies (a person answering from a session's Inbox panel)."""
+        return [e for e in self.person_inbox if e.id == msg_id] + [
+            e for r in self.sessions.values() for e in r.holds(msg_id)
+        ]
+
+    def _check_person_depth(self, sender: str) -> None:
+        """The person inbox's depth and per-sender depth (design §4.10): it fills exactly when the
+        person has been away, so the refusal is a redirect to the channel with a `Due:` date."""
+        unread = [e for e in self.person_inbox if not e.read_at]
+        full = None
+        if mail.PERSON_INBOX_DEPTH is not None and len(unread) >= mail.PERSON_INBOX_DEPTH:
+            full = f"the person inbox holds {mail.PERSON_INBOX_DEPTH} unread entries"
+        elif mail.PERSON_SENDER_DEPTH is not None and (
+            sum(1 for e in unread if e.from_ == sender) >= mail.PERSON_SENDER_DEPTH
+        ):
+            full = f"the person inbox holds {mail.PERSON_SENDER_DEPTH} unread entries from {sender}"
+        if full:
+            raise RpcError(
+                f"{full}: the person is away — write the line on user_attention.md with a Due: date, "
+                f"the channel that reaches an absent person (design §4.10)"
+            )
 
     def _mark(self, msg_id: str, **fields: Any) -> None:
         """Write the same fact on every copy of one message, so both cards show it: the home is
@@ -1613,16 +1648,36 @@ class HostAgent:
                     else:
                         setattr(e, k, v)
             self.store.save(r)
+        mine = [e for e in self.person_inbox if e.id == msg_id]
+        for e in mine:
+            for k, v in fields.items():
+                if k == "pending":
+                    if v not in e.pending:
+                        e.pending.append(v)
+                else:
+                    setattr(e, k, v)
+        if mine:
+            self.person_store.save(self.person_inbox)
 
     async def rpc_inbox(self, id: str | None = None, unread: bool = False, caller: Any = None) -> dict[str, Any]:
         """`ao inbox [--unread]` (design §4.10): a session reads its own inbox and nobody else's;
         that read — and nothing else — sets `read_at` (lifecycle stage 2: delivered into a turn).
         A person (no caller) reads any session's inbox, as the Inbox panel does, and sets nothing:
-        a person is not the session. Each entry says whether its sender is one of the reader's
+        a person is not the session. A person naming no session reads the org's person inbox, and
+        that read sets nothing either. Each entry says whether its sender is one of the reader's
         controllers, a person, or neither — the rule stated where the mail is read."""
         if mail.is_person(caller):
-            if not id:
-                raise RpcError("the person inbox is not built yet (TD-052 step 2): name a session, ao inbox <id>")
+            if not id or id == PERSON:
+                held = [e for e in self.person_inbox if not (unread and e.read_at)]
+                return {
+                    "id": PERSON,
+                    "entries": [
+                        {**e.to_dict(), "from_role": mail.from_role(self.sessions, PERSON, e.from_)} for e in held
+                    ],
+                    "threads": {},
+                    "sends": [],
+                    "unread": sum(1 for e in self.person_inbox if not e.read_at),
+                }
             s = self._get(self._addr(id))
             mark = False
         else:
@@ -1681,8 +1736,15 @@ class HostAgent:
             for e in list(r.outbox):
                 if e.open and e.bound and _parse(e.bound) <= now:
                     self._mark(e.id, expired_at=stamp)
+        for e in list(self.person_inbox):  # an `ask` to the person expires on its bound like any other
+            if e.open and e.bound and _parse(e.bound) <= now:
+                self._mark(e.id, expired_at=stamp)
         if mail.MAIL_RETENTION is None:
             return
+        kept = [e for e in self.person_inbox if self._keep(e, now, inbox=True)]
+        if len(kept) != len(self.person_inbox):
+            self.person_inbox = kept
+            self.person_store.save(kept)
         for r in self.sessions.values():
             inbox = [e for e in r.inbox if self._keep(e, now, inbox=True)]
             outbox = [e for e in r.outbox if self._keep(e, now, inbox=False)]

@@ -25,6 +25,8 @@ TEXT_CAP = 4096  # bytes of `text`; a `conflict` cites `sends` by id rather than
 THREAD_BOUND: int | None = None  # entries per thread (and per pair inside PAIR_WINDOW) before a send is refused
 PAIR_WINDOW = timedelta(hours=24)  # the rolling window a reply-less pair is counted in (the wake budget's)
 MAILBOX_DEPTH: int | None = None  # unread entries an inbox holds before a send to it is refused
+PERSON_INBOX_DEPTH: int | None = None  # unread entries the org's person inbox holds before a send is refused
+PERSON_SENDER_DEPTH: int | None = None  # …and of those, how many one sender may hold there
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
 MAIL_RETENTION: timedelta | None = None  # how long a read entry is kept; an open `ask` is exempt
 SENDS_KEEP = 20  # `sends` entries a record keeps
@@ -135,11 +137,12 @@ def message_edge(records: Mapping[str, Session], sender: str, target: str) -> st
 
 def message_gate(records: Mapping[str, Session], sender: str, target: str) -> str | None:
     """Design §4.10: may `sender` message `target`? A person (`sender == PERSON`) always may — they
-    are not a session and may message anyone (§4.8). A session may message along one of
+    are not a session and may message anyone (§4.8) — and any session may message the person
+    inbox (`target == PERSON`). Otherwise a session may message along one of
     `message_edge`'s four edges and nothing else, refused by naming §4.10's graph rather than
     invariant 11: messaging is not acting. Returns the refusal, or None when the message may land."""
-    if sender == PERSON:
-        return None
+    if sender == PERSON or target == PERSON:
+        return None  # the person inbox is ungated (§4.10 "A session reaches a person")
     if sender == target:
         return f"{sender} cannot message itself: a note to yourself is a ledger entry (design §4.10)"
     if sender not in records:

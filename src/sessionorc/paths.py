@@ -26,6 +26,12 @@ def attachments_dir() -> Path:
     return home() / "attachments"
 
 
+def person_inbox_file() -> Path:
+    """The org's person inbox (design §4.10 "A session reaches a person"): one per org, held by the
+    home host agent and belonging to no session record, so it is its own file beside `sessions/`."""
+    return home() / "person_inbox.json"
+
+
 def socket_path() -> Path:
     return home() / "agent.sock"
 

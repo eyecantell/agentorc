@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import paths
-from sessionorc.models import Session
+from sessionorc.models import MailEntry, Session
 
 
 def _atomic_write(path: Path, text: str) -> None:
@@ -51,6 +51,25 @@ class SessionStore:
 
     def delete(self, session_id: str) -> None:
         self.path(session_id).unlink(missing_ok=True)
+
+
+class PersonInboxStore:
+    """The person inbox's file (design §4.10): a list of entries, written whole on every change and
+    reloaded on restart. A missing or unreadable file is an empty inbox, never a crash."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = path or paths.person_inbox_file()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def load(self) -> list[MailEntry]:
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            return [MailEntry.from_dict(d) for d in raw.get("entries", [])]
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return []
+
+    def save(self, entries: list[MailEntry]) -> None:
+        _atomic_write(self.path, json.dumps({"entries": [e.to_dict() for e in entries]}, indent=1))
 
 
 class EventQueue:
