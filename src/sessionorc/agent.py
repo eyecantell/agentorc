@@ -2,7 +2,10 @@
 
 JSON-lines RPC over a Unix socket: `{"id": n, "method": "...", "params": {...}}` →
 `{"id": n, "result": ...}` or `{"id": n, "error": "..."}`. `subscribe` turns the connection into
-a stream of `{"event": "session", "session": {...}}` / `{"event": "gone", "id": ...}` lines.
+a stream of `{"event": "session", "session": {...}}` / `{"event": "gone", "id": ...}` lines; a
+`wait` holds its connection until it returns and is dropped when that connection closes. A response
+to a session with unread mail carries `"mail": {"unread": N, "wake_budget_spent": bool}` beside
+its result or error (design §4.10 "a line on every `ao` reply").
 """
 
 from __future__ import annotations
@@ -25,7 +28,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, hosts, mail, naming, paths, reports
+from sessionorc import adapters, hosts, mail, naming, paths, reports, waits
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
@@ -97,6 +100,16 @@ def _is_branch_claim(e: Any) -> bool:
     return e.source != "declared" and e.status == "claimed" and not e.pr
 
 
+class _Wait:
+    """One session (or person) blocked in `wait` (design §4.10: *blocked in `wait`* is what makes a
+    session reachable). Registered while the RPC is blocked, removed the moment it returns or its
+    connection closes, so the tick's decision never finds a ghost."""
+
+    def __init__(self, caller: str | None) -> None:
+        self.caller = caller
+        self.poke = asyncio.Event()
+
+
 class HostAgent:
     def __init__(
         self, *, tmux: Tmux | None = None, store: SessionStore | None = None, events: EventQueue | None = None
@@ -130,6 +143,7 @@ class HostAgent:
         # without every other tab being re-sent everything)
         self._subscribers: dict[asyncio.StreamWriter, dict[str, str]] = {}
         self._gone: list[str] = []  # forgotten ids not yet announced (`_forget` → `_push_changes`)
+        self._waits: set[_Wait] = set()  # every `wait` blocked right now, each on its own connection
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
@@ -220,6 +234,7 @@ class HostAgent:
             self._usage_task = asyncio.create_task(self._refresh_usage())
         await self._enforce_stop_times(snapshot_at)
         await self._sweep_mail(snapshot_at)
+        self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
 
     async def _enforce_stop_times(self, now: datetime) -> None:
         """Stop the unattended sessions whose time is up (design §6, TD-026 gap 1).
@@ -921,6 +936,9 @@ class HostAgent:
         )
         new.threads = {k.replace(f"pair:{old.id}", f"pair:{new.id}"): t for k, t in old.threads.items()}
         new.sends = list(old.sends)
+        # the wake decisions follow the conversation too, so moved mail a wake already covered is
+        # not decided (and charged) a second time, and a spent budget is not reset by a resume
+        new.mail_decided, new.wakes, new.wake_refilled_at = old.mail_decided, list(old.wakes), old.wake_refilled_at
         old.inbox, old.outbox, old.threads, old.sends = [], [], {}, []
         for r in self.sessions.values():
             if r.id in (old.id, new.id):
@@ -1041,6 +1059,8 @@ class HostAgent:
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
         entry = self._record_send(s, caller, text)
+        if mail.is_person(caller):
+            self._refill(s)
         try:
             await self._submit(id, adapters.get(s.adapter), text)
         except RpcError as e:
@@ -1167,6 +1187,8 @@ class HostAgent:
         s = self._get(id)
         self._refuse_closed(s)
         self._record_send(s, caller, " ".join(str(k) for k in keys))
+        if mail.is_person(caller):
+            self._refill(s)  # keys are how a person answers a menu or a question in the pane
         await asyncio.to_thread(lambda: self.tmux.run("send-keys", "-t", f"={id}:", *keys))
 
     async def rpc_explain(self, id: str, lines: int = 40) -> dict[str, Any]:
@@ -1538,10 +1560,19 @@ class HostAgent:
                     r.threads[root] = Tally()
                     if r not in touched:
                         touched.append(r)
+        if sender == PERSON:
+            for sid in named:  # a person's message, reply or not, refills each addressee's budget
+                if sid != PERSON:
+                    self._refill(records[sid])
         for r in touched:
             self.store.save(r)
         await self._push_changes()
+        now = datetime.now(UTC)
         return {
+            # exhaustion is visible to the sender (design §4.10): the mail landed, and it wakes nobody
+            "wake_budget_spent": [
+                sid for sid in (*named, *landed) if sid != PERSON and mail.wake_budget_spent(records[sid], now)
+            ],
             "entry": entry.to_dict(),
             "delivered": list(named),
             "copies": landed,
@@ -1773,6 +1804,121 @@ class HostAgent:
             return True
         return _parse(since) + mail.MAIL_RETENTION > now
 
+    # -- waking (design §4.8 "Waking a lead", §4.10 "The host agent decides each wake") ----------
+
+    async def rpc_wait(self, timeout: float = 600.0, scope: str = "controlled", caller: Any = None) -> dict[str, Any]:
+        """`ao wait [--timeout N] [--scope controlled|all]` (TD-049, moved here by TD-052 step 3):
+        block until something in the caller's scope changes, new mail wakes it, or the timeout
+        passes — and **that timeout is the fallback poll**.
+
+        A read, never gated (§9 invariant 11). The snapshot is this agent's own records, complete
+        by construction, compared against the per-caller cursor under `waits/` exactly as the CLI
+        did: an unreadable cursor wakes on everything in scope, a first wait records and wakes on
+        nothing. Mail's half of the cursor is the caller's `mail_decided` watermark, on its record:
+        while it is blocked here the caller is *reachable*, so every pass — each change, and each
+        tick — takes the wake decision (`_decide_wake`), which may return the wait for mail. A
+        member's change returns at once, carrying any undecided mail with it for free.
+
+        Returns `{"changed": [records], "mail": [headers], "wake": decision | None}`. The mail is
+        headers only — id, from, kind, about, at, the sender's role — because `read_at` means
+        *`ao inbox` printed it* and nothing else (§4.10 lifecycle)."""
+        if scope not in waits.SCOPES:
+            raise RpcError(f"unknown scope {scope!r}; scopes are: {', '.join(waits.SCOPES)}")
+        who = None if mail.is_person(caller) else self._addr(caller)
+        before = waits.read_cursor(who)
+        cursor: dict[str, str] | None = None
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + max(float(timeout), 0.0)
+        me = _Wait(who)
+        self._waits.add(me)
+        try:
+            while True:
+                me.poke.clear()
+                views = [x.view() for x in self.sessions.values()]
+                changed, cursor = waits.wake_changes(before, waits.wait_scope(views, who, scope))
+                s = self.sessions.get(who) if who is not None else None
+                wake = self._decide_wake(s, member_change=bool(changed)) if s is not None else None
+                if changed or (wake is not None and wake["cause"] == "mail"):
+                    covered = wake["entries"] if wake is not None else []
+                    return {
+                        "changed": changed,
+                        "mail": [self._header(s, e) for e in covered] if s is not None else [],
+                        "wake": {k: v for k, v in wake.items() if k != "entries"} if wake is not None else None,
+                    }
+                left = deadline - loop.time()
+                if left <= 0:
+                    return {"changed": [], "mail": [], "wake": None}
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(me.poke.wait(), left)
+        finally:
+            # Discarded before anything else can run: a cancelled wait (its connection closed) is
+            # gone by the time the next tick decides. The cursor is written on every way out —
+            # it holds only what this wait compared and found unchanged, or what it returned.
+            self._waits.discard(me)
+            if cursor is not None:
+                waits.write_cursor(who, cursor)
+
+    def _header(self, s: Session, e: MailEntry) -> dict[str, Any]:
+        return {
+            "id": e.id,
+            "from": e.from_,
+            "from_role": mail.from_role(self.sessions, s.id, e.from_),
+            "kind": e.kind,
+            "about": e.about,
+            "at": e.at,
+        }
+
+    def _poke_waits(self) -> None:
+        for w in self._waits:
+            w.poke.set()
+
+    def blocked_in_wait(self, sid: str) -> bool:
+        """Reachable in step 3's sense: some connection holds a `wait` for this session now."""
+        return any(w.caller == sid for w in self._waits)
+
+    def _decide_wake(self, s: Session, *, member_change: bool) -> dict[str, Any] | None:
+        """The one wake decision (design §4.10), taken when `s` is reachable — blocked in `wait`
+        here; step 7's doorbell calls it at a hook-confirmed `idle`. Looks at the unread mail past
+        the `mail_decided` watermark:
+
+        - none, or `s` is a person's session (never woken by mail) → None, nothing recorded;
+        - a member's change is waking it anyway → a **free** wake: recorded `charged: False`,
+          watermark advanced over all of it;
+        - the budget holds → one unit spent however many entries it covers, `charged: True`,
+          watermark advanced;
+        - the budget is spent → None: the mail has landed, nothing wakes, **the watermark stays**,
+          so the same mail is still undecided when the window refills.
+
+        Returns the decision as recorded, plus the `entries` it covered."""
+        if not mail.mail_wakes(s):
+            return None
+        fresh = mail.undecided_mail(s)
+        if not fresh:
+            return None
+        now = datetime.now(UTC)
+        if not member_change and mail.wake_budget_spent(s, now):
+            return None
+        decision = {
+            "at": now.isoformat(timespec="microseconds"),
+            "cause": "member" if member_change else "mail",
+            "charged": not member_change,
+            "covered": len(fresh),
+        }
+        s.wakes = (s.wakes + [decision])[-mail.WAKES_KEEP :]
+        s.mail_decided = {"id": fresh[-1].id, "at": fresh[-1].at}
+        self.store.save(s)
+        return {**decision, "entries": fresh}
+
+    def _refill(self, s: Session | None) -> None:
+        """A person's act toward `s` restores its wake budget in full (design §4.10 "Time and a
+        person restore it"): a send or keys with no caller, a person's message, a decided
+        permission. Never a session's traffic, never a person looking (`seen`, a panel read)."""
+        if s is None or s.external:
+            return
+        s.wake_refilled_at = datetime.now(UTC).isoformat(timespec="microseconds")
+        self.store.save(s)
+        self._poke_waits()
+
     async def rpc_hook(self, session: str, **event: Any) -> dict[str, Any] | None:
         """Called by an adapter's hook script. A `permission` event blocks until answered or timed out."""
         if event.get("kind") == "permission":
@@ -1822,6 +1968,7 @@ class HostAgent:
             raise RpcError("behavior must be allow or deny")
         fut.set_result({"behavior": behavior, "reason": reason})
         s.set_state("working", confidence="hook")
+        self._refill(s)  # an answer to its permission is a person's act toward it (design §4.10)
         self.store.save(s)
         await self._push_changes()
 
@@ -1878,6 +2025,7 @@ class HostAgent:
     async def _push_changes(self) -> None:
         """Send each subscriber what changed since *it* was last told. One payload per session is
         serialised once; the per-subscriber comparison is a string compare."""
+        self._poke_waits()
         gone, self._gone = self._gone, []
         if not self._subscribers:
             return
@@ -1915,6 +2063,12 @@ class HostAgent:
                 except ValueError:
                     writer.write(b'{"error": "bad json"}\n')
                     continue
+                if req.get("method") == "wait":
+                    if writer in self._subscribers:
+                        writer.write(b'{"error": "a wait runs on its own connection, never a subscribed one"}\n')
+                        continue
+                    await self._serve_wait(req, reader, writer)
+                    continue
                 if req.get("method") == "subscribe":
                     self._subscribers[writer] = {}  # empty: the first push is this tab's full snapshot
                     writer.write((json.dumps({"id": req.get("id"), "result": "subscribed"}) + "\n").encode())
@@ -1931,7 +2085,58 @@ class HostAgent:
             self._subscribers.pop(writer, None)
             writer.close()
 
+    async def _serve_wait(
+        self, req: dict[str, Any], reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        """A `wait` holds its connection (design §4.10): the RPC runs while this reads the socket
+        for the close. The moment the client goes away — a Ctrl-C, a cancelled turn — the wait is
+        cancelled, so no ghost wait is left to be charged a wake and hand the mail to nobody.
+        Requests are serial per connection; one sent mid-wait is answered with an error."""
+        task = asyncio.ensure_future(self._dispatch(req))
+        try:
+            while True:
+                line = asyncio.ensure_future(reader.readline())
+                done, _ = await asyncio.wait({task, line}, return_when=asyncio.FIRST_COMPLETED)
+                if task in done:
+                    # readline leaves unconsumed bytes in the buffer when cancelled, so a request
+                    # already on its way is read by the connection loop after the reply
+                    line.cancel()
+                    with contextlib.suppress(asyncio.CancelledError, ConnectionError):
+                        await line
+                    writer.write((json.dumps(task.result()) + "\n").encode())
+                    await writer.drain()
+                    return
+                try:
+                    got = line.result()
+                except (ConnectionError, asyncio.IncompleteReadError, ValueError):
+                    got = b""
+                if not got:
+                    raise ConnectionResetError("the waiting client closed its connection")
+                with contextlib.suppress(ValueError, AttributeError):
+                    rid = json.loads(got).get("id")
+                    writer.write(
+                        (json.dumps({"id": rid, "error": "this connection is blocked in wait"}) + "\n").encode()
+                    )
+                    await writer.drain()
+        finally:
+            if not task.done():
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await task
+
     async def _dispatch(self, req: dict[str, Any]) -> dict[str, Any]:
+        resp = await self._dispatch_inner(req)
+        caller = req.get("caller")
+        if not mail.is_person(caller):
+            # The line on every `ao` reply (design §4.10): the response to a session with unread
+            # mail says so — result or refusal alike — read after the method ran, so an `ao inbox`
+            # that just read everything carries no line. It types nothing and starts nothing.
+            s = self.sessions.get(self._addr(naming.split_address(str(caller))[0]))
+            if s is not None and (n := s.unread()):
+                resp["mail"] = {"unread": n, "wake_budget_spent": s.wake_budget_spent()}
+        return resp
+
+    async def _dispatch_inner(self, req: dict[str, Any]) -> dict[str, Any]:
         rid = req.get("id")
         name = req.get("method")
         method = getattr(self, f"rpc_{name}", None)

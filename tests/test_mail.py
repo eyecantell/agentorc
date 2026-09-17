@@ -4,6 +4,7 @@ beside the acting gate, threads and their bounds, copies, `sends`, the lifecycle
 the move on resume."""
 
 import asyncio
+import contextlib
 import json
 from datetime import UTC, datetime, timedelta
 
@@ -591,4 +592,268 @@ async def test_the_person_inbox_depth_refuses_naming_the_board(agent, tmp_path, 
                 await cb.call("msg", to=["person"], text="full")
         assert len((await person.call("inbox"))["entries"]) == 2
         for sid in (a, b):
+            await person.call("kill", id=sid)
+
+
+# -- waking: the `wait` RPC and the wake decision (design §4.10, TD-052 step 3) ------------------
+
+
+async def _team(person, tmp_path):
+    """A lead and one worker it controls, both unattended: the worker may mail its lead (upward)."""
+    mk = _mk(person, tmp_path)
+    lead, worker = await mk("lead", unattended=True), await mk("w", unattended=True)
+    await person.call("set_controllers", id=worker, add=[lead])
+    for sid in (lead, worker):  # settled, so a shell starting up is not a member's change mid-test
+        await wait_state(person, sid, "idle")
+    return lead, worker
+
+
+async def _blocked(agent, sid, timeout=6.0):
+    end = asyncio.get_running_loop().time() + timeout
+    while not agent.blocked_in_wait(sid):
+        assert asyncio.get_running_loop().time() < end, f"{sid} never blocked in wait"
+        await asyncio.sleep(0.05)
+
+
+@pytest.fixture
+async def start_wait(agent):
+    """A lead's `ao wait`, on its own connection, running until it returns. Depends on `agent` so
+    every connection it opened is closed before the agent is torn down: a server does not finish
+    closing while a client still holds one, so a failed assertion would otherwise hang the run."""
+    opened: list[tuple[LocalClient, asyncio.Future]] = []
+
+    async def start(lead, timeout=30.0):
+        client = LocalClient(caller=lead)
+        await client.__aenter__()
+        task = asyncio.ensure_future(client.call("wait", timeout=timeout))
+        opened.append((client, task))
+        await _blocked(agent, lead)
+        return client, task
+
+    yield start
+    for client, task in opened:
+        task.cancel()
+        with contextlib.suppress(BaseException):
+            await client.__aexit__()
+
+
+async def test_wait_returns_on_a_members_change_and_on_new_mail_and_a_first_wait_on_nothing(
+    agent, tmp_path, start_wait
+):
+    """The `wait` RPC keeps `ao wait`'s semantics (TD-049) and gains mail: a first wait records and
+    wakes on nothing, a member's change returns it with the record, and new mail in the caller's
+    own inbox returns it with headers only — `read_at` stays `ao inbox`'s — as a charged wake."""
+    async with LocalClient() as person:
+        lead, worker = await _team(person, tmp_path)
+        async with LocalClient(caller=lead) as ld:
+            first = await ld.call("wait", timeout=0.3)
+        assert first == {"changed": [], "mail": [], "wake": None}
+        # a member's change
+        client, task = await start_wait(lead)
+        await person.call("progress", id=worker, ref="TD-900", status="done", pr=7)
+        got = await asyncio.wait_for(task, 10)
+        await client.__aexit__()
+        assert [s["id"] for s in got["changed"]] == [worker] and got["wake"] is None
+        # new mail
+        client, task = await start_wait(lead)
+        async with LocalClient(caller=worker) as w:
+            sent = await w.call("msg", to=lead, text="done with TD-900")
+        got = await asyncio.wait_for(task, 10)
+        await client.__aexit__()
+        assert got["changed"] == []
+        assert [m["id"] for m in got["mail"]] == [sent["entry"]["id"]] and "text" not in got["mail"][0]
+        assert got["mail"][0]["from_role"] == "other"  # the worker is not the lead's controller
+        assert got["wake"]["cause"] == "mail" and got["wake"]["charged"] and got["wake"]["covered"] == 1
+        rec = await person.call("get", id=lead)
+        assert rec["unread"] == 1 and rec["mail_decided"]["id"] == sent["entry"]["id"]
+        # covered once: the next wait does not return for the same mail
+        async with LocalClient(caller=lead) as ld:
+            assert await ld.call("wait", timeout=0.5) == {"changed": [], "mail": [], "wake": None}
+        # a wait is a read: a session with no grant waits, and an unknown scope is refused
+        async with LocalClient(caller=worker) as w:
+            assert (await w.call("wait", timeout=0))["wake"] is None
+            with pytest.raises(AgentError, match="unknown scope"):
+                await w.call("wait", timeout=0, scope="mine")
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_the_cursor_and_the_watermark_survive_a_fresh_host_agent(agent, tmp_path):
+    """The per-caller cursor stays on disk under `waits/` and the watermark on the record, so a
+    host-agent restart reads neither as a first wait: a change made while nobody waited returns
+    the first wait on the new agent, and mail a wake already covered is not decided again."""
+    from sessionorc.agent import HostAgent
+
+    async with LocalClient() as person:
+        lead, worker = await _team(person, tmp_path)
+        async with LocalClient(caller=lead) as ld:
+            await ld.call("wait", timeout=0)  # records the cursor
+        async with LocalClient(caller=worker) as w:
+            await w.call("msg", to=lead, text="covered before the restart")
+        async with LocalClient(caller=lead) as ld:
+            assert (await ld.call("wait", timeout=5))["wake"]["cause"] == "mail"
+        await person.call("progress", id=worker, ref="TD-901", status="claimed")
+        fresh = HostAgent(tmux=agent.tmux)
+        got = await fresh.rpc_wait(timeout=0, caller=lead)
+        assert [s["id"] for s in got["changed"]] == [worker]
+        assert got["mail"] == [] and got["wake"] is None  # the watermark came back with the record
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_a_wait_whose_connection_closes_is_dropped_and_never_charged(agent, tmp_path, start_wait):
+    """No ghost waits (design §4.10): a CLI killed mid-wait closes its connection, the host agent
+    cancels the wait, and mail that lands afterwards finds nobody blocked — no wake is recorded
+    and the watermark does not move, so the lead's next real wait still gets it."""
+    async with LocalClient() as person:
+        lead, worker = await _team(person, tmp_path)
+        client, task = await start_wait(lead)
+        task.cancel()
+        await client.__aexit__()  # the Ctrl-C
+        for _ in range(100):
+            if not agent.blocked_in_wait(lead):
+                break
+            await asyncio.sleep(0.05)
+        assert not agent.blocked_in_wait(lead)
+        async with LocalClient(caller=worker) as w:
+            await w.call("msg", to=lead, text="into the void?")
+        await agent.tick()
+        await asyncio.sleep(0.3)
+        rec = await person.call("get", id=lead)
+        assert rec["wakes"] == [] and rec["mail_decided"] is None
+        async with LocalClient(caller=lead) as ld:
+            assert (await ld.call("wait", timeout=5))["wake"]["covered"] == 1
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_a_spent_budget_lands_mail_without_waking_and_the_window_refills_it(
+    agent, tmp_path, start_wait, monkeypatch
+):
+    """Design §4.10 with `WAKE_BUDGET` at 1: the first mail returns the wait, charged; the second
+    lands and the wait does not return for it, the watermark stays where it was, the record says
+    the budget is spent and so does the sender's reply; roll the window to zero and the next tick
+    returns the still-blocked wait for that same mail."""
+    monkeypatch.setattr(mail, "WAKE_BUDGET", 1)
+    async with LocalClient() as person:
+        lead, worker = await _team(person, tmp_path)
+        async with LocalClient(caller=worker) as w:
+            first = await w.call("msg", to=lead, text="one")
+            assert first["wake_budget_spent"] == []
+            async with LocalClient(caller=lead) as ld:
+                assert (await ld.call("wait", timeout=5))["wake"]["charged"] is True
+            client, task = await start_wait(lead)
+            second = await w.call("msg", to=lead, text="two")
+            assert second["wake_budget_spent"] == [lead]  # the sender is told the mail wakes nobody
+        await agent.tick()
+        await asyncio.sleep(0.5)
+        assert not task.done(), "a spent budget must not return the wait"
+        rec = await person.call("get", id=lead)
+        assert rec["mail_decided"]["id"] == first["entry"]["id"]  # a non-wake moves nothing
+        assert rec["mail"]["wake_budget_spent"] is True and rec["unread"] == 2
+        assert len(rec["wakes"]) == 1
+        monkeypatch.setattr(mail, "WAKE_WINDOW", timedelta(seconds=0))
+        await agent.tick()
+        got = await asyncio.wait_for(task, 10)
+        await client.__aexit__()
+        assert [m["id"] for m in got["mail"]] == [second["entry"]["id"]] and got["wake"]["charged"] is True
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_a_members_change_with_mail_alongside_is_a_free_wake(agent, tmp_path, start_wait, monkeypatch):
+    """A `wait` returning for a member's change spends nothing, even with the budget spent: it
+    returns the mail too, advances the watermark, and is recorded `charged: False` — step 5
+    measures these apart from mail-caused wakes."""
+    monkeypatch.setattr(mail, "WAKE_BUDGET", 0)
+    async with LocalClient() as person:
+        lead, worker = await _team(person, tmp_path)
+        async with LocalClient(caller=lead) as ld:
+            await ld.call("wait", timeout=0)  # the cursor, so a member's change is a change
+        client, task = await start_wait(lead)
+        async with LocalClient(caller=worker) as w:
+            sent = await w.call("msg", to=lead, text="done, PR up")
+        await asyncio.sleep(0.3)
+        assert not task.done()
+        await person.call("progress", id=worker, ref="TD-902", status="done", pr=8)
+        got = await asyncio.wait_for(task, 10)
+        await client.__aexit__()
+        assert [s["id"] for s in got["changed"]] == [worker]
+        assert [m["id"] for m in got["mail"]] == [sent["entry"]["id"]]
+        assert got["wake"]["cause"] == "member" and got["wake"]["charged"] is False
+        rec = await person.call("get", id=lead)
+        assert rec["mail_decided"]["id"] == sent["entry"]["id"]
+        assert [(x["cause"], x["charged"], x["covered"]) for x in rec["wakes"]] == [("member", False, 1)]
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_a_persons_act_refills_the_budget_and_nothing_a_session_does(agent, tmp_path, monkeypatch):
+    """Design §4.10 "Time and a person restore it; nothing a session does does": a person's
+    message refills in full; a controller's message, a session's own traffic and a person looking
+    (`seen`, reading the Inbox panel) refill nothing."""
+    monkeypatch.setattr(mail, "WAKE_BUDGET", 1)
+    async with LocalClient() as person:
+        lead, worker = await _team(person, tmp_path)
+        async with LocalClient(caller=lead) as ld:
+            await ld.call("msg", to=worker, text="go")
+        async with LocalClient(caller=worker) as w:
+            assert (await w.call("wait", timeout=5))["wake"]["charged"] is True
+        assert (await person.call("get", id=worker))["mail"]["wake_budget_spent"] is True
+        async with LocalClient(caller=lead) as ld:
+            await ld.call("msg", to=worker, text="and again")  # a controller's mail refills nothing
+        await person.call("seen", id=worker)
+        await person.call("inbox", id=worker)
+        assert (await person.call("get", id=worker))["mail"]["wake_budget_spent"] is True
+        await person.call("msg", to=worker, text="from the person")
+        rec = await person.call("get", id=worker)
+        assert rec["mail"]["wake_budget_spent"] is False and rec["wake_refilled_at"]
+        # the refill wakes it for everything still undecided, in one unit
+        async with LocalClient(caller=worker) as w:
+            assert (await w.call("wait", timeout=5))["wake"]["covered"] == 2
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_a_persons_session_is_never_woken_by_mail(agent, tmp_path):
+    """§9 invariant 5: an interactive session blocked in `wait` is not returned by mail, and no
+    wake is recorded; it has the unread count and the line, and nothing else."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        mine = await mk("mine")
+        await person.call("msg", to=mine, text="for you")
+        async with LocalClient(caller=mine) as m:
+            assert await m.call("wait", timeout=0.5) == {"changed": [], "mail": [], "wake": None}
+        assert (await person.call("get", id=mine))["wakes"] == []
+        await person.call("kill", id=mine)
+
+
+async def test_every_reply_to_a_session_with_unread_mail_carries_the_count(agent, tmp_path, monkeypatch):
+    """Design §4.10 "a line on every `ao` reply": the host agent adds `mail` to the response
+    envelope of a session with unread mail — on a result and on a refusal — and not to a person's,
+    nor once the session has read it."""
+    import json as _json
+
+    async def raw(caller, method, **params):
+        reader, writer = await asyncio.open_unix_connection(str(paths.socket_path()))
+        writer.write((_json.dumps({"id": 1, "method": method, "params": params, "caller": caller}) + "\n").encode())
+        await writer.drain()
+        resp = _json.loads(await reader.readline())
+        writer.close()
+        return resp
+
+    monkeypatch.setattr(mail, "WAKE_BUDGET", 0)
+    async with LocalClient() as person:
+        lead, worker = await _team(person, tmp_path)
+        assert "mail" not in await raw(worker, "ping")
+        await person.call("msg", to=worker, text="hello")
+        ok = await raw(worker, "ping")
+        assert ok["result"] == "pong" and ok["mail"] == {"unread": 1, "wake_budget_spent": True}
+        refused = await raw(worker, "kill", id=lead)
+        assert "error" in refused and refused["mail"]["unread"] == 1
+        assert "mail" not in await raw(None, "ping")
+        async with LocalClient(caller=worker) as w:
+            await w.call("inbox")
+        assert "mail" not in await raw(worker, "ping")
+        for sid in (lead, worker):
             await person.call("kill", id=sid)
