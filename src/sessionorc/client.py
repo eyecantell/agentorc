@@ -32,6 +32,15 @@ class AgentUnavailable(AgentError):
 # from the last of them, after its own output.
 last_mail: dict[str, Any] | None = None
 
+# Every parameter name the running host agent did not take, across every call this process has made
+# since it last reset this (design §4.4, TD-062): dropped by the agent rather than refused. Non-empty
+# means the agent is older than this client and a CLI prints one line from it. **Accumulated**, not
+# last-call-wins like `last_mail`: a command that makes several calls — `ao team start` (a
+# `name_check` and a `create` per member), `ao control … add <many>` — would otherwise have the
+# warning from its first call cleared by its last, which is exactly where an operator most needs it.
+# Deduped, so a long-lived client (the UI) is bounded by the number of distinct parameter names.
+last_ignored: list[str] = []
+
 
 class LocalClient:
     """One connection, sequential requests. Cheap enough to open per CLI call."""
@@ -59,9 +68,19 @@ class LocalClient:
                 await self._writer.wait_closed()
 
     async def call(self, method: str, **params: Any) -> Any:
+        """One request, one reply.
+
+        **A parameter that is not set is not sent** (design §4.4, TD-062 fix (a)): every optional
+        RPC parameter defaults to `None` on the agent side and means the same thing absent, so a
+        `None` here is dropped from the envelope. That is what keeps a client newer than the
+        running host agent working — a call that does not use a new parameter never mentions it,
+        and so cannot be refused as an unexpected keyword. It is a rule of this one choke point on
+        purpose: no command can forget it, and none may hand-roll the filtering instead.
+        """
         assert self._reader and self._writer
         self._n += 1
-        req: dict[str, Any] = {"id": self._n, "method": method, "params": params}
+        sent = {k: v for k, v in params.items() if v is not None}
+        req: dict[str, Any] = {"id": self._n, "method": method, "params": sent}
         if self.caller:
             req["caller"] = self.caller
         self._writer.write((json.dumps(req) + "\n").encode())
@@ -70,8 +89,11 @@ class LocalClient:
         if not line:
             raise AgentUnavailable("host agent closed the connection")
         resp = json.loads(line)
-        global last_mail
+        global last_mail, last_ignored
         last_mail = resp.get("mail") if isinstance(resp, dict) else None
+        for name in (resp.get("ignored") or []) if isinstance(resp, dict) else []:
+            if name not in last_ignored:
+                last_ignored.append(name)
         if "error" in resp:
             raise AgentError(resp["error"], resp.get("error_data"))
         return resp.get("result")

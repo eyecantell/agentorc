@@ -2163,7 +2163,11 @@ class HostAgent:
         method = getattr(self, f"rpc_{name}", None)
         if method is None:
             return {"id": rid, "error": f"unknown method {name!r}"}
-        params = req.get("params") or {}
+        params = dict(req.get("params") or {})
+        if ignored := _drop_unknown(method, params):
+            # logged with the method, because the reply cannot tell a client newer than this agent
+            # from a caller bug of the same age, and the second is worth finding in a log
+            log.warning("rpc %s: ignored unknown params %s", name, ", ".join(ignored))
         caller = req.get("caller")
         if not mail.is_person(caller):
             # A request's identity comes from the channel it arrived on, never from a field it
@@ -2179,14 +2183,36 @@ class HostAgent:
                 # after the gate: a client that put its own `caller` in `params` does not get to
                 # choose who it is.
                 params["caller"] = caller
-            return {"id": rid, "result": await method(**params)}
+            resp: dict[str, Any] = {"id": rid, "result": await method(**params)}
         except RpcError as e:
-            return {"id": rid, "error": str(e), **({"error_data": e.data} if e.data else {})}
+            resp = {"id": rid, "error": str(e), **({"error_data": e.data} if e.data else {})}
         except TypeError as e:
-            return {"id": rid, "error": f"bad params: {e}"}
+            resp = {"id": rid, "error": f"bad params: {e}"}
         except Exception as e:  # noqa: BLE001
             log.exception("rpc %s failed", req.get("method"))
-            return {"id": rid, "error": f"{type(e).__name__}: {e}"}
+            resp = {"id": rid, "error": f"{type(e).__name__}: {e}"}
+        if ignored:
+            resp["ignored"] = ignored
+        return resp
+
+
+def _drop_unknown(method: Any, params: dict[str, Any]) -> list[str]:
+    """Design §4.4, TD-062 fix (b): remove the parameters `method` does not take and name them,
+    so a client newer than this host agent degrades instead of failing.
+
+    The other half of the skew rule — a client never sends a parameter it has not set (§4.4,
+    `LocalClient.call`) — means a dropped parameter is always one the caller *did* set, i.e. a
+    feature this agent predates. The call still runs, without it, and the reply says which ones
+    went: `ao` prints that line, so the skew is visible rather than silent. A method that takes
+    `**kwargs` (`rpc_hook`) accepts everything and nothing is dropped.
+    """
+    sig = inspect.signature(method).parameters
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in sig.values()):
+        return []
+    dropped = sorted(k for k in params if k not in sig)
+    for k in dropped:
+        del params[k]
+    return dropped
 
 
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.

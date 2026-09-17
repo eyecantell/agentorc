@@ -448,6 +448,20 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   picker, and clipboard paste (screenshots) on desktop; the share sheet on the phone.
 - Permission decisions: the `PermissionRequest` hook script asks the host agent over the socket and
   blocks until the UI answers or the hook times out (§4.2).
+- **Version skew is survivable** (2026-09-17, TD-062). The live install is promoted by a person, so
+  a merged RPC change reaches every session's `ao` before the running host agent knows it. Two
+  halves keep the window harmless, and they are properties of the envelope rather than of any one
+  command: a client **never sends a parameter it has not set** — every optional RPC parameter means
+  the same absent as `None`, so the client drops the `None`s in one place, and a call that does not
+  use a new feature cannot be refused for mentioning it; and the agent **drops a parameter its
+  method does not take** rather than refusing the call, naming them in the reply's `ignored: [...]`,
+  which `ao` prints as one line — accumulated across every call the command made, since the call
+  that skews is rarely the last one. The line says what happened before it says why: a caller bug
+  against an agent of the same age looks identical from the client, and it is the agent's log line,
+  which names the method, that tells the two apart. A method taking `**kwargs`
+  (`hook`) keeps everything. The drop happens before the gate, so a refusal still says why it
+  refused. What this does not cover is a *new method* or a changed meaning, which still needs the
+  promotion.
 - Board write-back: **Snooze** (edit the `Due:` date) and **Done** (check the item off) on a
   dev-cadence `user_attention.md` item are one-line edits the host agent makes and commits with a
   fixed message naming the session (`agentorc: snooze <item> to <date> (session <name>)`), so the
