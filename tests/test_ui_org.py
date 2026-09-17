@@ -143,3 +143,31 @@ def test_a_lead_whose_own_badge_differs_is_still_found_but_keeps_its_card():
     assert groups["t"]["lead"]["name"] == "orc" and groups["t"]["lead_elsewhere"] is True
     assert groups["t"]["ids"] == ["w1", "w2"]  # the lead's card is not moved into this group
     assert groups["other"]["ids"] == ["o"] and groups["other"]["lead"] is None
+
+
+def test_the_top_bar_person_inbox_shows_its_count_only_above_zero(monkeypatch, tmp_path):
+    """design §4.5a Org top bar **person inbox** (§4.10): the control is always there to open, and
+    its unread count shows at one and not at zero."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import templates
+
+    def render(n):
+        return templates.get_template("org.html").render(
+            sessions=[],
+            groups=None,
+            counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
+            strip={"teams": [], "source": "", "notes": []},
+            host="kmaster",
+            active="Org",
+            agent_down=False,
+            volatile=False,
+            usage={},
+            person_unread=n,
+        )
+
+    zero, one = render(0), render(1)
+    for html in (zero, one):
+        assert 'id="personinbox"' in html and 'id="personbox"' in html and 'id="personlist"' in html
+    assert 'class="badge unread hidden" id="personunread"></span>' in zero
+    assert 'class="badge unread" id="personunread">1</span>' in one

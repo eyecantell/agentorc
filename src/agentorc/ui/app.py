@@ -435,9 +435,11 @@ def create_app() -> FastAPI:
         # (design §4.5 unreachable hosts), never a bare 503.
         agent_down = False
         usage: dict[str, Any] = {}
+        person_unread = 0
         try:
             sessions = await call("list")
             usage = await call("usage")
+            person_unread = (await call("inbox"))["unread"]  # the top bar's person inbox count (§4.5a)
         except HTTPException as e:
             if e.status_code != 503:
                 raise
@@ -458,6 +460,7 @@ def create_app() -> FastAPI:
                 "agent_down": agent_down,
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
+                "person_unread": person_unread,
             },
         )
 
@@ -854,6 +857,39 @@ def create_app() -> FastAPI:
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
         return got
+
+    @app.get("/api/person/inbox")
+    async def api_person_inbox():
+        """design §4.5a Org top bar **person inbox** (§4.10 "A session reaches a person through the
+        org's person inbox"): the `inbox` RPC with no caller and no id. A person's read sets nothing
+        and rings nothing. The top bar polls this for its count — the pushed stream carries session
+        records only, and the person inbox belongs to none."""
+        got = await call("inbox")
+        fleet = await call("list")
+        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        for e in got["entries"]:
+            e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+        return got
+
+    @app.post("/api/person/{action}")
+    async def api_person_action(action: str, request: Request):
+        """design §4.5a Org top bar **person inbox** → Reply and delete (§4.10): a person's reply
+        lands in the sender's inbox (the agent addresses it to the entry's sender and closes its
+        `ask`); delete removes the entry from the person inbox only — the sender keeps its copy."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        if action == "reply":
+            ref = str(body.get("reply_to") or "").strip()
+            if not ref:
+                raise HTTPException(400, "a reply names the entry it answers")
+            got = await call("msg", text=str(body.get("text") or ""), kind="reply", reply_to=ref)
+            return JSONResponse({"ok": True, "id": got["entry"]["id"], "delivered": got["delivered"]})
+        if action == "unmail":
+            ref = str(body.get("msg") or "").strip()
+            if not ref:
+                raise HTTPException(400, "delete needs the entry's id")
+            got = await call("inbox_delete", msg=ref)
+            return JSONResponse({"ok": True, "unread": got["unread"]})
+        raise HTTPException(404, f"no action {action}")
 
     @app.get("/api/sessions")
     async def api_sessions():
