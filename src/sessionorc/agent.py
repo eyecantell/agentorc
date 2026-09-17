@@ -178,8 +178,6 @@ class HostAgent:
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
-        # Read-only cards for sessions the adapters see outside agentorc (TD-010 a): rebuilt every
-        # tick from `adapters.external_sessions()`, never stored, keyed `ext-<tool id>`.
 
     # -- lifecycle ------------------------------------------------------------------------------
 
