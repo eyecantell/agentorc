@@ -507,7 +507,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Priority:** Medium
 **Added:** 2026-09-16 (Paul; discussed in samscrape session 746e1973 on kmaster)
 
-**Status:** Open — **awaiting Paul's decision on the name.** `shiftlead` is the leading candidate (free on PyPI, npm, crates.io and as a GitHub org when checked 2026-09-16; `.dev`/`.org`/`.tech` open per Paul); Paul asked for time to think. Nothing is renamed and no name is claimed. The candidates, the test they were held to, the measured surface and the six decisions are in [ADR 2026-09-16](decisions/2026-09-16-rename.md). Worktree `agentorc_rename` exists with no commits.
+**Status:** Open — **awaiting Paul's decision on the name.** `shiftlead` is the leading candidate (free on PyPI, npm, crates.io and as a GitHub org when checked 2026-09-16; `.dev`/`.org`/`.tech` open per Paul); Paul asked for time to think. Nothing is renamed. **Both names were claimed 2026-09-17 ahead of the decision:** PyPI `shiftlead 0.0.0` (empty placeholder) and the GitHub org `ShiftLead`; the domains are not registered. The candidates, the test they were held to, the measured surface and the six decisions are in [ADR 2026-09-16](decisions/2026-09-16-rename.md). Worktree `agentorc_rename` exists with no commits.
 
 **Location:** the whole repo — 1,110 case-insensitive occurrences of `agentorc` in 93 tracked files and 260 of `sessionorc` in 56 (`origin/main` at `8bd21b9`) — plus what lives outside it: `~/.agentorc/`, six `AGENTORC_*` environment variables, `agentorc-agent.service` / `agentorc-ui.service`, `~/.local/share/agentorc-venv`, `.agentorc.yml` in other repos, the `ao-` session-id prefix, and three synced files in dev-cadence (and so in samscrape and contractmatch).
 
