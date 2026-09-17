@@ -197,3 +197,6 @@ def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph
     assert "ready to close ✓" in templates.get_template("card.html").render(s=v)
     # no role and no grant involved: any session a live one lists as a controller
     assert view({**lead, "id": "ao-x"}, [{**worker, "state": "idle", "controllers": ["ao-x"]}])["ready"][-1][1] is False
+    # the fleet asked for and not got: unknown is not none (review of PR #195)
+    unknown = view(lead, [lead], fleet_known=False)["ready"][-1]
+    assert unknown[1] is False and unknown[0].startswith("members unknown")
