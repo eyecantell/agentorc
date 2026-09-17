@@ -462,3 +462,31 @@ async def test_read_entries_are_pruned_after_retention_and_open_asks_never(agent
             assert [e["id"] for e in (await person.call("inbox", id=worker))["entries"]] == [unread["id"]]
         for sid in (lead, worker):
             await person.call("kill", id=sid)
+
+
+async def test_a_person_deletes_one_copy_and_no_session_may(agent, tmp_path):
+    """Design §4.10 lifecycle: outside its stages an entry leaves only with its record or by a
+    person's hand — the Inbox panel's delete. It removes that record's copy only (the sender's
+    stays), and is refused to every session, the inbox's own included."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        lead, worker = await mk("lead", unattended=True), await mk("w", unattended=True)
+        await person.call("set_controllers", id=worker, add=[lead])
+        async with LocalClient(caller=lead) as ld:
+            got = await ld.call("msg", to=worker, text="done yet?", kind="ask")
+        mid = got["entry"]["id"]
+        for who in (worker, lead):
+            async with LocalClient(caller=who) as c:
+                with pytest.raises(AgentError, match="only by a person"):
+                    await c.call("inbox_delete", id=worker, msg=mid)
+        assert (await person.call("get", id=worker))["unread"] == 1
+        with pytest.raises(AgentError, match="holds no entry"):
+            await person.call("inbox_delete", id=worker, msg="m-nope")
+        assert (await person.call("inbox_delete", id=worker, msg=mid)) == {"id": worker, "deleted": mid, "unread": 0}
+        assert (await person.call("inbox", id=worker))["entries"] == []
+        assert (await person.call("get", id=worker))["mail"]["open_asks"] == []
+        # the sender's copy is its own and stays
+        stored = json.loads((paths.sessions_dir() / f"{lead}.json").read_text())
+        assert [e["id"] for e in stored["outbox"]] == [mid]
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)

@@ -1646,6 +1646,25 @@ class HostAgent:
             "unread": s.unread(),
         }
 
+    async def rpc_inbox_delete(self, id: str, msg: str, caller: Any = None) -> dict[str, Any]:
+        """The Inbox panel's delete (design §4.10 lifecycle, §4.5a): a person removes one entry
+        from one session's inbox — that record's copy only, so the sender's and any other
+        addressee's copies stay, and a thread stays one thread on their side. Refused to every
+        session, itself included: a session's inbox is read-only to it through the RPCs, and an
+        entry leaves outside its lifecycle only with its record or by a person's hand."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot delete mail: an entry is deleted only by a person, in the Inbox panel (design §4.10)"
+            )
+        s = self._get(self._addr(id))
+        kept = [e for e in s.inbox if e.id != msg]
+        if len(kept) == len(s.inbox):
+            raise RpcError(f"{s.id}'s inbox holds no entry {msg}")
+        s.inbox = kept
+        self.store.save(s)
+        await self._push_changes()
+        return {"id": s.id, "deleted": msg, "unread": s.unread()}
+
     async def _sweep_mail(self, now: datetime) -> None:
         """Once a tick: an `ask` past its bound expires on every copy; an addressee that exited
         leaves the `ask`s addressed to it pending, a closed one expires them (design §4.10

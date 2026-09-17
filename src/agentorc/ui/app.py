@@ -687,6 +687,33 @@ def create_app() -> FastAPI:
             with contextlib.suppress(HTTPException):
                 await call("seen", id=sid)
             return JSONResponse({"ok": True, "controllers": s.get("controllers") or []})
+        elif action in ("message", "reply"):
+            # design §4.5a **Message** (card `more ▾`, Focus header) and Focus Inbox **Reply**
+            # (§4.10): mail, not a send — nothing is typed into any pane. The UI calls with no
+            # `caller`, so `from` is the person and the message gate lets it through. A reply names
+            # the entry it answers and no addressee: the agent addresses it to that entry's sender.
+            text = str(body.get("text") or "")
+            if action == "reply":
+                ref = str(body.get("reply_to") or "").strip()
+                if not ref:
+                    raise HTTPException(400, "a reply names the entry it answers")
+                got = await call("msg", text=text, kind="reply", reply_to=ref)
+            else:
+                kind = str(body.get("kind") or "note")
+                if kind not in ("note", "ask"):
+                    raise HTTPException(400, "a person's Message is a note or an ask")
+                about = str(body.get("about") or "").strip() or None
+                got = await call("msg", to=[sid], text=text, kind=kind, about=about)
+            with contextlib.suppress(HTTPException):
+                await call("seen", id=sid)
+            return JSONResponse({"ok": True, "id": got["entry"]["id"], "delivered": got["delivered"]})
+        elif action == "unmail":
+            # design §4.5a Focus **Inbox** → delete (§4.10 lifecycle: a person's hand): this
+            # session's copy only; the sender keeps its own.
+            ref = str(body.get("msg") or "").strip()
+            if not ref:
+                raise HTTPException(400, "delete needs the entry's id")
+            await call("inbox_delete", id=sid, msg=ref)
         elif action == "remove":
             await call("remove", id=sid)
         elif action == "seen":
@@ -815,6 +842,18 @@ def create_app() -> FastAPI:
         if pending:
             msg += f" — {pending} follows when they settle"
         return JSONResponse({"ok": True, "team": name, "now": now, "sessions": st.acted, "lead": pending, "text": msg})
+
+    @app.get("/api/sessions/{sid}/inbox")
+    async def api_inbox(sid: str):
+        """design §4.5a Focus side panel **Inbox** (§4.10 "A bounded body"): bodies never ride the
+        pushed record, so the panel fetches them here. No caller — a person's read, which sets no
+        `read_at`, because a person is not the session. Each sender gets its name beside its id."""
+        got = await call("inbox", id=sid)
+        fleet = await call("list")
+        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        for e in got["entries"]:
+            e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+        return got
 
     @app.get("/api/sessions")
     async def api_sessions():

@@ -837,3 +837,83 @@ def test_the_stop_control_round_trips_and_can_actually_be_hidden():
     assert note.startswith("stops ") and "wrap-up sent" in note
     with pytest.raises(AgentError):
         stop_time(note[len("stops ") :])
+
+
+def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_path):
+    """TD-052 step 8, design §4.5a's mail rows (§4.10): the card's **unread** chip only above zero,
+    the Focus **Inbox** panel fed by the `inbox` RPC as a person's read (no `read_at`), **Message**
+    landing a `note` from the person, **Reply** landing a `reply` from the person in the sender's
+    inbox and closing the `ask`, and delete removing this session's copy only."""
+    import asyncio
+
+    from agentorc.ui.app import templates, view
+    from sessionorc.client import LocalClient
+
+    base = {
+        "id": "ao-x", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
+        "state": "idle", "since": "2026-09-12T10:00:00Z", "confidence": "hook", "tail": [],
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    assert "badge unread" not in card.render(s=view({**base, "unread": 0}))
+    one = card.render(s=view({**base, "unread": 1}))
+    assert 'class="badge unread" href="/focus/ao-x#inbox"' in one and "✉ 1" in one
+    assert 'data-act="message"' in one  # **Message…** in the card's more ▾
+
+    def mk(name):
+        r = client.post("/shell", data={"dir": str(tmp_path), "name": name}, follow_redirects=False)
+        return r.headers["location"].rsplit("/", 1)[-1]
+
+    lead, worker = mk("mlead"), mk("mworker")
+    client.post(f"/api/sessions/{worker}/controllers", json={"add": [lead]})
+
+    async def as_lead():
+        async with LocalClient(caller=lead) as c:
+            return await c.call("msg", to=worker, text="are you done?", kind="ask", about="TD-052")
+
+    ask = asyncio.run(as_lead())["entry"]["id"]
+    rec = lambda sid: next(x for x in client.get("/api/sessions").json() if x["id"] == sid)  # noqa: E731
+    assert rec(worker)["unread"] == 1 and "inbox" not in rec(worker)  # counts ride the record, bodies do not
+    org = client.get("/").text
+    assert f'href="/focus/{worker}#inbox"' in org and f'href="/focus/{lead}#inbox"' not in org
+
+    page = client.get(f"/focus/{worker}").text
+    assert 'id="inboxcard"' in page and 'id="inboxlist"' in page and 'data-act="message"' in page
+    got = client.get(f"/api/sessions/{worker}/inbox").json()
+    [e] = got["entries"]
+    assert (e["id"], e["from"], e["from_name"], e["kind"], e["about"]) == (ask, lead, "mlead", "ask", "TD-052")
+    assert e["read_at"] is None and e["bound"] and e["closed_by"] is None
+    assert rec(worker)["unread"] == 1  # the panel's read marked nothing: a person is not the session
+
+    # **Message**: a note from the person, into this session's inbox
+    assert client.post(f"/api/sessions/{worker}/message", json={"kind": "reply", "text": "x"}).status_code == 400
+    assert client.post(f"/api/sessions/{worker}/message", json={"kind": "note", "text": " "}).status_code == 400
+    sent = client.post(f"/api/sessions/{worker}/message", json={"kind": "note", "text": "hold off", "about": ""})
+    assert sent.status_code == 200 and sent.json()["delivered"] == [worker]
+    note = sent.json()["id"]
+    entries = client.get(f"/api/sessions/{worker}/inbox").json()["entries"]
+    assert [(x["id"], x["from"], x["from_name"], x["kind"]) for x in entries][-1] == (note, "person", "person", "note")
+    assert rec(worker)["unread"] == 2
+
+    # **Reply**: a `reply` from the person, addressed to the entry's sender, closing the ask
+    assert client.post(f"/api/sessions/{worker}/reply", json={"text": "yes"}).status_code == 400
+    r = client.post(f"/api/sessions/{worker}/reply", json={"reply_to": ask, "text": "yes, merged"})
+    assert r.status_code == 200 and r.json()["delivered"] == [lead]
+    [back] = client.get(f"/api/sessions/{lead}/inbox").json()["entries"]
+    assert (back["from"], back["kind"], back["reply_to"], back["text"]) == ("person", "reply", ask, "yes, merged")
+    asked = next(x for x in client.get(f"/api/sessions/{worker}/inbox").json()["entries"] if x["id"] == ask)
+    assert asked["closed_by"] == r.json()["id"]
+
+    # delete: this session's copy only
+    before = [x["id"] for x in client.get(f"/api/sessions/{worker}/inbox").json()["entries"]]
+    assert client.post(f"/api/sessions/{worker}/unmail", json={}).status_code == 400
+    assert client.post(f"/api/sessions/{worker}/unmail", json={"msg": ask}).json() == {"ok": True}
+    after = [x["id"] for x in client.get(f"/api/sessions/{worker}/inbox").json()["entries"]]
+    assert after == [x for x in before if x != ask]
+    assert client.post(f"/api/sessions/{worker}/unmail", json={"msg": ask}).status_code == 400  # already gone
+    assert [x["id"] for x in client.get(f"/api/sessions/{lead}/inbox").json()["entries"]] == [back["id"]]
+    # the panel refetches bodies through `inbox` when the record's counts or marks change — never
+    # from the pushed record, which carries none (§4.10 "A bounded body")
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert "JSON.stringify([v.unread || 0, v.mail || {}])" in js and "/inbox`" in js
+    for sid in (lead, worker):
+        client.post(f"/api/sessions/{sid}/kill")
