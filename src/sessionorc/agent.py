@@ -1437,14 +1437,15 @@ class HostAgent:
         # -- forwarding: a closed record a live one superseded hands its mail on -------------------
         forwarded: dict[str, str] = {}
         resolved: list[str] = []
-        for sid in named:
-            seen = {sid}
+        for asked in named:
+            sid, seen = asked, {asked}
             while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
-                forwarded[sid] = r.superseded_by
                 sid = r.superseded_by
                 if sid in seen:
                     break
                 seen.add(sid)
+            if sid != asked:
+                forwarded[asked] = sid  # the id the sender wrote → the record continuing it, however many hops
             if sid not in resolved:
                 resolved.append(sid)
         named = resolved
@@ -1518,8 +1519,6 @@ class HostAgent:
                 for sid in named:
                     self._pair(me, sid, now).at.append(at)
                     self._pair(records[sid], sender, now).at.append(at)
-                    self._pair(me, sid, now)
-                    self._pair(records[sid], sender, now)
         if closes and replied is not None:
             self._mark(replied.id, closed_by=mid, closed_at=at)
         if sender == PERSON and reply_to:
