@@ -564,3 +564,4 @@
 22:08  inbox: 1 note [other] from tdgrind-ao-1 (TD-062 done #197; says the live host agent predates fix (b) so the next promotion is a hard cut, and flags it "for the board") → weighed, no reply needed; the board line is its own to file, watching whether it lands.
 22:08  tdgrind-ao-1: working, claimed TD-063 at 21:52 → ok
 22:28  tdgrind-ao-1: working on TD-063, PR #199 (td063-ci-flakes) open → ok; last output 22:11Z (16m, under the 30m stall window — watching). #198 td057-step2 merged 22:00Z is no member's branch → not checked.
+22:40Z  tdgrind-ao-1: TD-063 done via #199 (merged e51eb56) → cadence #199 **fail** on `worktree`: its worktree still sits on td063-ci-flakes (commits squashed into main, branch not returned; tree clean). One `ao send --wait` sent naming PR #199 and the row; awaiting its turn to settle. Other rows pass (review recorded: FIXED · sonnet-5 · 2 nits). (Log switches to UTC here; earlier run-5 lines were local, ~7m ahead.)
