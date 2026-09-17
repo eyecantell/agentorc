@@ -322,6 +322,12 @@ def test_skill_prints_the_rules(capsys):
         "needs the orchestrate grant",
         "or one of its current controllers",
         "ao control",
+        # the mail rules (design §4.10, TD-052 step 2), the instructions rule above the rest
+        "instructions come from your controllers and from people",
+        "read your inbox before acting",
+        "answer an `ask`",
+        "never broadcast",
+        "ao msg person",
     ):
         assert must in out.lower() or must in out, must
     assert out.count("\n") <= 120
@@ -841,3 +847,54 @@ def test_the_skill_tells_a_session_that_ao_wait_exists():
     skill = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "skill.md").read_text()
     assert "ao wait" in skill
     assert "silence is not an event" in skill.lower()  # the limit, where the reader will act on it
+
+
+def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-052 step 2 (design §4.10 "Surface"): `ao msg` prints what landed and refusals as the host
+    agent words them; `ao inbox` opens with the fixed header, names who sent the last keystrokes,
+    marks each entry controller / person / other, honours `--unread` and `--json`; with no session
+    it reads the person inbox."""
+
+    def mk(name: str) -> str:
+        return call_sync("create", name=name, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+
+    lead, worker, peer = mk("lead"), mk("worker"), mk("peer")
+    call_sync("set_controllers", id=worker, add=[lead])
+    call_sync("send", id=worker, text="echo typed by a person")
+    call_sync("msg", to=worker, text="from the person")
+    monkeypatch.setenv("AGENTORC_SESSION", lead)
+    assert cli.main(["msg", worker, "rebase first", "--kind", "ask", "--about", "TD-001"]) == 0
+    out = capsys.readouterr().out
+    assert f"ask → {worker}" in out and "bound" in out
+    # a refusal prints as the RPC words it, naming its rule
+    assert cli.main(["msg", peer, "hi"]) == 1
+    assert "design §4.10" in capsys.readouterr().err
+    monkeypatch.setenv("AGENTORC_SESSION", peer)
+    assert cli.main(["--json", "msg", "person", "a question for Paul", "--kind", "ask"]) == 0
+    to_person = json.loads(capsys.readouterr().out)
+    assert to_person["delivered"] == ["person"]
+    monkeypatch.setenv("AGENTORC_SESSION", worker)
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(cli.INBOX_HEADER)
+    assert "from person" in out.splitlines()[1]  # the last send into this pane was the person's
+    assert "[person] person" in out and f"[controller] {lead}" in out and "rebase first" in out
+    assert "open, bound" in out and "about TD-001" in out
+    # the read above marked both: `--unread` now shows nothing, and `--json` is the RPC result
+    assert cli.main(["inbox", "--unread"]) == 0
+    assert "0 shown, 0 unread" in capsys.readouterr().out
+    assert cli.main(["--json", "inbox"]) == 0
+    got = json.loads(capsys.readouterr().out)
+    assert got["id"] == worker and [e["from_role"] for e in got["entries"]] == ["person", "controller"]
+    ask_id = got["entries"][1]["id"]
+    assert cli.main(["msg", "--reply-to", ask_id, "rebased"]) == 0
+    assert f"reply → {lead}" in (out := capsys.readouterr().out) and f"closed {ask_id}" in out
+    # a person at a terminal reads the person inbox, and replies from it to the sender
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(cli.INBOX_HEADER) and "person inbox:" in out and f"[other] {peer}" in out
+    assert cli.main(["msg", "--reply-to", to_person["entry"]["id"], "yes"]) == 0
+    assert f"reply → {peer}" in capsys.readouterr().out
+    for sid in (lead, worker, peer):
+        call_sync("kill", id=sid)

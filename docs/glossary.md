@@ -150,8 +150,8 @@ not mix:
   into a pane (design §4.10). Kinds: `note`, `ask`, `reply`, `conflict`. The sender keeps its own
   copy in its **outbox**, which is where the marks it must see live. — *proposed*; built 2026-09-17
   (TD-052 step 1).
-- **person inbox** — the host's inbox for the person; sessions reach it with `ao msg person`. —
-  *proposed* (design §4.10, 2026-09-16).
+- **person inbox** — the host's inbox for the person; sessions reach it with `ao msg person`, a
+  person reads it with `ao inbox` outside any session. — *built* 2026-09-16 (design §4.10, TD-052 step 2).
 - **thread** — a root message and every `reply` chained to it. — *proposed*.
 - **wake** — a turn that mail caused: a doorbell starting one, or `ao wait` returning on mail.
   **Wake budget** — how many wakes a session may take in a rolling window. — *proposed*.

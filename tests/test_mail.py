@@ -490,3 +490,79 @@ async def test_a_person_deletes_one_copy_and_no_session_may(agent, tmp_path):
         assert [e["id"] for e in stored["outbox"]] == [mid]
         for sid in (lead, worker):
             await person.call("kill", id=sid)
+
+
+async def test_the_person_inbox_is_ungated_persisted_and_read_without_marking(agent, tmp_path):
+    """Design §4.10 "A session reaches a person through the org's person inbox" (TD-052 step 2):
+    any session lands there with no edge to anyone; the inbox is its own file in the store and a
+    fresh host agent on the same store reloads it; a person (no caller, no id) reads it and sets
+    nothing; a person's reply from it lands in the sender's inbox as a person's, closing the
+    sender's `ask` on every copy; a session answering a person's message answers into the person
+    inbox; and an `ask` to the person expires on its bound like any other."""
+    from sessionorc.agent import HostAgent
+
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        loner, other = await mk("loner", unattended=True), await mk("other", unattended=True)
+        async with LocalClient(caller=loner) as lo:
+            note = await lo.call("msg", to="person", text="fyi, TD-001 is done", about="TD-001")
+            assert note["delivered"] == ["person"] and note["entry"]["to"] == ["person"]
+            ask = (await lo.call("msg", to=["person"], text="merge it?", kind="ask"))["entry"]
+        # a person cannot write to their own inbox: that is a board line
+        with pytest.raises(AgentError, match="board line"):
+            await person.call("msg", to="person", text="note to me")
+        # persisted in its own file, and a fresh host agent on the same store reloads it
+        assert paths.person_inbox_file().is_file()
+        saved = json.loads(paths.person_inbox_file().read_text())["entries"]
+        assert [e["id"] for e in saved] == [note["entry"]["id"], ask["id"]]
+        fresh = HostAgent(tmux=agent.tmux)
+        assert [e.id for e in fresh.person_inbox] == [note["entry"]["id"], ask["id"]]
+        # a person reads it: the sender's role is shown, nothing is marked read
+        seen = await person.call("inbox")
+        assert seen["id"] == "person" and [e["from"] for e in seen["entries"]] == [loner, loner]
+        assert all(e["from_role"] == "other" and e["read_at"] is None for e in seen["entries"])
+        assert (await person.call("inbox", unread=True))["unread"] == 2
+        # a person's reply from it lands in the sender's inbox as a person's and closes the ask
+        reply = await person.call("msg", text="yes", kind="reply", reply_to=ask["id"])
+        assert reply["delivered"] == [loner] and reply["closed"] == ask["id"]
+        async with LocalClient(caller=loner) as lo:
+            got = (await lo.call("inbox"))["entries"]
+            assert [(e["from"], e["from_role"]) for e in got] == [("person", "person")]
+            assert (await person.call("get", id=loner))["mail"]["open_asks"] == []
+            closed = [e for e in (await person.call("inbox"))["entries"] if e["id"] == ask["id"]][0]
+            assert closed["closed_by"] == reply["entry"]["id"]
+            # a session answering the person's message answers into the person inbox
+            back = await lo.call("msg", text="merged", kind="reply", reply_to=reply["entry"]["id"])
+            assert back["delivered"] == ["person"]
+            # an ask to the person expires on its bound, read or not
+            short = (await lo.call("msg", to="person", text="quick?", kind="ask", bound=0.2))["entry"]
+        await asyncio.sleep(0.4)
+        await agent._sweep_mail(datetime.now(UTC))
+        held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == short["id"]][0]
+        assert held["expired_at"] and (await person.call("get", id=loner))["mail"]["expired"] == [short["id"]]
+        # a session with no edge to `loner` still reaches the person: the person inbox is ungated
+        async with LocalClient(caller=other) as o:
+            assert (await o.call("msg", to="person", text="me too"))["delivered"] == ["person"]
+        for sid in (loner, other):
+            await person.call("kill", id=sid)
+
+
+async def test_the_person_inbox_depth_refuses_naming_the_board(agent, tmp_path, monkeypatch):
+    """Design §4.10 (fourth review): the person inbox's depth fills exactly when the person is
+    away, so its refusal — total or per sender — names user_attention.md with a Due: date."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        a, b = await mk("a", unattended=True), await mk("b", unattended=True)
+        monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 1)
+        async with LocalClient(caller=a) as ca, LocalClient(caller=b) as cb:
+            await ca.call("msg", to="person", text="one")
+            with pytest.raises(AgentError, match=r"user_attention\.md with a Due: date") as e:
+                await ca.call("msg", to="person", text="two")
+            assert f"from {a}" in str(e.value)
+            await cb.call("msg", to="person", text="b's first")  # the per-sender depth is per sender
+            monkeypatch.setattr(mail, "PERSON_INBOX_DEPTH", 2)
+            with pytest.raises(AgentError, match=r"user_attention\.md with a Due: date"):
+                await cb.call("msg", to=["person"], text="full")
+        assert len((await person.call("inbox"))["entries"]) == 2
+        for sid in (a, b):
+            await person.call("kill", id=sid)
