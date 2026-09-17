@@ -303,6 +303,15 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):
                 print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
+            # Mail (design §4.10): the unread count and the marks — never a body, which `ao inbox`
+            # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
+            if unread := s.get("unread"):
+                print(f"{'':<{w}}      mail:   {unread} unread")
+            for k in ("open_asks", "expired", "addressee_exited", "bound_hit"):
+                if ids := (s.get("mail") or {}).get(k):
+                    print(f"{'':<{w}}      {k.replace('_', ' ')}: {', '.join(ids)}")
+            for e in (s.get("sends") or [])[-3:]:
+                print(f"{'':<{w}}      send {e['id']} from {e['from']} {_age(e['at'])}: {e['text'][:60]}")
             for line in (s.get("tail") or [])[-3:]:
                 print(f"{'':<{w}}      │ {line}")
     return 0

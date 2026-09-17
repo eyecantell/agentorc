@@ -1,5 +1,6 @@
 """The session record every layer agrees on: on-disk tolerance, ordering, `since` semantics."""
 
+import json
 from typing import get_args
 
 import pytest
@@ -134,3 +135,48 @@ def test_report_line_shows_the_reference_the_pr_and_the_lane_count():
     free = Session(id="b", name="b", kind="interactive", adapter="shell", dir="/", lane=["free-pick"])
     free.report_progress(ProgressEntry(ref="TD-025", status="done", pr=59))
     assert report_line(free.to_dict()) == "TD-025 → #59 · 1/1 done"
+
+
+def test_every_record_field_has_exactly_one_owner():
+    """Design §4.4a, §9 invariant 15: merges go by owner, never by last write, so every field of
+    the record is node-owned, home-owned or identity — one set, never two, never none."""
+    from sessionorc.models import HOME_OWNED, IDENTITY, NODE_OWNED
+
+    fields = set(Session.__dataclass_fields__) - {"rev"}
+    assert fields == NODE_OWNED | HOME_OWNED | IDENTITY
+    assert not (NODE_OWNED & HOME_OWNED) and not (NODE_OWNED & IDENTITY) and not (HOME_OWNED & IDENTITY)
+
+
+def test_mail_survives_the_store_roundtrip_and_stays_out_of_the_view():
+    """Design §4.10: the inbox, the sender's copy, the tallies and `sends` are persisted with the
+    record; `view()` — what `list`, `get` and the push carry — drops the bodies and carries counts."""
+    from sessionorc.models import MailEntry, SendEntry, Tally
+
+    s = Session(id="ao-x", name="x", kind="interactive", adapter="shell", dir="/tmp", host="h1")
+    ask = MailEntry(
+        id="m-1",
+        from_="ao-lead",
+        to=["ao-x"],
+        at="2026-09-16T10:00:00Z",
+        kind="ask",
+        text="?",
+        bound="2026-09-17T10:00:00Z",
+    )
+    s.inbox.append(ask)
+    s.outbox.append(
+        MailEntry(id="m-2", from_="ao-x", to=["ao-lead"], at="2026-09-16T10:01:00Z", kind="note", text="fyi")
+    )
+    s.threads["m-1"] = Tally(count=1)
+    s.sends.append(SendEntry(id="s-1", from_="person", at="2026-09-16T09:00:00Z", text="echo hi"))
+    d = s.to_dict()
+    assert d["inbox"][0]["from"] == "ao-lead" and "from_" not in d["inbox"][0] and d["sends"][0]["from"] == "person"
+    back = Session.from_dict(json.loads(json.dumps(d)))
+    assert back == s and back.inbox[0].root == "m-1" and back.inbox[0].open
+    v = s.view()
+    assert "inbox" not in v and "outbox" not in v
+    assert (
+        v["unread"] == 1 and v["host"] == "h1" and v["threads"] == {"m-1": {"count": 1, "bound_hit": False, "at": []}}
+    )
+    assert v["mail"]["open_asks"] == ["m-1"] and v["sends"][0]["id"] == "s-1"
+    ask.closed_by = "m-3"
+    assert not ask.open and s.mail_marks()["open_asks"] == []

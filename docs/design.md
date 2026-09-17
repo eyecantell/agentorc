@@ -1832,7 +1832,11 @@ window on correspondence and produces a plausible account of work nobody asked f
   2026-09-16): only the addressees the sender named take part in all-or-nothing. A copy that
   cannot land — its recipient's mailbox is full, or a future gate change refuses the edge — is
   dropped and recorded on the sender's entry as `copies_failed`, which the sender's `ao` reply and
-  card show. Otherwise a second controller that has sat idle for a week, its inbox full, would
+  card show. (*The sender's entry* is a real entry: every session keeps its own copy of what it
+  sent, `outbox`, on the same rule as the inbox — persisted, moved on resume, pruned by the same
+  retention — so the marks the sender must see, `copies_failed`, *expired*, *addressee exited*,
+  are on its own record and never a scan of other records' inboxes; TD-052 step 1.) Otherwise a
+  second controller that has sat idle for a week, its inbox full, would
   block a lead's `note` to its own worker.
 - **A bounded exchange, counted by thread.** Messages in one thread are counted, and past the
   bound the host agent **refuses the next send**, naming the bound and the thread, and writes a
