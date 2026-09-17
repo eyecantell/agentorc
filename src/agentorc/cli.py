@@ -533,8 +533,9 @@ def cmd_team_status(args: argparse.Namespace) -> int:
         # the names the definition would start; a definition that cannot start (a checkout gone,
         # say) is not an error here — status reads what is running, and says what is not
         expected = [x.name for x in teams.plan(org, args.name, hosts.local_host().name).launches]
-    except (teams.TeamError, ValueError):
-        pass
+    except (teams.TeamError, ValueError) as e:
+        if hosts.is_node():  # the one reason worth saying: the definition is not missing, it is elsewhere
+            print(str(e), file=sys.stderr)
     found = teamrun.badged(args.name, call_sync("list"))
     lead, members = teamrun.split(args.name, found, org)
     rows = [

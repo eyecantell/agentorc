@@ -608,7 +608,11 @@ stopping policy (above).
 **The replica, and the merge in both directions.** `models.apply_home(record, home_copy)` overlays
 exactly the home-owned fields and `models.apply_node(record, report)` exactly the node-owned ones;
 identity fields are never overlaid, and a copy that disagrees on one is refused rather than
-merged — it is a different session. Step 2 builds and tests the two functions; step 4 is what
+merged — it is a different session. **Three home-owned fields are merged, not overlaid, in both
+directions** (review of PR #198): `sends`, `seen_at` and `wake_refilled_at` are written on a node
+while it is offline — a person typed there, looked there — and each only ever grows (a list keyed
+by id; two times that only move forward), so the union and the later time lose nothing and
+resurrect nothing, where an overlay would erase the offline half and say it had worked. Step 2 builds and tests the two functions; step 4 is what
 calls them across the link. **`org.yml` lives on the home**: on a node `ao team …` and the Org
 page's Teams strip say so and name the home instead of reading a local file that would disagree
 with it.

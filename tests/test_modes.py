@@ -129,6 +129,28 @@ def test_a_copy_overlays_only_its_owners_fields_parsed_and_omitted_fields_stand(
 
 
 @pytest.mark.unit
+def test_what_a_person_did_on_an_offline_node_survives_the_homes_copy():
+    """Review of PR #198: `sends`, `seen_at` and `wake_refilled_at` are home-owned and still written
+    on a node offline — a person typed there, looked there. They only grow, so both directions merge
+    them; an overlay would erase the offline half and say nothing."""
+    from sessionorc import mail
+    from sessionorc.models import SENDS_KEPT, SendEntry
+
+    assert SENDS_KEPT == mail.SENDS_KEEP  # a parity pair: models cannot import mail
+    node = rec(seen_at="2026-09-17T21:00:00Z", wake_refilled_at="2026-09-17T21:00:00.000000+00:00")
+    node.sends = [SendEntry(id="s-node", from_="person", at="2026-09-17T21:00:00Z", text="typed on the laptop")]
+    home = rec(seen_at="2026-09-17T20:00:00Z")
+    home.sends = [SendEntry(id="s-home", from_="ao-x-lead", at="2026-09-17T20:30:00Z", text="typed from the home")]
+    apply_home(node, home.to_dict())
+    assert [e.id for e in node.sends] == ["s-home", "s-node"]  # both, in time order
+    assert node.seen_at == "2026-09-17T21:00:00Z" and node.wake_refilled_at  # the later look stands
+    apply_node(home, node.to_dict())
+    assert [e.id for e in home.sends] == ["s-home", "s-node"] and home.seen_at == "2026-09-17T21:00:00Z"
+    apply_node(home, node.to_dict())
+    assert len(home.sends) == 2  # idempotent: a replayed snapshot adds nothing
+
+
+@pytest.mark.unit
 def test_a_copy_that_disagrees_on_identity_is_another_session():
     with pytest.raises(NotTheSameSession, match="`host`"):
         apply_home(rec(), {**rec().to_dict(), "host": "kmaster"})

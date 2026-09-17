@@ -611,14 +611,29 @@ class NotTheSameSession(ValueError):
     """A copy that disagrees with the record on an identity field describes another session."""
 
 
+# Home-owned, and yet written on a node while it is offline: a person's `send` or `keys` there is
+# recorded in `sends` and refills the wake budget, and their look sets `seen_at` (review of PR
+# #198). An overlay would erase them on reconnect and say nothing. Each only ever grows — an
+# append-only list keyed by id, and two timestamps that only move forward — so both directions
+# **merge** these three instead: nothing a merge of monotonic fields can resurrect or lose.
+GROWS = frozenset({"sends", "seen_at", "wake_refilled_at"})
+SENDS_KEPT = 20  # the bound `sessionorc.mail.SENDS_KEEP` holds the list to; models cannot import mail
+
+
 def _overlay(record: Session, copy: Mapping[str, Any], owned: frozenset[str]) -> Session:
     for f in sorted(IDENTITY):
         if f in copy and copy[f] != getattr(record, f):
             raise NotTheSameSession(f"{record.id}: `{f}` is {getattr(record, f)!r} here and {copy[f]!r} in the copy")
-    parsed = Session.from_dict({**record.to_dict(), **{k: v for k, v in copy.items() if k in owned}})
-    for f in owned:
-        if f in copy:
-            setattr(record, f, getattr(parsed, f))
+    taken = (owned | GROWS) & copy.keys()
+    parsed = Session.from_dict({**record.to_dict(), **{k: copy[k] for k in taken}})
+    for f in taken - GROWS:
+        setattr(record, f, getattr(parsed, f))
+    if "sends" in taken:
+        by_id = {e.id: e for e in (*parsed.sends, *record.sends)}  # on one id the record's own entry stands
+        record.sends = sorted(by_id.values(), key=lambda e: (e.at, e.id))[-SENDS_KEPT:]
+    for f in ("seen_at", "wake_refilled_at"):
+        if f in taken:
+            setattr(record, f, max(filter(None, (getattr(record, f), getattr(parsed, f))), default=None))
     return record
 
 
@@ -627,7 +642,8 @@ def apply_home(record: Session, home_copy: Mapping[str, Any]) -> Session:
     graph and intent — and nothing the node observes is touched. Merges go by owner, never by last
     write (§4.4a): the link was down, the node wrapped a worker up and it exited, and meanwhile a
     person at the home extended its `run_until`; the node's `exited` stands, and so does the new
-    `run_until`. `home_copy` is a record as `to_dict()` writes it; fields it omits are left alone."""
+    `run_until`. `home_copy` is a record as `to_dict()` writes it; fields it omits are left alone.
+    The three fields in `GROWS` are merged, in this direction and the other."""
     return _overlay(record, home_copy, HOME_OWNED)
 
 

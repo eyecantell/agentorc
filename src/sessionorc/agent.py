@@ -133,7 +133,12 @@ class HostAgent:
         if self.mode == "node":
             log.warning(
                 "node of %s: the link (TD-057 step 3) is not built, so home is unreachable — this host's "
-                "sessions only; mail, reports, home-owned edits and sessions' acts on others are refused",
+                "sessions only; mail, reports, home-owned edits and sessions' acts on others are refused. "
+                "This host calls itself %s: if this machine IS %s, set `local: {name: %s}` in hosts.yml — without "
+                "it the name is the machine's hostname, and a home that does not recognise its own name is a node.",
+                self.home,
+                self.host,
+                self.home,
                 self.home,
             )
         self.sessions: dict[str, Session] = self.store.load_all()
