@@ -14,10 +14,10 @@ tested by monkeypatching the constant.
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
-from sessionorc.models import GRANTS, PERSON, Session
+from sessionorc.models import GRANTS, PERSON, MailEntry, Session
 
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
 RECIPIENT_CAP = 5  # addressees the *sender* names; automatic copies are exempt
@@ -31,6 +31,9 @@ ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the h
 MAIL_RETENTION: timedelta | None = None  # how long a read entry is kept; an open `ask` is exempt
 SENDS_KEEP = 20  # `sends` entries a record keeps
 NONCES_KEEP = 256  # verdicts remembered per host agent for a client's same-nonce retry
+WAKE_BUDGET: int | None = None  # mail-caused wakes a session may take per WAKE_WINDOW (§4.10 "wake budget")
+WAKE_WINDOW = timedelta(hours=1)  # the rolling window the wake budget counts charged wakes in
+WAKES_KEEP = 50  # wake decisions a record keeps (`wakes`): what step 5 measures
 
 # RPCs that act on a session (design §4.8): a caller that is a session needs the `orchestrate`
 # grant to run one of these on a session other than itself (§9 invariant 11). `create` targets a
@@ -166,3 +169,40 @@ def from_role(records: Mapping[str, Session], holder: str, sender: str) -> str:
     if me is not None and sender in me.controllers:
         return "controller"
     return "other"
+
+
+# -- the wake decision (design §4.10 "The host agent decides each wake") -------------------------
+
+
+def undecided_mail(s: Session) -> list[MailEntry]:
+    """The unread entries in `s`'s inbox that no wake has covered: those after the `mail_decided`
+    watermark. The inbox is in arrival order, so the watermark's id is where the covered part
+    ends. If that entry has since left the inbox (a person deleted it, retention pruned it), its
+    `at` stands in — compared with `>=`, since `at` is whole seconds: a sibling from the same
+    second may be decided twice, a redundant wake, never a missed one."""
+    mark = s.mail_decided
+    if not mark:
+        return [e for e in s.inbox if not e.read_at]
+    ids = [e.id for e in s.inbox]
+    if mark.get("id") in ids:
+        return [e for e in s.inbox[ids.index(mark["id"]) + 1 :] if not e.read_at]
+    return [e for e in s.inbox if not e.read_at and e.at >= str(mark.get("at") or "")]
+
+
+def charged_wakes(s: Session, now: datetime) -> int:
+    """Mail-caused wakes inside the rolling window and since the last refill (a person's act
+    restores the budget in full; time restores it as the window rolls)."""
+    since = (now - WAKE_WINDOW).isoformat(timespec="microseconds")
+    if s.wake_refilled_at and s.wake_refilled_at > since:
+        since = s.wake_refilled_at
+    return sum(1 for w in s.wakes if w.get("charged") and str(w.get("at", "")) > since)
+
+
+def wake_budget_spent(s: Session, now: datetime) -> bool:
+    return WAKE_BUDGET is not None and charged_wakes(s, now) >= WAKE_BUDGET
+
+
+def mail_wakes(s: Session) -> bool:
+    """A person's session is never woken by mail (§9 invariant 5, §4.10 *Done when*): it gets the
+    unread line and the chip, and nothing returns or rings for it."""
+    return not (s.kind == "interactive" and not s.unattended)

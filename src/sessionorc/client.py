@@ -26,6 +26,13 @@ class AgentUnavailable(AgentError):
     pass
 
 
+# The `mail` field of the last response any client in this process read (design §4.10 "a line on
+# every `ao` reply"): `{"unread": N, "wake_budget_spent": bool}` while the calling session has
+# unread mail, None otherwise. A CLI makes one or a few calls per command and prints the line once,
+# from the last of them, after its own output.
+last_mail: dict[str, Any] | None = None
+
+
 class LocalClient:
     """One connection, sequential requests. Cheap enough to open per CLI call."""
 
@@ -63,6 +70,8 @@ class LocalClient:
         if not line:
             raise AgentUnavailable("host agent closed the connection")
         resp = json.loads(line)
+        global last_mail
+        last_mail = resp.get("mail") if isinstance(resp, dict) else None
         if "error" in resp:
             raise AgentError(resp["error"], resp.get("error_data"))
         return resp.get("result")

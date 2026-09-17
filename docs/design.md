@@ -950,7 +950,7 @@ definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every ch
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
-its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC not yet): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — moves into the host agent as the `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC built 2026-09-16 by step 3): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — is a thin call to the host agent's `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -1081,7 +1081,7 @@ orchestrator controls.** The prior-art survey behind the rules below is
   controls that target. Control is handed on, never seized.
 **Waking a lead** (TD-049, from Paul 2026-09-14). Everything a lead knows, it learns by asking, so it is up to a round stale on every event that matters — a worker marking `done` waits a round for its cadence check, a worker that exited waits a round for its restart — and a quiet team pays for a poll that finds nothing, on the same usage budget as the work. The substrate for the alternative already exists and no session used it: `subscribe` (§4.6) is a stream of record deltas, which is what the Org page consumes.
 
-`ao wait [--timeout N]` is a blocking command over that stream (built in the CLI; it moves into the host agent as the `wait` RPC under TD-052, so the host agent can decide mail wakes — §4.10): a lead's round **ends** with it instead of sleeping. An event returns in about a second, a quiet window returns at the timeout, and **that timeout is the fallback poll** — one mechanism, not two that can disagree. Four things make it trustworthy rather than merely quick:
+`ao wait [--timeout N]` is a blocking command over that stream (built in the CLI 2026-09-14; since TD-052 step 3 a thin call to the host agent's `wait` RPC, which compares its own complete records against the same cursor, so the host agent can decide mail wakes — §4.10): a lead's round **ends** with it instead of sleeping. An event returns in about a second, a quiet window returns at the timeout, and **that timeout is the fallback poll** — one mechanism, not two that can disagree. Four things make it trustworthy rather than merely quick:
 
 - **Scope is the authority rule.** By default a lead waits on exactly the sessions it may act on — those whose `controllers` name it — so the wake and the authority cannot drift apart. A person at a terminal has no caller and sees everything, which is what `ao status` gives them anyway.
 - **The vocabulary is short, and the exclusions are the point.** A wake is a change to a session's `state`, its `exit_code`, the pending thing it is asking (the question, never the permission's countdown), what it has claimed or marked `done` and with which PR, what it has filed, or who controls it. Explicitly **not** `last_output`, `tail`, `since`, `seen_at` or `git`: those move on almost every tick of a healthy session, and a lead woken continuously is worth less than the poll it replaces.
@@ -1605,7 +1605,12 @@ instead of forbidden:
   ghost wait that is charged a wake and hands the mail to nobody. The per-caller cursor stays on
   disk under the host agent's `waits/` directory, as TD-049 built it, so a host-agent restart does
   not read as a first wait. `wait` is a read, not an acting RPC (invariant 11): a person at a
-  terminal waits with no caller, on everything, as today.
+  terminal waits with no caller, on everything, as today. As built (TD-052 step 3, 2026-09-16):
+  mail's half of the cursor *is* the `mail_decided` watermark, so a first wait wakes on no
+  member's change but does decide unread mail already waiting; a wait returns mail as headers
+  only — `read_at` stays `ao inbox`'s; a person's session blocked in `wait` is never returned by
+  mail; and the budget's decisions are a bounded `wakes` list on the record,
+  `{at, cause, charged, covered}`, which is what step 5 reads.
 - **A controller's `send` is never charged to the budget** (fourth review, 2026-09-16, reversing
   the second). Rounds two and three charged a `send` made inside a mail-caused turn to the
   controller's budget and refused it when spent, with the wrap-up prompt exempt. The loop that rule
@@ -1971,8 +1976,8 @@ escalation is the bound above — three designs collapsing into one.
 
 **Surface.** CLI (§4.7): `ao msg <to> "…" [--kind] [--about] [--reply-to]` and `ao inbox [--json]
 [--unread]` are new; **`ao wait` already exists** (§4.8 "Waking a lead", TD-049, landed
-2026-09-14); it moves into the host agent as the `wait` RPC, so the host agent knows who is
-blocked and can decide mail wakes (above), and gains mail as a second thing it returns on — the wake and the mailbox are one
+2026-09-14); since TD-052 step 3 (2026-09-16) it is the host agent's `wait` RPC, so the host agent knows who is
+blocked and decides mail wakes (above), and gains mail as a second thing it returns on — the wake and the mailbox are one
 mechanism, and the per-caller cursor that entry built is what makes a message that arrived while
 the session was mid-turn still there on its next wait, so mail needs no second answer to that
 question. UI

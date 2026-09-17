@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import hashlib
 import json
 import os
 import pathlib
@@ -18,11 +17,12 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import repoconfig, teamrun, teams
-from sessionorc import hosts, naming, paths
+from sessionorc import client as clientmod
+from sessionorc import hosts, naming
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note, wake_digest
+from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note
 from sessionorc.tmux import attach_argv
 
 
@@ -93,167 +93,34 @@ def emit(args: argparse.Namespace, result: Any, prose: Callable[[], None]) -> in
 # ── ao wait: a lead blocks instead of sleeping (design §4.8 "Waking a lead", TD-049) ──────────
 
 
-def wait_scope(sessions: list[dict[str, Any]], caller: str | None, scope: str) -> list[dict[str, Any]]:
-    """Which sessions a waiter is watching. The default reuses the authority rule (§4.8): a lead
-    waits on exactly the sessions it may act on — the ones whose `controllers` name it — so the
-    wake and the authority cannot drift apart. A person at a terminal has no caller and watches
-    everything, which is what `ao status` already shows them."""
-    if scope == "all" or caller is None:
-        return list(sessions)
-    return [s for s in sessions if caller in (s.get("controllers") or [])]
-
-
-def _cursor_file(caller: str | None) -> pathlib.Path:
-    # `slug` truncates, so two ids differing only past its limit would share one cursor and
-    # cross-pollinate each other's history (review of PR #145). The digest makes the name unique;
-    # the slug keeps it readable for whoever opens the directory.
-    who = caller or "person"
-    return paths.waits_dir() / f"{naming.slug(who)}-{hashlib.sha256(who.encode()).hexdigest()[:8]}.json"
-
-
-def read_cursor(caller: str | None) -> dict[str, str] | None:
-    """What this caller last saw, `{}` for a caller that has never waited, and **None** for a
-    cursor that exists but cannot be read.
-
-    The three are not the same thing (review of PR #145). An empty cursor wakes on nothing, which
-    is right for a first wait and exactly wrong for a corrupt one: it would swallow everything
-    that changed since the last good write, silently, which is the one failure this command must
-    not have. `None` means *unknown*, and unknown wakes on everything in scope — a redundant wake,
-    never a missed one, which is the trade this whole mechanism is built on."""
-    f = _cursor_file(caller)
-    if not f.exists():
-        return {}
-    try:
-        got = json.loads(f.read_text())
-    except (OSError, ValueError):
-        return None
-    return got if isinstance(got, dict) else None
-
-
-def write_cursor(caller: str | None, cursor: dict[str, str]) -> None:
-    f = _cursor_file(caller)
-    try:
-        f.parent.mkdir(parents=True, exist_ok=True)
-        tmp = f.with_suffix(".tmp")
-        tmp.write_text(json.dumps(cursor))
-        # Atomic, so a cursor is never half-written. Two waits for one caller at once (a lead's
-        # tick overlapping a person's `ao wait` in another pane) still race on *which* complete
-        # cursor lands, and the loser costs one redundant wake next time — self-healing, and the
-        # reason this is a replace rather than a lock (review of PR #145).
-        tmp.replace(f)
-    except OSError:
-        pass  # a cursor that cannot be saved costs one redundant wake, never a missed one
-
-
-def wake_changes(
-    before: dict[str, str] | None, now: list[dict[str, Any]]
-) -> tuple[list[dict[str, Any]], dict[str, str]]:
-    """The sessions whose wake digest differs from what this waiter last saw, and the new cursor.
-
-    `now` must be the **complete** set in scope: a session in `before` and not in `now` is
-    reported gone, so a partial view would report a healthy fleet as vanished and then drop it
-    from the cursor. That is why the snapshot is a `list` call and not a timed burst.
-
-    Three cursors, three different answers (review of PR #145):
-
-    - `{}` — never waited. Report nothing and record where we are, or the first call of every
-      lead's life returns its whole fleet and it learns to ignore the result.
-    - `None` — a cursor exists and could not be read. We do not know what was seen, so everything
-      in scope is reported: a redundant wake, never a missed one.
-    - anything else — the digests to compare against.
-    """
-    cursor = {s["id"]: wake_digest(s) for s in now}
-    if before is None:
-        return list(now), cursor
-    if not before:
-        return [], cursor
-    changed = [s for s in now if before.get(s["id"]) != cursor[s["id"]]]
-    changed += [{"id": sid, "gone": True} for sid in before if sid not in cursor]
-    return changed, cursor
-
-
 def cmd_wait(args: argparse.Namespace) -> int:
-    """`ao wait [--timeout N]` (design §4.8 "Waking a lead", TD-049): block until something a lead
-    acts on changes, or the timeout passes.
+    """`ao wait [--timeout N] [--scope controlled|all]`: block until something a lead acts on
+    changes, mail wakes it, or the timeout passes — and that timeout is the fallback poll.
 
-    A lead's tick ends with this instead of sleeping: an event returns in about a second, a quiet
-    window returns at the timeout, and **that timeout is the fallback poll** — one mechanism, not
-    two that can disagree. Nothing is sent into the lead's pane, so there is no interrupt to
-    invent and no keystrokes landing mid-turn (§4.8: the agent, which already sees every record
-    and computes the deltas, is the right thing to turn a declaration into a wake).
-
-    The cursor is what makes a busy lead safe. `subscribe` opens with a snapshot of every record
-    (§4.6), so the first thing this does is compare that snapshot against what this caller last
-    *saw* — which means a wake that fired while the lead was running a cadence check is still
-    there on its next wait. Only then does it listen."""
+    A thin call to the host agent's `wait` RPC (TD-052 step 3): the snapshot, the per-caller
+    cursor under `waits/` and the wake decision all live there, so the host agent knows who is
+    blocked and why a wait returned. The call gets its own connection, and closing it (Ctrl-C)
+    drops the wait. An agent older than the RPC is said so in one line, never looped on."""
     caller = os.environ.get("AGENTORC_SESSION") or None
-    before = read_cursor(caller)
-    latest: dict[str, str] = {}
 
-    async def go() -> list[dict[str, Any]]:
-        deadline = asyncio.get_running_loop().time() + max(args.timeout, 0.0)
+    async def go() -> Any:
         async with LocalClient(caller=caller) as c:
-            # The snapshot is `list`, not the burst `subscribe` opens with. A burst has no end
-            # marker, so the only way to know it is complete is to time it — and a gap in a slow
-            # or large one would be read as "that is all", reporting every record not yet received
-            # as *gone* and dropping it from the cursor. `list` has a definite answer.
-            seen: dict[str, dict[str, Any]] = {s["id"]: s for s in await c.call("list")}
-            changed, cursor = wake_changes(before, wait_scope(list(seen.values()), caller, args.scope))
-            latest.clear()
-            latest.update(cursor)
-            if changed:
-                return changed  # it happened while this caller was busy; no need to listen at all
-
-            # Nothing moved while we were away, so the cursor now equals what we last saw and the
-            # snapshot `subscribe` repeats is judged as unchanged — no special case needed for it.
-            events = c.subscribe().__aiter__()
-            # `asyncio.wait`, not `wait_for`: a timeout has to leave the pending read alone.
-            # `wait_for` cancels it, and a cancelled `__anext__` ends the generator — so the next
-            # read raised StopAsyncIteration at once and every wait returned immediately.
-            read: asyncio.Task[Any] | None = None
-            try:
-                while True:
-                    left = deadline - asyncio.get_running_loop().time()
-                    if left <= 0:
-                        return []
-                    if read is None:
-                        read = asyncio.ensure_future(events.__anext__())
-                    done, _ = await asyncio.wait({read}, timeout=left)
-                    if not done:
-                        return []
-                    try:
-                        ev = read.result()
-                    except StopAsyncIteration:
-                        return []  # the agent went away; the cursor stands and the next wait re-reads
-                    finally:
-                        read = None
-                    if ev.get("event") == "session":
-                        seen[ev["session"]["id"]] = ev["session"]
-                    elif ev.get("event") == "gone":
-                        seen.pop(ev["id"], None)
-                    else:
-                        continue
-                    watched = wait_scope(list(seen.values()), caller, args.scope)
-                    changed, cursor = wake_changes(before, watched)
-                    latest.clear()
-                    latest.update(cursor)
-                    if changed:
-                        return changed
-            finally:
-                if read is not None:
-                    read.cancel()
+            return await c.call("wait", timeout=args.timeout, scope=args.scope)
 
     try:
-        changed = asyncio.run(go())
-    except AgentUnavailable as e:
-        return fail(args, str(e), 1)
-    # Written on the way out, whether something changed or the window passed: the next wait
-    # compares against what this one actually saw.
-    if latest:
-        write_cursor(caller, latest)
+        got = asyncio.run(go())
+    except AgentError as e:
+        if str(e).startswith("unknown method"):
+            return fail(
+                args,
+                "the running host agent predates the wait RPC (TD-052 step 3): restart agentorc-agent to use ao wait",
+                1,
+            )
+        raise
+    changed, mail = got.get("changed") or [], got.get("mail") or []
 
     def prose() -> None:
-        if not changed:
+        if not changed and not mail:
             print(f"nothing changed in {args.timeout:g}s")
             return
         for s in changed:
@@ -262,8 +129,12 @@ def cmd_wait(args: argparse.Namespace) -> int:
                 continue
             line = report_line(s)
             print(f"{s.get('name') or s['id']}  {s.get('state', '?')}" + (f"  {line}" if line else ""))
+        if mail:
+            # headers only: the bodies are `ao inbox`'s to print, which is what marks them read
+            who = ", ".join(dict.fromkeys(f"{m['from']} [{m['from_role']}]" for m in mail))
+            print(f"mail: {len(mail)} new from {who} — run ao inbox")
 
-    return emit(args, changed, prose)
+    return emit(args, got, prose)
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -1264,6 +1135,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    clientmod.last_mail = None
+    try:
+        return _run(args)
+    finally:
+        unread_line(args)
+
+
+def _run(args: argparse.Namespace) -> int:
     try:
         if isinstance(getattr(args, "id", None), str) and args.id:
             args.id = resolve(args.id)  # a full id, or a bare name resolved here (TD-030 step 5)
@@ -1273,6 +1152,23 @@ def main(argv: list[str] | None = None) -> int:
     except AgentError as e:
         # the holder's id and state under --json (TD-030); `fail`'s own keywords are not overridable
         return fail(args, str(e), 1, **{k: v for k, v in e.data.items() if k not in ("prose", "code", "message")})
+
+
+def unread_line(args: argparse.Namespace) -> None:
+    """Design §4.10 "Busy for hours: a line on every `ao` reply": every command a session runs ends
+    with this while it has unread mail — refusals included — read from the `mail` field of the
+    last response the host agent sent it. It types nothing and starts nothing. Under `--json` it
+    goes to stderr, so a caller parsing stdout never meets it. A command that never reached the
+    agent (`ao --skill`, `ao roles`) has no response to read and prints nothing."""
+    m = clientmod.last_mail
+    if not m or not m.get("unread"):
+        return
+    n = int(m["unread"])
+    line = f"[agentorc] you have {n} unread messages — run ao inbox"
+    if m.get("wake_budget_spent"):
+        line += " (wake budget spent)"
+    sys.stdout.flush()
+    print(line, file=sys.stderr if getattr(args, "json", False) else sys.stdout)
 
 
 if __name__ == "__main__":

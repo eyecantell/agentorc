@@ -80,6 +80,9 @@ HOME_OWNED = frozenset(
         "threads",
         "sends",
         "superseded_by",
+        "mail_decided",
+        "wakes",
+        "wake_refilled_at",
     }
 )
 IDENTITY = frozenset(
@@ -437,6 +440,16 @@ class Session:
     # Set on the closed record a resume left behind: the id continuing its conversation. Mail
     # addressed to this record is forwarded there; an act on it is refused as on any closed record.
     superseded_by: str | None = None
+    # The wake decision (design §4.10, TD-052 step 3). `mail_decided` is the one watermark per
+    # session — `{id, at}` of the newest inbox entry any wake has covered; a decision not to wake
+    # leaves it where it was. `wakes` is every decision that woke the session, bounded
+    # (`mail.WAKES_KEEP`): `{at, cause: "mail" | "member", charged, covered}` — the record step 5
+    # measures, a charged mail wake apart from a free one that rode a member's change.
+    # `wake_refilled_at` is the last person's act toward the session: charged wakes before it no
+    # longer count against the budget.
+    mail_decided: dict[str, str] | None = None
+    wakes: list[dict[str, Any]] = field(default_factory=list)
+    wake_refilled_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """The whole record, as the store writes it."""
@@ -473,7 +486,15 @@ class Session:
             "addressee_exited": [e.id for e in self.outbox if e.pending and e.open],
             "copies_failed": [e.id for e in self.outbox if e.copies_failed],
             "bound_hit": [k for k, t in self.threads.items() if t.bound_hit],
+            "wake_budget_spent": self.wake_budget_spent(),
         }
+
+    def wake_budget_spent(self) -> bool:
+        """Exhaustion is visible (design §4.10): on the record, and so on the card and every `ao`
+        reply. The rule and its placeholder numbers live in `mail`, beside the other bounds."""
+        from sessionorc import mail  # mail imports this module; the bound is read at call time
+
+        return mail.wake_budget_spent(self, datetime.now(UTC))
 
     def holds(self, msg_id: str) -> list[MailEntry]:
         """Every copy of a message this record holds: at most one in the inbox, one in the outbox."""

@@ -659,7 +659,7 @@ def test_the_wake_vocabulary_ignores_what_moves_every_tick_and_notices_what_a_le
 
 def test_a_lead_waits_on_what_it_controls_and_a_person_sees_everything():
     """Scope reuses the authority rule (§4.8): a lead waits on exactly what it may act on."""
-    from agentorc.cli import wait_scope
+    from sessionorc.waits import wait_scope
 
     ss = [{"id": "m1", "controllers": ["lead"]}, {"id": "m2", "controllers": ["other"]}, {"id": "m3"}]
     assert [s["id"] for s in wait_scope(ss, "lead", "controlled")] == ["m1"]
@@ -675,8 +675,8 @@ def test_an_event_that_fired_while_the_lead_was_busy_is_still_there_when_it_come
     what this caller last *saw*, not against what happened to be streamed while it listened, so
     the `subscribe` snapshot answers it before the stream is ever read.
     """
-    from agentorc.cli import wake_changes
     from sessionorc.models import wake_digest
+    from sessionorc.waits import wake_changes
 
     working = {"id": "m1", "state": "working", "controllers": ["lead"], "progress": []}
     done = {**working, "state": "idle", "progress": [{"ref": "TD-1", "status": "done", "pr": 7}]}
@@ -695,7 +695,7 @@ def test_an_event_that_fired_while_the_lead_was_busy_is_still_there_when_it_come
 
 def test_a_session_that_went_away_is_a_wake_of_its_own():
     """The one a lead most needs: a member that exited and was forgotten has no record to diff."""
-    from agentorc.cli import wake_changes
+    from sessionorc.waits import wake_changes
 
     _, cursor = wake_changes({}, [{"id": "m1", "state": "working", "controllers": ["lead"]}])
     changed, cursor2 = wake_changes(cursor, [])
@@ -754,7 +754,7 @@ def test_a_worker_marking_done_wakes_a_waiting_lead_within_seconds(subprocess_ag
         assert cli.main(["progress", "done", "TD-999", "--pr", "7", "--id", sid]) == 0
         out, _ = waiter.communicate(timeout=30)
         assert time.monotonic() - t0 < 20.0  # seconds, not a tick
-        woke = json.loads(out or "[]")
+        woke = json.loads(out or "{}").get("changed") or []
         assert any(
             r.get("id") == sid and any(p.get("ref") == "TD-999" and p.get("pr") == 7 for p in r.get("progress") or [])
             for r in woke
@@ -776,7 +776,7 @@ def test_the_snapshot_is_a_list_call_not_a_timed_burst(subprocess_agent, tmp_pat
     that returns immediately because something changed while the caller was busy must do so
     without ever reading the stream.
     """
-    from agentorc.cli import wake_changes
+    from sessionorc.waits import wake_changes
 
     # the bug itself, at the level it bit: a partial view is not an empty fleet
     changed, cursor = wake_changes({"m1": "A", "m2": "B"}, [{"id": "m1", "state": "working"}])
@@ -805,7 +805,7 @@ def test_a_cursor_that_cannot_be_read_wakes_on_everything_rather_than_on_nothing
     wait and *swallow* everything that changed since the last good write — silently, which is the
     one failure this command must not have. Unknown has to mean "wake on everything".
     """
-    from agentorc.cli import read_cursor, wake_changes, write_cursor
+    from sessionorc.waits import read_cursor, wake_changes, write_cursor
 
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     rec = [{"id": "m1", "state": "working", "controllers": ["lead"]}]
@@ -818,7 +818,7 @@ def test_a_cursor_that_cannot_be_read_wakes_on_everything_rather_than_on_nothing
     assert wake_changes(read_cursor("lead"), rec)[0] == []  # nothing moved
 
     # a cursor that exists and is unreadable is *unknown*, not empty
-    from agentorc.cli import _cursor_file
+    from sessionorc.waits import cursor_file as _cursor_file
 
     _cursor_file("lead").write_text("{ truncated")
     assert read_cursor("lead") is None
@@ -833,7 +833,7 @@ def wake_digest_of(s):
 
 def test_two_callers_whose_ids_differ_only_past_the_slug_do_not_share_a_cursor(tmp_path, monkeypatch):
     """`naming.slug` truncates, so a digest keeps the filename unique (review of PR #145)."""
-    from agentorc.cli import _cursor_file
+    from sessionorc.waits import cursor_file as _cursor_file
 
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     a = "ao-agentorc-a-very-long-orchestrator-session-name-one"
@@ -898,3 +898,70 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert f"reply → {peer}" in capsys.readouterr().out
     for sid in (lead, worker, peer):
         call_sync("kill", id=sid)
+
+
+def test_every_ao_reply_ends_with_the_unread_line_while_the_caller_has_mail(subprocess_agent, tmp_path, capsys):
+    """Design §4.10 "Busy for hours: a line on every `ao` reply": present while the calling session
+    has unread mail — on a refusal too — absent without it, and on stderr under `--json`, so a
+    caller parsing stdout never meets it."""
+    assert cli.main(["--json", "shell", "-d", str(tmp_path), "mailed"]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    line = "[agentorc] you have 1 unread messages — run ao inbox"
+    os.environ["AGENTORC_SESSION"] = sid
+    try:
+        assert cli.main(["status"]) == 0
+        assert line not in capsys.readouterr().out
+        del os.environ["AGENTORC_SESSION"]
+        assert cli.main(["msg", sid, "a note for you"]) == 0  # a person's message
+        capsys.readouterr()
+        os.environ["AGENTORC_SESSION"] = sid
+        assert cli.main(["status"]) == 0
+        out = capsys.readouterr().out
+        assert out.rstrip().endswith(line)
+        assert cli.main(["--json", "status"]) == 0
+        got = capsys.readouterr()
+        json.loads(got.out)  # stdout stays parseable
+        assert line in got.err
+        assert cli.main(["kill", "ao-no-such-session"]) == 1  # a refusal carries it too
+        assert line in capsys.readouterr().out
+        assert cli.main(["inbox"]) == 0  # reading it clears the line from this very reply
+        assert "[agentorc]" not in capsys.readouterr().out
+    finally:
+        os.environ.pop("AGENTORC_SESSION", None)
+        cli.main(["kill", sid])
+
+
+def test_the_unread_line_says_when_the_wake_budget_is_spent(capsys):
+    """The ` (wake budget spent)` suffix, from the envelope's `mail` field (design §4.10)."""
+    import argparse
+
+    from sessionorc import client as clientmod
+
+    args = argparse.Namespace(json=False)
+    clientmod.last_mail = {"unread": 3, "wake_budget_spent": True}
+    cli.unread_line(args)
+    assert capsys.readouterr().out == "[agentorc] you have 3 unread messages — run ao inbox (wake budget spent)\n"
+    clientmod.last_mail = None
+    cli.unread_line(args)
+    assert capsys.readouterr().out == ""
+
+
+def test_ao_wait_against_an_agent_without_the_wait_rpc_says_so_and_exits(monkeypatch, capsys):
+    """The running lead's agent may predate the RPC: one line, non-zero, never a loop."""
+    from sessionorc.client import AgentError
+
+    async def unknown(self, method, **params):
+        raise AgentError(f"unknown method {method!r}")
+
+    async def enter(self):
+        return self
+
+    async def leave(self, *exc):
+        return None
+
+    monkeypatch.setattr(cli.LocalClient, "call", unknown)
+    monkeypatch.setattr(cli.LocalClient, "__aenter__", enter)
+    monkeypatch.setattr(cli.LocalClient, "__aexit__", leave)
+    assert cli.main(["wait", "--timeout", "1"]) == 1
+    err = capsys.readouterr().err
+    assert "predates the wait RPC" in err and err.count("\n") == 1
