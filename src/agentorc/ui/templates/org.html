@@ -33,7 +33,7 @@
       <span class="meta" title="{{ t.source or 'no file' }}">{{ (t.source or '').split('/')|last }}</span>
       {% if t.projects %}<span class="meta">{{ t.projects | join(', ') }}</span>{% endif %}
       <span class="meta">lead {{ t.lead }} · {{ t.members }} member{{ '' if t.members == 1 else 's' }}</span>
-      <span class="meta live" {% if t.wound_down %}title="every session that carried this team's badge declared it was out of work — `ao team start` is the restart"{% endif %}>{% if t.live %}{{ t.live }} live{% elif t.wound_down %}wound down{% if t.wound_down_age %} {{ t.wound_down_age }} ago{% endif %}{% else %}stopped{% endif %}</span>
+      <span class="meta live" data-idle="{% if t.wound_down %}wound down{% if t.wound_down_age %} {{ t.wound_down_age }} ago{% endif %}{% else %}stopped{% endif %}" {% if t.wound_down %}title="every session that carried this team's badge declared it was out of work — `ao team start` is the restart"{% endif %}>{% if t.live %}{{ t.live }} live{% elif t.wound_down %}wound down{% if t.wound_down_age %} {{ t.wound_down_age }} ago{% endif %}{% else %}stopped{% endif %}</span>
       <button class="btn sm start" data-team-act="start" data-team="{{ t.name }}" title="the same sequence as `ao team start`: every check before any session is created">Start</button>
     </span>
     {% endfor %}
