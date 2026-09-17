@@ -343,3 +343,65 @@ async def test_laptop_closed_its_cards_go_unreachable_and_come_back(home, hookst
         async with LocalClient() as c:
             await c.call("kill", id=s["id"])  # and a change on the node reaches the home
         await until(lambda v: v is not None and v["state"] == "exited")
+
+
+async def test_a_report_after_the_first_hook_still_lands_and_a_record_that_will_not_parse_is_not_forgotten(agent):
+    """Review of PR #202. `adapter_id` is set by the first hook *after* create: an identity check over
+    it froze the home's copy for good. And a snapshot forgets only what it omits — a record it lists
+    and the home cannot take is kept, mail and all."""
+    agent._take_records("laptop", [record(adapter_id=None)], whole=True)
+    agent._take_records("laptop", [record(adapter_id="tool-uuid", state="idle", name="renamed")], whole=False)
+    held = agent.remote["laptop"]["ao-x-w"]
+    assert (held.adapter_id, held.state, held.name) == ("tool-uuid", "idle", "renamed")
+    agent._take_records("laptop", [record(dir="/tmp/another-session-entirely")], whole=True)  # refused by `apply_node`
+    assert "ao-x-w" in agent.remote["laptop"] and held.dir == "/tmp/x"  # listed, so not forgotten
+
+
+class FakeMux:
+    closed_why = None
+
+    def __init__(self, during=None, stall=False):
+        self.during, self.stall, self.sent = during, stall, []
+
+    async def request(self, method, timeout=None, **params):
+        self.sent.append((method, params))
+        if self.during:
+            self.during()
+        return {"taken": len(params.get("records") or [])}
+
+    async def notify(self, method, **params):
+        if self.stall:
+            await asyncio.sleep(30)
+        self.sent.append((method, params))
+
+    def close(self, why="closed"):
+        self.closed_why = why
+
+
+async def test_a_record_created_while_the_snapshot_is_out_goes_in_the_first_report(agent, monkeypatch):
+    from sessionorc.models import Session
+
+    agent.mode, agent.home = "node", "kmaster"
+    mk = lambda rid: Session(id=rid, name=rid, kind="agent", adapter="claude-code", dir="/tmp/x", host=agent.host)  # noqa: E731
+    agent.sessions["ao-x-a"] = mk("ao-x-a")
+    mux = FakeMux(during=lambda: agent.sessions.__setitem__("ao-x-b", mk("ao-x-b")))
+    agent._home_mux = mux
+    await agent._send_snapshot(mux)
+    assert [r["id"] for r in mux.sent[0][1]["records"]] == ["ao-x-a"]
+    await agent._report_home()
+    assert mux.sent[1][0] == "report" and [r["id"] for r in mux.sent[1][1]["records"]] == ["ao-x-b"]
+    agent.sessions.pop("ao-x-a"), agent.sessions.pop("ao-x-b")
+
+
+async def test_a_report_that_cannot_be_written_gives_the_link_up_instead_of_stalling_the_node(agent, monkeypatch):
+    from sessionorc.models import Session
+
+    monkeypatch.setattr("sessionorc.agent.REPORT_WRITE", 0.2)
+    agent.mode, agent.home = "node", "kmaster"
+    agent._home_mux, agent._snapshot_sent = FakeMux(stall=True), True
+    agent.sessions["ao-x-a"] = Session(
+        id="ao-x-a", name="a", kind="agent", adapter="claude-code", dir="/tmp/x", host=agent.host
+    )
+    await asyncio.wait_for(agent._report_home(), timeout=3)  # returns: the tick is not held for `LINK_SILENCE`
+    assert "could not be written within 0.2 s" in agent._home_mux.closed_why
+    agent.sessions.pop("ao-x-a")

@@ -87,6 +87,7 @@ PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
 # killed anyway, because the whole point is that nobody is watching.
 WRAPUP_GRACE = timedelta(minutes=10)
+REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
@@ -2133,17 +2134,17 @@ class HostAgent:
         once it is acknowledged, so the home never applies a change to a record it has not got."""
         if mux is None:
             return
-        records = [s.to_dict() for s in self.sessions.values()]
+        # What is marked as told is exactly what was sent: a record created while the request is out
+        # is not in it, and must go in the first report rather than be taken as known.
+        sending = {s.id: (_urgent(s), s.to_dict()) for s in self.sessions.values()}
         try:
-            await mux.request("snapshot", timeout=link.LINK_SILENCE, records=records)
+            await mux.request("snapshot", timeout=link.LINK_SILENCE, records=[d for _, d in sending.values()])
         except (link.LinkClosed, link.LinkError, TimeoutError) as e:
             log.warning("snapshot to %s failed: %s", self.home, e)
             mux.close(f"snapshot failed: {e}")  # start over: a link whose snapshot did not land reports into a void
             return
         now = time.monotonic()
-        self._reported = {
-            s.id: (_urgent(s), json.dumps(s.to_dict(), sort_keys=True), now) for s in self.sessions.values()
-        }
+        self._reported = {sid: (urgent, json.dumps(d, sort_keys=True), now) for sid, (urgent, d) in sending.items()}
         self._snapshot_sent = True
 
     async def _report_home(self) -> None:
@@ -2163,11 +2164,18 @@ class HostAgent:
         forgotten = [sid for sid in self._reported if sid not in self.sessions]
         for sid in forgotten:
             del self._reported[sid]
-        with contextlib.suppress(link.LinkClosed):
-            if changed:
-                await mux.notify("report", records=changed)
-            if forgotten:
-                await mux.notify("gone", ids=forgotten)
+        # Bounded: this runs inside the tick and inside every RPC that pushes, and a write to a peer
+        # that has gone blocks once the pipe is full — for `LINK_SILENCE`, were nothing to stop it.
+        try:
+            async with asyncio.timeout(REPORT_WRITE):
+                if changed:
+                    await mux.notify("report", records=changed)
+                if forgotten:
+                    await mux.notify("gone", ids=forgotten)
+        except link.LinkClosed:
+            pass
+        except TimeoutError:
+            mux.close(f"a report could not be written within {REPORT_WRITE:g} s")  # the reconnect's snapshot repairs it
 
     async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
         """What the home may ask of this node. Step 3a: nothing but a ping; acts arrive with step 4."""
@@ -2238,6 +2246,7 @@ class HostAgent:
                 log.warning("link from %s: dropped a report about %s@%s", host, raw.get("id"), raw.get("host"))
                 continue
             rid = str(raw["id"])
+            seen.add(rid)  # listed, whether or not it could be taken: a snapshot forgets only what it omits
             try:
                 if rid in mine:
                     apply_node(mine[rid], raw)
@@ -2246,7 +2255,6 @@ class HostAgent:
             except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
                 log.warning("link from %s: could not take %s: %s", host, rid, e)
                 continue
-            seen.add(rid)
             self._remote_store(host).save(mine[rid])
         if whole:
             for rid in [r for r in mine if r not in seen]:

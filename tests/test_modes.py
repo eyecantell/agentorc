@@ -156,6 +156,10 @@ def test_a_copy_that_disagrees_on_identity_is_another_session():
         apply_home(rec(), {**rec().to_dict(), "host": "kmaster"})
     with pytest.raises(NotTheSameSession, match="`dir`"):
         apply_node(rec(), {"dir": "/tmp/elsewhere", "state": "idle"})
+    # …but what the session's own host sets after it exists travels with the node's report
+    r = apply_node(rec(), {"adapter_id": "tool-uuid", "name": "renamed", "state": "idle"})
+    assert (r.adapter_id, r.name, r.state) == ("tool-uuid", "renamed", "idle")
+    assert apply_home(rec(), {"adapter_id": "from-home"}).adapter_id is None  # never from the home's copy
 
 
 # -- a node, end to end ---------------------------------------------------------------------------------
