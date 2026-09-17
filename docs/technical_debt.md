@@ -35,6 +35,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-055 | Rename to the glossary's decided words: the `orchestrator` role becomes `lead`, the `orchestrate` grant `control`, orc-of-orcs director, a lead's tick a round, the daemon always *host agent*; nudge, supervisor and fleet retired | Medium | Open |
 | TD-056 | Reference leases: a worker's claim on a `TD-NNN` or a path is an advisory, timed reservation checked at claim, not a note to siblings | Medium | Open |
 | TD-057 | Sessions on different hosts cannot talk: build the home and node split — one home host agent holds the org's graph and mail, other hosts dial it (design §4.4a) | Medium | Partly done |
+| TD-058 | `systemctl restart agentorc-agent` hangs for the 90 s stop timeout and ends in SIGKILL: the serve loop waits for every open connection to close | Medium | Open |
 
 ---
 
@@ -455,3 +456,20 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a session on the laptop and its lead on kmaster exchange mail and the lead's acts reach it, every gate reads one graph at the home, a sleeping laptop loses nothing and is woken once on return, and phase 1 (one host, no `home:`) behaves exactly as before.
 
 **Related:** design §4.4a (the whole section), §4.5b, §4.6, §4.8, §4.10, §5, §7, §9 invariants 1, 11, 12, 13, 15, §10 (the 2026-09-16 entry); TD-052 (mail on one host, whose step 1 carries this entry's step 1 choices), TD-004 (host identity), ADR 2026-09-16 (messaging prior art).
+
+## TD-058: Stopping the host agent hangs until systemd kills it
+
+**Priority:** Medium
+**Added:** 2026-09-16 (observed by the anchor session restarting the units for TD-052's live check)
+
+**Status:** Open
+
+**Location:** `src/sessionorc/agent.py` (`HostAgent.serve`: `async with server: await server.serve_forever()`; `serve_until_signal`), `src/agentorc/service.py` (the unit: `KillMode=process`, no `TimeoutStopSec`)
+
+**Why:** on 2026-09-16 21:24 MDT `systemctl --user restart agentorc-agent` sat in `stop-sigterm` for 90 s, then systemd logged `State 'stop-sigterm' timed out. Killing.` and sent SIGKILL (`journalctl --user -u agentorc-agent`). SIGTERM cancels the serve task (TD-024), and leaving `async with server` calls `Server.wait_closed()`, which since Python 3.12 waits for **every open client connection** to finish — and the UI's `subscribe` connection never does, nor does a CLI blocked in the `wait` RPC (TD-052 step 3, which makes long-lived connections the normal case for every lead). So a stop never completes on its own. Nothing is lost today — tmux holds the sessions, the store is written on every change, and the unit restarts — but the socket file is not unlinked by the `finally`, in-flight permission waiters die without an answer, every restart costs 90 s during which hooks queue to disk, and a SIGKILL is the wrong default for a process that will soon hold the org's mail.
+
+**Fix:** on shutdown, close the client connections the agent holds (subscribers, `_waits`, and any other open writer — track them in `_handle_conn`) before awaiting `wait_closed()`, or bound the wait with a short timeout and then close them; cancel blocked `wait` RPCs so each writes its cursor; keep the `finally` that unlinks the socket reachable. A test: an agent with one subscriber and one blocked `wait` stops within a second of the serve task being cancelled. Consider `TimeoutStopSec=10` on the unit as the backstop, not the fix.
+
+**Done when** `systemctl --user restart agentorc-agent` returns in a few seconds with the UI open and a lead blocked in `ao wait`, and the journal shows a clean stop.
+
+**Related:** TD-024 (archived: the pending-task traceback on SIGTERM, which made the cancel path clean but did not meet this), TD-052 step 3 (the `wait` RPC's long-lived connections), design §4.4, §4.6.
