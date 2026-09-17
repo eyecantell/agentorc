@@ -324,6 +324,9 @@ def test_a_lead_stopping_its_own_team_is_the_wind_down_and_is_never_typed_at(wor
     capsys.readouterr()
     monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")
     by_id = {s["id"]: s for s in state["sessions"]}
+    pushed = {"dirty": 0, "ahead": 0, "upstream": "origin/x"}
+    by_id["ao-agentorc-grind-1"]["git"] = pushed
+    by_id["ao-agentorc-hunt"]["git"] = pushed
     by_id["ao-agentorc-grind-2"]["git"] = {"dirty": 0, "ahead": 2, "upstream": "origin/x"}
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
     assert [p["id"] for m, p in state["calls"] if m == "send"] == [
@@ -332,7 +335,7 @@ def test_a_lead_stopping_its_own_team_is_the_wind_down_and_is_never_typed_at(wor
     assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1", "ao-agentorc-hunt"]
     out = capsys.readouterr().out
     assert "lead: is you" in out and "ao close ao-agentorc-orc-ao" in out
-    assert "left open: 0 uncommitted, 2 unpushed" in out
+    assert "left open: 2 unpushed" in out
     assert "still working" not in out  # the lead's own line is not a member that missed the window
     assert by_id["ao-agentorc-orc-ao"]["state"] == "working"  # untouched by its own command
     # `--now` from the lead kills the members and still spares the caller
@@ -347,13 +350,47 @@ def test_a_finished_member_gets_no_wrap_up_prompt_and_is_closed(world, capsys, m
     tmp_path, state = world
     started(state)
     by_id = {s["id"]: s for s in state["sessions"]}
-    by_id["ao-agentorc-grind-1"].update(state="idle", out_of_work={"at": "2026-09-17T06:00:00Z", "why": "ledger empty"})
+    by_id["ao-agentorc-grind-1"].update(
+        state="idle",
+        out_of_work={"at": "2026-09-17T06:00:00Z", "why": "ledger empty"},
+        git={"dirty": 0, "ahead": 0, "upstream": "origin/x"},
+    )
     by_id["ao-agentorc-grind-2"]["out_of_work"] = {"at": "2026-09-17T06:00:00Z", "why": "x"}  # declared, still working
     monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")
     assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
     assert [p["id"] for m, p in state["calls"] if m == "send"] == ["ao-agentorc-grind-2", "ao-agentorc-hunt"]
     assert "ao-agentorc-grind-1" in [p["id"] for m, p in state["calls"] if m == "close"]
     assert "finished (out of work), nothing sent, closed" in capsys.readouterr().out
+
+
+def test_close_needs_proof_of_pushed_not_an_absent_count(world, capsys, tmp_path_factory):
+    """Review of PR #192: `ahead: 0` with no upstream is what a never-pushed branch looks like, and
+    a record with no `git` yet is unknown, not clean. With no upstream the commit is looked for on
+    the remote branches — a merged worker on a detached `origin/main` is pushed."""
+    import subprocess
+
+    tmp_path, state = world
+    started(state)
+    by_id = {s["id"]: s for s in state["sessions"]}
+    repo = tmp_path_factory.mktemp("wt")
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "merged"], check=True)
+    subprocess.run([*git, "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
+    no_upstream = {"dirty": 0, "ahead": 0, "upstream": None}
+    by_id["ao-agentorc-grind-1"].update(dir=str(repo), git=no_upstream)  # detached on what origin has
+    by_id["ao-agentorc-hunt"].pop("git", None)  # unknown
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1"]
+    out = capsys.readouterr().out
+    assert out.count("left open: git state unknown") == 2  # grind-2 and hunt
+    # the same checkout with a commit origin has never seen
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "never pushed"], check=True)
+    by_id["ao-agentorc-grind-1"]["state"] = "idle"
+    state["calls"].clear()
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert not [m for m, _ in state["calls"] if m == "close"]
+    assert "no upstream, and its commit is on no remote branch" in capsys.readouterr().out
 
 
 def test_a_persons_stop_without_close_closes_nothing(world, capsys):

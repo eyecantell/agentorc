@@ -13,6 +13,7 @@ a terminal or a page — the callers do that from the returned records.
 
 from __future__ import annotations
 
+import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -230,15 +231,44 @@ def stop_lead(call: Call, st: Stopping, *, timeout: float = STOP_TIMEOUT, close:
 def _close_settled(call: Call, entry: dict[str, Any], record: dict[str, Any] | None) -> None:
     if record is None or record["state"] == "closed":
         return
-    git = record.get("git") or {}
     if record["state"] not in SETTLED:
         entry["left_open"] = f"still {record['state']}"
-    elif git.get("dirty") or git.get("ahead"):
-        entry["left_open"] = f"{git.get('dirty', 0)} uncommitted, {git.get('ahead', 0)} unpushed"
-    else:
-        call("close", id=entry["id"])
-        entry["action"] += ", closed"
-        entry["state"] = "closed"
+        return
+    unsafe = _unsafe_to_close(record)
+    if unsafe:
+        entry["left_open"] = unsafe
+        return
+    call("close", id=entry["id"])
+    entry["action"] += ", closed"
+    entry["state"] = "closed"
+
+
+def _unsafe_to_close(record: dict[str, Any]) -> str | None:
+    """Why this member's checkout is not *clean and pushed*, or None when it is. Unknown is unsafe:
+    a record with no `git` yet is left open, as Ready to close leaves it unchecked. `ahead: 0`
+    proves nothing without an upstream — a branch never pushed has no `branch.ab` line at all
+    (review of PR #192) — so with none, the commit itself is looked for on the remote-tracking
+    branches: a worker that merged and sits on a detached `origin/main` is pushed; one that
+    committed to a fresh branch and never pushed is not."""
+    git = record.get("git")
+    if not git:
+        return "git state unknown"
+    if git.get("dirty"):
+        return f"{git['dirty']} uncommitted"
+    if git.get("upstream"):
+        return f"{git['ahead']} unpushed" if git.get("ahead") else None
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(record.get("dir") or ""), "branch", "-r", "--contains", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "no upstream, and the remote branches could not be read"
+    if cp.returncode != 0 or not cp.stdout.strip():
+        return "no upstream, and its commit is on no remote branch"
+    return None
 
 
 def _own_end(lead: dict[str, Any]) -> dict[str, Any]:

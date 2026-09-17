@@ -1323,7 +1323,9 @@ with the id, `--json` the records. `ao team stop <name>` sends the wrap-up promp
 card's Wrap up sends, §4.5a) to each member, waits for each to go idle or the wrap-up window to
 pass, then to the lead; `--now` kills instead of asking. `--close` (2026-09-17, §4.9a) also closes
 each member that settled with nothing to lose — no uncommitted file, no unpushed commit — and
-names any it left open: a wrapped-up Claude Code session sits `idle` rather than leaving, and
+names any it left open. *Pushed* needs proof: an upstream with nothing ahead of it, or, with no
+upstream (a worker that merged and sits on a detached `origin/main`), the commit found on a
+remote branch; a record whose git state is not known yet is left open, never assumed clean: a wrapped-up Claude Code session sits `idle` rather than leaving, and
 `ao team start` refuses while a session holds a member's name. `ao team status <name>` is the lead's
 Members view for a terminal: each member with state, lane and report line. `ao team list` shows
 every definition, its source file, and whether it is live. A team is **live** when any session
