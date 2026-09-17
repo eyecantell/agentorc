@@ -542,7 +542,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Priority:** Medium
 **Added:** 2026-09-17 (anchor session, watching the samscrape team)
 
-**Status:** Open — seen once, answered by hand. Nothing built; the policy is Paul's to choose.
+**Status:** Open — seen twice on 2026-09-17, an hour apart, from the same sender to the same lead; answered by hand both times. It recurs on every such message. Nothing built; the policy is Paul's to choose.
 
 **Location:** `src/agentorc/adapters/claude_code/` (the settings layer a launch writes), design §4.10 (the mediation property), §4.2 (what `needs-you` means for an unattended session), ADR `docs/decisions/2026-09-16-agent-messaging-prior-art.md`
 
