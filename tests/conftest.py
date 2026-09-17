@@ -206,6 +206,41 @@ async def wait_state(client, sid: str, state: str, timeout: float = 6.0) -> dict
     raise AssertionError(f"{sid} never reached {state}: {s['state']} {s.get('tail')} {pane_line(sid)}")
 
 
+async def derived(agent, check, timeout: float = 10.0):
+    """Drive derivations until `check()` holds, and return what it returned (TD-063).
+
+    `tick()` starts a derivation only when `self._derive_task` is None or done, and the `agent`
+    fixture runs a live tick loop at `FAST_TICK`. So a background tick can already own an in-flight
+    derive whose snapshot predates whatever the test just changed — a `git checkout`, a `gh` stub —
+    and the test's own `tick()` then starts nothing at all: `await agent._derive_task` awaits that
+    stale derive, which legitimately still reports the old answer. Seen on CI 2026-09-17 as
+    `test_the_tick_retires_a_branch_claim_the_session_abandoned` asserting `progress == []` one
+    derive too early. Waiting on the condition instead of on one task is what makes it deterministic:
+    a stale derive costs a retry rather than a failure, and nothing here waits on a duration.
+
+    `check` is called after each round and may be a coroutine function.
+    """
+    end = time.monotonic() + timeout
+    while True:
+        if (t := agent._derive_task) is not None and not t.done():
+            with contextlib.suppress(Exception):
+                await t  # let a tick's in-flight derive finish before asking for a fresh one
+        agent._git_checked.clear()  # the branch read has its own cadence; the derive follows it
+        agent._derived_at.clear()
+        await agent.tick()
+        if (t := agent._derive_task) is not None:
+            with contextlib.suppress(Exception):
+                await t
+        got = check()
+        if asyncio.iscoroutine(got):
+            got = await got
+        if got:
+            return got
+        if time.monotonic() > end:
+            raise AssertionError(f"the derive never satisfied {getattr(check, '__doc__', None) or check}")
+        await asyncio.sleep(0.05)
+
+
 # -- the in-process agent -----------------------------------------------------------------------
 
 
