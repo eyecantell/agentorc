@@ -577,9 +577,12 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             return
         w = max(len(r["name"]) for r in rows)
         for r in rows:
-            live = f"{r['live']} live" if r["live"] else "stopped"
+            # *stopped* and *wound down* are different facts about a team (§4.9a, TD-053 step 6),
+            # and the strip says which — so this does too, from the same rows, or the page and the
+            # CLI would disagree about the same definition.
+            live = f"{r['live']} live" if r["live"] else ("wound down" if r["wound_down"] else "stopped")
             print(
-                f"{r['name']:<{w}}  {live:<8}  lead: {r['lead']}  members: {r['members']}  "
+                f"{r['name']:<{w}}  {live:<10}  lead: {r['lead']}  members: {r['members']}  "
                 f"projects: {', '.join(r['projects'])}  [{r['source']}]"
             )
 

@@ -99,23 +99,49 @@ def org_with_repo_teams(org: orgmod.Org, roots: list[Path | str]) -> tuple[orgmo
     return org, notes
 
 
+def wound_down(sessions: list[dict[str, Any]]) -> str | None:
+    """When a team's sessions all declared they were out of work, the latest of those instants
+    (design §4.9a, §4.5a **Teams** strip, TD-053 step 6) — else None.
+
+    *Nothing running* and *nothing left to run* are different facts about a team, and only the
+    second is an answer: a team stopped by a person, by a clock or by a crash looks identical on the
+    strip otherwise. The rule is deliberately all-or-nothing and reads the records rather than
+    counting ledger rows, exactly as §4.9a asks: one member's exhaustion is not the team's, and a
+    single session that never declared means the team stopped for some other reason. A team with no
+    session carrying its badge has never run, or has been forgotten, and is neither.
+    """
+    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions]
+    if not seen or not all(d.get("at") for d in seen):
+        return None
+    # `str` before `max`: two declarations of different types would otherwise be a TypeError, and
+    # the strip is on the same page as every card (review of PR #203)
+    return max(str(d["at"]) for d in seen)
+
+
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
-    the name, the file it came from, its projects, how many sessions it starts, and how many
-    carrying its badge are live. There is no team record — a team that is stopped is only its
-    definition, so `live` is counted across the fleet on every call."""
+    the name, the file it came from, its projects, how many sessions it starts, how many carrying
+    its badge are live, and — when none are and every one of them said why — when it wound down.
+    There is no team record — a team that is stopped is only its definition, so both are counted
+    across the fleet on every call."""
     up = live(sessions)
-    return [
-        {
-            "name": t.name,
-            "source": str(t.source) if t.source else None,
-            "projects": list(t.projects),
-            "lead": t.lead.name if t.lead.role != orgmod.PERSON else "person",
-            "members": sum(len(m.names()) for m in t.members if m.team is None),
-            "live": len(badged(t.name, up)),
-        }
-        for t in org.teams.values()
-    ]
+    rows_out = []
+    for t in org.teams.values():
+        mine = badged(t.name, sessions)
+        n_live = len(badged(t.name, up))
+        rows_out.append(
+            {
+                "name": t.name,
+                "source": str(t.source) if t.source else None,
+                "projects": list(t.projects),
+                "lead": t.lead.name if t.lead.role != orgmod.PERSON else "person",
+                "members": sum(len(m.names()) for m in t.members if m.team is None),
+                "live": n_live,
+                # only when nothing is live: a team still running is described by what it is doing
+                "wound_down": None if n_live else wound_down(mine),
+            }
+        )
+    return rows_out
 
 
 # ── start ─────────────────────────────────────────────────────────────────────────────────────

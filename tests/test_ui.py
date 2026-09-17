@@ -942,3 +942,67 @@ def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
     assert client.get("/api/person/inbox").json()["entries"] == []
     assert client.post("/api/person/unmail", json={"msg": ask}).status_code == 400  # already gone
     assert client.post("/api/person/nope", json={}).status_code == 404
+
+
+def test_a_declaration_of_no_work_is_a_chip_on_the_card_and_the_focus_header(tmp_path, monkeypatch):
+    """design §4.5a **out of work** chip (§4.9a, TD-053 step 6): a session that declared it found
+    nothing left says so where a person looks, with the reason on hover. It is not a state — the
+    record still reads `idle` — and it is drawn for any session that declared, since a hand-started
+    worker may run out too. A card with neither report channel still draws the row for it."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-2", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "idle", "since": "2026-09-17T16:00:00Z", "confidence": "hook", "pane": True, "tail": [],
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    assert "out of work" not in card.render(s=view(base))
+    assert view(base)["out_of_work"] is None
+
+    # no apostrophe: Jinja escapes one, and a test that reads the raw HTML would be asserting the
+    # escaping rather than the hover
+    why = "every open entry is parked on a person or belongs to another team"
+    at = (datetime.now(UTC) - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
+    done = {**base, "out_of_work": {"at": at, "why": why}}
+    html = card.render(s=view(done))
+    assert "out of work 2h" in html and why in html  # the words, and the reason on hover
+    assert view(done)["out_of_work"]["age"].startswith("2h")
+    # the chip does not pretend to be a state: the card still reads `idle` (§4.2's unseen-idle rule)
+    assert 'data-state="idle"' in html and "out-of-work" not in html
+    # a declaration with no reason is still a declaration — the hover says so rather than being empty
+    bare = card.render(s=view({**base, "out_of_work": {"at": at, "why": ""}}))
+    assert "out of work" in bare and "no reason recorded" in bare
+    # and a record whose declaration has no instant is not one (the agent refuses to write it)
+    assert view({**base, "out_of_work": {"why": why}})["out_of_work"] is None
+
+    # A malformed declaration costs that card its chip and nothing else. `view` runs for every
+    # session on the grid, so a raise here would take down the page rather than the one card — the
+    # failure PR #131's review caught for a `run_until` of *half six*, and the same guard is owed to
+    # a field a different build or a hand repair could leave in any shape (review of PR #203).
+    for junk in ("out of work", ["nope"], 7, {"at": 12345}, {"at": "half six"}, {"at": {"nested": 1}}):
+        d = view({**base, "out_of_work": junk})
+        assert d["out_of_work"] is None or d["out_of_work"]["age"] == ""
+        assert "out of work" not in card.render(s=d) or d["out_of_work"] is not None
+
+
+def test_the_focus_header_carries_the_out_of_work_chip_from_the_record(client, tmp_path):
+    """The other half of §4.5a's row (§4.9a, TD-053 step 6), on the live page: the declaration the
+    session itself wrote is what the header reads — `ao progress none --why` is refused from anyone
+    but the session (invariant 14), so this goes through the agent rather than a hand-built record."""
+    from sessionorc.client import call_sync
+
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "oow"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    assert "out of work" not in client.get(f"/focus/{sid}").text
+
+    why = "nothing open that this brief does not exclude"
+    call_sync("progress", id=sid, status="none", why=why, caller=sid)
+    page = client.get(f"/focus/{sid}").text
+    assert "out of work" in page and why in page
+    assert "out of work" in client.get("/").text  # and the card on the Org page
+
+    # a claim means it has work again — the record clears the declaration, and so does the header
+    call_sync("progress", id=sid, ref="TD-053", status="claimed", caller=sid)
+    assert "out of work" not in client.get(f"/focus/{sid}").text
+    call_sync("kill", id=sid)

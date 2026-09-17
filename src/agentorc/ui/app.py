@@ -138,7 +138,14 @@ def teams_view(sessions: list[dict[str, Any]]) -> dict[str, Any]:
     """The **Teams** strip's contents (design §4.5a): every definition with its source, projects,
     member count and live count — `teamrun.rows`, the very rows `ao team list` prints."""
     org, notes = org_here()
-    return {"teams": teamrun.rows(org, sessions), "source": str(org.path or ""), "notes": notes}
+    rows = teamrun.rows(org, sessions)
+    now = datetime.now(UTC)
+    for r in rows:
+        # design §4.5a **wound down** note (§4.9a, TD-053 step 6): the strip says *wound down <t>*
+        # rather than a bare *stopped* when every session that carried the badge declared it was out
+        # of work. The instant comes from the records; the age is rendered here, like every other.
+        r["wound_down_age"] = _age(r.get("wound_down"), now)
+    return {"teams": rows, "source": str(org.path or ""), "notes": notes}
 
 
 def vscode_url(directory: str) -> str:
@@ -159,7 +166,14 @@ def vscode_url(directory: str) -> str:
 
 
 def _age(iso: str | None, now: datetime) -> str:
-    if not iso:
+    """An instant off a record as *2h 5m*, or "" for anything this cannot read.
+
+    Anything: `view` runs for every session on the grid, so a raise here takes down the page rather
+    than the one card — the failure PR #131's review caught for a `run_until` of *half six*. A
+    record's timestamps are written by the agent and are well-formed, but a state file that a
+    different build, a bug or a hand repair left holding a number or a dict must cost its card a
+    line and nothing more, so the shape is checked rather than trusted (review of PR #203)."""
+    if not isinstance(iso, str) or not iso:
         return ""
     try:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
@@ -264,6 +278,17 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
     d["report"] = report_line(s)
     d["report_derived"] = bool(head and head.get("source", "declared") != "declared")
     d["findings_line"] = f"{len(findings)} filed" if findings else ""
+    # design §4.5a card / Focus header **out of work** chip (§4.9a, TD-053 step 6). Not a state —
+    # the session still reads `idle` or `exited` — and shown for any session that declared it, since
+    # a hand-started worker may run out too. The words are fixed and the `why` is the hover, because
+    # the reason is a paragraph naming every entry the session looked at: a card cannot hold it, and
+    # a card that tried would push the report line off. Dropped the moment the session claims again,
+    # which is the record's own rule (§4.9a: a session that claims has work again).
+    oow = s.get("out_of_work")
+    oow = oow if isinstance(oow, dict) else {}  # one malformed record must not empty the grid
+    d["out_of_work"] = (
+        {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
+    )
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)

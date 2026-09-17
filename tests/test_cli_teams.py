@@ -439,6 +439,17 @@ def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, ca
     rows = {r["name"]: r for r in json.loads(capsys.readouterr().out)["teams"]}
     assert rows["ao-grind"]["live"] == 4 and rows["ao-grind"]["members"] == 3
     assert rows["repo-team"]["live"] == 0
+    # *stopped* and *wound down* are different facts about a team (§4.9a, TD-053 step 6), and the
+    # CLI says which from the same rows the Org strip reads, or the two would disagree about one
+    # definition. Every session that carried the badge declared, and each was then stopped.
+    for s in state["sessions"]:
+        if s.get("team") == "ao-grind":
+            s["state"], s["out_of_work"] = "closed", {"at": "2026-09-17T20:00:00Z", "why": "nothing open"}
+    capsys.readouterr()
+    assert cli.main(["team", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "ao-grind" in out and "wound down" in out
+    assert "repo-team" in out and "stopped" in out  # one that never ran is not wound down
 
 
 # ── the profile precedence chain, and `ao new --project` ──────────────────────────────────────
