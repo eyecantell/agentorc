@@ -182,6 +182,10 @@ class HostAgent:
         self._git_checked: dict[str, datetime] = {}
         self._derived_at: dict[str, datetime] = {}
         self._model_checked: dict[str, datetime] = {}
+        # When a `kill` or a `close` destroyed a pane, so a tick holding a pane list taken before
+        # it does not observe a session that is already gone (TD-063). Dropped as soon as a
+        # snapshot newer than the kill arrives, so it holds at most one tick's worth of ids.
+        self._killed_at: dict[str, datetime] = {}
         self._derive_task: asyncio.Task[None] | None = None
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
@@ -535,7 +539,19 @@ class HostAgent:
                 if s.closed_at and _parse(s.closed_at) + CLOSED_KEEP < now:
                     self._forget(sid)
                 continue
+            killed = self._killed_at.get(sid)
+            if killed is not None and killed < snapshot_at:
+                del self._killed_at[sid]  # this snapshot is newer than the kill: the guard is spent
+                killed = None
             pane = panes.get(sid)
+            if pane is not None and killed is not None:
+                # The pane list was taken before the kill that ended this record, so it still lists
+                # a tmux session that is gone. Observing it would set `pane` back to True and read a
+                # state off the last screen — an `exited` record flipped back to `idle`, which then
+                # refuses its own `remove` ("kill it first"). The window is the two `to_thread` hops
+                # between the snapshot and here, and an RPC runs on the loop inside them (TD-063,
+                # seen on a 3.12 CI runner 2026-09-17).
+                continue
             if pane is None:
                 # A session created after the pane snapshot was taken is not judged by it.
                 if _parse(s.created) + CREATE_GRACE < snapshot_at and (s.state != "exited" or s.pane):
@@ -641,7 +657,14 @@ class HostAgent:
     def _scrub(self, sid: str) -> None:
         """No cadence or hook key outlives the session it was about — whether the record is
         forgotten or replaced in place by a new session of the same name (§4.1)."""
-        for side in (self._git_checked, self._derived_at, self._model_checked, self._pre_limited, self._last_hook):
+        for side in (
+            self._git_checked,
+            self._derived_at,
+            self._model_checked,
+            self._pre_limited,
+            self._last_hook,
+            self._killed_at,
+        ):
             side.pop(sid, None)
 
     def _forget(self, sid: str) -> None:
@@ -1015,6 +1038,7 @@ class HostAgent:
         await asyncio.to_thread(self.tmux.kill_session, id)
         s.set_state("exited", confidence="scraped")
         s.pane = False  # unlike a natural exit, a kill destroys the pane (TD-023)
+        self._killed_at[id] = datetime.now(UTC)  # a tick's older pane list must not revive it (TD-063)
         self.store.save(s)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
@@ -1025,6 +1049,11 @@ class HostAgent:
         s.set_state("closed", confidence="scraped")
         s.pane = False
         s.closed_at = now_iso()
+        # A `kill` then a `close` before an intervening tick would otherwise strand a `_killed_at`
+        # stamp for `CLOSED_KEEP`: the reconcile skips a closed record before it reaches the guard,
+        # so nothing else would ever clear it. Harmless — a closed record is never observed either
+        # way — but it would make the guard's one-tick bound untrue (review of PR #199).
+        self._killed_at.pop(id, None)
         self.store.save(s)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()

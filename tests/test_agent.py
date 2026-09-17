@@ -6,7 +6,7 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import FAST_TICK, wait_state
+from conftest import FAST_TICK, derived, wait_state
 
 from sessionorc import adapters, naming, paths, reports
 from sessionorc.agent import WRAPUP_GRACE
@@ -992,29 +992,36 @@ async def test_the_tick_retires_a_branch_claim_the_session_abandoned(agent, tmp_
     monkeypatch.setattr(reports, "_prs_for_head", lambda directory, branch, **kw: [])
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
-        await agent.tick()
-        await agent._derive_task
-        s = await person.call("get", id=sid)
-        assert [(p["ref"], p["status"], p["pr"], p["branch"]) for p in s["progress"]] == [
-            ("TD-077", "claimed", None, "td077-cap")
-        ]
+
+        async def claimed():
+            """the branch it is on is derived as a claim"""
+            got = await person.call("get", id=sid)
+            return [(p["ref"], p["status"], p["pr"], p["branch"]) for p in got["progress"]] == [
+                ("TD-077", "claimed", None, "td077-cap")
+            ]
+
+        await derived(agent, claimed)
         # the session gives the branch up for a neighbour and moves to its own
         subprocess.run(["git", "-C", str(repo), "checkout", "-q", "main"], check=True)
-        agent._git_checked.clear()  # the branch read has its own cadence; the derive follows it
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        assert (await person.call("get", id=sid))["progress"] == []
+
+        async def retired():
+            """the branch claim is gone from the record"""
+            return (await person.call("get", id=sid))["progress"] == []
+
+        await derived(agent, retired)
         assert json.loads((paths.sessions_dir() / f"{sid}.json").read_text())["progress"] == []  # and it is saved
         # a declaration of the same shape is untouched by any number of ticks (§9 invariant 10)
         async with LocalClient(caller=sid) as worker:
             await worker.call("progress", id=sid, ref="TD-077")
-        agent._git_checked.clear()
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        s = await person.call("get", id=sid)
-        assert [(p["ref"], p["status"], p["source"]) for p in s["progress"]] == [("TD-077", "claimed", "declared")]
+
+        async def declared():
+            """the declaration is still the record's, whatever the derive did"""
+            got = await person.call("get", id=sid)
+            return [(p["ref"], p["status"], p["source"]) for p in got["progress"]] == [
+                ("TD-077", "claimed", "declared")
+            ]
+
+        await derived(agent, declared)
         await person.call("kill", id=sid)
 
 
@@ -1034,20 +1041,18 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
     )
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
-        await agent.tick()
-        await agent._derive_task  # detached so a slow `gh` never holds up the tick
-        s = await person.call("get", id=sid)
-        assert [(p["ref"], p["status"], p["pr"], p["source"]) for p in s["progress"]] == [
-            ("TD-077", "claimed", 77, "derived")
-        ]
+
+        async def progress_is(want):
+            got = (await person.call("get", id=sid))["progress"]
+            return [tuple(p[k] for k in want[0]) for p in got] == want[1]
+
+        # detached so a slow `gh` never holds up the tick, so the wait is on the entry, not the task
+        keys = ("ref", "status", "pr", "source")
+        await derived(agent, lambda: progress_is((keys, [("TD-077", "claimed", 77, "derived")])))
         # the session declares the same reference done: the declaration replaces the derived entry
         await person.call("progress", id=sid, ref="TD-077", status="done", pr=77)
         # ... and the next derivation cannot put it back to claimed (§9 invariant 10)
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        s = await person.call("get", id=sid)
-        assert [(p["ref"], p["status"], p["source"]) for p in s["progress"]] == [("TD-077", "done", "declared")]
+        await derived(agent, lambda: progress_is((("ref", "status", "source"), [("TD-077", "done", "declared")])))
         # every entry of a multi-entry derivation is applied and saved: these upserts are the write,
         # so an `any()` over a generator would have stopped at the first one (review 2026-09-11)
         ledgers: list[str] = []  # the record's `ledger` (§5) reaches the derivation; unset → the default
@@ -1063,13 +1068,14 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
                 )
             ),
         )
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
-        assert [p["ref"] for p in on_disk["progress"]] == ["TD-077", "TD-080", "TD-081"]
-        assert [f["ref"] for f in on_disk["findings"]] == ["TD-082", "TD-083"]
-        assert ledgers == [reports.LEDGER_DEFAULT]
+        def on_disk():
+            """all four stubbed entries are applied and saved"""
+            rec = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+            return rec if [p["ref"] for p in rec["progress"]] == ["TD-077", "TD-080", "TD-081"] else None
+
+        rec = await derived(agent, on_disk)
+        assert [f["ref"] for f in rec["findings"]] == ["TD-082", "TD-083"]
+        assert set(ledgers) == {reports.LEDGER_DEFAULT}  # a retried round still asks for the default
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
         assert sid not in agent._derived_at  # no key outlives the record
@@ -1079,9 +1085,8 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
                                    role="grinder", ledger="docs/debt.md"))  # fmt: skip
         assert other["role"] == "grinder" and other["ledger"] == "docs/debt.md"
         ledgers.clear()
-        await agent.tick()
-        await agent._derive_task
-        assert ledgers == ["docs/debt.md"]
+        await derived(agent, lambda: ledgers)
+        assert set(ledgers) == {"docs/debt.md"}
         await person.call("kill", id=other["id"])
         await person.call("remove", id=other["id"])
 
@@ -1281,25 +1286,52 @@ async def test_derived_entries_go_to_the_record_that_holds_the_directory(agent, 
         await person.call("kill", id=old)
         await wait_state(person, old, "exited")
         new = (await person.call("create", name="run-2", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        live = await person.call("get", id=new)
-        assert [(p["ref"], p["status"], p["pr"], p["source"]) for p in live["progress"]] == [
-            ("TD-077", "claimed", 77, "derived")
-        ]
+
+        async def credited():
+            """the live record holds the branch's claim"""
+            got = (await person.call("get", id=new))["progress"]
+            rows = [(p["ref"], p["status"], p["pr"], p["source"]) for p in got]
+            return rows == [("TD-077", "claimed", 77, "derived")]
+
+        await derived(agent, credited)
         # the exited record gains nothing from a branch it never saw
         assert [p["ref"] for p in (await person.call("get", id=old))["progress"]] == ["TD-070"]
         # ... but its own PR merging still reaches it, which is why skipping exited records is wrong
         prs[1] = {"number": 70, "state": "MERGED", "mergedAt": "now", "headRefName": "td070-earlier"}
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        gone = await person.call("get", id=old)
-        assert [(p["ref"], p["status"], p["pr"]) for p in gone["progress"]] == [("TD-070", "done", 70)]
+
+        async def finished():
+            """the exited record's own PR merging still reaches it"""
+            got = (await person.call("get", id=old))["progress"]
+            return [(p["ref"], p["status"], p["pr"]) for p in got] == [("TD-070", "done", 70)]
+
+        await derived(agent, finished)
         await person.call("kill", id=new)
         for sid in (old, new):
             await person.call("remove", id=sid)
+
+
+async def test_a_pane_list_taken_before_a_kill_does_not_revive_the_record(agent, tmp_path):
+    """TD-063: `tick()` reads the pane list in one thread and the tails in another before it
+    reconciles, and an RPC runs on the loop inside that window. A `kill` there left the tick holding
+    a list that still named the session, `_observe` set `pane` back to True and read a state off the
+    last screen, and the `exited` record came back as `idle` — which then refused its own `remove`
+    with *kill it first*. That is the 3.12 CI failure of 2026-09-17, reproduced here by handing
+    `_reconcile` exactly the snapshot the in-flight tick would have had."""
+    async with LocalClient() as person:
+        made = await person.call("create", name="revive", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        sid = made["id"]
+        await wait_state(person, sid, "idle")
+        snapshot_at = datetime.now(UTC)
+        panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+        assert sid in panes, "the snapshot must predate the kill for this to test anything"
+
+        await person.call("kill", id=sid)
+        agent._reconcile(panes, {}, snapshot_at)  # the tick that was already in flight, finishing
+
+        s = await person.call("get", id=sid)
+        assert (s["state"], s["pane"]) == ("exited", False)
+        await person.call("remove", id=sid)  # and so `remove` is not refused
+        assert sid not in agent._killed_at  # no key outlives the record
 
 
 async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_up_twice(agent, tmp_path):

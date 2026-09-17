@@ -9,6 +9,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -223,16 +224,28 @@ def test_send_wait(subprocess_agent, tmp_path, capsys):
     call_sync("hook", session=sid, state="idle")
     wait_state(sid, "idle")
 
-    def turn():
-        time.sleep(0.3)
-        call_sync("hook", session=sid, state="working")
-        time.sleep(0.3)
-        call_sync("hook", session=sid, state="idle")
+    # Turns until the send returns, rather than one turn on a timer (TD-063). `rpc_send` captures
+    # the revision it waits for *after* `_submit` — a paste, a settle and a composer check — so on a
+    # slow runner a single working→idle pair posted 0.3 s and 0.6 s in can both land before that
+    # read: the record is idle, its revision is already past, nothing else ever moves it, and the
+    # stall window expires. CI saw exactly that (`showed no activity within 4.69821 s`). Whichever
+    # cycle lands after the read satisfies both waits, at any load, and the loop ends on idle so the
+    # settled state the command prints is unchanged.
+    done = threading.Event()
+
+    def turns():
+        while not done.is_set():
+            call_sync("hook", session=sid, state="working")
+            call_sync("hook", session=sid, state="idle")
+            done.wait(0.05)
 
     with ThreadPoolExecutor(max_workers=1) as pool:
-        fut = pool.submit(turn)
-        assert cli.main(["send", sid, "--wait", "--timeout", "5", "go"]) == 0
-        fut.result(timeout=5)
+        fut = pool.submit(turns)
+        try:
+            assert cli.main(["send", sid, "--wait", "--timeout", "5", "go"]) == 0
+        finally:
+            done.set()
+        fut.result(timeout=5)  # `rpc_hook` applies the event inline, so the last idle is on the record
     assert capsys.readouterr().out.strip() == f"{sid}: idle"
     assert cli.main(["send", sid, "--wait", "--timeout", "1", "nothing happens"]) == 1
     assert "prompt-stalled" in capsys.readouterr().err

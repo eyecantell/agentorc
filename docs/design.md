@@ -432,7 +432,10 @@ Adapter status at design time (verify before building each):
 
 Python, one process per host, started by the same systemd user unit. Responsibilities:
 
-- Enumerate sessions (tmux + state dir), merge, serve JSON over a local Unix socket.
+- Enumerate sessions (tmux + state dir), merge, serve JSON over a local Unix socket. A tick reads
+  the pane list and the tails in threads and reconciles afterwards, and an RPC runs on the loop in
+  between: a pane list **older than the kill that ended a record never revives it** (TD-063), or an
+  `exited` session comes back as `idle` and then refuses its own `remove`.
 - Create / kill / send / resume sessions (the only writer).
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
