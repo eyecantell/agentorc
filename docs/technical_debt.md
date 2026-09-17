@@ -39,6 +39,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-061 | A worktree session's memory write lands uncommitted in the main checkout, where the anchor's next `git commit -a` sweeps it into an unrelated PR | Medium | Open |
 | TD-062 | A merge that changes an RPC's parameters breaks the `ao` CLI on the live system until the host agent restarts: the install is editable, so the client is new at once and the agent is not | Medium | Partly done |
 | TD-063 | CI-only flakes on the 3.12 runner: the two timing-shaped tests and the record-revive race are fixed; the 26-minute hang of PR #192 is still unattributed | Low | Partly done |
+| TD-064 | Claude Code's own session-to-session messages reach an agentorc session around the mail gates, and an unattended session blocks on their approval prompt until a person answers | Medium | Open |
 
 ---
 
@@ -535,3 +536,20 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-033 (archived: the same class, two other tests), TD-025 (archived: `test_cli.py` idle-wait diagnostics).
 
+
+## TD-064: Claude Code's peer messages reach a session around the mail gates, and block an unattended one
+
+**Priority:** Medium
+**Added:** 2026-09-17 (anchor session, watching the samscrape team)
+
+**Status:** Open — seen once, answered by hand. Nothing built; the policy is Paul's to choose.
+
+**Location:** `src/agentorc/adapters/claude_code/` (the settings layer a launch writes), design §4.10 (the mediation property), §4.2 (what `needs-you` means for an unattended session), ADR `docs/decisions/2026-09-16-agent-messaging-prior-art.md`
+
+**Why:** Claude Code has its own session-to-session messaging (a per-session socket under `/run/user/<uid>/cc-socks/`, peers discovered through `~/.claude/sessions/`). On 2026-09-17 Paul's interactive samscrape session sent `orchestrator-sam-1` his 22 board decisions that way. Claude Code **held** the message — *the sending session's permission mode class doesn't match this session's … set "crossSessionInbound" to "accept"* — and put a two-option dialog in the lead's pane. The host agent reported `needs-you` with *A message from another session needs your approval*; the lead, unattended and blocked in `ao wait`, could not answer it, and the team had no lead until the anchor session chose *Deliver* with `ao keys`. Two separate problems: **(1) it is a second channel.** §4.10 builds mail so that every message between sessions passes one gate, is tallied, bounded and visible on the card; a peer message passes none of that, and had the modes matched it would have been delivered with nobody seeing it. **(2) it stops an unattended session.** No policy answers that dialog, and no brief can: the session is not running a turn while it is up.
+
+**Fix:** decide the policy, then write it into the settings layer every agentorc launch already carries (design §4.2): `crossSessionInbound` set so an unattended session **never blocks** — *deny* keeps mail the only channel and costs a person the shortcut Paul used; *accept* keeps the shortcut and leaves a channel the gates do not see. Whichever is chosen, the classifier should recognise the held-message dialog by name rather than as a generic question, and the design should say in §4.10 that the tool's own messaging exists and what agentorc does about it. A person who wants to tell a lead something has `ao msg` and the card's **Message**.
+
+**Done when** an unattended session started by agentorc cannot be stopped by another Claude Code session's message, and §4.10 names the channel and the policy.
+
+**Related:** TD-052 (mail), design §9 invariant 13, ADR 2026-09-16 (why agentorc builds its own messaging rather than using Claude Code's — this is the other half of that decision: what to do about theirs).
