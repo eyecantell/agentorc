@@ -8,6 +8,7 @@ back as the agent's own message, and that the page renders what §4.5a's row des
 
 from __future__ import annotations
 
+import pathlib
 import time
 from pathlib import Path
 
@@ -254,6 +255,12 @@ def test_the_strip_row_reads_wound_down_where_it_would_have_read_stopped(world, 
     ]
     html = client.get("/").text
     assert "wound down" in html and ">stopped<" not in html
+    # The page script rewrites this cell on every layout (live counts come from the cards), so what
+    # an idle team reads has to be on the cell for it to put back — it used to write a bare
+    # "stopped" over the note the moment the page loaded. No JS harness here: the pair is pinned.
+    assert 'data-idle="wound down' in html
+    js = (pathlib.Path(uiapp.__file__).parent / "static" / "app.js").read_text()
+    assert 'cell.dataset.idle || "stopped"' in js
     assert 'class="team-row" data-team="ao-grind"' in html and "hidden" not in html.split("team-row")[1][:200]
     assert 'data-team-act="start"' in html  # `ao team start` is the restart (§4.9)
     assert "declared it was out of work" in html  # the hover says why the word is different

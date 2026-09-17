@@ -356,7 +356,11 @@
       defined.add(row.dataset.team);
       row.dataset.live = n;
       row.hidden = n > 0;
-      $(".live", row).textContent = n ? `${n} live` : "stopped";
+      // What a team with nothing live reads is the server's — *stopped*, or *wound down <t> ago*
+      // (§4.5a, TD-053 step 6) — kept on the cell, because this line runs on every layout and
+      // used to overwrite it with a bare "stopped" the moment the page loaded.
+      const cell = $(".live", row);
+      cell.textContent = n ? `${n} live` : (cell.dataset.idle || "stopped");
     });
     if (defined.size) strip.hidden = !$$(".team-row", strip).some((r) => !r.hidden) && !$(".warnish", strip);
     // A header re-rendered for a delta arrives with its buttons hidden: the definitions are the
