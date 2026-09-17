@@ -7,8 +7,8 @@
   <div class="sc-body">
     <div class="row">
       <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>
-      {% if s.external %}<span class="badge" title="known from the tool's live registry: no terminal, no controls">registry</span>{% else %}<button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
-              title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>{% endif %}
+      <button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
+              title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>
       {% if s.role %}<span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ s.role }}</span>{% endif %}
       {# design §4.5a card **team** badge (§4.9): the team the session was started under; a badge,
          nothing keys on it (§9 invariant 9). Click filters the grid to that team, client-side. #}
@@ -76,7 +76,7 @@
     <a class="btn sm {{ 'ghost' if nopane else 'primary' }}" href="/focus/{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
     {% if s.vscode %}<a class="btn sm ghost" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
     <span class="grow"></span>
-    {% if not s.external %}<details class="more">
+    <details class="more">
       <summary class="btn sm ghost" title="more">⋯</summary>
       <div class="menu">
         <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail into its inbox — lands, types nothing">Message…</button>
@@ -86,6 +86,6 @@
         <button data-act="shell-here" data-id="{{ s.id }}">Open shell here</button>
         <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
       </div>
-    </details>{% endif %}
+    </details>
   </div>
 </div>

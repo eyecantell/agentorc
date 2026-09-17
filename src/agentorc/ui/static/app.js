@@ -682,7 +682,6 @@
       } else if (v.state === "needs-you" && p) {
         head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>`;
         compose.disabled = true; $("#composehint").textContent = "answer in the terminal above";
-      } else if (v.external) { compose.disabled = true; $("#composehint").textContent = "started outside agentorc: a read-only card (no terminal, no controls)";
       } else if (v.state === "exited" || v.state === "closed" || v.state === "unreachable") {
         // There is no turn to start or steer: the pane is dead or out of reach. The composer used
         // to sit enabled here and say nothing, which was merely useless; saying "starts a new

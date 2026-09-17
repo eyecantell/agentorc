@@ -90,11 +90,9 @@ def act_gate(records: Mapping[str, Session], caller: Any, method: str, params: M
     target = records.get(target_id)
     # An id this agent has no record of falls through to the method, which answers "no session
     # <id>" — a membership refusal here would say more about the org than the caller may read.
-    # Two other ids land here as `None` and are refused by the method rather than by this gate:
-    # a registry-only record (`HostAgent._external`), which every acting RPC rejects through `_get`
-    # without `external=True`, and a missing `id`, which is a required argument on all of them
-    # and so fails as bad params. Both are pinned by tests; an acting RPC that ever took
-    # `external=True` or gave `id` a default would need its own membership check here.
+    # A missing `id` lands here as `None` too and is refused by the method rather than by this
+    # gate: it is a required argument on every acting RPC and so fails as bad params (pinned by a
+    # test; an acting RPC that ever gave `id` a default would need its own membership check here).
     if target is not None and target.kind == "interactive" and not target.unattended:
         # §9 invariant 5 (TD-041): a person's session — `kind: interactive` says conversation,
         # `unattended: false` says not a worker — is out of every session's reach, whatever the

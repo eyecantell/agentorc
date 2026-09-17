@@ -84,8 +84,6 @@ PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
 # killed anyway, because the whole point is that nobody is watching.
 WRAPUP_GRACE = timedelta(minutes=10)
-# a tool registry's status → our state (Claude Code: busy | idle | shell, the last a `!` command running)
-EXTERNAL_STATES = {"busy": "working", "idle": "idle", "shell": "working"}
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
@@ -180,9 +178,6 @@ class HostAgent:
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
-        # Read-only cards for sessions the adapters see outside agentorc (TD-010 a): rebuilt every
-        # tick from `adapters.external_sessions()`, never stored, keyed `ext-<tool id>`.
-        self._external: dict[str, Session] = {}
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -375,7 +370,7 @@ class HostAgent:
         holders = reports.holds_directory(self.sessions.values())
         due: list[tuple[Session, str | None, list[tuple[str, int]], list[tuple[str, str | None]]]] = []
         for s in self.sessions.values():
-            if not s.dir or s.external or s.state == "closed":
+            if not s.dir or s.state == "closed":
                 continue
             if now - self._derived_at.get(s.id, datetime.min.replace(tzinfo=UTC)) <= DERIVE_EVERY:
                 continue
@@ -426,7 +421,7 @@ class HostAgent:
         thread, on its own cadence. An adapter that cannot tell leaves the field alone."""
         due = []
         for s in self.sessions.values():
-            if not (s.adapter_id and s.dir) or s.external or s.state == "closed":
+            if not (s.adapter_id and s.dir) or s.state == "closed":
                 continue
             if now - self._model_checked.get(s.id, datetime.min.replace(tzinfo=UTC)) <= MODEL_EVERY:
                 continue
@@ -531,53 +526,6 @@ class HostAgent:
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
                 self._observe(s, pane, tails.get(name, []), now)
-        self._reconcile_external()
-
-    def _reconcile_external(self) -> None:
-        """Read-only cards for live sessions the adapters see that agentorc did not start (a
-        `claude` in a VS Code terminal: no tmux at all; TD-010 a, design §4.1). State comes from
-        the tool's registry status, so it is `scraped`. Skipped: a tool id one of our records
-        already carries, and any session in a directory where one of our agent sessions is live
-        (that is our own pane before its first hook reported the id; invariant 2 says there is
-        only one). A card leaves when its process does."""
-        try:
-            exts = adapters.external_sessions()
-        except Exception:  # noqa: BLE001
-            log.exception("external sessions")
-            return
-        ours = {s.adapter_id for s in self.sessions.values() if s.adapter_id}
-        taken = {
-            Path(s.dir).resolve()
-            for s in self.sessions.values()
-            if s.dir and s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
-        }
-        seen: set[str] = set()
-        for ext in exts:
-            if (ext.tool_id and ext.tool_id in ours) or (ext.cwd and Path(ext.cwd).resolve() in taken):
-                continue
-            sid = base = "ext-" + naming.slug(ext.tool_id or ext.name, max_len=48)
-            n = 2
-            while sid in seen:  # two entries with no tool id and one name: never hide the second
-                sid = f"{base}-{n}"
-                n += 1
-            seen.add(sid)
-            s = self._external.get(sid)
-            if s is None:
-                s = Session(
-                    id=sid, name=ext.name, kind="interactive", adapter=ext.adapter, dir=ext.cwd, adapter_id=ext.tool_id
-                )
-                s.external, s.pane = True, False
-                self._external[sid] = s
-            s.name, s.dir = ext.name, ext.cwd
-            st = EXTERNAL_STATES.get(ext.status or "", "working")
-            if st != s.state:
-                s.set_state(st, confidence="scraped")
-        for sid in list(self._external):
-            if sid not in seen:
-                del self._external[sid]
-                for last in self._subscribers.values():  # as `_forget` does: announce `gone` exactly once
-                    last.pop(sid, None)
-                self._gone.append(sid)
 
     def _is_removed_pane(self, name: str, pane: PaneInfo) -> bool:
         """Is this the pane a recent `remove` killed (as a stale snapshot would still list it)? A
@@ -684,10 +632,10 @@ class HostAgent:
     # -- RPC methods -----------------------------------------------------------------------------
 
     async def rpc_list(self) -> list[dict[str, Any]]:
-        return [s.view() for s in (*self.sessions.values(), *self._external.values())]
+        return [s.view() for s in self.sessions.values()]
 
     async def rpc_get(self, id: str) -> dict[str, Any]:
-        return self._get(id, external=True).view()
+        return self._get(id).view()
 
     async def rpc_create(
         self,
@@ -1253,10 +1201,9 @@ class HostAgent:
     async def rpc_seen(self, id: str) -> dict[str, Any]:
         """A person looked at this session (Focus opened, a card control used). The UI reads
         `since > seen_at` on an `idle` record as "finished while you were away" (design §4.2)."""
-        s = self._get(id, external=True)
+        s = self._get(id)
         s.seen_at = now_iso()
-        if not s.external:
-            self.store.save(s)
+        self.store.save(s)
         await self._push_changes()
         return s.view()
 
@@ -1989,7 +1936,7 @@ class HostAgent:
         """A person's act toward `s` restores its wake budget in full (design §4.10 "Time and a
         person restore it"): a send or keys with no caller, a person's message, a decided
         permission. Never a session's traffic, never a person looking (`seen`, a panel read)."""
-        if s is None or s.external:
+        if s is None:
             return
         s.wake_refilled_at = datetime.now(UTC).isoformat(timespec="microseconds")
         self.store.save(s)
@@ -2078,13 +2025,7 @@ class HostAgent:
         this host is stored bare, another host's as `id@host`."""
         return naming.qualify(str(address), local=self.host)
 
-    def _get(self, sid: str, *, external: bool = False) -> Session:
-        """A record by id. A registry-only card (`external`) is returned only to callers that
-        can act on it read-only; anything else gets a line saying why not."""
-        if sid in self._external:
-            if external:
-                return self._external[sid]
-            raise RpcError(f"{sid} was started outside agentorc (a read-only card from the tool's registry)")
+    def _get(self, sid: str) -> Session:
         try:
             return self.sessions[sid]
         except KeyError:
@@ -2106,9 +2047,7 @@ class HostAgent:
         if not self._subscribers:
             return
         # sort_keys: the payload is the comparison key too (the UI reads fields by name, never order)
-        payloads = {
-            sid: json.dumps(s.view(), sort_keys=True) for sid, s in (*self.sessions.items(), *self._external.items())
-        }
+        payloads = {sid: json.dumps(s.view(), sort_keys=True) for sid, s in self.sessions.items()}
         for w, last in list(self._subscribers.items()):
             for sid, payload in payloads.items():
                 if last.get(sid) != payload:
