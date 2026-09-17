@@ -17,7 +17,7 @@ from collections.abc import Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
-from sessionorc.models import GRANTS, PERSON, MailEntry, Session
+from sessionorc.models import GRANTS, PERSON, MailEntry, Session, canonical_grants, has_control
 
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
 RECIPIENT_CAP = 5  # addressees the *sender* names; automatic copies are exempt
@@ -35,7 +35,7 @@ WAKE_BUDGET: int | None = None  # mail-caused wakes a session may take per WAKE_
 WAKE_WINDOW = timedelta(hours=1)  # the rolling window the wake budget counts charged wakes in
 WAKES_KEEP = 50  # wake decisions a record keeps (`wakes`): what step 5 measures
 
-# RPCs that act on a session (design §4.8): a caller that is a session needs the `orchestrate`
+# RPCs that act on a session (design §4.8): a caller that is a session needs the `control`
 # grant to run one of these on a session other than itself (§9 invariant 11). `create` targets a
 # session that is by definition not the caller; `set_grants` is gated so a session cannot grant
 # itself. Reads are never listed here, and neither is `msg`: messaging is not acting (§4.10).
@@ -55,7 +55,7 @@ def is_person(caller: Any) -> bool:
 
 def act_gate(records: Mapping[str, Session], caller: Any, method: str, params: Mapping[str, Any]) -> str | None:
     """Design §4.8, §9 invariant 11: an acting RPC from a session onto a *different* session
-    needs the `orchestrate` grant on the caller's record **and** the caller in the target's
+    needs the `control` grant on the caller's record **and** the caller in the target's
     `controllers` (TD-036). Both halves are read from the records here, on every call, so a
     revoke or a membership edit takes effect on the session's next call and neither is cached.
     No caller (a person's terminal, the UI) passes; a session acting on itself passes, except
@@ -73,13 +73,17 @@ def act_gate(records: Mapping[str, Session], caller: Any, method: str, params: M
     if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller:
         return None
     me = records.get(str(caller))
-    if me is None or "orchestrate" not in me.capabilities:
+    if me is None or not has_control(me.capabilities):
         target = "a new session" if method == "create" else params.get("id", "?")
-        return f"{caller} cannot {method} {target}: needs the orchestrate grant (design §4.8)"
+        return f"{caller} cannot {method} {target}: needs the control grant (design §4.8)"
     if method == "create":
         # No target to be a member of yet. What create is gated on instead is attenuation: the
         # child's grants must be a subset of the creator's (design §4.8, capability attenuation).
-        excess = [g for g in (params.get("capabilities") or []) if g in GRANTS and g not in me.capabilities]
+        excess = [
+            g
+            for g in canonical_grants(list(params.get("capabilities") or []))
+            if g in GRANTS and g not in canonical_grants(me.capabilities)
+        ]
         if excess:
             return (
                 f"{caller} cannot create a session holding {', '.join(excess)}: "

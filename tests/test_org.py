@@ -40,7 +40,7 @@ ORG = {
         "guardians-ui": {
             "projects": ["guardians"],
             "lead": {"role": "person"},
-            "members": [{"role": "grinder", "home": "guardians", "unattended": False, "grants": ["orchestrate"]}],
+            "members": [{"role": "grinder", "home": "guardians", "unattended": False, "grants": ["control"]}],
         },
     },
     "roles": {"grinder": {"profile": "grind"}},
@@ -89,7 +89,7 @@ def test_every_default_of_section_4_9(tmp_path):
     assert g.members[1] == org.MemberDef(team="guardians-ui")
     ui = o.teams["guardians-ui"]
     assert ui.lead.role == "person" and ui.lead.home == ""  # no lead session, so no home to require
-    assert ui.members[0].unattended is False and ui.members[0].grants == ["orchestrate"]
+    assert ui.members[0].unattended is False and ui.members[0].grants == ["control"]
     assert o.team_repos(g) == ["guardians", "guardians-api"]
 
 

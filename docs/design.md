@@ -753,19 +753,19 @@ noted). If a control is not in this table it does not exist.
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
 | New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `lead`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule — landed 2026-09-13, TD-040 step a: the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked since 2026-09-14 (the row below), so nothing it grants applies unseen |
-| New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `orchestrate`). Unchecked by default for every preset but `lead`; shown with a one-line warning of what the grant allows — landed 2026-09-14 (TD-028 step 5): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and **what is ticked is what the session starts with**, so an untick on a `lead` preset means the session does not get the grant |
+| New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `control`). Unchecked by default for every preset but `lead`; shown with a one-line warning of what the grant allows — landed 2026-09-14 (TD-028 step 5): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and **what is ticked is what the session starts with**, so an untick on a `lead` preset means the session does not get the grant |
 | card | **report line** | shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, a lead's `last round 20:10 · 2 wrapped up`; an entry the host agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed` (landed 2026-09-12) |
 | Focus side panel | **Reports** | the full `progress` and `findings` lists: each reference with its status, PR or priority, time, and declared / derived; **Drop** on a claimed progress item (host-agent RPC, recorded as dropped by the person — a *declaration*, so the tick cannot undo it) (landed 2026-09-12) |
 | Focus header | **grants** chip | lists the session's `capabilities`; click to revoke or grant (agent RPC; takes effect on the next call the session makes), each with what the grant allows on its confirm (landed 2026-09-12) |
 | Focus header | **controllers** chip | the sessions that may act on this one (§4.8): each controller by name, clicking it removes it; **+** asks for a session id or name and adds it (the `set_controllers` RPC — a person always may, a session only if it already controls this one; the host agent refuses, the chip only asks). A controller whose session is gone is shown dim, not dropped. Empty reads *no controller — nobody may act on this session*, which is the default, not a warning — landed 2026-09-13, TD-036 step 3 |
-| card | **under `<orc>`** chip | the session's `controllers` when it has any — the controlling session's name, click to focus it; several are listed. Nothing is shown when the list is empty, which is the common case for a person's own session — landed 2026-09-13, TD-036 step 3 |
-| Focus (lead) | **Members** list | for a session holding `orchestrate`: every session whose `controllers` name it, with state, lane and report line — the lead's central view. Derived from the records on each tick, never cached (§4.8) — landed 2026-09-13, TD-036 step 3 |
+| card | **under `<controller>`** chip | the session's `controllers` when it has any — the controlling session's name, click to focus it; several are listed. Nothing is shown when the list is empty, which is the common case for a person's own session — landed 2026-09-13, TD-036 step 3 |
+| Focus (lead) | **Members** list | for a session holding `control`: every session whose `controllers` name it, with state, lane and report line — the lead's central view. Derived from the records on each tick, never cached (§4.8) — landed 2026-09-13, TD-036 step 3 |
 | Focus side panel | **Inbox** | the session's mailbox (§4.10): each entry with its sender, kind, time, `about` reference and whether it is read; an `ask` shows its bound and the `reply` that answered it. A person may **reply** to any entry as themselves, and may delete one. Sits beside **Reports**, which it deliberately is not: Reports are what this session declared about its work, the Inbox is what others addressed to it — design 2026-09-14, TD-052; built 2026-09-16, PR #165: the panel fetches bodies through `inbox` as a person's read and refetches when the pushed record's `unread` or `mail` marks change, and delete is the `inbox_delete` RPC, a person's only, removing this session's copy and no other |
 | card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, which is the common case. A person's own session shows it too when the graph reaches it (§4.10); mail meant for the person goes to the top bar's **person inbox**, not here — design 2026-09-14, TD-052; built 2026-09-16, PR #165 |
 | Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (host agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a send, and the sender reads it when it next looks (§4.10) — design 2026-09-14, TD-052; built 2026-09-16, PR #165 (no Reply on an entry the person sent: a person does not answer themselves — the session's answer to it lands in the top bar's person inbox, where the person replies) |
 | card `more ▾`, Focus header | **Message** | opens a composer that sends a `note` or `ask` from the person into this session's inbox (host agent RPC, ungated for a person; `from` is the person). Mail, not a send: it lands, may wake the session within its budget as any person's act does, and refills that budget (§4.10). Beside **Send**, which types into the pane and is the act of control — design 2026-09-16 (fourth Fable review), TD-052; built 2026-09-16, PR #165, as one dialog shared with Reply, an `ask` taking the default bound |
 | Org top bar | **person inbox** | the org's person inbox (§4.10): unread count, click to open; each entry with its sender session, kind, time and `about`, with **Reply** into the sender's inbox and delete. Sessions reach it with `ao msg person`, ungated. Rings nothing; the count is polled from the `inbox` RPC, since the pushed stream carries session records and the person inbox belongs to none — design 2026-09-16 (Fable review), TD-052; built 2026-09-16, PR #168 |
-| New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `orchestrate` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
+| New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `control` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
 | New session | **Where**: this directory / new worktree | for a git repo, the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the host agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
@@ -933,10 +933,10 @@ with `{lane}` filled, the lane's default, its grants, its `profile` unless `-p` 
 session's directory (a configured name that is not running is skipped with one line naming it
 and the file, never an error; an explicit `--controller` that does not resolve is); `--lane free-pick` for
 scan-and-choose; `ao roles` lists what the repo and the package define, marking each role's
-source; `--grant orchestrate` adds a grant a preset lacks, and works without a preset. `ao grant <id> orchestrate` / `ao revoke <id> orchestrate` edit a
+source; `--grant control` adds a grant a preset lacks, and works without a preset. `ao grant <id> control` / `ao revoke <id> control` edit a
 running session's grants (the `set_grants` RPC; `ao status -v` and `--json` show
 `capabilities`). The membership surface beside them (landed 2026-09-13, TD-036 step 2):
-`ao control <orc> add|remove <session>…` edits membership from the lead's side — which is
+`ao control <controller> add|remove <session>…` edits membership from the lead's side — which is
 how a person thinks about it, *this lead controls these sessions*, while the list itself lives on
 each target — one `set_controllers` call per target, so a refusal names the session it refused and
 the rest still stand. `ao new --controller <id>…` sets it at create, and `ao new` prints one line
@@ -1044,10 +1044,12 @@ the repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are referen
 **Grants** — gated, recorded in `capabilities` on the session, checked by the host agent on every
 acting RPC. One exists today:
 
-- `orchestrate`: the session may act on *other* sessions — `send`, `keys`, wrap-up, `kill`,
+- `control` (named `orchestrate` until 2026-09-17, TD-055 step 3; the old name is read for one
+  release — on a stored record, which is rewritten on load, in a request, and in a role's or
+  team's `grants:`, each saying so once — and never written): the session may act on *other* sessions — `send`, `keys`, wrap-up, `kill`,
   `close`, `mode`, `new`, `remove`, and `set_grants` (gated on every target, so a session cannot
   grant itself). Without it, an acting RPC whose caller is a session and
-  whose target is a different session is refused with "needs the orchestrate grant"; reads
+  whose target is a different session is refused with "needs the control grant"; reads
   (`status`, `tail`, `explain`) are never gated. The caller is known from the session id the CLI
   sends (§4.7); an RPC with no caller is a person at a terminal or the UI, and is allowed as
   today; a caller id the host agent has no record of is a session too, holding no grant. The host agent
@@ -1077,7 +1079,7 @@ lead controls.** The prior-art survey behind the rules below is
   restart, and it dies when the record is forgotten. The lead's own member view is *derived* from the records — its Focus
   lists its members with their states, which is the central view a person reads — and must never
   become a cache of them.
-- **The gate.** An acting RPC from session A onto session B passes only if A holds `orchestrate`
+- **The gate.** An acting RPC from session A onto session B passes only if A holds `control`
   **and** A's id is in B's `controllers` (§9 invariant 11). Both are read from the records on
   every call, as the grant already is, so a revoke or a membership edit takes effect on the
   session's next call and nothing caches either. An empty list means **nobody may act on this
@@ -1107,7 +1109,7 @@ lead controls.** The prior-art survey behind the rules below is
 
 **The timer stays.** Silence is not an event: a worker sitting at an empty prompt after a `/compact` emits nothing, and no wake fires. The fallback interval is for exactly what no record delta can see — a PR merged from a worker's branch, a new `docs/cadence-changes.md` entry, a dropped subscription after an agent restart, and a session that has gone quiet when it should not have. Events shorten the tail on activity; they do not replace the timer's job of noticing absence.
 
-- **A director is not a special case.** It is a session holding `orchestrate` whose members
+- **A director is not a special case.** It is a session holding `control` whose members
   happen to be leads; nothing in the core treats it differently. What it adds is restart,
   and restart needs two rules the design did not have. A restart is **`one_for_one`** — only the
   session that exited, never its siblings — and it is **bounded: at most 3 restarts of one session
@@ -1130,9 +1132,9 @@ lead controls.** The prior-art survey behind the rules below is
   in the repo — and when none remain the no-controller line prints as usual, while an explicit
   `--controller` naming an unknown session still errors, since the person typed it; the New
   session picker is ticked from the same rule).
-- **Surface.** `ao new --controller <id>…`; `ao control <orc> add|remove <session>…`;
+- **Surface.** `ao new --controller <id>…`; `ao control <controller> add|remove <session>…`;
   `ao status -v` shows both directions (a session's controllers, a lead's members); the
-  worker card carries an *under `<orc>`* chip; the lead's Focus lists its members; New
+  worker card carries an *under `<controller>`* chip; the lead's Focus lists its members; New
   session has a controller picker (§4.5a).
 - **What this is not.** As with the grant, a guard against a confused worker, not a security
   boundary: the socket is local and the caller id is an environment variable. What it closes is
@@ -1188,7 +1190,7 @@ deliberately not warned about: briefs cite dated ADRs and state what was true on
 |---|---|---|---|---|
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
-| `lead` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `orchestrate` | `progress` per round: sessions acted on and what was done |
+| `lead` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
 | `plain` | — (no template) | — | none | whatever it declares |
 
 The lead preset was called `orchestrator` until 2026-09-17 (TD-055 step 2, `docs/glossary.md`).
@@ -1311,7 +1313,7 @@ because the badge is a plain string nothing keys on).
 profile resolves, and every session name is free under §4.1's rule — a live holder refuses the
 whole start and names it, so there is never half a team; exited or closed holders are
 superseded as §4.1 says, which makes `ao team start` after a night's exit the restart too. Then
-it creates the lead (its grants, profile and mode — the role's `orchestrate`, the host's
+it creates the lead (its grants, profile and mode — the role's `control`, the host's
 profile and unattended, unless the definition overrides any of them — in a
 worktree), and each member with `controllers: [lead id]`, its role, lane, brief
 (the role's template with `{lane}` filled, the Project block in front, a `brief:` override
@@ -1509,7 +1511,7 @@ two leads are peers, so TD-036's gate refuses them each other; two workers coord
 branch name, a PR that already claims the reference.
 
 **The cause is a conflation, not four missing features.** The `control` grant (named `orchestrate`
-until TD-055 renames it) plus `controllers`
+until TD-055 step 3) plus `controllers`
 answers *may A act on B?*, where acting means kill, close, `mode`, `set_controllers`, `send`.
 Messaging was folded into that because keystrokes were the only delivery there was — and typing
 into a session's pane genuinely *is* an act of control, so the gate was right about the mechanism
@@ -2071,7 +2073,7 @@ unattended:
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}   # profile: §4.9
   hunter: {brief: docs/briefs/hunter.md}
-  lead: {brief: docs/briefs/lead.md, grants: [orchestrate]}
+  lead: {brief: docs/briefs/lead.md, grants: [control]}
 controllers: [orchestrator-ao-1]      # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
@@ -2182,7 +2184,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    swap and the cron line in `infra/kmaster/crontab`).
    **Capabilities, report channels and presets** (§4.8) land at the start of this phase,
    because the migration is the first time several workers run at once and the Org has to say
-   what each is doing and keep them off each other: the caller check and the `orchestrate`
+   what each is doing and keep them off each other: the caller check and the `control`
    grant first, then `progress` / `findings` with `ao progress` / `ao finding`, the derived
    source on the tick, the card's report line and the Focus Reports panel, and last the
    presets — with a lead run as a session for a few evenings before its mechanical
@@ -2240,7 +2242,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 10. A report entry the session declared is never overwritten by one the host agent derived; a
     derived entry is shown as such, like a scraped state.
 11. A session **acts on** another session only through the host agent, only with the `control`
-    grant on its record (named `orchestrate` until TD-055), and only when the caller is in the target's `controllers` list (an
+    grant on its record (named `orchestrate` until TD-055 step 3), and only when the caller is in the target's `controllers` list (an
     empty list means nobody may act on it; the membership half is proposed 2026-09-12, §4.8,
     TD-036) — and never when the target is interactive, whatever the list says (invariant 5). Grant and membership are both read from the records on every call, so a revoke or
     a membership edit takes effect on the session's next call and neither is cached. Reads are

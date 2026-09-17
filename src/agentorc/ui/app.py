@@ -29,7 +29,7 @@ from sessionorc import hosts, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_head, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, canonical_grants, has_control, report_head, report_line, stop_note
 
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 
@@ -49,7 +49,7 @@ NO_GRANTS: list[str] = []
 UNDESCRIBED_GRANT = "⚠ this grant has no description — see design §4.8"
 
 GRANT_NOTES: dict[str, str] = {
-    "orchestrate": (
+    "control": (
         "lets this session act on other sessions — send to them, wrap them up, kill them — "
         "for the sessions that name it a controller (§4.8)"
     ),
@@ -285,7 +285,7 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         for o in (fleet or [])
         if s.get("id") in (o.get("controllers") or [])
     ]
-    d["is_orchestrator"] = "orchestrate" in (s.get("capabilities") or [])
+    d["holds_control"] = has_control(s.get("capabilities"))
     return d
 
 
@@ -310,7 +310,7 @@ def team_groups(views: list[dict[str, Any]], defined: Collection[str] = ()) -> l
     session carries a badge — the page then renders the flat grid, with no header anywhere.
 
     The badge decides the group; `controllers` decides the lead: the one member holding
-    `orchestrate` that other members of the same group list as a controller. A group without one
+    `control` that other members of the same group list as a controller. A group without one
     has no lead card and its header says so. Within a group the lead comes first, then the rest in
     urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
     per group in Pinned mode. Sessions with no badge form the *No team* group at the end.
@@ -333,7 +333,7 @@ def team_groups(views: list[dict[str, Any]], defined: Collection[str] = ()) -> l
             # The fleet, not just this group: a lead whose own badge differs is still this group's
             # lead, and saying "led by you" over a group that plainly has one would be a lie.
             leads = sorted(
-                (v for v in views if "orchestrate" in (v.get("capabilities") or []) and v["id"] in named),
+                (v for v in views if has_control(v.get("capabilities")) and v["id"] in named),
                 key=lambda v: (str(v.get("team") or "") != team, v["rank"], v["name"]),  # our own badge first
             )
             if leads:
@@ -489,11 +489,11 @@ def create_app() -> FastAPI:
         recent = repos + [d for d in await call("recent_dirs") if d not in repos]
         adapters = await call("adapters")
         # design §4.5a New session **Controllers** picker (§4.8): the candidates are the sessions
-        # holding `orchestrate` — nothing else could act on the new session anyway.
-        orchestrators = [
+        # holding `control` — nothing else could act on the new session anyway.
+        control_holders = [
             {"id": o["id"], "name": o.get("name") or o["id"]}
             for o in await call("list")
-            if "orchestrate" in (o.get("capabilities") or []) and o.get("state") not in ("closed", "exited")
+            if has_control(o.get("capabilities")) and o.get("state") not in ("closed", "exited")
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
@@ -508,7 +508,7 @@ def create_app() -> FastAPI:
                 "default_profile": default,
                 "recent": recent,
                 "adapters": adapters,
-                "orchestrators": orchestrators,
+                "control_holders": control_holders,
                 # design §4.5a New session **Grants** checkboxes: the grants a record may hold
                 # (`sessionorc.models.GRANTS`, the same list `ao new --grant` offers), each with
                 # the one-line warning the row asks for.
@@ -603,7 +603,7 @@ def create_app() -> FastAPI:
             # The Grants checkboxes were ticked from the preset when the page loaded and as the
             # Role changed (design §4.5a), so what is ticked is what was meant — including an
             # untick, which is a person deciding this session does not get the grant.
-            capabilities=[g for g in grant if g in GRANTS],
+            capabilities=[g for g in canonical_grants(grant) if g in GRANTS],
             lane=refs or (list(preset.lane) if preset else []),
             role=preset.name if preset else "",
             ledger=ledger,

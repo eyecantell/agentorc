@@ -48,7 +48,7 @@ async def test_the_message_gate_reads_the_graph_and_names_its_own_rule(agent, tm
         async with LocalClient(caller=stranger) as x:
             with pytest.raises(AgentError, match=r"design §4\.10") as e:
                 await x.call("msg", to=worker, text="hi")
-            assert "invariant 11" not in str(e.value) and "orchestrate" not in str(e.value)
+            assert "invariant 11" not in str(e.value) and "control grant" not in str(e.value)
             with pytest.raises(AgentError, match="cannot message itself"):
                 await x.call("msg", to=stranger, text="note to self")
         # the team badge is the one sideways edge that keys on `team`
@@ -95,7 +95,7 @@ async def test_a_message_reaches_an_interactive_session_and_an_act_does_not(agen
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         orc = await mk("orc", unattended=True)
-        await person.call("set_grants", id=orc, add=["orchestrate"])
+        await person.call("set_grants", id=orc, add=["control"])
         mine = await mk("mine")  # interactive by default: the person's own
         await person.call("set_controllers", id=mine, add=[orc])
         async with LocalClient(caller=orc) as o:
@@ -276,7 +276,7 @@ async def test_sends_are_recorded_with_who_typed_and_a_conflict_cites_them(agent
         mk = _mk(person, tmp_path)
         lead, lead2, worker = [await mk(n, unattended=True) for n in ("lead", "lead2", "w")]
         for sid in (lead, lead2):
-            await person.call("set_grants", id=sid, add=["orchestrate"])
+            await person.call("set_grants", id=sid, add=["control"])
         await person.call("set_controllers", id=worker, add=[lead, lead2])
         await wait_state(person, worker, "idle")
         async with LocalClient(caller=lead) as ld, LocalClient(caller=lead2) as l2:
@@ -351,7 +351,7 @@ async def test_resume_carries_mail_forward_and_the_old_id_forwards(agent, hookst
         ]
         await person.call("hook", session=w, adapter_id="conv-9", state="idle")
         await person.call("set_controllers", id=w, add=[lead])
-        await person.call("set_grants", id=lead, add=["orchestrate"])
+        await person.call("set_grants", id=lead, add=["control"])
         async with LocalClient(caller=lead) as ld, LocalClient(caller=w) as worker:
             await ld.call("send", id=w, text="echo hi")
             ask = (await ld.call("msg", to=w, text="branch?", kind="ask"))["entry"]

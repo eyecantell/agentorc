@@ -22,7 +22,7 @@ from sessionorc import hosts, naming
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note
+from sessionorc.models import GRANT_ALIASES, GRANTS, STATE_RANK, report_line, stop_note
 from sessionorc.tmux import attach_argv
 
 
@@ -280,7 +280,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "profile": args.profile or role.profile or "",
         "prompt": prompt,
-        "capabilities": list(dict.fromkeys([*role.grants, *(args.grant or [])])),
+        "capabilities": list(dict.fromkeys([*role.grants, *grant_names(args.grant or [])])),
         "controllers": ids,
         "lane": lane,
         "role": role.name,
@@ -356,8 +356,8 @@ def cmd_new(args: argparse.Namespace) -> int:
     if not s.get("controllers") and not args.json:
         # Design §4.8: an empty list is the explicit default, not an error — but an unattended
         # worker nobody may act on is rarely what was meant, so `ao new` says so once, here,
-        # rather than leaving it to be discovered when a nudge is refused.
-        print(f"{s['id']} starts with no controller: nobody may act on it (ao control <orc> add {s['name']})")
+        # rather than leaving it to be discovered when a send is refused.
+        print(f"{s['id']} starts with no controller: nobody may act on it (ao control <controller> add {s['name']})")
     if s.get("previous_run") and not args.json:
         # the same note the New session form shows before Start (design §4.1, TD-030)
         print(f"replaces the earlier {s['name']} — run log kept: {s['previous_run']}")
@@ -657,10 +657,22 @@ def cmd_mode(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: {'unattended' if s['unattended'] else 'interactive'}"))
 
 
+def grant_names(names: list[str]) -> list[str]:
+    """Grants as typed, with a renamed one under its current name and one stderr line saying so
+    (TD-055: `orchestrate` is `control`, accepted for one release)."""
+    for old in dict.fromkeys(n for n in names if n in GRANT_ALIASES):
+        print(
+            f"grant `{old}` is now `{GRANT_ALIASES[old]}` (TD-055); `{old}` is still accepted for one release",
+            file=sys.stderr,
+        )
+    return list(dict.fromkeys(GRANT_ALIASES.get(n, n) for n in names))
+
+
 def cmd_grants(args: argparse.Namespace) -> int:
-    """`ao grant <id> orchestrate` / `ao revoke <id> orchestrate` (design §4.8): edit the record's
-    `capabilities`; the agent applies it on the session's next call."""
-    edit = {"add": args.grants} if args.cmd == "grant" else {"remove": args.grants}
+    """`ao grant <id> control` / `ao revoke <id> control` (design §4.8): edit the record's
+    `capabilities`; the host agent applies it on the session's next call."""
+    grants = grant_names(args.grants)
+    edit = {"add": grants} if args.cmd == "grant" else {"remove": grants}
     s = call_sync("set_grants", id=args.id, **edit)
     return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
 
@@ -675,11 +687,11 @@ def cmd_until(args: argparse.Namespace) -> int:
 
 
 def cmd_control(args: argparse.Namespace) -> int:
-    """`ao control <orc> add|remove <session>…` (design §4.8, TD-036): edit membership from the
-    orchestrator's side, which is how a person thinks about it — *this orc controls these
+    """`ao control <controller> add|remove <session>…` (design §4.8, TD-036): edit membership from
+    the controller's side, which is how a person thinks about it — *this lead controls these
     sessions* — while the list itself lives on each target. One `set_controllers` call per target,
     so a refusal names the session it refused and the rest still stand."""
-    orc = resolve(args.orc)
+    orc = resolve(args.controller)
     edit = "add" if args.action == "add" else "remove"
     done, refused = [], []
     for ident in args.sessions:
@@ -945,8 +957,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--grant",
         action="append",
-        choices=GRANTS,
-        help="a grant the session starts with (design §4.8); `orchestrate` lets it act on other sessions",
+        choices=[*GRANTS, *GRANT_ALIASES],
+        help="a grant the session starts with (design §4.8); `control` lets it act on other sessions",
     )
     p.add_argument(
         "--controller",
@@ -1084,16 +1096,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_until)
 
     for name, help_ in (
-        ("grant", "give a session a grant: `orchestrate` lets it act on other sessions (design §4.8)"),
+        ("grant", "give a session a grant: `control` lets it act on other sessions (design §4.8)"),
         ("revoke", "take a grant away from a session"),
     ):
         p = add(name, help=help_)
         p.add_argument("id")
-        p.add_argument("grants", nargs="+", choices=GRANTS, metavar="grant")
+        p.add_argument("grants", nargs="+", choices=[*GRANTS, *GRANT_ALIASES], metavar="grant")
         p.set_defaults(fn=cmd_grants)
 
-    p = add("control", help="say which sessions an orchestrator may act on (design §4.8)")
-    p.add_argument("orc", help="the orchestrating session (id or name)")
+    p = add("control", help="say which sessions a controller (a lead) may act on (design §4.8)")
+    p.add_argument("controller", help="the controlling session, usually a lead (id or name)")
     p.add_argument("action", choices=["add", "remove"])
     p.add_argument("sessions", nargs="+", metavar="session", help="the sessions it controls (id or name)")
     p.set_defaults(fn=cmd_control)

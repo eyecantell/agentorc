@@ -23,7 +23,7 @@
     <div class="row"><span class="meta strong">{{ s.place }}</span><span class="grow"></span><span class="meta age" data-since="{{ s.since }}">{{ s.age }}</span></div>
     <div class="row"><span class="meta strong">{{ s.where }}</span><span class="grow"></span>{% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}</div>
     <div class="meta">{{ s.profile_line }}</div>
-    {# design §4.5a card **under `<orc>`** chip (§4.8, TD-036): who may act on this session. Shown
+    {# design §4.5a card **under `<controller>`** chip (§4.8, TD-036): who may act on this session. Shown
        only when the list is non-empty — a person's own session has none, which is the common case
        and not worth a line. A controller whose session is gone keeps its entry, shown dim. #}
     {% if s.under %}<div class="row"><span class="meta">under

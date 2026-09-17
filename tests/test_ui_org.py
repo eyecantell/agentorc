@@ -36,10 +36,10 @@ def test_no_badge_anywhere_is_the_flat_grid():
 
 def test_two_teams_each_with_a_lead():
     views = [
-        sess("ao-orc", "orchestrator-ao-1", team="ao-grind", project="agentorc", caps=["orchestrate"]),
+        sess("ao-orc", "orchestrator-ao-1", team="ao-grind", project="agentorc", caps=["control"]),
         sess("ao-g1", "tdgrind-ao-1", team="ao-grind", project="agentorc", controllers=["ao-orc"], state="working"),
         sess("ao-g2", "tdgrind-ao-2", team="ao-grind", project="agentorc", controllers=["ao-orc"], state="needs-you"),
-        sess("gu-orc", "orchestrator-gu", team="guardians", project="guardians", caps=["orchestrate"]),
+        sess("gu-orc", "orchestrator-gu", team="guardians", project="guardians", caps=["control"]),
         sess("gu-1", "api-grinder", team="guardians", project="guardians-api", controllers=["gu-orc"]),
     ]
     groups = team_groups(views)
@@ -56,8 +56,8 @@ def test_a_team_with_no_lead_and_the_needs_you_count():
         sess("ao-a", "a", team="solo", state="needs-you"),
         sess("ao-b", "b", team="solo", state="needs-you"),
         sess("ao-c", "c", team="solo", state="exited"),
-        # holds `orchestrate` but nobody lists it as a controller: not this group's lead
-        sess("ao-d", "d", team="solo", caps=["orchestrate"]),
+        # holds `control` but nobody lists it as a controller: not this group's lead
+        sess("ao-d", "d", team="solo", caps=["control"]),
     ]
     (g,) = team_groups(views)
     assert g["lead"] is None  # the header says "led by you"
@@ -66,7 +66,7 @@ def test_a_team_with_no_lead_and_the_needs_you_count():
 
 
 def test_unbadged_sessions_form_the_no_team_group_last():
-    views = [sess("ao-x", "x"), sess("ao-orc", "orc", team="t", caps=["orchestrate"])]
+    views = [sess("ao-x", "x"), sess("ao-orc", "orc", team="t", caps=["control"])]
     groups = team_groups(views)
     assert [g["label"] for g in groups] == ["t", "No team"]
     assert groups[-1]["team"] == "" and groups[-1]["lead"] is None
@@ -97,7 +97,7 @@ def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
             "kind": "agent",
             "team": "ao-grind",
             "project": "agentorc",
-            "capabilities": ["orchestrate"],
+            "capabilities": ["control"],
         },
         {
             "id": "ao-g1",
@@ -136,7 +136,7 @@ def test_a_lead_whose_own_badge_differs_is_still_found_but_keeps_its_card():
     """`ao team start` gives the lead its team's badge, but a hand-typed `ao new --team` need not —
     and a group whose members plainly name a controller must not claim it is led by the person.
     The lead is found across the fleet; its card stays under its own badge (review of PR #117)."""
-    orc = sess("o", "orc", team="other", caps=["orchestrate"])
+    orc = sess("o", "orc", team="other", caps=["control"])
     w1 = sess("w1", "w1", team="t", controllers=["o"])
     w2 = sess("w2", "w2", team="t", controllers=["o"])
     groups = {g["team"]: g for g in team_groups([orc, w1, w2])}

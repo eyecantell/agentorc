@@ -82,8 +82,8 @@ not mix:
 - **grant** — a capability on a session record (the field is `capabilities`; prose says
   *grant*). **`control`** is the one that lets a session act on its members, so one word names the
   whole authority mechanism: the `control` grant, the `controllers` list, `ao control`. *Not:*
-  `orchestrate`, accepted as an alias for one release. — **decided** 2026-09-16 (Paul); rename is
-  TD-055.
+  `orchestrate`, accepted as an alias for one release. — **decided** 2026-09-16 (Paul); renamed 2026-09-17
+  (TD-055 step 3).
 - **home** — the one checkout an agent lives in; **reach** — other repos a project lets it read or
   change without moving it. *reach* means only that: a lead's members are its *members*, not its
   reach. — *proposed*.

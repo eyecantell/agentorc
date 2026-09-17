@@ -46,6 +46,7 @@ from sessionorc.models import (
     Session,
     State,
     Tally,
+    canonical_grants,
     normalize_ref,
     now_iso,
 )
@@ -136,6 +137,9 @@ class HostAgent:
                 self.store.save(s)
             if not s.host:  # a record written before TD-057 step 1: it ran here, so it is this host's
                 s.host = self.host
+                self.store.save(s)
+            if renamed := getattr(s, "renamed_grants", None):  # TD-055: read for one release, written new
+                log.warning("%s: grant %s is now `control` (TD-055); the record is rewritten", s.id, ", ".join(renamed))
                 self.store.save(s)
         # (sender, client nonce) → the verdict its first send got (design §4.4a "Delivery and
         # time"): a retry after a reconnect never lands twice and is not an identical repeat —
@@ -366,7 +370,7 @@ class HostAgent:
         came from and then *retired* if that branch never grew a PR (TD-045): nothing else could
         ever remove one — the re-check above works by PR number, the upsert has no delete branch,
         and invariant 10 only replaces a derived entry when the session declares the same reference
-        — and a permanent false `claimed` is exactly what the idle-with-open-work nudge fires on."""
+        — and a permanent false `claimed` is exactly what the idle-with-open-work send fires on."""
         holders = reports.holds_directory(self.sessions.values())
         due: list[tuple[Session, str | None, list[tuple[str, int]], list[tuple[str, str | None]]]] = []
         for s in self.sessions.values():
@@ -1258,7 +1262,7 @@ class HostAgent:
     async def rpc_set_controllers(
         self, id: str, add: list[str] | None = None, remove: list[str] | None = None
     ) -> dict[str, Any]:
-        """`ao control <orc> add|remove <session>`, the Focus controllers chip (design §4.8,
+        """`ao control <controller> add|remove <session>`, the Focus controllers chip (design §4.8,
         TD-036): edit which sessions may act on this one. Gated on the *target* like `set_grants`,
         so a person always may and a session only if it already controls it — control is handed
         on, never seized; and never at all from a session onto an interactive target (§9
@@ -2241,7 +2245,9 @@ def _source(source: str) -> str:
 
 
 def _grants(names: list[str]) -> list[str]:
-    """Validate a list of grant names against `GRANTS`, in canonical order."""
+    """Validate a list of grant names against `GRANTS`, in canonical order. A renamed grant's old
+    name is accepted as the new one for a release (`GRANT_ALIASES`, TD-055)."""
+    names = canonical_grants(list(names))
     bad = [n for n in names if n not in GRANTS]
     if bad:
         raise RpcError(f"unknown grant {', '.join(map(str, bad))}; grants are: {', '.join(GRANTS)}")

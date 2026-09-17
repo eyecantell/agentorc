@@ -1,7 +1,7 @@
 # TD-036 step 6: attaching orchestrator-ao-1 to the sessions it already leads
 
 **Run this in the same sitting as the host agent upgrade, not after it.** Until it is done, the
-lead holds the `orchestrate` grant and can act on nothing: every send it makes is
+lead holds the `control` grant and can act on nothing: every send it makes is
 refused with `not in its controllers`, and its own log is the only place that says why.
 
 ## Why it is needed
@@ -17,7 +17,7 @@ into a world where the grant was the whole gate, and none of them names the lead
 
 | session | state | grant | controllers |
 |---|---|---|---|
-| `ao-agentorc-orchestrator-ao-1` | idle | `orchestrate` | — |
+| `ao-agentorc-orchestrator-ao-1` | idle | `control` | — |
 | `ao-agentorc-tdgrind-ao-1` | idle | — | — |
 | `ao-samscrape-tdgrind-1` | idle | — | — |
 | `ao-samscrape-tdgrind-2` | idle | — | — |
@@ -74,5 +74,5 @@ name has been reused (§4.1).
 - Do not attach a session to two leads today. It is allowed by design and is the reason
   the list is flat, but what two controllers do when they disagree is an open question (TD-039),
   and the first time it happens should not be unattended overnight.
-- Do not grant `orchestrate` to anything else while doing this. The grant is still the one
+- Do not grant `control` to anything else while doing this. The grant is still the one
   revocable kill switch; membership narrows it, it does not replace it.
