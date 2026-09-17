@@ -542,7 +542,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Priority:** Medium
 **Added:** 2026-09-17 (anchor session, watching the samscrape team)
 
-**Status:** Open — seen twice on 2026-09-17, an hour apart, from the same sender to the same lead; answered by hand both times. It recurs on every such message. Nothing built; the policy is Paul's to choose.
+**Status:** Open — seen twice on 2026-09-17, an hour apart, from the same sender to the same lead; answered by hand both times. It recurs on every such message. Nothing built; the policy is Paul's to choose. **Two more facets, seen on the fourth and fifth messages (2026-09-17 ~23:00 MDT):** (a) once the dialog is answered the message is only *queued* — a lead blocked in its round's `ao wait` reads it when that call returns, up to nine minutes later, where `ao msg` wakes the same lead within a second; the sender, seeing no reaction, resent, and the resend was held in turn (*my previous confirmation expired unapproved*). (b) the card keeps reading `needs-you` after the dialog is gone, for minutes, because nothing tells the host agent the question was answered until the session's next hook event — and a lead inside one long Bash call fires none.
 
 **Location:** `src/agentorc/adapters/claude_code/` (the settings layer a launch writes), design §4.10 (the mediation property), §4.2 (what `needs-you` means for an unattended session), ADR `docs/decisions/2026-09-16-agent-messaging-prior-art.md`
 
