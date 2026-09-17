@@ -36,6 +36,24 @@ passes there. The one-agent-per-directory anchor rule (design §9 invariant 2) i
 this repo's cadence enforces on its own checkout (below), and it applies to the sessions
 agentorc creates.
 
+## The live copy is promoted, not edited (TD-062, 2026-09-17)
+
+The systemd units and every session's `ao` run a **non-editable** install in
+`~/.local/share/agentorc-venv`, so a merge, or a branch checked out here, changes nothing that is
+running. Until 2026-09-17 the install was editable: one merged RPC change broke `ao progress` for
+every worker for 31 minutes, and any branch checked out in this checkout was live at once.
+**The anchor session promotes**: after a merge that should be live, with `main` clean and current —
+
+```bash
+V=~/.local/share/agentorc-venv/bin
+$V/pip install --upgrade --force-reinstall --no-deps '/home/kmaster/agentorc[ui]' && $V/ao service install
+```
+
+— which replaces client and host agent together and restarts both units (sessions live in tmux and
+survive it). Never promote from a feature branch; a lead or a worker never promotes. Still read
+from the checkout at team start, so still exposed to the branch checked out here: a team's
+`brief:` files under `docs/briefs/`.
+
 ## Session Hygiene — Never Strand Work
 
 Work that exists only in a session's conversation is lost when the session closes. Two rules,
