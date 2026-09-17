@@ -18,6 +18,9 @@
   </div>
   <div class="grow"></div>
   <span class="mono dim" id="usagechip" title="usage per profile: 5-hour window · weekly window (TD-001)">{% for prof, u in (usage or {}).items() %}<span data-profile="{{ prof }}">{{ prof }} {{ u.five_hour_pct }}%·{{ u.weekly_pct }}%</span> {% endfor %}</span>
+  {# design §4.5a Org top bar **person inbox** (§4.10): mail sessions sent with `ao msg person`.
+     The count shows only above zero; opening it reads as a person, which marks nothing and rings nothing. #}
+  <button class="btn light" type="button" id="personinbox" title="the person inbox: mail sessions sent you with ao msg person">✉ Inbox<span class="badge unread{% if not person_unread %} hidden{% endif %}" id="personunread">{{ person_unread or '' }}</span></button>
   <span class="mono dim" id="hostchip">{{ host }} <span id="hostdot">●</span></span>
   <button class="btn ghost light" id="theme" title="dark / light">◐</button>
   <form method="post" action="/shell" class="inline" id="shellform">
@@ -45,6 +48,13 @@
       <button class="btn primary" value="send" id="mailsend">✉ Mail it</button>
     </div>
   </form>
+</dialog>
+<dialog id="personbox" class="card pad maildlg inbox">
+  <div class="col gap">{# no form: its Reply and Delete buttons must not submit-close the dialog #}
+    <div class="row gap"><span class="h2">Person inbox</span><span class="meta" id="personcount"></span><span class="grow"></span><button class="btn ghost" type="button" id="personclose">Close</button></div>
+    <div id="personlist"><div class="note">Loading…</div></div>
+    <div class="note">Mail sessions sent you with <code>ao msg person</code>. Reading it here marks nothing and rings nothing. Reply goes to the sender's inbox; delete removes it from here only — the sender keeps its copy. Anything with a date on it belongs on the board.</div>
+  </div>
 </dialog>
 {% block body %}{% endblock %}
 <script src="/static/app.js"></script>

@@ -58,6 +58,8 @@ class Fleet:
             }
             self.sessions.append(rec)
             return rec
+        if method == "inbox":  # the Org top bar's person inbox count (design §4.5a)
+            return {"id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0}
         if method in ("send", "kill", "seen"):
             for s in self.sessions:
                 if s["id"] == params["id"]:

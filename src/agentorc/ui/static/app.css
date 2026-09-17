@@ -76,6 +76,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .badge.unread { color: var(--working-fg); background: var(--working-bg); border-color: var(--working); text-decoration: none; }
 .maildlg { width: min(560px, 92vw); color: var(--fg); } .maildlg::backdrop { background: rgba(0,0,0,.35); }
 .maildlg .row[hidden] { display: none; }
+#personinbox .badge { margin-left: 4px; } #personlist { max-height: 60vh; overflow: auto; }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }

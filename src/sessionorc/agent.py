@@ -1701,16 +1701,25 @@ class HostAgent:
             "unread": s.unread(),
         }
 
-    async def rpc_inbox_delete(self, id: str, msg: str, caller: Any = None) -> dict[str, Any]:
+    async def rpc_inbox_delete(self, msg: str, id: str | None = None, caller: Any = None) -> dict[str, Any]:
         """The Inbox panel's delete (design §4.10 lifecycle, §4.5a): a person removes one entry
         from one session's inbox — that record's copy only, so the sender's and any other
         addressee's copies stay, and a thread stays one thread on their side. Refused to every
         session, itself included: a session's inbox is read-only to it through the RPCs, and an
-        entry leaves outside its lifecycle only with its record or by a person's hand."""
+        entry leaves outside its lifecycle only with its record or by a person's hand. Naming no
+        session (or `person`) deletes from the org's person inbox — the top bar's delete — and the
+        sender's copy stays there too."""
         if not mail.is_person(caller):
             raise RpcError(
                 f"{caller} cannot delete mail: an entry is deleted only by a person, in the Inbox panel (design §4.10)"
             )
+        if not id or id == PERSON:
+            kept = [e for e in self.person_inbox if e.id != msg]
+            if len(kept) == len(self.person_inbox):
+                raise RpcError(f"the person inbox holds no entry {msg}")
+            self.person_inbox = kept
+            self.person_store.save(kept)
+            return {"id": PERSON, "deleted": msg, "unread": sum(1 for e in kept if not e.read_at)}
         s = self._get(self._addr(id))
         kept = [e for e in s.inbox if e.id != msg]
         if len(kept) == len(s.inbox):

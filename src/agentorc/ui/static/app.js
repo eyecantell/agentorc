@@ -43,7 +43,8 @@
 
   // ---- actions: every data-act button posts to /api/sessions/<id>/<act> ----
   async function act(id, action, body) {
-    const r = await fetch(`/api/sessions/${id}/${action}`, {
+    // the top bar's person inbox is no session: its Reply and delete have their own routes (§4.5a)
+    const r = await fetch(id === "person" ? `/api/person/${action}` : `/api/sessions/${id}/${action}`, {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body || {}),
     });
     if (!r.ok) { let t = r.statusText; try { t = (await r.json()).detail || t; } catch (e) {} throw new Error(t); }
@@ -135,6 +136,7 @@
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
       if (action === "unmail") AO.toast("deleted from this inbox", true);
       if (["message", "reply", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
+      if (["reply", "unmail"].includes(action) && id === "person") AO.refreshPersonInbox(true);
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
       if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
       if (action2 === "controllers") {
@@ -143,6 +145,62 @@
       }
     } catch (e) { AO.toast(`${action} failed: ${e.message}`); }
   });
+
+  // One mail entry, as the Focus Inbox panel and the top bar's person inbox both show it (design
+  // §4.5a, §4.10): sender (name, id on hover), kind, `about`, read/unread, age, an `ask`'s state,
+  // Reply and delete. `owner` is the inbox it sits in — a session id, or "person". No Reply on an
+  // entry the person sent: its answer is the session's, which lands in the person inbox.
+  AO.mailEntry = function (e, owner) {
+    const ask = e.kind === "ask" || e.kind === "conflict";
+    let st = "";
+    if (ask) {
+      st = e.closed_by ? `answered by ${esc(e.closed_by)}`
+        : e.expired_at ? "expired"
+        : (e.pending || []).length ? "addressee exited · pending"
+        : e.bound ? `open · bound ${esc(new Date(e.bound).toLocaleString())}` : "open";
+    }
+    const person = owner === "person";
+    const reply = e.from === "person" ? ""
+      : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}">Reply</button>`;
+    const confirmText = person ? "Delete this entry from the person inbox? The sender keeps its copy."
+      : "Delete this entry from this session's inbox? The sender keeps its copy.";
+    return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
+      + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
+      + (person && e.from_name && e.from_name !== e.from ? `<span class="st">${esc(e.from)}</span>` : "")
+      + `<span class="st kind">${esc(e.kind)}</span>${e.about ? `<span class="st">re ${esc(e.about)}</span>` : ""}`
+      + `<span class="grow"></span><span class="st">${e.read_at ? "read" : "unread"}</span>`
+      + `<span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
+      + (e.reply_to ? `<div class="st">reply to ${esc(e.reply_to)}</div>` : "")
+      + `<div class="body">${esc(e.text)}</div>`
+      + `<div class="row gap">${st ? `<span class="st${e.expired_at ? " expired" : ""}">${st}</span>` : ""}<span class="grow"></span>${reply}`
+      + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-confirm="${confirmText}">Delete</button></div></div>`;
+  };
+
+  // design §4.5a Org top bar **person inbox** (§4.10). No session record holds it, so nothing on
+  // the pushed stream carries its count: the top bar polls the `inbox` RPC (a person's read, which
+  // marks nothing). The list is fetched only while the panel is open.
+  AO.refreshPersonInbox = async function (list) {
+    let got;
+    try {
+      const r = await fetch("/api/person/inbox");
+      if (!r.ok) return;
+      got = await r.json();
+    } catch (e) { return; }
+    const n = got.unread || 0, es = got.entries || [];
+    const chip = $("#personunread");
+    if (chip) { chip.textContent = n ? String(n) : ""; chip.classList.toggle("hidden", !n); }
+    if (!list) return;
+    $("#personcount").textContent = es.length ? `${n} unread · ${es.length}` : "";
+    $("#personlist").innerHTML = es.length ? es.slice().reverse().map((e) => AO.mailEntry(e, "person")).join("")
+      : `<div class="note">Nothing here.</div>`;
+  };
+  if ($("#personinbox")) {
+    $("#personinbox").addEventListener("click", () => { $("#personbox").showModal(); AO.refreshPersonInbox(true); });
+    $("#personclose").addEventListener("click", () => $("#personbox").close());
+    // only the Org page renders the count server-side: every other page reads it at load
+    if (location.pathname !== "/") AO.refreshPersonInbox(false);
+    setInterval(() => AO.refreshPersonInbox($("#personbox").open), 20000);
+  }
 
   $("#theme") && $("#theme").addEventListener("click", () => {
     const cur = document.documentElement.dataset.theme;
@@ -713,27 +771,7 @@
         const es = got.entries || [];
         $("#inboxcard").classList.toggle("hidden", !es.length);
         $("#inboxcount").textContent = es.length ? `${got.unread} unread · ${es.length}` : "";
-        $("#inboxlist").innerHTML = es.slice().reverse().map((e) => {
-          const ask = e.kind === "ask" || e.kind === "conflict";
-          let st = "";
-          if (ask) {
-            st = e.closed_by ? `answered by ${esc(e.closed_by)}`
-              : e.expired_at ? "expired"
-              : (e.pending || []).length ? "addressee exited · pending"
-              : e.bound ? `open · bound ${esc(new Date(e.bound).toLocaleString())}` : "open";
-          }
-          const reply = e.from === "person" ? ""
-            : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(id)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}">Reply</button>`;
-          return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
-            + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
-            + `<span class="st kind">${esc(e.kind)}</span>${e.about ? `<span class="st">re ${esc(e.about)}</span>` : ""}`
-            + `<span class="grow"></span><span class="st">${e.read_at ? "read" : "unread"}</span>`
-            + `<span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
-            + (e.reply_to ? `<div class="st">reply to ${esc(e.reply_to)}</div>` : "")
-            + `<div class="body">${esc(e.text)}</div>`
-            + `<div class="row gap">${st ? `<span class="st${e.expired_at ? " expired" : ""}">${st}</span>` : ""}<span class="grow"></span>${reply}`
-            + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(id)}" data-msg="${esc(e.id)}" data-confirm="Delete this entry from this session's inbox? The sender keeps its copy.">Delete</button></div></div>`;
-        }).join("");
+        $("#inboxlist").innerHTML = es.slice().reverse().map((e) => AO.mailEntry(e, id)).join("");
         if (inboxFirst && location.hash === "#inbox" && es.length) $("#inboxcard").scrollIntoView({ block: "nearest" });
         inboxFirst = false;
       }, 150);

@@ -547,6 +547,32 @@ async def test_the_person_inbox_is_ungated_persisted_and_read_without_marking(ag
             await person.call("kill", id=sid)
 
 
+async def test_a_person_deletes_from_the_person_inbox_and_no_session_may(agent, tmp_path):
+    """Design §4.10 lifecycle and §4.5a's top-bar **person inbox** delete: `inbox_delete` naming no
+    session (or `person`) removes one entry from the org's person inbox, persisted; the sender's
+    own copy stays; every session is refused, the sender included."""
+    from sessionorc.agent import HostAgent
+
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w = await mk("w", unattended=True)
+        async with LocalClient(caller=w) as c:
+            one = (await c.call("msg", to="person", text="one"))["entry"]["id"]
+            two = (await c.call("msg", to="person", text="two", kind="ask"))["entry"]["id"]
+            for target in (None, "person"):
+                with pytest.raises(AgentError, match="only by a person"):
+                    await c.call("inbox_delete", msg=one, **({"id": target} if target else {}))
+        with pytest.raises(AgentError, match="person inbox holds no entry"):
+            await person.call("inbox_delete", msg="m-nope")
+        assert await person.call("inbox_delete", msg=one) == {"id": "person", "deleted": one, "unread": 1}
+        assert await person.call("inbox_delete", id="person", msg=two) == {"id": "person", "deleted": two, "unread": 0}
+        assert (await person.call("inbox"))["entries"] == []
+        assert HostAgent(tmux=agent.tmux).person_inbox == []  # persisted
+        stored = json.loads((paths.sessions_dir() / f"{w}.json").read_text())
+        assert [e["id"] for e in stored["outbox"]] == [one, two]  # the sender's copies are its own
+        await person.call("kill", id=w)
+
+
 async def test_the_person_inbox_depth_refuses_naming_the_board(agent, tmp_path, monkeypatch):
     """Design §4.10 (fourth review): the person inbox's depth fills exactly when the person is
     away, so its refusal — total or per sender — names user_attention.md with a Due: date."""
