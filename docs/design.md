@@ -704,7 +704,7 @@ decided here so both ends are written from one text.
   forwarding this to the home is not built*. Serving such a call locally the moment the link came
   up would be the split-brain this section exists to rule out.
 
-**A container node (2026-09-17, after a Fable review; TD-057 step 3).** A devcontainer that runs an
+**A container node (2026-09-17, after a Fable review; TD-057 step 3 — designed here, not yet built).** A devcontainer that runs an
 `agentorc-agent` beside a tmux server is a host (§10, 2026-09-13), and on the home's own machine it
 is a node like any other: it dials out, and nothing in it listens. Two things are settled here so
 that a container is built to them rather than around them.
@@ -723,7 +723,10 @@ that a container is built to them rather than around them.
   (TD-062) is one — and a mounted file would keep the dead inode. The home's own `agent.sock` is
   never mounted in: an unqualified caller there is a person at the home. Everything else the node
   owns — `hosts.yml`, profiles, run logs, the hook socket — lives in its own `AGENTORC_HOME` on a
-  volume, so a rebuild reconnects with its history and not with an empty snapshot.
+  volume, so a rebuild reconnects with its history and not with an empty snapshot. A worker's
+  container carries a mount of its own with no credential of the person's in it: the token it
+  needs is a scoped one in the agent's environment, and the person's own mounts belong to the
+  person's container, which is a different one.
 The terminal and the VS Code link reach a container by `docker exec` and `dev-container+` rather
 than by ssh — a `reach:` on the host entry, not yet built (§4.6) — and `docker exec` is right there
 and wrong for the link, which runs the other way.
