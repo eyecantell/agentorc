@@ -751,8 +751,7 @@ async def test_a_permission_waiting_on_a_node_is_answered_at_the_home_and_says_s
             await until(
                 home, address, lambda v: v is not None and (v.get("pending") or {}).get("tool_use_id") == "tu-2"
             )
-            monkeypatch.setattr(link, "BACKOFF_FIRST", 30.0)
-            monkeypatch.setattr(link, "BACKOFF_MAX", 30.0)
+            home.write_hosts([])  # the link stays down: the dialer's backoff was fixed when it started
             node._home_mux.close("the lid closed")
             v = await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
             assert v["last_state"] == "needs-you" and v["pending"]["host_unreachable"] is True
