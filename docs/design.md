@@ -670,8 +670,9 @@ decided here so both ends are written from one text.
   home. A second link for a host that already has one **replaces** it (the node reconnected before
   the home noticed the first had died), and the old one is closed.
 - **Where to dial.** On a node, `hosts.yml`'s `link:` — `{ssh: <target>}`, defaulting to the
-  `home:` name as an ssh alias, or `{command: [...]}`, which is run as given and is how the tests
-  dial without an sshd (and how any other transport would).
+  `home:` name as an ssh alias; `{command: [...]}`, which is run as given and is how the tests
+  dial without an sshd (and how any other transport would); or `{socket: <path>}`, a container
+  node's per-node socket at the home (*A container node*, below — not yet built).
 - **Frames.** One JSON object per line, in both directions, multiplexed: a request is
   `{"id": n, "method": m, "params": {…}}`, its reply `{"re": n, "result": …}` or
   `{"re": n, "error": "…"}`, and a frame with a method and no `id` is a notification that expects
@@ -702,6 +703,112 @@ decided here so both ends are written from one text.
   the mailbox and a session's acts on others with step 4 and 5 — and says so: *the link is up, but
   forwarding this to the home is not built*. Serving such a call locally the moment the link came
   up would be the split-brain this section exists to rule out.
+
+**A container node (2026-09-17, after two Fable reviews and Paul's steer to the long-term shape;
+TD-057 step 3c — designed here, not yet built).** A devcontainer that runs an `agentorc-agent`
+beside a tmux server is a host (§10, 2026-09-13). On the home's own machine it is a node like any
+other — it dials out, nothing in it listens, and everything above holds for it — with one
+difference that decides the rest: **the home brings it up, installs the agent in it at its own
+version, and keeps it running**, as systemd keeps the home's agent running. Nobody installs `ao`
+in a container by hand and no repo's Dockerfile carries it: a copy installed by hand drifts from
+the home's version until the link refuses it and dies with the next image rebuild, and a copy
+baked into the image couples the project's devcontainer to agentorc and rebuilds the image at
+every promote. The person's part is one entry on the home:
+
+```yaml
+nodes:
+  contractmatch:
+    container: {devcontainer: ~/contractmatch}   # the checkout whose .devcontainer defines the image
+```
+
+- **The checkout is mounted at the same absolute path inside as outside.** Git worktrees carry
+  absolute paths both ways, a team puts every member in one, and the cadence's `git worktree prune`
+  on the host would delete a worktree it cannot see from under a live session. With one path,
+  invariant 2's "identity across a mount namespace" is what `occupants()` already compares, and
+  the home *knows* the container's checkout is its own: a record on that node whose `dir` is under
+  the mounted checkout is a directory on the home, and `create` checks occupancy across both —
+  derived from the `container:` entry, never configured. What is left is the person's own tool in
+  the person's own VS Code container (another container, another pid namespace), which is theirs
+  to avoid, as a terminal on another machine is today. The container's user carries the person's
+  uid, so a file written inside is theirs outside and the home's `0600` sockets are the node's to
+  open; the repo's Dockerfile pins it (`useradd --uid 1000`).
+- **The home generates the container's definition from the repo's, and keeps the repo's mounts
+  out of it.** `ao host up <name>` reads the repo's `devcontainer.json` and writes the node's own
+  under `~/.agentorc/nodes/<name>/`: the image (`build`, `image`, `features`) kept, its relative
+  `dockerfile` and `context` re-anchored to absolute paths, since the file no longer sits beside
+  them; `remoteUser` and the lifecycle commands kept; the repo's `mounts`, `customizations` and
+  `containerEnv` **dropped**, because they are the person's — contractmatch's mount carries
+  `.netrc`, a kubeconfig and a Modal token, the person's whole credential set, which no unattended
+  worker holds — and **each dropped mount replaced by an empty tmpfs at the same target**, so a
+  lifecycle script that creates a directory under one, or tests for a file in one, runs as it
+  would beside an empty mount rather than dying on a path that is not there (contractmatch's
+  `postCreate.sh` does the first, under `set -e`); `workspaceMount` and `workspaceFolder` set to
+  the checkout's own path; agentorc's two mounts added, the link directory and the node's
+  volume; and **one feature of agentorc's own added**, a local feature written beside the generated
+  file (`features: {"./agentorc": {}}`, a `devcontainer-feature.json` and an `install.sh`, which the
+  devcontainer CLI runs as root at build), that installs tmux with whatever package manager the
+  image has — apt, apk or dnf — because tmux is what makes a host a host, and the person should not
+  edit their project's Dockerfile for agentorc's sake (Paul, 2026-09-17: the home installs the
+  client, so it installs tmux). It brings the container up with the devcontainer CLI — the
+  reference implementation VS Code itself uses, a requirement of a home that runs containers as
+  tmux is of every host — under agentorc's own id label, so it is a *second* container from the
+  project's image beside any the person's VS Code opens, never that one.
+- **The agent is installed onto the node's volume, at the home's version.** `~/.agentorc/nodes/
+  <name>/` is mounted at `/agentorc` inside, and everything of the node's lives under it, by
+  absolute path, so nothing depends on the image's `$HOME` or on what its lifecycle scripts do to
+  `~/.claude`: `/agentorc/home` is the node's `AGENTORC_HOME` — its `hosts.yml` (`local: {name}`,
+  `home:`, `link: {socket: …}`), written by the home; `profiles.yml`, the home's own entries for
+  the profiles the node's roles name, copied with each `config_dir` rewritten under
+  `/agentorc/profiles/<profile>/`, which is the `CLAUDE_CONFIG_DIR` the adapter launches with
+  (§4.2a), logged in once by hand inside and kept — one account then polls its usage endpoint
+  from two hosts, twice a minute rather than once, which is accepted; run logs, the hook socket and the store,
+  so a rebuild reconnects with its history and not with an empty snapshot the home would take as
+  the truth; the agent's own log — and `/agentorc/venv`, which the home fills with **its own
+  wheel**: the promote (TD-062) gains one step, writing the
+  wheel of what it installed to `~/.agentorc/wheels/`, and a container node is re-provisioned from
+  the newest, a `hello` refused for protocol being the cue. The image supplies Python 3.12+ — a feature cannot put an interpreter in every image the
+  same way, and the agent needs one to start — and `ao host up` refuses, naming it, when it does
+  not; tmux the generated definition brings itself (above). What a worker needs beyond that is in `~/.agentorc/nodes/<name>/env` (`0600`), read
+  into the container's environment: a fine-grained GitHub token scoped to the repo (`gh auth
+  setup-git` at provisioning makes `git push` use it), the author name and email, and whatever the
+  repo's own briefs say a worker needs — for contractmatch a Doppler service token. Never the
+  person's own.
+- **It dials a per-node link socket at the home, and is handed the socket's directory.** The home
+  binds `~/.agentorc/links/<name>/link.sock` for every `nodes:` entry, speaking only the link
+  protocol; a connection on it *is* that node, so the name comes from the home's configuration and
+  never from the node's argv — the forced command's rule, with no sshd, key or network in the
+  image. The node's `link: {socket: <path>}` opens it directly. The *directory* is bind-mounted,
+  never the file: the home unlinks and re-binds its sockets on every start — every promote is one —
+  and a mounted file would keep the dead inode. The home's own `agent.sock` is never mounted in: an
+  unqualified caller there is a person at the home.
+- **The home supervises it.** There is no systemd inside, so the home's tick, for each `container:`
+  node whose link is down, checks the container (gone: the same idempotent `up`), the agent (none
+  inside: start it), and the version (a protocol refusal: re-provision), with backoff, and the
+  card's overlay says which of the three it is doing. *Start it* is `docker exec -d -u <user>` of
+  `agentorc-agent serve` with its output to `/agentorc/home/agent.log` — detached, so it outlives
+  the exec that started it — and *none inside* is a pidfile under `/agentorc/home` whose pid is
+  not alive in the container; the generated definition sets `init: true`, so the container's
+  pid 1 reaps what exits. That is the whole of the contract systemd gives the home's own agent
+  (`Restart=on-failure`): a crash drops the link, the next tick finds no live pid and starts it
+  again, and the log says why it died. A container stopped or restarted is that host
+  rebooting: tmux and its sessions are gone, the snapshot says so, the records go `exited`.
+  `ao host rebuild <name>` rebuilds the image on purpose; `ao host forget <name>` is the removal
+  path a runtime needs that a machine did not — it removes the container, the link directory and
+  the `nodes:` entry, closes the host's records at the home as a closed session is kept, and keeps
+  `~/.agentorc/nodes/<name>/` (the run logs, invariant 3) unless told `--purge`; `volatile: true`
+  is right for one the person stops.
+- **Reach.** The terminal and the VS Code link go by `docker exec -u <user> -it <container> tmux
+  attach` and `vscode-remote://dev-container+…`, derived from the `container:` entry rather than
+  from `vscode_host` (§4.6; with the rest of the remote terminal, not yet built — until then the
+  same `docker exec` by hand). `docker exec` is right there and wrong for the link, which runs the
+  other way.
+
+For the org (§4.9): the project's repo entry names the node too — `contractmatch: {kmaster:
+~/contractmatch, contractmatch: ~/contractmatch}`, the same path twice because it is the same
+checkout — and a team definition says where its members run (`host:` on the definition, a step 4 change to
+`org.yml`'s schema and `teams.plan`), so `ao team start cm-grind` from kmaster lands the lead and the grinder in the container, and the host limits its
+briefs encode fall away. A container anywhere but the home's machine (guardians' devenv) is a
+machine to agentorc: an ssh node, provisioned by hand.
 
 **A node's records at the home (2026-09-17, TD-057 step 3b).** The first thing the link carries.
 
@@ -948,7 +1055,7 @@ dials out; nothing on the host listens.** Three transports, one agent:
 | transport | who runs the UI | how the host agent is reached | who it is for |
 |---|---|---|---|
 | `local` | you, on the same host | Unix socket | phase 1, one machine |
-| `ssh` | you, on a host you choose | the UI reaches the home host agent; every other host agent is a node that dials the home over ssh (`agentorc-agent link`, §4.4a, 2026-09-16) | phases 2+, several hosts you own |
+| `ssh` | you, on a host you choose | the UI reaches the home host agent; every other host agent is a node that dials the home over ssh (`agentorc-agent link`, §4.4a, 2026-09-16). A node in a **container on the home's own machine** dials out the same way, over a per-node link socket at the home whose directory is bind-mounted in; the home brings the container up, installs its own version in it and supervises it (§4.4a *A container node*, 2026-09-17) | phases 2+, several hosts you own |
 | `relay` | a service (yours or a hosted one) | the host agent opens an outbound connection to the relay and keeps it up; the relay authenticates the person and proxies the UI, `/events`, and the terminal websocket over it | non-technical users; the hosted product |
 
 The `relay` transport is the hosted service: `pipx install agentorc && agentorc join <token>`
@@ -1528,7 +1635,10 @@ wherever an `agentorc-agent` runs beside a tmux server — a devcontainer that r
 *is* a host, shape (b) in §10, which is phase 2's transport aimed at a container. guardians is
 not on kmaster and is not to be cloned there (Paul, 2026-09-12); its project entry names the
 devenv host, and `ao team start guardians` from kmaster waits for phase 2. Nothing in this
-section changes for that: the host column fills in.
+section changes for that: the host column fills in. A container on the *same* machine as the home
+— contractmatch's devcontainer, 2026-09-17 — is the same shape, dialling out like any node (§4.4a,
+§10), and what it waits on is TD-057 step 3c: the home bringing the container up with the checkout
+at the same absolute path inside, and a per-node link socket (§4.4a *A container node*).
 
 **Done when** `ao team start ao-grind` brings up a lead and two grinders, each in its
 own worktree, the grinders' `controllers` naming the lead, the Org page showing the
@@ -2693,6 +2803,23 @@ the block. A policy is agent code and needs no grant; a session doing the same w
       revisable): a host is wherever an `agentorc-agent` runs beside a tmux server, a devcontainer
       that runs one is a host, and a project's repo entry names it per host. guardians stays off
       kmaster and its team start waits for phase 2's transport.
+      → **Follow-up 2026-09-17** (Paul: contractmatch cannot be ground by a worker on kmaster —
+      the Flutter SDK is in its devcontainer, not on the host; *the grinder can wait*), **after two
+      Fable reviews the same day and Paul's steer to the long-term shape regardless of the work.**
+      The answer stands, and the mechanism is §4.4a *A container node*. Decided there: the first
+      container question is the **path** — the checkout is mounted at the same absolute path
+      inside, or git worktrees break across the boundary and invariant 2 has no identity to
+      compare; **the home provisions the container** — generates its definition from the repo's
+      with the person's mounts dropped, brings it up, installs its own wheel onto the node's
+      volume, supervises the agent from its tick — rather than a person installing `ao` inside or
+      the repo's Dockerfile carrying it, because a hand install drifts and dies with a rebuild and
+      a baked one couples the project's image to every promote; the link is a **per-node socket
+      at the home**, its directory bind-mounted in, and `docker exec` is backwards for the link
+      though right for the terminal; occupancy across the home and its container is **derived**
+      from the `container:` entry, never configured, and the person's own VS Code container is
+      the person's to keep clear; and a host that is a runtime has `ao host forget`. Bind-mounting
+      the home's whole `~/.agentorc` was **rejected** — its `agent.sock` makes an unqualified
+      caller a person at the home. The build list is TD-057 step 3c.
 - [ ] Phone answers for *questions*: the narrow Focus with a soft-key row (above) is the
       current answer; revisit after phase 2 if it is too fiddly to use one-handed.
 - [x] **Rename the Herd page?** (2026-09-13) → **yes, to Team.** Decided by Paul: "Herd" reads
