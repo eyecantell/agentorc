@@ -92,6 +92,23 @@ def install(*, bind: str = "127.0.0.1", port: int = 8765, home: str | None = Non
         p = UNIT_DIR / f"{name}.service"
         p.write_text(unit_text(name, bind=bind, port=port, home=home or os.environ.get("AGENTORC_HOME")))
         written.append(str(p))
+    # The wheel of what was just installed — what a container node is provisioned from (design
+    # §4.4a "A container node", TD-057 step 3c.2) — is written **before** the units restart: the
+    # restarted agent takes its nodes' `hello`s at once and names the build it would provision
+    # from the newest wheel, so a wheel written afterwards left a window in which a node could be
+    # re-provisioned from the previous build (seen live at the promote of PR #225, 2026-09-18).
+    # Never fatal to the promote, whatever it raises (a disk that refuses the directory, a `pip`
+    # that cannot start): first in line, it must not be what stops the units coming up on the new
+    # code (review of PR #227). A node then stays on the wheel the home already had.
+    from sessionorc import containers
+
+    try:
+        wheel = containers.write_wheel()
+    except Exception as e:  # noqa: BLE001
+        print(f"agentorc: the wheel could not be written ({type(e).__name__}: {e}); units go ahead", file=sys.stderr)
+        wheel = None
+    if wheel is not None:
+        written.append(str(wheel))
     _systemctl("daemon-reload")
     # Always enable (a reboot must not need a human, design §8); --no-start only defers the start.
     cp = _systemctl("enable", *(["--now"] if start else []), *[f"{u}.service" for u in UNITS])
@@ -102,13 +119,6 @@ def install(*, bind: str = "127.0.0.1", port: int = 8765, home: str | None = Non
         # re-points the units (dev venv → stable install) must restart to take effect. Safe: the
         # agent unit never takes tmux down (KillMode=process); the UI's terminals reconnect.
         _systemctl("restart", *[f"{u}.service" for u in UNITS])
-    # The promote's one more step (design §4.4a "A container node", TD-057 step 3c.2): the wheel
-    # of what was just installed, which is what a container node is provisioned from.
-    from sessionorc import containers
-
-    wheel = containers.write_wheel()
-    if wheel is not None:
-        written.append(str(wheel))
     return written
 
 
