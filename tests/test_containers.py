@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from conftest import wait_for_sync
 
 from sessionorc import containers, paths
 from sessionorc.client import LocalClient
@@ -461,7 +462,8 @@ def test_the_promote_writes_the_wheel_of_what_it_installed_and_keeps_the_newest(
         (None, False, "", ("up", "container gone — bringing it up")),
         ("gone", False, "", ("up", "container gone — bringing it up")),
         ("exited", False, "closed by the other end", ("up", "container exited — bringing it up")),
-        ("paused", False, "", ("up", "container paused — bringing it up")),
+        ("paused", False, "", ("unpause", "container paused — unpausing it")),
+        ("dead", False, "", ("up", "container dead — bringing it up")),
         ("running", False, "", ("start", "agent not running inside — starting it")),
         (
             "running",
@@ -494,6 +496,9 @@ def test_observe_and_act_through_the_seam(home):
     r = Fake(ps="")
     with pytest.raises(ContainerError, match="went away"):
         containers.act(n, r, "start", "developer")
+    r = Fake(inspect="paused\n")
+    containers.act(n, r, "unpause", "")
+    assert ["docker", "unpause", "abc123def456"] in r.calls
     r = Fake()
     containers.act(n, r, "up", "")
     assert [c for c in r.calls if c[0] == r.cli][1][1] == "up"  # the whole idempotent host_up
@@ -570,3 +575,59 @@ async def test_a_failing_action_backs_off_and_the_card_says_why(container_home, 
         timeout=5.0,
         step=0.05,
     )
+
+
+def test_backoff_starts_at_first_and_doubles_to_max_and_a_success_resets(container_home, agent, monkeypatch):
+    monkeypatch.setattr(containers, "SUPERVISE_FIRST", 5.0)
+    monkeypatch.setattr(containers, "SUPERVISE_MAX", 30.0)
+    monkeypatch.setattr(containers, "SUPERVISE_GRACE", 1.0)
+    sup = {"doing": "", "since": "", "attempts": 0, "next": 0.0, "error": ""}
+    delays = []
+    for _ in range(5):
+        agent._supervised("cm", sup, "x: failed", failed=True)
+        delays.append(round(sup["next"] - __import__("time").monotonic(), 1))
+    assert delays == [5.0, 10.0, 20.0, 30.0, 30.0] and sup["attempts"] == 5 and sup["error"]
+    agent._supervised("cm", sup, "x: done", failed=False)
+    assert sup["attempts"] == 0 and not sup["error"] and round(sup["next"] - __import__("time").monotonic(), 1) == 1.0
+
+
+async def test_a_runner_can_be_cancelled_mid_action_and_shutdown_and_forget_do_it(container_home, agent):
+    import threading
+    import time as _time
+
+    from conftest import wait_for
+
+    started = threading.Event()
+
+    class Slow(Fake):
+        def run(self, cmd, *, check=True, stream=False):
+            if cmd[0] == self.cli and cmd[1] == "build":
+                started.set()
+                while not self.cancelled:  # a build that takes as long as it is allowed to
+                    _time.sleep(0.01)
+                raise ContainerError("cancelled")
+            return super().run(cmd, check=check, stream=stream)
+
+    container_home["make"] = lambda: Slow(ps="")
+    assert await wait_for(started.is_set, timeout=5.0, step=0.05)  # awaited: the tick runs on this loop
+    task, r = agent._supervising["cm"]
+    async with LocalClient() as c:
+        await c.call("forget_host", host="cm")  # a person forgot it: the action in flight is cut
+    assert r.cancelled and "cm" not in agent.supervision
+    assert await wait_for(task.done, timeout=5.0, step=0.05)
+    # a real Runner's process is terminated by cancel
+    real = Runner(log=lambda line: None)
+    holder = {}
+
+    def go():
+        try:
+            real.run(["sleep", "30"])
+        except ContainerError as e:
+            holder["err"] = str(e)
+
+    t = threading.Thread(target=go)
+    t.start()
+    assert wait_for_sync(lambda: real.proc is not None, timeout=5.0)
+    real.cancel()
+    t.join(5.0)
+    assert not t.is_alive() and holder["err"] == "cancelled"

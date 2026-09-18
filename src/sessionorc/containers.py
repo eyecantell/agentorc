@@ -32,6 +32,7 @@ is not in the suite (docker is not in `pdm run test`).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -309,16 +310,37 @@ class Runner:
 
     log: Callable[[str], None] = lambda line: print(line, file=sys.stderr)
     calls: list[list[str]] = field(default_factory=list)
+    proc: subprocess.Popen[str] | None = None  # the process in flight, for `cancel`
+    cancelled: bool = False
 
     def run(self, cmd: list[str], *, check: bool = True, stream: bool = False) -> subprocess.CompletedProcess[str]:
         """stdout is always captured (a result is read from it); `stream` lets stderr through to
         the terminal — a build's progress."""
         self.calls.append(list(cmd))
-        cp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=None if stream else subprocess.PIPE, text=True)
+        if self.cancelled:
+            raise ContainerError("cancelled")
+        with subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=None if stream else subprocess.PIPE, text=True
+        ) as proc:
+            self.proc = proc
+            out, err = proc.communicate()
+            self.proc = None
+        cp = subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+        if self.cancelled:
+            raise ContainerError("cancelled")
         if check and cp.returncode != 0:
             err = (cp.stderr or "").strip().splitlines()[-1:] if cp.stderr else []
             raise ContainerError(f"{' '.join(cmd[:2])} failed ({cp.returncode})" + (f": {err[0]}" if err else ""))
         return cp
+
+    def cancel(self) -> None:
+        """Stop what is in flight: the home is stopping, or the node was forgotten. The thread
+        running `run` returns at once with a refusal, and nothing further is started."""
+        self.cancelled = True
+        proc = self.proc
+        if proc is not None:
+            with contextlib.suppress(ProcessLookupError, OSError):
+                proc.terminate()
 
     def devcontainer(self) -> str:
         """The devcontainer CLI on the home, or a refusal naming it."""
@@ -755,7 +777,10 @@ def decide(container_state: str | None, agent_alive: bool, link_why: str) -> tup
     """What to do for a node whose link is down: `(action, doing)` — `up` (the container is gone
     or stopped), `start` (running, no agent), `provision` (the agent is there but the home refused
     its protocol), or None (running, the agent alive, the link merely not up yet: wait). A pure
-    function over what the tick observed, so the suite pins every row."""
+    function over what the tick observed, so the suite pins every row. A paused container is
+    the one state `up` cannot mend (`docker start` refuses it): `unpause`."""
+    if container_state == "paused":
+        return "unpause", "container paused — unpausing it"  # `up` cannot start a paused container
     if container_state != "running":
         what = "gone" if container_state in (None, "gone") else container_state
         return "up", f"container {what} — bringing it up"
@@ -788,6 +813,9 @@ def act(n: ContainerNode, r: Runner, action: str, user: str) -> None:
     cid = container_id(r, n.name)
     if not cid:
         raise ContainerError(f"{n.name}: the container went away while acting")
+    if action == "unpause":
+        r.run(["docker", "unpause", cid])
+        return
     user = user or _remote_user(n)
     if action == "provision":
         provision(n, r, cid, user)

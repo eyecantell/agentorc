@@ -144,7 +144,7 @@ class HostAgent:
         # what the tick is doing about a down link — `{doing, since, attempts, next}` — and the one
         # action in flight. `container_runner` is the seam the suite replaces.
         self.supervision: dict[str, dict[str, Any]] = {}
-        self._supervising: dict[str, asyncio.Task[None]] = {}
+        self._supervising: dict[str, tuple[asyncio.Task[None], containers.Runner]] = {}
         self.container_runner: Callable[[], containers.Runner] = lambda: containers.Runner(log=log.info)
         self.home_link: dict[str, Any] = {"up": False, "since": now_iso(), "why": "not dialed yet"}
         self._home_mux: link.Mux | None = None
@@ -271,6 +271,8 @@ class HostAgent:
                 dialer.cancel()
             for m in list(self._link_muxes.values()):
                 m.close("the home is stopping")
+            for name in list(self._supervising):
+                self._stop_supervising(name)  # a build in flight is killed, not left to finish alone
             with contextlib.suppress(FileNotFoundError):
                 sock.unlink()
             for lsock, _ in link_servers:
@@ -2163,16 +2165,25 @@ class HostAgent:
             sup = self.supervision.setdefault(
                 name, {"doing": "", "since": now_iso(), "attempts": 0, "next": 0.0, "error": ""}
             )
-            if name in self._supervising and not self._supervising[name].done():
+            if name in self._supervising and not self._supervising[name][0].done():
                 continue
             if now < sup["next"]:
                 continue
-            task = asyncio.create_task(self._supervise_one(n, sup))
-            self._supervising[name] = task
+            r = self.container_runner()
+            task = asyncio.create_task(self._supervise_one(n, sup, r))
+            self._supervising[name] = (task, r)
             task.add_done_callback(lambda t, name=name: self._supervising.pop(name, None))
 
-    async def _supervise_one(self, n: containers.ContainerNode, sup: dict[str, Any]) -> None:
-        r = self.container_runner()
+    def _stop_supervising(self, name: str) -> None:
+        """Cancel the node's action in flight, process and all, and forget its record."""
+        entry = self._supervising.pop(name, None)
+        if entry is not None:
+            task, r = entry
+            r.cancel()
+            task.cancel()
+        self.supervision.pop(name, None)
+
+    async def _supervise_one(self, n: containers.ContainerNode, sup: dict[str, Any], r: containers.Runner) -> None:
         try:
             cstate, alive, user = await asyncio.to_thread(containers.observe, n, r)
         except Exception as e:  # noqa: BLE001 — docker itself failing is a reason on the card, not a crash
@@ -2200,10 +2211,9 @@ class HostAgent:
         self._supervised(n.name, sup, f"{doing}: done, waiting for it to dial in", failed=False)
 
     def _supervised(self, name: str, sup: dict[str, Any], doing: str, *, failed: bool) -> None:
-        sup["attempts"] += 1 if failed else 0
-        if not failed:
-            sup["attempts"] = 0
+        # the first failure waits SUPERVISE_FIRST, then doubling to SUPERVISE_MAX; a success resets
         delay = min(containers.SUPERVISE_FIRST * (2 ** sup["attempts"]), containers.SUPERVISE_MAX)
+        sup["attempts"] = sup["attempts"] + 1 if failed else 0
         sup["next"] = time.monotonic() + (delay if failed else containers.SUPERVISE_GRACE)
         sup["doing"], sup["since"], sup["error"] = doing, now_iso(), doing if failed else ""
         (log.warning if failed else log.info)("supervisor %s: %s", name, doing)
@@ -2235,6 +2245,7 @@ class HostAgent:
         if mux is not None:
             mux.close("the host was forgotten")
         self.links.pop(host, None)
+        self._stop_supervising(host)  # `ao host forget` removed the `nodes:` entry: nothing to mend
         await self._push_changes()
         return {"host": host, "closed": closed, "kept": len(self.remote.get(host, {}))}
 
