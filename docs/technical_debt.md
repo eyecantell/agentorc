@@ -710,6 +710,8 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 5. **The mode badge** — *unattended* is the loudest thing on every card (filled, dark) and is true of every team session. Quieter, or a glyph; *interactive* is the rarer fact worth marking.
 6. **The legend** — the note under the grid explains the sort order in words; with glyphs it could be the glyphs.
 
+7. **The mockups are behind the page** — `docs/mockups/gen.py` and the generated `Main.dc.html` / `MainDark.dc.html` still draw the Urgent first / Pinned control and the Teams strip, both retired 2026-09-18 (review of PR #229). Regenerate them with the look-and-feel pass rather than twice.
+
 **Done when** each idea is either built (its own PR, §4.5a first) or struck here.
 
 **Related:** design §4.5a (**team groups**, **state icon**), TD-069, TD-070, TD-065 (the undefined `chip` class — same page, same kind of finding).
