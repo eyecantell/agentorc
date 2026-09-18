@@ -2507,22 +2507,26 @@ class HostAgent:
                     p[key] = [self._from_host(x, host) for x in p[key]]
         if rpc == "create":
             p.setdefault("host", host)
-        if params.get("caller") is None and rpc == "wait":
-            p["only_host"] = host  # a person at a node watches that node's records, not the org's
-        if params.get("caller") is None and (rpc in modes.PERSON_NODE_BOUND or (rpc == "inbox" and p.get("id"))):
+        if params.get("caller") is None:
             # A person at a node acts only on that node's records (§4.4a): `id@<this home>` collapsed
             # to a home record above, and the person gate would then have passed it (security read of
-            # PR #217). The target's host, read after the rewrite, has to be the link's own.
-            target = p.get("host") if rpc == "create" else p.get("id")
-            _, where = naming.split_address(str(target or ""))
+            # PR #217). The target's host, read after the rewrite, has to be the link's own. A call
+            # that names no session — the person inbox, a `wait` — names nothing to bound; the wait
+            # is scoped to the node's host instead. A `create` for another host is refused at the
+            # node before it gets here; the check is kept as a second line.
+            if rpc == "wait":
+                p["only_host"] = host
+            where: str | None = None
             if rpc == "create":
-                where = str(target or host)
-            if (where or self.host) != host:
+                where = str(p.get("host") or host)
+            elif rpc in modes.PERSON_NODE_BOUND and p.get("id") and p["id"] != PERSON:
+                where = naming.split_address(str(p["id"]))[1] or self.host
+            if where is not None and where != host:
                 return {
                     "id": 0,
                     "error": (
-                        f"a person at {host} may {rpc} only {host}'s sessions: {target} is on "
-                        f"{where or self.host} (design §4.4a)"
+                        f"a person at {host} may {rpc} only {host}'s sessions: {p.get('id') or p.get('host')} "
+                        f"is on {where} (design §4.4a)"
                     ),
                 }
         req = {"id": 0, "method": rpc, "params": p, "caller": params.get("caller")}

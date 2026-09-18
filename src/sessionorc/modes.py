@@ -32,7 +32,8 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "see
 # the two reads a node does not serve itself: an `inbox` with an `id` (mail bodies of a home lead
 # would otherwise be readable from any laptop, where its `get` is not) and a `wait`, which is
 # scoped to the node's host. A person may still message anyone. Checked at the home, in `_forwarded`.
-PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox_delete"})) - frozenset({"hook"})
+# `NODE_ACTS` is in the set as a second line only: a person's act on a pane never leaves the node.
+PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox", "inbox_delete"})) - frozenset({"hook"})
 
 
 def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str) -> str | None:

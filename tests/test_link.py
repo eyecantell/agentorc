@@ -849,6 +849,13 @@ async def test_a_persons_forwarded_act_reaches_only_the_nodes_own_records(home, 
                 await person_at_laptop.call("inbox", id=f"{lead['id']}@kmaster")
             seen = await person_at_laptop.call("wait", timeout=0.5, scope="all")
             assert all(v.get("host") == "laptop" for v in seen.get("changed") or [])
+            # the person inbox names no session, and stays the person's from anywhere (review of #219)
+            async with LocalClient(caller=w["id"]) as as_w:
+                sent = await as_w.call("msg", to=["person"], text="for you")
+            theirs = await person_at_laptop.call("inbox")
+            assert sent["entry"]["id"] in [e["id"] for e in theirs["entries"]]
+            gone = await person_at_laptop.call("inbox_delete", msg=sent["entry"]["id"])
+            assert gone["deleted"] == sent["entry"]["id"]
             with pytest.raises(AgentError, match="acts on its own sessions only"):  # refused at the node itself
                 await person_at_laptop.call("create", name="x", dir=str(tmp_path), adapter="shell", host="kmaster")
             # the node's own record: the same edit, forwarded and served
