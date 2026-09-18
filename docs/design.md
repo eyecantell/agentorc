@@ -885,7 +885,12 @@ nodes:
   home would provision now is marked `stale` on its link state — asked at the `hello` and again
   on every tick, so a link that outlives a new wheel is caught too — and re-provisioned and
   restarted by the same supervisor, link up or not; the restart waits for the old agent to go,
-  and takes it down hard if it has not, before starting the new one: never two under one pidfile. Its sessions live in tmux and survive it, as they
+  and takes it down hard if it has not, before starting the new one: never two under one pidfile.
+  A linked node that is merely behind waits one grace before the supervisor acts — a promote
+  writes the wheel a second before it restarts the home, and a process about to be stopped must
+  not start an install it cannot finish (so a node found behind at any start of the home waits
+  that grace too); a node whose link is down is looked at at once, a link that drops during
+  that grace included. Its sessions live in tmux and survive it, as they
   survive a promote at the home. `ao host up` restarts an agent that is behind for the same
   reason. A machine node's build is recorded and shown, and nothing more: the home installs
   nothing there. *Start it* is `docker exec -d -u <user>` of

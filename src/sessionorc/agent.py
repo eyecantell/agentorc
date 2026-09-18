@@ -2298,9 +2298,22 @@ class HostAgent:
                 if self.supervision.pop(name, None) is not None:
                     self._note_link(name)
                 continue
-            sup = self.supervision.setdefault(
-                name, {"doing": "", "since": now_iso(), "attempts": 0, "next": 0.0, "error": ""}
-            )
+            if name not in self.supervision:
+                # A linked node that is merely behind waits one grace before anything is done about
+                # it: a promote writes the new wheel about a second before it restarts this agent,
+                # and the process about to be stopped must not start an install it cannot finish
+                # (seen live at the promote of PR #227: a `docker exec pip` left running by the stop,
+                # no outcome logged, and the new process installing again 30 s later). A node whose
+                # link is down is looked at at once, as before.
+                linked = bool(state and state["up"])
+                first = now + containers.SUPERVISE_GRACE if linked else 0.0
+                self.supervision[name] = {"doing": "", "since": now_iso(), "attempts": 0, "next": first, "error": ""}
+            sup = self.supervision[name]
+            if not (state and state["up"]) and sup["attempts"] == 0 and not sup["doing"]:
+                # the link dropped while that grace was still running — the container may really be
+                # gone: looked at at once, as a down link always is. A record that has already
+                # acted keeps its own backoff (review of PR #228).
+                sup["next"] = 0.0
             if name in self._supervising and not self._supervising[name][0].done():
                 continue
             if now < sup["next"]:
