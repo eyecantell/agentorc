@@ -230,8 +230,9 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
         d["rank"] = STATE_RANK["idle"] - 0.5
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
-    # Another host's record, as the home shows it (design §4.4a): its own host on the card, and no
-    # VS Code link — that URL is built from *this* host's ssh alias, which would open the wrong machine.
+    # Another host's record, as the home shows it (design §4.4a): its own host on the card, and a
+    # VS Code link only when a container node's reach names one — the ssh URL below is built from
+    # *this* host's alias, which would open the wrong machine.
     d["host"] = s.get("host") or host_name()
     here = d["host"] == host_name()
     # An unreachable host's reason, and what the home is doing about a container node (§4.4a

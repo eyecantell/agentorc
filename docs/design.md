@@ -828,7 +828,7 @@ nodes:
   link state as `host_link.reach`, on every card of its. From it the Focus terminal and
   `ao focus <id@node>` run `docker exec -u <user> -it <container> tmux attach` (the scroll
   commands the same way), and the card's VS Code link is *attach to running container*,
-  `vscode-remote://attached-container+<hex of {"containerName": "/<name>"}><checkout>` — never the
+  `vscode://vscode-remote/attached-container+<hex of {"containerName": "/<name>"}><checkout>` — never the
   `dev-container+` form, which would open the person's own container from the repo's definition
   rather than this one. Derived from the `container:` entry, never from `vscode_host` (§4.6).
   A machine node's session still has no terminal from here (4b, with the terminal over the link),

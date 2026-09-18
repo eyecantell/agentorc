@@ -359,7 +359,8 @@ def test_status_and_reach_are_derived_from_the_entry(home):
     assert out["reach"]["name"] == "agentorc-node-cm"
     # VS Code attaches to *this* container by docker's name — the `dev-container+` form would open
     # the person's own container from the repo's definition (3c.5)
-    head, _, path = out["reach"]["vscode"].removeprefix("vscode-remote://attached-container+").partition("/")
+    link = out["reach"]["vscode"].removeprefix("vscode://vscode-remote/attached-container+")
+    head, _, path = link.removesuffix("?windowId=_blank").partition("/")
     assert (
         json.loads(bytes.fromhex(head)) == {"containerName": "/agentorc-node-cm"} and "/" + path == out["devcontainer"]
     )
@@ -610,7 +611,7 @@ async def test_the_home_derives_a_container_nodes_reach_when_it_dials_in(contain
     await agent._note_reach("cm")
     reach = agent.links["cm"]["reach"]
     assert reach["container"] == "abc123def456" and reach["user"] == "developer"
-    assert reach["vscode"].startswith("vscode-remote://attached-container+")
+    assert reach["vscode"].startswith("vscode://vscode-remote/attached-container+")
     assert agent._view(agent.remote["cm"]["ao-cm-w"])["host_link"]["reach"] == reach
     agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}  # a new link: derived again, or not
     container_home["make"] = lambda: Fake(ps="")

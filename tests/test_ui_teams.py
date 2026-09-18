@@ -481,7 +481,7 @@ def test_a_container_nodes_session_is_reached_by_docker_exec_and_vs_code_attache
     reach = {
         "container": "abc123def456",
         "user": "developer",
-        "vscode": "vscode-remote://attached-container+7b7d/home/x/repo",
+        "vscode": "vscode://vscode-remote/attached-container+7b7d/home/x/repo?windowId=_blank",
     }
     fleet.sessions.append(
         {
@@ -511,4 +511,4 @@ def test_a_container_nodes_session_is_reached_by_docker_exec_and_vs_code_attache
     assert seen["argv"][:6] == ["docker", "exec", "-u", "developer", "-it", "abc123def456"]
     assert seen["argv"][6:10] == ["tmux", "attach", "-t", "=ao-repo-w:"]  # the bare id inside the container
     page = client.get("/").text
-    assert 'href="vscode-remote://attached-container+7b7d/home/x/repo"' in page
+    assert 'href="vscode://vscode-remote/attached-container+7b7d/home/x/repo?windowId=_blank"' in page

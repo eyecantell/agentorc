@@ -977,7 +977,8 @@ def cmd_host(args: argparse.Namespace) -> int:
             link = out["link"]
             print(f"  link: {'up' if link.get('up') else 'down'} — {link.get('why', '')}")
             for k, v in (out.get("reach") or {}).items():
-                print(f"  {k}: {v}")
+                if k in ("terminal", "vscode"):  # the rest is shown above, or is theirs
+                    print(f"  {k}: {v}")
 
         return emit(args, out, prose)
     except containers.ContainerError as e:

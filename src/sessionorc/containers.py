@@ -648,7 +648,7 @@ def host_status(name: str, r: Runner | None = None) -> dict[str, Any]:
 
 def observe_reach(n: ContainerNode, r: Runner) -> dict[str, str] | None:
     """`reach` for a node that is running now, else None — what the home records on the link when
-    the node dials in (3c.5), one docker round-trip per hello."""
+    the node dials in (3c.5): three docker calls, once per hello, off the link."""
     cid = container_id(r, n.name)
     if not cid or container_state(r, cid) != "running":
         return None
@@ -679,7 +679,10 @@ def reach(n: ContainerNode, cid: str, user: str, name: str = "") -> dict[str, st
     if name:
         out["name"] = name
         attached = json.dumps({"containerName": f"/{name}"}).encode().hex()
-        out["vscode"] = f"vscode-remote://attached-container+{attached}{n.devcontainer}"
+        # `vscode://vscode-remote/…` is the scheme a browser hands to VS Code, as the ssh link is
+        # built (`ui.app.vscode_url`); bare `vscode-remote:` is VS Code's internal form and opens
+        # nothing from a page (review of PR #216)
+        out["vscode"] = f"vscode://vscode-remote/attached-container+{attached}{n.devcontainer}?windowId=_blank"
     return out
 
 

@@ -2625,8 +2625,8 @@ class HostAgent:
                     await self._push_changes()  # its cards go `unreachable` now, not at the next tick
 
     async def _note_reach(self, host: str) -> None:
-        """How a container node's sessions are reached (§4.4a "Reach", 3c.5): looked up once when
-        it dials in and kept on its link state, so every card of its carries `host_link.reach` —
+        """How a container node's sessions are reached (§4.4a "Reach", 3c.5): looked up (three
+        docker calls) once when it dials in and kept on its link state, so every card of its carries `host_link.reach` —
         the Focus terminal and `ao focus` run `docker exec … tmux attach` from it, and the card's
         VS Code link attaches to that container. A failed look is a log line and no reach."""
         n = containers.container_nodes().get(host)
