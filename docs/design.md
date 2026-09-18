@@ -738,8 +738,10 @@ nodes:
   the mounted checkout is a directory on the home, and `create` checks occupancy across both —
   derived from the `container:` entry, never configured. **Built as 3c.4 (2026-09-17):**
   `occupants()` at the home reads, beside its own records, every container node's records over the
-  directory (as last reported), so a create here is refused by the anchor rule while a session in
-  the container holds the checkout, and the New session form shows it; and a create routed to a
+  directory while its link is up — down, the container is a blip from dialing back (the snapshot
+  then repairs its records) or stopped, and a stopped container's sessions are dead, so neither
+  holds the checkout against a create here — so a create here is refused by the anchor rule while
+  a session in the container holds the checkout, and the New session form shows it; and a create routed to a
   container node (`--host`) is checked here first, over the same set, before it crosses — the
   node then checks its own, since it cannot see this host's. A worktree is another directory,
   as on one host. A machine node's records are never read for this: its `/home/x/repo` is not
@@ -819,8 +821,8 @@ nodes:
   the `nodes:` entry, closes the host's records at the home as a closed session is kept, and keeps
   `~/.agentorc/nodes/<name>/` (the run logs, invariant 3) unless told `--purge`; `volatile: true`
   is right for one the person stops: the supervisor then never starts the container itself — a
-  stopped or gone one is *left as the person left it* on the card — and still starts the agent
-  inside a running one (3c.4).
+  stopped, paused or gone one is *left as the person left it* on the card — and still starts the
+  agent inside a running one (3c.4).
 - **Reach.** The terminal and the VS Code link go by `docker exec -u <user> -it <container> tmux
   attach` and `vscode-remote://dev-container+…`, derived from the `container:` entry rather than
   from `vscode_host` (§4.6; with the rest of the remote terminal, not yet built — until then the

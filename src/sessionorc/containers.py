@@ -140,7 +140,9 @@ def container_nodes() -> dict[str, ContainerNode]:
         c = flags.get("container")
         if isinstance(c, dict) and isinstance(c.get("devcontainer"), str) and c["devcontainer"].strip():
             out[name] = ContainerNode(
-                name, Path(c["devcontainer"].strip()).expanduser().resolve(), volatile=flags.get("volatile") is True
+                name,
+                Path(c["devcontainer"].strip()).expanduser().resolve(),
+                volatile=hosts._flag(flags.get("volatile")),
             )
     return out
 

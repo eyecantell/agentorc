@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import adapters, containers, hosts, link, mail, modes, naming, paths, reports, waits
-from sessionorc.gitinfo import WORKTREES_DIR, WorktreeError, ensure_worktree, git_info
+from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktree_path
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
     ASK_KINDS,
@@ -1077,29 +1077,32 @@ class HostAgent:
         agent sessions, plus live sessions the adapters can see that agentorc did not start
         (a VS Code terminal running `claude` in the checkout, say). Shells never count."""
         directory = Path(directory).resolve()
-        ours = {s.adapter_id for s in self.sessions.values() if s.adapter_id}
-        out = [
-            f"{s.id} ({s.state})"
-            for s in self.sessions.values()
-            if s.kind == "interactive"
-            and s.adapter != "shell"
-            and s.state not in ("exited", "closed")
-            and Path(s.dir).resolve() == directory
-        ]
+        # Runs in a thread while the loop goes on writing these maps in place: iterate copies, taken
+        # in one step, never the live dicts (review of PR #215).
+        mine = list(self.sessions.values())
+        ours = {s.adapter_id for s in mine if s.adapter_id}
+
+        def holds(s: Session) -> bool:
+            return (
+                s.kind == "interactive"
+                and s.adapter != "shell"
+                and s.state not in ("exited", "closed")
+                and Path(s.dir).resolve() == directory
+            )
+
+        out = [f"{s.id} ({s.state})" for s in mine if holds(s)]
         # A container node on this machine has the checkout mounted at the same path (design §4.4a
         # "A container node", 3c.4): a record of its over this directory holds the slot too — read
-        # from what the node last reported, derived from the `container:` entry, never configured.
-        # A machine node's `/home/x/repo` is another directory, and is not read.
+        # from what the node reports, derived from the `container:` entry, never configured — while
+        # its link is up. Down, the container is a blip away from dialing back (its records are
+        # then repaired by the snapshot) or stopped, and a stopped container's sessions are dead:
+        # neither may hold this checkout against a create here. A machine node's `/home/x/repo`
+        # is another directory, and is not read.
         if self.mode == "home" and self.remote:
             for host in containers.container_nodes():
-                out += [
-                    f"{s.id}@{host} ({s.state})"
-                    for s in self.remote.get(host, {}).values()
-                    if s.kind == "interactive"
-                    and s.adapter != "shell"
-                    and s.state not in ("exited", "closed")
-                    and Path(s.dir).resolve() == directory
-                ]
+                if not (self.links.get(host) or {}).get("up"):
+                    continue
+                out += [f"{s.id}@{host} ({s.state})" for s in list(self.remote.get(host, {}).values()) if holds(s)]
         for ext in adapters.external_sessions():
             if ext.tool_id and ext.tool_id in ours:
                 continue  # that is one of ours, seen through the tool's registry
@@ -2499,10 +2502,14 @@ class HostAgent:
             return
         if params.get("kind", "interactive") != "interactive" or params.get("adapter", "shell") == "shell":
             return
-        directory = Path(str(params.get("dir") or "")).expanduser()
-        if params.get("worktree"):  # the same place `create` puts it: <repo>/.claude/worktrees/<name>
-            repo = Path(str(params.get("repo") or directory)).expanduser()
-            directory = repo / WORKTREES_DIR / str(params["worktree"])
+        directory = Path(str(params.get("dir") or "")).expanduser().resolve()
+        if params.get("worktree"):
+            # the same place `create` puts it — one resolution, the main checkout's, shared with it
+            repo = Path(str(params.get("repo") or directory)).expanduser().resolve()
+            try:
+                directory = await asyncio.to_thread(worktree_path, repo, str(params["worktree"]))
+            except WorktreeError:
+                return  # the node's own create refuses it in its own words
         if not directory.is_dir():
             return  # the node's own create says whether it exists there
         for who in await asyncio.to_thread(self.occupants, directory):

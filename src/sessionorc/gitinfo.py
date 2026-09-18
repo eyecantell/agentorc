@@ -30,15 +30,12 @@ class WorktreeError(RuntimeError):
 WORKTREES_DIR = ".claude/worktrees"  # design §5 default; Claude Code's own `--worktree` uses the same place
 
 
-def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
-    """`<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
-    (after a fetch) or from HEAD when there is no origin. Reused when it already exists. Runs the
-    repo's own `scripts/hydrate_worktree.sh` when present (dev-cadence repos), so the worktree
-    gets the untracked pieces git leaves out."""
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
-        raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
-    # The MAIN checkout, even when called from inside a worktree: --show-toplevel would answer
-    # with the worktree and nest the new one under it (cadence §9 path-resolution; review 2026-09-06).
+def worktree_path(repo: Path, name: str) -> Path:
+    """Where `ensure_worktree` puts (or finds) the worktree `name` of `repo`: under the MAIN
+    checkout's `.claude/worktrees/`, even when `repo` is a worktree or a subdirectory of it —
+    `--show-toplevel` would answer with the worktree and nest the new one under it (cadence §9
+    path-resolution; review 2026-09-06). Read-only: the one resolution every check of that path
+    shares (review of PR #215)."""
     common = subprocess.run(
         ["git", "-C", str(repo), "rev-parse", "--path-format=absolute", "--git-common-dir"],
         capture_output=True,
@@ -46,8 +43,18 @@ def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
     )
     if common.returncode != 0:
         raise WorktreeError(f"{repo} is not a git repository")
-    repo = Path(common.stdout.strip()).parent
-    path = repo / WORKTREES_DIR / name
+    return Path(common.stdout.strip()).parent / WORKTREES_DIR / name
+
+
+def ensure_worktree(repo: Path, name: str, timeout: float = 60.0) -> Path:
+    """`<repo>/.claude/worktrees/<name>` on branch <name>, created from origin's default branch
+    (after a fetch) or from HEAD when there is no origin. Reused when it already exists. Runs the
+    repo's own `scripts/hydrate_worktree.sh` when present (dev-cadence repos), so the worktree
+    gets the untracked pieces git leaves out."""
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,63}", name):
+        raise WorktreeError(f"worktree name {name!r}: letters, digits, . _ - only")
+    path = worktree_path(repo, name)
+    repo = path.parent.parent.parent
     if path.is_dir():
         if subprocess.run(["git", "-C", str(path), "rev-parse", "--git-dir"], capture_output=True).returncode != 0:
             raise WorktreeError(f"{path} exists but is not a worktree")
