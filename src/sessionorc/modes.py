@@ -4,9 +4,10 @@ home. An agent whose `hosts.yml` names no `home:`, or names itself, is the home,
 exactly: nothing in this module runs for it.
 
 What is here is the one decision a node makes alone: what it answers while it cannot reach its
-home. Until step 3 builds the link that is always, so this table is a node's whole behaviour. It is
-a pure function, read before the gate, so it can be tested without an agent and so step 3 changes
-*when* it is consulted, not what it says.
+home. Until step 3 built the link that was always, and this table was a node's whole behaviour;
+since step 5 what it refuses is forwarded to the home while the link is up, and refused, naming the
+home, while it is down. It is a pure function, read before the gate, so it can be tested without
+an agent.
 """
 
 from __future__ import annotations
@@ -35,11 +36,12 @@ def offline_refusal(
     refused. Every refusal names the home and says nothing was queued: a refusal the caller can
     see, never a delivery that is not coming."""
     if reachable:
-        # Step 3a: the link is up, and nothing forwards over it yet. Serving these locally the moment
-        # it came up would be the split-brain §4.4a exists to rule out, so the table still holds.
+        # Since step 5 the agent never asks with the link up: what this table refuses is then
+        # forwarded to the home (`HostAgent._forward`). Kept for a caller that wants the table's
+        # verdict on its own — serving such a call locally would be the split-brain §4.4a rules out.
         tail = (
-            f"the link to {home} (home) is up, but forwarding this from {host} is not built "
-            "(TD-057 steps 4–5); refused, not queued (design §4.4a)"
+            f"the link to {home} (home) is up, and this is answered there, not here "
+            "(TD-057 step 5); refused, not queued (design §4.4a)"
         )
     else:
         tail = f"{home} (home) is unreachable from {host}; refused, not queued (design §4.4a)"

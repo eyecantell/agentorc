@@ -13,7 +13,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
-import copy
 import inspect
 import json
 import logging
@@ -160,6 +159,8 @@ class HostAgent:
         self.container_runner: Callable[[], containers.Runner] = lambda: containers.Runner(log=log.info)
         self.home_link: dict[str, Any] = {"up": False, "since": now_iso(), "why": "not dialed yet"}
         self._home_mux: link.Mux | None = None
+        # A node's calls in flight here, by the node's token (step 5): a `wait` the node cancels
+        self._forwarded_calls: dict[str, asyncio.Task[Any]] = {}
         # Other hosts' records, at the home (§4.4a "A node's records at the home", step 3b): held
         # apart from `self.sessions` — host → id → record — so nothing that reads this host's panes
         # ever meets one. Loaded from `remote/<host>/`, so a restarted home still shows them,
@@ -176,8 +177,8 @@ class HostAgent:
         self._bg: set[asyncio.Task[None]] = set()  # fire-and-forget tasks, held so they are not collected
         if self.mode == "node":
             log.warning(
-                "node of %s: this host's sessions only until the link is up, and until TD-057 steps 4–5 "
-                "forward them — mail, reports, home-owned edits and sessions' acts on others are refused. "
+                "node of %s: this host's sessions only while the link is down — mail, reports, home-owned edits "
+                "and sessions' acts on others are then refused, and forwarded to the home while it is up. "
                 "This host calls itself %s: if this machine IS %s, set `local: {name: %s}` in hosts.yml — without "
                 "it the name is the machine's hostname, and a home that does not recognise its own name is a node.",
                 self.home,
@@ -1471,7 +1472,7 @@ class HostAgent:
         A declared claim is a **lease** (§4.8, TD-056): refused while another live record holds an
         unexpired declared claim on the same reference, naming the holder; `force` claims anyway and
         the reply carries `lease_overridden`."""
-        s = self._get(id)
+        s = self._find(id)  # a node's session reports here (step 5): the field is the home's
         if status == "none":
             if ref or pr is not None:
                 raise RpcError('progress none takes no reference and no PR, only why="<the search that came up empty>"')
@@ -1498,7 +1499,7 @@ class HostAgent:
         """The other live record holding an unexpired declared claim on `entry.ref`, if any. Read and
         acted on in one loop step, so two claims a moment apart get one grant and one refusal."""
         now = datetime.now(UTC)
-        for o in self.sessions.values():
+        for o in self._graph().values():
             if o.id == s.id or o.state in ("exited", "closed"):
                 continue
             for e in o.progress:
@@ -1529,7 +1530,7 @@ class HostAgent:
     ) -> dict[str, Any]:
         """`ao finding <ref> [--priority …]` (design §4.8): a reference this session filed on the
         side. Ungated like `progress`, and upserted by reference the same way."""
-        s = self._get(id)
+        s = self._find(id)  # a node's session reports here (step 5): the field is the home's
         entry = FindingEntry(ref=_ref(ref), priority=priority, source=_source(source))
         return await self._report(s, s.report_finding(entry), entry)
 
@@ -1538,7 +1539,7 @@ class HostAgent:
         `derived` or `scraped` entry over a `declared` one) is not an error — the caller gets the
         record as it stands, with `refused` naming the entry that did not land."""
         if applied:
-            self.store.save(s)
+            self._save(s)
             await self._push_changes()
         out = s.view()
         if not applied:
@@ -1602,8 +1603,10 @@ class HostAgent:
         cites: list[str] | None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
-        the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land)."""
-        records = self.sessions
+        the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
+        The records are the org's one graph (§4.4a, step 5): an addressee on another host is its
+        record here, its inbox the home's copy — landed whether or not its link is up, and said so."""
+        records = self._graph()
         if kind not in MAIL_KINDS:
             raise RpcError(f"unknown message kind {kind!r}; kinds are: {', '.join(MAIL_KINDS)}")
         text = str(text or "").strip()
@@ -1667,7 +1670,7 @@ class HostAgent:
         for sid in named:
             if sid not in records and sid != PERSON:
                 raise RpcError(f"no session {sid}")
-            if (reason := mail.message_gate(records, sender, sid)) is not None:
+            if (reason := mail.message_gate(records, sender, sid, controllers=self._ctl)) is not None:
                 raise RpcError(reason)
         cited: list[str] = []
         if kind == "conflict":
@@ -1682,8 +1685,8 @@ class HostAgent:
                 )
         # -- copies: a controller's mail `about` its member reaches the member's other controllers --
         subject = records.get(self._addr(about)) if about and not reply_to and me is not None else None
-        if subject is not None and sender in subject.controllers:
-            copies = [c for c in subject.controllers if c not in (sender, *named)]
+        if subject is not None and sender in self._ctl(subject):
+            copies = [c for c in self._ctl(subject) if c not in (sender, *named)]
         copies = [c for c in copies if c in records]
         # -- what this message counts as ------------------------------------------------------------
         closes = replied is not None and kind == "reply" and replied.open
@@ -1757,13 +1760,22 @@ class HostAgent:
                 if sid != PERSON:
                     self._refill(records[sid])
         for r in touched:
-            self.store.save(r)
+            self._save(r)
         await self._push_changes()
         now = datetime.now(UTC)
         return {
             # exhaustion is visible to the sender (design §4.10): the mail landed, and it wakes nobody
             "wake_budget_spent": [
                 sid for sid in (*named, *landed) if sid != PERSON and mail.wake_budget_spent(records[sid], now)
+            ],
+            # landed at the home while its host's link is down (§4.4a "When the recipient's host is
+            # unreachable"): nothing waits anywhere but the mailbox, and the sender is told
+            "unreachable": [
+                sid
+                for sid in (*named, *landed)
+                if sid != PERSON
+                and records[sid].host != self.host
+                and not (self.links.get(records[sid].host) or {}).get("up")
             ],
             "entry": entry.to_dict(),
             "delivered": list(named),
@@ -1798,7 +1810,7 @@ class HostAgent:
         """A send is refused when the sender's tally, or any named addressee's, is at the bound —
         never a copy recipient's — and `bound_hit` is written on every record holding the thread
         so the other side learns the exchange stopped (design §4.10 "A bounded exchange")."""
-        records = self.sessions
+        records = self._graph()
         me = records[sender]
         if root:
             limit = mail.THREAD_BOUND
@@ -1813,7 +1825,7 @@ class HostAgent:
                 for r in records.values():
                     if root in r.threads:
                         r.threads[root].bound_hit = True
-                        self.store.save(r)
+                        self._save(r)
                 raise RpcError(
                     f"thread {root} is at its bound of {limit} entries ({', '.join(at_bound)}): the send is "
                     f"refused — write the user_attention.md line yourself, with the thread attached (design §4.10)"
@@ -1828,8 +1840,8 @@ class HostAgent:
             mine, theirs = self._pair(me, sid, now), self._pair(records[sid], sender, now)
             if mine.count >= limit or theirs.count >= limit:
                 mine.bound_hit = theirs.bound_hit = True
-                self.store.save(me)
-                self.store.save(records[sid])
+                self._save(me)
+                self._save(records[sid])
                 raise RpcError(
                     f"{sender} and {sid} have exchanged {limit} messages replying to nothing inside "
                     f"{mail.PAIR_WINDOW}: the send is refused — write the user_attention.md line yourself "
@@ -1840,7 +1852,7 @@ class HostAgent:
         """Where a person's `--reply-to` looks: the person inbox first (a session's message to the
         person), then every session's copies (a person answering from a session's Inbox panel)."""
         return [e for e in self.person_inbox if e.id == msg_id] + [
-            e for r in self.sessions.values() for e in r.holds(msg_id)
+            e for r in self._graph().values() for e in r.holds(msg_id)
         ]
 
     def _check_person_depth(self, sender: str) -> None:
@@ -1863,7 +1875,7 @@ class HostAgent:
     def _mark(self, msg_id: str, **fields: Any) -> None:
         """Write the same fact on every copy of one message, so both cards show it: the home is
         the one writer (design §4.4a). `pending=<id>` appends to the list; anything else is set."""
-        for r in self.sessions.values():
+        for r in self._graph().values():
             copies = r.holds(msg_id)
             if not copies:
                 continue
@@ -1874,7 +1886,7 @@ class HostAgent:
                             e.pending.append(v)
                     else:
                         setattr(e, k, v)
-            self.store.save(r)
+            self._save(r)
         mine = [e for e in self.person_inbox if e.id == msg_id]
         for e in mine:
             for k, v in fields.items():
@@ -1899,30 +1911,38 @@ class HostAgent:
                 return {
                     "id": PERSON,
                     "entries": [
-                        {**e.to_dict(), "from_role": mail.from_role(self.sessions, PERSON, e.from_)} for e in held
+                        {
+                            **e.to_dict(),
+                            "from_role": mail.from_role(self._graph(), PERSON, e.from_, controllers=self._ctl),
+                        }
+                        for e in held
                     ],
                     "threads": {},
                     "sends": [],
                     "unread": sum(1 for e in self.person_inbox if not e.read_at),
                 }
-            s = self._get(self._addr(id))
+            s = self._find(self._addr(id))  # another host's too: the mailbox is the home's (step 5)
             mark = False
         else:
             me = self._addr(caller)
             if id and self._addr(id) != me:
                 raise RpcError(f"{me} cannot read {id}'s inbox: nobody reads another session's inbox (design §4.10)")
-            s = self._get(me)
+            s = self._find(me)
             mark = True
         entries = [e for e in s.inbox if not (unread and e.read_at)]
         if mark and any(not e.read_at for e in entries):
             at = now_iso()
             for e in entries:
                 e.read_at = e.read_at or at
-            self.store.save(s)
+            self._save(s)
             await self._push_changes()
+        who = self._address(s)
         return {
-            "id": s.id,
-            "entries": [{**e.to_dict(), "from_role": mail.from_role(self.sessions, s.id, e.from_)} for e in entries],
+            "id": who,
+            "entries": [
+                {**e.to_dict(), "from_role": mail.from_role(self._graph(), who, e.from_, controllers=self._ctl)}
+                for e in entries
+            ],
             "threads": {k: t.to_dict() for k, t in s.threads.items()},
             "sends": [e.to_dict() for e in s.sends[-3:]],
             "unread": s.unread(),
@@ -1947,22 +1967,22 @@ class HostAgent:
             self.person_inbox = kept
             self.person_store.save(kept)
             return {"id": PERSON, "deleted": msg, "unread": sum(1 for e in kept if not e.read_at)}
-        s = self._get(self._addr(id))
+        s = self._find(self._addr(id))
         kept = [e for e in s.inbox if e.id != msg]
         if len(kept) == len(s.inbox):
             raise RpcError(f"{s.id}'s inbox holds no entry {msg}")
         s.inbox = kept
         _prune_tallies(s)  # a delete is the other way an entry leaves (review of PR #214)
-        self.store.save(s)
+        self._save(s)
         await self._push_changes()
-        return {"id": s.id, "deleted": msg, "unread": s.unread()}
+        return {"id": self._address(s), "deleted": msg, "unread": s.unread()}
 
     async def _sweep_mail(self, now: datetime) -> None:
         """Once a tick: an `ask` past its bound expires on every copy; an addressee that exited
         leaves the `ask`s addressed to it pending, a closed one expires them (design §4.10
         lifecycle); read entries past retention are pruned, open asks exempt."""
         stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
-        for r in list(self.sessions.values()):
+        for r in list(self._graph().values()):
             for e in list(r.inbox):
                 if not e.open:
                     continue
@@ -1982,13 +2002,13 @@ class HostAgent:
         if len(kept) != len(self.person_inbox):
             self.person_inbox = kept
             self.person_store.save(kept)
-        for r in self.sessions.values():
+        for r in self._graph().values():
             inbox = [e for e in r.inbox if self._keep(e, now, inbox=True)]
             outbox = [e for e in r.outbox if self._keep(e, now, inbox=False)]
             if len(inbox) != len(r.inbox) or len(outbox) != len(r.outbox):
                 r.inbox, r.outbox = inbox, outbox
                 _prune_tallies(r)
-                self.store.save(r)
+                self._save(r)
 
     @staticmethod
     def _keep(e: MailEntry, now: datetime, *, inbox: bool) -> bool:
@@ -2034,7 +2054,7 @@ class HostAgent:
                 me.poke.clear()
                 views = self._views()
                 changed, cursor = waits.wake_changes(before, waits.wait_scope(views, who, scope))
-                s = self.sessions.get(who) if who is not None else None
+                s = self._graph().get(who) if who is not None else None  # a node's session waits here too (step 5)
                 wake = self._decide_wake(s, member_change=bool(changed)) if s is not None else None
                 if changed or (wake is not None and wake["cause"] == "mail"):
                     covered = wake["entries"] if wake is not None else []
@@ -2060,7 +2080,7 @@ class HostAgent:
         return {
             "id": e.id,
             "from": e.from_,
-            "from_role": mail.from_role(self.sessions, s.id, e.from_),
+            "from_role": mail.from_role(self._graph(), self._address(s), e.from_, controllers=self._ctl),
             "kind": e.kind,
             "about": e.about,
             "at": e.at,
@@ -2104,7 +2124,7 @@ class HostAgent:
         }
         s.wakes = (s.wakes + [decision])[-mail.WAKES_KEEP :]
         s.mail_decided = {"id": fresh[-1].id, "at": fresh[-1].at}
-        self.store.save(s)
+        self._save(s)
         return {**decision, "entries": fresh}
 
     def _refill(self, s: Session | None) -> None:
@@ -2114,7 +2134,7 @@ class HostAgent:
         if s is None:
             return
         s.wake_refilled_at = datetime.now(UTC).isoformat(timespec="microseconds")
-        self.store.save(s)
+        self._save(s)
         self._poke_waits()
 
     async def rpc_hook(self, session: str, **event: Any) -> dict[str, Any] | None:
@@ -2426,6 +2446,71 @@ class HostAgent:
             "gone": bool(sid) and record is None and rpc == "remove",
         }
 
+    # -- a node's calls the home answers (design §4.4a "Mail across hosts", TD-057 step 5) --------
+
+    def _from_home_form(self, address: str) -> str:
+        """An address in the home's form, read at this node: the home's own sessions bare there are
+        `id@home` here, and `id@<this node>` is bare."""
+        sid, h = naming.split_address(address)
+        return naming.qualify(f"{sid}@{h or self.home}", local=self.host)
+
+    async def _forward(self, rid: Any, name: str, params: dict[str, Any], caller: Any) -> dict[str, Any]:
+        """A node hands a call it cannot serve to the home over the link — `forward {rpc, params,
+        caller, token}` — and answers with the home's verdict, every address in it rewritten into
+        this host's form. A cancelled call (a `wait` whose client went away) is cancelled at the
+        home too, by its token, so no ghost wait is charged a wake there. Never queued: a link
+        that drops while the call is out is that call's error."""
+        mux = self._home_mux
+        if mux is None:
+            raise RpcError(f"{self.home} (home) is unreachable from {self.host}; refused, not queued (design §4.4a)")
+        token = secrets.token_hex(8)
+        try:
+            reply = await mux.request("forward", timeout=None, rpc=name, params=params, caller=caller, token=token)
+        except asyncio.CancelledError:
+            with contextlib.suppress(Exception):
+                await mux.notify("cancel", token=token)
+            raise
+        except link.LinkError as e:
+            return {"id": rid, "error": f"{self.home}: {e}"}
+        except link.LinkClosed:
+            return {"id": rid, "error": f"the link to {self.home} dropped while {name} was out: its verdict is unknown"}
+        reply = reply if isinstance(reply, dict) else {}
+        out = naming.readdress({k: v for k, v in reply.items() if k != "id"}, self._from_home_form)
+        return {"id": rid, **out}
+
+    async def _forwarded(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
+        """The home's end: a node's call run here as that node's session — the caller is
+        `id@host`, every address in the params read from that host's point of view, a `create`
+        landing on that host unless it says otherwise — through the same dispatch a local caller
+        gets, gate and routing included. The reply is the dispatch's, addresses in the home's
+        form; the node rewrites them. Registered by token until it returns so the node can
+        cancel it."""
+        rpc = str(params.get("rpc") or "")
+        p = naming.readdress(dict(params.get("params") or {}), lambda a: self._from_host(a, host))
+        if rpc == "set_controllers":
+            for key in ("add", "remove"):
+                if p.get(key):
+                    p[key] = [self._from_host(x, host) for x in p[key]]
+        if rpc == "create":
+            p.setdefault("host", host)
+        req = {"id": 0, "method": rpc, "params": p, "caller": params.get("caller")}
+        task = asyncio.ensure_future(self._dispatch(req, link_host=host))
+        token = str(params.get("token") or "")
+        if token:
+            self._forwarded_calls[token] = task
+        try:
+            return await task
+        finally:
+            if token:
+                self._forwarded_calls.pop(token, None)
+            if not task.done():
+                task.cancel()
+
+    def _cancel_forwarded(self, token: str) -> None:
+        task = self._forwarded_calls.pop(str(token), None)
+        if task is not None and not task.done():
+            task.cancel()
+
     # -- acts across the link, at the home (design §4.4a, TD-057 step 4a) -----------------------
 
     def _act_host(self, method: str, params: dict[str, Any]) -> str | None:
@@ -2451,17 +2536,25 @@ class HostAgent:
         return naming.qualify(f"{sid}@{h or self.host}", local=host)
 
     def _graph(self) -> dict[str, Session]:
-        """One graph for the gate (§4.4a "The gate reads one graph", step 4a): this host's records
-        under their ids and every other host's under `id@host`, each remote record's `controllers`
-        re-addressed from this home's point of view. Copies, read-only: `self.sessions` itself is
-        never widened — the tick, the anchor rule and the pane reads stay this host's."""
+        """One graph for the gates and the mailbox (§4.4a "The gate reads one graph", steps 4a and
+        5): this host's records under their ids and every other host's under `id@host` — the
+        records themselves, so what the mailbox writes lands on the record `_save` knows the host
+        of. A remote record's `controllers` are stored as its node writes them; `_ctl` reads them
+        from here, and every gate takes it. `self.sessions` itself is never widened — the tick,
+        the anchor rule and the pane reads stay this host's."""
         g: dict[str, Session] = dict(self.sessions)
         for host, recs in self.remote.items():
             for rid, r in recs.items():
-                c = copy.copy(r)
-                c.controllers = [self._from_host(x, host) for x in r.controllers]
-                g[f"{rid}@{host}"] = c
+                g[f"{rid}@{host}"] = r
         return g
+
+    def _ctl(self, s: Session) -> list[str]:
+        """A record's `controllers` as this host addresses them (§4.4a "Every address crosses in
+        the reader's form"): its own as stored, another host's re-addressed."""
+        return s.controllers if s.host == self.host else [self._from_host(x, s.host) for x in s.controllers]
+
+    def _address(self, s: Session) -> str:
+        return s.id if s.host == self.host else f"{s.id}@{s.host}"
 
     def _node_mux(self, host: str) -> link.Mux:
         """The live link to `host`, or the refusal in words: *unreachable since <when> — <why>*,
@@ -2610,6 +2703,11 @@ class HostAgent:
                     self._forget_remote(host, str(rid))
                 await self._push_changes()
                 return None
+            if method == "forward":
+                return await self._forwarded(host, params)
+            if method == "cancel":
+                self._cancel_forwarded(str(params.get("token") or ""))
+                return None
             raise link.LinkError(f"unknown link method {method!r}")
 
         mux = link.Mux(reader, writer, from_node)
@@ -2707,7 +2805,7 @@ class HostAgent:
         function over a record map, so a node can forward and the home can answer (§4.4a)."""
         if method == "create" and params.get("capabilities"):
             _grants(params["capabilities"])  # an unknown grant name is refused before the gate reads it
-        reason = mail.act_gate(self._graph() if self.remote else self.sessions, caller, method, params)
+        reason = mail.act_gate(self._graph(), caller, method, params, controllers=self._ctl)
         if reason:
             raise RpcError(reason)
 
@@ -2756,7 +2854,7 @@ class HostAgent:
         if s.host == self.host:
             return v
         v["id"] = f"{s.id}@{s.host}"
-        v["controllers"] = [self._from_host(c, s.host) for c in s.controllers]  # as this home addresses them
+        v["controllers"] = self._ctl(s)  # as this home addresses them
         state = self.links.get(s.host) or {"up": False, "since": None, "why": "not connected since the home started"}
         v["host_link"] = dict(state)
         if (sup := self.supervision.get(s.host)) and sup.get("doing"):
@@ -2886,19 +2984,29 @@ class HostAgent:
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
 
-    async def _dispatch(self, req: dict[str, Any]) -> dict[str, Any]:
-        resp = await self._dispatch_inner(req)
+    async def _dispatch(self, req: dict[str, Any], *, link_host: str | None = None) -> dict[str, Any]:
+        """`link_host`: the request came over that node's link (step 5), so its caller is that
+        host's session — `id@host` here — and never this socket's."""
+        resp = await self._dispatch_inner(req, link_host=link_host)
         caller = req.get("caller")
-        if not mail.is_person(caller):
+        if not mail.is_person(caller) and self.mode == "home":
             # The line on every `ao` reply (design §4.10): the response to a session with unread
             # mail says so — result or refusal alike — read after the method ran, so an `ao inbox`
             # that just read everything carries no line. It types nothing and starts nothing.
-            s = self.sessions.get(self._addr(naming.split_address(str(caller))[0]))
+            s = self._graph().get(self._caller_address(caller, link_host))
             if s is not None and (n := s.unread()):
                 resp["mail"] = {"unread": n, "wake_budget_spent": s.wake_budget_spent()}
         return resp
 
-    async def _dispatch_inner(self, req: dict[str, Any]) -> dict[str, Any]:
+    def _caller_address(self, caller: Any, link_host: str | None) -> str:
+        """A request's identity comes from the channel it arrived on, never from a field it
+        carries (design §4.4a): this socket is this host's, so any `@host` a client wrote is
+        dropped and the caller is this host's bare id; a node's link is that node's, so the
+        caller is `id@node` here."""
+        bare = naming.split_address(str(caller))[0]
+        return naming.qualify(f"{bare}@{link_host}", local=self.host) if link_host else bare
+
+    async def _dispatch_inner(self, req: dict[str, Any], *, link_host: str | None = None) -> dict[str, Any]:
         rid = req.get("id")
         name = req.get("method")
         method = getattr(self, f"rpc_{name}", None)
@@ -2911,20 +3019,23 @@ class HostAgent:
             log.warning("rpc %s: ignored unknown params %s", name, ", ".join(ignored))
         caller = req.get("caller")
         if not mail.is_person(caller):
-            # A request's identity comes from the channel it arrived on, never from a field it
-            # carries (design §4.4a): this socket is this host's, so any `@host` a client wrote
-            # is dropped and the caller is this host's bare id.
-            caller = naming.split_address(str(caller))[0]
+            caller = self._caller_address(caller, link_host)
         try:
             if self.mode == "node":
                 # A node (design §4.4a, the call-by-call table): decided before the gate, because
-                # the gate's graph is at the home. With the link down these are refused as
-                # unreachable; with it up, as not forwarded yet — never served from the replica.
-                refusal = modes.offline_refusal(
-                    str(name), caller, params, host=self.host, home=self.home, reachable=self.home_reachable()
-                )
-                if refusal:
-                    raise RpcError(refusal)
+                # the gate's graph is at the home. What the table refuses — the mailbox, reports,
+                # home-owned edits, a session's acts on others — is forwarded to the home while
+                # the link is up (step 5) and refused as unreachable while it is down; never
+                # served from the replica. A `wait` goes to the home too: that is where the mail
+                # and the other hosts' members are.
+                refusal = modes.offline_refusal(str(name), caller, params, host=self.host, home=self.home)
+                if refusal or name == "wait":
+                    if not self.home_reachable():
+                        raise RpcError(
+                            refusal
+                            or f"a wait sees the org at the home: {self.home} (home) is unreachable from {self.host}"
+                        )
+                    return await self._forward(rid, str(name), params, caller)
             self._gate(caller, str(name), params)
             if (target := self._act_host(str(name), params)) is not None:
                 # Another host's record (design §4.4a, step 4a): gated above over the one graph,

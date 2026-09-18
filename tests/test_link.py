@@ -201,8 +201,9 @@ async def test_the_link_comes_up_drops_with_the_home_and_comes_back(home, tmp_pa
             with pytest.raises(link.LinkError, match="unknown link method"):
                 await node._home_mux.request("not-a-method", timeout=10, pad="x" * 200_000)
             assert await node._home_mux.request("ping", timeout=10) == "pong"
-            # up, and still not served from the replica: nothing forwards yet (steps 4–5)
-            with pytest.raises(AgentError, match="the link to kmaster .home. is up, but forwarding"):
+            # up: the mailbox call is forwarded to the home (step 5), which reads the bare id as
+            # this node's session — and has no such record
+            with pytest.raises(AgentError, match="no session ao-x-w@laptop"):
                 await c.call("msg", to=["ao-x-w"], text="hi")
         home.stop()
         assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
@@ -479,7 +480,8 @@ async def test_the_gate_reads_one_graph_with_every_address_from_the_homes_point_
         "laptop", [record(controllers=[f"{lead['id']}@{agent.host}", "ao-x-sib"], team="g")], whole=True
     )
     g = agent._graph()
-    assert g["ao-x-w@laptop"].controllers == [lead["id"], "ao-x-sib@laptop"]
+    assert g["ao-x-w@laptop"] is agent.remote["laptop"]["ao-x-w"]  # the record itself, never a copy (step 5)
+    assert agent._ctl(g["ao-x-w@laptop"]) == [lead["id"], "ao-x-sib@laptop"]  # read from here
     assert agent.remote["laptop"]["ao-x-w"].controllers == [f"{lead['id']}@{agent.host}", "ao-x-sib"]  # untouched
     assert (await agent.rpc_get("ao-x-w@laptop"))["controllers"] == [lead["id"], "ao-x-sib@laptop"]
     assert "ao-x-w@laptop" not in agent.sessions  # never widened
@@ -695,3 +697,125 @@ async def test_a_container_nodes_session_holds_the_checkout_at_the_home_and_the_
             await c.call("create", name="y", dir=str(checkout), adapter="claude-code", host="laptop")
         agent.sessions[mine["id"]].adapter = "shell"
         await c.call("kill", id=mine["id"])
+
+
+# -- mail across hosts (step 5) ---------------------------------------------------------------------------
+
+
+async def test_a_forwarded_wait_blocks_at_the_home_as_the_nodes_session_and_its_token_cancels_it(agent):
+    """The home's end of `forward` (§4.4a "Mail across hosts"): the call runs under the caller's
+    cross-host identity, a `wait` is registered like any other, and the node's `cancel` ends it —
+    no ghost wait is charged a wake here."""
+    from conftest import wait_for
+
+    agent._take_records("laptop", [record(kind="interactive", unattended=True)], whole=True)
+    call = {"rpc": "wait", "params": {"timeout": 30, "scope": "all"}, "caller": "ao-x-w", "token": "t1"}
+    task = asyncio.ensure_future(agent._forwarded("laptop", call))
+    assert await wait_for(lambda: agent.blocked_in_wait("ao-x-w@laptop"), timeout=5.0, step=0.05)
+    assert "t1" in agent._forwarded_calls
+    agent._cancel_forwarded("t1")
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert not agent._waits and not agent._forwarded_calls
+    # a person's forwarded call is a person here, and a node session's is `id@node`
+    resp = await agent._forwarded("laptop", {"rpc": "inbox", "params": {}, "caller": None, "token": ""})
+    assert resp["result"]["id"] == "person"
+    resp = await agent._forwarded("laptop", {"rpc": "inbox", "params": {}, "caller": "ao-x-w", "token": ""})
+    assert resp["result"]["id"] == "ao-x-w@laptop"
+
+
+async def test_a_node_cancels_its_forwarded_call_at_the_home_by_token(agent):
+    class Held(FakeMux):
+        async def request(self, method, timeout=None, **params):
+            self.sent.append((method, params))
+            await asyncio.sleep(30)
+
+    agent.mode, agent.home = "node", "kmaster"
+    agent._home_mux = mux = Held()
+    task = asyncio.ensure_future(agent._forward(7, "wait", {"timeout": 30}, "ao-w"))
+    await asyncio.sleep(0.1)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert mux.sent[0][0] == "forward" and mux.sent[1] == ("cancel", {"token": mux.sent[0][1]["token"]})
+    agent._home_mux = None
+    with pytest.raises(Exception, match="unreachable"):
+        await agent._forward(8, "msg", {}, "ao-w")
+
+
+async def test_mail_crosses_the_link_both_ways_and_a_wait_from_the_node_wakes_on_it(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """TD-057 step 5, on one machine. A grinder on the node mails its lead at the home and reads
+    the reply; a `wait` from the node blocks at the home and returns on that mail; the node
+    session's act on a home session is gated at the home over the one graph and runs there;
+    mail to the node while its link is down lands at the home and says so."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        sock = home.dir / "agent.sock"
+        async with LocalClient(sock=sock) as person:
+            lead = await person.call(
+                "create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], unattended=True
+            )
+            await person.call("set_grants", id=lead["id"], add=["control"])
+            await person.call("set_controllers", id=address, add=[lead["id"]])
+            lead_there = f"{lead['id']}@kmaster"  # the lead, as the node addresses it
+            async with LocalClient(caller=w["id"]) as as_w, LocalClient(sock=sock, caller=lead["id"]) as as_lead:
+                # up the graph: the member mails its controller, forwarded, gated and landed at the home
+                got = await as_w.call("msg", to=[lead_there], text="claimed TD-1", kind="note")
+                assert got["delivered"] == [lead_there] and got["entry"]["from"] == w["id"]  # in the node's form
+                held = await person.call("inbox", id=lead["id"])
+                assert held["entries"][-1]["from"] == address and held["entries"][-1]["text"] == "claimed TD-1"
+                # a wait from the node blocks at the home and returns when the lead's reply lands
+                waiting = asyncio.ensure_future(as_w.call("wait", timeout=20, scope="all"))
+                await asyncio.sleep(0.5)
+                reply = await as_lead.call(
+                    "msg", to=[address], text="go ahead", kind="reply", reply_to=held["entries"][-1]["id"]
+                )
+                assert reply["delivered"] == [address] and reply["unreachable"] == []
+                woke = await asyncio.wait_for(waiting, timeout=15)
+                assert woke["wake"] and woke["wake"]["cause"] == "mail"
+                assert woke["mail"][0]["from"] == lead_there and woke["mail"][0]["from_role"] == "controller"
+                # the unread line rides every reply the home answers for the node's session, until
+                # it reads (a read the node serves alone carries none: the inbox is not there)
+                from sessionorc import client as clientmod
+
+                await as_w.call("msg", to=[lead_there], text="one more", kind="note")
+                assert clientmod.last_mail == {"unread": 1, "wake_budget_spent": False}
+                await as_w.call("list")
+                assert clientmod.last_mail is None
+                mine = await as_w.call("inbox")
+                assert mine["id"] == w["id"] and mine["entries"][-1]["from"] == lead_there
+                assert mine["entries"][-1]["read_at"] and (await person.call("get", id=address))["unread"] == 0
+                # a node session acting on a home session: gated at the home over one graph, both halves
+                with pytest.raises(AgentError, match="needs the control grant"):
+                    await as_w.call("send", id=lead_there, text="echo NO")
+                await person.call("set_grants", id=address, add=["control"])
+                with pytest.raises(AgentError, match="not in its controllers"):
+                    await as_w.call("send", id=lead_there, text="echo NO")
+                await person.call("set_controllers", id=lead["id"], add=[address])
+                await as_w.call("send", id=lead_there, text="echo FROM-NODE")
+                assert (await person.call("get", id=lead["id"]))["sends"][-1]["from"] == address
+                # a person at the node reaches the org's person inbox, and mails as a person
+                async with LocalClient() as at_node:
+                    assert (await at_node.call("inbox"))["id"] == "person"
+                    got = await at_node.call("msg", to=[lead_there], text="from the node's terminal")
+                    assert got["entry"]["from"] == "person"
+                # the lid closes: mail to the node lands at the home and says so; read on return
+                monkeypatch.setattr(link, "BACKOFF_FIRST", 2.0)
+                monkeypatch.setattr(link, "BACKOFF_MAX", 2.0)
+                node._home_mux.close("the lid closed")
+                await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
+                got = await as_lead.call("msg", to=[address], text="while you were away")
+                assert got["unreachable"] == [address] and got["delivered"] == [address]
+                assert (await person.call("get", id=address))["unread"] == 1
+                with pytest.raises(AgentError, match="unreachable"):
+                    await as_w.call("inbox")  # refused at the node, not queued
+                await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+                assert await wait_for(node.home_reachable, timeout=15.0, step=0.05)
+                mine = await as_w.call("inbox", unread=True)
+                assert [e["text"] for e in mine["entries"]] == ["while you were away"]
+            await person.call("kill", id=lead["id"])

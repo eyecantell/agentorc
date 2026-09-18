@@ -589,6 +589,9 @@ before step 3 builds the link, so until then a node is *always* out of reach of 
 table is its whole behaviour. One function decides it (`sessionorc.modes.offline_refusal`), read
 before the gate, and a home never calls it.
 
+Since step 5 the table is what a node answers **while its link is down**; with it up, every
+*refused* cell below is forwarded to the home instead (*Mail across hosts*).
+
 | Call | From a person | From a session |
 |---|---|---|
 | reads — `list`, `get`, `tail`, `explain`, `occupancy`, `name_check`, `recent_dirs`, `usage`, `adapters`, `ping`, `wait` | served: this host's sessions only | served; a `wait` sees only this host's records and no mail |
@@ -627,6 +630,40 @@ node's link is up*), so no wake is decided; when the link returns and the node r
 idle, the home's next tick decides the wake. An **act** onto an unreachable host is **refused**,
 never queued: a `kill` or a wrap-up that fires hours later is worse than a refusal the caller can
 see.
+
+**Mail across hosts (2026-09-18, TD-057 step 5).** How the paragraphs above are built.
+
+- **A node forwards; the home answers.** What the node's table refuses — `msg`, `inbox`,
+  `inbox_delete`, `progress`, `finding`, the home-owned edits, a session's `create` and its acts
+  on another session — and every `wait` go to the home as `forward {rpc, params, caller, token}`
+  while the link is up, and are refused as unreachable while it is down. The home runs the call
+  through its own dispatch **as that node's session**: the caller is `id@node` — identity from the
+  channel, never from a field — every address in the params is read from the node's point of
+  view (its bare ids are `id@node` here, its `id@kmaster` bare), a `create` lands on the node
+  unless it names a host, and the gate, the mailbox and the routing of acts are the ones a local
+  caller gets. The reply goes back with every address rewritten into the node's form
+  (`naming.readdress`, over the address keys and nothing else — never a `text`), and the unread
+  line rides it. A person at the node forwards as a person: their `ao inbox` is the org's person
+  inbox and their mail is a person's.
+- **The mailbox is one graph.** `_msg`, the inbox reads, the bounds, the marks and the sweep read
+  the org's records under their addresses — the records themselves, saved to the store of the host
+  each belongs to — and every gate reads a record's `controllers` re-addressed from the home. So a
+  grinder on a node mails its lead here up the same edge it would on one host, and the lead's
+  reply lands in the home's copy of the grinder's record, which is what the grinder's forwarded
+  `inbox` reads and marks.
+- **The doorbell is the forwarded `wait`.** A `wait` from a node blocks at the home under
+  `id@node`, sees the whole org and the mail as any wait does, and takes the wake decision there;
+  the node cancels it by token when its client goes away (`cancel`), so no ghost wait is charged a
+  wake at the home, and a link that drops ends it. *Reachable* includes the link being up because
+  a session that is not blocked in a wait here has no other doorbell yet — a hook-confirmed idle
+  on a node rings nothing across the link (4b, with the policy push).
+- **Landed — host unreachable.** Mail to a session whose link is down lands in the home's copy and
+  the sender's reply names it under `unreachable` (`ao msg` prints *landed — host unreachable*);
+  its card shows the unread count under the overlay. Nothing waits anywhere but the mailbox: the
+  node reads it on its next forwarded `inbox`.
+- **What the unread line cannot say on a node.** A read the node serves alone (`list`, `get`,
+  `tail`) carries no unread line — the inbox is not there — so on a node the line rides the
+  replies the home answered. Pushing the count with the home-owned fields is 4b.
 
 **When the home is lost.** A reboot costs nothing: sessions keep running under tmux (§4.1), nodes
 spool, and the home rebuilds from its store. A lost or stale store is rebuilt from the nodes'
@@ -706,11 +743,11 @@ decided here so both ends are written from one text.
   agent stopping — a node with no dialer never comes back — and the transport's stderr is read for
   as long as it runs, its last lines being the *ssh failed* diagnosis: an unread pipe fills, and a
   transport blocked on it takes the link with it days after it came up.
-- **What an up link changes, and what it does not yet.** `home_reachable()` is the link's state.
-  But a call the node cannot serve alone is still refused until the step that forwards it lands —
-  the mailbox and a session's acts on others with step 4 and 5 — and says so: *the link is up, but
-  forwarding this to the home is not built*. Serving such a call locally the moment the link came
-  up would be the split-brain this section exists to rule out.
+- **What an up link changes.** `home_reachable()` is the link's state. A call the node cannot
+  serve alone — the mailbox, reports, a home-owned edit, a session's acts on others, a `wait` —
+  is **forwarded** to the home while the link is up (*Mail across hosts*, below; step 5) and
+  refused, naming the home, while it is down. It is never served locally: that would be the
+  split-brain this section exists to rule out.
 
 **A container node (2026-09-17, after two Fable reviews and Paul's steer to the long-term shape;
 TD-057 step 3c — the link socket, `ao host up`, the supervisor, occupancy and reach built
@@ -876,8 +913,7 @@ machine to agentorc: an ssh node, provisioned by hand.
   a lead is woken when a member's host goes away and again when it returns — a member change, which
   the wake budget does not charge (§4.10). A home that has just started shows them
   unreachable until their node dials in.
-- **What is not built yet is refused by name.** Mail to `id@host` waits for step 5 and is refused
-  as *no session* there — the mailbox's graph is still this host's. The Focus terminal of such a
+- **What is not built yet is refused by name.** The Focus terminal of such a
   session on a machine node answers *runs on <host>: no terminal reaches it from here (4b)* — a
   container node's is reached by `docker exec` (*Reach*, below) — and `ao tail` and `ao explain`
   on any remote record, which read its pane, are refused the same way. Step 4b's list — the policy split,
