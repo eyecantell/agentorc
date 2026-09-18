@@ -33,6 +33,7 @@ is not in the suite (docker is not in `pdm run test`).
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import json
 import os
 import re
@@ -460,14 +461,51 @@ def _last_json(text: str) -> dict[str, Any]:
     return {}
 
 
-def exec_cmd(cid: str, user: str, *args: str, env_file: Path | None = None, detach: bool = False) -> list[str]:
+def exec_cmd(
+    cid: str,
+    user: str,
+    *args: str,
+    env_file: Path | None = None,
+    detach: bool = False,
+    env: dict[str, str] | None = None,
+) -> list[str]:
     cmd = ["docker", "exec"]
     if detach:
         cmd.append("-d")
     cmd += ["-u", user, "-e", f"AGENTORC_HOME={INSIDE_HOME}"]
+    for k, v in (env or {}).items():
+        cmd += ["-e", f"{k}={v}"]
     if env_file is not None and env_file.is_file():
         cmd += ["--env-file", str(env_file)]
     return [*cmd, cid, *args]
+
+
+BUILD_ENV = "AGENTORC_BUILD"  # what the agent inside was started on; it says so in its `hello`
+BUILDFILE = f"{INSIDE_HOME}/agent.build"  # the same, beside the pidfile: read from the home with no docker
+
+
+def build_id(wheel: Path) -> str:
+    """A build's name: the first 12 hex of the wheel's sha256. Every promote writes
+    `agentorc-0.0.1-…whl` again, so neither the file name nor the version tells two builds apart."""
+    return hashlib.sha256(wheel.read_bytes()).hexdigest()[:12]
+
+
+_home_build: tuple[tuple[str, int, int], str] | None = None  # (path, mtime_ns, size) → its build
+
+
+def home_build() -> str:
+    """The build the home would provision a node with now, or "" when it has no wheel yet. Asked
+    on every tick for every linked container node, so the hash is kept until the wheel changes."""
+    global _home_build
+    try:
+        wheel = newest_wheel()
+        st = wheel.stat()
+        key = (str(wheel), st.st_mtime_ns, st.st_size)
+        if _home_build is None or _home_build[0] != key:
+            _home_build = (key, build_id(wheel))
+        return _home_build[1]
+    except (ContainerError, OSError):
+        return ""
 
 
 def newest_wheel() -> Path:
@@ -517,7 +555,7 @@ def provision(n: ContainerNode, r: Runner, cid: str, user: str) -> Path:
     wheels = n.node_dir / "wheels"
     wheels.mkdir(parents=True, exist_ok=True)
     dest = wheels / wheel.name
-    if not dest.exists() or dest.stat().st_size != wheel.stat().st_size:
+    if not dest.exists() or build_id(dest) != build_id(wheel):  # by content: two builds may weigh the same
         shutil.copy2(wheel, dest)
     r.log(f"installing {wheel.name} into {INSIDE_VENV} …")
     r.run(exec_cmd(cid, user, "sh", "-c", f"test -x {INSIDE_VENV}/bin/python || python3 -m venv {INSIDE_VENV}"))
@@ -594,8 +632,44 @@ def agent_pid(r: Runner, cid: str, user: str) -> int | None:
 def start_agent(n: ContainerNode, r: Runner, cid: str, user: str) -> None:
     """`docker exec -d` of the agent, detached, with a pidfile and its log under the node's home —
     the whole of the contract systemd gives the home's own agent."""
-    script = f"echo $$ > {PIDFILE}; exec {INSIDE_VENV}/bin/agentorc-agent serve >> {AGENT_LOG} 2>&1"
-    r.run(exec_cmd(cid, user, "sh", "-c", script, env_file=n.env_file, detach=True))
+    # The build it is started on rides in its environment — it tells the home in its `hello`, and
+    # the home re-provisions a node that is behind (a promote changes no protocol number) — and
+    # sits beside the pidfile for `host_up`, which reads it from the home with no docker.
+    build = node_build(n)
+    script = (
+        f"echo $$ > {PIDFILE}; echo {build} > {BUILDFILE}; "
+        f"exec {INSIDE_VENV}/bin/agentorc-agent serve >> {AGENT_LOG} 2>&1"
+    )
+    r.run(exec_cmd(cid, user, "sh", "-c", script, env_file=n.env_file, detach=True, env={BUILD_ENV: build}))
+
+
+def node_build(n: ContainerNode) -> str:
+    """The build on the node's volume: what `provision` last installed there."""
+    wheels = sorted((n.node_dir / "wheels").glob("agentorc-*.whl"), key=lambda p: p.stat().st_mtime)
+    return build_id(wheels[-1]) if wheels else ""
+
+
+def running_build(n: ContainerNode) -> str:
+    """The build the agent inside says it was started on ("" for one started before this existed)."""
+    try:
+        return (n.node_dir / "home" / "agent.build").read_text().strip()
+    except OSError:
+        return ""
+
+
+def restart_agent(n: ContainerNode, r: Runner, cid: str, user: str) -> None:
+    """Stop the agent inside and start it on what is installed now. The sessions live in tmux and
+    survive it, as they survive a promote at the home."""
+    # Two agents under one pidfile is the failure to rule out: wait for the old one to go (it stops
+    # in under a second since TD-058), and take it down hard if it has not — only then start. Every
+    # promote drives every container node through here (review of PR #225).
+    stop = (
+        f"p=$(cat {PIDFILE} 2>/dev/null) && kill $p; i=0; "
+        'while [ -n "$p" ] && kill -0 $p 2>/dev/null && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done; '
+        '[ -n "$p" ] && kill -9 $p 2>/dev/null; true'
+    )
+    r.run(exec_cmd(cid, user, "sh", "-c", stop), check=False)
+    start_agent(n, r, cid, user)
 
 
 def host_up(name: str, r: Runner | None = None, *, rebuild: bool = False) -> dict[str, Any]:
@@ -610,17 +684,26 @@ def host_up(name: str, r: Runner | None = None, *, rebuild: bool = False) -> dic
     check_image(n, r, cid, user)
     wheel = provision(n, r, cid, user)
     pid = agent_pid(r, cid, user)
+    restarted = False
     if pid is None:
         start_agent(n, r, cid, user)
         r.log(f"agent started in {name}; its log is {n.node_dir / 'home' / 'agent.log'}")
+    elif running_build(n) != build_id(wheel):
+        # provisioned past what is running: a process keeps the code it loaded, so it is restarted
+        was = running_build(n) or "unknown"
+        r.log(f"agent in {name} (pid {pid}) runs build {was}; restarting it on {build_id(wheel)}")
+        restart_agent(n, r, cid, user)
+        restarted = True
     else:
-        r.log(f"agent already running in {name} (pid {pid}); `ao host rebuild {name}` restarts it on {wheel.name}")
+        r.log(f"agent already running in {name} (pid {pid}) on build {build_id(wheel)}")
     return {
         "node": name,
         "container": cid,
         "user": user,
         "wheel": wheel.name,
         "started": pid is None,
+        "restarted": restarted,
+        "build": build_id(wheel),
         "pid": pid,
     }
 
@@ -635,6 +718,8 @@ def host_status(name: str, r: Runner | None = None) -> dict[str, Any]:
         "container": cid,
         "state": None,
         "pid": None,
+        # what the agent inside was started on, and what this home would provision now
+        "build": {"running": running_build(n), "home": home_build()},
     }
     if cid:
         out["state"] = container_state(r, cid)
@@ -812,7 +897,9 @@ SUPERVISE_GRACE = 30.0  # seconds a started agent gets to dial in before it is l
 WAITING = "agent running inside, waiting for it to dial in"
 
 
-def decide(container_state: str | None, agent_alive: bool, link_why: str, *, volatile: bool = False) -> tuple[str, str]:
+def decide(
+    container_state: str | None, agent_alive: bool, link_why: str, *, volatile: bool = False, stale: bool = False
+) -> tuple[str, str]:
     """What to do for a node whose link is down: `(action, doing)` — `up` (the container is gone
     or stopped), `start` (running, no agent), `provision` (the agent is there but the home refused
     its protocol), or `wait` (running, the agent alive, the link merely not up yet — and, for a
@@ -831,7 +918,9 @@ def decide(container_state: str | None, agent_alive: bool, link_why: str, *, vol
         return "up", f"container {what} — bringing it up"
     if not agent_alive:
         return "start", "agent not running inside — starting it"
-    if link_why.startswith("refused:") and "protocol" in link_why:
+    if stale or (link_why.startswith("refused:") and "protocol" in link_why):
+        # behind the home: refused for its protocol, or linked and saying so in its `hello` (a
+        # promote changes no protocol number, so a linked node can be many builds behind)
         return "provision", "agent inside is an older build — re-provisioning it"
     return "wait", WAITING
 
@@ -864,5 +953,6 @@ def act(n: ContainerNode, r: Runner, action: str, user: str) -> None:
     user = user or _remote_user(n)
     if action == "provision":
         provision(n, r, cid, user)
-        r.run(exec_cmd(cid, user, "sh", "-c", f"p=$(cat {PIDFILE} 2>/dev/null) && kill $p"), check=False)
+        restart_agent(n, r, cid, user)
+        return
     start_agent(n, r, cid, user)

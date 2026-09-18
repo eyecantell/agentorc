@@ -877,7 +877,18 @@ nodes:
 - **The home supervises it.** There is no systemd inside, so the home's tick, for each `container:`
   node whose link is down, checks the container (gone: the same idempotent `up`), the agent (none
   inside: start it), and the version (a protocol refusal: re-provision), with backoff, and the
-  card's overlay says which of the three it is doing. *Start it* is `docker exec -d -u <user>` of
+  card's overlay says which of the three it is doing. **A linked node can be behind too**
+  (found live 2026-09-18: a node provisioned before steps 4a, 5 and 4b stayed linked through five
+  promotes, answering *unknown link method* to everything newer — a promote changes no protocol
+  number): a build is named by its wheel's content, the agent is started with its build in its
+  environment and says it in its `hello`, and a container node whose build is not the one this
+  home would provision now is marked `stale` on its link state — asked at the `hello` and again
+  on every tick, so a link that outlives a new wheel is caught too — and re-provisioned and
+  restarted by the same supervisor, link up or not; the restart waits for the old agent to go,
+  and takes it down hard if it has not, before starting the new one: never two under one pidfile. Its sessions live in tmux and survive it, as they
+  survive a promote at the home. `ao host up` restarts an agent that is behind for the same
+  reason. A machine node's build is recorded and shown, and nothing more: the home installs
+  nothing there. *Start it* is `docker exec -d -u <user>` of
   `agentorc-agent serve` with its output to `/agentorc/home/agent.log` — detached, so it outlives
   the exec that started it — and *none inside* is a pidfile under `/agentorc/home` whose pid is
   not alive in the container; the generated definition sets `init: true`, so the container's
