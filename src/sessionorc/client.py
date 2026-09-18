@@ -128,7 +128,7 @@ async def bridge_stdio() -> int:
         sys.stdout.flush()
         return 1
     loop = asyncio.get_running_loop()
-    stdin = asyncio.StreamReader()
+    stdin = asyncio.StreamReader(limit=LINE_LIMIT)
     await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(stdin), sys.stdin)
 
     async def up() -> None:
