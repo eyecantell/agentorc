@@ -44,3 +44,6 @@ Two briefs are written but **not launchable yet**, so that their rules are decid
 they are needed: `guardians-orchestrator.md` (blocked — the repos are not on this host, and the
 devcontainer question in design §10 is open) and `director.md` (needs two leads before
 it is worth running). Both carry the restart ceiling and `one_for_one` scope from TD-036.
+
+`td057-step4b.md` is a one-item brief (TD-057 step 4b, three PRs): launch it the same way, under the
+lead, when the step is wanted; it checks first that no other session holds the step.
