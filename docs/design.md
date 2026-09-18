@@ -566,12 +566,17 @@ link is back (the host agent's stopping policies keep running, above):
 all are **refused**, naming the unreachable home. An ungated spool would deliver mail the gate
 never saw; spooling with the verdict returned later is a possible later slice, not this one. The
 node keeps observing its sessions while home is away. **On reconnect it sends a full snapshot of
-its records first, then the events it spooled**; the home applies node-owned fields from the
-snapshot and drops replayed events older than it. The spool is bounded — drop the oldest, keep the
-snapshot — which is enough at the rate hooks fire, so nobody builds a queue for it. A report about a
+its records, and that is the whole of it** — there is no spool of hook events (decided in step
+4b.2). Every consequence of a hook that the home reads is a node-owned field of the record — the
+state, the pending, the tool's id, the model, the subagents — and nothing at the home consumes an
+event: a hook is applied on the session's own host (`_apply_event`), where its freshness also
+decides whether a screen rule may overrule it (§4.2). A spool would replay what the snapshot
+already carries. A future consumer of events at the home re-opens this. A report about a
 record the home has never seen (a person's offline create, or a home restored from an old store) is
 **adopted**, as `_reconcile_external` adopts a hand-made pane today, with the replica's
-`controllers` or none. A closed home record with the same id is superseded by it (invariant 12).
+`controllers` or none. A closed home record with the same id is superseded by it (invariant 12):
+replaced in place, as a new session of a name replaces a finished one on one host, while a live
+record that disagrees on identity is refused and logged (step 4b.2).
 **Permission prompts** follow the same line: the hook blocks on its node's socket and the waiter
 lives there; the home pushes `needs-you` to the UI and routes a person's answer back to the node.
 When the link drops mid-prompt, the home marks the pending *host unreachable* and the card sends the
@@ -606,7 +611,8 @@ Two of those rows are decisions the rule did not make. **Reports are refused, no
 They are home-owned, so a claim written to the replica would be overwritten by the home's copy on
 reconnect; and a claim is a lease checked against every sibling (§4.8, TD-056), which a node cannot
 check alone. A worker that cannot declare keeps working — its branch, its PR and the ledger are the
-durable record, and the tick still derives what it can see. **A person's mail is refused too**,
+durable record, and the tick derives from them again once the link is back (derived reports are
+the home's too: a node derives nothing while its link is down, step 4b.2). **A person's mail is refused too**,
 although a person is never gated: the refusal is not a gate's, it is that the inbox they would
 write to is not on this machine. Every refusal names the home and says *refused, not queued*, so
 nobody waits for a delivery that is not coming. What the node does **not** stop doing offline: its
@@ -658,17 +664,18 @@ see.
   the node cancels it by token when its client goes away (`cancel`), so no ghost wait is charged a
   wake at the home, and a link that drops ends it. *Reachable* includes the link being up because
   a session that is not blocked in a wait here has no other doorbell yet — a hook-confirmed idle
-  on a node rings nothing across the link (4b, with the policy push).
+  rings nothing on one host either (TD-052 step 7), and across the link it will be that.
 - **Landed — host unreachable.** Mail to a session whose link is down lands in the home's copy and
   the sender's reply names it under `unreachable` (`ao msg` prints *landed — host unreachable*);
   its card shows the unread count under the overlay. Nothing waits anywhere but the mailbox: the
   node reads it on its next forwarded `inbox`.
-- **What the unread line cannot say on a node.** A read the node serves alone (`list`, `get`,
-  `tail`) carries no unread line — the inbox is not there — so on a node the line rides the
-  replies the home answered. Pushing the count with the home-owned fields is 4b.
+- **The unread line on a node.** A read the node serves alone (`list`, `get`, `tail`) has no
+  inbox to count; since step 4b.2 it carries the line from the count the home pushes with each
+  record's intent (above), a hint as fresh as the link. The replies the home answered carry its
+  own line, as before.
 
 **When the home is lost.** A reboot costs nothing: sessions keep running under tmux (§4.1), nodes
-spool, and the home rebuilds from its store. A lost or stale store is rebuilt from the nodes'
+keep observing and send their snapshot when they dial back, and the home rebuilds from its store. A lost or stale store is rebuilt from the nodes'
 replicas, which carry every home-owned field as of their last push, adopted on reconnect as above.
 What is **lost with the home's store and only that**: mail, thread tallies, wake budgets and the
 person inbox — which invariant 13 already declares not durable. Backup is a **nightly tarball of the
@@ -919,8 +926,8 @@ machine to agentorc: an ssh node, provisioned by hand.
   session on a machine node answers *runs on <host>: no terminal reaches it from here* — the
   terminal over the link is *Later* in TD-057; a container node's is reached by `docker exec`
   (*Reach*, below). `ao tail` and `ao explain` on a remote record read its pane on its node since
-  step 4b.1 (*Acts across the link*). Step 4b's remaining list — the policy split and the spool of
-  hook events on reconnect — stays refused by the node's table above.
+  step 4b.1 (*Acts across the link*). A team's roles and briefs on a machine node without a clone at
+  the same path are refused naming that (*Teams across hosts*) until step 4b.3.
 
 **Acts across the link (2026-09-17, TD-057 step 4a).** What *A node reports and executes; the home
 decides* means call by call.
@@ -951,7 +958,30 @@ decides* means call by call.
   the home's — it owns those fields — and are applied to its copy, but only once the node has taken
   the same edit into its replica in the same call, so the node's stopping policies read the intent
   the home holds and an edit on an unreachable host is refused like any act rather than left to
-  diverge. Step 4b generalises this to pushing every home-owned field on reconnect.
+  diverge. Step 4b.2 added the general push (below); this per-call push stays, because it is what
+  makes an edit on an unreachable host a refusal rather than a divergence.
+- **The home's intent, pushed (step 4b.2).** *The home pushes each node its records' policy
+  fields* is the `intent` link method, home → node: `{records: [{id, host, <fields>, unread,
+  wake_budget_spent}]}`, sent for every record of the node once after its snapshot is taken and
+  then for each record whose pushed fields or unread count change. The fields are the home-owned
+  ones less the mailbox — never `inbox`, `outbox`, `threads`, `wakes`, `mail_decided` or a message
+  body — less `sends` (every send runs on the pane's own node, and the merge unions it) and less
+  `superseded_by` (written by the node's own resume, which the home does not hear), as the home
+  stores them, which for another host's record is already the node's address form. The node
+  applies them with `apply_home` — whatever else a push carries is not taken — and a changed
+  `run_until` resets `wrapup_sent_at` as `set_stop` does. So a replica that drifted — a home
+  restored from an old store, a routed edit whose second half failed — is repaired on the next
+  link. The unread count is kept as a **hint**, not an inbox: a read the node serves alone carries
+  the mail line from it. Refused, not queued: nothing is pushed to a link that is down, and the
+  next snapshot pushes everything.
+- **Derived reports from a node (step 4b.2).** The tick's derived `progress` and `findings` are
+  home-owned, so a node's tick sends what it derives to the home as `derived {id, progress,
+  findings, retire}` — applied there exactly as the home's own tick applies its own (upserts under
+  invariant 10, a moved-off branch claim retired), for a record of that link's host only, and
+  refused whole if an entry says `declared`. Its own link method rather than a forwarded
+  `progress`, because a derived entry carries the branch it came from and a retire, which the RPC
+  does not. While the link is down the node derives nothing: a claim written to the replica is
+  overwritten on reconnect and was never checked against the siblings' leases.
 - **Reads of a pane (step 4b.1).** `tail` and `explain` on `id@host` read a screen only that
   node's tmux holds, so the home asks the node for them — `read {rpc, params}`, a link method of
   its own whose allowlist is exactly those two (`NODE_READS`), so a read can never reach an acting
