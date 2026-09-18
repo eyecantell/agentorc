@@ -576,7 +576,9 @@ record the home has never seen (a person's offline create, or a home restored fr
 lives there; the home pushes `needs-you` to the UI and routes a person's answer back to the node.
 When the link drops mid-prompt, the home marks the pending *host unreachable* and the card sends the
 person to Focus; the hook keeps blocking until its own timeout, and a person at that host answers
-in the tool's own terminal dialog, which is already up in the pane (§4.2). **Reachability has one
+in the tool's own terminal dialog, which is already up in the pane (§4.2). (Built as step 4b.1: the
+answer is `decide` routed as an act; the mark is `host_unreachable` on the view's `pending`, an
+overlay like `unreachable` itself; `decide` on a dropped link is refused like any act.) **Reachability has one
 source**: the home's link state per host, with §4.6's *ssh failed* vs *agent down* diagnosis made
 by that link, shown as an overlay on the host's cards, never as a record state. The
 alternative Paul was offered — the laptop acting as its own home while offline — would make two
@@ -914,10 +916,10 @@ machine to agentorc: an ssh node, provisioned by hand.
   the wake budget does not charge (§4.10). A home that has just started shows them
   unreachable until their node dials in.
 - **What is not built yet is refused by name.** The Focus terminal of such a
-  session on a machine node answers *runs on <host>: no terminal reaches it from here (4b)* — a
-  container node's is reached by `docker exec` (*Reach*, below) — and `ao tail` and `ao explain`
-  on any remote record, which read its pane, are refused the same way. Step 4b's list — the policy split,
-  permission prompts answered over the link, a node's own `ao` forwarding to the home, the spool of
+  session on a machine node answers *runs on <host>: no terminal reaches it from here* — the
+  terminal over the link is *Later* in TD-057; a container node's is reached by `docker exec`
+  (*Reach*, below). `ao tail` and `ao explain` on a remote record read its pane on its node since
+  step 4b.1 (*Acts across the link*). Step 4b's remaining list — the policy split and the spool of
   hook events on reconnect — stays refused by the node's table above.
 
 **Acts across the link (2026-09-17, TD-057 step 4a).** What *A node reports and executes; the home
@@ -950,6 +952,15 @@ decides* means call by call.
   the same edit into its replica in the same call, so the node's stopping policies read the intent
   the home holds and an edit on an unreachable host is refused like any act rather than left to
   diverge. Step 4b generalises this to pushing every home-owned field on reconnect.
+- **Reads of a pane (step 4b.1).** `tail` and `explain` on `id@host` read a screen only that
+  node's tmux holds, so the home asks the node for them — `read {rpc, params}`, a link method of
+  its own whose allowlist is exactly those two (`NODE_READS`), so a read can never reach an acting
+  method through it and `act`'s list never grows by a read. **Ungated**, as on one host (§9
+  invariant 11): no caller crosses with it, and a session with no grant reads a node's pane as it
+  reads a local one. Refused as unreachable — never queued — while the link is down; the reply is
+  the node's, untouched but for its addresses. A node serves reads of its own host's panes only: a
+  call at a node naming another host's session is *no session* there, not forwarded (the UI does
+  not call either — a card's preview is the record's own `tail`, reported).
 - **`create` with a `host`.** `create` takes `host` (default: this one); for another host it is an
   act to that node, whose `create` runs the anchor rule and occupancy over *its* records and its
   checkout, adds the caller — as the node addresses it — to `controllers`, and the reply is addressed

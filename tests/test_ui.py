@@ -1006,3 +1006,21 @@ def test_the_focus_header_carries_the_out_of_work_chip_from_the_record(client, t
     call_sync("progress", id=sid, ref="TD-053", status="claimed", caller=sid)
     assert "out of work" not in client.get(f"/focus/{sid}").text
     call_sync("kill", id=sid)
+
+
+def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_dialog(tmp_path, monkeypatch):
+    """§4.4a "Permission prompts follow the same line" (TD-057 step 4b.1): with the host's link down
+    the waiter is out of reach, so the card offers no Allow / Deny — whose `decide` would be refused —
+    and says where the prompt can still be answered."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    s = {
+        "id": "ao-x-w@laptop", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/x",
+        "host": "laptop", "state": "unreachable", "last_state": "needs-you", "since": "2026-09-18T10:00:00Z",
+        "confidence": "hook", "pane": True, "tail": [], "host_link": {"up": False, "why": "the lid closed"},
+        "pending": {"kind": "permission", "text": "Bash: git push", "tool_use_id": "tu", "host_unreachable": True},
+    }  # fmt: skip
+    html = templates.get_template("card.html").render(s=view(s))
+    assert "permission: Bash: git push — host unreachable" in html and "answer it at laptop" in html
+    assert 'data-act="allow"' not in html

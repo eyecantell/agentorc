@@ -358,8 +358,8 @@ async def test_another_hosts_record_is_addressed_unreachable_until_its_node_dial
         agent.links["laptop"] = {"up": False, "since": "t", "why": "the lid closed"}
         with pytest.raises(AgentError, match="runs on laptop: unreachable since t — the lid closed; refused, not"):
             await c.call("kill", id="ao-x-w@laptop")
-        with pytest.raises(AgentError, match="reading its pane across the link is not built"):
-            await c.call("explain", id="ao-x-w@laptop")
+        with pytest.raises(AgentError, match="runs on laptop: unreachable since t — the lid closed; refused, not"):
+            await c.call("explain", id="ao-x-w@laptop")  # a read crosses the link since 4b.1, and needs it up
     # a restarted home still has them, from `remote/laptop/`
     again = HostAgent(tmux=agent.tmux)
     assert (
@@ -635,6 +635,133 @@ async def test_a_create_with_a_host_lands_on_the_node_and_is_adopted_at_the_home
             await person.call("kill", id=lead["id"])
 
 
+# -- reads of a pane across the link, and a permission answered over it (step 4b.1) ------------------------
+
+
+async def test_a_read_of_another_hosts_pane_crosses_as_a_read_ungated_and_only_ever_a_read(agent):
+    """`tail` and `explain` on `id@laptop` go to that node as the `read` link method — never `act` —
+    for any caller, the gate being for acts (§9 invariant 11); the reply comes back with its
+    addresses in the home's form and nothing else touched; a link that is down refuses it."""
+
+    class Reads(FakeMux):
+        async def request(self, method, timeout=None, **params):
+            self.sent.append((method, params))
+            if params["rpc"] == "tail":
+                return ["line one", "ao-x-w is not an address here"]
+            return {"id": "ao-x-w", "state": "working", "tail": ["ao-x-w"], "reason": "no screen rule matched"}
+
+    agent._take_records("laptop", [record(controllers=["ao-x-lead"])], whole=True)
+    agent._link_muxes["laptop"] = mux = Reads()
+    agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
+    async with LocalClient(caller="ao-stranger") as stranger:
+        assert await stranger.call("tail", id="ao-x-w@laptop", lines=5) == ["line one", "ao-x-w is not an address here"]
+        x = await stranger.call("explain", id="ao-x-w@laptop")
+        assert x["id"] == "ao-x-w@laptop" and x["tail"] == ["ao-x-w"]  # the id addressed; a screen line untouched
+        assert mux.sent == [
+            ("read", {"rpc": "tail", "params": {"id": "ao-x-w", "lines": 5}}),
+            ("read", {"rpc": "explain", "params": {"id": "ao-x-w"}}),
+        ]
+        with pytest.raises(AgentError, match="needs the control grant"):
+            await stranger.call("kill", id="ao-x-w@laptop")  # reading is not acting
+        with pytest.raises(AgentError, match="no session ao-x-nope@laptop"):
+            await stranger.call("tail", id="ao-x-nope@laptop")
+        del agent._link_muxes["laptop"]
+        agent.links["laptop"] = {"up": False, "since": "t", "why": "the lid closed"}
+        with pytest.raises(
+            AgentError, match="runs on laptop: unreachable since t — the lid closed; refused, not queued"
+        ):
+            await stranger.call("tail", id="ao-x-w@laptop")
+    assert len(mux.sent) == 2  # nothing was queued for the link's return
+
+
+async def test_a_node_serves_the_home_a_read_and_nothing_else_through_it(agent):
+    """The node's end: `read` runs `NODE_READS` and only them — an acting method asked for through
+    it is refused, whatever sent it — and a record of another host is not this node's to read."""
+    agent.mode, agent.home = "node", "kmaster"
+    for rpc in ("kill", "send", "set_grants", "decide", "msg"):
+        with pytest.raises(link.LinkError, match=f"'{rpc}' is not a read a node serves the home"):
+            await agent._from_home("read", {"rpc": rpc, "params": {"id": "ao-x-w"}})
+    with pytest.raises(link.LinkError, match="ao-x-w@desk is not on .*: not my host"):
+        await agent._from_home("read", {"rpc": "tail", "params": {"id": "ao-x-w@desk"}})
+    with pytest.raises(link.LinkError, match="no session ao-nope"):
+        await agent._from_home("read", {"rpc": "explain", "params": {"id": "ao-nope"}})
+    with pytest.raises(link.LinkError, match="'tail' is not an act a node executes"):
+        await agent._from_home("act", {"rpc": "tail", "params": {"id": "ao-x-w"}, "caller": None})
+
+
+async def test_the_home_reads_a_nodes_pane_and_a_stranger_reads_it_too(home, tmp_path, monkeypatch):
+    """TD-057 step 4b.1, end to end: `ao tail` and `ao explain` at the home on a session of the
+    node return that node's pane; a session with no grant reads it as well and still cannot act."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as _node:
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            await c.call("send", id=w["id"], text="echo PANE-$((6*7))")
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        sock = home.dir / "agent.sock"
+        async with LocalClient(sock=sock) as person, LocalClient(sock=sock, caller="ao-stranger") as stranger:
+            for _ in range(100):
+                lines = await person.call("tail", id=address, lines=20)
+                if any("PANE-42" in ln for ln in lines):
+                    break
+                await asyncio.sleep(0.1)
+            assert any("PANE-42" in ln for ln in lines), lines
+            x = await stranger.call("explain", id=address)
+            assert x["id"] == address and x["adapter"] == "shell" and any("PANE-42" in ln for ln in x["tail"])
+            with pytest.raises(AgentError, match="needs the control grant"):
+                await stranger.call("kill", id=address)
+            await person.call("kill", id=address)
+
+
+async def test_a_permission_waiting_on_a_node_is_answered_at_the_home_and_says_so_when_the_link_drops(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """§4.4a "Permission prompts follow the same line". The hook blocks on its node; the home's card
+    reads `needs-you` and the person's answer there reaches the node's waiter, which returns it to
+    the hook. With the link down: the card's pending says *host unreachable*, `decide` is refused,
+    never queued, and the hook keeps blocking until its own timeout."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+
+        async def hook(tool_use_id, wait):
+            async with LocalClient() as c:  # the hook script's call, on the node's own socket
+                return await c.call(
+                    "hook",
+                    session=w["id"],
+                    kind="permission",
+                    text="Bash: git push",
+                    tool_use_id=tool_use_id,
+                    wait_seconds=wait,
+                )
+
+        blocked = asyncio.ensure_future(hook("tu-1", 20))
+        v = await until(
+            home, address, lambda v: v is not None and (v.get("pending") or {}).get("tool_use_id") == "tu-1"
+        )
+        assert v["state"] == "needs-you" and v["pending"]["kind"] == "permission"
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            await person.call("decide", id=address, tool_use_id="tu-1", behavior="allow")
+            assert await asyncio.wait_for(blocked, timeout=10) == {"behavior": "allow", "reason": None}
+            await until(home, address, lambda v: v is not None and v["state"] == "working")
+            # the lid closes mid-prompt
+            blocked = asyncio.ensure_future(hook("tu-2", 4))
+            await until(
+                home, address, lambda v: v is not None and (v.get("pending") or {}).get("tool_use_id") == "tu-2"
+            )
+            home.write_hosts([])  # the link stays down: the dialer's backoff was fixed when it started
+            node._home_mux.close("the lid closed")
+            v = await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
+            assert v["last_state"] == "needs-you" and v["pending"]["host_unreachable"] is True
+            with pytest.raises(AgentError, match="runs on laptop: unreachable since .*; refused, not queued"):
+                await person.call("decide", id=address, tool_use_id="tu-2", behavior="allow")
+            assert not blocked.done()  # still blocking on the node
+            assert await asyncio.wait_for(blocked, timeout=10) is None  # its own timeout: the terminal dialog
+        assert node.sessions[w["id"]].pending.kind == "question"
+
+
 # -- occupancy across the home and its container nodes (step 3c.4) ----------------------------------------
 
 
@@ -841,9 +968,13 @@ async def test_a_persons_forwarded_act_reaches_only_the_nodes_own_records(home, 
             ):
                 with pytest.raises(AgentError, match=f"a person at laptop may {rpc} only laptop's sessions"):
                     await person_at_laptop.call(rpc, id=f"{lead['id']}@kmaster", **extra)
-            # a person's acts on panes never leave the node: a foreign id is simply no session here
+            # a person's acts on panes never leave the node: a foreign id is simply no session here —
+            # and nor do its reads of a pane (4b.1 routes those from the home only)
             with pytest.raises(AgentError, match="no session"):
                 await person_at_laptop.call("kill", id=f"{lead['id']}@kmaster")
+            for read in ("tail", "explain"):
+                with pytest.raises(AgentError, match="no session"):
+                    await person_at_laptop.call(read, id=f"{lead['id']}@kmaster")
             # the two reads the same rule covers: a home lead's mail bodies, and a `wait` over the org
             with pytest.raises(AgentError, match="a person at laptop may inbox only laptop's sessions"):
                 await person_at_laptop.call("inbox", id=f"{lead['id']}@kmaster")
