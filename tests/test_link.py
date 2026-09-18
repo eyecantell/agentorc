@@ -616,3 +616,49 @@ async def test_a_create_with_a_host_lands_on_the_node_and_is_adopted_at_the_home
             assert check["verdict"] == "live" and check["holder"] == f"{rid}@laptop"  # addressed, like every reply
             await person.call("kill", id=v["id"])
             await person.call("kill", id=lead["id"])
+
+
+# -- occupancy across the home and its container nodes (step 3c.4) ----------------------------------------
+
+
+async def test_a_container_nodes_session_holds_the_checkout_at_the_home_and_the_reverse(agent, tmp_path, monkeypatch):
+    """Design §4.4a "A container node": the checkout is one directory here and there, so a record
+    of the node's over it is an occupant at the home — `create` here is refused by the anchor
+    rule, and a create routed to the node is refused here before it crosses. A machine node's
+    record over the same path is another directory and is not read."""
+    from sessionorc import containers
+
+    checkout = tmp_path / "repo"
+    (checkout / ".devcontainer").mkdir(parents=True)
+    (checkout / ".devcontainer" / "devcontainer.json").write_text('{"image": "python:3.12"}')
+    hosts_yml = paths.home() / "hosts.yml"
+    hosts_yml.write_text(
+        f"local:\n  name: {agent.host}\nnodes:\n  cm:\n    container: {{devcontainer: {checkout}}}\n  laptop: {{}}\n"
+    )
+    assert "cm" in containers.container_nodes()
+    agent._take_records("cm", [record("ao-repo-w", host="cm", dir=str(checkout), kind="interactive")], whole=True)
+    agent._take_records(
+        "laptop", [record("ao-repo-l", host="laptop", dir=str(checkout), kind="interactive")], whole=True
+    )
+    async with LocalClient() as c:
+        assert (await c.call("occupancy", dir=str(checkout)))["occupants"] == ["ao-repo-w@cm (working)"]
+        with pytest.raises(AgentError, match="already has agent session ao-repo-w@cm .working.; anchor rule"):
+            await c.call("create", name="x", dir=str(checkout), adapter="claude-code")
+        s = await c.call(
+            "create", name="sh", dir=str(checkout), adapter="shell", argv=["bash", "--norc"]
+        )  # shells never count
+        await c.call("kill", id=s["id"])
+        # the reverse: a home session holds it, and a create for the container is refused here
+        agent._take_records(
+            "cm", [record("ao-repo-w", host="cm", dir=str(checkout), kind="interactive", state="exited")], whole=True
+        )
+        mine = await c.call("create", name="here", dir=str(checkout), adapter="shell", argv=["bash", "--norc"])
+        agent.sessions[mine["id"]].adapter = "claude-code"  # an agent session, as far as the rule is concerned
+        with pytest.raises(AgentError, match=f"already has agent session {mine['id']} .working.; anchor rule"):
+            await c.call("create", name="y", dir=str(checkout), adapter="claude-code", host="cm")
+        with pytest.raises(AgentError, match="unreachable"):  # a worktree of it is another directory: not held
+            await c.call("create", name="y", dir=str(checkout), adapter="claude-code", host="cm", worktree="y")
+        with pytest.raises(AgentError, match="unreachable"):  # a machine node: its path is another directory
+            await c.call("create", name="y", dir=str(checkout), adapter="claude-code", host="laptop")
+        agent.sessions[mine["id"]].adapter = "shell"
+        await c.call("kill", id=mine["id"])

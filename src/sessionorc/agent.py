@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import adapters, containers, hosts, link, mail, modes, naming, paths, reports, waits
-from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
+from sessionorc.gitinfo import WORKTREES_DIR, WorktreeError, ensure_worktree, git_info
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
     ASK_KINDS,
@@ -1086,6 +1086,20 @@ class HostAgent:
             and s.state not in ("exited", "closed")
             and Path(s.dir).resolve() == directory
         ]
+        # A container node on this machine has the checkout mounted at the same path (design §4.4a
+        # "A container node", 3c.4): a record of its over this directory holds the slot too — read
+        # from what the node last reported, derived from the `container:` entry, never configured.
+        # A machine node's `/home/x/repo` is another directory, and is not read.
+        if self.mode == "home" and self.remote:
+            for host in containers.container_nodes():
+                out += [
+                    f"{s.id}@{host} ({s.state})"
+                    for s in self.remote.get(host, {}).values()
+                    if s.kind == "interactive"
+                    and s.adapter != "shell"
+                    and s.state not in ("exited", "closed")
+                    and Path(s.dir).resolve() == directory
+                ]
         for ext in adapters.external_sessions():
             if ext.tool_id and ext.tool_id in ours:
                 continue  # that is one of ours, seen through the tool's registry
@@ -2219,16 +2233,15 @@ class HostAgent:
             self._supervised(n.name, sup, f"cannot observe the container: {e}", failed=True)
             return
         why = (self.links.get(n.name) or {}).get("why", "")
-        decision = containers.decide(cstate, alive, str(why))
-        if decision is None:
-            # running, the agent alive, the link simply not up yet: give it the grace, then look again
+        action, doing = containers.decide(cstate, alive, str(why), volatile=n.volatile)
+        if action == "wait":
+            # nothing to mend — the agent is dialing, or the person stopped a volatile container:
+            # give it the grace, then look again
             sup["next"] = time.monotonic() + containers.SUPERVISE_GRACE
-            waiting = "agent running inside, waiting for it to dial in"
-            if sup["doing"] != waiting:
-                sup["doing"], sup["since"], sup["error"], sup["attempts"] = waiting, now_iso(), "", 0
+            if sup["doing"] != doing:
+                sup["doing"], sup["since"], sup["error"], sup["attempts"] = doing, now_iso(), "", 0
                 self._note_link(n.name)
             return
-        action, doing = decision
         sup["doing"], sup["since"], sup["error"] = doing, now_iso(), ""
         self._note_link(n.name)
         log.info("supervisor %s: %s", n.name, doing)
@@ -2476,6 +2489,25 @@ class HostAgent:
             raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
         return {"host": host, **(seen if isinstance(seen, dict) else {"dir": dir, "exists": False})}
 
+    async def _check_occupancy_for(self, host: str, params: dict[str, Any]) -> None:
+        """The anchor rule (§9 invariant 2) for a create routed to a container node on this
+        machine (3c.4): the checkout is one directory here and there, and the node cannot see this
+        host's sessions, so the home checks its own records — and the other container nodes' —
+        before the create crosses. The node then checks its own as it always has. A machine node
+        is not checked: its path is another directory."""
+        if host not in containers.container_nodes():
+            return
+        if params.get("kind", "interactive") != "interactive" or params.get("adapter", "shell") == "shell":
+            return
+        directory = Path(str(params.get("dir") or "")).expanduser()
+        if params.get("worktree"):  # the same place `create` puts it: <repo>/.claude/worktrees/<name>
+            repo = Path(str(params.get("repo") or directory)).expanduser()
+            directory = repo / WORKTREES_DIR / str(params["worktree"])
+        if not directory.is_dir():
+            return  # the node's own create says whether it exists there
+        for who in await asyncio.to_thread(self.occupants, directory):
+            raise RpcError(f"{directory} already has agent session {who}; anchor rule (use a worktree)")
+
     async def _route_act(self, method: str, params: dict[str, Any], caller: Any, host: str) -> Any:
         """An act on another host's record, gated here already: executed by that host's node and
         its verdict returned (§4.4a). Refused in words — never queued — while the link is down.
@@ -2484,6 +2516,8 @@ class HostAgent:
         rid, _h = naming.split_address(str(params.get("id") or ""))
         if method not in ("create", "name_check") and rid not in self.remote.get(host, {}):
             raise RpcError(f"no session {rid}@{host}")
+        if method == "create":
+            await self._check_occupancy_for(host, params)
         mux = self._node_mux(host)
         sent = dict(params)
         if rid:
