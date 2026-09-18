@@ -458,7 +458,10 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
             }
         )
     # what is running is read first; *No team* is never "stopped" — nothing there starts as one
-    groups.sort(key=lambda g: (2 if g["team"] and not g["live"] else 1 if not g["team"] else 0, g["team"]))
+    # …and among the live teams, one with a session that needs a person comes first (2026-09-18)
+    groups.sort(
+        key=lambda g: (2 if g["team"] and not g["live"] else 1 if not g["team"] else 0, not g["needs"], g["team"])
+    )
     return groups
 
 

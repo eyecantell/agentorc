@@ -1066,11 +1066,15 @@ Screens:
    channel, §4.2), a pending question with Focus, the reset time with Switch profile / Wait, or
    the last output lines; buttons Focus / VS Code / more. The **more** menu holds Wrap up, Kill
    (confirms), Close (enabled only when Ready to close passes; a card that passes also shows it
-   inline, see §4.2), Open shell here, Copy tmux command. A scraped state shows as a dashed pill outline. Two sort modes, remembered per
-   browser: **Urgent first** (`needs-you` → `limited` → `stalled?` → `unreachable` on a
-   non-volatile host → `working` → unseen `idle` (§4.2) → `idle` / `unreachable` on a volatile host → `exited` →
-   `closed`) and **Pinned** (cards stay where the person dragged them, needs-you cards are
-   highlighted and counted in the top bar). A **Due** strip above the grid lists the
+   inline, see §4.2), Open shell here, Copy tmux command. A scraped state shows as a dashed pill outline. **One order, no control**
+   (2026-09-18): inside a group the lead's card, then by urgency (`needs-you` → `limited` →
+   `stalled?` → `unreachable` on a non-volatile host → `working` → unseen `idle` (§4.2) → `idle` /
+   `unreachable` on a volatile host → `exited` → `closed`); between groups, a live team with a
+   `needs-you` session above the other live teams. A `needs-you` card is ringed and counted in the
+   page header, so a person who works from the grid can still see at a glance what to press. Until
+   2026-09-18 this was a toggle, **Urgent first / Pinned** (Pinned kept cards where they were
+   dragged); team cards took over the job of arranging the page, the toggle was left ordering cards
+   inside one team, and the place to work through what needs a person is the Inbox (TD-069). A **Due** strip above the grid lists the
    dev-cadence board items that are overdue or due today, each with Snooze and Done (agent
    write-back, §4.4); collapsed to a count when empty. Unreachable hosts get one banner row.
    Command-kind sessions are hidden unless "show command runs" is on. Two shortcuts next to
@@ -1136,9 +1140,9 @@ Browser mechanics (2026-09-06 review):
   deltas (state, pending, age, tail, ready-to-close) and host reachability; the page patches
   the DOM by session id. Pages are server-rendered on load and never fully re-rendered after.
   Reconnect with backoff; on reconnect the page reloads its snapshot once.
-- **Pinned layout**: the client owns card order and position (localStorage, by session id);
-  pushed data only patches card content. New or adopted cards are inserted at the top in
-  Pinned mode; a card whose session drops out of the Org is removed and its slot forgotten.
+- **Card order**: the server's, per group (§4.5 screen 1); the client re-sorts a group by the
+  same key when a delta changes a card's rank. Nothing about the order is stored in the browser
+  since the Pinned mode was dropped (2026-09-18).
 - **Permission countdown**: the delta carries the deadline once; the browser counts down
   locally. The timeout transition (buttons collapse to Focus) arrives as an ordinary state
   delta, never from the local clock reaching zero.
@@ -1167,7 +1171,7 @@ noted). If a control is not in this table it does not exist.
 |---|---|---|
 | top bar | **New session** | opens the New session form |
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
-| Org | **Urgent first / Pinned** | sort mode, remembered per browser |
+| Org | ~~**Urgent first / Pinned**~~ | dropped 2026-09-18: there is one order — the lead, then urgency, inside a team; a live team with a `needs-you` session above the other live teams — and no control for it. A `needs-you` card keeps its ring and the header its *n needs you* count; the list to work through is the Inbox (TD-069) |
 | Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
 | Org banner | **Retry** | asks the host agent on an unreachable host again now instead of on the next tick |
 | card | **Allow / Deny** | answers a pending permission through the hook channel; shown with the time left |
@@ -1817,7 +1821,7 @@ members to settle takes minutes, so the second half of a stop runs behind the re
 says what was sent and names the lead that follows, and the state deltas show the members settling, and the strip reports the lead's own outcome when it comes — a failure there is logged and toasted, never dropped. New
 session gains a **Project** picker that narrows the repo list to the project's repos on this host
 and adds the Project block to the brief — `teams.reach_block`, the function behind `ao new
---project`. Urgent-first sorting works within a group; Pinned order is per group.
+--project`. Cards sort by urgency within a group (§4.5 screen 1).
 
 **Roles gain a profile** (landed 2026-09-13, TD-040 step c: `org.yml`'s `roles:` is
 `resolve_role`'s overlay layer, and `ao new`, `ao roles` and `ao team start` all read it). A preset may name the profile it runs under, so the pick-list adds an
