@@ -571,6 +571,21 @@ async def test_acts_are_gated_at_the_home_executed_on_the_node_and_the_verdict_r
             await person.call("kill", id=lead["id"])
 
 
+async def test_a_node_refuses_an_act_for_a_record_that_is_not_its_own(agent):
+    """The node's side of *routes acts only to records whose host is that node's* (§4.4a): an `act`
+    naming another host's record, or a create for another host, is refused in words and nothing
+    runs — whatever the home (or anything on the link) sent."""
+    agent.mode, agent.home = "node", "kmaster"
+    with pytest.raises(link.LinkError, match="ao-x-w@desk is not on .*: not my host"):
+        await agent._act({"rpc": "kill", "params": {"id": "ao-x-w@desk"}, "caller": None})
+    with pytest.raises(link.LinkError, match="a create for desk is not .*: not my host"):
+        await agent._act({"rpc": "create", "params": {"name": "w", "dir": "/tmp", "host": "desk"}, "caller": None})
+    with pytest.raises(link.LinkError, match="'msg' is not an act a node executes"):
+        await agent._act({"rpc": "msg", "params": {"to": ["x"], "text": "hi"}, "caller": None})
+    with pytest.raises(link.LinkError, match="no session ao-nope"):
+        await agent._act({"rpc": "kill", "params": {"id": "ao-nope"}, "caller": None})
+
+
 async def test_an_act_on_an_unreachable_host_is_refused_and_never_runs_when_the_link_returns(
     home, hookstub, tmp_path, monkeypatch
 ):
