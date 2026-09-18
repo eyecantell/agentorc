@@ -4,9 +4,10 @@ home. An agent whose `hosts.yml` names no `home:`, or names itself, is the home,
 exactly: nothing in this module runs for it.
 
 What is here is the one decision a node makes alone: what it answers while it cannot reach its
-home. Until step 3 builds the link that is always, so this table is a node's whole behaviour. It is
-a pure function, read before the gate, so it can be tested without an agent and so step 3 changes
-*when* it is consulted, not what it says.
+home. Until step 3 built the link that was always, and this table was a node's whole behaviour;
+since step 5 what it refuses is forwarded to the home while the link is up, and refused, naming the
+home, while it is down. It is a pure function, read before the gate, so it can be tested without
+an agent.
 """
 
 from __future__ import annotations
@@ -27,22 +28,13 @@ REPORTS = frozenset({"progress", "finding"})
 NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})
 
 
-def offline_refusal(
-    method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str, reachable: bool = False
-) -> str | None:
+def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str) -> str | None:
     """Why a node that cannot reach `home` refuses this call, or None when it serves it (design
     §4.4a, the call-by-call table). `caller` is None for a person. Reads are never listed and never
     refused. Every refusal names the home and says nothing was queued: a refusal the caller can
-    see, never a delivery that is not coming."""
-    if reachable:
-        # Step 3a: the link is up, and nothing forwards over it yet. Serving these locally the moment
-        # it came up would be the split-brain §4.4a exists to rule out, so the table still holds.
-        tail = (
-            f"the link to {home} (home) is up, but forwarding this from {host} is not built "
-            "(TD-057 steps 4–5); refused, not queued (design §4.4a)"
-        )
-    else:
-        tail = f"{home} (home) is unreachable from {host}; refused, not queued (design §4.4a)"
+    see, never a delivery that is not coming. With the link up the agent forwards what this
+    refuses instead of asking (`HostAgent._forward`, step 5), so the table has one answer."""
+    tail = f"{home} (home) is unreachable from {host}; refused, not queued (design §4.4a)"
     if method in MAILBOX:
         return f"the mailbox is at the home: {tail}"
     if method in REPORTS:

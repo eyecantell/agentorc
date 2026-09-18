@@ -851,6 +851,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
             print(f"copied to {', '.join(got['copies'])}")
         if got.get("copies_failed"):
             print(f"copies failed (dropped): {', '.join(got['copies_failed'])}")
+        if got.get("unreachable"):  # design §4.4a: landed at the home, read when the host's link returns
+            print(f"landed — host unreachable: {', '.join(got['unreachable'])}")
         for asked, now in (got.get("forwarded") or {}).items():
             print(f"forwarded: {asked} was resumed as {now}")
 

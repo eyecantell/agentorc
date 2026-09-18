@@ -4,7 +4,10 @@ Both gates read several records at once — the caller's grant, the target's `co
 shared controlled target — and the process that holds every record is the home host agent
 (§4.4a). Writing them over a plain mapping rather than as methods reaching into the agent is what
 lets a node forward a request and the home answer it from one graph. Nothing here mutates a record
-or touches the store: each function returns a reason, or None when the call passes.
+or touches the store: each function returns a reason, or None when the call passes. Every gate
+takes `controllers`, how a record's `controllers` read from the caller's host (§4.4a "Every address
+crosses in the reader's form", step 5): the home passes a function that re-addresses another host's
+record's list into its own form, and the records themselves are never copied.
 
 Every number the mail rules need was `None` — unlimited — until TD-052 step 5 measured a team and
 step 6 set it from the evidence (2026-09-18, design §4.10 "The numbers"). What was measured: eight
@@ -13,7 +16,7 @@ hours of a four-session team, a lead over three free-pick grinders, on 2026-09-1
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -54,7 +57,21 @@ def is_person(caller: Any) -> bool:
     return caller is None
 
 
-def act_gate(records: Mapping[str, Session], caller: Any, method: str, params: Mapping[str, Any]) -> str | None:
+Controllers = Callable[[Session], list[str]]
+
+
+def _own(s: Session) -> list[str]:
+    return s.controllers
+
+
+def act_gate(
+    records: Mapping[str, Session],
+    caller: Any,
+    method: str,
+    params: Mapping[str, Any],
+    *,
+    controllers: Controllers = _own,
+) -> str | None:
     """Design §4.8, §9 invariant 11: an acting RPC from a session onto a *different* session
     needs the `control` grant on the caller's record **and** the caller in the target's
     `controllers` (TD-036). Both halves are read from the records here, on every call, so a
@@ -109,15 +126,15 @@ def act_gate(records: Mapping[str, Session], caller: Any, method: str, params: M
             f"{caller} cannot {method} {target_id}: it is interactive, and no session acts on an "
             f"interactive session — only a person does (design §9 invariant 5)"
         )
-    if target is not None and str(caller) not in target.controllers:
-        how = (
-            "nobody may act on it" if not target.controllers else "it is controlled by " + ", ".join(target.controllers)
-        )
+    if target is not None and str(caller) not in (ctl := controllers(target)):
+        how = "nobody may act on it" if not ctl else "it is controlled by " + ", ".join(ctl)
         return f"{caller} cannot {method} {target_id}: not in its controllers — {how} (design §4.8)"
     return None
 
 
-def message_edge(records: Mapping[str, Session], sender: str, target: str) -> str | None:
+def message_edge(
+    records: Mapping[str, Session], sender: str, target: str, *, controllers: Controllers = _own
+) -> str | None:
     """The edge that lets `sender` message `target` (design §4.10 "The message gate is weaker than
     `control`"), or None when there is none. No new list, no new grant: the graph is read on every
     call, so a membership edit changes who may talk on the next call.
@@ -130,18 +147,20 @@ def message_edge(records: Mapping[str, Session], sender: str, target: str) -> st
     me, it = records.get(sender), records.get(target)
     if me is None or it is None:
         return None
-    if target in me.controllers:
+    if target in controllers(me):
         return "upward"
-    if sender in it.controllers:
+    if sender in controllers(it):
         return "downward"
     if me.team and me.team == it.team:
         return "team"
-    if any(sender in r.controllers and target in r.controllers for r in records.values()):
+    if any(sender in (c := controllers(r)) and target in c for r in records.values()):
         return "shared target"
     return None
 
 
-def message_gate(records: Mapping[str, Session], sender: str, target: str) -> str | None:
+def message_gate(
+    records: Mapping[str, Session], sender: str, target: str, *, controllers: Controllers = _own
+) -> str | None:
     """Design §4.10: may `sender` message `target`? A person (`sender == PERSON`) always may — they
     are not a session and may message anyone (§4.8) — and any session may message the person
     inbox (`target == PERSON`). Otherwise a session may message along one of
@@ -153,7 +172,7 @@ def message_gate(records: Mapping[str, Session], sender: str, target: str) -> st
         return f"{sender} cannot message itself: a note to yourself is a ledger entry (design §4.10)"
     if sender not in records:
         return f"{sender} cannot message {target}: this host agent has no record of the sender (design §4.10)"
-    if message_edge(records, sender, target) is None:
+    if message_edge(records, sender, target, controllers=controllers) is None:
         return (
             f"{sender} cannot message {target}: not one of its controllers, its members, its team, "
             f"or a controller of a session it controls (design §4.10)"
@@ -161,7 +180,7 @@ def message_gate(records: Mapping[str, Session], sender: str, target: str) -> st
     return None
 
 
-def from_role(records: Mapping[str, Session], holder: str, sender: str) -> str:
+def from_role(records: Mapping[str, Session], holder: str, sender: str, *, controllers: Controllers = _own) -> str:
     """What `ao inbox` says beside every entry (design §4.10 "Surface"): whether its sender is one
     of the holder's controllers, a person, or neither — read at the moment the text is weighed,
     because instructions come from controllers and people, and mail from anyone else is
@@ -169,7 +188,7 @@ def from_role(records: Mapping[str, Session], holder: str, sender: str) -> str:
     if sender == PERSON:
         return "person"
     me = records.get(holder)
-    if me is not None and sender in me.controllers:
+    if me is not None and sender in controllers(me):
         return "controller"
     return "other"
 

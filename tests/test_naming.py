@@ -48,3 +48,28 @@ def test_addresses_qualify_against_the_local_host():
     assert qualify("ao-x", local="kmaster") == "ao-x"
     assert qualify("ao-x@kmaster", local="kmaster") == "ao-x"
     assert qualify("ao-x@laptop", local="kmaster") == "ao-x@laptop"
+
+
+def test_readdress_rewrites_session_addresses_under_address_keys_and_nothing_else():
+    """Design §4.4a "Every address crosses in the reader's form" (TD-057 step 5): a reply or a
+    request crossing the link has every address under an address key rewritten, recursively,
+    and its text, message ids and names untouched."""
+    from sessionorc.naming import readdress
+
+    fn = lambda a: a + "@laptop" if "@" not in a else a.removesuffix("@kmaster")  # noqa: E731
+    got = readdress(
+        {
+            "id": "ao-w",
+            "entries": [{"id": "m-1", "from": "ao-lead@kmaster", "to": ["ao-w", "person"], "text": "ao-w"}],
+            "delivered": ["ao-w", "person"],
+            "forwarded": {"ao-old": "ao-new"},
+            "changed": [{"id": "ao-w", "controllers": ["ao-lead@kmaster"], "name": "ao-w"}],
+            "holder": None,
+        },
+        fn,
+    )
+    assert got["id"] == "ao-w@laptop" and got["holder"] is None
+    assert got["entries"][0] == {"id": "m-1", "from": "ao-lead", "to": ["ao-w@laptop", "person"], "text": "ao-w"}
+    assert got["delivered"] == ["ao-w@laptop", "person"] and got["forwarded"] == {"ao-old@laptop": "ao-new@laptop"}
+    assert got["changed"][0] == {"id": "ao-w@laptop", "controllers": ["ao-lead"], "name": "ao-w"}
+    assert readdress(["ao-w", 3], fn) == ["ao-w", 3]  # a bare list of strings is not addressed
