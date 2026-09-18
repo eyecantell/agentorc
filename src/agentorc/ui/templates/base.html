@@ -17,7 +17,7 @@
     <span class="tab off" title="phase 4">Attention</span>
   </div>
   <div class="grow"></div>
-  <span class="mono dim" id="usagechip" title="usage per profile: 5-hour window · weekly window (TD-001)">{% for prof, u in (usage or {}).items() %}<span data-profile="{{ prof }}">{{ prof }} {{ u.five_hour_pct }}%·{{ u.weekly_pct }}%</span> {% endfor %}</span>
+  <span class="mono dim" id="usagechip" title="subscription usage per profile: the 5-hour window and the weekly window (TD-001)">{% for prof, u in (usage or {}).items() %}<span data-profile="{{ prof }}">{{ prof }} 5h {{ u.five_hour_pct }}% · wk {{ u.weekly_pct }}%</span> {% endfor %}</span>
   {# design §4.5a Org top bar **person inbox** (§4.10): mail sessions sent with `ao msg person`.
      The count shows only above zero; opening it reads as a person, which marks nothing and rings nothing. #}
   <button class="btn light" type="button" id="personinbox" title="mail sessions sent you with ao msg person">✉ Inbox<span class="badge unread{% if not person_unread %} hidden{% endif %}" id="personunread">{{ person_unread or '' }}</span></button>

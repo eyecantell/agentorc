@@ -48,6 +48,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-070 | Neither an `ask` nor a board item can offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, and an answers field on the board entry (a dev-cadence format change), rendered as buttons | Medium | Open |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Open |
 | TD-072 | Sessions exit with unread mail: nothing makes a worker read its inbox before it says it is out of work, and an unread `note` outlives the run it was sent to | Medium | Open |
+| TD-073 | Usage is shaped like Claude Code's two windows in the core and the UI (`five_hour_pct`, `weekly_pct`): a second tool's quota — other windows, a token budget, or none — has nowhere to go | Medium | Open |
 
 ---
 
@@ -745,3 +746,19 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Done when** a grinder that tries to wind down with unread mail is refused and told why, Ready to close shows the row, an exited session's card shows no unread `note`s, the briefs say when to read, and §4.10 / §4.9a / §4.2 say all of it.
 
 **Related:** design §4.10 (lifecycle, *an unread entry never ages out*), §4.9a (`out_of_work`), §4.2 (Ready to close), TD-052 (mail), TD-053 (wind-down), TD-066 (the crash that hid that night's mail), TD-069 (the page this keeps clean), TD-071 item 2.
+
+
+## TD-073: Usage is shaped like Claude Code's two windows — a second tool's quota has nowhere to go
+
+**Priority:** Medium
+**Added:** 2026-09-18 (the anchor session; Paul asked whether Claude, Codex, Grok and on-prem agents side by side break the top bar's usage display)
+**Status:** Open — nothing breaks today, because only one adapter reports usage; design first (§4.3's `usage()` contract and §6's usage gate) when a second one is about to.
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`Usage`: `five_hour_pct`, `weekly_pct`, `five_hour_resets`, `weekly_resets`), `src/sessionorc/agent.py` (`_cap`, which loops over the literal keys `five_hour` and `weekly`), `src/sessionorc/adapters.py` (the `Adapter` protocol's `usage_for` docstring, which spells out the same five field names as the contract), `src/agentorc/ui/templates/base.html` and `src/agentorc/ui/static/app.js` (`onUsage`), which print those two fields by name
+
+**Why:** design §4.3 puts tool-specific names inside the adapter, and usage is where that leaks. The adapter's `usage()` is per **profile** — an account of a tool — which is the right key, and a profile whose adapter reports nothing simply has no chip, so a shell, an on-prem model with no quota, or a tool with no usage endpoint costs nothing. But the *shape* of what is reported is Claude Code's: a 5-hour window and a weekly one. The core's cap check reads exactly those two keys, and the top bar prints exactly those two numbers. A tool with a daily window, a monthly credit balance, a token budget, or three windows cannot be represented, and its adapter would have to lie in Claude's field names to get a `limited` state at all. The chip also grows by one span per profile, unbounded, in a top bar with no room for six.
+
+**Fix:** the adapter reports a list, the core and UI iterate it: `windows: [{label: "5h", pct: 19, resets: <iso>}, {label: "wk", pct: 49, resets: <iso>}]`, labels chosen by the adapter. `_cap` becomes *any window at or over 100 whose reset has not passed*; the chip prints each window's label and number; a budget that is not a percentage is the adapter's to convert or to leave out. The Claude Code adapter keeps reading the same endpoint and maps its two windows into the list; the stored `_usage` and the `usage` event change shape together (one release with both, as the `orchestrate` → `control` rename did). For the top bar: the chip shows the **worst** window of each profile and the rest on hover, and collapses to the profiles at or near a cap when there are more than fits.
+
+**Done when** a test adapter reporting one daily window drives `limited` and shows in the chip without any Claude field name appearing outside `adapters/claude_code/`, and §4.3 and §6 describe the list.
+
+**Related:** TD-001 (the usage chip), design §4.3 (adapters own tool-specific names), §6 (usage gate), §4.5a (the **usage** chip row), TD-071 item 8 (the label fix that prompted the question).

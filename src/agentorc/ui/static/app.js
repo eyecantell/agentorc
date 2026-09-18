@@ -241,13 +241,13 @@
     }
     open();
   }
-  // ---- usage chip: one span per profile, "5-hour% · weekly%", red at a cap (TD-001) ----
+  // ---- usage chip: one span per profile, "5h n% · wk n%", red at a cap (TD-001) ----
   function onUsage(ev) {
     const chip = $("#usagechip"); if (!chip || !ev.usage) return;
     let el = chip.querySelector(`[data-profile="${CSS.escape(ev.profile)}"]`);
     if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.appendChild(el); chip.appendChild(document.createTextNode(" ")); }
     const u = ev.usage, capped = u.five_hour_pct >= 100 || u.weekly_pct >= 100;
-    el.textContent = `${ev.profile} ${u.five_hour_pct}%·${u.weekly_pct}%`;
+    el.textContent = `${ev.profile} 5h ${u.five_hour_pct}% · wk ${u.weekly_pct}%`;  // the numbers say what they are (2026-09-18)
     el.classList.toggle("cap", capped);
     el.title = `5-hour ${u.five_hour_pct}% (resets ${u.five_hour_resets || "?"}) · weekly ${u.weekly_pct}% (resets ${u.weekly_resets || "?"})`;
   }
