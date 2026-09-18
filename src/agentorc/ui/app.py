@@ -29,6 +29,7 @@ from sessionorc import hosts, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
+from sessionorc.containers import attach_argv_in
 from sessionorc.models import GRANTS, STATE_RANK, canonical_grants, has_control, report_head, report_line, stop_note
 
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
@@ -229,8 +230,9 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
         d["rank"] = STATE_RANK["idle"] - 0.5
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
-    # Another host's record, as the home shows it (design §4.4a): its own host on the card, and no
-    # VS Code link — that URL is built from *this* host's ssh alias, which would open the wrong machine.
+    # Another host's record, as the home shows it (design §4.4a): its own host on the card, and a
+    # VS Code link only when a container node's reach names one — the ssh URL below is built from
+    # *this* host's alias, which would open the wrong machine.
     d["host"] = s.get("host") or host_name()
     here = d["host"] == host_name()
     # An unreachable host's reason, and what the home is doing about a container node (§4.4a
@@ -238,7 +240,9 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
     hl = s.get("host_link") or {}
     sup = hl.get("supervisor") or {}
     d["host_note"] = sup.get("doing") or (hl.get("why", "") if state == "unreachable" else "")
-    d["vscode"] = vscode_url(s["dir"]) if s.get("dir") and here else ""
+    # A container node's record reaches VS Code by attaching to that container (§4.4a "Reach"),
+    # from what the home derived when the node dialed in; any other host's record has no link.
+    d["vscode"] = vscode_url(s["dir"]) if s.get("dir") and here else (hl.get("reach") or {}).get("vscode", "")
     d["place"] = f"{d['host']} / {Path(s['repo']).name}" if s.get("repo") else f"{d['host']} / {s.get('dir', '')}"
     git = s.get("git") or {}
     where = s.get("dir", "")
@@ -1054,21 +1058,30 @@ def create_app() -> FastAPI:
             await ws.close(code=4404)  # final: the client must not retry
             return
         sid = sid.removesuffix(f"@{host_name()}")  # a self-addressed id is this host's tmux session
+        sock = os.environ.get("AGENTORC_TMUX_SOCKET")
+        inside: list[str] = []  # the `docker exec` prefix every tmux command takes for a container node's session
+        argv = attach_argv(sid, socket_name=sock)
         if s.get("host") and s["host"] != host_name():
-            # Another host's session (design §4.4a): its pane is there, and nothing here attaches to it yet.
-            await ws.send_bytes(
-                f"\r\n[agentorc] runs on {s['host']}: the terminal across the link is not built "
-                f"(TD-057 3c.5 / step 4b).\r\n".encode()
-            )
-            await ws.close(code=4404)
-            return
+            # Another host's session (design §4.4a "Reach"): a container node on this machine is
+            # reached by `docker exec` into it, from what the home derived when it dialed in; a
+            # machine node's pane has nothing here that reaches it yet.
+            reach = (s.get("host_link") or {}).get("reach") or {}
+            if not reach.get("container"):
+                await ws.send_bytes(
+                    f"\r\n[agentorc] runs on {s['host']}: no terminal reaches it from here "
+                    f"(a container node's reach comes with its link; a machine node's is TD-057 step 4b).\r\n".encode()
+                )
+                await ws.close(code=4404)
+                return
+            sid, sock = naming.split_address(sid)[0], None  # the bare id, on the user's default server inside
+            argv = attach_argv_in(reach["container"], reach.get("user") or "root", sid)
+            inside = argv[: argv.index("tmux")]
         if s.get("state") == "closed" or not s.get("pane", True):  # no pane to attach (TD-023)
             await ws.send_bytes(b"\r\n[agentorc] this session's pane is gone (see the banner).\r\n")
             await ws.close(code=4404)
             return
-        sock = os.environ.get("AGENTORC_TMUX_SOCKET")
         try:
-            pty = PtySession(attach_argv(sid, socket_name=sock), cols=cols, rows=rows)
+            pty = PtySession(argv, cols=cols, rows=rows)
         except Exception as e:  # noqa: BLE001 — no silent failure path (design §4.5)
             await ws.send_bytes(f"\r\n[agentorc] could not attach a terminal: {type(e).__name__}: {e}\r\n".encode())
             await ws.close()
@@ -1099,7 +1112,7 @@ def create_app() -> FastAPI:
             # A tmux command against the session, not keys into the pane: there is no escape
             # sequence that enters copy mode (TD-022). Bad directions are the client's bug; ignore.
             try:
-                argv = scroll_argv(sid, direction, socket_name=sock)
+                argv = [*[a for a in inside if a != "-it"], *scroll_argv(sid, direction, socket_name=sock)]
             except ValueError:
                 return
             devnull = asyncio.subprocess.DEVNULL

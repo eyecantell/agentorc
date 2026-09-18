@@ -130,8 +130,8 @@ The package installs `agentorc` and an `ao` alias. Reading: `ao status [-v]`, `a
 `ao deny`, `ao mode`, `ao kill`, `ao close`, `ao forget`. Capabilities and reports (design §4.8):
 `ao grant` / `ao revoke`, `ao progress claim|done|drop`, `ao finding`. Serving: `ao ui`,
 `ao service`. A container node (design §4.4a): `ao host up|rebuild|forget|status <name>`; `ao new
---host <name>` starts a session on it, and every act on the `<id>@<name>` it prints is gated here
-and run there. `ao new
+--host <name>` starts a session on it, every act on the `<id>@<name>` it prints is gated here
+and run there, and `ao focus <id>@<name>` attaches through `docker exec`. `ao new
 --attach` (or `ao shell --attach`) starts the session and attaches your terminal to it — type it
 where you would have typed `claude`, and the session is a first-class card; `ao focus <id>`
 attaches to an existing one. Every

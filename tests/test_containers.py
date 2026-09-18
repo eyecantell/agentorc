@@ -198,6 +198,7 @@ class Fake(Runner):
             "user": "developer\n",
             "ps": "abc123def456\n",
             "inspect": "running\n",
+            "name": "/agentorc-node-cm\n",
             **answers,
         }
         self.cli = "/fake/devcontainer"
@@ -216,6 +217,8 @@ class Fake(Runner):
             out = self.answers["ps"]
         elif cmd[:2] == ["docker", "inspect"] and "{{.Config.User}}" in cmd:
             out = self.answers["user"]
+        elif cmd[:2] == ["docker", "inspect"] and "{{.Name}}" in cmd:
+            out = self.answers["name"]
         elif cmd[:2] == ["docker", "inspect"]:
             out = self.answers["inspect"]
         elif "sys.version_info" in text:
@@ -352,9 +355,25 @@ def test_status_and_reach_are_derived_from_the_entry(home):
     out = containers.host_status("contractmatch", r)
     assert out["container"] == "abc123def456" and out["state"] == "running" and out["pid"] == 7
     assert out["reach"]["terminal"] == "docker exec -u developer -it abc123def456 tmux attach"
-    assert out["reach"]["vscode"].startswith("vscode-remote://dev-container+")
+    assert out["reach"]["container"] == "abc123def456" and out["reach"]["user"] == "developer"
+    assert out["reach"]["name"] == "agentorc-node-cm"
+    # VS Code attaches to *this* container by docker's name — the `dev-container+` form would open
+    # the person's own container from the repo's definition (3c.5)
+    link = out["reach"]["vscode"].removeprefix("vscode://vscode-remote/attached-container+")
+    head, _, path = link.removesuffix("?windowId=_blank").partition("/")
+    assert (
+        json.loads(bytes.fromhex(head)) == {"containerName": "/agentorc-node-cm"} and "/" + path == out["devcontainer"]
+    )
     gone = containers.host_status("contractmatch", Fake(ps=""))
     assert gone["container"] is None and gone["state"] is None and "reach" not in gone
+    # what the home records on the link when the node dials in, and what the terminal runs
+    n = containers.node("contractmatch")
+    assert containers.observe_reach(n, Fake(inspect="exited\n")) is None
+    assert containers.observe_reach(n, Fake(ps="")) is None
+    assert containers.observe_reach(n, Fake())["container"] == "abc123def456"
+    argv = containers.attach_argv_in("abc123def456", "developer", "ao-cm-w")
+    assert argv[:6] == ["docker", "exec", "-u", "developer", "-it", "abc123def456"]
+    assert argv[6:] == ["tmux", "attach", "-t", "=ao-cm-w:", ";", "set-option", "-t", "=ao-cm-w:", "mouse", "on"]
 
 
 # -- forget ------------------------------------------------------------------------------------------------
@@ -579,6 +598,29 @@ def volatile_home(container_home, tmp_path):
     hosts_yml.write_text(hosts_yml.read_text().replace("    container:", "    volatile: true\n    container:"))
     container_home["make"] = lambda: Fake(inspect="exited\n")
     return container_home
+
+
+async def test_the_home_derives_a_container_nodes_reach_when_it_dials_in(container_home, agent):
+    """3c.5: one docker look per hello, kept on the link state, so every card of the node carries
+    `host_link.reach` — and a look that fails, or a node not running, leaves no reach."""
+    from test_link import record
+
+    container_home["make"] = lambda: Fake(pid="9\n")
+    agent._take_records("cm", [record("ao-cm-w", host="cm")], whole=True)
+    agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}
+    await agent._note_reach("cm")
+    reach = agent.links["cm"]["reach"]
+    assert reach["container"] == "abc123def456" and reach["user"] == "developer"
+    assert reach["vscode"].startswith("vscode://vscode-remote/attached-container+")
+    assert agent._view(agent.remote["cm"]["ao-cm-w"])["host_link"]["reach"] == reach
+    agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}  # a new link: derived again, or not
+    container_home["make"] = lambda: Fake(ps="")
+    await agent._note_reach("cm")
+    assert "reach" not in agent.links["cm"]
+    agent.links["cm"] = {"up": False, "since": "now", "why": "down"}
+    await agent._note_reach("cm")
+    assert "reach" not in agent.links["cm"]
+    await agent._note_reach("laptop")  # not a container node: nothing
 
 
 async def test_a_stopped_volatile_container_is_left_alone_and_the_card_says_so(volatile_home, agent):
