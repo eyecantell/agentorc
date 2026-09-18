@@ -882,8 +882,10 @@ nodes:
   promotes, answering *unknown link method* to everything newer — a promote changes no protocol
   number): a build is named by its wheel's content, the agent is started with its build in its
   environment and says it in its `hello`, and a container node whose build is not the one this
-  home would provision now is marked `stale` on its link state and re-provisioned and restarted
-  by the same supervisor, link up or not. Its sessions live in tmux and survive it, as they
+  home would provision now is marked `stale` on its link state — asked at the `hello` and again
+  on every tick, so a link that outlives a new wheel is caught too — and re-provisioned and
+  restarted by the same supervisor, link up or not; the restart waits for the old agent to go,
+  and takes it down hard if it has not, before starting the new one: never two under one pidfile. Its sessions live in tmux and survive it, as they
   survive a promote at the home. `ao host up` restarts an agent that is behind for the same
   reason. A machine node's build is recorded and shown, and nothing more: the home installs
   nothing there. *Start it* is `docker exec -d -u <user>` of

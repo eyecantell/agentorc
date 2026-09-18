@@ -2289,6 +2289,11 @@ class HostAgent:
         now = time.monotonic()
         for name, n in containers.container_nodes().items():
             state = self.links.get(name)
+            if state and state["up"] and "build" in state:
+                # Asked again on every tick, not only at `hello`: a link that outlives a new wheel
+                # at the home (today a promote restarts the home and so drops it — nothing promises
+                # that) must not leave the node behind for good (review of PR #225).
+                self._note_build(name, str(state["build"]))
             if state and state["up"] and not state.get("stale"):
                 if self.supervision.pop(name, None) is not None:
                     self._note_link(name)
@@ -3038,8 +3043,13 @@ class HostAgent:
         if host in containers.container_nodes():
             ours = containers.home_build()
             if ours and build != ours:
+                if "stale" not in state:
+                    log.warning(
+                        "link from %s: the node runs build %s, this home's is %s", host, build or "unknown", ours
+                    )
                 state["stale"] = f"the node runs build {build or 'unknown'}, this home's is {ours}"
-                log.warning("link from %s: %s", host, state["stale"])
+            else:
+                state.pop("stale", None)
 
     async def _note_reach(self, host: str) -> None:
         """How a container node's sessions are reached (§4.4a "Reach", 3c.5): looked up (three

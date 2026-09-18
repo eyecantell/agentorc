@@ -741,6 +741,9 @@ def test_a_build_is_the_wheels_content_and_an_agent_on_an_older_one_is_restarted
     out = containers.host_up("contractmatch", r)
     assert out["restarted"] is True and containers.node_build(n) == ours
     assert r.execs("kill $p") and len(r.execs("agentorc-agent serve")) == 1
+    stop = r.execs("kill $p")[0][-1]  # waits for the old agent to go, then takes it down hard: never two
+    assert "kill -0 $p" in stop and "kill -9 $p" in stop
+    assert r.calls.index(r.execs("kill $p")[0]) < r.calls.index(r.execs("agentorc-agent serve")[0])
     start = r.execs("agentorc-agent serve")[0]
     assert f"AGENTORC_BUILD={ours}" in start and f"echo {ours} > /agentorc/home/agent.build" in start[-1]
     # and the supervisor's decision: linked and behind is `provision`, as a protocol refusal is
@@ -769,6 +772,13 @@ async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_lev
         lambda: any(f.execs("pip install") and f.execs("kill $p") for f in fakes[before:]), timeout=5.0, step=0.05
     )
     assert "older build — re-provisioning it" in agent.supervision["cm"]["doing"]
+    # a link that outlives a new wheel at the home: asked again on the tick, with no new hello
+    agent.links["cm"] = {"up": True, "since": "now", "why": "linked", "build": ours}
+    assert await wait_for(lambda: "cm" not in agent.supervision, timeout=5.0, step=0.05)  # level: stood down
+    wheel = paths.home() / "wheels" / "agentorc-0.0.1-py3-none-any.whl"
+    wheel.write_bytes(b"a newer promote")
+    assert await wait_for(lambda: "stale" in agent.links["cm"], timeout=5.0, step=0.05)
+    assert containers.home_build() in agent.links["cm"]["stale"] and containers.home_build() != ours
     agent.links["laptop"] = {"up": True, "since": "now", "why": "linked"}
     agent._note_build("laptop", "abc")  # a machine node: recorded, never `stale` — the home does not install there
     assert agent.links["laptop"] == {"up": True, "since": "now", "why": "linked", "build": "abc"}

@@ -490,10 +490,20 @@ def build_id(wheel: Path) -> str:
     return hashlib.sha256(wheel.read_bytes()).hexdigest()[:12]
 
 
+_home_build: tuple[tuple[str, int, int], str] | None = None  # (path, mtime_ns, size) → its build
+
+
 def home_build() -> str:
-    """The build the home would provision a node with now, or "" when it has no wheel yet."""
+    """The build the home would provision a node with now, or "" when it has no wheel yet. Asked
+    on every tick for every linked container node, so the hash is kept until the wheel changes."""
+    global _home_build
     try:
-        return build_id(newest_wheel())
+        wheel = newest_wheel()
+        st = wheel.stat()
+        key = (str(wheel), st.st_mtime_ns, st.st_size)
+        if _home_build is None or _home_build[0] != key:
+            _home_build = (key, build_id(wheel))
+        return _home_build[1]
     except (ContainerError, OSError):
         return ""
 
@@ -650,7 +660,15 @@ def running_build(n: ContainerNode) -> str:
 def restart_agent(n: ContainerNode, r: Runner, cid: str, user: str) -> None:
     """Stop the agent inside and start it on what is installed now. The sessions live in tmux and
     survive it, as they survive a promote at the home."""
-    r.run(exec_cmd(cid, user, "sh", "-c", f"p=$(cat {PIDFILE} 2>/dev/null) && kill $p"), check=False)
+    # Two agents under one pidfile is the failure to rule out: wait for the old one to go (it stops
+    # in under a second since TD-058), and take it down hard if it has not — only then start. Every
+    # promote drives every container node through here (review of PR #225).
+    stop = (
+        f"p=$(cat {PIDFILE} 2>/dev/null) && kill $p; i=0; "
+        'while [ -n "$p" ] && kill -0 $p 2>/dev/null && [ $i -lt 50 ]; do sleep 0.1; i=$((i+1)); done; '
+        '[ -n "$p" ] && kill -9 $p 2>/dev/null; true'
+    )
+    r.run(exec_cmd(cid, user, "sh", "-c", stop), check=False)
     start_agent(n, r, cid, user)
 
 
