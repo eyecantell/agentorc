@@ -743,8 +743,13 @@ nodes:
   lifecycle script that creates a directory under one, or tests for a file in one, runs as it
   would beside an empty mount rather than dying on a path that is not there (contractmatch's
   `postCreate.sh` does the first, under `set -e`); `workspaceMount` and `workspaceFolder` set to
-  the checkout's own path; and agentorc's two mounts added, the link directory and the node's
-  volume. It brings the container up with the devcontainer CLI — the
+  the checkout's own path; agentorc's two mounts added, the link directory and the node's
+  volume; and **one feature of agentorc's own added**, a local feature written beside the generated
+  file (`features: {"./agentorc": {}}`, a `devcontainer-feature.json` and an `install.sh`, which the
+  devcontainer CLI runs as root at build), that installs tmux with whatever package manager the
+  image has — apt, apk or dnf — because tmux is what makes a host a host, and the person should not
+  edit their project's Dockerfile for agentorc's sake (Paul, 2026-09-17: the home installs the
+  client, so it installs tmux). It brings the container up with the devcontainer CLI — the
   reference implementation VS Code itself uses, a requirement of a home that runs containers as
   tmux is of every host — under agentorc's own id label, so it is a *second* container from the
   project's image beside any the person's VS Code opens, never that one.
@@ -761,8 +766,9 @@ nodes:
   the truth; the agent's own log — and `/agentorc/venv`, which the home fills with **its own
   wheel**: the promote (TD-062) gains one step, writing the
   wheel of what it installed to `~/.agentorc/wheels/`, and a container node is re-provisioned from
-  the newest, a `hello` refused for protocol being the cue. The image supplies Python 3.12+ and tmux, and `ao host up` refuses, naming which, when
-  it does not. What a worker needs beyond that is in `~/.agentorc/nodes/<name>/env` (`0600`), read
+  the newest, a `hello` refused for protocol being the cue. The image supplies Python 3.12+ — a feature cannot put an interpreter in every image the
+  same way, and the agent needs one to start — and `ao host up` refuses, naming it, when it does
+  not; tmux the generated definition brings itself (above). What a worker needs beyond that is in `~/.agentorc/nodes/<name>/env` (`0600`), read
   into the container's environment: a fine-grained GitHub token scoped to the repo (`gh auth
   setup-git` at provisioning makes `git push` use it), the author name and email, and whatever the
   repo's own briefs say a worker needs — for contractmatch a Doppler service token. Never the
