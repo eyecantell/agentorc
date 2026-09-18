@@ -1239,6 +1239,7 @@ def test_a_checkouts_files_are_read_inside_it_and_nothing_else(tmp_path):
 
     repo, outside = tmp_path / "repo", tmp_path / "secret"
     (repo / "docs").mkdir(parents=True)
+    (repo / ".git").mkdir()
     outside.write_text("the key")
     (repo / ".agentorc.yml").write_text("roles: {}\n")
     (repo / "docs" / "brief.md").write_text("a brief")
@@ -1263,6 +1264,12 @@ def test_a_checkouts_files_are_read_inside_it_and_nothing_else(tmp_path):
         read_checkout(str(repo), ["a"] * (FILES_MAX + 1))
     with pytest.raises(ValueError, match="does not exist here"):
         read_checkout(str(tmp_path / "nope"), [".agentorc.yml"])
+    (tmp_path / ".ssh").mkdir()
+    with pytest.raises(ValueError, match="is not a git checkout"):  # a directory that is not a repo is not read
+        read_checkout(str(tmp_path / ".ssh"), ["id_ed25519"])
+    os.mkfifo(repo / "pipe")
+    with pytest.raises(ValueError, match="not a regular file"):  # and never blocks on one
+        read_checkout(str(repo), ["pipe"])
 
 
 async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(agent, tmp_path):
@@ -1275,7 +1282,7 @@ async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(a
             self.sent.append((method, params))
             return {"dir": params["dir"], "files": {p: f"on laptop: {p}" for p in params["paths"]}}
 
-    (tmp_path / "repo").mkdir()
+    (tmp_path / "repo" / ".git").mkdir(parents=True)
     (tmp_path / "repo" / ".agentorc.yml").write_text("x: 1\n")
     async with LocalClient() as person:
         here = await person.call("host_files", host=agent.host, dir=str(tmp_path / "repo"), paths=[".agentorc.yml"])
@@ -1311,7 +1318,7 @@ async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(a
 
 async def test_a_node_serves_files_from_its_own_checkout_across_the_link(home, tmp_path, monkeypatch):
     """End to end: the home's `host_files` for the node reads the checkout on the node."""
-    (tmp_path / "cm").mkdir()
+    (tmp_path / "cm" / ".git").mkdir(parents=True)
     (tmp_path / "cm" / ".agentorc.yml").write_text("roles: {grinder: {brief: b.md}}\n")
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)

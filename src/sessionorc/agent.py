@@ -20,7 +20,9 @@ import os
 import re
 import secrets
 import signal
+import stat
 import sys
+import tarfile
 import time
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -2469,7 +2471,9 @@ class HostAgent:
             return None
         if method == "files":
             try:
-                return await asyncio.to_thread(read_checkout, params.get("dir"), params.get("paths"))
+                return await asyncio.wait_for(
+                    asyncio.to_thread(read_checkout, params.get("dir"), params.get("paths")), ACT_TIMEOUT
+                )
             except ValueError as e:
                 raise link.LinkError(str(e)) from None
         if method == "stat":
@@ -2781,9 +2785,11 @@ class HostAgent:
                 raise RpcError(f"{caller} cannot read files on {host}: needs the control grant (design §4.4a)")
         if host == self.host:
             try:
-                got = await asyncio.to_thread(read_checkout, dir, paths)
+                got = await asyncio.wait_for(asyncio.to_thread(read_checkout, dir, paths), ACT_TIMEOUT)
             except ValueError as e:
                 raise RpcError(str(e)) from None
+            except TimeoutError:
+                raise RpcError(f"reading {dir} did not finish within {ACT_TIMEOUT:g} s") from None
             return {"host": host, **got}
         mux = self._node_mux(host)
         try:
@@ -3384,8 +3390,6 @@ def backup_store(day: str) -> Path | None:
     so a half-written tarball never counts as one; the newest `BACKUP_KEEP` kept. Regular files
     only — a socket, a symlink or anything else found among them is not followed. None when
     today's already exists. Blocking: run it in a thread."""
-    import tarfile
-
     out_dir = paths.backups_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
     os.chmod(out_dir, 0o700)
@@ -3426,6 +3430,10 @@ def read_checkout(directory: Any, rel_paths: Any) -> dict[str, Any]:
         raise ValueError(f"{directory} does not exist here") from None
     if not root.is_dir():
         raise ValueError(f"{directory} is not a directory")
+    if not (root / ".git").exists():
+        # a team's checkout is a repo (a worktree's `.git` is a file): a directory that is not one
+        # — a home directory, `~/.ssh` — is not read, whoever asks (review of PR #224)
+        raise ValueError(f"{directory} is not a git checkout")
     wanted = [str(p) for p in (rel_paths or [])]
     if len(wanted) > FILES_MAX:
         raise ValueError(f"{len(wanted)} files asked for: at most {FILES_MAX} in one call")
@@ -3439,12 +3447,27 @@ def read_checkout(directory: Any, rel_paths: Any) -> dict[str, Any]:
         if not full.exists():
             out[rel] = None
             continue
-        if not full.is_file():
-            raise ValueError(f"{rel}: not a regular file")
-        if full.stat().st_size > FILE_CAP:
-            raise ValueError(f"{rel}: over {FILE_CAP} bytes, which is not a repo config or a brief")
-        out[rel] = full.read_text(encoding="utf-8", errors="replace")
+        out[rel] = _read_capped(full, rel)
     return {"dir": str(root), "files": out}
+
+
+def _read_capped(full: Path, rel: str) -> str:
+    """One file, judged and read through one descriptor (review of PR #224): opened without
+    blocking and without following a final symlink swapped in since the check, then `fstat` says
+    whether it is a regular file, and no more than `FILE_CAP` + 1 bytes are ever read — so a file
+    replaced by a FIFO, or grown, between the check and the read is refused rather than trusted."""
+    try:
+        fd = os.open(full, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    except OSError as e:
+        raise ValueError(f"{rel}: cannot be read ({e.strerror or e})") from None
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise ValueError(f"{rel}: not a regular file")
+    with os.fdopen(fd, "rb") as fh:
+        data = fh.read(FILE_CAP + 1)
+    if len(data) > FILE_CAP:
+        raise ValueError(f"{rel}: over {FILE_CAP} bytes, which is not a repo config or a brief")
+    return data.decode("utf-8", errors="replace")
 
 
 def _drop_unknown(method: Any, params: dict[str, Any]) -> list[str]:

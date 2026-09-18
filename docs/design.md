@@ -708,11 +708,14 @@ directory here — this host, or a container node sharing the path — and other
 host (step 4b.3): the home's `host_files {host, dir, paths}` RPC, over the `files` link method,
 returns the text of files inside that checkout, and `repoconfig.load_text` and a role's brief
 read take it by the same loader as a local read. A file read across a trust boundary, so it is
-bounded: paths relative to the checkout and resolved there, symlinks followed and then refused
-if they land outside it, regular files only, at most `FILES_MAX` (16) per call of at most
-`FILE_CAP` (256 KiB) each, and a brief the repo keeps outside its checkout is refused before it
-is asked for. It is a person's read or a `control` holder's — one that could start the team
-anyway — and never served to a call forwarded from a node, whoever makes it (`modes.HOME_ONLY`).
+bounded: the directory must be a git checkout, paths are relative to it and resolved there,
+symlinks followed and then refused if they land outside it, each file judged and read through
+one descriptor (regular files only, never blocking on one swapped for a FIFO, never more than the
+cap read), at most `FILES_MAX` (16) per call of at most `FILE_CAP` (256 KiB) each, and a brief the
+repo keeps outside its checkout is refused before it is asked for. It is a person's read or a
+`control` holder's — either may already start a session in any directory of a linked host, so the
+read grants neither anything new — and it is never served to a call forwarded from a node, whoever
+makes it (`modes.HOME_ONLY`): a laptop does not read other hosts' files through the home.
 The start stays all-or-nothing: a read that fails stops it before anything is created.
 
 **The link.** The node dials the home over **ssh**, with a key authorised on the home for one
