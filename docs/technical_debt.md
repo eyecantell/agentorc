@@ -579,7 +579,7 @@ It matters more than a Low priority suggests in one narrow way: design §4.5a's 
 **Priority:** High
 **Added:** 2026-09-17 (anchor session, watching the samscrape team)
 
-**Status:** Open — the immediate cause is fixed (PR #PRNUM: the client and the stdio bridge open their streams with the same 8 MiB limit the link uses); the growth that caused it is not.
+**Status:** Open — the immediate cause is fixed (PR #209: the client and the stdio bridge open their streams with the same 8 MiB limit the link uses); the growth that caused it is not.
 
 **Location:** `src/sessionorc/client.py` (`LINE_LIMIT`), `src/sessionorc/link.py` (`FRAME_LIMIT`), `src/sessionorc/mail.py` (the bounds that are `None` until TD-052 step 6: `MAIL_RETENTION`, `MAILBOX_DEPTH`, `THREAD_BOUND`), `src/sessionorc/models.py` (`Session.view()`)
 
