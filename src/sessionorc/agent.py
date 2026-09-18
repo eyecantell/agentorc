@@ -2024,7 +2024,9 @@ class HostAgent:
 
     # -- waking (design §4.8 "Waking a lead", §4.10 "The host agent decides each wake") ----------
 
-    async def rpc_wait(self, timeout: float = 600.0, scope: str = "controlled", caller: Any = None) -> dict[str, Any]:
+    async def rpc_wait(
+        self, timeout: float = 600.0, scope: str = "controlled", only_host: str | None = None, caller: Any = None
+    ) -> dict[str, Any]:
         """`ao wait [--timeout N] [--scope controlled|all]` (TD-049, moved here by TD-052 step 3):
         block until something in the caller's scope changes, new mail wakes it, or the timeout
         passes — and **that timeout is the fallback poll**.
@@ -2053,6 +2055,8 @@ class HostAgent:
             while True:
                 me.poke.clear()
                 views = self._views()
+                if only_host:  # a person over a link watches that node's records only (§4.4a)
+                    views = [v for v in views if v.get("host") == only_host]
                 changed, cursor = waits.wake_changes(before, waits.wait_scope(views, who, scope))
                 s = self._graph().get(who) if who is not None else None  # a node's session waits here too (step 5)
                 wake = self._decide_wake(s, member_change=bool(changed)) if s is not None else None
@@ -2503,6 +2507,28 @@ class HostAgent:
                     p[key] = [self._from_host(x, host) for x in p[key]]
         if rpc == "create":
             p.setdefault("host", host)
+        if params.get("caller") is None:
+            # A person at a node acts only on that node's records (§4.4a): `id@<this home>` collapsed
+            # to a home record above, and the person gate would then have passed it (security read of
+            # PR #217). The target's host, read after the rewrite, has to be the link's own. A call
+            # that names no session — the person inbox, a `wait` — names nothing to bound; the wait
+            # is scoped to the node's host instead. A `create` for another host is refused at the
+            # node before it gets here; the check is kept as a second line.
+            if rpc == "wait":
+                p["only_host"] = host
+            where: str | None = None
+            if rpc == "create":
+                where = str(p.get("host") or host)
+            elif rpc in modes.PERSON_NODE_BOUND and p.get("id") and p["id"] != PERSON:
+                where = naming.split_address(str(p["id"]))[1] or self.host
+            if where is not None and where != host:
+                return {
+                    "id": 0,
+                    "error": (
+                        f"a person at {host} may {rpc} only {host}'s sessions: {p.get('id') or p.get('host')} "
+                        f"is on {where} (design §4.4a)"
+                    ),
+                }
         req = {"id": 0, "method": rpc, "params": p, "caller": params.get("caller")}
         task = asyncio.ensure_future(self._dispatch(req, link_host=host))
         token = str(params.get("token") or "")

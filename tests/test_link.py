@@ -819,3 +819,51 @@ async def test_mail_crosses_the_link_both_ways_and_a_wait_from_the_node_wakes_on
                 mine = await as_w.call("inbox", unread=True)
                 assert [e["text"] for e in mine["entries"]] == ["while you were away"]
             await person.call("kill", id=lead["id"])
+
+
+async def test_a_persons_forwarded_act_reaches_only_the_nodes_own_records(home, hookstub, tmp_path, monkeypatch):
+    """Security read of PR #217: a person at a node runs `ao` against `<home session>@kmaster`; the
+    home rewrote that to its own bare id and the person gate passed it — controllers and grants of
+    any session in the org, from any laptop. §4.4a: a person's request arriving over a link may act
+    only on that node's records. Reads stay the org's, and a person may still message anyone."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as _node:
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        await until(home, f"{w['id']}@laptop", lambda v: v is not None and v["state"] != "unreachable")
+        async with LocalClient(sock=home.dir / "agent.sock") as at_home:
+            lead = await at_home.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash"])
+        async with LocalClient() as person_at_laptop:
+            for rpc, extra in (
+                ("set_controllers", {"add": ["ao-anyone"]}),
+                ("set_grants", {"add": ["control"]}),
+                ("set_mode", {"unattended": True}),
+                ("inbox_delete", {"msg": "m-none"}),
+            ):
+                with pytest.raises(AgentError, match=f"a person at laptop may {rpc} only laptop's sessions"):
+                    await person_at_laptop.call(rpc, id=f"{lead['id']}@kmaster", **extra)
+            # a person's acts on panes never leave the node: a foreign id is simply no session here
+            with pytest.raises(AgentError, match="no session"):
+                await person_at_laptop.call("kill", id=f"{lead['id']}@kmaster")
+            # the two reads the same rule covers: a home lead's mail bodies, and a `wait` over the org
+            with pytest.raises(AgentError, match="a person at laptop may inbox only laptop's sessions"):
+                await person_at_laptop.call("inbox", id=f"{lead['id']}@kmaster")
+            seen = await person_at_laptop.call("wait", timeout=0.5, scope="all")
+            assert all(v.get("host") == "laptop" for v in seen.get("changed") or [])
+            # the person inbox names no session, and stays the person's from anywhere (review of #219)
+            async with LocalClient(caller=w["id"]) as as_w:
+                sent = await as_w.call("msg", to=["person"], text="for you")
+            theirs = await person_at_laptop.call("inbox")
+            assert sent["entry"]["id"] in [e["id"] for e in theirs["entries"]]
+            gone = await person_at_laptop.call("inbox_delete", msg=sent["entry"]["id"])
+            assert gone["deleted"] == sent["entry"]["id"]
+            with pytest.raises(AgentError, match="acts on its own sessions only"):  # refused at the node itself
+                await person_at_laptop.call("create", name="x", dir=str(tmp_path), adapter="shell", host="kmaster")
+            # the node's own record: the same edit, forwarded and served
+            got = await person_at_laptop.call("set_controllers", id=w["id"], add=[f"{lead['id']}@kmaster"])
+            assert got["controllers"] == [f"{lead['id']}@kmaster"]
+            # …and a person may still message anyone (a read of a home record is not served here at all:
+            # a node's replica holds its own host's records only)
+            assert (await person_at_laptop.call("msg", to=[f"{lead['id']}@kmaster"], text="hi"))["delivered"]
+        async with LocalClient(sock=home.dir / "agent.sock") as at_home:
+            assert (await at_home.call("get", id=lead["id"]))["controllers"] == []  # untouched
+            await at_home.call("kill", id=lead["id"])
