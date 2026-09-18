@@ -30,8 +30,22 @@ def sess(sid, name, *, team=None, project=None, state="idle", rank=5, controller
 def test_no_badge_anywhere_is_the_flat_grid():
     views = [sess("ao-a", "a"), sess("ao-b", "b")]
     assert team_groups(views) is None
-    # a badge on a *dead* session does not turn grouping on: the page is about live work
-    assert team_groups([sess("ao-a", "a", team="ao-grind", state="exited")]) is None
+
+
+def test_a_team_with_nothing_live_keeps_its_card_below_the_live_ones_and_no_team():
+    """Design §4.5a **team groups** (2026-09-18): the page used to go flat the moment the last badged
+    session exited. Dead cards under a team's name are that team's; a definition nothing carries is
+    a group with no members, because its card is where Start lives."""
+    (g,) = team_groups([sess("ao-a", "a", team="ao-grind", state="exited")])
+    assert g["team"] == "ao-grind" and g["live"] == 0 and g["ids"] == ["ao-a"] and not g["defined"]
+    rows = [{"name": "zz-idle", "lead": "orc", "members": 2, "projects": ["p"], "wound_down": None}]
+    views = [sess("ao-a", "a", team="ao-grind", state="exited"), sess("ao-b", "b"), sess("ao-c", "c", team="live")]
+    groups = team_groups(views, rows)
+    assert [g["team"] for g in groups] == ["live", "", "ao-grind", "zz-idle"]  # live, No team, stopped
+    idle = groups[-1]
+    assert idle["defined"] and idle["ids"] == [] and idle["def_lead"] == "orc" and idle["projects"] == ["p"]
+    # a definition alone turns grouping on: a stopped team is a card, not a line above a flat grid
+    assert [g["team"] for g in team_groups([sess("ao-b", "b")], rows)] == ["", "zz-idle"]
 
 
 def test_two_teams_each_with_a_lead():

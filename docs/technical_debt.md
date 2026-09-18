@@ -44,6 +44,9 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-066 | Records grow without bound until TD-052 step 6 sets the mail bounds, and one `list` reply outgrew the client's 64 KiB line limit: every `ao` and the UI failed at once | High | Open |
 | TD-067 | Standing up a team has no operator's guide: the briefs README predates `ao team start`, design §4.9 is a spec, and `ao --skill` is for a session, not for the person or the Claude session that sets a team up | Medium | Open |
 | TD-068 | A brief over about 16 KB cannot start a session: the prompt is passed on tmux's command line, and `tmux new-session` answers *command too long* | Medium | Open |
+| TD-069 | The Inbox is a dialog: too narrow to read and act on the paragraphs sessions write to the person — it needs a full-width page of its own | Medium | Open |
+| TD-070 | An `ask` cannot offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, rendered as buttons beside Reply and Delete | Medium | Open |
+| TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Open |
 
 ---
 
@@ -646,4 +649,58 @@ It matters more than a Low priority suggests in one narrow way: design §4.5a's 
 **Done when** a 32 KB brief starts a session through `ao new --prompt` and through `ao team start`, and a prompt no path can deliver is refused by agentorc, in its own words, before anything is created.
 
 **Related:** TD-042 (briefs that name one run), TD-067 (the operator's guide should say how long a brief may be), design §4.3 (adapters own the tool's launch), §4.9 (`ao team start` is all or nothing).
+
+
+## TD-069: The Inbox needs a page of its own — a dialog is too narrow to read and act on mail
+
+**Priority:** Medium
+**Added:** 2026-09-18 (the anchor session; Paul's review of the Org page)
+**Status:** Open — asked for by Paul 2026-09-18; design first (a new screen and its controls are §4.5 and §4.5a rows before they are code).
+**Location:** `src/agentorc/ui/templates/base.html` (the `personbox` dialog), `src/agentorc/ui/static/app.js` (its list, Reply and delete), `src/agentorc/ui/app.py` (`/api/inbox` routes); a new `inbox.html` and nav item
+
+**Why:** the top bar's **Inbox** opens a dialog: a fixed-width column, `max-height: 60vh`, every entry cut to what fits. Sessions write paragraphs to the person — on 2026-09-18 the five entries there were two defect reports, a wind-down notice and a venv failure, each several hundred characters — and a dialog over the Org page is the wrong place to read them, answer them, or compare two.
+
+**Fix:** an **Inbox** page at `/inbox` (nav item beside Org, the unread count on it), full width: one row per entry — sender (link to its Focus), kind, `about`, age, the whole text — with Reply and Delete in place, an open `ask` marked as waiting on you and sorted first, and the thread an entry belongs to shown under it (the person's own replies are already in the senders' records). The top-bar button goes to the page; the dialog retires. The same page is the natural home for TD-070's suggested answers.
+
+**Done when** the top bar's Inbox opens a full-width page, a 2,000-character message reads without a scroll box inside a dialog, Reply and Delete work from it, and §4.5 / §4.5a describe it.
+
+**Related:** design §4.10 (the person inbox), §4.5a (the top bar **Inbox** row), TD-052 (mail), TD-070.
+
+
+## TD-070: An `ask` cannot offer its expected answers — the person types every reply from scratch
+
+**Priority:** Medium
+**Added:** 2026-09-18 (the anchor session; Paul's review of the Org page)
+**Status:** Open — asked for by Paul 2026-09-18; design first (a new field on a message is §4.10, a new control is §4.5a).
+**Location:** `src/sessionorc/mail.py` (the message shape), `src/sessionorc/agent.py` (`rpc_msg`), `src/agentorc/cli.py` (`ao msg`), the Inbox UI (dialog today, TD-069's page), `docs/briefs/` (so leads and workers use it)
+
+**Why:** most questions a session puts to a person have two or three expected answers — *merge it / hold it*, *yes, deploy / not tonight*, *option A / option B* — and the sender knows them when it asks. Today the person reads the question, presses Reply, and types. Offering the answers beside **Reply** and **Delete** turns the common case into one click and keeps free text for the rest.
+
+**Fix:** `ao msg … --kind ask --answer "merge it" --answer "hold it"` stores `answers: [...]` on the entry — bounded (a handful, each short; the bounds belong beside `TEXT_CAP` in §4.10) and **data, never instructions**: an answer is text the sender proposed, rendered as a button whose press sends exactly that text as the `reply`, the same RPC the free-text Reply uses, so nothing new can be said through it that Reply could not say. Session-to-session asks may carry them too (`ao inbox` prints them); the first surface is the person's Inbox. The briefs tell a session to offer answers when it knows them.
+
+**Done when** an ask sent with `--answer` shows its answers as buttons beside Reply and Delete, pressing one delivers that text as a `reply` that wakes the sender's `ao wait`, free-text Reply still works, and the bounds are in §4.10 and enforced at the RPC.
+
+**Related:** design §4.10 (kinds, bounds, *a reply is mail, not a send*), TD-069 (the page these sit on), TD-052.
+
+
+## TD-071: Org page review, 2026-09-18 — what was built, and the ideas that were not
+
+**Priority:** Low
+**Added:** 2026-09-18 (the anchor session; Paul's review of the Org page)
+**Status:** Open — a list to pick from, none approved. Built in the same PR as this entry: a team with nothing live keeps its card (Start on it, its dead cards folded, below the live teams and *No team*), the **Teams** strip retired, state glyphs on every pill, *Person inbox* → **Inbox**.
+**Location:** `src/agentorc/ui/` (templates, `app.js`, `app.css`)
+
+**Why:** on 2026-09-18 the page was seven cards, six of them dead, under a strip of three stopped teams: nothing on it said which dead card was whose, and what was running was one card among them. The review fixed the grouping; these are what it turned up beside it, kept here so they are not lost with the conversation.
+
+**Ideas, cheapest first:**
+1. **Forget all** on a stopped team's card — seven exited cards is seven Forget clicks today. A team-level control: §4.5a row first. It should refuse while any of the team's sessions is not ready to close (unpushed work, as `orchestrator-ao-1`'s *305 unpushed* flag showed on 2026-09-18).
+2. **Unread mail on a folded team** — the header of a folded team says nothing about its sessions' unread counts (`tdgrind-1` held 19 on 2026-09-18). A `✉ n` beside the fold count. Unread mail on an exited session is by design as far as it goes: an unread entry never ages out (§4.10), and a *resumed* conversation takes the old record's mail with it (`agent.py`, `_supersede` → `_move_mail`). **Not verified:** what a fresh `ao team start` under the same name does with the dead record's inbox. Most of those 19 were claim notes, stale within the hour — worth deciding whether an unread `note` should outlive the run it was sent to (§4.10).
+3. **A roll-up on a live team's header** — `3 working · 1 idle` as glyph counts, so a team is read without reading its cards.
+4. **Exited cards carry less** — profile line, *under* chip and stop note say nothing once a session is dead; a dead card could be two rows and Forget.
+5. **The mode badge** — *unattended* is the loudest thing on every card (filled, dark) and is true of every team session. Quieter, or a glyph; *interactive* is the rarer fact worth marking.
+6. **The legend** — the note under the grid explains the sort order in words; with glyphs it could be the glyphs.
+
+**Done when** each idea is either built (its own PR, §4.5a first) or struck here.
+
+**Related:** design §4.5a (**team groups**, **state icon**), TD-069, TD-070, TD-065 (the undefined `chip` class — same page, same kind of finding).
 

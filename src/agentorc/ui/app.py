@@ -10,6 +10,7 @@ import contextlib
 import json
 import logging
 import os
+import time
 from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
@@ -156,17 +157,21 @@ def projects_view() -> list[dict[str, Any]]:
     ]
 
 
+def _aged(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """design §4.5a **wound down** note (§4.9a, TD-053 step 6): a team's card says *wound down <t>*
+    rather than a bare *stopped* when every session that carried the badge declared it was out of
+    work. The instant comes from the records; the age is rendered here, like every other."""
+    now = datetime.now(UTC)
+    for r in rows:
+        r["wound_down_age"] = _age(r.get("wound_down"), now)
+    return rows
+
+
 def teams_view(sessions: list[dict[str, Any]]) -> dict[str, Any]:
     """The **Teams** strip's contents (design §4.5a): every definition with its source, projects,
     member count and live count — `teamrun.rows`, the very rows `ao team list` prints."""
     org, notes = org_here()
-    rows = teamrun.rows(org, sessions)
-    now = datetime.now(UTC)
-    for r in rows:
-        # design §4.5a **wound down** note (§4.9a, TD-053 step 6): the strip says *wound down <t>*
-        # rather than a bare *stopped* when every session that carried the badge declared it was out
-        # of work. The instant comes from the records; the age is rendered here, like every other.
-        r["wound_down_age"] = _age(r.get("wound_down"), now)
+    rows = _aged(teamrun.rows(org, sessions))
     # on a node the one note is where the org is, not a definition that failed to read
     elsewhere = notes[0] if hosts.is_node() and notes else ""
     return {"teams": rows, "source": str(org.path or ""), "notes": [] if elsewhere else notes, "elsewhere": elsewhere}
@@ -378,32 +383,38 @@ def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ())
     return checks
 
 
+DEFS_TTL = 5.0  # seconds the events stream keeps the team definitions it read (design §4.5a)
 NO_TEAM = ""  # the group key for sessions carrying no `team` badge; rendered as *No team*, last
 DEAD = ("exited", "closed")
 
 
-def team_groups(views: list[dict[str, Any]], defined: Collection[str] = ()) -> list[dict[str, Any]] | None:
+def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = ()) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
-    derived from the views on every render and every delta, never stored. `None` when no *live*
-    session carries a badge — the page then renders the flat grid, with no header anywhere.
+    derived from the views on every render and every delta, never stored. `rows` is the definitions
+    (`teamrun.rows`). `None` when no session carries a badge and nothing is defined — the page then
+    renders the flat grid, with no header anywhere. A team with nothing live keeps its group
+    (2026-09-18): dead cards under a team's name are still that team's, and a definition no session
+    carries is a group with no members, because its card is where Start lives.
 
     The badge decides the group; `controllers` decides the lead: the one member holding
     `control` that other members of the same group list as a controller. A group without one
     has no lead card and its header says so. Within a group the lead comes first, then the rest in
     urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
-    per group in Pinned mode. Sessions with no badge form the *No team* group at the end.
+    per group in Pinned mode. Down the page: the teams with something live, the sessions with no
+    badge as *No team*, then the teams with nothing live.
 
     A lead carrying a different badge from its members — which `ao team start` never produces, but a
     hand-typed `ao new --team` can — is still found, by looking across the whole fleet rather than
     only inside the group (review of PR #117). Its card stays where its own badge puts it; the
     header names it and says so, because moving the card would contradict the badge."""
-    if not any(v.get("team") and v.get("state") not in DEAD for v in views):
-        return None
-    by_team: dict[str, list[dict[str, Any]]] = {}
+    defs = {str(r["name"]): r for r in rows}
+    by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
         by_team.setdefault(str(v.get("team") or NO_TEAM), []).append(v)
+    if not any(t != NO_TEAM for t in by_team):
+        return None
     groups: list[dict[str, Any]] = []
-    for team in sorted(by_team, key=lambda t: (t == NO_TEAM, t)):
+    for team in sorted(by_team):
         members = sorted(by_team[team], key=lambda v: (v["rank"], v["name"]))
         lead, lead_elsewhere = None, False
         if team != NO_TEAM:
@@ -422,6 +433,7 @@ def team_groups(views: list[dict[str, Any]], defined: Collection[str] = ()) -> l
                 else:
                     lead_elsewhere = True
         projects = sorted({str(m.get("project")) for m in members if m.get("project")})
+        row = defs.get(team) or {}
         groups.append(
             {
                 "team": team,
@@ -432,13 +444,21 @@ def team_groups(views: list[dict[str, Any]], defined: Collection[str] = ()) -> l
                 "lead_elsewhere": lead_elsewhere,  # its card sits under its own badge, not here
                 "members": members,
                 "ids": [m["id"] for m in members],
-                "projects": projects,
+                "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "live": sum(1 for m in members if m.get("state") not in DEAD),
-                # a definition exists, so the group's card carries Stop / Stop now (§4.5a, 2026-09-16)
-                "defined": team in defined,
+                # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
+                "defined": team in defs,
+                "source": row.get("source"),
+                "def_lead": row.get("lead"),  # the definition's word, for a card with no sessions yet
+                "def_members": row.get("members"),
+                # *nothing running* and *nothing left to run* are different facts (§4.9a)
+                "wound_down": row.get("wound_down"),
+                "wound_down_age": row.get("wound_down_age"),
             }
         )
+    # what is running is read first; *No team* is never "stopped" — nothing there starts as one
+    groups.sort(key=lambda g: (2 if g["team"] and not g["live"] else 1 if not g["team"] else 0, g["team"]))
     return groups
 
 
@@ -485,13 +505,25 @@ def create_app() -> FastAPI:
     def render_card(v: dict[str, Any]) -> str:
         return templates.get_template("card.html").render(s=v)
 
-    def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
+    defs_cache: dict[str, Any] = {"at": 0.0, "org": None}
+
+    async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The definitions' rows for a delta's headers. The page reads the files on every load;
+        the events stream re-renders every header on every delta, so it reads them at most once in
+        `DEFS_TTL` seconds — a definition edited by hand shows on the next load, or within that."""
+        now = time.monotonic()
+        if defs_cache["org"] is None or now - defs_cache["at"] > DEFS_TTL:
+            # off the loop: every open page shares it, and the read is a file per registered repo
+            defs_cache.update(at=now, org=(await asyncio.to_thread(org_here))[0])
+        return _aged(teamrun.rows(defs_cache["org"], sessions))
+
+    async def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
         """The team groups as the events stream ships them (design §4.5a **team groups**): per group
         its key, the member ids in order, and the header rendered by the same template the page
         uses — so the client moves cards between groups and swaps headers without composing any
         markup of its own. `None` means "flat grid", exactly as the page renders it."""
         fleet = list(known.values())
-        groups = team_groups([view(s, fleet) for s in fleet])
+        groups = team_groups([view(s, fleet) for s in fleet], await team_rows(fleet))
         if groups is None:
             return None
         head = templates.get_template("group_head.html")
@@ -499,6 +531,7 @@ def create_app() -> FastAPI:
             {
                 "team": g["team"],
                 "lead": (g["lead"] or {}).get("id", ""),
+                "live": g["live"],
                 "ids": g["ids"],
                 "html": head.render(g=g),
             }
@@ -536,7 +569,7 @@ def create_app() -> FastAPI:
             "org.html",
             {
                 "sessions": vs,
-                "groups": team_groups(vs, {t["name"] for t in strip["teams"]}),
+                "groups": team_groups(vs, strip["teams"]),
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),
@@ -1024,7 +1057,7 @@ def create_app() -> FastAPI:
                                 "rank": v["rank"],  # the view's: unseen idle sorts above idle
                                 "html": render_card(v),
                                 "session": v,
-                                "groups": group_heads(known),
+                                "groups": await group_heads(known),
                             }
                         )
                     )
@@ -1034,7 +1067,7 @@ def create_app() -> FastAPI:
                         # popping on it would one day evict a live session by coincidence
                         went = str(ev.get("id") or "")
                         known.pop(went, None)
-                        await ws.send_text(json.dumps({**ev, "groups": group_heads(known)}))
+                        await ws.send_text(json.dumps({**ev, "groups": await group_heads(known)}))
                         # A card's *under* chip names another record, so the session that went
                         # is not the only card now out of date: every card listing it as a
                         # controller has to be redrawn, or it keeps naming and linking to a

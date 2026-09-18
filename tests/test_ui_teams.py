@@ -234,21 +234,22 @@ def test_a_malformed_definition_is_a_note_not_a_500(world):
     assert [r["name"] for r in v["teams"]] == ["ao-grind"] and "ao-api" in v["notes"][0]
 
 
-def test_the_page_renders_a_row_per_team_and_collapses_to_a_line_when_none_is_defined(world, client):
+def test_a_stopped_team_is_a_card_with_start_and_none_defined_is_a_line(world, client):
     tmp_path, fleet = world
     html = client.get("/").text
-    # Nothing is live: the strip lists the definition with Start, and Stop has no card to sit on.
+    # Nothing is live: the definition is a card with Start, no sessions in it, and no Stop.
     assert 'data-team-act="start"' in html and 'data-team-act="stop' not in html
-    assert 'class="team-row" data-team="ao-grind"' in html and "lead orc-ao · 2 members" in html
+    assert '<section class="tgroup" data-team="ao-grind"' in html and "lead orc-ao · 2 members" in html
+    assert "team-row" not in html  # the strip's rows are retired (design §4.5a, 2026-09-18)
     (tmp_path / "home" / "org.yml").unlink()
     html = client.get("/").text
     assert "Teams: none defined" in html and "data-team-act" not in html
 
 
-def test_the_strip_row_reads_wound_down_where_it_would_have_read_stopped(world, client):
+def test_a_stopped_teams_card_reads_wound_down_where_it_would_have_read_stopped(world, client):
     """The rendered half of the same row: the words a person actually sees. A wound-down team is
-    startable like any other — `ao team start` is the restart (§4.9) — so **Start** stays, and the
-    row is not hidden: nothing is live."""
+    startable like any other — `ao team start` is the restart (§4.9) — so **Start** stays, its
+    sessions' cards sit on the team's card, and the header offers the fold."""
     _tmp, fleet = world
     assert ">stopped<" in client.get("/").text
 
@@ -259,31 +260,37 @@ def test_the_strip_row_reads_wound_down_where_it_would_have_read_stopped(world, 
     ]
     html = client.get("/").text
     assert "wound down" in html and ">stopped<" not in html
-    # The page script rewrites this cell on every layout (live counts come from the cards), so what
-    # an idle team reads has to be on the cell for it to put back — it used to write a bare
-    # "stopped" over the note the moment the page loaded. No JS harness here: the pair is pinned.
-    assert 'data-idle="wound down' in html
-    js = (pathlib.Path(uiapp.__file__).parent / "static" / "app.js").read_text()
-    assert 'cell.dataset.idle || "stopped"' in js
-    assert 'class="team-row" data-team="ao-grind"' in html and "hidden" not in html.split("team-row")[1][:200]
-    assert 'data-team-act="start"' in html  # `ao team start` is the restart (§4.9)
-    assert "declared it was out of work" in html  # the hover says why the word is different
+    head = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
+    assert 'data-live="0"' in head[:200]  # what the fold and the quieter card key on
+    head, grid = head.split('<div class="grid">', 1)
+    assert 'data-fold="ao-grind" data-n="2"' in head and "2 sessions" in head
+    assert 'data-team-act="start"' in head and 'data-team-act="stop' not in head
+    assert "declared it was out of work" in head  # the hover says why the word is different
+    assert "orc-ao" in grid  # the dead cards are the team's
 
 
-def test_a_live_team_leaves_the_strip_and_its_card_carries_stop_and_stop_now(world, client):
+def test_a_live_teams_card_carries_stop_and_stop_now_and_never_folds(world, client):
     """Design §4.5a **team groups** (2026-09-16): the control sits on the thing it stops."""
     _tmp, fleet = world
     fleet.sessions = [{**badged("orc-ao", "ao-grind"), "tail": []}, {**badged("adhoc-1", "adhoc"), "tail": []}]
     html = client.get("/").text
-    assert 'class="team-row" data-team="ao-grind" data-live="1" hidden' in html  # out of the strip
     head = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
     head = head[: head.index('<div class="grid">')]
-    assert 'data-team-act="stop" data-team="ao-grind" title' in head  # shown: no `hidden`
+    assert 'data-team-act="stop" data-team="ao-grind" title' in head
     assert 'data-team-act="stopnow" data-team="ao-grind" title' in head
-    # A badge with no definition has nothing `ao team stop` could read: its buttons stay hidden.
+    assert 'data-team-act="start"' not in head and "data-fold" not in head
+    # A badge with no definition has nothing `ao team start|stop` could read: no control at all.
     adhoc = html[html.index('<section class="tgroup" data-team="adhoc"') :]
     adhoc = adhoc[: adhoc.index('<div class="grid">')]
-    assert 'data-team-act="stop" data-team="adhoc" hidden' in adhoc
+    assert "data-team-act" not in adhoc
+
+
+def test_the_state_pill_has_a_glyph_for_every_state_the_view_can_name():
+    """Design §4.5a **state icon**: the glyph is CSS keyed on the pill's state class, so a state
+    class with no rule is a pill with no icon — pinned here, since there is no JS/CSS harness."""
+    css = (pathlib.Path(uiapp.__file__).parent / "static" / "app.css").read_text()
+    for cls in ("needs", "limited", "stalled", "working", "idle", "exited", "done", "unreachable"):
+        assert f".pill.s-{cls}::before" in css, cls
 
 
 # ── Start: the shared planner, every check before any create ──────────────────────────────────
