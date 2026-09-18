@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import copy
 import inspect
 import json
 import logging
@@ -89,6 +90,17 @@ PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs
 # killed anyway, because the whole point is that nobody is watching.
 WRAPUP_GRACE = timedelta(minutes=10)
 REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
+# An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
+# itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
+ACT_TIMEOUT = 120.0
+# What the home routes to the node whose name is the record's `host` (design §4.4a "A node reports
+# and executes; the home decides"): the acts that touch a pane or the node's waiters, executed
+# there with no gate of their own. `name_check` is a read, routed with a `host` for a team start.
+NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "create", "name_check"})
+# What the home owns and edits on its own copy (§4.4a "Each field has one owner"), and pushes to
+# the node's replica in the same call so its stopping policies read the same intent. 4b generalises
+# the push to every home-owned field on reconnect.
+HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"})
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
@@ -783,8 +795,13 @@ class HostAgent:
         project: str = "",
         run_until: str | None = None,
         wrapup_prompt: str | None = None,
+        host: str | None = None,
         caller: str | None = None,
     ) -> dict[str, Any]:
+        if host and host != self.host:
+            # Routed before the method runs (`_act_host`) when this is the home; a node asked for
+            # another host's create got here through the link, and the link is one host's.
+            raise RpcError(f"{host} is not this host ({self.host}): a create lands on the host it names")
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
@@ -896,9 +913,13 @@ class HostAgent:
                 await self._supersede(resume, sid)
         return s.view()
 
-    async def rpc_name_check(self, dir: str, name: str, repo: str | None = None) -> dict[str, Any]:
+    async def rpc_name_check(
+        self, dir: str, name: str, repo: str | None = None, host: str | None = None
+    ) -> dict[str, Any]:
         """What §4.1's name rule would do to this name, without doing it: the New session form's
         check as you type, and the note `ao new` prints (design §4.5a, TD-030 step 4)."""
+        if host and host != self.host:
+            raise RpcError(f"{host} is not this host ({self.host}): a name is checked on the host it would run on")
         verdict, _ = await self._name_verdict(Path(dir).expanduser(), repo, name)
         return verdict
 
@@ -1337,9 +1358,9 @@ class HostAgent:
         return s.view()
 
     async def rpc_set_mode(self, id: str, unattended: bool) -> dict[str, Any]:
-        s = self._get(id)
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
         s.unattended = bool(unattended)
-        self.store.save(s)
+        self._save(s)
         return s.view()
 
     async def rpc_set_stop(
@@ -1352,7 +1373,7 @@ class HostAgent:
         time is where this started, so clearing one is a decision worth being able to make out loud
         rather than by restarting the session.
         """
-        s = self._get(id)
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
         when = _stop_time(run_until)  # a malformed time is an error before anything else is judged
         if when and not s.unattended:
             raise RpcError(f"{id} is interactive: a stop time is a policy, and policies leave it alone (§4.2)")
@@ -1368,7 +1389,7 @@ class HostAgent:
         s.run_until = when
         if wrapup_prompt is not None:
             s.wrapup_prompt = str(wrapup_prompt).strip() or None
-        self.store.save(s)
+        self._save(s)
         await self._push_changes()
         return s.view()
 
@@ -1377,10 +1398,10 @@ class HostAgent:
     ) -> dict[str, Any]:
         """`ao grant` / `ao revoke`, the Focus grants chip (design §4.8): edit `capabilities`. Takes
         effect on the target's next call — the gate reads the record, not a cached copy."""
-        s = self._get(id)
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
         adding, removing = _grants(add or []), _grants(remove or [])
         s.capabilities = [g for g in GRANTS if (g in s.capabilities or g in adding) and g not in removing]
-        self.store.save(s)
+        self._save(s)
         await self._push_changes()
         return s.view()
 
@@ -1394,9 +1415,11 @@ class HostAgent:
         invariant 5, TD-041 — `_gate` refuses it before this method runs), while a person may hand
         their own session to a controller deliberately. Takes effect on the next call the
         controller makes: the gate reads the record, not a cached copy."""
-        s = self._get(id)
-        adding = [self._addr(c) for c in _controllers(add or [])]
-        removing = [self._addr(c) for c in _controllers(remove or [])]
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
+        # Stored as the record's own host addresses them (§4.4a, step 4a): bare for that host's
+        # sessions, `id@host` for the rest — another host's record keeps its node's form here too.
+        adding = [self._to_host(c, s.host) for c in _controllers(add or [])]
+        removing = [self._to_host(c, s.host) for c in _controllers(remove or [])]
         if s.id in adding:
             raise RpcError(f"{s.id} cannot be its own controller: it could then drop the ones watching it")
         # One call naming an id in both `add` and `remove` drops it: remove wins, as it already
@@ -1404,7 +1427,7 @@ class HostAgent:
         # that disagree on the ambiguous call is how one of them eventually surprises someone, and
         # of the two answers the safe one is the one that takes authority away (review 2026-09-13).
         s.controllers = _controllers([c for c in s.controllers + adding if c not in removing])
-        self.store.save(s)
+        self._save(s)
         await self._push_changes()
         return s.view()
 
@@ -2327,10 +2350,171 @@ class HostAgent:
             mux.close(f"a report could not be written within {REPORT_WRITE:g} s")  # the reconnect's snapshot repairs it
 
     async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
-        """What the home may ask of this node. Step 3a: nothing but a ping; acts arrive with step 4."""
+        """What the home may ask of this node: a ping; an `act` (step 4a) — an RPC the home has
+        already gated, run here through the same handler a local caller reaches, with no gate of
+        its own; and `stat`, whether a directory exists here (a team start's checkout check)."""
         if method == "ping":
             return "pong"
+        if method == "act":
+            return await self._act(params)
+        if method == "stat":
+            d = Path(str(params.get("dir") or "")).expanduser()
+            return {"dir": str(d), "exists": await asyncio.to_thread(d.is_dir)}
         raise link.LinkError(f"unknown link method {method!r}")
+
+    async def _act(self, params: dict[str, Any]) -> dict[str, Any]:
+        """An act the home routed here (design §4.4a "A node reports and executes; the home
+        decides"): `{rpc, params, caller}`, every address in it already written from this host's
+        point of view. The home is the gate and this node the executor, so neither `_gate` nor
+        the offline table runs — the request came over the link, which is the home. Refused by
+        name when the record is another host's (*not my host*). The reply carries the RPC's
+        result and the record as it now stands, so the home applies the outcome before it answers
+        the caller rather than a report later."""
+        rpc = str(params.get("rpc") or "")
+        if rpc not in NODE_ACTS and rpc not in HOME_EDITS:
+            raise link.LinkError(f"{rpc!r} is not an act a node executes")
+        p = dict(params.get("params") or {})
+        caller = params.get("caller")
+        rid = str(p["id"]) if p.get("id") is not None else None
+        if rid is not None:
+            bare, where = naming.split_address(rid)
+            if where and where != self.host:
+                raise link.LinkError(f"{rid} is not on {self.host}: not my host")
+            p["id"] = rid = bare
+        if rpc in ("create", "name_check"):
+            asked = p.pop("host", None)
+            if asked and asked != self.host:
+                raise link.LinkError(f"a {rpc} for {asked} is not {self.host}'s: not my host")
+        method = getattr(self, f"rpc_{rpc}")
+        if ignored := _drop_unknown(method, p):
+            log.warning("act %s from the home: ignored unknown params %s", rpc, ", ".join(ignored))
+        if "caller" in inspect.signature(method).parameters:
+            p["caller"] = caller
+        try:
+            result = await method(**p)
+        except RpcError as e:
+            raise link.LinkError(str(e)) from None
+        except TypeError as e:
+            raise link.LinkError(f"bad params: {e}") from None
+        sid = rid if rid is not None else (result.get("id") if isinstance(result, dict) else None)
+        record = self.sessions.get(str(sid)) if sid else None
+        return {
+            "result": result,
+            "record": record.to_dict() if record is not None else None,
+            "gone": bool(sid) and record is None and rpc == "remove",
+        }
+
+    # -- acts across the link, at the home (design §4.4a, TD-057 step 4a) -----------------------
+
+    def _act_host(self, method: str, params: dict[str, Any]) -> str | None:
+        """The host an act is for when it is not this one: the address in `id`, or `create`'s
+        (and `name_check`'s) `host`. None means *here*, and the method runs as it always has."""
+        if method not in NODE_ACTS and method not in HOME_EDITS:
+            return None
+        if method in ("create", "name_check"):
+            h = str(params.get("host") or "")
+        else:
+            _rid, h = naming.split_address(str(params.get("id") or ""))
+        return h if h and h != self.host else None
+
+    def _from_host(self, address: Any, host: str) -> str:
+        """An address as `host`'s node stores it, read from here: its bare ids are `id@host`, and
+        an `id@<this home>` is bare."""
+        sid, h = naming.split_address(str(address))
+        return naming.qualify(f"{sid}@{h or host}", local=self.host)
+
+    def _to_host(self, address: Any, host: str) -> str:
+        """The inverse: an address as this home stores it, written for `host`'s node."""
+        sid, h = naming.split_address(str(address))
+        return naming.qualify(f"{sid}@{h or self.host}", local=host)
+
+    def _graph(self) -> dict[str, Session]:
+        """One graph for the gate (§4.4a "The gate reads one graph", step 4a): this host's records
+        under their ids and every other host's under `id@host`, each remote record's `controllers`
+        re-addressed from this home's point of view. Copies, read-only: `self.sessions` itself is
+        never widened — the tick, the anchor rule and the pane reads stay this host's."""
+        g: dict[str, Session] = dict(self.sessions)
+        for host, recs in self.remote.items():
+            for rid, r in recs.items():
+                c = copy.copy(r)
+                c.controllers = [self._from_host(x, host) for x in r.controllers]
+                g[f"{rid}@{host}"] = c
+        return g
+
+    def _node_mux(self, host: str) -> link.Mux:
+        """The live link to `host`, or the refusal in words: *unreachable since <when> — <why>*,
+        never queued (§4.4a "When the recipient's host is unreachable")."""
+        if self.mode != "home":
+            raise RpcError(f"{self.host} is a node of {self.home}: it acts on its own sessions only, ask the home")
+        mux = self._link_muxes.get(host)
+        if mux is not None:
+            return mux
+        state = self.links.get(host)
+        if state is None and host not in hosts.nodes() and host not in self.remote:
+            raise RpcError(f"unknown host {host}: not under `nodes:` in {self.host}'s hosts.yml")
+        since = (state or {}).get("since") or "the home started"
+        why = (state or {}).get("why") or "not connected since the home started"
+        raise RpcError(f"runs on {host}: unreachable since {since} — {why}; refused, not queued (design §4.4a)")
+
+    async def rpc_host_dir(self, host: str, dir: str) -> dict[str, Any]:
+        """Whether `dir` exists on `host` (design §4.4a "Teams across hosts"): `ao team start`'s
+        *every checkout exists on the record's host*, asked of that host's node. A read."""
+        if host == self.host:
+            return {"host": host, "dir": dir, "exists": await asyncio.to_thread(Path(dir).expanduser().is_dir)}
+        mux = self._node_mux(host)
+        try:
+            seen = await mux.request("stat", timeout=ACT_TIMEOUT, dir=dir)
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except (link.LinkClosed, TimeoutError) as e:
+            raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
+        return {"host": host, **(seen if isinstance(seen, dict) else {"dir": dir, "exists": False})}
+
+    async def _route_act(self, method: str, params: dict[str, Any], caller: Any, host: str) -> Any:
+        """An act on another host's record, gated here already: executed by that host's node and
+        its verdict returned (§4.4a). Refused in words — never queued — while the link is down.
+        A home-owned edit is applied to this home's copy after the node took it, so the two agree
+        and the caller's reply is the home's view."""
+        rid, _h = naming.split_address(str(params.get("id") or ""))
+        if method not in ("create", "name_check") and rid not in self.remote.get(host, {}):
+            raise RpcError(f"no session {rid}@{host}")
+        mux = self._node_mux(host)
+        sent = dict(params)
+        if rid:
+            sent["id"] = rid
+        for key in ("controllers", "add", "remove") if method in ("create", "set_controllers") else ():
+            if sent.get(key):
+                sent[key] = [self._to_host(x, host) for x in sent[key]]
+        who = None if mail.is_person(caller) else self._to_host(caller, host)
+        timeout: float | None = ACT_TIMEOUT
+        if method == "send" and sent.get("wait"):
+            timeout = None if sent.get("timeout") is None else float(sent["timeout"]) + ACT_TIMEOUT
+        try:
+            reply = await mux.request("act", timeout=timeout, rpc=method, params=sent, caller=who)
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except link.LinkClosed:
+            raise RpcError(
+                f"the link to {host} dropped while {method} was out: its verdict is unknown — read the record"
+            ) from None
+        except TimeoutError:
+            raise RpcError(f"{host} did not answer {method} within {timeout:g} s: its verdict is unknown") from None
+        reply = reply if isinstance(reply, dict) else {}
+        if reply.get("record"):
+            self._take_records(host, [reply["record"]], whole=False)
+        elif reply.get("gone") and rid:
+            self._forget_remote(host, rid)
+        result = reply.get("result")
+        if method in HOME_EDITS:
+            # the home's own copy carries the edit, and its view — addressed — is what the caller gets
+            await getattr(self, f"rpc_{method}")(**params)
+            result = self._view(self.remote[host][rid])
+        elif isinstance(result, dict) and result.get("host") == host and result.get("id"):
+            # the node answered with its view of the record: the caller gets this home's, addressed
+            held = self.remote.get(host, {}).get(str(result["id"]))
+            result = self._view(held) if held is not None else {**result, "id": f"{result['id']}@{host}"}
+        await self._push_changes()
+        return result
 
     async def _serve_link(self, info: Any, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         """One node's link, for as long as it lasts. The host name is the one sshd's forced command
@@ -2450,7 +2634,7 @@ class HostAgent:
         function over a record map, so a node can forward and the home can answer (§4.4a)."""
         if method == "create" and params.get("capabilities"):
             _grants(params["capabilities"])  # an unknown grant name is refused before the gate reads it
-        reason = mail.act_gate(self.sessions, caller, method, params)
+        reason = mail.act_gate(self._graph() if self.remote else self.sessions, caller, method, params)
         if reason:
             raise RpcError(reason)
 
@@ -2465,7 +2649,9 @@ class HostAgent:
         except KeyError:
             rid, host = naming.split_address(sid)
             if host and rid in self.remote.get(host, {}):
-                raise RpcError(f"{sid} runs on {host}: acts across the link are not built (TD-057 step 4)") from None
+                raise RpcError(
+                    f"{sid} runs on {host}: reading its pane across the link is not built (TD-057 3c.5 / step 4b)"
+                ) from None
             raise RpcError(f"no session {sid}") from None
 
     def _find(self, sid: str) -> Session:
@@ -2497,6 +2683,7 @@ class HostAgent:
         if s.host == self.host:
             return v
         v["id"] = f"{s.id}@{s.host}"
+        v["controllers"] = [self._from_host(c, s.host) for c in s.controllers]  # as this home addresses them
         state = self.links.get(s.host) or {"up": False, "since": None, "why": "not connected since the home started"}
         v["host_link"] = dict(state)
         if (sup := self.supervision.get(s.host)) and sup.get("doing"):
@@ -2666,6 +2853,10 @@ class HostAgent:
                 if refusal:
                     raise RpcError(refusal)
             self._gate(caller, str(name), params)
+            if (target := self._act_host(str(name), params)) is not None:
+                # Another host's record (design §4.4a, step 4a): gated above over the one graph,
+                # executed by that host's node, its verdict returned — or refused as unreachable.
+                return {"id": rid, "result": await self._route_act(str(name), params, caller, target)}
             if "caller" in inspect.signature(method).parameters:
                 # The methods that need to know who called (`create` seeds the new record's
                 # controllers with its creator; `send` and `keys` record who typed; `msg` and

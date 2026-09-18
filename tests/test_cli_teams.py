@@ -64,6 +64,10 @@ def world(tmp_path, monkeypatch):
             return state["sessions"]
         if method == "name_check":
             return state["verdicts"].get(params["name"], {"name": params["name"], "verdict": "free"})
+        if method == "host_dir":
+            if isinstance(state.get("elsewhere"), Exception):
+                raise state["elsewhere"]
+            return {"host": params["host"], "dir": params["dir"], "exists": params["dir"] in state.get("elsewhere", ())}
         if method == "create":
             rec = {
                 "id": f"ao-{Path(params['dir']).name}-{params['name']}",
@@ -80,6 +84,8 @@ def world(tmp_path, monkeypatch):
             state["sessions"].append(rec)
             return rec
         if method in ("send", "kill", "close"):
+            if (why := state.get("refuse", {}).get(params["id"])) is not None:
+                raise cli.AgentError(why)
             for s in state["sessions"]:
                 if s["id"] == params["id"]:
                     s["state"] = "idle" if method == "send" else "closed"
@@ -261,7 +267,74 @@ def test_a_repo_on_another_host_is_a_note_not_a_failure(world):
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 0
     prompt = creates(state)[1]["prompt"]
-    assert "- ao-api: not checked out on kmaster (declared on devenv) — out of reach until phase 2" in prompt
+    assert "- ao-api: not checked out on kmaster (declared on devenv) — out of reach" in prompt
+
+
+# ── a team on another host (design §4.4a "Teams across hosts", TD-057 step 4a) ────────────────
+
+
+def on_devenv(tmp_path):
+    """The team's `host:` is `devenv`, and the repo is checked out there at the same path it has
+    here — a container node's shape, where the roles and briefs are read."""
+    doc = org_doc(tmp_path)
+    doc["projects"]["ao"]["repos"]["agentorc"]["devenv"] = str(tmp_path / "agentorc")
+    doc["teams"]["ao-grind"]["host"] = "devenv"
+    write_org(tmp_path, doc)
+    return str(tmp_path / "agentorc")
+
+
+def test_a_team_with_a_host_is_checked_there_and_created_there(world, capsys):
+    tmp_path, state = world
+    checkout = on_devenv(tmp_path)
+    state["elsewhere"] = {checkout}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    calls = state["calls"]
+    assert [p for m, p in calls if m == "host_dir"] == [{"host": "devenv", "dir": checkout}]  # once per checkout
+    assert all(p["host"] == "devenv" for m, p in calls if m == "name_check")
+    assert all(p["host"] == "devenv" and p["dir"] == checkout for p in creates(state))
+    order = [m for m, _ in calls]
+    assert order[0] == "host_dir" and order.index("create") > order.index("name_check")
+
+
+def test_a_team_whose_host_is_unreachable_is_refused_whole(world, capsys):
+    tmp_path, state = world
+    on_devenv(tmp_path)
+    state["elsewhere"] = cli.AgentError("runs on devenv: unreachable since t — ssh failed; refused, not queued")
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "was not started — devenv: runs on devenv: unreachable" in capsys.readouterr().err and not creates(state)
+    state["elsewhere"] = set()  # reachable, and the checkout is not there
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "does not exist on devenv" in capsys.readouterr().err and not creates(state)
+
+
+def test_a_host_whose_checkout_is_not_readable_here_says_why(world, capsys):
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["projects"]["ao"]["repos"]["agentorc"]["devenv"] = "/workspaces/agentorc"  # a laptop's path, not here
+    doc["teams"]["ao-grind"]["host"] = "devenv"
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    err = capsys.readouterr().err
+    assert "/workspaces/agentorc is not readable on kmaster" in err and "same path" in err and not creates(state)
+    del doc["projects"]["ao"]["repos"]["agentorc"]["devenv"]  # declared nowhere on that host
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "has no checkout on devenv (declared on kmaster)" in capsys.readouterr().err
+
+
+def test_stop_degrades_per_member_when_one_is_refused(world, capsys):
+    """The 3b leftover: a member whose host is unreachable is named with the reason, and the rest
+    are still wrapped up — the stop never aborts on the first refusal."""
+    tmp_path, state = world
+    started(state)
+    state["refuse"] = {"ao-agentorc-grind-2": "runs on devenv: unreachable since t — ssh failed; refused, not queued"}
+    capsys.readouterr()
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0"]) == 0
+    sent = [p["id"] for m, p in state["calls"] if m == "send"]  # every member was tried, the lead last
+    assert sent == ["ao-agentorc-grind-1", "ao-agentorc-grind-2", "ao-agentorc-hunt", "ao-agentorc-orc-ao"]
+    out = capsys.readouterr().out
+    assert "ao-agentorc-grind-2  member: refused: runs on devenv: unreachable" in out
+    assert out.count("wrap-up sent") == 3 and "still working" not in out  # the refused one is not waited on
 
 
 def test_a_members_brief_override_replaces_the_roles_template(world):

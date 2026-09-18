@@ -8,8 +8,13 @@ then each member with `controllers: [lead id]`.
 
 Design §4.9 "Starting and stopping" and "Home and reach". Two things that section describes are
 deliberately not built here and say so rather than pretending: a member that is `{team: <name>}` (a
-nested team) is refused with its name, and a repo whose checkout entry names another host is
-reported as out of reach until phase 2's transport.
+nested team) is refused with its name, and a repo whose checkout entry names a host the team is not
+on is reported as out of reach.
+
+A team lands on one host (design §4.4a "Teams across hosts", TD-057 step 4a): its definition's
+`host:`, else the host the start runs on. Checkouts are resolved on *that* host; the roles and
+briefs are still read from the checkout's path on the host running the start — a container node
+shares the path, and a machine node needs the same path here until a link method reads them there.
 """
 
 from __future__ import annotations
@@ -97,12 +102,16 @@ class Launch:
     unattended: bool = True
     lead: bool = False
     ledger: str | None = None
+    host: str = ""  # the host this session lands on; "" is the host the start runs on
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
         session lives in `<repo>/.claude/worktrees/<name>`, so the main checkout stays the
-        person's and the anchor rule (§9 invariant 2) holds per member without anyone counting."""
+        person's and the anchor rule (§9 invariant 2) holds per member without anyone counting.
+        `host` is sent only when the session lands elsewhere (§4.4, a client never sends a
+        parameter it has not set): the home routes the create to that node."""
         return {
+            **({"host": self.host} if self.host else {}),
             "name": self.name,
             "dir": str(self.dir),
             "adapter": repoconfig.DEFAULT_ADAPTER,
@@ -130,6 +139,7 @@ class Plan:
     source: Path | None = None
     lead: Launch | None = None
     members: list[Launch] = field(default_factory=list)
+    host: str = ""  # where the team lands when that is not the host the start runs on (§4.4a)
     warnings: list[str] = field(default_factory=list)
     """Briefs that name one run (TD-042). Said out loud, like `out_of_reach`; never a refusal."""
 
@@ -171,7 +181,7 @@ def project_block(org: orgmod.Org, projects: list[str], host: str, home: str = "
         if path is None:
             # §4.9: an entry for another host is noted, not an error — phase 2's transport reaches it
             elsewhere = ", ".join(sorted(by_host)) or "nowhere"
-            lines.append(f"- {rname}: not checked out on {host} (declared on {elsewhere}) — out of reach until phase 2")
+            lines.append(f"- {rname}: not checked out on {host} (declared on {elsewhere}) — out of reach")
         else:
             lines.append(f"- {rname}: {path}" + ("  — your home" if rname == home else ""))
     return "\n".join([*lines, "", REACH_NOTE, "", ""])
@@ -225,6 +235,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     role_name: str,
     home: str,
     host: str,
+    here: str,
     profile_override: str | None,
     member: Spec,  # the lead's own definition or a member's: both carry lane, brief, grants, profile
     lead: bool,
@@ -234,10 +245,22 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     project = project_of(org, team.projects, home)
     checkout = org.checkout(project, home, host)
     if checkout is None:
-        raise TeamError(f"{where}: repo {home!r} has no checkout on {host} — its project names another host (phase 2)")
+        declared = ", ".join(sorted((org.projects[project].repos.get(home) or {}) if project in org.projects else []))
+        raise TeamError(
+            f"{where}: repo {home!r} has no checkout on {host} (declared on {declared or 'no host'}) — "
+            f"add `{host}: <path>` under it in org.yml, or set the team's `host:`"
+        )
     checkout = Path(checkout).expanduser()
     if not checkout.is_dir():
-        raise TeamError(f"{where}: {checkout} does not exist on {host} (repo {home!r}) — nothing was started")
+        if host == here:
+            raise TeamError(f"{where}: {checkout} does not exist on {host} (repo {home!r}) — nothing was started")
+        # Another host's checkout: whether it exists *there* is that host's node's to say
+        # (`teamrun.start` asks it); the roles and briefs, though, are read from this path here.
+        raise TeamError(
+            f"{where}: {checkout} is not readable on {here}, and a team's roles and briefs are read from the "
+            f"checkout's path on the host that starts it — a container node shares the path; for a machine "
+            f"node keep a clone at the same path here (repo {home!r} on {host}) — nothing was started"
+        )
     try:
         cfg = repoconfig.load(checkout)
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
@@ -274,16 +297,19 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         unattended=member.unattended if member is not None else True,  # a lead may ask to be watched
         lead=lead,
         ledger=cfg.ledger,
+        host=host if host != here else "",
     )
 
 
 def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -> Plan:
     """Resolve a definition into the sessions it starts, checking everything that can be checked
-    without the agent: the checkouts exist on this host, every role, profile and brief resolves,
-    and no member asks for something this phase does not build. Raises `TeamError` on the first
-    thing that would have stopped the start — nothing is created here (§4.9: never half a team)."""
+    without the agent: the checkouts are declared on the team's host (and exist, when that is this
+    one — `host` is the host the start runs on), every role, profile and brief resolves, and no
+    member asks for something this phase does not build. Raises `TeamError` on the first thing
+    that would have stopped the start — nothing is created here (§4.9: never half a team)."""
     team = find(org, name)
-    p = Plan(team=team.name, source=team.source)
+    here, host = host, team.host or host  # the team lands on its `host:`, else where the start runs (§4.4a)
+    p = Plan(team=team.name, source=team.source, host=host if host != here else "")
     reach = bool(project_block(org, team.projects, host))
     if team.lead.role != orgmod.PERSON:
         p.lead = _launch(
@@ -293,6 +319,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -
             role_name=team.lead.role,
             home=team.lead.home,
             host=host,
+            here=here,
             profile_override=profile or team.lead.profile,
             member=team.lead,  # its lane, brief, grants and unattended read like a member's
             lead=True,
@@ -318,6 +345,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -
                     role_name=member.role,
                     home=member.home,
                     host=host,
+                    here=here,
                     profile_override=profile,
                     member=member,
                     lead=False,

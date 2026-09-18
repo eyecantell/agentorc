@@ -64,7 +64,8 @@ class Stopping:
 
     @property
     def member_ids(self) -> list[str]:
-        return [e["id"] for e in self.acted if e["role"] == "member"]
+        """The members the stop reached: a refused one (its host unreachable, §4.4a) is not waited on."""
+        return [e["id"] for e in self.acted if e["role"] == "member" and not e.get("refused")]
 
 
 def badged(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -159,11 +160,22 @@ def start(
     plan = teams.plan(org, name, host, profile=profile)
     if not plan.launches:
         raise teams.TeamError(f"team {name} starts nothing: a person leads it and it has no members")
+    on = {"host": plan.host} if plan.host else {}
+    if plan.host:
+        # Design §4.4a "Teams across hosts": *every checkout exists on the record's host*, asked of
+        # that host's node through the home — and the whole team refused while it is unreachable.
+        for d in dict.fromkeys(str(x.dir) for x in plan.launches):
+            try:
+                seen = call("host_dir", host=plan.host, dir=d)
+            except Exception as e:  # noqa: BLE001 — whatever the transport raised, the answer is the same
+                raise teams.TeamError(f"team {name} was not started — {plan.host}: {e}") from e
+            if not seen.get("exists"):
+                raise teams.TeamError(f"team {name} was not started — {d} does not exist on {plan.host}")
     # §4.1's rule, asked of the agent rather than reimplemented here (`name_check`, the same verdict
     # `create` and the New session form use), for every session before any of them exists.
     held = [
         v
-        for v in (call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir)) for x in plan.launches)
+        for v in (call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on) for x in plan.launches)
         if v.get("verdict") == "live"
     ]
     if held:
@@ -307,10 +319,16 @@ def _own_end(lead: dict[str, Any]) -> dict[str, Any]:
 
 
 def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[str, Any]:
-    if now:
-        call("kill", id=s["id"])
-    else:
-        call("send", id=s["id"], text=teams.WRAPUP_PROMPT)
+    """One member's or the lead's stop. A refusal — its host unreachable (§4.4a), a pending prompt
+    — is this entry's outcome, not the stop's: the rest of the team is still wrapped up, and the
+    refused one is named with the reason (TD-057 step 4a, the 3b leftover)."""
+    try:
+        if now:
+            call("kill", id=s["id"])
+        else:
+            call("send", id=s["id"], text=teams.WRAPUP_PROMPT)
+    except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
+        return {**_entry(s, role), "action": f"refused: {e}", "state": s.get("state") or "?", "refused": True}
     return {**_entry(s, role), "action": "killed" if now else "wrap-up sent", "state": "killed" if now else "?"}
 
 

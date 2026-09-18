@@ -1512,9 +1512,9 @@ The repo name is the project's word for it; session ids keep using the checkout'
 name as they do today. A repo may sit in several projects (agentorc and dev-cadence can be one
 project or two, the person decides). A project is a grouping over checkouts that exist: it is
 not a place to register a repo — the dev-cadence registry stays that — and `ao team start`
-refuses with the missing path rather than cloning anything. In phase 1 the only host is
-`hosts.yml`'s `local` entry, and an entry for another host is ignored with a note until phase
-2's transport reaches it.
+refuses with the missing path rather than cloning anything. A team lands on one host (its
+`host:`, below, else the one the start runs on), and a repo's entry for any other host is a note
+inside the Project block, not a start.
 
 **Teams.** A lead plus members as (role, count), on one or more projects:
 
@@ -1528,11 +1528,15 @@ teams:
       - {role: hunter, name: hunter-ao, lane: ui}
   guardians:
     projects: [guardians]
+    host: devenv                      # every session lands on that node (§4.4a "Teams across hosts")
     lead: {role: lead, name: guardians-lead, home: guardians}
     members:
       - {role: grinder, home: guardians-api, brief: docs/briefs/api-grinder.md}
       - {team: guardians-ui}          # a nested team: its lead's controllers name this lead
 ```
+
+`host` (on the team, 2026-09-17, TD-057 step 4a): the host every session of the team lands on —
+a `nodes:` entry of the home — default the host the start runs on. Checkouts are resolved on it.
 
 `lead`: `role` (default `lead`; **`person`** means the person leads — no session is
 started and members get an empty `controllers` list plus the team badge), `name` (default
@@ -1593,8 +1597,7 @@ every definition, its source file, and whether it is live. A team is **live** wh
 carrying its badge is live; there is no team record — a team that is stopped is only its
 definition. **What step (c) did not build, and says so rather than claiming:** a `{team: …}`
 member is refused by name (the flat case ships first, as above); a repo whose checkout entry
-names another host is a note inside the Project block, not a start, until phase 2's transport;
-and `ao team stop` waits on each member's *state* (idle, exited or closed, or a `--timeout`
+names a host the team is not on is a note inside the Project block, not a start; and `ao team stop` waits on each member's *state* (idle, exited or closed, or a `--timeout`
 window, default 300 s), which is what a client can see — "wrapped up" is not a state the record
 carries. The lead is started with an empty `controllers` list: the definition, not a repo
 default, is the authority over a team session, and it is a person who runs the start. A member

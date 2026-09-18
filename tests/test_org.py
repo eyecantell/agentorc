@@ -294,3 +294,20 @@ def test_grants_orchestrate_in_a_team_is_read_as_control(tmp_path, capsys, monke
     g = org.load(f).teams["t"]
     assert g.lead.grants == ["control"] and g.members[0].grants == ["control"]
     assert capsys.readouterr().err.count("grant `orchestrate` is now `control`") == 1
+
+
+def test_a_team_may_name_the_host_it_lands_on(tmp_path):
+    """Design §4.4a "Teams across hosts", TD-057 step 4a: `host:` on a team definition; unsaid, the
+    host the start runs on (`teams.plan` reads it); still a stray key anywhere else."""
+    f = tmp_path / "org.yml"
+    f.write_text(
+        "projects: {p: {repos: {r: {contractmatch: /home/x/r}}}}\n"
+        "teams:\n"
+        "  t: {projects: [p], host: contractmatch, lead: {role: lead}, members: [{role: grinder}]}\n"
+        "  u: {projects: [p], lead: {role: lead}}\n"
+    )
+    loaded = org.load(f)
+    assert loaded.teams["t"].host == "contractmatch" and loaded.teams["u"].host == ""
+    f.write_text("projects: {p: {repos: {r: {k: /x}}}}\nteams: {t: {projects: [p], members: [{role: g, host: k}]}}\n")
+    with pytest.raises(ValueError, match="host"):
+        org.load(f)

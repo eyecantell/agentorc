@@ -360,6 +360,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         team=getattr(args, "team", None) or "",  # badges (design §4.9): plain strings, unvalidated
         project=getattr(args, "project", None) or "",
         **_stop(args),
+        **({"host": args.host} if getattr(args, "host", None) else {}),  # sent only when set (§4.4 skew rule)
     )
     if not s.get("controllers") and not args.json:
         # Design §4.8: an empty list is the explicit default, not an error — but an unattended
@@ -514,7 +515,11 @@ def cmd_team_stop(args: argparse.Namespace) -> int:
         # Members only: the window is theirs. The lead's wrap-up is sent after it and nothing waits
         # on it, so its `?` used to be printed as *still working* on every stop (seen 2026-09-17).
         waiting = [
-            e["id"] for e in acted if e["role"] == "member" and e.get("state") not in (*teamrun.SETTLED, "killed", None)
+            e["id"]
+            for e in acted
+            if e["role"] == "member"
+            and not e.get("refused")
+            and e.get("state") not in (*teamrun.SETTLED, "killed", None)
         ]
         if waiting:
             print(f"still working when the {args.timeout:g}s window passed: {', '.join(waiting)}")
@@ -1070,6 +1075,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--project",
         help="the project it is started under (design §4.9): the badge, and the Project block in front of the brief "
         "naming each of the project's repos on this host when there is more than one",
+    )
+    p.add_argument(
+        "--host",
+        help="the host it lands on (design §4.4a): a `nodes:` entry of this home; the create is gated here and run "
+        "there, and the reply is addressed <id>@<host>. Default: this host",
     )
     p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_new)

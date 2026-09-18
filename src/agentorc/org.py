@@ -12,6 +12,11 @@ teams:
     members:
       - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
       - {team: ao-ui}                 # a nested team
+  cm-grind:
+    projects: [contractmatch]
+    host: contractmatch               # every session lands on that node (§4.4a "Teams across hosts")
+    lead: {role: lead}
+    members: [{role: grinder}]
 roles:
   grinder: {profile: grind}
 ```
@@ -84,6 +89,7 @@ class TeamDef:
     lead: LeadDef = field(default_factory=LeadDef)
     members: list[MemberDef] = field(default_factory=list)
     source: Path | None = None  # the file it was read from (`ao team list` names it)
+    host: str = ""  # where every session lands (design §4.4a "Teams across hosts"); "" is the host the start runs on
 
 
 @dataclass
@@ -234,7 +240,7 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 
 LEAD_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
 MEMBER_KEYS = (*LEAD_KEYS, "count", "team")
-TEAM_KEYS = ("projects", "lead", "members")
+TEAM_KEYS = ("projects", "lead", "members", "host")
 
 
 def _no_stray(raw: dict[str, Any], known: tuple[str, ...], key: str) -> None:
@@ -297,7 +303,8 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
     if not isinstance(members_raw, list):
         raise ValueError(f"{key}.members must be a list")
     members = [_member(m, f"{key}.members[{i}]") for i, m in enumerate(members_raw)]
-    return TeamDef(name, [_str(p, f"{key}.projects") for p in projects], lead, members, source)
+    projects = [_str(p, f"{key}.projects") for p in projects]
+    return TeamDef(name, projects, lead, members, source, host=_str(raw.get("host"), f"{key}.host"))
 
 
 # ── validation ────────────────────────────────────────────────────────────────────────────────

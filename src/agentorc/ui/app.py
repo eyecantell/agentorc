@@ -1053,6 +1053,14 @@ def create_app() -> FastAPI:
             await ws.send_bytes(f"\r\n[agentorc] {e.detail}\r\n".encode())
             await ws.close(code=4404)  # final: the client must not retry
             return
+        if s.get("host") and s["host"] != host_name():
+            # Another host's session (design §4.4a): its pane is there, and nothing here attaches to it yet.
+            await ws.send_bytes(
+                f"\r\n[agentorc] runs on {s['host']}: the terminal across the link is not built "
+                f"(TD-057 3c.5 / step 4b).\r\n".encode()
+            )
+            await ws.close(code=4404)
+            return
         if s.get("state") == "closed" or not s.get("pane", True):  # no pane to attach (TD-023)
             await ws.send_bytes(b"\r\n[agentorc] this session's pane is gone (see the banner).\r\n")
             await ws.close(code=4404)
