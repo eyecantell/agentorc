@@ -2309,6 +2309,11 @@ class HostAgent:
                 first = now + containers.SUPERVISE_GRACE if linked else 0.0
                 self.supervision[name] = {"doing": "", "since": now_iso(), "attempts": 0, "next": first, "error": ""}
             sup = self.supervision[name]
+            if not (state and state["up"]) and sup["attempts"] == 0 and not sup["doing"]:
+                # the link dropped while that grace was still running — the container may really be
+                # gone: looked at at once, as a down link always is. A record that has already
+                # acted keeps its own backoff (review of PR #228).
+                sup["next"] = 0.0
             if name in self._supervising and not self._supervising[name][0].done():
                 continue
             if now < sup["next"]:

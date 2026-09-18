@@ -768,13 +768,14 @@ async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_lev
     before = len(fakes)
     await asyncio.sleep(0.3)
     assert not [f for f in fakes[before:] if f.execs("pip install")]  # level with the home: nothing to do
-    monkeypatch.setattr(containers, "SUPERVISE_GRACE", 0.6)
+    monkeypatch.setattr(containers, "SUPERVISE_GRACE", 1.5)
     agent._note_build("cm", "")  # an agent started before builds existed, or on an older wheel
     assert "the node runs build unknown" in agent.links["cm"]["stale"]
     # behind, and linked: nothing for one grace — a promote restarts this agent a second after it
     # writes the wheel, and the process being stopped must not start an install it cannot finish
-    await asyncio.sleep(0.3)
-    assert not [f for f in fakes[before:] if f.execs("pip install")] and "cm" in agent.supervision
+    assert await wait_for(lambda: "cm" in agent.supervision, timeout=5.0, step=0.05)  # noticed on a tick…
+    await asyncio.sleep(0.5)
+    assert not [f for f in fakes[before:] if f.execs("pip install")]  # …and left alone for the grace
     assert await wait_for(
         lambda: any(f.execs("pip install") and f.execs("kill $p") for f in fakes[before:]), timeout=5.0, step=0.05
     )
@@ -789,3 +790,25 @@ async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_lev
     agent.links["laptop"] = {"up": True, "since": "now", "why": "linked"}
     agent._note_build("laptop", "abc")  # a machine node: recorded, never `stale` — the home does not install there
     assert agent.links["laptop"] == {"up": True, "since": "now", "why": "linked", "build": "abc"}
+
+
+async def test_a_link_that_drops_during_the_stale_grace_is_looked_at_at_once(container_home, agent, monkeypatch):
+    """Review of PR #228: the grace is for a node that is linked and merely behind. If its link
+    drops while the grace runs, the container may really be gone, and a down link is never made
+    to wait."""
+    from conftest import wait_for
+
+    fakes = container_home["fakes"]
+    container_home["make"] = lambda: Fake(pid="9\n")
+    agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}
+    agent._note_build("cm", containers.home_build())
+    assert await wait_for(lambda: "cm" not in agent._supervising and "cm" not in agent.supervision, timeout=5.0)
+    before = len(fakes)
+    monkeypatch.setattr(containers, "SUPERVISE_GRACE", 30.0)
+    agent._note_build("cm", "")  # behind: a record with a 30 s grace
+    assert await wait_for(lambda: "cm" in agent.supervision, timeout=5.0, step=0.05)
+    container_home["make"] = lambda: Fake(ps="")  # and now the container is gone
+    agent.links["cm"] = {"up": False, "since": "now", "why": "closed by the other end"}
+    assert await wait_for(
+        lambda: any(c[0] == f.cli and c[1] == "up" for f in fakes[before:] for c in f.calls), timeout=5.0, step=0.05
+    )  # brought up within ticks, not after the 30 s
