@@ -56,7 +56,12 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .warn { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 4px; color: var(--warn-fg); font-size: 12px; }
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 .pill .dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
+/* design §4.5a **state icon**: a page of cards is read by shape before it is read by word */
+.pill::before { font-size: 9px; line-height: 1; }
+.pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
+.pill.s-working::before { content: "▶"; } .pill.s-idle::before { content: "‖"; } .pill.s-exited::before { content: "■"; }
+.pill.s-done::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; }
+.sc[data-unseen] .pill.s-idle::before { content: "●"; }
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
    dashed, the same signal a scraped state carries */
@@ -94,17 +99,17 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* A team is one card holding its sessions' cards (design §4.5a **team groups**, 2026-09-16); *No
    team* and the flat grid (`data-team=""`) stay plain sections. */
 .tgroup:not([data-team=""]) { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px 14px; background: var(--line2); }
-.strip[hidden], .strip .team-row[hidden], .ghead .btn[hidden] { display: none; }
+.ghead .btn[hidden] { display: none; }
+/* a team with nothing live: its cards folded behind the header's count, and the card itself quieter */
+.tgroup.folded:not(.filtering) .grid { display: none; } .tgroup.folded:not(.filtering) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.tgroup[data-live="0"]:not([data-team=""]) { background: transparent; border-style: dashed; }
+.tgroup:not(:has(.sc)) .grid { display: none; } .tgroup:not(:has(.sc)) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }  /* a definition nothing carries yet */
 .ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; font-size: 12px; } .ghead .h2 { font-size: 14px; }
 .ghead .name { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; color: var(--fg); text-decoration: none; }
 .badge.team { cursor: pointer; color: var(--fg); }
-/* Org Teams strip (design §4.5a): one row per definition, Start / Stop / Stop now; a plain line when none is defined */
+/* what is left of the Org Teams strip (design §4.5a): one line about the definitions themselves, when there is something to say */
 .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
-.strip .team-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
-.strip .team-row b { font-family: "JetBrains Mono", monospace; font-size: 12.5px; }
-.strip .team-row .meta { max-width: 22ch; } .strip .team-row .live { min-width: 6ch; }
 .strip .warnish { color: var(--warn-fg); }
-.strip .btn[hidden] { display: none; }  /* `.btn` is inline-flex, which would otherwise beat the attribute */
 .badge[hidden] { display: none; }      /* same trap: `.badge` is inline-block (TD-026's Focus stop control) */
 .sc { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow: hidden; position: relative; } .sc.off { opacity: .55; }
 .sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; } .sc-foot { display: flex; gap: 6px; align-items: center; }

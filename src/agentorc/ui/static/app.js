@@ -162,7 +162,7 @@
     const person = owner === "person";
     const reply = e.from === "person" ? ""
       : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}">Reply</button>`;
-    const confirmText = person ? "Delete this entry from the person inbox? The sender keeps its copy."
+    const confirmText = person ? "Delete this entry from your inbox? The sender keeps its copy."
       : "Delete this entry from this session's inbox? The sender keeps its copy.";
     return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
       + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
@@ -259,8 +259,8 @@
 
   // ---- Org (design §4.5 screen 1) ----
   // The page is one or more `.tgroup` sections, each an optional header plus its own `.grid`: one
-  // per team when any live session carries a `team` badge (design §4.5a **team groups**, §4.9),
-  // and one unnamed, headerless group when none does. Every rule below is per group — Urgent first
+  // per team when any session carries a `team` badge or any team is defined (design §4.5a **team
+  // groups**, §4.9), and one unnamed, headerless group otherwise. Every rule below is per group — Urgent first
   // sorts inside a section (the lead's card first), Pinned order is stored per team.
   let sortMode = store.get("sort", "urgent");
   const sections = () => $$("#groups .tgroup");
@@ -288,7 +288,7 @@
     const counts = {}; shown.forEach((c) => (counts[c.dataset.state] = (counts[c.dataset.state] || 0) + 1));
     $("#badges").innerHTML = [["needs-you", "needs", "needs you"], ["limited", "limited", "limited"], ["stalled?", "stalled", "stalled"]]
       .filter(([k]) => counts[k]).map(([k, cls, l]) => `<span class="pill s-${cls}"><span class="dot"></span>${counts[k]} ${l}</span>`).join("");
-    syncStrip();
+    syncTeams();
   }
   function applyFilter() {
     const raw = ($("#filter") ? $("#filter").value : "").trim(), cmd = $("#showcmd") && $("#showcmd").checked;
@@ -302,7 +302,12 @@
       c.hidden = hideKind || miss;
     });
     // A group with nothing left to show goes away with its header; the empty page says so once.
-    sections().forEach((sec) => (sec.hidden = !$$(".sc", sec).some((c) => !c.hidden)));
+    // A team's card stays while no filter is set, sessions or none: it is where Start lives.
+    const filtering = !!raw;
+    sections().forEach((sec) => {
+      sec.hidden = !$$(".sc", sec).some((c) => !c.hidden) && (filtering || !sec.dataset.team);
+      sec.classList.toggle("filtering", filtering);  // a filter shows what it matched, folded or not
+    });
   }
   // The server derives the groups on every render and every delta (only it sees the whole fleet),
   // so a badge or `controllers` change moves cards between groups here without a page reload.
@@ -320,6 +325,7 @@
         sec.innerHTML = '<div class="grid"></div>';
       }
       sec.dataset.lead = g.lead || "";
+      sec.dataset.live = g.live || 0;
       let head = $(".ghead", sec);
       if (g.html) {
         if (!head) { head = document.createElement("div"); head.className = "row gap wrap ghead"; sec.prepend(head); }
@@ -337,38 +343,19 @@
       sec.remove();
     });
   }
-  // ---- the Teams strip (design §4.5a Org **Teams** strip, §4.9) ----
-  // Live counts come from the cards, never a second request: a team is live when a session carrying
-  // its badge is (there is no team record to ask), and the cards are the fleet already, delta by
-  // delta. So a start or a stop shows up in the strip the moment its sessions do.
-  function syncStrip() {
-    const strip = $("#teams"); if (!strip) return;
-    const live = {};
-    $$("#groups .sc").forEach((c) => {
-      const t = c.dataset.team;
-      if (t && c.dataset.state !== "exited" && c.dataset.state !== "closed") live[t] = (live[t] || 0) + 1;
+  // ---- a team's card: the fold, and a request in flight (design §4.5a **team groups**) ----
+  // A team with nothing live folds its cards away: they have exited and are waiting for Forget, and
+  // a page of them buries what is running. The choice is kept per team; a live team never folds.
+  const foldKey = (team) => "fold:" + team;
+  function syncTeams() {
+    sections().forEach((sec) => {
+      const team = sec.dataset.team, b = $(".ghead .fold", sec);
+      const folded = !!team && !+sec.dataset.live && !!b && store.get(foldKey(team), true);
+      sec.classList.toggle("folded", folded);
+      if (b) b.textContent = `${b.dataset.n} session${b.dataset.n === "1" ? "" : "s"} — ${folded ? "show" : "hide"}`;
     });
-    // A live team's controls are on its group's card (design §4.5a **team groups**, 2026-09-16),
-    // so the strip shows the definitions with nothing live, and goes away when there are none.
-    const defined = new Set();
-    $$(".team-row", strip).forEach((row) => {
-      const n = live[row.dataset.team] || 0;
-      defined.add(row.dataset.team);
-      row.dataset.live = n;
-      row.hidden = n > 0;
-      // What a team with nothing live reads is the server's — *stopped*, or *wound down <t> ago*
-      // (§4.5a, TD-053 step 6) — kept on the cell, because this line runs on every layout and
-      // used to overwrite it with a bare "stopped" the moment the page loaded.
-      const cell = $(".live", row);
-      cell.textContent = n ? `${n} live` : (cell.dataset.idle || "stopped");
-    });
-    if (defined.size) strip.hidden = !$$(".team-row", strip).some((r) => !r.hidden) && !$(".warnish", strip);
-    // A header re-rendered for a delta arrives with its buttons hidden: the definitions are the
-    // page's, read once into the strip's rows, and this is where the two meet.
-    $$("#groups .ghead [data-team-act]").forEach((b) => {
-      b.hidden = !(defined.has(b.dataset.team) && live[b.dataset.team] > 0);
-      b.disabled = pendingTeams.has(b.dataset.team);  // a fresh header must not re-arm a request in flight
-    });
+    // a header re-rendered for a delta must not re-arm a request in flight
+    $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
   }
   // A stop returns before its lead does (design §4.9: the members settle first, which is minutes).
   // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
@@ -417,7 +404,7 @@
     } finally {
       pendingTeams.delete(name);
       btn.disabled = false;
-      syncStrip();  // the button on the page now may not be the one that was pressed
+      syncTeams();  // the button on the page now may not be the one that was pressed
     }
   }
 
@@ -448,11 +435,13 @@
       store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
     });
     $$("#groups .sc").forEach((c) => (c.draggable = true));
-    // Start is in the strip, Stop / Stop now on the team's card: one handler for both places.
-    [$("#teams"), box].forEach((el) => el && el.addEventListener("click", (e) => {
+    // Start, Stop and Stop now are all on the team's card, and so is its fold.
+    box.addEventListener("click", (e) => {
       const b = e.target.closest("[data-team-act]");
-      if (b) teamAct(b.dataset.team, b.dataset.teamAct, b);
-    }));
+      if (b) return teamAct(b.dataset.team, b.dataset.teamAct, b);
+      const f = e.target.closest("[data-fold]");
+      if (f) { store.set(foldKey(f.dataset.fold), !store.get(foldKey(f.dataset.fold), true)); syncTeams(); }
+    });
     layout();
     connectEvents((ev) => {
       if (ev.event === "session") {
