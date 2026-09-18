@@ -10,12 +10,17 @@ nodes:
     container: {devcontainer: ~/contractmatch}   # the checkout whose .devcontainer defines the image
 ```
 
-Everything else is derived. The node's definition is **generated** from the repo's under
-`~/.agentorc/nodes/<name>/devcontainer/` — the image kept, its build paths re-anchored, the
-person's `mounts`, `customizations` and `containerEnv` dropped (they carry the person's
-credentials), each dropped mount stood in by an empty tmpfs at the same target, the checkout
-mounted at the **same absolute path** inside as outside, agentorc's two mounts added, and one
-local feature of agentorc's own that installs tmux at build. `~/.agentorc/nodes/<name>/` is
+Everything else is derived, under `~/.agentorc/nodes/<name>/.devcontainer/`. Two generated
+definitions from the repo's: **`base.json`** is the repo's image — `image` or `build` with its
+paths re-anchored, and the repo's `features` — with the person's `mounts`, `customizations` and
+`containerEnv` dropped (they carry the person's credentials), built once by `devcontainer build`
+and tagged `agentorc-node-<name>-base`; **`devcontainer.json`** is the node's container, built from
+a one-stage **generated Dockerfile** on that base that installs tmux as root, with the repo's
+`remoteUser`, lifecycle commands and ports kept, each dropped mount stood in by an empty tmpfs at
+the same target, the checkout mounted at the **same absolute path** inside as outside, and
+agentorc's two mounts added. (A local devcontainer *feature* was the first shape; the CLI takes
+one only from the workspace's own `.devcontainer/`, which is the repo's — seen live 2026-09-17 —
+so the tmux layer is a stage of agentorc's own on the repo's image instead.) `~/.agentorc/nodes/<name>/` is
 `/agentorc` inside: `/agentorc/home` the node's `AGENTORC_HOME`, `/agentorc/venv` the agent at the
 home's version from the wheel the promote wrote (`~/.agentorc/wheels/`), `/agentorc/link` the
 home's per-node link socket directory (step 3c.1).
@@ -57,15 +62,10 @@ MIN_PYTHON = (3, 12)
 # replaced by an empty tmpfs at its target (a lifecycle script may assume the path).
 DROPPED = ("mounts", "customizations", "containerEnv")
 
-FEATURE_JSON = {
-    "id": "agentorc",
-    "version": "1.0.0",
-    "name": "agentorc node prerequisites",
-    "description": "tmux, which is what makes a host a host (design §4.1); the agent itself is installed at run time",
-}
-FEATURE_INSTALL = """#!/bin/sh
-# agentorc's own devcontainer feature: tmux with whatever package manager the image has. The agent
-# is not installed here — the home installs its own wheel onto the node's volume at every promote.
+BASE_IMAGE = "agentorc-node-{name}-base"  # what `devcontainer build` tags the repo's image as
+INSTALL_TMUX = """#!/bin/sh
+# agentorc's layer on the repo's image: tmux with whatever package manager the image has. The
+# agent is not installed here — the home installs its own wheel onto the node's volume.
 set -e
 if command -v tmux >/dev/null 2>&1; then exit 0; fi
 if command -v apt-get >/dev/null 2>&1; then
@@ -104,11 +104,22 @@ class ContainerNode:
 
     @property
     def config_dir(self) -> Path:
-        return self.node_dir / "devcontainer"
+        # Literally `.devcontainer`: the devcontainer CLI takes a local feature only from a child of
+        # a folder of that name (seen live, 2026-09-17: "Resolved path must be a child of the
+        # .devcontainer/ folder").
+        return self.node_dir / ".devcontainer"
 
     @property
     def config(self) -> Path:
         return self.config_dir / "devcontainer.json"
+
+    @property
+    def base_config(self) -> Path:
+        return self.config_dir / "base.json"
+
+    @property
+    def base_image(self) -> str:
+        return BASE_IMAGE.format(name=self.name)
 
     @property
     def link_dir(self) -> Path:
@@ -193,17 +204,32 @@ def _reanchor(build: Any, base: Path) -> Any:
     return out
 
 
-def generate(
-    repo: dict[str, Any], *, name: str, checkout: Path, repo_config_dir: Path, node_dir: Path, link_dir: Path
-) -> dict[str, Any]:
-    """The node's definition from the repo's (design §4.4a "The home generates the container's
-    definition from the repo's, and keeps the repo's mounts out of it")."""
-    out: dict[str, Any] = {k: v for k, v in repo.items() if k not in DROPPED}
-    out["name"] = f"agentorc node {name}"
+IMAGE_KEYS = ("image", "build", "dockerFile", "context", "features", "hostRequirements")
+
+
+def generate_base(repo: dict[str, Any], *, name: str, repo_config_dir: Path) -> dict[str, Any]:
+    """The repo's image and nothing of the person's (design §4.4a "The home generates the
+    container's definition from the repo's, and keeps the repo's mounts out of it"): what
+    `devcontainer build` builds and tags as the base."""
+    out: dict[str, Any] = {k: v for k, v in repo.items() if k in IMAGE_KEYS}
+    out["name"] = f"agentorc node {name} (base)"
     if "build" in out:
         out["build"] = _reanchor(out["build"], repo_config_dir)
-    if "dockerFile" in out and isinstance(out["dockerFile"], str) and not os.path.isabs(out["dockerFile"]):
-        out["dockerFile"] = str((repo_config_dir / out["dockerFile"]).resolve())  # the legacy top-level key
+    for key in ("dockerFile", "context"):  # the legacy top-level pair
+        v = out.get(key)
+        if isinstance(v, str) and v and not os.path.isabs(v):
+            out[key] = str((repo_config_dir / v).resolve())
+    return out
+
+
+def generate_node(
+    repo: dict[str, Any], *, name: str, checkout: Path, config_dir: Path, node_dir: Path, link_dir: Path
+) -> dict[str, Any]:
+    """The node's container on the built base: the repo's definition with its image keys
+    replaced by the generated Dockerfile, the person's parts out, agentorc's in."""
+    out: dict[str, Any] = {k: v for k, v in repo.items() if k not in DROPPED and k not in IMAGE_KEYS}
+    out["name"] = f"agentorc node {name}"
+    out["build"] = {"dockerfile": str(config_dir / "Dockerfile"), "context": str(config_dir)}
     mounts: list[str] = []
     for m in repo.get("mounts") or []:
         t = _mount_target(m)
@@ -214,30 +240,42 @@ def generate(
     out["mounts"] = mounts
     out["workspaceMount"] = f"source={checkout},target={checkout},type=bind"
     out["workspaceFolder"] = str(checkout)
-    features = dict(out.get("features") or {}) if isinstance(out.get("features"), dict) else {}
-    features["./agentorc"] = {}
-    out["features"] = features
     out["init"] = True
     return out
 
 
-def write_definition(n: ContainerNode) -> dict[str, Any]:
-    """Generate and write the node's definition and agentorc's feature beside it."""
+def dockerfile_text(base_image: str, image_user: str) -> str:
+    """One stage on the base: tmux as root, then the image's own user back."""
+    lines = [
+        "# generated by agentorc (`ao host up`): the repo's image plus what a host needs. Not the repo's.",
+        f"FROM {base_image}",
+        "USER root",
+        "COPY install-tmux.sh /tmp/agentorc-install-tmux.sh",
+        "RUN sh /tmp/agentorc-install-tmux.sh && rm -f /tmp/agentorc-install-tmux.sh",
+    ]
+    if image_user:
+        lines.append(f"USER {image_user}")
+    return "\n".join(lines) + "\n"
+
+
+def write_base(n: ContainerNode) -> dict[str, Any]:
     repo = read_definition(n.repo_config)
-    out = generate(
-        repo,
-        name=n.name,
-        checkout=n.devcontainer,
-        repo_config_dir=n.repo_config.parent,
-        node_dir=n.node_dir,
-        link_dir=n.link_dir,
+    out = generate_base(repo, name=n.name, repo_config_dir=n.repo_config.parent)
+    n.config_dir.mkdir(parents=True, exist_ok=True)
+    n.base_config.write_text(json.dumps(out, indent=2) + "\n")
+    return out
+
+
+def write_node(n: ContainerNode, image_user: str) -> dict[str, Any]:
+    repo = read_definition(n.repo_config)
+    out = generate_node(
+        repo, name=n.name, checkout=n.devcontainer, config_dir=n.config_dir, node_dir=n.node_dir, link_dir=n.link_dir
     )
-    feature = n.config_dir / "agentorc"
-    feature.mkdir(parents=True, exist_ok=True)
-    (feature / "devcontainer-feature.json").write_text(json.dumps(FEATURE_JSON, indent=2) + "\n")
-    install = feature / "install.sh"
-    install.write_text(FEATURE_INSTALL)
+    n.config_dir.mkdir(parents=True, exist_ok=True)
+    install = n.config_dir / "install-tmux.sh"
+    install.write_text(INSTALL_TMUX)
     install.chmod(0o755)
+    (n.config_dir / "Dockerfile").write_text(dockerfile_text(n.base_image, image_user))
     n.config.write_text(json.dumps(out, indent=2) + "\n")
     return out
 
@@ -287,11 +325,42 @@ def container_state(r: Runner, cid: str) -> str:
     return (cp.stdout or "").strip() if cp.returncode == 0 else "gone"
 
 
-def up(n: ContainerNode, r: Runner, *, rebuild: bool = False) -> dict[str, Any]:
-    """`devcontainer up` on the generated definition under our id label — idempotent: the CLI finds
-    the container it made before. `rebuild` removes it and builds the image without cache."""
+def build_base(n: ContainerNode, r: Runner, *, rebuild: bool = False) -> str:
+    """`devcontainer build` on the repo's image definition, tagged as the node's base; returns the
+    image's own user (for the generated Dockerfile to restore after its root step)."""
     cli = r.devcontainer()
-    write_definition(n)
+    write_base(n)
+    cmd = [
+        cli,
+        "build",
+        "--workspace-folder",
+        str(n.devcontainer),
+        "--config",
+        str(n.base_config),
+        "--image-name",
+        n.base_image,
+    ]
+    if rebuild:
+        cmd.append("--no-cache")
+    r.log(f"devcontainer build of {n.name}'s image ({'no cache' if rebuild else 'cached'}) …")
+    cp = r.run(cmd, check=False, stream=True)
+    result = _last_json(cp.stdout or "")
+    if cp.returncode != 0 or result.get("outcome") != "success":
+        detail = result.get("message") or (cp.stderr or "").strip().splitlines()[-1:] or [f"exit {cp.returncode}"]
+        raise ContainerError(
+            f"devcontainer build failed for {n.name}: {detail if isinstance(detail, str) else detail[0]}"
+        )
+    cp = r.run(["docker", "inspect", "-f", "{{.Config.User}}", n.base_image], check=False)
+    return (cp.stdout or "").strip() if cp.returncode == 0 else ""
+
+
+def up(n: ContainerNode, r: Runner, *, rebuild: bool = False) -> dict[str, Any]:
+    """The base built, then `devcontainer up` on the node's definition under our id label —
+    idempotent: the CLI finds the container it made before. `rebuild` removes it and builds both
+    without cache."""
+    cli = r.devcontainer()
+    image_user = build_base(n, r, rebuild=rebuild)
+    write_node(n, image_user)
     n.link_dir.mkdir(parents=True, exist_ok=True)
     (n.node_dir / "home").mkdir(parents=True, exist_ok=True)
     cmd = [
@@ -311,7 +380,16 @@ def up(n: ContainerNode, r: Runner, *, rebuild: bool = False) -> dict[str, Any]:
     result = _last_json(cp.stdout or "")
     if cp.returncode != 0 or result.get("outcome") != "success":
         detail = result.get("message") or (cp.stderr or "").strip().splitlines()[-1:] or [f"exit {cp.returncode}"]
-        raise ContainerError(f"devcontainer up failed for {n.name}: {detail if isinstance(detail, str) else detail[0]}")
+        why = detail if isinstance(detail, str) else detail[0]
+        if "Command failed" in why:
+            # the repo's own lifecycle command died inside the node: its output is above, and the
+            # usual cause is a path hardcoded to where the repo's VS Code container mounts it
+            why += (
+                f" — a lifecycle command of {n.repo_config} failed inside the node (its output is above); "
+                f"the checkout is at {n.devcontainer} inside, the same path as here, and a script that assumes "
+                "another path is the repo's part to re-point (TD-057)"
+            )
+        raise ContainerError(f"devcontainer up failed for {n.name}: {why}")
     return result
 
 
@@ -562,6 +640,8 @@ def remove_node_entry(path: Path, name: str) -> bool:
         i += 1
     new_text = "".join(out)
     after = yaml.safe_load(new_text) if new_text.strip() else {}
+    if isinstance(after, dict) and after.get("nodes") is None and "nodes" in after:
+        after["nodes"] = {} if isinstance(before.get("nodes"), dict) else []  # the last entry went: `nodes:` alone
     expected = dict(before)
     nodes_before = before.get("nodes")
     if isinstance(nodes_before, dict):

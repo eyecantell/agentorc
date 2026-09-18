@@ -1068,6 +1068,7 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
                 )
             ),
         )
+
         def on_disk():
             """all four stubbed entries are applied and saved"""
             rec = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())

@@ -71,55 +71,77 @@ def home(tmp_path, monkeypatch):
 # -- the generated definition --------------------------------------------------------------------------
 
 
-def test_the_definition_is_the_repos_with_the_persons_parts_out_and_agentorcs_in(home, tmp_path):
+def test_the_base_is_the_repos_image_and_nothing_of_the_persons(home, tmp_path):
     n = containers.node("contractmatch")
-    out = containers.write_definition(n)
+    base = containers.write_base(n)
     checkout = tmp_path / "contractmatch"
-    # kept: the image, the user, the lifecycle command, the ports — and the build paths re-anchored
+    # the image, with its build paths re-anchored — the generated file no longer sits beside them
+    assert base["build"]["dockerfile"] == str(checkout / ".devcontainer" / "Dockerfile")
+    assert base["build"]["context"] == str(checkout) and base["build"]["target"] == "development"
+    assert base["name"] == "agentorc node contractmatch (base)"
+    # nothing else: not the mounts (credentials), not the customizations, not the env, not the ports
+    assert set(base) == {"build", "name"}
+    assert containers.read_definition(n.base_config) == base
+    assert n.base_image == "agentorc-node-contractmatch-base"
+
+
+def test_the_node_is_the_repos_with_the_persons_parts_out_and_agentorcs_in(home, tmp_path):
+    n = containers.node("contractmatch")
+    out = containers.write_node(n, "developer")
+    checkout = tmp_path / "contractmatch"
+    # kept: the user, the lifecycle command, the ports
     assert out["remoteUser"] == "developer" and out["postCreateCommand"].startswith("sh setup_scripts")
     assert out["forwardPorts"] == [8080] and out["portsAttributes"]["8080"]["label"] == "ContractMatch Dev"
-    assert out["build"]["dockerfile"] == str(checkout / ".devcontainer" / "Dockerfile")
-    assert out["build"]["context"] == str(checkout) and out["build"]["target"] == "development"
+    # the image keys replaced by the generated Dockerfile on the built base
+    assert out["build"] == {"dockerfile": str(n.config_dir / "Dockerfile"), "context": str(n.config_dir)}
+    assert "image" not in out and "features" not in out
     # dropped: the person's mounts, customizations and containerEnv
     assert "customizations" not in out and "containerEnv" not in out
     assert not any("stuff_for_containers_home" in m and "bind" in m for m in out["mounts"])
     # each dropped mount stood in by an empty tmpfs at its target, so postCreate's mkdir under it lives
     assert "type=tmpfs,target=/mounted/dev" in out["mounts"]
     assert "type=tmpfs,target=/mounted/stuff_for_containers_home" in out["mounts"]
-    # agentorc's two mounts, the checkout at the same path both sides, the feature, init, the name
+    # agentorc's two mounts, the checkout at the same path both sides, init, the name
     assert f"source={n.node_dir},target=/agentorc,type=bind" in out["mounts"]
     assert f"source={n.link_dir},target=/agentorc/link,type=bind" in out["mounts"]
     assert out["workspaceMount"] == f"source={checkout},target={checkout},type=bind"
     assert out["workspaceFolder"] == str(checkout)
-    assert out["features"] == {"./agentorc": {}} and out["init"] is True
-    assert out["name"] == "agentorc node contractmatch"
-    # written beside the feature the devcontainer CLI will run as root at build
-    feature = n.config_dir / "agentorc"
-    assert json.loads((feature / "devcontainer-feature.json").read_text())["id"] == "agentorc"
-    install = feature / "install.sh"
-    assert install.stat().st_mode & 0o111 and "apt-get" in install.read_text() and "apk" in install.read_text()
-    assert "dnf" in install.read_text()
-    # and the file itself round-trips
+    assert out["init"] is True and out["name"] == "agentorc node contractmatch"
+    # the Dockerfile: one stage on the base, tmux as root, the image's own user restored
+    df = (n.config_dir / "Dockerfile").read_text()
+    assert df.splitlines()[1] == "FROM agentorc-node-contractmatch-base"
+    assert "USER root" in df and df.rstrip().endswith("USER developer")
+    assert "COPY install-tmux.sh" in df and "RUN sh /tmp/agentorc-install-tmux.sh" in df
+    install = n.config_dir / "install-tmux.sh"
+    text = install.read_text()
+    assert install.stat().st_mode & 0o111 and "apt-get" in text and "apk" in text and "dnf" in text
     assert containers.read_definition(n.config) == out
+    # an image with no USER of its own gets no USER line back
+    assert "USER" not in containers.dockerfile_text("x", "").split("USER root")[1]
 
 
-def test_the_repos_features_are_kept_and_a_string_mount_is_understood(tmp_path):
+def test_the_repos_features_and_image_go_to_the_base_and_a_string_mount_is_understood(tmp_path):
     repo = {
         "image": "python:3.12",
         "features": {"ghcr.io/devcontainers/features/node:1": {}},
         "mounts": ["source=/x,target=/mounted/x,type=bind", {"type": "volume", "target": "/data"}, "nonsense"],
     }
-    out = containers.generate(
+    base = containers.generate_base(repo, name="n", repo_config_dir=Path("/c/.devcontainer"))
+    assert base == {
+        "image": "python:3.12",
+        "features": {"ghcr.io/devcontainers/features/node:1": {}},
+        "name": "agentorc node n (base)",
+    }
+    out = containers.generate_node(
         repo,
         name="n",
         checkout=Path("/c"),
-        repo_config_dir=Path("/c/.devcontainer"),
+        config_dir=Path("/n/.devcontainer"),
         node_dir=Path("/n"),
         link_dir=Path("/l"),
     )
-    assert out["features"] == {"ghcr.io/devcontainers/features/node:1": {}, "./agentorc": {}}
     assert out["mounts"][:2] == ["type=tmpfs,target=/mounted/x", "type=tmpfs,target=/data"]
-    assert out["image"] == "python:3.12" and "build" not in out
+    assert "image" not in out and "features" not in out and out["build"]["context"] == "/n/.devcontainer"
 
 
 def test_a_missing_or_unparsable_definition_is_refused_by_name(home, tmp_path):
@@ -152,6 +174,8 @@ class Fake(Runner):
             "tmux": "/usr/bin/tmux\n",
             "pid": "",
             "up": json.dumps({"outcome": "success", "containerId": "abc123def456", "remoteUser": "developer"}) + "\n",
+            "build": json.dumps({"outcome": "success", "imageName": ["agentorc-node-contractmatch-base"]}) + "\n",
+            "user": "developer\n",
             "ps": "abc123def456\n",
             "inspect": "running\n",
             **answers,
@@ -166,10 +190,12 @@ class Fake(Runner):
         text = " ".join(cmd)
         rc, out = 0, ""
         if cmd[0] == self.cli:
-            out = self.answers["up"]
+            out = self.answers[cmd[1]]  # "build" or "up"
             rc = 0 if '"success"' in out else 1
         elif cmd[:2] == ["docker", "ps"]:
             out = self.answers["ps"]
+        elif cmd[:2] == ["docker", "inspect"] and "{{.Config.User}}" in cmd:
+            out = self.answers["user"]
         elif cmd[:2] == ["docker", "inspect"]:
             out = self.answers["inspect"]
         elif "sys.version_info" in text:
@@ -204,8 +230,15 @@ def test_host_up_brings_it_up_provisions_it_and_starts_the_agent(home, tmp_path)
         "started": True,
         "pid": None,
     }
-    # `devcontainer up` on the generated definition, keyed on our id label, never the repo's own
-    up = r.calls[0]
+    # the base built from the repo's image definition and tagged; then `devcontainer up` on the
+    # node's definition, keyed on our id label, never the repo's own
+    build = r.calls[0]
+    assert build[:2] == ["/fake/devcontainer", "build"] and "--no-cache" not in build
+    assert build[build.index("--config") + 1] == str(n.base_config)
+    assert build[build.index("--image-name") + 1] == "agentorc-node-contractmatch-base"
+    assert ["docker", "inspect", "-f", "{{.Config.User}}", "agentorc-node-contractmatch-base"] in r.calls
+    assert (n.config_dir / "Dockerfile").read_text().rstrip().endswith("USER developer")
+    up = r.calls[2]
     assert up[:2] == ["/fake/devcontainer", "up"] and "--remove-existing-container" not in up
     assert (
         up[up.index("--config") + 1] == str(n.config)
@@ -244,7 +277,8 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
     assert r.execs("command -v gh")[0][r.execs("command -v gh")[0].index("--env-file") + 1] == str(n.env_file)
     r2 = Fake()
     containers.host_up("contractmatch", r2, rebuild=True)
-    up = r2.calls[0]
+    assert "--no-cache" in r2.calls[0]
+    up = r2.calls[2]
     assert "--remove-existing-container" in up and "--build-no-cache" in up
     start = r2.execs("agentorc-agent serve")
     assert start and "--env-file" in start[0]
@@ -258,8 +292,12 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
         ({"id": "1234567\n"}, "is uid 1234567 and you are"),
         ({"tmux": ""}, "no tmux in contractmatch after the build"),
         (
-            {"up": json.dumps({"outcome": "error", "message": "build failed: no such Dockerfile"}) + "\n"},
-            "build failed",
+            {"up": json.dumps({"outcome": "error", "message": "no such container user"}) + "\n"},
+            "up failed .*no such container",
+        ),
+        (
+            {"build": json.dumps({"outcome": "error", "message": "no such Dockerfile"}) + "\n"},
+            "build failed .*no such Dockerfile",
         ),
     ],
 )
@@ -284,7 +322,7 @@ def test_no_wheel_and_no_cli_are_refused_before_anything_runs(home, monkeypatch)
 
 def test_status_and_reach_are_derived_from_the_entry(home):
     r = Fake(pid="7\n")
-    containers.write_definition(containers.node("contractmatch"))
+    containers.write_node(containers.node("contractmatch"), "developer")
     out = containers.host_status("contractmatch", r)
     assert out["container"] == "abc123def456" and out["state"] == "running" and out["pid"] == 7
     assert out["reach"]["terminal"] == "docker exec -u developer -it abc123def456 tmux attach"
@@ -321,6 +359,17 @@ def test_forget_purge_deletes_the_volume_and_a_list_shaped_nodes_entry_is_unders
     assert containers.remove_node_entry(f, "b") is True
     assert f.read_text() == "local: {name: k}\nnodes:\n  - a\n  - c\n"
     assert containers.remove_node_entry(f, "zzz") is False
+
+
+def test_the_last_entry_leaves_an_empty_nodes_key(tmp_path):
+    f = tmp_path / "h.yml"
+    f.write_text("local:\n  name: k\nnodes:\n  contractmatch:\n    container: {devcontainer: ~/contractmatch}\n")
+    assert (
+        containers.remove_node_entry(f, "contractmatch") is True
+    )  # seen live 2026-09-17: `nodes:` alone parses as None
+    assert f.read_text() == "local:\n  name: k\nnodes:\n"
+    f.write_text("nodes:\n  - only\n")
+    assert containers.remove_node_entry(f, "only") is True and f.read_text() == "nodes:\n"
 
 
 def test_a_shape_it_cannot_edit_cleanly_is_refused_not_rewritten(tmp_path):
