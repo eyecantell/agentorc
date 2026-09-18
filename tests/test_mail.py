@@ -465,6 +465,9 @@ async def test_read_entries_are_pruned_after_retention_and_open_asks_never(agent
             await w.call("msg", text="here", kind="reply", reply_to=ask["id"])
             await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
             assert [e["id"] for e in (await person.call("inbox", id=worker))["entries"]] == [unread["id"]]
+            # …and a person's delete is the other way an entry leaves: the tally goes with it too
+            await person.call("inbox_delete", msg=unread["id"], id=worker)
+            assert unread["id"] not in (await person.call("get", id=worker))["threads"]
         for sid in (lead, worker):
             await person.call("kill", id=sid)
 

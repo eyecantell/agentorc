@@ -1935,6 +1935,7 @@ class HostAgent:
         if len(kept) == len(s.inbox):
             raise RpcError(f"{s.id}'s inbox holds no entry {msg}")
         s.inbox = kept
+        _prune_tallies(s)  # a delete is the other way an entry leaves (review of PR #214)
         self.store.save(s)
         await self._push_changes()
         return {"id": s.id, "deleted": msg, "unread": s.unread()}
@@ -1969,11 +1970,7 @@ class HostAgent:
             outbox = [e for e in r.outbox if self._keep(e, now, inbox=False)]
             if len(inbox) != len(r.inbox) or len(outbox) != len(r.outbox):
                 r.inbox, r.outbox = inbox, outbox
-                # A thread's tally lives as long as the record holds an entry of it (§4.10): pruned
-                # with its last entry, or it would grow by one key per message forever (TD-066).
-                held = {e.root for e in (*inbox, *outbox)}
-                for key in [k for k in r.threads if not k.startswith("pair:") and k not in held]:
-                    del r.threads[key]
+                _prune_tallies(r)
                 self.store.save(r)
 
     @staticmethod
@@ -2912,6 +2909,16 @@ def _drop_unknown(method: Any, params: dict[str, Any]) -> list[str]:
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
 _CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
+
+
+def _prune_tallies(r: Session) -> None:
+    """A thread's tally lives as long as the record holds an entry of it (§4.10): pruned with its
+    last entry — by retention or by a person's delete — or it would grow by one key per message
+    forever (TD-066). A reply must name an entry the replier holds, so a pruned thread cannot come
+    back. Pair tallies are windowed by `_pair` and stay."""
+    held = {e.root for e in (*r.inbox, *r.outbox)}
+    for key in [k for k in r.threads if not k.startswith("pair:") and k not in held]:
+        del r.threads[key]
 
 
 def _urgent(s: Session) -> str:
