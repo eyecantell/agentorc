@@ -61,7 +61,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
 .pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
 .pill.s-done::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; }
-.sc[data-unseen] .pill.s-idle::before { content: "●"; }
+.sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: 9px; letter-spacing: 0; }  /* not the idle glyph's tuning */
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
    dashed, the same signal a scraped state carries */
