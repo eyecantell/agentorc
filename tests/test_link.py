@@ -354,8 +354,11 @@ async def test_another_hosts_record_is_addressed_unreachable_until_its_node_dial
         agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
         assert (await c.call("get", id="ao-x-w@laptop"))["state"] == "working"
         assert (await c.call("seen", id="ao-x-w@laptop"))["seen_at"]  # a look is the home's to record
-        with pytest.raises(AgentError, match="runs on laptop: acts across the link are not built"):
+        agent.links["laptop"] = {"up": False, "since": "t", "why": "the lid closed"}
+        with pytest.raises(AgentError, match="runs on laptop: unreachable since t — the lid closed; refused, not"):
             await c.call("kill", id="ao-x-w@laptop")
+        with pytest.raises(AgentError, match="reading its pane across the link is not built"):
+            await c.call("explain", id="ao-x-w@laptop")
     # a restarted home still has them, from `remote/laptop/`
     again = HostAgent(tmux=agent.tmux)
     assert (
@@ -459,3 +462,157 @@ async def test_a_report_that_cannot_be_written_gives_the_link_up_instead_of_stal
     await asyncio.wait_for(agent._report_home(), timeout=3)  # returns: the tick is not held for `LINK_SILENCE`
     assert "could not be written within 0.2 s" in agent._home_mux.closed_why
     agent.sessions.pop("ao-x-a")
+
+
+# -- acts across the link (step 4a) ---------------------------------------------------------------------
+
+
+async def test_the_gate_reads_one_graph_with_every_address_from_the_homes_point_of_view(agent, tmp_path):
+    """Step 4a: a remote record's `controllers` are stored as its node writes them — the home's
+    lead bare-qualified `@kmaster`, the node's own sessions bare — and the gate reads them
+    re-addressed, so a lead here holding `control` over a member there passes the same two-part
+    check it passes today, and is then refused only for what is true: the host is unreachable."""
+    async with LocalClient() as person:
+        lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        await person.call("set_grants", id=lead["id"], add=["control"])
+    agent._take_records(
+        "laptop", [record(controllers=[f"{lead['id']}@{agent.host}", "ao-x-sib"], team="g")], whole=True
+    )
+    g = agent._graph()
+    assert g["ao-x-w@laptop"].controllers == [lead["id"], "ao-x-sib@laptop"]
+    assert agent.remote["laptop"]["ao-x-w"].controllers == [f"{lead['id']}@{agent.host}", "ao-x-sib"]  # untouched
+    assert (await agent.rpc_get("ao-x-w@laptop"))["controllers"] == [lead["id"], "ao-x-sib@laptop"]
+    assert "ao-x-w@laptop" not in agent.sessions  # never widened
+    async with LocalClient(caller=lead["id"]) as c, LocalClient(caller="ao-stranger") as stranger:
+        with pytest.raises(AgentError, match="runs on laptop: unreachable since .*refused, not queued"):
+            await c.call("kill", id="ao-x-w@laptop")  # gated: passed; routed: no link
+        with pytest.raises(AgentError, match="needs the control grant"):
+            await stranger.call("kill", id="ao-x-w@laptop")
+    async with LocalClient() as person:
+        with pytest.raises(AgentError, match="unknown host desk: not under `nodes:`"):
+            await person.call("create", name="x", dir=str(tmp_path), adapter="shell", host="desk")
+        with pytest.raises(AgentError, match="runs on laptop: unreachable"):
+            await person.call("set_stop", id="ao-x-w@laptop", run_until="+1h")  # a home edit waits for the link too
+        assert agent.remote["laptop"]["ao-x-w"].run_until is None
+        await person.call("kill", id=lead["id"])
+
+
+class Acts:
+    """A spy on the node's `act` handler: what the home routed to it."""
+
+    def __init__(self, node, monkeypatch):
+        self.taken = []
+        orig = node._act
+
+        async def spy(params):
+            self.taken.append(params)
+            return await orig(params)
+
+        monkeypatch.setattr(node, "_act", spy)
+
+
+async def at_home(home, address):
+    async with LocalClient(sock=home.dir / "agent.sock") as h:
+        return {v["id"]: v for v in await h.call("list")}.get(address)
+
+
+async def until(home, address, pred, timeout=15.0):
+    for _ in range(int(timeout / 0.1)):
+        v = await at_home(home, address)
+        if pred(v):
+            return v
+        await asyncio.sleep(0.1)
+    raise AssertionError(f"never: {await at_home(home, address)}")
+
+
+async def test_acts_are_gated_at_the_home_executed_on_the_node_and_the_verdict_returned(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """TD-057 step 4a. A `send` and a `kill` from the home on `id@laptop` run on the node and the
+    reply is the record as it now stands; a caller without `control` is refused at the home before
+    anything crosses (the node's handler never sees it); a home-owned edit lands on both copies."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        acts = Acts(node, monkeypatch)
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            await person.call("set_grants", id=lead["id"], add=["control"])
+            # a person's send: typed on the node and recorded there (a send without `wait` returns nothing,
+            # here as everywhere), and the home's copy carries the `sends` entry before the reply
+            assert await person.call("send", id=address, text="echo ACT-OK") is None
+            assert node.sessions[w["id"]].sends[-1].text == "echo ACT-OK" and acts.taken[-1]["rpc"] == "send"
+            assert (await at_home(home, address))["sends"][-1]["text"] == "echo ACT-OK"
+            assert acts.taken[-1]["caller"] is None and acts.taken[-1]["params"]["id"] == w["id"]
+            # the lead is nobody to it yet: refused at the home, and the node never hears of it
+            n = len(acts.taken)
+            async with LocalClient(sock=home.dir / "agent.sock", caller=lead["id"]) as as_lead:
+                with pytest.raises(AgentError, match="not in its controllers"):
+                    await as_lead.call("kill", id=address)
+                assert len(acts.taken) == n and node.sessions[w["id"]].state != "exited"
+                # a home-owned edit: the home's copy and the node's replica agree, each in its own address
+                v = await person.call("set_controllers", id=address, add=[lead["id"]])
+                assert v["controllers"] == [lead["id"]] and v["id"] == address
+                assert node.sessions[w["id"]].controllers == [f"{lead['id']}@kmaster"]
+                assert (await at_home(home, address))["controllers"] == [lead["id"]]
+                # and now the lead's kill crosses, runs there, and the verdict comes back at once
+                v = await as_lead.call("kill", id=address)
+                assert v["state"] == "exited" and v["id"] == address
+                assert node.sessions[w["id"]].state == "exited"
+                assert acts.taken[-1]["rpc"] == "kill" and acts.taken[-1]["caller"] == f"{lead['id']}@kmaster"
+                assert (await at_home(home, address))["state"] == "exited"  # applied from the reply, not a later report
+                # a node's refusal comes back in words, and a remove is forgotten at both ends
+                with pytest.raises(AgentError, match="laptop: .* is closed"):
+                    await as_lead.call("close", id=address) and await as_lead.call("send", id=address, text="x")
+                await as_lead.call("remove", id=address)
+                assert w["id"] not in node.sessions and await at_home(home, address) is None
+            await person.call("kill", id=lead["id"])
+
+
+async def test_an_act_on_an_unreachable_host_is_refused_and_never_runs_when_the_link_returns(
+    home, hookstub, tmp_path, monkeypatch
+):
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        monkeypatch.setattr(link, "BACKOFF_FIRST", 2.0)
+        monkeypatch.setattr(link, "BACKOFF_MAX", 2.0)
+        node._home_mux.close("the lid closed")
+        await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            with pytest.raises(AgentError, match="runs on laptop: unreachable since .*; refused, not queued"):
+                await person.call("kill", id=address)
+            with pytest.raises(AgentError, match="runs on laptop: unreachable"):
+                await person.call("host_dir", host="laptop", dir=str(tmp_path))
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        await asyncio.sleep(0.5)  # nothing was queued: the session is still there after the link came back
+        assert node.sessions[w["id"]].state != "exited"
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            assert (await person.call("host_dir", host="laptop", dir=str(tmp_path)))["exists"] is True
+            assert (await person.call("host_dir", host="laptop", dir=str(tmp_path / "nope")))["exists"] is False
+
+
+async def test_a_create_with_a_host_lands_on_the_node_and_is_adopted_at_the_home(home, hookstub, tmp_path, monkeypatch):
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+            await person.call("set_grants", id=lead["id"], add=["control"])
+            async with LocalClient(sock=home.dir / "agent.sock", caller=lead["id"]) as as_lead:
+                v = await as_lead.call(
+                    "create", name="w2", dir=str(tmp_path), adapter=hookstub.name, unattended=True, host="laptop"
+                )
+            assert v["id"].endswith("@laptop") and v["host"] == "laptop"
+            rid = v["id"].removesuffix("@laptop")
+            assert rid in node.sessions and all(s["id"] != rid for s in await person.call("list"))  # landed there
+            assert node.sessions[rid].controllers == [f"{lead['id']}@kmaster"]  # the creator, as the node addresses it
+            assert v["controllers"] == [lead["id"]]  # and as the home does
+            assert (await person.call("get", id=v["id"]))["state"] != "unreachable"  # adopted before the reply
+            check = await person.call("name_check", dir=str(tmp_path), name="w2", host="laptop")
+            assert check["verdict"] == "live" and check["holder"] == f"{rid}@laptop"  # addressed, like every reply
+            await person.call("kill", id=v["id"])
+            await person.call("kill", id=lead["id"])

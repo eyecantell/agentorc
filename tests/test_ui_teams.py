@@ -44,6 +44,8 @@ class Fleet:
             return ["claude-code", "shell"]
         if method == "name_check":
             return self.verdicts.get(params["name"], {"name": params["name"], "verdict": "free"})
+        if method == "get":
+            return next(s for s in self.sessions if s["id"] == params["id"])
         if method == "create":
             rec = {
                 "id": f"ao-{params['name']}",
@@ -459,3 +461,13 @@ def test_two_stop_presses_do_not_start_two_lead_stops(world, client, monkeypatch
     assert first["lead"] == "orc-ao"
     assert second["lead"] is None and "already stopping" in second["text"]
     assert started == ["orc-ao"]  # one task, not two
+
+
+def test_the_terminal_of_another_hosts_session_is_refused_by_name(world, client):
+    """TD-057 step 4a (the 3b leftover): `/term/<id@host>` says what is not built rather than
+    leaving it to tmux's miss."""
+    _tmp, fleet = world
+    fleet.sessions.append({"id": "ao-w@laptop", "name": "w", "state": "working", "host": "laptop", "pane": True})
+    with client.websocket_connect("/term/ao-w@laptop") as ws:
+        got = ws.receive_bytes()
+    assert b"runs on laptop: the terminal across the link is not built" in got
