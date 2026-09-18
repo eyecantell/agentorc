@@ -148,6 +148,22 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
 # ── start ─────────────────────────────────────────────────────────────────────────────────────
 
 
+def files_via(call: Call) -> teams.Files:
+    """How a plan reads a checkout on another host that is not a directory here (a machine node):
+    the home's `host_files`, confined to the checkout on that host (§4.4a, TD-057 step 4b.3). Any
+    refusal — the host unreachable, a path outside the checkout — is the plan's `OSError`, so the
+    start stops before anything is created."""
+
+    def files(host: str, directory: str, paths: list[str]) -> dict[str, str | None]:
+        try:
+            got = call("host_files", host=host, dir=directory, paths=paths)
+        except Exception as e:  # noqa: BLE001 — whatever the transport raised, nothing was started
+            raise OSError(f"{host}: {e}") from e
+        return dict((got or {}).get("files") or {})
+
+    return files
+
+
 def start(
     call: Call, org: orgmod.Org, name: str, host: str, *, profile: str | None = None
 ) -> tuple[teams.Plan, dict[str, Any]]:
@@ -157,7 +173,7 @@ def start(
 
     Raises `TeamError` (or `NamesHeld`) before anything is created, and `PartialStart` if a create
     fails after the checks passed. Returns the plan and the result the callers render."""
-    plan = teams.plan(org, name, host, profile=profile)
+    plan = teams.plan(org, name, host, profile=profile, files=files_via(call))
     if not plan.launches:
         raise teams.TeamError(f"team {name} starts nothing: a person leads it and it has no members")
     on = {"host": plan.host} if plan.host else {}

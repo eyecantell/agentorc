@@ -445,8 +445,8 @@ def _org_here(directory: pathlib.Path) -> orgmod.Org:
     if hosts.is_node():
         raise ValueError(
             f"the org lives on {hosts.home_name()} (home): run `ao team` there — "
-            f"{hosts.local_host().name} is a node, and the link that would read it from here is not built "
-            "(TD-057 step 3)"
+            f"{hosts.local_host().name} is a node, and a node does not read the org from the home "
+            "(design §4.4a: decided, not built)"
         )
     o = orgmod.load()
     cfg = repoconfig.discover(directory)
@@ -551,7 +551,8 @@ def cmd_team_status(args: argparse.Namespace) -> int:
         org = _org_here(directory)
         # the names the definition would start; a definition that cannot start (a checkout gone,
         # say) is not an error here — status reads what is running, and says what is not
-        expected = [x.name for x in teams.plan(org, args.name, hosts.local_host().name).launches]
+        plan = teams.plan(org, args.name, hosts.local_host().name, files=teamrun.files_via(call_sync))
+        expected = [x.name for x in plan.launches]
     except (teams.TeamError, ValueError) as e:
         if hosts.is_node():  # the one reason worth saying: the definition is not missing, it is elsewhere
             print(str(e), file=sys.stderr)

@@ -68,6 +68,12 @@ def world(tmp_path, monkeypatch):
             if isinstance(state.get("elsewhere"), Exception):
                 raise state["elsewhere"]
             return {"host": params["host"], "dir": params["dir"], "exists": params["dir"] in state.get("elsewhere", ())}
+        if method == "host_files":
+            files = state.get("files")
+            if isinstance(files, Exception):
+                raise files
+            there = (files or {}).get(params["dir"], {})
+            return {"host": params["host"], "dir": params["dir"], "files": {p: there.get(p) for p in params["paths"]}}
         if method == "create":
             rec = {
                 "id": f"ao-{Path(params['dir']).name}-{params['name']}",
@@ -307,15 +313,36 @@ def test_a_team_whose_host_is_unreachable_is_refused_whole(world, capsys):
     assert "does not exist on devenv" in capsys.readouterr().err and not creates(state)
 
 
-def test_a_host_whose_checkout_is_not_readable_here_says_why(world, capsys):
+def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
+    """TD-057 step 4b.3: a checkout that is not a directory here — a machine node's — has its
+    `.agentorc.yml` and its briefs read on that node (`host_files`), by the same loader; the start
+    stays all-or-nothing when that read fails, and a brief outside the checkout is never asked for."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
     doc["projects"]["ao"]["repos"]["agentorc"]["devenv"] = "/workspaces/agentorc"  # a laptop's path, not here
     doc["teams"]["ao-grind"]["host"] = "devenv"
     write_org(tmp_path, doc)
+    there = "/workspaces/agentorc"
+    state["elsewhere"] = {there}
+    repo_cfg = yaml.safe_dump({"roles": {"grinder": {"brief": "docs/grind.md", "profile": "repo-grind"}}})
+    state["files"] = {there: {".agentorc.yml": repo_cfg, "docs/grind.md": "grind on the node: {lane}"}}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    asked = [p for m, p in state["calls"] if m == "host_files"]
+    assert asked and all(p["host"] == "devenv" and p["dir"] == there for p in asked)
+    assert {x for p in asked for x in p["paths"]} == {".agentorc.yml", "docs/grind.md"}
+    made = {p["name"]: p for p in creates(state)}
+    assert "grind on the node: free-pick" in made["grind-1"]["prompt"] and made["grind-1"]["profile"] == "repo-grind"
+    assert all(p["host"] == "devenv" and p["dir"] == there for p in made.values())
+    # the node cannot be read: nothing is started
+    state["sessions"], state["calls"] = [], []
+    state["files"] = cli.AgentError("runs on devenv: unreachable since t — ssh failed; refused, not queued")
     assert cli.main(["team", "start", "ao-grind"]) == 1
-    err = capsys.readouterr().err
-    assert "/workspaces/agentorc is not readable on kmaster" in err and "same path" in err and not creates(state)
+    assert "devenv: runs on devenv: unreachable" in capsys.readouterr().err and not creates(state)
+    # a brief the repo keeps outside its checkout is refused here, never asked of the node
+    state["files"] = {there: {".agentorc.yml": yaml.safe_dump({"roles": {"grinder": {"brief": "/etc/passwd"}}})}}
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "outside the checkout" in capsys.readouterr().err and not creates(state)
+    assert "/etc/passwd" not in str([p for m, p in state["calls"] if m == "host_files"])
     del doc["projects"]["ao"]["repos"]["agentorc"]["devenv"]  # declared nowhere on that host
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 1

@@ -98,6 +98,29 @@ def rpc(method: str, **params: Any) -> Any:
     return _call_sync(method, **params)
 
 
+def node_org_note() -> str:
+    """What a node's page and toasts say about the org (design §4.4a): it lives on the home, and a
+    node does not read it from there — decided, not pending (TD-057 step 4b.3)."""
+    return (
+        f"the org lives on {hosts.home_name()} (home): start and stop teams there — "
+        f"{hosts.local_host().name} is a node, and its page shows this host's sessions only"
+    )
+
+
+def node_banner(info: dict[str, Any] | None) -> str:
+    """The Org page's line on a node (design §4.4a "When a host cannot reach home"): whether its
+    link to the home is up, from the `host` RPC, and when it is not, what that means here."""
+    if not info or info.get("mode") != "node":
+        return ""
+    home, link = info.get("home") or "the home", info.get("link") or {}
+    if info.get("home_reachable"):
+        return f"node of {home}: linked — the org's teams, mail and other hosts are on {home}"
+    return (
+        f"node of {home}: unreachable since {link.get('since') or '?'} — {link.get('why') or 'no link'} · "
+        f"offline: this host's sessions only; mail, reports and home-owned edits wait for the link"
+    )
+
+
 def org_here() -> tuple[orgmod.Org, list[str]]:
     """The definitions the Org page acts on (design §4.9): `~/.agentorc/org.yml`, plus the `teams:`
     of every repo in this host's registry — the page is not *in* a directory the way `ao team` is,
@@ -106,9 +129,7 @@ def org_here() -> tuple[orgmod.Org, list[str]]:
     never a 500 — the rest of the page is still the fleet. On a node the org is not here (design
     §4.4a: `org.yml` lives on the home), which is a note too."""
     if hosts.is_node():
-        return orgmod.Org(path=orgmod.org_file()), [
-            f"the org lives on {hosts.home_name()} (home); {hosts.local_host().name} is a node and cannot read it yet"
-        ]
+        return orgmod.Org(path=orgmod.org_file()), [node_org_note()]
     try:
         org = orgmod.load()
     except ValueError as e:
@@ -146,7 +167,9 @@ def teams_view(sessions: list[dict[str, Any]]) -> dict[str, Any]:
         # rather than a bare *stopped* when every session that carried the badge declared it was out
         # of work. The instant comes from the records; the age is rendered here, like every other.
         r["wound_down_age"] = _age(r.get("wound_down"), now)
-    return {"teams": rows, "source": str(org.path or ""), "notes": notes}
+    # on a node the one note is where the org is, not a definition that failed to read
+    elsewhere = notes[0] if hosts.is_node() and notes else ""
+    return {"teams": rows, "source": str(org.path or ""), "notes": [] if elsewhere else notes, "elsewhere": elsewhere}
 
 
 def vscode_url(directory: str) -> str:
@@ -489,10 +512,18 @@ def create_app() -> FastAPI:
         agent_down = False
         usage: dict[str, Any] = {}
         person_unread = 0
+        info: dict[str, Any] | None = None
         try:
             sessions = await call("list")
             usage = await call("usage")
-            person_unread = (await call("inbox"))["unread"]  # the top bar's person inbox count (§4.5a)
+            info = await call("host")
+            try:
+                person_unread = (await call("inbox"))["unread"]  # the top bar's person inbox count (§4.5a)
+            except HTTPException as e:
+                # a node whose link is down refuses the mailbox (§4.4a): the banner says why, and
+                # the page is still this host's sessions
+                if e.status_code == 503 or (info or {}).get("mode") != "node":
+                    raise
         except HTTPException as e:
             if e.status_code != 503:
                 raise
@@ -514,6 +545,7 @@ def create_app() -> FastAPI:
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
                 "person_unread": person_unread,
+                "node_banner": node_banner(info),
             },
         )
 
@@ -854,6 +886,8 @@ def create_app() -> FastAPI:
 
     @app.post("/api/teams/{name}/start")
     async def api_team_start(name: str):
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())  # the strip's note, as the toast (§4.4a)
         org, _notes = org_here()
         try:
             _plan, result = await asyncio.to_thread(teamrun.start, rpc, org, name, host_name())
@@ -866,6 +900,8 @@ def create_app() -> FastAPI:
     async def api_team_stop(name: str, request: Request):
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         now = bool(body.get("now"))
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
         org, _notes = org_here()
         try:
             st = await asyncio.to_thread(teamrun.stop_members, rpc, org, name, now=now)

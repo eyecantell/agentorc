@@ -26,6 +26,7 @@ repo's own `roles:`, each overriding per key.
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -101,6 +102,15 @@ def _aliased(blocks: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return out
 
 
+# Reads one file by its absolute path and returns its text, or None when there is no such file;
+# raises `OSError` when it exists and cannot be read. `_read_here` is this host's disk.
+Reader = Callable[[Path], "str | None"]
+
+
+def _read_here(path: Path) -> str | None:
+    return path.read_text(encoding="utf-8") if path.is_file() else None
+
+
 @dataclass
 class Role:
     """A preset, resolved: what `ao new --role` and the New session form fill in from it."""
@@ -122,9 +132,12 @@ class Role:
         """`built-in`, `repo`, `built-in + repo` …: for `ao roles` and the form's note."""
         return " + ".join(self.sources) or "built-in"
 
-    def brief_text(self, lane: list[str] | None = None) -> str | None:
+    def brief_text(self, lane: list[str] | None = None, *, read: Reader | None = None) -> str | None:
         """The opening prompt this role gives a session: its template with `{lane}` filled from
-        `lane` (default the role's own). None for a role without a brief (`plain`)."""
+        `lane` (default the role's own). None for a role without a brief (`plain`). `read` reads a
+        repo's brief file — this host's disk by default, or another host's checkout across the link
+        (design §4.4a "Teams across hosts", TD-057 step 4b.3); a built-in template is always the
+        package's own."""
         if not self.brief:
             return None
         if self.brief_source == "built-in":
@@ -134,9 +147,11 @@ class Role:
             if not path.is_absolute():
                 path = (self.root or Path.cwd()) / path
             try:
-                text = path.read_text(encoding="utf-8")
+                text = (read or _read_here)(path)
             except OSError as e:
                 raise ValueError(f"role {self.name!r}: brief {path} cannot be read ({e.strerror or e})") from None
+            if text is None:
+                raise ValueError(f"role {self.name!r}: brief {path} cannot be read (no such file)")
         return text.replace(LANE_PLACEHOLDER, ", ".join(lane if lane is not None else self.lane) or "(none given)")
 
     def to_dict(self) -> dict[str, Any]:
@@ -167,16 +182,25 @@ class RepoConfig:
     teams: dict[str, Any] = field(default_factory=dict)  # §4.9; read by the team step, passed through here
 
 
-def load(repo_root: Path | str) -> RepoConfig:
-    """`<repo>/.agentorc.yml`, or the defaults when there is none."""
+def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
+    """`<repo>/.agentorc.yml`, or the defaults when there is none. `read` is how the file is read:
+    this host's disk by default, another host's checkout across the link for a team started there
+    (TD-057 step 4b.3) — one loader for both, `load_text`."""
+    root = Path(repo_root).expanduser()
+    return load_text((read or _read_here)(root / FILE), root)
+
+
+def load_text(text: str | None, repo_root: Path | str) -> RepoConfig:
+    """A repo's config from the text of its `.agentorc.yml` (None: the file is not there — the
+    defaults), wherever that text was read."""
     root = Path(repo_root).expanduser()
     path = root / FILE
     cfg = RepoConfig(root=root)
-    if not path.is_file():
+    if text is None:
         return cfg
     cfg.path = path
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = yaml.safe_load(text)
     except yaml.YAMLError as e:
         raise ValueError(f"{path}: not valid YAML ({e})") from None
     if data is None:

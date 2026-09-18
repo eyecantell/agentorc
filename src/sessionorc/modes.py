@@ -34,6 +34,9 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "see
 # scoped to the node's host. A person may still message anyone. Checked at the home, in `_forwarded`.
 # `NODE_ACTS` is in the set as a second line only: a person's act on a pane never leaves the node.
 PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox", "inbox_delete"})) - frozenset({"hook"})
+# Never served to a call forwarded from a node, whoever makes it (step 4b.3): a checkout's files on
+# any host are read by a caller at the home, for a team start there — `_forwarded` refuses it.
+HOME_ONLY = frozenset({"host_files"})
 
 
 def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str) -> str | None:

@@ -20,7 +20,9 @@ import os
 import re
 import secrets
 import signal
+import stat
 import sys
+import tarfile
 import time
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
@@ -52,6 +54,7 @@ from sessionorc.models import (
     apply_home,
     apply_node,
     canonical_grants,
+    has_control,
     normalize_ref,
     now_iso,
 )
@@ -116,6 +119,16 @@ NODE_READS = frozenset({"tail", "explain"})
 INTENT_FIELDS = HOME_OWNED - frozenset(
     {"inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "superseded_by"}
 )
+# A checkout's files read across the link for a team start (§4.4a "Teams across hosts", step
+# 4b.3): its repo config and the briefs its roles name. A read across a trust boundary, so bounded:
+# at most this many files per call, each at most this many bytes, and only inside the checkout.
+FILES_MAX = 16
+FILE_CAP = 256 * 1024
+# The home's nightly tarball of its store (§4.4a "When the home is lost", step 4b.3): what goes in,
+# relative to AGENTORC_HOME — the org's records and the files that say what the org is — and how
+# many days are kept. Nothing else: never a node's `env`, a token, a run log or a socket.
+BACKUP_KEEP = 7
+BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml")
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
@@ -270,6 +283,8 @@ class HostAgent:
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
+        self._backed_up = ""  # the local date of the last nightly tarball tried (a home only)
+        self._backup_task: asyncio.Task[None] | None = None
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -382,6 +397,10 @@ class HostAgent:
             await asyncio.to_thread(self._prune_runs, snapshot_at, live)
         if self.mode == "home":
             self._supervise_containers()
+            day = datetime.now().astimezone().date().isoformat()
+            if day != self._backed_up and (self._backup_task is None or self._backup_task.done()):
+                self._backed_up = day  # tried once a day: a failure is a log line and tomorrow's retry
+                self._backup_task = asyncio.create_task(self._backup(day))
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
@@ -437,6 +456,16 @@ class HostAgent:
             if settled or now - _parse(s.wrapup_sent_at) >= WRAPUP_GRACE:
                 log.info("%s stopped after its wrap-up (%s)", s.id, "settled" if settled else "grace ran out")
                 await self.rpc_kill(s.id)
+
+    async def _backup(self, day: str) -> None:
+        """The nightly tarball (§4.4a "When the home is lost"): off the loop, and never an error
+        anyone but the log hears of."""
+        try:
+            made = await asyncio.to_thread(backup_store, day)
+            if made:
+                log.info("backed up the store to %s", made)
+        except Exception:  # noqa: BLE001 — a detached task: log, and try again tomorrow
+            log.exception("the nightly backup of the store failed")
 
     def _prune_runs(self, now: datetime, live: set[str]) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
@@ -2440,6 +2469,13 @@ class HostAgent:
         if method == "intent":
             await self._take_intent(params.get("records") or [])
             return None
+        if method == "files":
+            try:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(read_checkout, params.get("dir"), params.get("paths")), ACT_TIMEOUT
+                )
+            except ValueError as e:
+                raise link.LinkError(str(e)) from None
         if method == "stat":
             d = Path(str(params.get("dir") or "")).expanduser()
             return {"dir": str(d), "exists": await asyncio.to_thread(d.is_dir)}
@@ -2511,7 +2547,7 @@ class HostAgent:
                 continue
             if s.run_until != stop_before:
                 s.wrapup_sent_at = None  # a new stop time is a new run, as `set_stop` has it
-            if s.to_dict() != before:
+            if _renamed_grants(s, f"the intent from {self.home}") or s.to_dict() != before:
                 self.store.save(s)
                 changed = True
         if changed:
@@ -2609,6 +2645,10 @@ class HostAgent:
         form; the node rewrites them. Registered by token until it returns so the node can
         cancel it."""
         rpc = str(params.get("rpc") or "")
+        if rpc in modes.HOME_ONLY:
+            # a checkout's files are read by a caller at the home, for a team start there (4b.3);
+            # a node — a person or a session on it — never reads another host's files through here
+            return {"id": 0, "error": f"host_files is not served to a call from {host}: ask at the home (design §4.4a)"}
         p = naming.readdress(dict(params.get("params") or {}), lambda a: self._from_host(a, host))
         if rpc == "set_controllers":
             for key in ("add", "remove"):
@@ -2729,6 +2769,36 @@ class HostAgent:
         except (link.LinkClosed, TimeoutError) as e:
             raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
         return {"host": host, **(seen if isinstance(seen, dict) else {"dir": dir, "exists": False})}
+
+    async def rpc_host_files(
+        self, host: str, dir: str, paths: list[str] | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """The text of files in a checkout on `host` (design §4.4a "Teams across hosts", step
+        4b.3): a team start's repo config and briefs, read where the checkout is — `paths` relative
+        to `dir`, confined to it, bounded (`read_checkout`). A read, like `host_dir`, and yet more
+        than an existence check: a person's, or a session's holding `control` — one that could
+        start that team anyway. Never for a call forwarded from a node (`_forwarded` refuses it):
+        a laptop does not read another host's files through the home."""
+        if not mail.is_person(caller):
+            me = self._graph().get(self._addr(caller))
+            if me is None or not has_control(me.capabilities):
+                raise RpcError(f"{caller} cannot read files on {host}: needs the control grant (design §4.4a)")
+        if host == self.host:
+            try:
+                got = await asyncio.wait_for(asyncio.to_thread(read_checkout, dir, paths), ACT_TIMEOUT)
+            except ValueError as e:
+                raise RpcError(str(e)) from None
+            except TimeoutError:
+                raise RpcError(f"reading {dir} did not finish within {ACT_TIMEOUT:g} s") from None
+            return {"host": host, **got}
+        mux = self._node_mux(host)
+        try:
+            got = await mux.request("files", timeout=ACT_TIMEOUT, dir=dir, paths=list(paths or []))
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except (link.LinkClosed, TimeoutError) as e:
+            raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
+        return {"host": host, **(got if isinstance(got, dict) else {"dir": dir, "files": {}})}
 
     async def _check_occupancy_for(self, host: str, params: dict[str, Any]) -> None:
         """The anchor rule (§9 invariant 2) for a create routed to a container node on this
@@ -3000,6 +3070,7 @@ class HostAgent:
             except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
                 log.warning("link from %s: could not take %s: %s", host, rid, e)
                 continue
+            _renamed_grants(mine[rid], f"the link from {host}")  # saved just below
             self._remote_store(host).save(mine[rid])
         if whole:
             for rid in [r for r in mine if r not in seen]:
@@ -3313,6 +3384,92 @@ class HostAgent:
         return resp
 
 
+def backup_store(day: str) -> Path | None:
+    """`backups/store-<day>.tar.gz` of `BACKUP_MEMBERS` under AGENTORC_HOME (design §4.4a "When
+    the home is lost", TD-057 step 4b.3), mode `0600`, written under a temporary name and renamed
+    so a half-written tarball never counts as one; the newest `BACKUP_KEEP` kept. Regular files
+    only — a socket, a symlink or anything else found among them is not followed. None when
+    today's already exists. Blocking: run it in a thread."""
+    out_dir = paths.backups_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    os.chmod(out_dir, 0o700)
+    target = out_dir / f"store-{day}.tar.gz"
+    if target.exists():
+        return None
+    home = paths.home()
+    tmp = out_dir / f".store-{day}.tar.gz.part"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as fh, tarfile.open(fileobj=fh, mode="w:gz") as tar:
+            for member in BACKUP_MEMBERS:
+                top = home / member
+                for f in sorted([top] if top.is_file() else top.rglob("*") if top.is_dir() else []):
+                    if f.is_file() and not f.is_symlink():
+                        tar.add(f, arcname=str(f.relative_to(home)), recursive=False)
+        os.chmod(tmp, 0o600)
+        tmp.rename(target)
+    finally:
+        tmp.unlink(missing_ok=True)
+    for old in sorted(out_dir.glob("store-*.tar.gz"))[:-BACKUP_KEEP]:
+        old.unlink(missing_ok=True)
+    return target
+
+
+def read_checkout(directory: Any, rel_paths: Any) -> dict[str, Any]:
+    """Files inside one checkout, by their paths relative to it (design §4.4a "Teams across
+    hosts", step 4b.3): `{dir, files: {path: text, or None when there is no such file}}`. A file
+    read across a trust boundary, so everything is refused rather than guessed: a directory that
+    is not one, an absolute path or one that climbs out, a path — symlinks followed — that
+    resolves outside the checkout, anything but a regular file, a file over `FILE_CAP` bytes, and
+    more than `FILES_MAX` paths. Blocking: run it in a thread."""
+    if not directory or not str(directory).strip():
+        raise ValueError("no checkout named")
+    try:
+        root = Path(str(directory)).expanduser().resolve(strict=True)
+    except OSError:
+        raise ValueError(f"{directory} does not exist here") from None
+    if not root.is_dir():
+        raise ValueError(f"{directory} is not a directory")
+    if not (root / ".git").exists():
+        # a team's checkout is a repo (a worktree's `.git` is a file): a directory that is not one
+        # — a home directory, `~/.ssh` — is not read, whoever asks (review of PR #224)
+        raise ValueError(f"{directory} is not a git checkout")
+    wanted = [str(p) for p in (rel_paths or [])]
+    if len(wanted) > FILES_MAX:
+        raise ValueError(f"{len(wanted)} files asked for: at most {FILES_MAX} in one call")
+    out: dict[str, str | None] = {}
+    for rel in wanted:
+        if not rel.strip() or Path(rel).is_absolute():
+            raise ValueError(f"{rel!r}: a path relative to the checkout, please")
+        full = (root / rel).resolve()  # symlinks followed, then checked: a link out is refused like `..`
+        if not full.is_relative_to(root):
+            raise ValueError(f"{rel}: outside the checkout {root}")
+        if not full.exists():
+            out[rel] = None
+            continue
+        out[rel] = _read_capped(full, rel)
+    return {"dir": str(root), "files": out}
+
+
+def _read_capped(full: Path, rel: str) -> str:
+    """One file, judged and read through one descriptor (review of PR #224): opened without
+    blocking and without following a final symlink swapped in since the check, then `fstat` says
+    whether it is a regular file, and no more than `FILE_CAP` + 1 bytes are ever read — so a file
+    replaced by a FIFO, or grown, between the check and the read is refused rather than trusted."""
+    try:
+        fd = os.open(full, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    except OSError as e:
+        raise ValueError(f"{rel}: cannot be read ({e.strerror or e})") from None
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise ValueError(f"{rel}: not a regular file")
+    with os.fdopen(fd, "rb") as fh:
+        data = fh.read(FILE_CAP + 1)
+    if len(data) > FILE_CAP:
+        raise ValueError(f"{rel}: over {FILE_CAP} bytes, which is not a repo config or a brief")
+    return data.decode("utf-8", errors="replace")
+
+
 def _drop_unknown(method: Any, params: dict[str, Any]) -> list[str]:
     """Design §4.4, TD-062 fix (b): remove the parameters `method` does not take and name them,
     so a client newer than this host agent degrades instead of failing.
@@ -3345,6 +3502,19 @@ def _prune_tallies(r: Session) -> None:
     held = {e.root for e in (*r.inbox, *r.outbox)}
     for key in [k for k in r.threads if not k.startswith("pair:") and k not in held]:
         del r.threads[key]
+
+
+def _renamed_grants(s: Session, where: str) -> bool:
+    """A copy that arrived with a renamed grant's old name (TD-055) was normalised as it was read;
+    say so, as the loader does, and tell the caller to save it. True when there was one."""
+    renamed = getattr(s, "renamed_grants", None)
+    if not renamed:
+        return False
+    log.warning(
+        "%s: grant %s is now `control` (TD-055), from %s; the record is rewritten", s.id, ", ".join(renamed), where
+    )
+    del s.renamed_grants
+    return True
 
 
 def _urgent(s: Session) -> str:

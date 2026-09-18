@@ -1024,3 +1024,41 @@ def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_d
     html = templates.get_template("card.html").render(s=view(s))
     assert "permission: Bash: git push — host unreachable" in html and "answer it at laptop" in html
     assert 'data-act="allow"' not in html
+
+
+async def test_a_nodes_org_page_says_its_link_and_where_the_org_is(agent):
+    """TD-057 step 4b.3 (*Left for step 4*): the Org page on a node reads the `host` RPC and says
+    whether its link to the home is up — here it has never dialed, so *offline* — and still
+    renders this host's sessions although the node refuses the mailbox; the Teams strip names where
+    the org is, and a Start or Stop pressed there answers with that note rather than *no team*."""
+    import asyncio
+
+    from sessionorc import paths
+
+    (paths.home() / "hosts.yml").write_text("home: elsewhere\n")
+    agent.mode, agent.home = "node", "elsewhere"
+    try:
+        from agentorc.ui.app import create_app
+
+        def browse():
+            with TestClient(create_app()) as c:
+                return c.get("/"), c.post("/api/teams/ao-grind/start"), c.post("/api/teams/ao-grind/stop")
+
+        page, start, stop = await asyncio.to_thread(browse)
+        assert page.status_code == 200, page.text
+        assert "node of elsewhere: unreachable since" in page.text and "offline: this host" in page.text
+        assert "the org lives on elsewhere (home)" in page.text and "a definition could not be read" not in page.text
+        for r in (start, stop):
+            assert r.status_code == 409 and "the org lives on elsewhere (home)" in r.json()["detail"]
+    finally:
+        agent.mode, agent.home = "home", agent.host
+
+
+def test_the_node_banner_reads_the_host_rpc():
+    from agentorc.ui.app import node_banner
+
+    assert node_banner({"mode": "home"}) == "" and node_banner(None) == ""
+    up = node_banner({"mode": "node", "home": "kmaster", "home_reachable": True, "link": {"up": True}})
+    assert up.startswith("node of kmaster: linked")
+    down = {"mode": "node", "home": "kmaster", "home_reachable": False, "link": {"since": "t", "why": "ssh failed"}}
+    assert node_banner(down).startswith("node of kmaster: unreachable since t — ssh failed · offline")

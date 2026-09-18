@@ -13,13 +13,15 @@ on is reported as out of reach.
 
 A team lands on one host (design §4.4a "Teams across hosts", TD-057 step 4a): its definition's
 `host:`, else the host the start runs on. Checkouts are resolved on *that* host; the roles and
-briefs are still read from the checkout's path on the host running the start — a container node
-shares the path, and a machine node needs the same path here until a link method reads them there.
+briefs are read from the checkout's path here when it is a directory here (this host, or a
+container node sharing the path), and otherwise from the checkout on that host, through `files`
+— the home's `host_files`, a read across the link (step 4b.3) — by the same loader.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -217,14 +219,37 @@ def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> t
 Spec = orgmod.MemberDef | orgmod.LeadDef | None
 
 
-def _brief(role: repoconfig.Role, member: Spec, checkout: Path, lane: list[str]) -> str | None:
+# `(host, checkout, [paths relative to it])` → `{path: text, or None when there is no such file}`:
+# another host's checkout, read there (the home's `host_files`). Raises `OSError` for a failure.
+Files = Callable[[str, str, list[str]], dict[str, "str | None"]]
+
+
+def _reader_on(files: Files, host: str, checkout: Path) -> repoconfig.Reader:
+    """A `repoconfig.Reader` for a checkout on another host: only its own files, by their path
+    relative to it — a brief outside the checkout is not read across the link at all."""
+
+    def read(path: Path) -> str | None:
+        try:
+            rel = str(Path(path).relative_to(checkout))
+        except ValueError:
+            raise OSError(
+                f"{path} is outside the checkout {checkout}: only a checkout's own files are read on {host}"
+            ) from None
+        return files(host, str(checkout), [rel]).get(rel)
+
+    return read
+
+
+def _brief(
+    role: repoconfig.Role, member: Spec, checkout: Path, lane: list[str], read: repoconfig.Reader | None = None
+) -> str | None:
     """The role's template with `{lane}` filled, or the member's `brief:` override read from its
     home checkout. A lead may override its brief too — a lead's is the one a repo most
     often keeps its own copy of (2026-09-13)."""
     if member is not None and member.brief:
         override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
-        return override.brief_text(lane)
-    return role.brief_text(lane)
+        return override.brief_text(lane, read=read)
+    return role.brief_text(lane, read=read)
 
 
 def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
@@ -240,6 +265,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     member: Spec,  # the lead's own definition or a member's: both carry lane, brief, grants, profile
     lead: bool,
     block: str,
+    files: Files | None = None,
 ) -> Launch:
     where = f"team {team.name}: {name}"
     project = project_of(org, team.projects, home)
@@ -251,20 +277,22 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
             f"add `{host}: <path>` under it in org.yml, or set the team's `host:`"
         )
     checkout = Path(checkout).expanduser()
+    read: repoconfig.Reader | None = None  # this host's disk
     if not checkout.is_dir():
         if host == here:
             raise TeamError(f"{where}: {checkout} does not exist on {host} (repo {home!r}) — nothing was started")
-        # Another host's checkout: whether it exists *there* is that host's node's to say
-        # (`teamrun.start` asks it); the roles and briefs, though, are read from this path here.
-        raise TeamError(
-            f"{where}: {checkout} is not readable on {here}, and a team's roles and briefs are read from the "
-            f"checkout's path on the host that starts it — a container node shares the path; for a machine "
-            f"node keep a clone at the same path here (repo {home!r} on {host}) — nothing was started"
-        )
+        if files is None:
+            raise TeamError(
+                f"{where}: {checkout} is not a directory on {here}, and nothing here reads it on {host} "
+                f"(repo {home!r}) — nothing was started"
+            )
+        # Another host's checkout that is not a directory here — a machine node (a container node
+        # shares the path): its roles and briefs are read there, by the same loader (step 4b.3).
+        read = _reader_on(files, host, checkout)
     try:
-        cfg = repoconfig.load(checkout)
+        cfg = repoconfig.load(checkout, read=read)
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
-    except (KeyError, ValueError) as e:
+    except (KeyError, ValueError, OSError) as e:
         raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     lane = list(member.lane) if member is not None and member.lane else list(role.lane)
     grants = list(member.grants) if member is not None and member.grants is not None else list(role.grants)
@@ -278,7 +306,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     try:
-        prompt = _brief(role, member, checkout, lane)
+        prompt = _brief(role, member, checkout, lane, read)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
@@ -301,7 +329,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     )
 
 
-def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -> Plan:
+def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, files: Files | None = None) -> Plan:
     """Resolve a definition into the sessions it starts, checking everything that can be checked
     without the agent: the checkouts are declared on the team's host (and exist, when that is this
     one — `host` is the host the start runs on), every role, profile and brief resolves, and no
@@ -324,6 +352,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -
             member=team.lead,  # its lane, brief, grants and unattended read like a member's
             lead=True,
             block=project_block(org, team.projects, host, team.lead.home) if reach else "",
+            files=files,
         )
     seen: set[str] = {p.lead.name} if p.lead else set()
     for member in team.members:
@@ -350,6 +379,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -
                     member=member,
                     lead=False,
                     block=block,
+                    files=files,
                 )
             )
     # One line per finding, not per session: a team's members share a brief, and four copies of

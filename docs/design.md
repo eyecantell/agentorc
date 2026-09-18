@@ -505,6 +505,13 @@ long-lived link. The home is also a node for its own host's sessions (one proces
   hosts until the link returns (Paul, 2026-09-16: *"won't the inability to reach home mean the UI
   will not render?"* — it would have). Writes a person makes there are node-owned acts on the
   node's own sessions; home-owned edits (controllers, grants, stop time) wait for the link.
+  **Decided in step 4b.3, and not built: a node does not show the org.** Its `list`, `get` and
+  UI stay this host's sessions with the link up too, and `ao team` and the Org page's Teams strip
+  there say the org lives on the home and name it — a Start or Stop pressed there answers with
+  that note. Showing the org from a node is a read across the boundary a person's request
+  arriving over a link is held to (*Addresses*, PR #219): the person at a laptop would read every
+  host's records through it. The node's Org page carries one line from the `host` RPC instead:
+  *node of <home>: linked*, or *unreachable since <when> — <why>* with what *offline* means there.
 - **A node reports and executes; the home decides.** A node reports its sessions' state, hooks and
   pane evidence to the home, which merges them into the records. An act (`send`, `keys`, `kill`,
   `close`, wrap-up, `create`, a doorbell `ring`) is gated at the home and executed by the node that
@@ -679,7 +686,12 @@ keep observing and send their snapshot when they dial back, and the home rebuild
 replicas, which carry every home-owned field as of their last push, adopted on reconnect as above.
 What is **lost with the home's store and only that**: mail, thread tallies, wake budgets and the
 person inbox — which invariant 13 already declares not durable. Backup is a **nightly tarball of the
-home's store**; replication is not warranted at this scale. **Moving the home** is three things,
+home's store**; replication is not warranted at this scale. (Built as step 4b.3: once a day, the
+first tick of each local date, off the loop, the home writes `backups/store-<date>.tar.gz` —
+`sessions/`, `remote/`, the person inbox, `org.yml`, `hosts.yml` and `profiles.yml`, regular files
+only, and never a node's `env`, a token, a run log or a socket — mode `0600`, under a temporary
+name and renamed, the newest seven kept; a failure is a log line and tomorrow's retry. A node's
+store is a replica and takes none.) **Moving the home** is three things,
 not one line: the store directory, every node's `home:` line, and the link keys authorised on the
 new home.
 
@@ -691,9 +703,20 @@ runs on — and every member is created there; the existence check is the `host_
 link method, not a dry-run create: a create that half-runs is the thing the check exists to
 prevent), asked once per checkout before any name check; `ao team stop` degrades **per member** —
 a member whose host is unreachable is named with the reason and not waited on, the rest are still
-wrapped up. One thing the step reads from *this* host: the roles and briefs, from the checkout's
-path here — a container node shares the path, and a machine node needs a clone at the same path
-until a link method reads them there (4b).
+wrapped up. The roles and briefs are read from the checkout's path here when that is a
+directory here — this host, or a container node sharing the path — and otherwise on the team's
+host (step 4b.3): the home's `host_files {host, dir, paths}` RPC, over the `files` link method,
+returns the text of files inside that checkout, and `repoconfig.load_text` and a role's brief
+read take it by the same loader as a local read. A file read across a trust boundary, so it is
+bounded: the directory must be a git checkout, paths are relative to it and resolved there,
+symlinks followed and then refused if they land outside it, each file judged and read through
+one descriptor (regular files only, never blocking on one swapped for a FIFO, never more than the
+cap read), at most `FILES_MAX` (16) per call of at most `FILE_CAP` (256 KiB) each, and a brief the
+repo keeps outside its checkout is refused before it is asked for. It is a person's read or a
+`control` holder's — either may already start a session in any directory of a linked host, so the
+read grants neither anything new — and it is never served to a call forwarded from a node, whoever
+makes it (`modes.HOME_ONLY`): a laptop does not read other hosts' files through the home.
+The start stays all-or-nothing: a read that fails stops it before anything is created.
 
 **The link.** The node dials the home over **ssh**, with a key authorised on the home for one
 forced command bound to its host name — `command="agentorc-agent link --host laptop"` in the home's
@@ -877,7 +900,7 @@ nodes:
   `vscode://vscode-remote/attached-container+<hex of {"containerName": "/<name>"}><checkout>` — never the
   `dev-container+` form, which would open the person's own container from the repo's definition
   rather than this one. Derived from the `container:` entry, never from `vscode_host` (§4.6).
-  A machine node's session still has no terminal from here (4b, with the terminal over the link),
+  A machine node's session still has no terminal from here (the terminal over the link is *Later* in TD-057),
   and says so. `docker exec` is right there and wrong for the link, which runs the other way.
 
 For the org (§4.9): the project's repo entry names the node too — `contractmatch: {kmaster:
@@ -926,8 +949,7 @@ machine to agentorc: an ssh node, provisioned by hand.
   session on a machine node answers *runs on <host>: no terminal reaches it from here* — the
   terminal over the link is *Later* in TD-057; a container node's is reached by `docker exec`
   (*Reach*, below). `ao tail` and `ao explain` on a remote record read its pane on its node since
-  step 4b.1 (*Acts across the link*). A team's roles and briefs on a machine node without a clone at
-  the same path are refused naming that (*Teams across hosts*) until step 4b.3.
+  step 4b.1 (*Acts across the link*).
 
 **Acts across the link (2026-09-17, TD-057 step 4a).** What *A node reports and executes; the home
 decides* means call by call.

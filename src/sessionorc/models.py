@@ -641,6 +641,10 @@ def _overlay(record: Session, copy: Mapping[str, Any], owned: frozenset[str]) ->
     parsed = Session.from_dict({**record.to_dict(), **{k: copy[k] for k in taken}})
     for f in taken - GROWS:
         setattr(record, f, getattr(parsed, f))
+    if "capabilities" in taken and (renamed := getattr(parsed, "renamed_grants", None)):
+        # the copy carried a renamed grant: normalised above, and the marker kept, so the caller
+        # saves and says so as the loader does (TD-055; review of TD-057 step 2, fixed in 4b.3)
+        record.renamed_grants = renamed
     if "sends" in taken:
         by_id = {e.id: e for e in (*parsed.sends, *record.sends)}  # on one id the record's own entry stands
         record.sends = sorted(by_id.values(), key=lambda e: (e.at, e.id))[-SENDS_KEPT:]
