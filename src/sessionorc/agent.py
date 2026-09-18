@@ -2313,7 +2313,7 @@ class HostAgent:
         if self.mode != "home":
             return f"{self.host} is a node of {self.home}, not a home: there is one home, and a node takes no links"
         if not host:
-            return "the forced command named no host (`agentorc-agent link --host <name>` in authorized_keys)"
+            return "the link named no host (`agentorc-agent link --host <name>` in authorized_keys)"
         if host == self.host:
             return f"{host} is this home's own name: a node's key must be bound to the node's name"
         if host not in hosts.nodes():
@@ -2321,8 +2321,9 @@ class HostAgent:
         claimed = str(hello.get("host") or "")
         if claimed and claimed != host:
             return (
-                f"this key is bound to {host}, and the node calls itself {claimed}: the `--host` in "
-                "authorized_keys and the node's `local: {name: …}` must agree"
+                f"this link is bound to {host}, and the node calls itself {claimed}: the name the home binds "
+                "(the `--host` in authorized_keys, or the `nodes:` entry whose socket this is) and the node's "
+                "`local: {name: …}` must agree"
             )
         if hello.get("protocol") != link.PROTOCOL:
             return f"link protocol {hello.get('protocol')!r} here is {link.PROTOCOL}: promote both ends to one build"

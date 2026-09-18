@@ -261,7 +261,8 @@ async def test_a_container_node_dials_the_homes_socket_with_no_ssh_and_survives_
     node opens it directly — no ssh, no bridge — and what the node holds is the *directory*, so a
     home that unlinks and re-binds its socket on restart is found again."""
     sock = home.dir / "links" / "laptop" / "link.sock"
-    assert sock.exists() and (sock.parent.stat().st_mode & 0o777) == 0o700 and (sock.stat().st_mode & 0o777) == 0o600
+    assert await wait_for(sock.exists, timeout=5.0, step=0.05)  # bound just after agent.sock, which start() waited on
+    assert (sock.parent.stat().st_mode & 0o777) == 0o700 and (sock.stat().st_mode & 0o777) == 0o600
     async with node_agent(tmp_path, monkeypatch, socket=sock) as node:
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
         assert node.home_link["why"] == "linked to kmaster as laptop"
