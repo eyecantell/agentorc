@@ -25,6 +25,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from sessionorc import paths
+from sessionorc.client import LINE_LIMIT
 
 log = logging.getLogger("agentorc.link")
 
@@ -34,8 +35,9 @@ LINK_SILENCE = 45.0  # seconds without a frame before either end gives the link 
 BACKOFF_FIRST = 1.0
 BACKOFF_MAX = 60.0
 # One frame is one line, and asyncio's default line limit is 64 KiB — a node's snapshot of its
-# records (step 3b) is larger than that. Every stream a frame crosses is opened with this limit.
-FRAME_LIMIT = 8 * 1024 * 1024
+# records (step 3b) is larger than that. Every stream a frame crosses is opened with this limit,
+# and it is the client's, so a reply the agent writes is one every reader can read (TD-066).
+FRAME_LIMIT = LINE_LIMIT
 STDERR_KEPT = 20  # lines of the transport's stderr kept for the diagnosis
 
 Handler = Callable[[str, dict[str, Any]], Awaitable[Any]]

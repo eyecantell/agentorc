@@ -12,6 +12,11 @@ from typing import Any
 
 from sessionorc import paths
 
+# One reply is one line, and asyncio's default line limit is 64 KiB. A `list` of six records after a
+# day of two teams' mail crossed it on 2026-09-17 and every `ao` on the machine failed with
+# `Separator is found, but chunk is longer than limit` (TD-066). The same limit the link uses.
+LINE_LIMIT = 8 * 1024 * 1024
+
 
 class AgentError(Exception):
     """An error the agent returned. `data` is whatever it sent alongside the message — the id of
@@ -56,7 +61,7 @@ class LocalClient:
 
     async def __aenter__(self) -> LocalClient:
         try:
-            self._reader, self._writer = await asyncio.open_unix_connection(str(self.sock))
+            self._reader, self._writer = await asyncio.open_unix_connection(str(self.sock), limit=LINE_LIMIT)
         except (ConnectionError, FileNotFoundError, OSError) as e:
             raise AgentUnavailable(f"host agent not reachable at {self.sock}: {e}") from e
         return self
@@ -117,13 +122,13 @@ def call_sync(method: str, *, caller: str | None = None, **params: Any) -> Any:
 async def bridge_stdio() -> int:
     """Pump stdin → socket → stdout, line for line. `ssh host agentorc-agent rpc` is this."""
     try:
-        reader, writer = await asyncio.open_unix_connection(str(paths.socket_path()))
+        reader, writer = await asyncio.open_unix_connection(str(paths.socket_path()), limit=LINE_LIMIT)
     except (ConnectionError, FileNotFoundError, OSError) as e:
         sys.stdout.write(json.dumps({"error": f"agent down: {e}"}) + "\n")
         sys.stdout.flush()
         return 1
     loop = asyncio.get_running_loop()
-    stdin = asyncio.StreamReader()
+    stdin = asyncio.StreamReader(limit=LINE_LIMIT)
     await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(stdin), sys.stdin)
 
     async def up() -> None:
