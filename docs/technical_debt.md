@@ -47,6 +47,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-069 | One place to work from: an Inbox page listing everything that needs a person — session states, mail, due board items — each with its controls, filtered by team; today they are in three places and the mail dialog is too narrow to read | Medium | Open |
 | TD-070 | Neither an `ask` nor a board item can offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, and an answers field on the board entry (a dev-cadence format change), rendered as buttons | Medium | Open |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Open |
+| TD-072 | Sessions exit with unread mail: nothing makes a worker read its inbox before it says it is out of work, and an unread `note` outlives the run it was sent to | Medium | Open |
 
 ---
 
@@ -722,3 +723,21 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Related:** design §4.5a (**team groups**, **state icon**), TD-069, TD-070, TD-065 (the undefined `chip` class — same page, same kind of finding).
 
+
+## TD-072: Sessions exit with unread mail — nothing makes a worker read its inbox before it winds down
+
+**Priority:** Medium
+**Added:** 2026-09-18 (the anchor session; Paul's review of the Org page — *"our agents should go through them and decide they don't care about them instead of just leaving them pending"*)
+**Status:** Open — three parts proposed to Paul 2026-09-18, not yet approved one by one. Design first: §4.10 (mail lifecycle) and §4.9a (wind-down) change before code does.
+**Location:** `docs/briefs/tdgrind-ao-1.md` and the samscrape team's briefs (when a worker reads mail), `src/sessionorc/agent.py` (`rpc_progress` → `_out_of_work`, and the mail sweep), the Ready to close checks (§4.2; the check names live in `src/agentorc/repoconfig.py`, `ready_when`), design §4.10 and §4.9a
+
+**Why:** on 2026-09-18 the Org page showed exited sessions still holding unread mail — `tdgrind-1` 19 entries, `tdgrind-3` 2 — almost all `note`s from siblings (*claimed: TD-289…*) and from the lead. Part of that night's count was a defect, since fixed: bare `ao inbox` crashed on a long inbox (TD-066), so a worker told *19 unread* on every `ao` reply could not read them. But the mechanism allows it on any night. Reading is what marks mail read (`ao inbox`, design §4.10); every `ao` reply carries the unread count (`cli.py`, `unread_line`); and nothing else happens. The lead's brief says to read the inbox at the top of every round (`docs/briefs/orchestrator-ao-1.md`, step 1); the grinder's brief says how to weigh mail and never says *when* to read it. An unread entry never ages out (§4.10), so a claim note that was stale within the hour sits on a dead record until a person forgets the session — and it is noise on the page that TD-069 is about to make the place a person works from.
+
+**Fix, three parts, cheapest first:**
+1. **The briefs say when.** A grinder reads `ao inbox --unread` when it claims a reference (a sibling may have claimed it, or said something about it) and before it declares itself out of work. Reading is the triage: a `note` needs no answer, an `ask` gets one or a refusal.
+2. **The wind-down checks it.** `ao progress none --why …` (§4.9a) is refused while the session has unread mail, naming the count and the command — briefs are skimmed, a refusal is not. Ready to close (§4.2) gains a row, *mail read*, so a session that exits some other way still shows it.
+3. **A `note` does not outlive the run it was sent to.** When a session's record goes to `exited`, its unread `note`s are dropped; an `ask` keeps the lifecycle it has (it expires, and the sender is told). **Not verified, and part of this item:** what a fresh `ao team start` under the same name does with the dead record's inbox — a resumed conversation takes the mail with it (`_supersede` → `_move_mail`), a new one of the same name was not traced.
+
+**Done when** a grinder that tries to wind down with unread mail is refused and told why, Ready to close shows the row, an exited session's card shows no unread `note`s, the briefs say when to read, and §4.10 / §4.9a / §4.2 say all of it.
+
+**Related:** design §4.10 (lifecycle, *an unread entry never ages out*), §4.9a (`out_of_work`), §4.2 (Ready to close), TD-052 (mail), TD-053 (wind-down), TD-066 (the crash that hid that night's mail), TD-069 (the page this keeps clean), TD-071 item 2.
