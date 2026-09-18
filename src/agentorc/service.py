@@ -97,9 +97,16 @@ def install(*, bind: str = "127.0.0.1", port: int = 8765, home: str | None = Non
     # restarted agent takes its nodes' `hello`s at once and names the build it would provision
     # from the newest wheel, so a wheel written afterwards left a window in which a node could be
     # re-provisioned from the previous build (seen live at the promote of PR #225, 2026-09-18).
+    # Never fatal to the promote, whatever it raises (a disk that refuses the directory, a `pip`
+    # that cannot start): first in line, it must not be what stops the units coming up on the new
+    # code (review of PR #227). A node then stays on the wheel the home already had.
     from sessionorc import containers
 
-    wheel = containers.write_wheel()
+    try:
+        wheel = containers.write_wheel()
+    except Exception as e:  # noqa: BLE001
+        print(f"agentorc: the wheel could not be written ({type(e).__name__}: {e}); units go ahead", file=sys.stderr)
+        wheel = None
     if wheel is not None:
         written.append(str(wheel))
     _systemctl("daemon-reload")
