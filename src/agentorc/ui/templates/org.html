@@ -19,13 +19,17 @@
     </span>
   </div>
   <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
+  {# design §4.4a: a node's page says whose org it is part of and whether its link is up #}
+  {% if node_banner %}<div class="warn" id="nodebanner">⚠ <b>{{ host }}</b>: {{ node_banner }}</div>{% endif %}
   {# design §4.5a Org **Teams** strip (§4.9 "Starting and stopping"): every definition in
      `~/.agentorc/org.yml` and in a registered repo's own `teams:`, with its source, projects,
      member count and Start. A definition with sessions live is hidden here: its group's card
      carries Stop / Stop now (2026-09-16). Collapsed to a count when nothing is defined. Live counts are recomputed from the cards on every tick — a team is live when a
      session carrying its badge is, and there is no team record to ask. #}
   <div class="strip" id="teams" data-source="{{ strip.source }}"{% if strip.teams and not (strip.teams | rejectattr("live") | list) and not strip.notes %} hidden{% endif %}>
-    {% if strip.teams %}
+    {% if strip.elsewhere %}
+    <span class="meta">Teams: {{ strip.elsewhere }}</span>
+    {% elif strip.teams %}
     <span class="meta">Teams</span>
     {% for t in strip.teams %}
     <span class="team-row" data-team="{{ t.name }}" data-live="{{ t.live }}"{% if t.live %} hidden{% endif %}>

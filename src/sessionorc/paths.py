@@ -61,6 +61,12 @@ def waits_dir() -> Path:
     return home() / "waits"
 
 
+def backups_dir() -> Path:
+    """The home's nightly tarballs of its store (design §4.4a "When the home is lost", TD-057 step
+    4b.3): `store-<date>.tar.gz`, the newest seven kept."""
+    return home() / "backups"
+
+
 def recent_dirs_file() -> Path:
     return home() / "recent_dirs"
 

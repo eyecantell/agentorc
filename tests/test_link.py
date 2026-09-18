@@ -994,6 +994,9 @@ async def test_a_persons_forwarded_act_reaches_only_the_nodes_own_records(home, 
             assert gone["deleted"] == sent["entry"]["id"]
             with pytest.raises(AgentError, match="acts on its own sessions only"):  # refused at the node itself
                 await person_at_laptop.call("create", name="x", dir=str(tmp_path), adapter="shell", host="kmaster")
+            # nor may a person at the node read the home's files through it (4b.3: `host_files`)
+            with pytest.raises(AgentError, match="is a node of kmaster"):
+                await person_at_laptop.call("host_files", host="kmaster", dir=str(tmp_path), paths=["x"])
             # the node's own record: the same edit, forwarded and served
             got = await person_at_laptop.call("set_controllers", id=w["id"], add=[f"{lead['id']}@kmaster"])
             assert got["controllers"] == [f"{lead['id']}@kmaster"]
@@ -1223,3 +1226,170 @@ async def test_a_persons_offline_create_is_adopted_with_its_controllers_when_the
         assert v["controllers"] == [lead["id"]] and v["host"] == "laptop"
         async with LocalClient(sock=home.dir / "agent.sock") as person:
             await person.call("kill", id=lead["id"])
+
+
+# -- a team on a machine node, the nightly tarball (step 4b.3) ---------------------------------------------
+
+
+def test_a_checkouts_files_are_read_inside_it_and_nothing_else(tmp_path):
+    """`read_checkout`: a file read across a trust boundary refuses rather than guesses — a path
+    that climbs out, an absolute one, a symlink pointing out, a directory, an oversized file, too
+    many paths — and a file that is simply not there is None."""
+    from sessionorc.agent import FILE_CAP, FILES_MAX, read_checkout
+
+    repo, outside = tmp_path / "repo", tmp_path / "secret"
+    (repo / "docs").mkdir(parents=True)
+    outside.write_text("the key")
+    (repo / ".agentorc.yml").write_text("roles: {}\n")
+    (repo / "docs" / "brief.md").write_text("a brief")
+    (repo / "docs" / "inside.md").symlink_to(repo / "docs" / "brief.md")
+    (repo / "docs" / "out.md").symlink_to(outside)
+    (repo / "big.md").write_text("x" * (FILE_CAP + 1))
+    got = read_checkout(str(repo), [".agentorc.yml", "docs/brief.md", "docs/inside.md", "missing.md"])
+    assert got["files"] == {
+        ".agentorc.yml": "roles: {}\n", "docs/brief.md": "a brief", "docs/inside.md": "a brief", "missing.md": None,
+    }  # fmt: skip
+    for bad, why in (
+        ("../secret", "outside the checkout"),
+        ("docs/out.md", "outside the checkout"),
+        (str(outside), "relative to the checkout"),
+        ("docs", "not a regular file"),
+        ("big.md", "over"),
+        ("", "relative to the checkout"),
+    ):
+        with pytest.raises(ValueError, match=why):
+            read_checkout(str(repo), [bad])
+    with pytest.raises(ValueError, match=f"at most {FILES_MAX}"):
+        read_checkout(str(repo), ["a"] * (FILES_MAX + 1))
+    with pytest.raises(ValueError, match="does not exist here"):
+        read_checkout(str(tmp_path / "nope"), [".agentorc.yml"])
+
+
+async def test_host_files_is_a_persons_or_a_controllers_read_and_never_a_nodes(agent, tmp_path):
+    """The home's `host_files` (step 4b.3): this host's checkout read here, another host's through its
+    node's `files` link method, unreachable refused; a session needs `control`, as a team start
+    does; and a call forwarded from a node — a person's or a session's — is refused whole."""
+
+    class Files(FakeMux):
+        async def request(self, method, timeout=None, **params):
+            self.sent.append((method, params))
+            return {"dir": params["dir"], "files": {p: f"on laptop: {p}" for p in params["paths"]}}
+
+    (tmp_path / "repo").mkdir()
+    (tmp_path / "repo" / ".agentorc.yml").write_text("x: 1\n")
+    async with LocalClient() as person:
+        here = await person.call("host_files", host=agent.host, dir=str(tmp_path / "repo"), paths=[".agentorc.yml"])
+        assert here["files"] == {".agentorc.yml": "x: 1\n"}
+        with pytest.raises(AgentError, match="outside the checkout"):
+            await person.call("host_files", host=agent.host, dir=str(tmp_path / "repo"), paths=["../../etc/passwd"])
+        agent._take_records("laptop", [record()], whole=True)  # a host the home has heard of
+        with pytest.raises(AgentError, match="runs on laptop: unreachable"):
+            await person.call("host_files", host="laptop", dir="/w", paths=["a"])
+        agent._link_muxes["laptop"] = mux = Files()
+        agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
+        got = await person.call("host_files", host="laptop", dir="/w", paths=[".agentorc.yml"])
+        assert got["files"] == {".agentorc.yml": "on laptop: .agentorc.yml"} and mux.sent[0][0] == "files"
+        lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+    async with LocalClient(caller=lead["id"]) as as_lead:
+        with pytest.raises(AgentError, match="needs the control grant"):
+            await as_lead.call("host_files", host="laptop", dir="/w", paths=["a"])
+    async with LocalClient() as person:
+        await person.call("set_grants", id=lead["id"], add=["control"])
+    async with LocalClient(caller=lead["id"]) as as_lead:
+        assert (await as_lead.call("host_files", host="laptop", dir="/w", paths=["a"]))["files"] == {
+            "a": "on laptop: a"
+        }
+    for caller in (None, "ao-x-w"):
+        call = {"rpc": "host_files", "params": {"host": agent.host, "dir": "/", "paths": ["etc/passwd"]}}
+        resp = await agent._forwarded("laptop", {**call, "caller": caller, "token": ""})
+        assert "host_files is not served to a call from laptop" in resp["error"]
+    assert len(mux.sent) == 2
+    del agent._link_muxes["laptop"]
+    async with LocalClient() as person:
+        await person.call("kill", id=lead["id"])
+
+
+async def test_a_node_serves_files_from_its_own_checkout_across_the_link(home, tmp_path, monkeypatch):
+    """End to end: the home's `host_files` for the node reads the checkout on the node."""
+    (tmp_path / "cm").mkdir()
+    (tmp_path / "cm" / ".agentorc.yml").write_text("roles: {grinder: {brief: b.md}}\n")
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            got = await person.call(
+                "host_files", host="laptop", dir=str(tmp_path / "cm"), paths=[".agentorc.yml", "b.md"]
+            )
+            assert got["files"] == {".agentorc.yml": "roles: {grinder: {brief: b.md}}\n", "b.md": None}
+            with pytest.raises(AgentError, match="laptop: .*outside the checkout"):
+                await person.call("host_files", host="laptop", dir=str(tmp_path / "cm"), paths=["../kmaster/hosts.yml"])
+        async with LocalClient() as at_node:  # a node reads no other host's files, and does not forward it
+            with pytest.raises(AgentError, match="is a node of kmaster"):
+                await at_node.call("host_files", host="kmaster", dir="/", paths=["etc/hostname"])
+
+
+def test_the_nightly_tarball_holds_the_store_and_the_orgs_files_and_nothing_else(tmp_path, monkeypatch):
+    import stat
+    import tarfile
+
+    from sessionorc.agent import BACKUP_KEEP, backup_store
+
+    home = tmp_path / "h"
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    for rel, text in {
+        "sessions/ao-a.json": "{}", "remote/laptop/ao-b.json": "{}", "person_inbox.json": "[]",
+        "org.yml": "teams: {}", "hosts.yml": "nodes: [laptop]", "profiles.yml": "profiles: {}",
+        "nodes/cm/env": "GH_TOKEN=secret", "runs/ao-a-1.log": "output", "waits/ao-a": "{}",
+    }.items():  # fmt: skip
+        (home / rel).parent.mkdir(parents=True, exist_ok=True)
+        (home / rel).write_text(text)
+    made = backup_store("2026-09-18")
+    assert made == home / "backups" / "store-2026-09-18.tar.gz" and stat.S_IMODE(made.stat().st_mode) == 0o600
+    with tarfile.open(made) as tar:
+        names = set(tar.getnames())
+    assert names == {
+        "sessions/ao-a.json", "remote/laptop/ao-b.json", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml",
+    }  # fmt: skip
+    assert backup_store("2026-09-18") is None  # once a day
+    for d in range(1, 10):
+        backup_store(f"2026-08-{d:02d}")
+    kept = sorted(p.name for p in (home / "backups").glob("store-*.tar.gz"))
+    assert len(kept) == BACKUP_KEEP and kept[-1] == "store-2026-09-18.tar.gz"
+    assert not list((home / "backups").glob(".*.part"))
+
+
+async def test_the_homes_tick_takes_the_tarball_and_a_nodes_does_not(agent):
+    from datetime import datetime
+
+    day = datetime.now().astimezone().date().isoformat()
+    assert await wait_for(lambda: (paths.backups_dir() / f"store-{day}.tar.gz").exists(), timeout=10.0, step=0.05)
+    agent.mode, agent._backed_up = "node", ""
+    await agent.tick()
+    assert agent._backed_up == ""  # a node's store is a replica: the home's tarball is the backup
+    agent.mode = "home"
+
+
+async def test_a_copy_with_a_renamed_grant_is_rewritten_and_said_so_at_either_end(agent, caplog):
+    """*Left for step 4* (TD-055 × step 2): a record crossing the link with `orchestrate` is
+    normalised to `control` — and, as the loader does, saved and logged rather than silently."""
+    import json as jsonmod
+    import logging
+
+    from sessionorc.models import Session
+
+    caplog.set_level(logging.WARNING, logger="agentorc.agent")
+    agent._take_records("laptop", [record(capabilities=["orchestrate"])], whole=True)
+    assert agent.remote["laptop"]["ao-x-w"].capabilities == ["control"]
+    stored = jsonmod.loads(paths.remote_dir("laptop").joinpath("ao-x-w.json").read_text())
+    assert stored["capabilities"] == ["control"] and "grant orchestrate is now `control`" in caplog.text
+    caplog.clear()
+    agent.mode, agent.home = "node", "kmaster"
+    s = Session(id="ao-x-n", name="n", kind="interactive", adapter="claude-code", dir="/tmp", host=agent.host)
+    s.capabilities = ["control"]
+    agent.sessions[s.id] = s
+    try:
+        await agent._take_intent([{"id": s.id, "host": agent.host, "capabilities": ["orchestrate"]}])
+        assert s.capabilities == ["control"] and "grant orchestrate is now `control`" in caplog.text
+        assert not hasattr(s, "renamed_grants")
+    finally:
+        agent.sessions.pop(s.id)
+        agent.mode, agent.home = "home", agent.host
