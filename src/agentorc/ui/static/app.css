@@ -58,7 +58,8 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* design §4.5a **state icon**: a page of cards is read by shape before it is read by word */
 .pill::before { font-size: 9px; line-height: 1; }
 .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
-.pill.s-working::before { content: "▶"; } .pill.s-idle::before { content: "‖"; } .pill.s-exited::before { content: "■"; }
+/* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
+.pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
 .pill.s-done::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; }
 .sc[data-unseen] .pill.s-idle::before { content: "●"; }
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
