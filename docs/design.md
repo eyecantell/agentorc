@@ -752,9 +752,11 @@ nodes:
   <name>/` is mounted at `/agentorc` inside, and everything of the node's lives under it, by
   absolute path, so nothing depends on the image's `$HOME` or on what its lifecycle scripts do to
   `~/.claude`: `/agentorc/home` is the node's `AGENTORC_HOME` — its `hosts.yml` (`local: {name}`,
-  `home:`, `link: {socket: …}`), written by the home; `profiles.yml`, each profile's `config_dir`
-  under `/agentorc/profiles/<profile>/`, which is the `CLAUDE_CONFIG_DIR` the adapter launches
-  with (§4.2a), logged in once by hand inside and kept; run logs, the hook socket and the store,
+  `home:`, `link: {socket: …}`), written by the home; `profiles.yml`, the home's own entries for
+  the profiles the node's roles name, copied with each `config_dir` rewritten under
+  `/agentorc/profiles/<profile>/`, which is the `CLAUDE_CONFIG_DIR` the adapter launches with
+  (§4.2a), logged in once by hand inside and kept — one account then polls its usage endpoint
+  from two hosts, twice a minute rather than once, which is accepted; run logs, the hook socket and the store,
   so a rebuild reconnects with its history and not with an empty snapshot the home would take as
   the truth; the agent's own log — and `/agentorc/venv`, which the home fills with **its own
   wheel**: the promote (TD-062) gains one step, writing the
@@ -785,7 +787,10 @@ nodes:
   again, and the log says why it died. A container stopped or restarted is that host
   rebooting: tmux and its sessions are gone, the snapshot says so, the records go `exited`.
   `ao host rebuild <name>` rebuilds the image on purpose; `ao host forget <name>` is the removal
-  path a runtime needs that a machine did not; `volatile: true` is right for one the person stops.
+  path a runtime needs that a machine did not — it removes the container, the link directory and
+  the `nodes:` entry, closes the host's records at the home as a closed session is kept, and keeps
+  `~/.agentorc/nodes/<name>/` (the run logs, invariant 3) unless told `--purge`; `volatile: true`
+  is right for one the person stops.
 - **Reach.** The terminal and the VS Code link go by `docker exec -u <user> -it <container> tmux
   attach` and `vscode-remote://dev-container+…`, derived from the `container:` entry rather than
   from `vscode_host` (§4.6; with the rest of the remote terminal, not yet built — until then the
