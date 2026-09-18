@@ -482,14 +482,20 @@ class Session:
         d["sends"] = [e.to_dict() for e in self.sends]
         return d
 
-    def view(self) -> dict[str, Any]:
+    def view(self, *, bookkeeping: bool = False) -> dict[str, Any]:
         """The record as `list`, `get` and the `subscribe` deltas hand it out: message bodies never
         ride the push that reaches the Org page on every change (design §4.10 "A bounded body") —
-        those carry counts, and a body is fetched by `inbox`. `threads` (the `bound_hit` marks a
-        card shows) and `sends` (what `ao status` prints) stay."""
+        those carry counts, and a body is fetched by `inbox`. `sends` (what `ao status` prints)
+        stays. `threads` and `wakes` are the host agent's bookkeeping — their one visible part,
+        `bound_hit`, is in `mail` — and ride only a `get` of one record (`bookkeeping=True`): they
+        left `list`, the stream and `wait` when a `list` of six records outgrew what a client could
+        read (TD-066)."""
         d = self.to_dict()
         d.pop("inbox")
         d.pop("outbox")
+        if not bookkeeping:
+            d.pop("threads")
+            d.pop("wakes")
         d["unread"] = self.unread()
         d["mail"] = self.mail_marks()
         return d

@@ -193,6 +193,7 @@ async def test_the_exchange_bound_refuses_and_marks_both_sides_and_a_person_rese
     refuses, a reply-less pair is counted inside a rolling window on both records, and a person's
     message into the thread is uncounted and resets it."""
     monkeypatch.setattr(mail, "THREAD_BOUND", 2)
+    monkeypatch.setattr(mail, "PAIR_BOUND", 2)  # its own number since step 6: a pair outlives any thread
     async with LocalClient() as person:
         mk = _mk(person, tmp_path)
         lead, lead2, worker = [await mk(n, unattended=True) for n in ("lead", "lead2", "w")]
@@ -457,10 +458,16 @@ async def test_read_entries_are_pruned_after_retention_and_open_asks_never(agent
             await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
             left = [e["id"] for e in (await person.call("inbox", id=worker))["entries"]]
             assert left == [ask["id"], unread["id"]]  # the read note went; the open ask and the unread one stay
-            assert (await person.call("get", id=worker))["threads"][note["id"]]["count"] == 1  # never recounted
+            # …and its tally with it (TD-066): a reply must name an entry the replier holds, so a pruned
+            # thread cannot be revived and its tally would only ever grow the record
+            threads = (await person.call("get", id=worker))["threads"]
+            assert note["id"] not in threads and ask["id"] in threads
             await w.call("msg", text="here", kind="reply", reply_to=ask["id"])
             await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
             assert [e["id"] for e in (await person.call("inbox", id=worker))["entries"]] == [unread["id"]]
+            # …and a person's delete is the other way an entry leaves: the tally goes with it too
+            await person.call("inbox_delete", msg=unread["id"], id=worker)
+            assert unread["id"] not in (await person.call("get", id=worker))["threads"]
         for sid in (lead, worker):
             await person.call("kill", id=sid)
 

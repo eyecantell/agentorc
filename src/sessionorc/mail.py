@@ -6,9 +6,9 @@ shared controlled target — and the process that holds every record is the home
 lets a node forward a request and the home answer it from one graph. Nothing here mutates a record
 or touches the store: each function returns a reason, or None when the call passes.
 
-Every number the mail rules need is a placeholder until TD-052 step 5 measures a team and step 6
-sets it from the evidence; `None` means *unlimited*, and the refusal path it guards is built and
-tested by monkeypatching the constant.
+Every number the mail rules need was `None` — unlimited — until TD-052 step 5 measured a team and
+step 6 set it from the evidence (2026-09-18, design §4.10 "The numbers"). What was measured: eight
+hours of a four-session team, a lead over three free-pick grinders, on 2026-09-17.
 """
 
 from __future__ import annotations
@@ -22,16 +22,17 @@ from sessionorc.models import GRANTS, PERSON, MailEntry, Session, canonical_gran
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
 RECIPIENT_CAP = 5  # addressees the *sender* names; automatic copies are exempt
 TEXT_CAP = 4096  # bytes of `text`; a `conflict` cites `sends` by id rather than quoting them
-THREAD_BOUND: int | None = None  # entries per thread (and per pair inside PAIR_WINDOW) before a send is refused
-PAIR_WINDOW = timedelta(hours=24)  # the rolling window a reply-less pair is counted in (the wake budget's)
-MAILBOX_DEPTH: int | None = None  # unread entries an inbox holds before a send to it is refused
-PERSON_INBOX_DEPTH: int | None = None  # unread entries the org's person inbox holds before a send is refused
-PERSON_SENDER_DEPTH: int | None = None  # …and of those, how many one sender may hold there
+THREAD_BOUND: int | None = 40  # entries per thread before a send is refused; measured: no thread past 2
+PAIR_BOUND: int | None = 300  # reply-less entries between one pair inside PAIR_WINDOW; measured: 48 in 8 h
+PAIR_WINDOW = timedelta(hours=24)  # the rolling window a reply-less pair is counted in
+MAILBOX_DEPTH: int | None = 100  # unread entries an inbox holds before a send to it is refused; measured: 19
+PERSON_INBOX_DEPTH: int | None = 200  # unread entries the org's person inbox holds before a send is refused
+PERSON_SENDER_DEPTH: int | None = 20  # …and of those, how many one sender may hold there
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
-MAIL_RETENTION: timedelta | None = None  # how long a read entry is kept; an open `ask` is exempt
+MAIL_RETENTION: timedelta | None = timedelta(hours=12)  # how long a read entry is kept; an open `ask` is exempt
 SENDS_KEEP = 20  # `sends` entries a record keeps
 NONCES_KEEP = 256  # verdicts remembered per host agent for a client's same-nonce retry
-WAKE_BUDGET: int | None = None  # mail-caused wakes a session may take per WAKE_WINDOW (§4.10 "wake budget")
+WAKE_BUDGET: int | None = 30  # mail-caused wakes a session may take per WAKE_WINDOW; measured: a lead took 4 an hour
 WAKE_WINDOW = timedelta(hours=1)  # the rolling window the wake budget counts charged wakes in
 WAKES_KEEP = 50  # wake decisions a record keeps (`wakes`): what step 5 measures
 

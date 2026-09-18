@@ -175,7 +175,11 @@ def test_mail_survives_the_store_roundtrip_and_stays_out_of_the_view():
     v = s.view()
     assert "inbox" not in v and "outbox" not in v
     assert (
-        v["unread"] == 1 and v["host"] == "h1" and v["threads"] == {"m-1": {"count": 1, "bound_hit": False, "at": []}}
+        v["unread"] == 1
+        and v["host"] == "h1"
+        and "threads" not in v
+        and "wakes" not in v  # bookkeeping rides only a `get` (TD-066)
+        and s.view(bookkeeping=True)["threads"] == {"m-1": {"count": 1, "bound_hit": False, "at": []}}
     )
     assert v["mail"]["open_asks"] == ["m-1"] and v["sends"][0]["id"] == "s-1"
     ask.closed_by = "m-3"

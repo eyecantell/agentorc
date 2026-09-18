@@ -2193,6 +2193,28 @@ session it is on, its controllers through the `conflict`, and a person.
 each other will talk to each other, and the failure is not a crash: it is a team that spends its
 window on correspondence and produces a plausible account of work nobody asked for. So:
 
+**The numbers (2026-09-18, TD-052 step 6), and what they were set from.** Step 5's measurement was
+eight hours of a four-session team on 2026-09-17 — a lead over three free-pick grinders, the first
+night any team ran with mail — read off the records: 55–65 entries in each inbox, all `note` but
+one `ask` and eight `reply`s; the busiest pair (lead ↔ one grinder) 48 reply-less entries; no thread
+past 2; 19 unread at most; bodies averaging 1.6 KB with the longest at the 4 KB cap; the lead woken
+by mail 31 times, about 4 an hour; the one `ask` expired unanswered at its 30-minute bound; nothing
+reached the person inbox. Each number is set so that at least **twice** the measured traffic stays
+clear of it and a runaway is still caught in minutes — and where the measurement was tiny, well
+above twice, because what the bound guards is a loop, not a busy day, and a bound that a slightly
+busier night would hit is a bound a team learns to fear: a **thread** refuses at **40** entries
+(measured 2); a **pair** at **300** reply-less entries in its 24-hour window (measured 48 in 8 h,
+about 145 a day — this one *is* twice, because it is the one a healthy team approaches; a thread is
+finite and a pair is not, and one number for both would have refused a healthy lead and grinder by
+their second day, so the two are separate constants); a **mailbox** at **100** unread (measured
+19); the **person inbox** at **200** unread and **20** from one sender (unmeasured — no session
+wrote to it that night; provisional until one does); a read entry is kept **12 hours** (the same
+night's records were 106–249 KB before any pruning, and a record is written whole on every change —
+TD-066); the **wake budget** is **30** an hour (measured 4). What would change them: a
+pair that hits 300 doing real work (raise it), a team that reads its mail in turns longer than
+12 hours (raise retention), or a mailbox at 100 that was not a loop. The evidence to re-read is the
+same: the records of a night's team.
+
 - **No broadcast.** Recipients are named, at most a handful per message. The cap counts the
   addressees the **sender** named; the automatic copies below are exempt, and are bounded anyway by
   how many controllers one session has — a lead's `note` to a worker with three controllers must not

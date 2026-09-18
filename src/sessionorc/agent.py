@@ -770,7 +770,7 @@ class HostAgent:
         return self._views()
 
     async def rpc_get(self, id: str) -> dict[str, Any]:
-        return self._view(self._find(id))
+        return self._view(self._find(id), bookkeeping=True)  # one record: its tallies and wakes ride along
 
     async def rpc_create(
         self,
@@ -1673,7 +1673,7 @@ class HostAgent:
         counts = sender != PERSON and not closes  # a person's message is never counted; a first reply is free
         root = replied.root if replied is not None else ""
         now = datetime.now(UTC)
-        if counts and mail.THREAD_BOUND is not None:
+        if counts and (mail.THREAD_BOUND is not None or mail.PAIR_BOUND is not None):
             self._check_bounds(sender, named, root, now)
         if PERSON in named:
             self._check_person_depth(sender)
@@ -1781,11 +1781,12 @@ class HostAgent:
         """A send is refused when the sender's tally, or any named addressee's, is at the bound —
         never a copy recipient's — and `bound_hit` is written on every record holding the thread
         so the other side learns the exchange stopped (design §4.10 "A bounded exchange")."""
-        limit = mail.THREAD_BOUND
-        assert limit is not None
         records = self.sessions
         me = records[sender]
         if root:
+            limit = mail.THREAD_BOUND
+            if limit is None:
+                return
             at_bound = [
                 sid
                 for sid in (sender, *named)
@@ -1800,6 +1801,9 @@ class HostAgent:
                     f"thread {root} is at its bound of {limit} entries ({', '.join(at_bound)}): the send is "
                     f"refused — write the user_attention.md line yourself, with the thread attached (design §4.10)"
                 )
+            return
+        limit = mail.PAIR_BOUND
+        if limit is None:
             return
         for sid in named:
             if sid == PERSON:
@@ -1931,6 +1935,7 @@ class HostAgent:
         if len(kept) == len(s.inbox):
             raise RpcError(f"{s.id}'s inbox holds no entry {msg}")
         s.inbox = kept
+        _prune_tallies(s)  # a delete is the other way an entry leaves (review of PR #214)
         self.store.save(s)
         await self._push_changes()
         return {"id": s.id, "deleted": msg, "unread": s.unread()}
@@ -1965,6 +1970,7 @@ class HostAgent:
             outbox = [e for e in r.outbox if self._keep(e, now, inbox=False)]
             if len(inbox) != len(r.inbox) or len(outbox) != len(r.outbox):
                 r.inbox, r.outbox = inbox, outbox
+                _prune_tallies(r)
                 self.store.save(r)
 
     @staticmethod
@@ -2679,11 +2685,11 @@ class HostAgent:
 
     # -- one org, to a client (design §4.4a "A node's records at the home") -----------------------
 
-    def _view(self, s: Session) -> dict[str, Any]:
+    def _view(self, s: Session, *, bookkeeping: bool = False) -> dict[str, Any]:
         """The view a client gets. This host's record is `s.view()`. Another host's carries its
         address as `id`, and while that host's link is down reads `unreachable` — an overlay on the
         view, never a state on the record."""
-        v = s.view()
+        v = s.view(bookkeeping=bookkeeping)
         if s.host == self.host:
             return v
         v["id"] = f"{s.id}@{s.host}"
@@ -2903,6 +2909,16 @@ def _drop_unknown(method: Any, params: dict[str, Any]) -> list[str]:
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
 _CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
+
+
+def _prune_tallies(r: Session) -> None:
+    """A thread's tally lives as long as the record holds an entry of it (§4.10): pruned with its
+    last entry — by retention or by a person's delete — or it would grow by one key per message
+    forever (TD-066). A reply must name an entry the replier holds, so a pruned thread cannot come
+    back. Pair tallies are windowed by `_pair` and stay."""
+    held = {e.root for e in (*r.inbox, *r.outbox)}
+    for key in [k for k in r.threads if not k.startswith("pair:") and k not in held]:
+        del r.threads[key]
 
 
 def _urgent(s: Session) -> str:
