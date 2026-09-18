@@ -705,8 +705,8 @@ decided here so both ends are written from one text.
   up would be the split-brain this section exists to rule out.
 
 **A container node (2026-09-17, after two Fable reviews and Paul's steer to the long-term shape;
-TD-057 step 3c — the link socket and `ao host up` built 2026-09-17, 3c.1–3c.2; the supervisor,
-occupancy and reach are 3c.3–3c.5).** A devcontainer that runs an `agentorc-agent`
+TD-057 step 3c — the link socket, `ao host up` and the supervisor built 2026-09-17, 3c.1–3c.3;
+occupancy and reach are 3c.4–3c.5).** A devcontainer that runs an `agentorc-agent`
 beside a tmux server is a host (§10, 2026-09-13). On the home's own machine it is a node like any
 other — it dials out, nothing in it listens, and everything above holds for it — with one
 difference that decides the rest: **the home brings it up, installs the agent in it at its own

@@ -23,12 +23,13 @@ import signal
 import sys
 import time
 from collections import OrderedDict, defaultdict
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, hosts, link, mail, modes, naming, paths, reports, waits
+from sessionorc import adapters, containers, hosts, link, mail, modes, naming, paths, reports, waits
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
@@ -139,6 +140,12 @@ class HostAgent:
         # node: the same shape for its one link to the home.
         self.links: dict[str, dict[str, Any]] = {}
         self._link_muxes: dict[str, link.Mux] = {}
+        # The container supervisor (§4.4a "The home supervises it", step 3c.3): per container node,
+        # what the tick is doing about a down link — `{doing, since, attempts, next}` — and the one
+        # action in flight. `container_runner` is the seam the suite replaces.
+        self.supervision: dict[str, dict[str, Any]] = {}
+        self._supervising: dict[str, tuple[asyncio.Task[None], containers.Runner]] = {}
+        self.container_runner: Callable[[], containers.Runner] = lambda: containers.Runner(log=log.info)
         self.home_link: dict[str, Any] = {"up": False, "since": now_iso(), "why": "not dialed yet"}
         self._home_mux: link.Mux | None = None
         # Other hosts' records, at the home (§4.4a "A node's records at the home", step 3b): held
@@ -264,6 +271,8 @@ class HostAgent:
                 dialer.cancel()
             for m in list(self._link_muxes.values()):
                 m.close("the home is stopping")
+            for name in list(self._supervising):
+                self._stop_supervising(name)  # a build in flight is killed, not left to finish alone
             with contextlib.suppress(FileNotFoundError):
                 sock.unlink()
             for lsock, _ in link_servers:
@@ -335,6 +344,8 @@ class HostAgent:
             # work goes to the thread
             live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ("exited", "closed")}
             await asyncio.to_thread(self._prune_runs, snapshot_at, live)
+        if self.mode == "home":
+            self._supervise_containers()
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
@@ -2138,6 +2149,82 @@ class HostAgent:
             out["link"] = dict(self.home_link)
         return out
 
+    # -- the container supervisor (design §4.4a "The home supervises it", TD-057 step 3c.3) -----
+
+    def _supervise_containers(self) -> None:
+        """For each container node whose link is down and whose turn has come: observe, decide,
+        act — in a task, so a build never holds the tick — and say on the overlay what is being
+        done. A node whose link is up is left alone and its record cleared."""
+        now = time.monotonic()
+        for name, n in containers.container_nodes().items():
+            state = self.links.get(name)
+            if state and state["up"]:
+                if self.supervision.pop(name, None) is not None:
+                    self._note_link(name)
+                continue
+            sup = self.supervision.setdefault(
+                name, {"doing": "", "since": now_iso(), "attempts": 0, "next": 0.0, "error": ""}
+            )
+            if name in self._supervising and not self._supervising[name][0].done():
+                continue
+            if now < sup["next"]:
+                continue
+            r = self.container_runner()
+            task = asyncio.create_task(self._supervise_one(n, sup, r))
+            self._supervising[name] = (task, r)
+            task.add_done_callback(lambda t, name=name: self._supervising.pop(name, None))
+
+    def _stop_supervising(self, name: str) -> None:
+        """Cancel the node's action in flight, process and all, and forget its record."""
+        entry = self._supervising.pop(name, None)
+        if entry is not None:
+            task, r = entry
+            r.cancel()
+            task.cancel()
+        self.supervision.pop(name, None)
+
+    async def _supervise_one(self, n: containers.ContainerNode, sup: dict[str, Any], r: containers.Runner) -> None:
+        try:
+            cstate, alive, user = await asyncio.to_thread(containers.observe, n, r)
+        except Exception as e:  # noqa: BLE001 — docker itself failing is a reason on the card, not a crash
+            self._supervised(n.name, sup, f"cannot observe the container: {e}", failed=True)
+            return
+        why = (self.links.get(n.name) or {}).get("why", "")
+        decision = containers.decide(cstate, alive, str(why))
+        if decision is None:
+            # running, the agent alive, the link simply not up yet: give it the grace, then look again
+            sup["next"] = time.monotonic() + containers.SUPERVISE_GRACE
+            waiting = "agent running inside, waiting for it to dial in"
+            if sup["doing"] != waiting:
+                sup["doing"], sup["since"], sup["error"], sup["attempts"] = waiting, now_iso(), "", 0
+                self._note_link(n.name)
+            return
+        action, doing = decision
+        sup["doing"], sup["since"], sup["error"] = doing, now_iso(), ""
+        self._note_link(n.name)
+        log.info("supervisor %s: %s", n.name, doing)
+        try:
+            await asyncio.to_thread(containers.act, n, r, action, user)
+        except Exception as e:  # noqa: BLE001
+            self._supervised(n.name, sup, f"{doing}: failed — {e}", failed=True)
+            return
+        self._supervised(n.name, sup, f"{doing}: done, waiting for it to dial in", failed=False)
+
+    def _supervised(self, name: str, sup: dict[str, Any], doing: str, *, failed: bool) -> None:
+        # the first failure waits SUPERVISE_FIRST, then doubling to SUPERVISE_MAX; a success resets
+        delay = min(containers.SUPERVISE_FIRST * (2 ** sup["attempts"]), containers.SUPERVISE_MAX)
+        sup["attempts"] = sup["attempts"] + 1 if failed else 0
+        sup["next"] = time.monotonic() + (delay if failed else containers.SUPERVISE_GRACE)
+        sup["doing"], sup["since"], sup["error"] = doing, now_iso(), doing if failed else ""
+        (log.warning if failed else log.info)("supervisor %s: %s", name, doing)
+        self._note_link(name)
+
+    def _note_link(self, name: str) -> None:
+        """The overlay changed for that host's cards: push it."""
+        task = asyncio.ensure_future(self._push_changes())
+        self._bg.add(task)
+        task.add_done_callback(self._bg.discard)
+
     async def rpc_forget_host(self, host: str, caller: Any = None) -> dict[str, Any]:
         """`ao host forget` (design §4.4a "A container node"): the host's records at the home are
         closed as a closed session is kept — never deleted, their run logs are the node's volume —
@@ -2158,6 +2245,7 @@ class HostAgent:
         if mux is not None:
             mux.close("the host was forgotten")
         self.links.pop(host, None)
+        self._stop_supervising(host)  # `ao host forget` removed the `nodes:` entry: nothing to mend
         await self._push_changes()
         return {"host": host, "closed": closed, "kept": len(self.remote.get(host, {}))}
 
@@ -2257,6 +2345,9 @@ class HostAgent:
                 refusal = self._link_refusal(host, params)
                 if refusal:
                     asyncio.get_running_loop().call_later(0.2, mux.close, refusal)  # after the reply is written
+                    if host in hosts.nodes() and "protocol" in refusal:
+                        # an authorised node on an older build: the supervisor re-provisions a container
+                        self.links[host] = {"up": False, "since": now_iso(), "why": f"refused: {refusal}"}
                     raise link.LinkError(refusal)
                 old = self._link_muxes.get(host)
                 if old is not None and old is not mux:
@@ -2408,6 +2499,8 @@ class HostAgent:
         v["id"] = f"{s.id}@{s.host}"
         state = self.links.get(s.host) or {"up": False, "since": None, "why": "not connected since the home started"}
         v["host_link"] = dict(state)
+        if (sup := self.supervision.get(s.host)) and sup.get("doing"):
+            v["host_link"]["supervisor"] = {k: sup[k] for k in ("doing", "since", "attempts")}
         if not state["up"]:
             v["last_state"], v["state"] = v["state"], "unreachable"
         return v

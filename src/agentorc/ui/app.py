@@ -233,6 +233,11 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
     # VS Code link — that URL is built from *this* host's ssh alias, which would open the wrong machine.
     d["host"] = s.get("host") or host_name()
     here = d["host"] == host_name()
+    # An unreachable host's reason, and what the home is doing about a container node (§4.4a
+    # "The home supervises it"): the overlay's line, on the state pill's title and as the flag.
+    hl = s.get("host_link") or {}
+    sup = hl.get("supervisor") or {}
+    d["host_note"] = sup.get("doing") or (hl.get("why", "") if state == "unreachable" else "")
     d["vscode"] = vscode_url(s["dir"]) if s.get("dir") and here else ""
     d["place"] = f"{d['host']} / {Path(s['repo']).name}" if s.get("repo") else f"{d['host']} / {s.get('dir', '')}"
     git = s.get("git") or {}

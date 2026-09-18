@@ -125,6 +125,26 @@ def _sweep_stale_test_servers():
 
 
 @pytest.fixture(scope="session", autouse=True)
+def _never_docker():
+    """Docker is not in `pdm run test` (TD-057 3c.2): a host agent's container supervisor that
+    reaches `containers.Runner` here gets a refusal, never the machine's docker. A test that wants
+    the seam builds its own fake on the original class."""
+    from sessionorc import containers
+
+    class NoDocker(containers.Runner):
+        def run(self, cmd, *, check=True, stream=False):
+            raise containers.ContainerError("docker is not in pdm run test: give the agent a fake container_runner")
+
+        def devcontainer(self):
+            raise containers.ContainerError("docker is not in pdm run test: give the agent a fake container_runner")
+
+    original = containers.Runner
+    containers.Runner = NoDocker
+    yield
+    containers.Runner = original
+
+
+@pytest.fixture(scope="session", autouse=True)
 def _never_this_machines_home(tmp_path_factory):
     """No test reads this machine's `~/.agentorc` or `~/.claude` (TD-044).
 
