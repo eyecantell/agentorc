@@ -100,6 +100,11 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "cre
 # the node's replica in the same call so its stopping policies read the same intent. 4b generalises
 # the push to every home-owned field on reconnect.
 HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"})
+# What the home reads from the node whose name is the record's `host` (§4.4a, step 4b.1): a pane's
+# screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
+# their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
+# read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
+NODE_READS = frozenset({"tail", "explain"})
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
@@ -2403,6 +2408,8 @@ class HostAgent:
             return "pong"
         if method == "act":
             return await self._act(params)
+        if method == "read":
+            return await self._read(params)
         if method == "stat":
             d = Path(str(params.get("dir") or "")).expanduser()
             return {"dir": str(d), "exists": await asyncio.to_thread(d.is_dir)}
@@ -2449,6 +2456,28 @@ class HostAgent:
             "record": record.to_dict() if record is not None else None,
             "gone": bool(sid) and record is None and rpc == "remove",
         }
+
+    async def _read(self, params: dict[str, Any]) -> Any:
+        """A read the home routed here (§4.4a, step 4b.1): `{rpc, params}`, `rpc` one of
+        `NODE_READS` and nothing else — ungated, as on one host, so no caller rides along. Refused
+        by name when the record is another host's (*not my host*). The reply is the RPC's own."""
+        rpc = str(params.get("rpc") or "")
+        if rpc not in NODE_READS:
+            raise link.LinkError(f"{rpc!r} is not a read a node serves the home")
+        p = dict(params.get("params") or {})
+        bare, where = naming.split_address(str(p.get("id") or ""))
+        if where and where != self.host:
+            raise link.LinkError(f"{p.get('id')} is not on {self.host}: not my host")
+        p["id"] = bare
+        method = getattr(self, f"rpc_{rpc}")
+        if ignored := _drop_unknown(method, p):
+            log.warning("read %s from the home: ignored unknown params %s", rpc, ", ".join(ignored))
+        try:
+            return await method(**p)
+        except RpcError as e:
+            raise link.LinkError(str(e)) from None
+        except TypeError as e:
+            raise link.LinkError(f"bad params: {e}") from None
 
     # -- a node's calls the home answers (design §4.4a "Mail across hosts", TD-057 step 5) --------
 
@@ -2552,7 +2581,7 @@ class HostAgent:
     def _act_host(self, method: str, params: dict[str, Any]) -> str | None:
         """The host an act is for when it is not this one: the address in `id`, or `create`'s
         (and `name_check`'s) `host`. None means *here*, and the method runs as it always has."""
-        if method not in NODE_ACTS and method not in HOME_EDITS:
+        if method not in NODE_ACTS and method not in HOME_EDITS and method not in NODE_READS:
             return None
         if method in ("create", "name_check"):
             h = str(params.get("host") or "")
@@ -2643,6 +2672,22 @@ class HostAgent:
             return  # the node's own create says whether it exists there
         for who in await asyncio.to_thread(self.occupants, directory):
             raise RpcError(f"{directory} already has agent session {who}; anchor rule (use a worktree)")
+
+    async def _route_read(self, method: str, params: dict[str, Any], host: str) -> Any:
+        """A read of another host's pane (§4.4a, step 4b.1): served by that host's node through the
+        `read` link method, ungated, and refused as unreachable — never queued — while the link is
+        down. The reply is the node's, untouched but for its addresses."""
+        rid, _h = naming.split_address(str(params.get("id") or ""))
+        if rid not in self.remote.get(host, {}):
+            raise RpcError(f"no session {rid}@{host}")
+        mux = self._node_mux(host)
+        try:
+            reply = await mux.request("read", timeout=ACT_TIMEOUT, rpc=method, params={**params, "id": rid})
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except (link.LinkClosed, TimeoutError) as e:
+            raise RpcError(f"{host} did not answer {method}: {e or 'the link dropped'}") from None
+        return naming.readdress(reply, lambda a: self._from_host(a, host))
 
     async def _route_act(self, method: str, params: dict[str, Any], caller: Any, host: str) -> Any:
         """An act on another host's record, gated here already: executed by that host's node and
@@ -2856,9 +2901,7 @@ class HostAgent:
         except KeyError:
             rid, host = naming.split_address(sid)
             if host and rid in self.remote.get(host, {}):
-                raise RpcError(
-                    f"{sid} runs on {host}: reading its pane across the link is not built (TD-057 3c.5 / step 4b)"
-                ) from None
+                raise RpcError(f"{sid} runs on {host}: this call does not cross the link") from None
             raise RpcError(f"no session {sid}") from None
 
     def _find(self, sid: str) -> Session:
@@ -2897,6 +2940,11 @@ class HostAgent:
             v["host_link"]["supervisor"] = {k: sup[k] for k in ("doing", "since", "attempts")}
         if not state["up"]:
             v["last_state"], v["state"] = v["state"], "unreachable"
+            if v.get("pending"):
+                # §4.4a "Permission prompts follow the same line": the hook still blocks on its node
+                # and nothing answered here can reach it, so the card says so and sends the person
+                # to the tool's own dialog at that host. An overlay too — the record keeps its pending.
+                v["pending"] = {**v["pending"], "host_unreachable": True}
         return v
 
     def _views(self) -> list[dict[str, Any]]:
@@ -3076,6 +3124,8 @@ class HostAgent:
             if (target := self._act_host(str(name), params)) is not None:
                 # Another host's record (design §4.4a, step 4a): gated above over the one graph,
                 # executed by that host's node, its verdict returned — or refused as unreachable.
+                if name in NODE_READS:
+                    return {"id": rid, "result": await self._route_read(str(name), params, target)}
                 return {"id": rid, "result": await self._route_act(str(name), params, caller, target)}
             if "caller" in inspect.signature(method).parameters:
                 # The methods that need to know who called (`create` seeds the new record's

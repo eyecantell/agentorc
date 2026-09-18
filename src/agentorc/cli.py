@@ -212,7 +212,7 @@ def _attach(args: argparse.Namespace, sid: str, result: Any | None = None) -> in
             return fail(
                 args,
                 f"{sid} runs on {result['host']}: no terminal reaches it from here (a container node's reach "
-                f"comes with its link; a machine node's is TD-057 step 4b)",
+                f"comes with its link; a machine node's waits for the terminal over the link, TD-057 *Later*)",
                 1,
             )
         from sessionorc import containers  # as `cmd_host` does: docker's module, loaded only when a node is in play

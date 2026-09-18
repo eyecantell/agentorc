@@ -1069,7 +1069,8 @@ def create_app() -> FastAPI:
             if not reach.get("container"):
                 await ws.send_bytes(
                     f"\r\n[agentorc] runs on {s['host']}: no terminal reaches it from here "
-                    f"(a container node's reach comes with its link; a machine node's is TD-057 step 4b).\r\n".encode()
+                    "(a container node's reach comes with its link; a machine node's waits for the terminal "
+                    "over the link, TD-057 *Later*).\r\n".encode()
                 )
                 await ws.close(code=4404)
                 return

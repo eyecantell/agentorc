@@ -55,6 +55,10 @@
         <button class="btn sm" data-act="deny" data-id="{{ s.id }}">Deny</button>
         <span class="meta countdown" data-deadline="{{ s.deadline }}">via hook</span>
       </div>
+    {% elif s.state == 'unreachable' and s.pending and s.pending.host_unreachable %}
+      {# design §4.4a "Permission prompts follow the same line": the waiter is on the node, out of reach #}
+      <div class="status needs">{{ s.pending.kind }}: {{ s.pending.text }} — host unreachable</div>
+      <div class="row gap"><span class="meta">answer it at {{ s.host }}, in the tool's own dialog (Focus)</span></div>
     {% elif s.state == 'needs-you' and s.pending %}
       <div class="status needs">{{ s.pending.kind }}: {{ s.pending.text }}</div>
       <div class="row gap"><span class="meta">answer in the terminal (Focus)</span></div>

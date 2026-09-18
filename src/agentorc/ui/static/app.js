@@ -686,6 +686,10 @@
       } else if (v.state === "needs-you" && p) {
         head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>`;
         compose.disabled = true; $("#composehint").textContent = "answer in the terminal above";
+      } else if (v.state === "unreachable" && p && p.host_unreachable) {
+        // design §4.4a: the hook still blocks on its node, and an answer from here cannot reach it
+        head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)} — host unreachable: answer it at ${esc(v.host)}, in the tool's own dialog</span>`;
+        compose.disabled = true; $("#composehint").textContent = "the host agent cannot be reached: nothing can be sent until it is back";
       } else if (v.state === "exited" || v.state === "closed" || v.state === "unreachable") {
         // There is no turn to start or steer: the pane is dead or out of reach. The composer used
         // to sit enabled here and say nothing, which was merely useless; saying "starts a new
