@@ -204,6 +204,20 @@ def _attach(args: argparse.Namespace, sid: str, result: Any | None = None) -> in
     tick behind; `cmd_focus` refuses a known-gone pane before getting here) gets a clear line
     rather than tmux's. Under `--json` nothing is run: the argv is printed for the caller."""
     argv = attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET"))
+    if result and result.get("host") and result["host"] != hosts.local_host().name:
+        # Another host's session (design §4.4a "Reach"): a container node on this machine is reached
+        # by `docker exec` into it, from what the home derived when it dialed in.
+        reach = (result.get("host_link") or {}).get("reach") or {}
+        if not reach.get("container"):
+            return fail(
+                args,
+                f"{sid} runs on {result['host']}: no terminal reaches it from here (a container node's reach "
+                f"comes with its link; a machine node's is TD-057 step 4b)",
+                1,
+            )
+        from sessionorc import containers  # as `cmd_host` does: docker's module, loaded only when a node is in play
+
+        argv = containers.attach_argv_in(reach["container"], reach.get("user") or "root", naming.split_address(sid)[0])
     if args.json:
         print(json.dumps({**(result or {"id": sid}), "attach": argv}, indent=1))
         return 0

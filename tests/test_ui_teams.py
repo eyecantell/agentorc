@@ -470,4 +470,45 @@ def test_the_terminal_of_another_hosts_session_is_refused_by_name(world, client)
     fleet.sessions.append({"id": "ao-w@laptop", "name": "w", "state": "working", "host": "laptop", "pane": True})
     with client.websocket_connect("/term/ao-w@laptop") as ws:
         got = ws.receive_bytes()
-    assert b"runs on laptop: the terminal across the link is not built" in got
+    assert b"runs on laptop: no terminal reaches it from here" in got
+
+
+def test_a_container_nodes_session_is_reached_by_docker_exec_and_vs_code_attaches_to_it(world, client, monkeypatch):
+    """3c.5: the home put `host_link.reach` on the record when the node dialed in; the Focus
+    terminal runs `docker exec … tmux attach` from it and the card's VS Code link attaches to
+    that container."""
+    tmp_path, fleet = world
+    reach = {
+        "container": "abc123def456",
+        "user": "developer",
+        "vscode": "vscode-remote://attached-container+7b7d/home/x/repo",
+    }
+    fleet.sessions.append(
+        {
+            "id": "ao-repo-w@cm",
+            "name": "w",
+            "state": "working",
+            "host": "cm",
+            "pane": True,
+            "dir": "/home/x/repo",
+            "kind": "interactive",
+            "adapter": "claude-code",
+            "tail": [],
+            "host_link": {"up": True, "since": "t", "why": "linked", "reach": reach},
+        }
+    )
+    seen = {}
+
+    class NoPty:
+        def __init__(self, argv, *, cols, rows):
+            seen["argv"] = argv
+            raise RuntimeError("no pty in this test")
+
+    monkeypatch.setattr(uiapp, "PtySession", NoPty)
+    with client.websocket_connect("/term/ao-repo-w@cm") as ws:
+        got = ws.receive_bytes()
+    assert b"could not attach a terminal: RuntimeError: no pty in this test" in got
+    assert seen["argv"][:6] == ["docker", "exec", "-u", "developer", "-it", "abc123def456"]
+    assert seen["argv"][6:10] == ["tmux", "attach", "-t", "=ao-repo-w:"]  # the bare id inside the container
+    page = client.get("/").text
+    assert 'href="vscode-remote://attached-container+7b7d/home/x/repo"' in page

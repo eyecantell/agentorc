@@ -2591,6 +2591,10 @@ class HostAgent:
                 self.links[host] = {"up": True, "since": now_iso(), "why": "linked"}
                 said_hello = True
                 log.info("link from %s: up", host)
+                if host in containers.container_nodes():
+                    task = asyncio.ensure_future(self._note_reach(host))  # one docker look, off the link
+                    self._bg.add(task)
+                    task.add_done_callback(self._bg.discard)
                 await self._push_changes()  # the overlay lifts on its cards
                 return {"protocol": link.PROTOCOL, "home": self.host, "host": host}
             if not said_hello:
@@ -2619,6 +2623,24 @@ class HostAgent:
                 log.warning("link from %s: down — %s", host, why)
                 with contextlib.suppress(Exception):
                     await self._push_changes()  # its cards go `unreachable` now, not at the next tick
+
+    async def _note_reach(self, host: str) -> None:
+        """How a container node's sessions are reached (§4.4a "Reach", 3c.5): looked up once when
+        it dials in and kept on its link state, so every card of its carries `host_link.reach` —
+        the Focus terminal and `ao focus` run `docker exec … tmux attach` from it, and the card's
+        VS Code link attaches to that container. A failed look is a log line and no reach."""
+        n = containers.container_nodes().get(host)
+        state = self.links.get(host)
+        if n is None or state is None or not state.get("up"):
+            return
+        try:
+            seen = await asyncio.to_thread(containers.observe_reach, n, self.container_runner())
+        except Exception as e:  # noqa: BLE001 — docker failing is a log line, never a dead link
+            log.warning("link from %s: could not derive its reach: %s", host, e)
+            return
+        if seen and self.links.get(host) is state:
+            state["reach"] = seen
+            await self._push_changes()
 
     def _take_records(self, host: str, records: list[Any], *, whole: bool) -> int:
         """A node's snapshot or report (§4.4a): only records whose `host` is the name this link's

@@ -713,8 +713,8 @@ decided here so both ends are written from one text.
   up would be the split-brain this section exists to rule out.
 
 **A container node (2026-09-17, after two Fable reviews and Paul's steer to the long-term shape;
-TD-057 step 3c — the link socket, `ao host up`, the supervisor and occupancy built 2026-09-17,
-3c.1–3c.4; reach is 3c.5).** A devcontainer that runs an `agentorc-agent`
+TD-057 step 3c — the link socket, `ao host up`, the supervisor, occupancy and reach built
+2026-09-17, 3c.1–3c.5).** A devcontainer that runs an `agentorc-agent`
 beside a tmux server is a host (§10, 2026-09-13). On the home's own machine it is a node like any
 other — it dials out, nothing in it listens, and everything above holds for it — with one
 difference that decides the rest: **the home brings it up, installs the agent in it at its own
@@ -823,11 +823,16 @@ nodes:
   is right for one the person stops: the supervisor then never starts the container itself — a
   stopped, paused or gone one is *left as the person left it* on the card — and still starts the
   agent inside a running one (3c.4).
-- **Reach.** The terminal and the VS Code link go by `docker exec -u <user> -it <container> tmux
-  attach` and `vscode-remote://dev-container+…`, derived from the `container:` entry rather than
-  from `vscode_host` (§4.6; with the rest of the remote terminal, not yet built — until then the
-  same `docker exec` by hand). `docker exec` is right there and wrong for the link, which runs the
-  other way.
+- **Reach (built as 3c.5, 2026-09-17).** When a container node dials in, the home looks once at
+  docker — the container's id, its name, the node's user — and keeps the result on the node's
+  link state as `host_link.reach`, on every card of its. From it the Focus terminal and
+  `ao focus <id@node>` run `docker exec -u <user> -it <container> tmux attach` (the scroll
+  commands the same way), and the card's VS Code link is *attach to running container*,
+  `vscode-remote://attached-container+<hex of {"containerName": "/<name>"}><checkout>` — never the
+  `dev-container+` form, which would open the person's own container from the repo's definition
+  rather than this one. Derived from the `container:` entry, never from `vscode_host` (§4.6).
+  A machine node's session still has no terminal from here (4b, with the terminal over the link),
+  and says so. `docker exec` is right there and wrong for the link, which runs the other way.
 
 For the org (§4.9): the project's repo entry names the node too — `contractmatch: {kmaster:
 ~/contractmatch, contractmatch: ~/contractmatch}`, the same path twice because it is the same
@@ -873,8 +878,9 @@ machine to agentorc: an ssh node, provisioned by hand.
   unreachable until their node dials in.
 - **What is not built yet is refused by name.** Mail to `id@host` waits for step 5 and is refused
   as *no session* there — the mailbox's graph is still this host's. The Focus terminal of such a
-  session answers *runs on <host>: the terminal across the link is not built (3c.5 / 4b)*, and so
-  do `ao tail` and `ao explain` on it, which read its pane. Step 4b's list — the policy split,
+  session on a machine node answers *runs on <host>: no terminal reaches it from here (4b)* — a
+  container node's is reached by `docker exec` (*Reach*, below) — and `ao tail` and `ao explain`
+  on any remote record, which read its pane, are refused the same way. Step 4b's list — the policy split,
   permission prompts answered over the link, a node's own `ao` forwarding to the home, the spool of
   hook events on reconnect — stays refused by the node's table above.
 

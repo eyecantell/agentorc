@@ -696,3 +696,30 @@ def test_on_a_node_the_org_lives_on_the_home_and_status_says_offline(world, caps
     assert cli.main(["status", "--json"]) == 0
     out = capsys.readouterr()
     assert out.out.strip() == "[]" and "offline" in out.err and "node of elsewhere" in out.err
+
+
+# ── ao focus on a container node's session (design §4.4a "Reach", TD-057 3c.5) ───────────────
+
+
+def test_focus_on_a_container_nodes_session_runs_docker_exec_and_a_machine_nodes_is_refused(world, capsys, monkeypatch):
+    tmp_path, state = world
+    records = {
+        "ao-repo-w@cm": {
+            "id": "ao-repo-w@cm",
+            "state": "working",
+            "host": "cm",
+            "host_link": {"up": True, "reach": {"container": "abc123def456", "user": "developer"}},
+        },
+        "ao-repo-l@laptop": {"id": "ao-repo-l@laptop", "state": "working", "host": "laptop", "host_link": {"up": True}},
+    }
+    monkeypatch.setattr(cli, "call_sync", lambda method, **p: records[p["id"]] if method == "get" else None)
+    assert cli.main(["--json", "focus", "ao-repo-w@cm"]) == 0
+    argv = json.loads(capsys.readouterr().out)["attach"]
+    assert argv[:6] == ["docker", "exec", "-u", "developer", "-it", "abc123def456"] and argv[6:9] == [
+        "tmux",
+        "attach",
+        "-t",
+    ]
+    assert argv[9] == "=ao-repo-w:"
+    assert cli.main(["focus", "ao-repo-l@laptop"]) == 1
+    assert "runs on laptop: no terminal reaches it from here" in capsys.readouterr().err

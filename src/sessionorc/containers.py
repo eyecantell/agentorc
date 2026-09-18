@@ -47,6 +47,7 @@ from typing import Any
 import yaml
 
 from sessionorc import hosts, paths
+from sessionorc.tmux import attach_argv as tmux_attach_argv
 
 INSIDE = "/agentorc"  # the node's volume, inside
 INSIDE_HOME = f"{INSIDE}/home"
@@ -367,6 +368,12 @@ def container_id(r: Runner, name: str) -> str | None:
     return ids[0] if ids else None
 
 
+def container_name(r: Runner, cid: str) -> str:
+    """docker's own name for the container (what VS Code's *attach to running container* takes)."""
+    cp = r.run(["docker", "inspect", "-f", "{{.Name}}", cid], check=False)
+    return (cp.stdout or "").strip().lstrip("/") if cp.returncode == 0 else ""
+
+
 def container_state(r: Runner, cid: str) -> str:
     cp = r.run(["docker", "inspect", "-f", "{{.State.Status}}", cid], check=False)
     return (cp.stdout or "").strip() if cp.returncode == 0 else "gone"
@@ -635,8 +642,24 @@ def host_status(name: str, r: Runner | None = None) -> dict[str, Any]:
             user = _remote_user(n)
             out["user"] = user
             out["pid"] = agent_pid(r, cid, user)
-            out["reach"] = reach(n, cid, user)
+            out["reach"] = reach(n, cid, user, container_name(r, cid))
     return out
+
+
+def observe_reach(n: ContainerNode, r: Runner) -> dict[str, str] | None:
+    """`reach` for a node that is running now, else None — what the home records on the link when
+    the node dials in (3c.5), one docker round-trip per hello."""
+    cid = container_id(r, n.name)
+    if not cid or container_state(r, cid) != "running":
+        return None
+    return reach(n, cid, _remote_user(n), container_name(r, cid))
+
+
+def attach_argv_in(cid: str, user: str, session: str) -> list[str]:
+    """The Focus terminal's and `ao focus`'s command for a session inside a container node (§4.4a
+    "Reach"): `docker exec -it` into the container as the node's user, then the very `tmux attach`
+    a local session gets — the node's tmux server is the default one of that user inside."""
+    return ["docker", "exec", "-u", user, "-it", cid, *tmux_attach_argv(session)]
 
 
 def _remote_user(n: ContainerNode) -> str:
@@ -646,13 +669,18 @@ def _remote_user(n: ContainerNode) -> str:
         return "root"
 
 
-def reach(n: ContainerNode, cid: str, user: str) -> dict[str, str]:
-    """How a person reaches the node's sessions until the remote terminal is built (§4.4a "Reach"):
-    by hand, derived from the entry."""
-    return {
-        "terminal": f"docker exec -u {user} -it {cid} tmux attach",
-        "vscode": f"vscode-remote://dev-container+{n.devcontainer.as_posix().encode().hex()}{n.devcontainer}",
-    }
+def reach(n: ContainerNode, cid: str, user: str, name: str = "") -> dict[str, str]:
+    """How the node's sessions are reached (§4.4a "Reach"), derived from the entry and one docker
+    look: what the Focus terminal and `ao focus` run (`container`, `user`), the same by hand
+    (`terminal`), and the VS Code link — *attach to running container*, by docker's name for it,
+    never the `dev-container+` form, which would open the person's own container from the repo's
+    definition rather than this one."""
+    out = {"container": cid, "user": user, "terminal": f"docker exec -u {user} -it {cid} tmux attach"}
+    if name:
+        out["name"] = name
+        attached = json.dumps({"containerName": f"/{name}"}).encode().hex()
+        out["vscode"] = f"vscode-remote://attached-container+{attached}{n.devcontainer}"
+    return out
 
 
 def host_forget(name: str, r: Runner | None = None, *, purge: bool = False) -> dict[str, Any]:
