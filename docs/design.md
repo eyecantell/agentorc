@@ -639,7 +639,15 @@ new home.
 
 **Teams across hosts.** `ao team start`'s all-or-nothing check (§4.9) reads *every checkout exists
 on the record's host*, checked by that host's node; a team whose members span two hosts is refused
-while either is unreachable. `org.yml` lives on the home, and clients read it there.
+while either is unreachable. `org.yml` lives on the home, and clients read it there. **Built as step
+4a (2026-09-17):** a team lands on one host — `host:` on its definition, else the host the start
+runs on — and every member is created there; the existence check is the `host_dir` RPC (a `stat`
+link method, not a dry-run create: a create that half-runs is the thing the check exists to
+prevent), asked once per checkout before any name check; `ao team stop` degrades **per member** —
+a member whose host is unreachable is named with the reason and not waited on, the rest are still
+wrapped up. One thing the step reads from *this* host: the roles and briefs, from the checkout's
+path here — a container node shares the path, and a machine node needs a clone at the same path
+until a link method reads them there (4b).
 
 **The link.** The node dials the home over **ssh**, with a key authorised on the home for one
 forced command bound to its host name — `command="agentorc-agent link --host laptop"` in the home's
@@ -852,9 +860,49 @@ machine to agentorc: an ssh node, provisioned by hand.
   a lead is woken when a member's host goes away and again when it returns — a member change, which
   the wake budget does not charge (§4.10). A home that has just started shows them
   unreachable until their node dials in.
-- **What is not built yet is refused by name.** An act on `id@host` answers *runs on <host>: acts
-  across the link are not built (TD-057 step 4)*; the Focus terminal of such a session has nothing
-  to attach to here. Mail to one waits for step 5 and is refused the same way.
+- **What is not built yet is refused by name.** Mail to `id@host` waits for step 5 and is refused
+  as *no session* there — the mailbox's graph is still this host's. The Focus terminal of such a
+  session answers *runs on <host>: the terminal across the link is not built (3c.5 / 4b)*, and so
+  do `ao tail` and `ao explain` on it, which read its pane. Step 4b's list — the policy split,
+  permission prompts answered over the link, a node's own `ao` forwarding to the home, the spool of
+  hook events on reconnect — stays refused by the node's table above.
+
+**Acts across the link (2026-09-17, TD-057 step 4a).** What *A node reports and executes; the home
+decides* means call by call.
+
+- **The `act` link method, home → node.** The home asks the node `act {rpc, params, caller}` and
+  the node runs that RPC through its own handler — `send`, `keys`, `kill`, `close`, `remove`,
+  `decide`, `create`, and `name_check` for a team start — with **no gate of its own** and without
+  its offline table: the request came over the link, which is the home. The node's result, or its
+  refusal in words, is the home's reply to the caller, and the reply carries the record as it now
+  stands, which the home applies before it answers — a `kill`'s `exited` is on the card when `ao`
+  returns, not a report later. A node asked to act on a record whose `host` is not its own refuses
+  (*not my host*); the home routes an act only to the node whose name is the record's `host`. While
+  that link is down the act is refused — *runs on <host>: unreachable since <since> — <why>;
+  refused, not queued* — and nothing runs when the link returns. An act whose link drops while it
+  is out is answered *its verdict is unknown — read the record*.
+- **Every address crosses in the reader's form.** A node stores `controllers`, `sends` and the
+  caller as it addresses them — its own sessions bare, the home's `id@kmaster` — and the home
+  stores its own the same way. So the home rewrites what it sends (`controllers`, the `caller`) into
+  the node's form, and reads what it holds for another host back into its own: the card's
+  `controllers` for a remote record read as the home addresses them, a home-owned edit on one is
+  stored in the node's form, and a routed reply's `id` (and a name check's `holder`) is `id@host`.
+- **The gate reads one graph.** At the home `_gate` reads this host's records under their ids and
+  every other host's under `id@host`, `controllers` re-addressed as above, so a lead here holding
+  `control` over a member there passes the same two-part check it passes on one host, and is refused
+  *before* anything crosses the link when it does not. `self.sessions` itself is never widened:
+  the tick, the anchor rule and the pane reads stay this host's.
+- **Home-owned edits.** `set_controllers`, `set_grants`, `set_stop` and `set_mode` on `id@host` are
+  the home's — it owns those fields — and are applied to its copy, but only once the node has taken
+  the same edit into its replica in the same call, so the node's stopping policies read the intent
+  the home holds and an edit on an unreachable host is refused like any act rather than left to
+  diverge. Step 4b generalises this to pushing every home-owned field on reconnect.
+- **`create` with a `host`.** `create` takes `host` (default: this one); for another host it is an
+  act to that node, whose `create` runs the anchor rule and occupancy over *its* records and its
+  checkout, adds the caller — as the node addresses it — to `controllers`, and the reply is addressed
+  `id@host`. The home's own occupancy check does not reach across hosts (a container node on the
+  home's machine, whose checkout is one directory, is 3c.4). `ao new --host <name>` is the
+  terminal's form.
 
 **Considered and rejected.** *The UI host as a store-and-forward router*: the least code, but it
 makes the UI — a client tier that may be a sleeping laptop — a second writer holding state, and it

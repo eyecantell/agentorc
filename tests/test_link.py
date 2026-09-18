@@ -613,6 +613,6 @@ async def test_a_create_with_a_host_lands_on_the_node_and_is_adopted_at_the_home
             assert v["controllers"] == [lead["id"]]  # and as the home does
             assert (await person.call("get", id=v["id"]))["state"] != "unreachable"  # adopted before the reply
             check = await person.call("name_check", dir=str(tmp_path), name="w2", host="laptop")
-            assert check["verdict"] == "live" and check["holder"] == rid
+            assert check["verdict"] == "live" and check["holder"] == f"{rid}@laptop"  # addressed, like every reply
             await person.call("kill", id=v["id"])
             await person.call("kill", id=lead["id"])

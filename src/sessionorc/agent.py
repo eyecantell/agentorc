@@ -2509,6 +2509,10 @@ class HostAgent:
             # the home's own copy carries the edit, and its view — addressed — is what the caller gets
             await getattr(self, f"rpc_{method}")(**params)
             result = self._view(self.remote[host][rid])
+        elif method == "name_check" and isinstance(result, dict):
+            for key in ("id", "holder"):  # the node's bare ids, addressed for the caller (review of PR #213)
+                if isinstance(result.get(key), str) and result[key].startswith(naming.PREFIX):
+                    result[key] = f"{result[key]}@{host}"
         elif isinstance(result, dict) and result.get("host") == host and result.get("id"):
             # the node answered with its view of the record: the caller gets this home's, addressed
             held = self.remote.get(host, {}).get(str(result["id"]))

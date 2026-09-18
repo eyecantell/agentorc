@@ -1053,6 +1053,7 @@ def create_app() -> FastAPI:
             await ws.send_bytes(f"\r\n[agentorc] {e.detail}\r\n".encode())
             await ws.close(code=4404)  # final: the client must not retry
             return
+        sid = sid.removesuffix(f"@{host_name()}")  # a self-addressed id is this host's tmux session
         if s.get("host") and s["host"] != host_name():
             # Another host's session (design §4.4a): its pane is there, and nothing here attaches to it yet.
             await ws.send_bytes(
