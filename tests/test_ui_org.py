@@ -214,3 +214,10 @@ def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph
     # the fleet asked for and not got: unknown is not none (review of PR #195)
     unknown = view(lead, [lead], fleet_known=False)["ready"][-1]
     assert unknown[1] is False and unknown[0].startswith("members unknown")
+
+
+def test_a_live_team_that_needs_a_person_comes_above_the_other_live_teams():
+    """Design §4.5 screen 1 (2026-09-18): one order, no control. The Urgent first / Pinned toggle is
+    gone; what it did between cards still happens inside a team, and between teams too."""
+    views = [sess("ao-a", "a", team="alpha"), sess("ao-z", "z", team="zeta", state="needs-you"), sess("ao-n", "n")]
+    assert [g["team"] for g in team_groups(views)] == ["zeta", "alpha", ""]

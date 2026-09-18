@@ -81,10 +81,9 @@
   };
 
   document.addEventListener("click", async (ev) => {
-    const b = ev.target.closest("[data-act], [data-copy], [data-sort]");
+    const b = ev.target.closest("[data-act], [data-copy]");
     if (!b) return;
     if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast("copied", true)); return; }
-    if (b.dataset.sort) { setSort(b.dataset.sort); return; }
     const id = b.dataset.id, action = b.dataset.act;
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
@@ -260,26 +259,16 @@
   // ---- Org (design §4.5 screen 1) ----
   // The page is one or more `.tgroup` sections, each an optional header plus its own `.grid`: one
   // per team when any session carries a `team` badge or any team is defined (design §4.5a **team
-  // groups**, §4.9), and one unnamed, headerless group otherwise. Every rule below is per group — Urgent first
-  // sorts inside a section (the lead's card first), Pinned order is stored per team.
-  let sortMode = store.get("sort", "urgent");
+  // groups**, §4.9), and one unnamed, headerless group otherwise. One order, no control (design
+  // §4.5, 2026-09-18): inside a group the lead's card, then urgency, then name.
   const sections = () => $$("#groups .tgroup");
-  const pinKey = (team) => (team ? "pinned:" + team : "pinned");  // the flat page keeps the old key
-  function setSort(m) { sortMode = m; store.set("sort", m); $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === m)); layout(); }
   function layout() {
     const box = $("#groups"); if (!box) return;
     sections().forEach((sec) => {
       const grid = $(".grid", sec), lead = sec.dataset.lead || "";
       const cards = $$(".sc", grid);
-      if (sortMode === "urgent") {
-        cards.sort((a, b) => (b.dataset.id === lead) - (a.dataset.id === lead) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
-          .forEach((c) => grid.appendChild(c));
-      } else {
-        const order = store.get(pinKey(sec.dataset.team), []);
-        cards.sort((a, b) => { const ia = order.indexOf(a.dataset.id), ib = order.indexOf(b.dataset.id); return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib); }).forEach((c) => grid.appendChild(c));
-        store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
-      }
-      cards.forEach((c) => c.classList.toggle("highlight", sortMode === "pinned" && c.dataset.state === "needs-you"));
+      cards.sort((a, b) => (b.dataset.id === lead) - (a.dataset.id === lead) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
+        .forEach((c) => grid.appendChild(c));
     });
     applyFilter();
     const shown = $$("#groups .sc").filter((c) => !c.hidden);
@@ -413,7 +402,6 @@
   }
 
   AO.org = function () {
-    $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === sortMode));
     $("#filter").addEventListener("input", layout);
     $("#showcmd").addEventListener("change", layout);
     $("#retry").addEventListener("click", () => location.reload());
@@ -426,19 +414,6 @@
       f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
       layout();
     });
-    // drag to pin: HTML5 drag on cards, order saved by id per group. A card never crosses into
-    // another team's grid — the badge decides the group, not where you dropped it.
-    box.addEventListener("dragstart", (e) => { const c = e.target.closest(".sc"); if (c) { e.dataTransfer.setData("text/plain", c.dataset.id); c.classList.add("dragging"); } });
-    box.addEventListener("dragover", (e) => { if (sortMode === "pinned") e.preventDefault(); });
-    box.addEventListener("drop", (e) => {
-      if (sortMode !== "pinned") return; e.preventDefault();
-      const id = e.dataTransfer.getData("text/plain"), from = $(`#card-${CSS.escape(id)}`), to = e.target.closest(".sc");
-      if (!from || !to || from === to || from.parentElement !== to.parentElement) return;
-      const grid = to.parentElement, sec = grid.closest(".tgroup");
-      grid.insertBefore(from, to);
-      store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
-    });
-    $$("#groups .sc").forEach((c) => (c.draggable = true));
     // Start, Stop and Stop now are all on the team's card, and so is its fold.
     box.addEventListener("click", (e) => {
       const b = e.target.closest("[data-team-act]");
@@ -451,11 +426,11 @@
       if (ev.event === "session") {
         const old = $(`#card-${CSS.escape(ev.id)}`);
         const tpl = document.createElement("template"); tpl.innerHTML = ev.html.trim();
-        const fresh = tpl.content.firstElementChild; fresh.draggable = true;
+        const fresh = tpl.content.firstElementChild;
         if (old) old.replaceWith(fresh);
         else {
           const grid = $(".tgroup .grid");  // syncGroups below moves it into its own group
-          if (sortMode === "pinned") grid.prepend(fresh); else grid.appendChild(fresh);
+          grid.appendChild(fresh);
         }
         if (ev.groups !== undefined) syncGroups(ev.groups);
         layout();

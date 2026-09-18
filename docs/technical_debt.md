@@ -44,7 +44,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-066 | Records grow without bound until TD-052 step 6 sets the mail bounds, and one `list` reply outgrew the client's 64 KiB line limit: every `ao` and the UI failed at once | High | Open |
 | TD-067 | Standing up a team has no operator's guide: the briefs README predates `ao team start`, design §4.9 is a spec, and `ao --skill` is for a session, not for the person or the Claude session that sets a team up | Medium | Open |
 | TD-068 | A brief over about 16 KB cannot start a session: the prompt is passed on tmux's command line, and `tmux new-session` answers *command too long* | Medium | Open |
-| TD-069 | The Inbox is a dialog: too narrow to read and act on the paragraphs sessions write to the person — it needs a full-width page of its own | Medium | Open |
+| TD-069 | One place to work from: an Inbox page listing everything that needs a person — session states, mail, due board items — each with its controls, filtered by team; today they are in three places and the mail dialog is too narrow to read | Medium | Open |
 | TD-070 | An `ask` cannot offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, rendered as buttons beside Reply and Delete | Medium | Open |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Open |
 
@@ -651,20 +651,30 @@ It matters more than a Low priority suggests in one narrow way: design §4.5a's 
 **Related:** TD-042 (briefs that name one run), TD-067 (the operator's guide should say how long a brief may be), design §4.3 (adapters own the tool's launch), §4.9 (`ao team start` is all or nothing).
 
 
-## TD-069: The Inbox needs a page of its own — a dialog is too narrow to read and act on mail
+## TD-069: One place to work from — the Inbox as the list of everything that needs a person
 
 **Priority:** Medium
-**Added:** 2026-09-18 (the anchor session; Paul's review of the Org page)
-**Status:** Open — asked for by Paul 2026-09-18; design first (a new screen and its controls are §4.5 and §4.5a rows before they are code).
-**Location:** `src/agentorc/ui/templates/base.html` (the `personbox` dialog), `src/agentorc/ui/static/app.js` (its list, Reply and delete), `src/agentorc/ui/app.py` (`/api/inbox` routes); a new `inbox.html` and nav item
+**Added:** 2026-09-18 (the anchor session; Paul's review of the Org page). Widened the same day: from *the dialog is too narrow* to *the one place to work from*.
+**Status:** Open — direction agreed with Paul 2026-09-18 (work from one spot, filter it by team, a row opens the session that needs you; the Org page keeps its own needs-you marks for a person who prefers the grid). **The shape below is a proposal under discussion, not a decision** — above all whether board items appear in the Inbox or mail on the board. Design first: a new screen and its controls are §4.5 and §4.5a rows before they are code.
+**Location:** `src/agentorc/ui/templates/base.html` (the `personbox` dialog), `src/agentorc/ui/static/app.js` (its list, Reply and delete), `src/agentorc/ui/app.py` (`/api/inbox` routes); a new `inbox.html` and nav item; design §4.5 screen 6 (**Attention**) and the **Due** strip, both unbuilt
 
-**Why:** the top bar's **Inbox** opens a dialog: a fixed-width column, `max-height: 60vh`, every entry cut to what fits. Sessions write paragraphs to the person — on 2026-09-18 the five entries there were two defect reports, a wind-down notice and a venv failure, each several hundred characters — and a dialog over the Org page is the wrong place to read them, answer them, or compare two.
+**Why:** three things ask for a person today, in three places. (1) **A session's state** — a permission prompt, a question in the terminal, a usage limit, a stall: on the session's card, found by scanning the grid. (2) **Mail to the person** (`ao msg person`): in a dialog off the top bar, a fixed-width column at `max-height: 60vh`, where sessions write paragraphs — on 2026-09-18 its five entries were two defect reports, a wind-down notice and a venv failure. (3) **Board items** (`docs/user_attention.md`, per repo, dated): printed into a session's context by a hook, and nowhere in the UI — 39 were due across this machine that day, most of them weeks stale. The Urgent first sort was the first answer to (1) and team cards made it moot (dropped 2026-09-18, PR with this entry); nothing answers all three.
 
-**Fix:** an **Inbox** page at `/inbox` (nav item beside Org, the unread count on it), full width: one row per entry — sender (link to its Focus), kind, `about`, age, the whole text — with Reply and Delete in place, an open `ask` marked as waiting on you and sorted first, and the thread an entry belongs to shown under it (the person's own replies are already in the senders' records). The top-bar button goes to the page; the dialog retires. The same page is the natural home for TD-070's suggested answers.
+**Proposed shape.** An **Inbox** page at `/inbox`, full width, the top bar's count on it. It is a **view over the three sources, and none is copied into another**: a state lives on the session's record and leaves the list the moment it is answered; mail lives in the host agent's person inbox (not durable, §9 invariant 13); a board item lives in its repo's git history. One row per thing, each with the controls of its kind, in place:
+- *permission* — what is asked, the countdown, **Allow / Deny** (the card's own controls, §4.5a);
+- *question*, *stalled?* — the text, **Open** (Focus on that session: the link Paul asked for);
+- *limited* — the reset time, **Switch profile / Wait**;
+- *ask* — the whole text, its suggested answers (TD-070), **Reply**, **Delete**; *note* — the text, **Dismiss**;
+- *board item, overdue or due today* — the text, its repo, **Snooze / Done** (the agent write-back §4.4 already specifies), **Open** on the session that wrote it when it is still here.
+Order: what is on a clock first (a permission's countdown, an `ask`'s bound), then states, then due board items, then notes. **A team filter** narrows all of it: a state and a message carry their session's `team` badge; a board item carries its repo, which `org.yml`'s projects map to the teams that work it.
 
-**Done when** the top bar's Inbox opens a full-width page, a 2,000-character message reads without a scroll box inside a dialog, Reply and Delete work from it, and §4.5 / §4.5a describe it.
+**Board items in the Inbox, not mail on the board** (the anchor's recommendation). The board is a file in git, written by PR, dated, and survives this machine; mail is chatter a session sends without a commit and the host agent may lose. Showing due board items in the Inbox costs a read; putting mail on the board would mean a commit per message and a board nobody can keep small. The door between them is one way and explicit: **Put on the board** on a mail row writes the entry (with a `Due:`) through the same write-back, and deletes the mail — the rule sessions already follow (*anything with a date on it belongs on the board*), given to the person too. This makes the Inbox what §4.5's unbuilt **Due** strip was going to be, so the strip is struck rather than built; the **Attention** tab stays the *whole* board — undated and future items included — which the Inbox deliberately is not.
 
-**Related:** design §4.10 (the person inbox), §4.5a (the top bar **Inbox** row), TD-052 (mail), TD-070.
+**Open questions for Paul:** (a) does a due board item count toward the top bar's number — today that would turn 5 into 44; (b) stale board items need a bulk snooze or the list is unusable on day one; (c) whether *exited with unpushed work* is a row (it is a thing only a person resolves, and no state says so today).
+
+**Done when** the top bar's Inbox opens a full-width page listing states, mail and due board items with their controls in place, a team filter narrows it, a row opens the session it is about, a 2,000-character message reads without a scroll box, and §4.5 / §4.5a describe it. Steps, each its own PR: the page with mail only (retires the dialog); states as rows; board items and the write-back; *Put on the board*.
+
+**Related:** design §4.10 (the person inbox), §4.5 screens 1 and 6, §4.4 (board write-back), §4.5a (the top bar **Inbox** row, the **Due** strip rows), TD-052 (mail), TD-070, cadence §3 (the board).
 
 
 ## TD-070: An `ask` cannot offer its expected answers — the person types every reply from scratch
@@ -699,6 +709,8 @@ It matters more than a Low priority suggests in one narrow way: design §4.5a's 
 4. **Exited cards carry less** — profile line, *under* chip and stop note say nothing once a session is dead; a dead card could be two rows and Forget.
 5. **The mode badge** — *unattended* is the loudest thing on every card (filled, dark) and is true of every team session. Quieter, or a glyph; *interactive* is the rarer fact worth marking.
 6. **The legend** — the note under the grid explains the sort order in words; with glyphs it could be the glyphs.
+
+7. **The mockups are behind the page** — `docs/mockups/gen.py` and the generated `Main.dc.html` / `MainDark.dc.html` still draw the Urgent first / Pinned control and the Teams strip, both retired 2026-09-18 (review of PR #229). Regenerate them with the look-and-feel pass rather than twice.
 
 **Done when** each idea is either built (its own PR, §4.5a first) or struck here.
 
