@@ -8,8 +8,11 @@ Three pieces, none of which knows what a session is:
   one. Requests are served concurrently; silence longer than `LINK_SILENCE` ends the link.
 - `bridge` — what sshd's forced command runs at the home: announce the host name the key is bound
   to, then copy lines between stdio and the home agent's socket.
-- `dial` — the node's loop: run the transport, say `hello`, ping, and start over with backoff when
-  it ends, keeping *why* it is down in words (§4.6: ssh failed / agent down / refused).
+- `dial` — the node's loop: open the transport, say `hello`, ping, and start over with backoff when
+  it ends, keeping *why* it is down in words (§4.6: ssh failed / agent down / refused). The
+  transport is a command (ssh to the home, the bridge at its end) or, for a container node on the
+  home's own machine, the home's per-node link socket reached through a mounted directory
+  (§4.4a "A container node", step 3c) — *cannot connect* in place of *ssh failed*.
 """
 
 from __future__ import annotations
@@ -22,6 +25,7 @@ import random
 import sys
 import time
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 from typing import Any
 
 from sessionorc import paths
@@ -41,6 +45,7 @@ FRAME_LIMIT = LINE_LIMIT
 STDERR_KEPT = 20  # lines of the transport's stderr kept for the diagnosis
 
 Handler = Callable[[str, dict[str, Any]], Awaitable[Any]]
+Target = list[str] | Path  # a transport command, or the home's link socket
 
 
 class LinkError(Exception):
@@ -247,7 +252,7 @@ def backoff_delays(first: float = BACKOFF_FIRST, top: float = BACKOFF_MAX):
 
 
 async def dial(
-    command: list[str],
+    target: Target,
     *,
     host: str,
     handler: Handler,
@@ -257,13 +262,14 @@ async def dial(
     first: float = BACKOFF_FIRST,
     top: float = BACKOFF_MAX,
 ) -> None:
-    """Keep a link to the home up, forever: run `command`, say `hello`, ping, and when it ends say
-    why and try again. `on_state(up, why, mux)` is called on every change. Runs until cancelled."""
+    """Keep a link to the home up, forever: open `target` (run a command, or connect to a socket),
+    say `hello`, ping, and when it ends say why and try again. `on_state(up, why, mux)` is called
+    on every change. Runs until cancelled."""
     delays = backoff_delays(first, top)
     while True:
         try:
             was_up, why = await _dial_once(
-                command, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence
+                target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence
             )
         except asyncio.CancelledError:
             raise
@@ -278,7 +284,7 @@ async def dial(
 
 
 async def _dial_once(
-    command: list[str],
+    target: Target,
     *,
     host: str,
     handler: Handler,
@@ -287,6 +293,49 @@ async def _dial_once(
     silence: float | None,
 ) -> tuple[bool, str]:
     """One attempt: whether the link came up, and why it is down now."""
+    if isinstance(target, Path):
+        return await _dial_socket(target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence)
+    return await _dial_command(target, host=host, handler=handler, on_state=on_state, ping=ping, silence=silence)
+
+
+async def _dial_socket(
+    path: Path,
+    *,
+    host: str,
+    handler: Handler,
+    on_state: Callable[[bool, str, Mux | None], None],
+    ping: float | None,
+    silence: float | None,
+) -> tuple[bool, str]:
+    """A container node's attempt (§4.4a): the home's per-node socket, straight to `_serve_link` at
+    its end — there is no bridge, so *agent down* and *ssh failed* collapse into *cannot connect*:
+    the home is not running, or the directory is not mounted."""
+    try:
+        reader, writer = await asyncio.open_unix_connection(str(path), limit=FRAME_LIMIT)
+    except (ConnectionError, OSError) as e:
+        return False, f"cannot connect: {path}: {e}"
+
+    async def closed_early() -> str:
+        return f"cannot connect: {path} closed before answering hello"
+
+    mux = Mux(reader, writer, handler, silence=silence)
+    try:
+        return await _converse(mux, host=host, on_state=on_state, ping=ping, silence=silence, closed_early=closed_early)
+    finally:
+        with contextlib.suppress(Exception):
+            writer.close()
+
+
+async def _dial_command(
+    command: list[str],
+    *,
+    host: str,
+    handler: Handler,
+    on_state: Callable[[bool, str, Mux | None], None],
+    ping: float | None,
+    silence: float | None,
+) -> tuple[bool, str]:
+    """An ssh node's attempt: run the transport, whose far end is the bridge."""
     try:
         proc = await asyncio.create_subprocess_exec(
             *command,
@@ -309,7 +358,37 @@ async def _dial_once(
         if "link_error" in frame:
             refusal.append(f"agent down on the home: {frame.get('detail') or frame['link_error']}")
 
+    async def closed_early() -> str:
+        if refusal:
+            return refusal[0]
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(proc.wait(), timeout=2)
+        with contextlib.suppress(TimeoutError):
+            await asyncio.wait_for(asyncio.shield(drain), timeout=1)
+        return "ssh failed" + (f": {errors[-1]}" if errors else f" (exit {proc.returncode})")
+
     mux = Mux(proc.stdout, _PipeWriter(proc), handler, silence=silence, stray=stray)
+    try:
+        return await _converse(mux, host=host, on_state=on_state, ping=ping, silence=silence, closed_early=closed_early)
+    finally:
+        drain.cancel()
+        with contextlib.suppress(ProcessLookupError, OSError):
+            proc.kill()
+        with contextlib.suppress(Exception):
+            await proc.wait()
+
+
+async def _converse(
+    mux: Mux,
+    *,
+    host: str,
+    on_state: Callable[[bool, str, Mux | None], None],
+    ping: float | None,
+    silence: float | None,
+    closed_early: Callable[[], Awaitable[str]],
+) -> tuple[bool, str]:
+    """The link itself, whatever carries it: `hello`, then ping until it ends. `closed_early` names
+    the reason when the other end went away before answering hello."""
     runner = asyncio.ensure_future(mux.run())
     try:
         try:
@@ -317,13 +396,7 @@ async def _dial_once(
         except LinkError as e:
             return False, f"refused: {e}"
         except (LinkClosed, TimeoutError):
-            if refusal:
-                return False, refusal[0]
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(proc.wait(), timeout=2)
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(asyncio.shield(drain), timeout=1)
-            return False, "ssh failed" + (f": {errors[-1]}" if errors else f" (exit {proc.returncode})")
+            return False, await closed_early()
         on_state(True, f"linked to {(answer or {}).get('home', 'home')} as {(answer or {}).get('host', host)}", mux)
         pinger = asyncio.ensure_future(_ping(mux, LINK_PING if ping is None else ping))
         try:
@@ -333,11 +406,6 @@ async def _dial_once(
     finally:
         mux.close()
         runner.cancel()
-        drain.cancel()
-        with contextlib.suppress(ProcessLookupError, OSError):
-            proc.kill()
-        with contextlib.suppress(Exception):
-            await proc.wait()
 
 
 async def _ping(mux: Mux, every: float) -> None:

@@ -42,6 +42,18 @@ def socket_path() -> Path:
     return home() / "agent.sock"
 
 
+def links_dir() -> Path:
+    """The home's per-node link sockets (design §4.4a "A container node", TD-057 step 3c): one
+    directory per `nodes:` entry, `links/<name>/link.sock`. A container node gets the *directory*
+    bind-mounted, never the file — the home unlinks and re-binds its sockets on every start, and a
+    mounted file would keep the dead inode."""
+    return home() / "links"
+
+
+def link_socket(name: str) -> Path:
+    return links_dir() / name / "link.sock"
+
+
 def waits_dir() -> Path:
     """One cursor file per waiter (`ao wait`, design §4.8 "Waking a lead", TD-049): what that
     caller had already seen when it last looked, so an event that arrives while it is busy is
