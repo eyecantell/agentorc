@@ -155,16 +155,36 @@ def node(name: str) -> ContainerNode:
 
 
 def _strip_jsonc(text: str) -> str:
-    """devcontainer.json is JSON with comments and trailing commas; take both out."""
-    text = re.sub(r"(?m)//[^\n]*$", lambda m: "" if not _in_string(text, m.start()) else m.group(0), text)
-    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
-    return re.sub(r",(\s*[}\]])", r"\1", text)
-
-
-def _in_string(text: str, pos: int) -> bool:
-    """Whether `pos` falls inside a JSON string on its line — a `//` in a URL is not a comment."""
-    line_start = text.rfind("\n", 0, pos) + 1
-    return text.count('"', line_start, pos) % 2 == 1
+    """devcontainer.json is JSON with comments and trailing commas; take both out, and only
+    outside strings — a `//` in a URL, a `/*` or a `,}` in a command are content."""
+    out: list[str] = []
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '"':  # copy a string whole, escapes included
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i : j + 1])
+            i = j + 1
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+        elif c in "}]":
+            k = len(out) - 1  # a trailing comma: the last non-blank thing before this bracket
+            while k >= 0 and out[k].isspace():
+                k -= 1
+            if k >= 0 and out[k] == ",":
+                del out[k]
+            out.append(c)
+            i += 1
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
 
 
 def read_definition(path: Path) -> dict[str, Any]:
@@ -375,6 +395,7 @@ def up(n: ContainerNode, r: Runner, *, rebuild: bool = False) -> dict[str, Any]:
     ]
     if rebuild:
         cmd += ["--remove-existing-container", "--build-no-cache"]
+        (n.node_dir / "home" / "agent.pid").unlink(missing_ok=True)  # the old container's, not the new one's
     r.log(f"devcontainer up ({'rebuild' if rebuild else 'idempotent'}) for {n.name} …")
     cp = r.run(cmd, check=False, stream=True)
     result = _last_json(cp.stdout or "")
@@ -466,7 +487,23 @@ def provision(n: ContainerNode, r: Runner, cid: str, user: str) -> Path:
         shutil.copy2(wheel, dest)
     r.log(f"installing {wheel.name} into {INSIDE_VENV} …")
     r.run(exec_cmd(cid, user, "sh", "-c", f"test -x {INSIDE_VENV}/bin/python || python3 -m venv {INSIDE_VENV}"))
+    # Two installs: the first brings the dependencies, the second replaces agentorc itself even at
+    # the same version — pip never reinstalls a same-version wheel on its own, and agentorc's
+    # version does not change per promote (Sonnet review, 2026-09-17: a re-promoted node kept its
+    # old code).
     r.run(exec_cmd(cid, user, f"{INSIDE_VENV}/bin/pip", "install", "-q", "--upgrade", f"{INSIDE_WHEELS}/{wheel.name}"))
+    r.run(
+        exec_cmd(
+            cid,
+            user,
+            f"{INSIDE_VENV}/bin/pip",
+            "install",
+            "-q",
+            "--force-reinstall",
+            "--no-deps",
+            f"{INSIDE_WHEELS}/{wheel.name}",
+        )
+    )
     write_node_config(n)
     if n.env_file.is_file():
         cp = r.run(exec_cmd(cid, user, "sh", "-c", "command -v gh", env_file=n.env_file), check=False)
@@ -512,8 +549,10 @@ def write_node_config(n: ContainerNode) -> None:
 
 
 def agent_pid(r: Runner, cid: str, user: str) -> int | None:
-    """The pid behind the node's pidfile, if it is alive in the container."""
-    cp = r.run(exec_cmd(cid, user, "sh", "-c", f"p=$(cat {PIDFILE} 2>/dev/null) && kill -0 $p && echo $p"), check=False)
+    """The pid behind the node's pidfile, if it is alive in the container *and* is the agent — a
+    pidfile on the volume outlives the container, and a fresh pid namespace reuses low numbers."""
+    script = f"p=$(cat {PIDFILE} 2>/dev/null) && kill -0 $p && grep -q agentorc-agent /proc/$p/cmdline && echo $p"
+    cp = r.run(exec_cmd(cid, user, "sh", "-c", script), check=False)
     out = (cp.stdout or "").strip()
     return int(out) if out.isdigit() else None
 

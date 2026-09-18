@@ -144,6 +144,24 @@ def test_the_repos_features_and_image_go_to_the_base_and_a_string_mount_is_under
     assert "image" not in out and "features" not in out and out["build"]["context"] == "/n/.devcontainer"
 
 
+def test_comments_and_trailing_commas_go_and_strings_are_kept_whole():
+    text = """{
+  // a line comment
+  "url": "https://x/y", /* a block
+  comment */ "cmd": "echo /* not a comment */ , }",
+  "esc": "a \\" quote // still a string",
+  "list": [1, 2, ], "obj": {"a": 1, },
+}"""
+    doc = json.loads(containers._strip_jsonc(text))
+    assert doc == {
+        "url": "https://x/y",
+        "cmd": "echo /* not a comment */ , }",
+        "esc": 'a " quote // still a string',
+        "list": [1, 2],
+        "obj": {"a": 1},
+    }
+
+
 def test_a_missing_or_unparsable_definition_is_refused_by_name(home, tmp_path):
     n = ContainerNode("x", tmp_path / "nowhere")
     with pytest.raises(ContainerError, match="no devcontainer definition at"):
@@ -251,6 +269,8 @@ def test_host_up_brings_it_up_provisions_it_and_starts_the_agent(home, tmp_path)
     venv = r.execs("python3 -m venv /agentorc/venv")
     assert venv and venv[0][venv[0].index("-u") + 1] == "developer"
     assert r.execs("/agentorc/venv/bin/pip install -q --upgrade /agentorc/wheels/agentorc-0.0.1-py3-none-any.whl")
+    # and agentorc itself replaced even at the same version: pip would otherwise keep the old code
+    assert r.execs("pip install -q --force-reinstall --no-deps /agentorc/wheels/agentorc-0.0.1-py3-none-any.whl")
     # the node's own configuration: a node of this home, dialing the mounted socket, the profiles rewritten
     hosts_yml = (n.node_dir / "home" / "hosts.yml").read_text()
     assert "home: kmaster" in hosts_yml and "name: contractmatch" in hosts_yml
@@ -273,10 +293,14 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
     r = Fake(pid="4242\n")
     out = containers.host_up("contractmatch", r)
     assert out["started"] is False and out["pid"] == 4242
+    assert "grep -q agentorc-agent /proc/$p/cmdline" in r.execs("agent.pid")[0][-1]  # alive *and* the agent
     assert not r.execs("agentorc-agent serve")  # a live pid behind the pidfile: not started twice
     assert r.execs("command -v gh")[0][r.execs("command -v gh")[0].index("--env-file") + 1] == str(n.env_file)
+    (n.node_dir / "home").mkdir(parents=True, exist_ok=True)
+    (n.node_dir / "home" / "agent.pid").write_text("4242\n")
     r2 = Fake()
     containers.host_up("contractmatch", r2, rebuild=True)
+    assert not (n.node_dir / "home" / "agent.pid").exists()  # the old container's pid is not the new one's
     assert "--no-cache" in r2.calls[0]
     up = r2.calls[2]
     assert "--remove-existing-container" in up and "--build-no-cache" in up
