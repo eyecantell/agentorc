@@ -26,6 +26,11 @@ REPORTS = frozenset({"progress", "finding"})
 # What a session may do to itself offline, and a person to any session on this host: the node is
 # the single tmux writer for its host, whether or not home can be reached.
 NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})
+# What a person's request forwarded from a node may do only to that node's records (design §4.4a:
+# "a person's request arriving over a link (no caller) may act only on that node's records"):
+# every act and every home-owned edit, a create for another host, and a delete from an inbox.
+# Reads are the org's, and a person may message anyone. Checked at the home, in `_forwarded`.
+PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox_delete"})) - frozenset({"hook"})
 
 
 def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str) -> str | None:
