@@ -749,11 +749,15 @@ nodes:
   tmux is of every host — under agentorc's own id label, so it is a *second* container from the
   project's image beside any the person's VS Code opens, never that one.
 - **The agent is installed onto the node's volume, at the home's version.** `~/.agentorc/nodes/
-  <name>/` holds the node's `AGENTORC_HOME` — its `hosts.yml` (`local: {name}`, `home:`,
-  `link: {socket: …}`), written by the home; `profiles.yml`; the profile's `CLAUDE_CONFIG_DIR`,
-  logged in once by hand inside and kept; run logs, the hook socket and the store, so a rebuild
-  reconnects with its history and not with an empty snapshot the home would take as the truth — and
-  a venv the home fills with **its own wheel**: the promote (TD-062) gains one step, writing the
+  <name>/` is mounted at `/agentorc` inside, and everything of the node's lives under it, by
+  absolute path, so nothing depends on the image's `$HOME` or on what its lifecycle scripts do to
+  `~/.claude`: `/agentorc/home` is the node's `AGENTORC_HOME` — its `hosts.yml` (`local: {name}`,
+  `home:`, `link: {socket: …}`), written by the home; `profiles.yml`, each profile's `config_dir`
+  under `/agentorc/profiles/<profile>/`, which is the `CLAUDE_CONFIG_DIR` the adapter launches
+  with (§4.2a), logged in once by hand inside and kept; run logs, the hook socket and the store,
+  so a rebuild reconnects with its history and not with an empty snapshot the home would take as
+  the truth; the agent's own log — and `/agentorc/venv`, which the home fills with **its own
+  wheel**: the promote (TD-062) gains one step, writing the
   wheel of what it installed to `~/.agentorc/wheels/`, and a container node is re-provisioned from
   the newest, a `hello` refused for protocol being the cue. The image supplies Python 3.12+ and tmux, and `ao host up` refuses, naming which, when
   it does not. What a worker needs beyond that is in `~/.agentorc/nodes/<name>/env` (`0600`), read
@@ -772,7 +776,13 @@ nodes:
 - **The home supervises it.** There is no systemd inside, so the home's tick, for each `container:`
   node whose link is down, checks the container (gone: the same idempotent `up`), the agent (none
   inside: start it), and the version (a protocol refusal: re-provision), with backoff, and the
-  card's overlay says which of the three it is doing. A container stopped or restarted is that host
+  card's overlay says which of the three it is doing. *Start it* is `docker exec -d -u <user>` of
+  `agentorc-agent serve` with its output to `/agentorc/home/agent.log` — detached, so it outlives
+  the exec that started it — and *none inside* is a pidfile under `/agentorc/home` whose pid is
+  not alive in the container; the generated definition sets `init: true`, so the container's
+  pid 1 reaps what exits. That is the whole of the contract systemd gives the home's own agent
+  (`Restart=on-failure`): a crash drops the link, the next tick finds no live pid and starts it
+  again, and the log says why it died. A container stopped or restarted is that host
   rebooting: tmux and its sessions are gone, the snapshot says so, the records go `exited`.
   `ao host rebuild <name>` rebuilds the image on purpose; `ao host forget <name>` is the removal
   path a runtime needs that a machine did not; `volatile: true` is right for one the person stops.
@@ -784,8 +794,8 @@ nodes:
 
 For the org (§4.9): the project's repo entry names the node too — `contractmatch: {kmaster:
 ~/contractmatch, contractmatch: ~/contractmatch}`, the same path twice because it is the same
-checkout — and a team definition says where its members run (`host:`, step 4), so `ao team start
-cm-grind` from kmaster lands the lead and the grinder in the container, and the host limits its
+checkout — and a team definition says where its members run (`host:` on the definition, a step 4 change to
+`org.yml`'s schema and `teams.plan`), so `ao team start cm-grind` from kmaster lands the lead and the grinder in the container, and the host limits its
 briefs encode fall away. A container anywhere but the home's machine (guardians' devenv) is a
 machine to agentorc: an ssh node, provisioned by hand.
 
