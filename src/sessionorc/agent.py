@@ -35,6 +35,7 @@ from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers r
 from sessionorc.models import (
     ASK_KINDS,
     GRANTS,
+    HOME_OWNED,
     MAIL_KINDS,
     PERSON,
     PROGRESS_STATUSES,
@@ -48,6 +49,7 @@ from sessionorc.models import (
     Session,
     State,
     Tally,
+    apply_home,
     apply_node,
     canonical_grants,
     normalize_ref,
@@ -105,6 +107,15 @@ HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"}
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
 # read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
 NODE_READS = frozenset({"tail", "explain"})
+# What the home pushes a node about each of its records (§4.4a "The home pushes each node its
+# records' policy fields as they change", step 4b.2): the home-owned fields, less the mailbox — the
+# inbox, outbox, threads, wakes and `mail_decided` stay the home's, and no message body ever reaches
+# a node — less `sends`, which every pane's own node writes first (a send runs there) and the merge
+# unions, and less `superseded_by`, which the node writes itself when a resume there supersedes a
+# record and the home does not hear (a node's report carries node-owned fields only).
+INTENT_FIELDS = HOME_OWNED - frozenset(
+    {"inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "superseded_by"}
+)
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
@@ -176,8 +187,15 @@ class HostAgent:
             for d in sorted(paths.home().joinpath("remote").iterdir()):
                 if d.is_dir():
                     self.remote[d.name] = self._remote_store(d.name).load_all()
+        # What the home last pushed each linked node about each of its records (`intent`, step
+        # 4b.2): host → id → payload. Present from that link's snapshot until the link goes, so a
+        # new link is pushed everything once and then what changes.
+        self._intent_sent: dict[str, dict[str, str]] = {}
         # A node's side of the same: what it last told the home about each record, and when.
         self._reported: dict[str, tuple[str, str, float]] = {}
+        # A node's hint of each record's mail, as the home last pushed it: `(unread, budget spent)`.
+        # Never an inbox — the mailbox is the home's — only what a reply's mail line needs.
+        self._mail_hints: dict[str, tuple[int, bool]] = {}
         self._snapshot_sent = False
         self._bg: set[asyncio.Task[None]] = set()  # fire-and-forget tasks, held so they are not collected
         if self.mode == "node":
@@ -489,6 +507,10 @@ class HostAgent:
         ever remove one — the re-check above works by PR number, the upsert has no delete branch,
         and invariant 10 only replaces a derived entry when the session declares the same reference
         — and a permanent false `claimed` is exactly what the idle-with-open-work send fires on."""
+        if self.mode == "node" and not self.home_reachable():
+            # `progress` and `findings` are the home's (§4.4a, step 4b.2): a claim written to the
+            # replica is overwritten on reconnect and was never checked against the siblings' leases.
+            return
         holders = reports.holds_directory(self.sessions.values())
         due: list[tuple[Session, str | None, list[tuple[str, int]], list[tuple[str, str | None]]]] = []
         for s in self.sessions.values():
@@ -529,6 +551,10 @@ class HostAgent:
                 log.warning("deriving reports for %s failed: %s", s.id, result)
                 continue
             progress, findings, retire = result
+            if self.mode == "node":
+                # sent to the home as the derived reports they are; the home's push brings them back
+                await self._send_derived(live, progress, findings, retire)
+                continue
             # Lists, not generators: these upserts are the write, and `any()` over a generator
             # would stop at the first change and silently drop every later entry (review 2026-09-11).
             applied = [live.report_progress(e) for e in progress] + [live.report_finding(e) for e in findings]
@@ -749,6 +775,7 @@ class HostAgent:
             self._pre_limited,
             self._last_hook,
             self._killed_at,
+            self._mail_hints,
         ):
             side.pop(sid, None)
 
@@ -2410,6 +2437,9 @@ class HostAgent:
             return await self._act(params)
         if method == "read":
             return await self._read(params)
+        if method == "intent":
+            await self._take_intent(params.get("records") or [])
+            return None
         if method == "stat":
             d = Path(str(params.get("dir") or "")).expanduser()
             return {"dir": str(d), "exists": await asyncio.to_thread(d.is_dir)}
@@ -2456,6 +2486,56 @@ class HostAgent:
             "record": record.to_dict() if record is not None else None,
             "gone": bool(sid) and record is None and rpc == "remove",
         }
+
+    async def _take_intent(self, records: list[Any]) -> None:
+        """The home's intent for this node's records (§4.4a, step 4b.2): `apply_home` over exactly
+        `INTENT_FIELDS` — whatever else a push carries is not taken — so the stopping policies read
+        what the home holds; the unread count kept apart as a hint for the mail line, never an
+        inbox. A record of another host, or one this node does not hold, is not this node's."""
+        changed = False
+        for raw in records:
+            if not isinstance(raw, dict) or raw.get("host") != self.host:
+                log.warning("intent from %s: dropped a record that is not %s's", self.home, self.host)
+                continue
+            s = self.sessions.get(str(raw.get("id") or ""))
+            if s is None:
+                continue
+            with contextlib.suppress(TypeError, ValueError):
+                self._mail_hints[s.id] = (int(raw.get("unread") or 0), bool(raw.get("wake_budget_spent")))
+            fields = {k: raw[k] for k in INTENT_FIELDS if k in raw}
+            before, stop_before = s.to_dict(), s.run_until
+            try:
+                apply_home(s, {**fields, "id": s.id, "host": s.host})
+            except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
+                log.warning("intent from %s: could not take %s: %s", self.home, s.id, e)
+                continue
+            if s.run_until != stop_before:
+                s.wrapup_sent_at = None  # a new stop time is a new run, as `set_stop` has it
+            if s.to_dict() != before:
+                self.store.save(s)
+                changed = True
+        if changed:
+            await self._push_changes()
+
+    async def _send_derived(self, s: Session, progress: list[Any], findings: list[Any], retire: list[str]) -> None:
+        """A node's tick derived these for `s` (§4.4a, step 4b.2): sent to the home — whose fields
+        they are — as `derived`, and applied there exactly as a home's own tick applies them. Not
+        queued: a link that is gone, or a home that refuses, is a log line, and the next derive
+        (`DERIVE_EVERY`) says it again."""
+        mux = self._home_mux
+        if mux is None or not (progress or findings or retire):
+            return
+        try:
+            await mux.request(
+                "derived",
+                timeout=REPORT_WRITE,
+                id=s.id,
+                progress=[e.to_dict() for e in progress],
+                findings=[e.to_dict() for e in findings],
+                retire=list(retire),
+            )
+        except (link.LinkError, link.LinkClosed, TimeoutError) as e:
+            log.warning("derived reports for %s did not reach %s: %s", s.id, self.home, e)
 
     async def _read(self, params: dict[str, Any]) -> Any:
         """A read the home routed here (§4.4a, step 4b.1): `{rpc, params}`, `rpc` one of
@@ -2762,6 +2842,7 @@ class HostAgent:
                 if old is not None and old is not mux:
                     old.close("replaced by a newer link from the same host")
                 self._link_muxes[host] = mux
+                self._intent_sent.pop(host, None)  # nothing is pushed to a link before its snapshot
                 self.links[host] = {"up": True, "since": now_iso(), "why": "linked"}
                 said_hello = True
                 log.info("link from %s: up", host)
@@ -2777,6 +2858,8 @@ class HostAgent:
                 return "pong"
             if method in ("snapshot", "report"):
                 taken = self._take_records(host, params.get("records") or [], whole=method == "snapshot")
+                if method == "snapshot":
+                    self._intent_sent[host] = {}  # the intent goes out whole once, then as it changes
                 await self._push_changes()
                 return {"taken": taken}
             if method == "gone":
@@ -2784,6 +2867,8 @@ class HostAgent:
                     self._forget_remote(host, str(rid))
                 await self._push_changes()
                 return None
+            if method == "derived":
+                return await self._take_derived(host, params)
             if method == "forward":
                 return await self._forwarded(host, params)
             if method == "cancel":
@@ -2798,10 +2883,73 @@ class HostAgent:
         finally:  # however it ended: a link the home still calls up after it has gone is the worst answer
             if self._link_muxes.get(host) is mux:
                 del self._link_muxes[host]
+                self._intent_sent.pop(host, None)
                 self.links[host] = {"up": False, "since": now_iso(), "why": why}
                 log.warning("link from %s: down — %s", host, why)
                 with contextlib.suppress(Exception):
                     await self._push_changes()  # its cards go `unreachable` now, not at the next tick
+
+    async def _take_derived(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
+        """A node's tick derived reports for one of its records (§4.4a, step 4b.2): applied as this
+        home's own tick applies its own — upserted under §9 invariant 10, the branch claims named
+        retired — and only for a record of the link's host. A derived report is never `declared`:
+        one that says it is is refused whole."""
+        rid = str(params.get("id") or "")
+        s = self.remote.get(host, {}).get(rid)
+        if s is None:
+            raise link.LinkError(f"{rid}@{host}: no such record here")
+        try:
+            progress = [ProgressEntry.from_dict(e) for e in params.get("progress") or []]
+            findings = [FindingEntry.from_dict(e) for e in params.get("findings") or []]
+        except (TypeError, ValueError, AttributeError) as e:
+            raise link.LinkError(f"bad derived report: {e}") from None
+        if any(e.source == "declared" for e in (*progress, *findings)):
+            raise link.LinkError("a derived report is never declared: a session declares through its own `ao`")
+        applied = [s.report_progress(e) for e in progress] + [s.report_finding(e) for e in findings]
+        changed = any(applied) | s.retire_branch_claims(str(r) for r in params.get("retire") or [])
+        if changed:
+            self._save(s)
+            await self._push_changes()
+        return {"changed": changed}
+
+    async def _push_intent(self) -> None:
+        """What changed in the home-owned fields, or the unread count, of a linked node's records
+        since that node was last told (§4.4a, step 4b.2) — everything, once, after its snapshot.
+        `controllers` go as stored: another host's record keeps them in its node's form here
+        (step 4a). A notification, bounded like a report: a push that cannot be written gives the
+        link up, and the next link's snapshot pushes everything again. Never queued."""
+        for host, sent in list(self._intent_sent.items()):
+            mux = self._link_muxes.get(host)
+            if mux is None:
+                continue
+            recs = self.remote.get(host, {})
+            out = []
+            for rid, r in recs.items():
+                d = r.to_dict()
+                item = {
+                    "id": rid,
+                    "host": host,
+                    **{k: d[k] for k in sorted(INTENT_FIELDS) if k in d},
+                    "unread": r.unread(),
+                    "wake_budget_spent": r.wake_budget_spent(),
+                }
+                payload = json.dumps(item, sort_keys=True)
+                if sent.get(rid) != payload:
+                    out.append((rid, payload, item))
+            for rid in [x for x in sent if x not in recs]:
+                del sent[rid]
+            if not out:
+                continue
+            try:
+                async with asyncio.timeout(REPORT_WRITE):
+                    await mux.notify("intent", records=[item for _, _, item in out])
+            except link.LinkClosed:
+                continue
+            except TimeoutError:
+                mux.close(f"an intent push could not be written within {REPORT_WRITE:g} s")
+                continue
+            for rid, payload, _ in out:  # marked as told only once it went
+                sent[rid] = payload
 
     async def _note_reach(self, host: str) -> None:
         """How a container node's sessions are reached (§4.4a "Reach", 3c.5): looked up (three
@@ -2837,7 +2985,16 @@ class HostAgent:
             seen.add(rid)  # listed, whether or not it could be taken: a snapshot forgets only what it omits
             try:
                 if rid in mine:
-                    apply_node(mine[rid], raw)
+                    try:
+                        apply_node(mine[rid], raw)
+                    except NotTheSameSession:
+                        if mine[rid].state != "closed":
+                            raise  # a live record that disagrees on identity is another session: refused
+                        # §4.4a, §9 invariant 12: a closed record of this id is superseded by the
+                        # node's new one — replaced in place, as a new session of a name replaces a
+                        # finished one on one host (`_take_name`); its run log stays on its node.
+                        log.info("link from %s: %s supersedes the closed record of the same id", host, rid)
+                        mine[rid] = Session.from_dict(raw)
                 else:
                     mine[rid] = Session.from_dict(raw)  # adopted, the replica's home-owned fields and all
             except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
@@ -2965,6 +3122,8 @@ class HostAgent:
         serialised once; the per-subscriber comparison is a string compare."""
         self._poke_waits()
         await self._report_home()  # a node tells its home, whether or not a browser is watching
+        if self._intent_sent:
+            await self._push_intent()  # and the home tells each node what it holds of its records
         gone, self._gone = self._gone, []
         if not self._subscribers:
             return
@@ -3072,7 +3231,14 @@ class HostAgent:
         """`link_host`: the request came over that node's link (step 5), so its caller is that
         host's session — `id@host` here — and never this socket's."""
         resp = await self._dispatch_inner(req, link_host=link_host)
+        via_home = resp.pop("_via_home", False)
         caller = req.get("caller")
+        if not mail.is_person(caller) and self.mode == "node" and not via_home and "mail" not in resp:
+            # A read this node served alone (§4.4a, step 4b.2): the inbox is at the home, and the
+            # count it last pushed is what the line says — a hint, as fresh as the link.
+            unread, spent = self._mail_hints.get(naming.split_address(str(caller))[0], (0, False))
+            if unread:
+                resp["mail"] = {"unread": unread, "wake_budget_spent": spent}
         if not mail.is_person(caller) and self.mode == "home":
             # The line on every `ao` reply (design §4.10): the response to a session with unread
             # mail says so — result or refusal alike — read after the method ran, so an `ao inbox`
@@ -3119,7 +3285,7 @@ class HostAgent:
                             refusal
                             or f"a wait sees the org at the home: {self.home} (home) is unreachable from {self.host}"
                         )
-                    return await self._forward(rid, str(name), params, caller)
+                    return {**await self._forward(rid, str(name), params, caller), "_via_home": True}
             self._gate(caller, str(name), params)
             if (target := self._act_host(str(name), params)) is not None:
                 # Another host's record (design §4.4a, step 4a): gated above over the one graph,

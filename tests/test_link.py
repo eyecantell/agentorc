@@ -907,16 +907,21 @@ async def test_mail_crosses_the_link_both_ways_and_a_wait_from_the_node_wakes_on
                 assert woke["wake"] and woke["wake"]["cause"] == "mail"
                 assert woke["mail"][0]["from"] == lead_there and woke["mail"][0]["from_role"] == "controller"
                 # the unread line rides every reply the home answers for the node's session, until
-                # it reads (a read the node serves alone carries none: the inbox is not there)
+                # it reads — and since 4b.2 a read the node serves alone too, from the count the
+                # home pushes with the record's intent (the inbox itself never leaves the home)
                 from sessionorc import client as clientmod
 
                 await as_w.call("msg", to=[lead_there], text="one more", kind="note")
                 assert clientmod.last_mail == {"unread": 1, "wake_budget_spent": False}
                 await as_w.call("list")
-                assert clientmod.last_mail is None
+                assert clientmod.last_mail == {"unread": 1, "wake_budget_spent": False}
+                assert not node.sessions[w["id"]].inbox  # a hint, never the mailbox
                 mine = await as_w.call("inbox")
                 assert mine["id"] == w["id"] and mine["entries"][-1]["from"] == lead_there
                 assert mine["entries"][-1]["read_at"] and (await person.call("get", id=address))["unread"] == 0
+                assert await wait_for(lambda: node._mail_hints[w["id"]][0] == 0, timeout=5.0, step=0.05)
+                await as_w.call("list")
+                assert clientmod.last_mail is None  # read: the push said so
                 # a node session acting on a home session: gated at the home over one graph, both halves
                 with pytest.raises(AgentError, match="needs the control grant"):
                     await as_w.call("send", id=lead_there, text="echo NO")
@@ -998,3 +1003,223 @@ async def test_a_persons_forwarded_act_reaches_only_the_nodes_own_records(home, 
         async with LocalClient(sock=home.dir / "agent.sock") as at_home:
             assert (await at_home.call("get", id=lead["id"]))["controllers"] == []  # untouched
             await at_home.call("kill", id=lead["id"])
+
+
+# -- the home's intent reaches the node's replica, and the node's own arrivals reach the home (4b.2) ------
+
+
+async def test_the_home_pushes_each_record_its_intent_and_its_unread_count_and_never_its_mail(agent):
+    """`intent` (§4.4a "The home pushes each node its records' policy fields", step 4b.2): once
+    after the snapshot, then only what changed; the home-owned policy fields in the node's own
+    address form, the unread count beside them — and never an inbox, outbox, thread, wake or
+    message body."""
+    from sessionorc.agent import INTENT_FIELDS
+    from sessionorc.models import MailEntry
+
+    agent._take_records(
+        "laptop", [record(controllers=[f"ao-lead@{agent.host}", "ao-x-sib"], run_until=None)], whole=True
+    )
+    held = agent.remote["laptop"]["ao-x-w"]
+    held.inbox = [
+        MailEntry(id="m-1", from_="person", to=["ao-x-w@laptop"], at="2026-09-18T10:00:00Z", kind="note", text="SECRET")
+    ]
+    agent._link_muxes["laptop"] = mux = FakeMux()
+    agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
+    await agent._push_changes()
+    assert mux.sent == []  # nothing before the link's snapshot
+    agent._intent_sent["laptop"] = {}  # what `snapshot` does
+    await agent._push_changes()
+    ((method, params),) = mux.sent
+    (item,) = params["records"]
+    assert method == "intent" and item["id"] == "ao-x-w" and item["host"] == "laptop" and item["unread"] == 1
+    assert item["controllers"] == [f"ao-lead@{agent.host}", "ao-x-sib"]  # the node's form, as stored
+    assert set(item) <= INTENT_FIELDS | {"id", "host", "unread", "wake_budget_spent"}
+    for never in ("inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "state", "tail"):
+        assert never not in item
+    assert "SECRET" not in str(mux.sent)
+    await agent._push_changes()
+    assert len(mux.sent) == 1  # unchanged: nothing more
+    held.run_until, held.inbox = "2026-09-18T12:00:00Z", []
+    await agent._push_changes()
+    assert mux.sent[1][1]["records"][0]["run_until"] == "2026-09-18T12:00:00Z"
+    assert mux.sent[1][1]["records"][0]["unread"] == 0
+    del agent._link_muxes["laptop"]
+
+
+async def test_a_node_takes_the_homes_intent_by_owner_and_keeps_the_count_as_a_hint(agent):
+    from sessionorc.models import Session
+
+    agent.mode, agent.home = "node", "kmaster"
+    s = Session(id="ao-x-w", name="w", kind="interactive", adapter="claude-code", dir="/tmp/x", host=agent.host)
+    s.unattended, s.run_until, s.wrapup_sent_at, s.state = True, "2026-09-18T10:00:00Z", "2026-09-18T10:00:01Z", "idle"
+    agent.sessions[s.id] = s
+    try:
+        await agent._from_home(
+            "intent",
+            {
+                "records": [
+                    {
+                        "id": s.id, "host": agent.host, "team": "grind", "run_until": "2026-09-18T11:00:00Z",
+                        "controllers": ["ao-lead@kmaster"], "unread": 3, "wake_budget_spent": True,
+                        "inbox": [{"id": "m-1", "from": "person", "text": "SECRET"}], "state": "exited",
+                    },
+                    {"id": s.id, "host": "desk", "team": "not-mine"},
+                ]
+            },
+        )  # fmt: skip
+        assert (s.team, s.controllers, s.run_until) == ("grind", ["ao-lead@kmaster"], "2026-09-18T11:00:00Z")
+        assert s.wrapup_sent_at is None  # a new stop time is a new run, as `set_stop` has it
+        assert s.state == "idle" and s.inbox == []  # nothing the node owns, and never the mailbox
+        assert agent._mail_hints[s.id] == (3, True)
+        async with LocalClient(caller=s.id) as c:
+            from sessionorc import client as clientmod
+
+            await c.call("list")  # a read this node serves alone carries the line
+            assert clientmod.last_mail == {"unread": 3, "wake_budget_spent": True}
+    finally:
+        agent.sessions.pop(s.id)
+
+
+async def test_a_nodes_derived_reports_go_to_the_home_while_linked_and_are_not_derived_while_it_is_not(
+    agent, monkeypatch
+):
+    """`_derive_reports` on a node (step 4b.2): what it derives is sent as `derived` and the replica
+    is not written — the push brings the home's copy back; with the link down nothing is derived."""
+    from datetime import UTC, datetime
+
+    from sessionorc import reports
+    from sessionorc.models import ProgressEntry, Session
+
+    agent.mode, agent.home = "node", "kmaster"
+    s = Session(id="ao-x-w", name="w", kind="interactive", adapter="claude-code", dir="/tmp", host=agent.host)
+    s.git = {"branch": "td9-x"}
+    agent.sessions[s.id] = s
+    monkeypatch.setattr(reports, "holds_directory", lambda _s: {s.id})
+    monkeypatch.setattr(
+        reports,
+        "derive",
+        lambda *a: ([ProgressEntry(ref="TD-009", source="derived", branch="td9-x")], [], ["TD-008"]),
+    )
+    try:
+        agent._home_mux, agent.home_link = FakeMux(), {"up": False, "since": "t", "why": "the lid closed"}
+        await agent._derive_reports_inner(datetime.now(UTC))
+        assert agent._home_mux.sent == [] and s.id not in agent._derived_at  # nothing derived offline
+        agent.home_link = {"up": True, "since": "t", "why": "linked"}
+        await agent._derive_reports_inner(datetime.now(UTC))
+        ((method, params),) = agent._home_mux.sent
+        assert method == "derived" and params["id"] == s.id and params["retire"] == ["TD-008"]
+        assert params["progress"][0]["ref"] == "TD-009" and params["progress"][0]["source"] == "derived"
+        assert params["progress"][0]["branch"] == "td9-x" and s.progress == []  # the replica is not written
+    finally:
+        agent.sessions.pop(s.id)
+        agent._home_mux = None
+
+
+async def test_the_home_takes_a_nodes_derived_reports_for_that_nodes_records_only(agent):
+    from sessionorc.models import ProgressEntry
+
+    agent._take_records(
+        "laptop",
+        [record(progress=[ProgressEntry(ref="TD-008", source="derived", branch="td8-gone").to_dict()])],
+        whole=True,
+    )
+    got = await agent._take_derived(
+        "laptop",
+        {
+            "id": "ao-x-w",
+            "progress": [{"ref": "TD-009", "status": "claimed", "source": "derived", "branch": "td9-x"}],
+            "findings": [{"ref": "TD-010", "source": "derived"}],
+            "retire": ["TD-008"],
+        },
+    )
+    held = agent.remote["laptop"]["ao-x-w"]
+    assert got == {"changed": True} and [e.ref for e in held.progress] == ["TD-009"]
+    assert held.progress[0].branch == "td9-x" and [f.ref for f in held.findings] == ["TD-010"]
+    with pytest.raises(link.LinkError, match="never declared"):
+        await agent._take_derived("laptop", {"id": "ao-x-w", "progress": [{"ref": "TD-11", "source": "declared"}]})
+    with pytest.raises(link.LinkError, match="no such record"):
+        await agent._take_derived("desk", {"id": "ao-x-w", "progress": []})  # another link's host
+
+
+async def test_a_closed_home_record_is_superseded_by_the_nodes_new_session_of_the_same_id(agent):
+    """§4.4a, §9 invariant 12: a report of an id the home holds closed, and that disagrees on
+    identity, is a new session — it replaces the closed record in place. A live record that
+    disagrees stays refused, and logged."""
+    agent._take_records("laptop", [record(state="closed", dir="/tmp/old", team="old")], whole=True)
+    agent._take_records("laptop", [record(dir="/tmp/new", controllers=["ao-x-lead"], team="new")], whole=False)
+    held = agent.remote["laptop"]["ao-x-w"]
+    assert (held.dir, held.state, held.team, held.controllers) == ("/tmp/new", "working", "new", ["ao-x-lead"])
+    agent._take_records("laptop", [record(dir="/tmp/third")], whole=False)  # the new one is live: refused
+    assert agent.remote["laptop"]["ao-x-w"].dir == "/tmp/new"
+
+
+async def test_the_replica_is_repaired_from_the_home_on_every_new_link(home, hookstub, tmp_path, monkeypatch):
+    """The push after a snapshot (step 4b.2): a replica that drifted from the home — a home restored
+    from an old store, an act whose second half failed — takes the home's copy when the link is
+    next made, without anyone editing anything."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        rec = node.sessions[w["id"]]
+        rec.team, rec.unattended = "drifted", False
+        node.store.save(rec)
+        node._home_mux.close("a blip")
+        assert await wait_for(lambda: rec.team == "" and rec.unattended is True, timeout=15.0, step=0.05)
+        assert (await at_home(home, address))["team"] == ""  # the home's copy never took the drift
+
+
+async def test_stopping_policies_run_on_the_node_with_the_link_down_and_both_owners_stand_after(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """§4.4a "Policies that stop run on the node … offline included", and the example under *Each
+    field has one owner*: with the link down the node wraps its worker up at `run_until` and kills
+    it after the grace; on reconnect the node's `exited` and `wrapup_sent_at` stand at the home
+    beside the home's `run_until`."""
+    from datetime import UTC, datetime, timedelta
+
+    monkeypatch.setattr("sessionorc.agent.WRAPUP_GRACE", timedelta(seconds=1))
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        at = (datetime.now(UTC) + timedelta(seconds=3)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        async with LocalClient() as c:
+            w = await c.call(
+                "create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True, run_until=at,
+                wrapup_prompt="wrap up now",
+            )  # fmt: skip
+        address = f"{w['id']}@laptop"
+        v = await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        assert v["run_until"] == at
+        home.write_hosts([])  # the lid closes, and stays closed
+        node._home_mux.close("the lid closed")
+        await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
+        rec = node.sessions[w["id"]]
+        assert await wait_for(lambda: rec.state == "exited" and rec.wrapup_sent_at, timeout=20.0, step=0.1)
+        home.write_hosts(["laptop"])  # the lid opens
+        v = await until(home, address, lambda v: v is not None and v["state"] == "exited", timeout=20.0)
+        assert v["wrapup_sent_at"] == rec.wrapup_sent_at and v["run_until"] == at
+
+
+async def test_a_persons_offline_create_is_adopted_with_its_controllers_when_the_link_returns(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """§4.4a "When a host cannot reach home": a person at that host creates a session with
+    `controllers`; it is reported and adopted when the link returns, and the home's card carries
+    them addressed as the home reads them."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        home.write_hosts([])
+        node._home_mux.close("the lid closed")
+        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
+        async with LocalClient() as at_node:
+            w = await at_node.call(
+                "create", name="w", dir=str(tmp_path), adapter=hookstub.name, controllers=[f"{lead['id']}@kmaster"]
+            )
+        assert node.sessions[w["id"]].controllers == [f"{lead['id']}@kmaster"]
+        home.write_hosts(["laptop"])
+        v = await until(home, f"{w['id']}@laptop", lambda v: v is not None and v["state"] != "unreachable")
+        assert v["controllers"] == [lead["id"]] and v["host"] == "laptop"
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            await person.call("kill", id=lead["id"])
