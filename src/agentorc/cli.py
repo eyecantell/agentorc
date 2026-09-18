@@ -977,6 +977,9 @@ def cmd_host(args: argparse.Namespace) -> int:
             print(f"{out['node']}: devcontainer {out['devcontainer']}")
             print(f"  container: {(out['container'] or 'none')[:12]} {out['state'] or ''}".rstrip())
             print(f"  agent pid: {out['pid'] if out['pid'] else 'none'}")
+            b = out.get("build") or {}
+            behind = "" if b.get("running") == b.get("home") else f"  — behind the home's {b.get('home') or 'none'}"
+            print(f"  build: {b.get('running') or 'unknown'}{behind}")
             link = out["link"]
             print(f"  link: {'up' if link.get('up') else 'down'} — {link.get('why', '')}")
             for k, v in (out.get("reach") or {}).items():

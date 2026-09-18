@@ -188,11 +188,13 @@ async def node_agent(tmp_path, monkeypatch, command=None, name="laptop", socket=
 async def test_the_link_comes_up_drops_with_the_home_and_comes_back(home, tmp_path, monkeypatch):
     """The shape of *laptop closed for an hour*, from the link's side: up, down with a reason,
     and up again on its own, the backoff starting over."""
+    monkeypatch.setenv("AGENTORC_BUILD", "abc123def456")  # what a provisioned agent is started with
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
         assert node.home_link["why"] == "linked to kmaster as laptop"
         seen = await home.host_rpc()
         assert seen["mode"] == "home" and seen["links"]["laptop"]["up"] is True
+        assert seen["links"]["laptop"]["build"] == "abc123def456"  # said in the hello, kept on the link state
         async with LocalClient() as c:
             mine = await c.call("host")
             assert mine["home_reachable"] is True and mine["link"]["up"] is True

@@ -21,6 +21,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import os
 import random
 import sys
 import time
@@ -392,7 +393,15 @@ async def _converse(
     runner = asyncio.ensure_future(mux.run())
     try:
         try:
-            answer = await mux.request("hello", timeout=silence or LINK_SILENCE, protocol=PROTOCOL, host=host)
+            # `build`: what this agent was started on, when a home provisions it (a container node):
+            # the home re-provisions one that is behind — a promote changes no protocol number
+            answer = await mux.request(
+                "hello",
+                timeout=silence or LINK_SILENCE,
+                protocol=PROTOCOL,
+                host=host,
+                build=os.environ.get("AGENTORC_BUILD", ""),
+            )
         except LinkError as e:
             return False, f"refused: {e}"
         except (LinkClosed, TimeoutError):

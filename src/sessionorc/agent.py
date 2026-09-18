@@ -2289,7 +2289,7 @@ class HostAgent:
         now = time.monotonic()
         for name, n in containers.container_nodes().items():
             state = self.links.get(name)
-            if state and state["up"]:
+            if state and state["up"] and not state.get("stale"):
                 if self.supervision.pop(name, None) is not None:
                     self._note_link(name)
                 continue
@@ -2320,8 +2320,10 @@ class HostAgent:
         except Exception as e:  # noqa: BLE001 — docker itself failing is a reason on the card, not a crash
             self._supervised(n.name, sup, f"cannot observe the container: {e}", failed=True)
             return
-        why = (self.links.get(n.name) or {}).get("why", "")
-        action, doing = containers.decide(cstate, alive, str(why), volatile=n.volatile)
+        state = self.links.get(n.name) or {}
+        why = state.get("why", "")
+        stale = bool(state.get("up") and state.get("stale"))  # linked, and behind this home's build
+        action, doing = containers.decide(cstate, alive, str(why), volatile=n.volatile, stale=stale)
         if action == "wait":
             # nothing to mend — the agent is dialing, or the person stopped a volatile container:
             # give it the grace, then look again
@@ -2914,6 +2916,7 @@ class HostAgent:
                 self._link_muxes[host] = mux
                 self._intent_sent.pop(host, None)  # nothing is pushed to a link before its snapshot
                 self.links[host] = {"up": True, "since": now_iso(), "why": "linked"}
+                self._note_build(host, str(params.get("build") or ""))
                 said_hello = True
                 log.info("link from %s: up", host)
                 if host in containers.container_nodes():
@@ -3020,6 +3023,23 @@ class HostAgent:
                 continue
             for rid, payload, _ in out:  # marked as told only once it went
                 sent[rid] = payload
+
+    def _note_build(self, host: str, build: str) -> None:
+        """What the node says it runs, kept on its link state — and, for a container node, whether
+        it is behind what this home would provision now (§4.4a "The home supervises it": *at its
+        own version*). A promote changes no protocol number, so a node can stay linked many builds
+        behind, answering *unknown link method* to everything newer; the supervisor re-provisions
+        one marked `stale`. A machine node's build is recorded and nothing more: the home does
+        not install there."""
+        state = self.links.get(host)
+        if state is None:
+            return
+        state["build"] = build
+        if host in containers.container_nodes():
+            ours = containers.home_build()
+            if ours and build != ours:
+                state["stale"] = f"the node runs build {build or 'unknown'}, this home's is {ours}"
+                log.warning("link from %s: %s", host, state["stale"])
 
     async def _note_reach(self, host: str) -> None:
         """How a container node's sessions are reached (§4.4a "Reach", 3c.5): looked up (three

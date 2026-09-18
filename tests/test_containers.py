@@ -251,6 +251,8 @@ def test_host_up_brings_it_up_provisions_it_and_starts_the_agent(home, tmp_path)
         "user": "developer",
         "wheel": "agentorc-0.0.1-py3-none-any.whl",
         "started": True,
+        "restarted": False,
+        "build": containers.home_build(),
         "pid": None,
     }
     # the base built from the repo's image definition and tagged; then `devcontainer up` on the
@@ -295,11 +297,14 @@ def test_host_up_is_idempotent_and_an_env_file_reaches_the_agent(home):
     n = containers.node("contractmatch")
     n.node_dir.mkdir(parents=True)
     n.env_file.write_text("GH_TOKEN=ghp_x\nGIT_AUTHOR_NAME=grinder\n")
+    ours = containers.home_build()
+    (n.node_dir / "home").mkdir(parents=True, exist_ok=True)
+    (n.node_dir / "home" / "agent.build").write_text(ours + "\n")  # what the running agent was started on
     r = Fake(pid="4242\n")
     out = containers.host_up("contractmatch", r)
-    assert out["started"] is False and out["pid"] == 4242
+    assert out["started"] is False and out["restarted"] is False and out["pid"] == 4242 and out["build"] == ours
     assert "grep -q agentorc-agent /proc/$p/cmdline" in r.execs("agent.pid")[0][-1]  # alive *and* the agent
-    assert not r.execs("agentorc-agent serve")  # a live pid behind the pidfile: not started twice
+    assert not r.execs("agentorc-agent serve")  # a live pid behind the pidfile, on this build: not started twice
     assert r.execs("command -v gh")[0][r.execs("command -v gh")[0].index("--env-file") + 1] == str(n.env_file)
     (n.node_dir / "home").mkdir(parents=True, exist_ok=True)
     (n.node_dir / "home" / "agent.pid").write_text("4242\n")
@@ -716,3 +721,54 @@ async def test_a_runner_can_be_cancelled_mid_action_and_shutdown_and_forget_do_i
     real.cancel()
     t.join(5.0)
     assert not t.is_alive() and holder["err"] == "cancelled"
+
+
+# -- a promote leaves a node behind: the build, said in the hello (found live 2026-09-18) -----------------
+
+
+def test_a_build_is_the_wheels_content_and_an_agent_on_an_older_one_is_restarted(home):
+    """Every promote writes `agentorc-0.0.1-…whl` again, so a build is named by content. `host_up`
+    on a node whose agent is alive used to install the new wheel and leave the old process
+    running the code it had loaded; the agent is now started with its build in its environment
+    and beside its pidfile, and one that is behind is restarted."""
+    n = containers.node("contractmatch")
+    wheel = paths.home() / "wheels" / "agentorc-0.0.1-py3-none-any.whl"
+    ours = containers.home_build()
+    assert ours == containers.build_id(wheel) and len(ours) == 12
+    (n.node_dir / "wheels").mkdir(parents=True)
+    (n.node_dir / "wheels" / wheel.name).write_bytes(b"older")  # the same size as b"wheel": copied by content
+    r = Fake(pid="4242\n")  # alive, and started before builds were recorded
+    out = containers.host_up("contractmatch", r)
+    assert out["restarted"] is True and containers.node_build(n) == ours
+    assert r.execs("kill $p") and len(r.execs("agentorc-agent serve")) == 1
+    start = r.execs("agentorc-agent serve")[0]
+    assert f"AGENTORC_BUILD={ours}" in start and f"echo {ours} > /agentorc/home/agent.build" in start[-1]
+    # and the supervisor's decision: linked and behind is `provision`, as a protocol refusal is
+    assert containers.decide("running", True, "linked", stale=True)[0] == "provision"
+    assert containers.decide("running", True, "linked", stale=False) == ("wait", containers.WAITING)
+    assert containers.decide("exited", False, "", stale=True, volatile=True)[0] == "wait"  # never starts a volatile one
+
+
+async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_level_is_left_alone(container_home, agent):
+    from conftest import wait_for
+
+    fakes = container_home["fakes"]
+    container_home["make"] = lambda: Fake(pid="9\n")
+    ours = containers.home_build()
+    agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}
+    agent._note_build("cm", ours)
+    assert "stale" not in agent.links["cm"] and agent.links["cm"]["build"] == ours
+    # whatever the first tick started before the link was "up" has finished; from here on, nothing
+    assert await wait_for(lambda: "cm" not in agent._supervising, timeout=5.0, step=0.05)
+    before = len(fakes)
+    await asyncio.sleep(0.3)
+    assert not [f for f in fakes[before:] if f.execs("pip install")]  # level with the home: nothing to do
+    agent._note_build("cm", "")  # an agent started before builds existed, or on an older wheel
+    assert "the node runs build unknown" in agent.links["cm"]["stale"]
+    assert await wait_for(
+        lambda: any(f.execs("pip install") and f.execs("kill $p") for f in fakes[before:]), timeout=5.0, step=0.05
+    )
+    assert "older build — re-provisioning it" in agent.supervision["cm"]["doing"]
+    agent.links["laptop"] = {"up": True, "since": "now", "why": "linked"}
+    agent._note_build("laptop", "abc")  # a machine node: recorded, never `stale` — the home does not install there
+    assert agent.links["laptop"] == {"up": True, "since": "now", "why": "linked", "build": "abc"}
