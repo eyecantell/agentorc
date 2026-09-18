@@ -2024,7 +2024,9 @@ class HostAgent:
 
     # -- waking (design §4.8 "Waking a lead", §4.10 "The host agent decides each wake") ----------
 
-    async def rpc_wait(self, timeout: float = 600.0, scope: str = "controlled", caller: Any = None) -> dict[str, Any]:
+    async def rpc_wait(
+        self, timeout: float = 600.0, scope: str = "controlled", only_host: str | None = None, caller: Any = None
+    ) -> dict[str, Any]:
         """`ao wait [--timeout N] [--scope controlled|all]` (TD-049, moved here by TD-052 step 3):
         block until something in the caller's scope changes, new mail wakes it, or the timeout
         passes — and **that timeout is the fallback poll**.
@@ -2053,6 +2055,8 @@ class HostAgent:
             while True:
                 me.poke.clear()
                 views = self._views()
+                if only_host:  # a person over a link watches that node's records only (§4.4a)
+                    views = [v for v in views if v.get("host") == only_host]
                 changed, cursor = waits.wake_changes(before, waits.wait_scope(views, who, scope))
                 s = self._graph().get(who) if who is not None else None  # a node's session waits here too (step 5)
                 wake = self._decide_wake(s, member_change=bool(changed)) if s is not None else None
@@ -2503,7 +2507,9 @@ class HostAgent:
                     p[key] = [self._from_host(x, host) for x in p[key]]
         if rpc == "create":
             p.setdefault("host", host)
-        if params.get("caller") is None and rpc in modes.PERSON_NODE_BOUND:
+        if params.get("caller") is None and rpc == "wait":
+            p["only_host"] = host  # a person at a node watches that node's records, not the org's
+        if params.get("caller") is None and (rpc in modes.PERSON_NODE_BOUND or (rpc == "inbox" and p.get("id"))):
             # A person at a node acts only on that node's records (§4.4a): `id@<this home>` collapsed
             # to a home record above, and the person gate would then have passed it (security read of
             # PR #217). The target's host, read after the rewrite, has to be the link's own.

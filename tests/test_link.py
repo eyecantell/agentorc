@@ -844,6 +844,11 @@ async def test_a_persons_forwarded_act_reaches_only_the_nodes_own_records(home, 
             # a person's acts on panes never leave the node: a foreign id is simply no session here
             with pytest.raises(AgentError, match="no session"):
                 await person_at_laptop.call("kill", id=f"{lead['id']}@kmaster")
+            # the two reads the same rule covers: a home lead's mail bodies, and a `wait` over the org
+            with pytest.raises(AgentError, match="a person at laptop may inbox only laptop's sessions"):
+                await person_at_laptop.call("inbox", id=f"{lead['id']}@kmaster")
+            seen = await person_at_laptop.call("wait", timeout=0.5, scope="all")
+            assert all(v.get("host") == "laptop" for v in seen.get("changed") or [])
             with pytest.raises(AgentError, match="acts on its own sessions only"):  # refused at the node itself
                 await person_at_laptop.call("create", name="x", dir=str(tmp_path), adapter="shell", host="kmaster")
             # the node's own record: the same edit, forwarded and served

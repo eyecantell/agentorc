@@ -28,8 +28,10 @@ REPORTS = frozenset({"progress", "finding"})
 NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})
 # What a person's request forwarded from a node may do only to that node's records (design §4.4a:
 # "a person's request arriving over a link (no caller) may act only on that node's records"):
-# every act and every home-owned edit, a create for another host, and a delete from an inbox.
-# Reads are the org's, and a person may message anyone. Checked at the home, in `_forwarded`.
+# every act and every home-owned edit, a create for another host, and a delete from an inbox — and
+# the two reads a node does not serve itself: an `inbox` with an `id` (mail bodies of a home lead
+# would otherwise be readable from any laptop, where its `get` is not) and a `wait`, which is
+# scoped to the node's host. A person may still message anyone. Checked at the home, in `_forwarded`.
 PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox_delete"})) - frozenset({"hook"})
 
 
