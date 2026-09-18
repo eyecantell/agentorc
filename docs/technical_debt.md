@@ -45,7 +45,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-067 | Standing up a team has no operator's guide: the briefs README predates `ao team start`, design §4.9 is a spec, and `ao --skill` is for a session, not for the person or the Claude session that sets a team up | Medium | Open |
 | TD-068 | A brief over about 16 KB cannot start a session: the prompt is passed on tmux's command line, and `tmux new-session` answers *command too long* | Medium | Open |
 | TD-069 | One place to work from: an Inbox page listing everything that needs a person — session states, mail, due board items — each with its controls, filtered by team; today they are in three places and the mail dialog is too narrow to read | Medium | Open |
-| TD-070 | An `ask` cannot offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, rendered as buttons beside Reply and Delete | Medium | Open |
+| TD-070 | Neither an `ask` nor a board item can offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, and an answers field on the board entry (a dev-cadence format change), rendered as buttons | Medium | Open |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Open |
 
 ---
@@ -655,7 +655,7 @@ It matters more than a Low priority suggests in one narrow way: design §4.5a's 
 
 **Priority:** Medium
 **Added:** 2026-09-18 (the anchor session; Paul's review of the Org page). Widened the same day: from *the dialog is too narrow* to *the one place to work from*.
-**Status:** Open — direction agreed with Paul 2026-09-18 (work from one spot, filter it by team, a row opens the session that needs you; the Org page keeps its own needs-you marks for a person who prefers the grid). **The shape below is a proposal under discussion, not a decision** — above all whether board items appear in the Inbox or mail on the board. Design first: a new screen and its controls are §4.5 and §4.5a rows before they are code.
+**Status:** Open — direction agreed with Paul 2026-09-18 (work from one spot, filter it by team, a row opens the session that needs you; the Org page keeps its own needs-you marks for a person who prefers the grid). Board items appear in the Inbox, not mail on the board, and the three questions the proposal ended on are answered below (2026-09-18); the rest of the shape is the proposal the design round starts from. Design first: a new screen and its controls are §4.5 and §4.5a rows before they are code.
 **Location:** `src/agentorc/ui/templates/base.html` (the `personbox` dialog), `src/agentorc/ui/static/app.js` (its list, Reply and delete), `src/agentorc/ui/app.py` (`/api/inbox` routes); a new `inbox.html` and nav item; design §4.5 screen 6 (**Attention**) and the **Due** strip, both unbuilt
 
 **Why:** three things ask for a person today, in three places. (1) **A session's state** — a permission prompt, a question in the terminal, a usage limit, a stall: on the session's card, found by scanning the grid. (2) **Mail to the person** (`ao msg person`): in a dialog off the top bar, a fixed-width column at `max-height: 60vh`, where sessions write paragraphs — on 2026-09-18 its five entries were two defect reports, a wind-down notice and a venv failure. (3) **Board items** (`docs/user_attention.md`, per repo, dated): printed into a session's context by a hook, and nowhere in the UI — 39 were due across this machine that day, most of them weeks stale. The Urgent first sort was the first answer to (1) and team cards made it moot (dropped 2026-09-18, PR with this entry); nothing answers all three.
@@ -670,14 +670,18 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Board items in the Inbox, not mail on the board** (the anchor's recommendation). The board is a file in git, written by PR, dated, and survives this machine; mail is chatter a session sends without a commit and the host agent may lose. Showing due board items in the Inbox costs a read; putting mail on the board would mean a commit per message and a board nobody can keep small. The door between them is one way and explicit: **Put on the board** on a mail row writes the entry (with a `Due:`) through the same write-back, and deletes the mail — the rule sessions already follow (*anything with a date on it belongs on the board*), given to the person too. This makes the Inbox what §4.5's unbuilt **Due** strip was going to be, so the strip is struck rather than built; the **Attention** tab stays the *whole* board — undated and future items included — which the Inbox deliberately is not.
 
-**Open questions for Paul:** (a) does a due board item count toward the top bar's number — today that would turn 5 into 44; (b) stale board items need a bulk snooze or the list is unusable on day one; (c) whether *exited with unpushed work* is a row (it is a thing only a person resolves, and no state says so today).
+**Decided with Paul, 2026-09-18** (the three questions the proposal ended on):
+- **One count and one view.** A due board item counts toward the top bar's number like a state or a message — no second, quieter count. What a person does not want to handle now they **snooze**, and a snoozed row leaves the list and the count until its time. For a board item that is the board's own snooze (edit the `Due:` date, §4.4's write-back); for mail it is new — a `snoozed_until` on the person-inbox entry, which §4.10 must gain; a permission prompt is on the tool's clock and cannot be snoozed; whether a question or a stall can is for the design round.
+- **The stale backlog is Paul's to clear, not the page's to hide.** 39 items were due on 2026-09-18 because the boards have not been manageable, which is what this page is for; he works through them or snoozes them once it exists. No bulk-snooze control is planned for that reason alone — add one only if the first pass shows it is needed.
+- **Exited with unpushed work is a row.** Only a person resolves it, and today it is a small flag on a dead card (`orchestrator-ao-1`, *305 unpushed*, 2026-09-18). The row says what Ready to close says (§4.2) and opens the session's details; it goes when the work is pushed or the session is forgotten.
+- **Board items get suggested answers too** — see TD-070, which now covers both; the board's half is a change to dev-cadence's entry format, not to this repo.
 
 **Done when** the top bar's Inbox opens a full-width page listing states, mail and due board items with their controls in place, a team filter narrows it, a row opens the session it is about, a 2,000-character message reads without a scroll box, and §4.5 / §4.5a describe it. Steps, each its own PR: the page with mail only (retires the dialog); states as rows; board items and the write-back; *Put on the board*.
 
 **Related:** design §4.10 (the person inbox), §4.5 screens 1 and 6, §4.4 (board write-back), §4.5a (the top bar **Inbox** row, the **Due** strip rows), TD-052 (mail), TD-070, cadence §3 (the board).
 
 
-## TD-070: An `ask` cannot offer its expected answers — the person types every reply from scratch
+## TD-070: Neither an `ask` nor a board item can offer its expected answers — the person types every reply from scratch
 
 **Priority:** Medium
 **Added:** 2026-09-18 (the anchor session; Paul's review of the Org page)
@@ -688,9 +692,11 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Fix:** `ao msg … --kind ask --answer "merge it" --answer "hold it"` stores `answers: [...]` on the entry — bounded (a handful, each short; the bounds belong beside `TEXT_CAP` in §4.10) and **data, never instructions**: an answer is text the sender proposed, rendered as a button whose press sends exactly that text as the `reply`, the same RPC the free-text Reply uses, so nothing new can be said through it that Reply could not say. Session-to-session asks may carry them too (`ao inbox` prints them); the first surface is the person's Inbox. The briefs tell a session to offer answers when it knows them.
 
+**Board items too (Paul, 2026-09-18).** A board entry is a question to a person as often as mail is — *approve the `rm -r`*, *decide TD-260*, *merge or hold* — and on the Inbox page (TD-069) it should carry the same buttons. That needs the entry to say its answers, which is **dev-cadence's format, not agentorc's**: `docs/cadence.md` §3 and the board skeleton are SYNCED files, edited there and never here. The shape to propose there: an optional trailing field on the entry line, after `Due:`, listing a few short answers; an entry without it is exactly what it is today, so no consumer breaks. What pressing one *does* is the open part — a board item has no sender waiting on `ao wait`. The cheapest honest meaning: the answer is written back onto the entry (the same agent write-back as Snooze and Done, §4.4) as the person's decision, with the date, and the entry stays on the board until a session acts on it and removes it — so the next session in that repo reads the decision from the SessionStart hook, which already prints due items. Steps: (1) the dev-cadence change — its own ledger entry and PR in that repo, by a session there; (2) agentorc's board parser reads the field; (3) the Inbox row renders the buttons and the write-back records the press.
+
 **Done when** an ask sent with `--answer` shows its answers as buttons beside Reply and Delete, pressing one delivers that text as a `reply` that wakes the sender's `ao wait`, free-text Reply still works, and the bounds are in §4.10 and enforced at the RPC.
 
-**Related:** design §4.10 (kinds, bounds, *a reply is mail, not a send*), TD-069 (the page these sit on), TD-052.
+**Related:** design §4.10 (kinds, bounds, *a reply is mail, not a send*), §4.4 (board write-back), TD-069 (the page these sit on), TD-052, dev-cadence `docs/cadence.md` §3 (the entry format).
 
 
 ## TD-071: Org page review, 2026-09-18 — what was built, and the ideas that were not
