@@ -507,22 +507,23 @@ def create_app() -> FastAPI:
 
     defs_cache: dict[str, Any] = {"at": 0.0, "org": None}
 
-    def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The definitions' rows for a delta's headers. The page reads the files on every load;
         the events stream re-renders every header on every delta, so it reads them at most once in
         `DEFS_TTL` seconds — a definition edited by hand shows on the next load, or within that."""
         now = time.monotonic()
         if defs_cache["org"] is None or now - defs_cache["at"] > DEFS_TTL:
-            defs_cache.update(at=now, org=org_here()[0])
+            # off the loop: every open page shares it, and the read is a file per registered repo
+            defs_cache.update(at=now, org=(await asyncio.to_thread(org_here))[0])
         return _aged(teamrun.rows(defs_cache["org"], sessions))
 
-    def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
+    async def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
         """The team groups as the events stream ships them (design §4.5a **team groups**): per group
         its key, the member ids in order, and the header rendered by the same template the page
         uses — so the client moves cards between groups and swaps headers without composing any
         markup of its own. `None` means "flat grid", exactly as the page renders it."""
         fleet = list(known.values())
-        groups = team_groups([view(s, fleet) for s in fleet], team_rows(fleet))
+        groups = team_groups([view(s, fleet) for s in fleet], await team_rows(fleet))
         if groups is None:
             return None
         head = templates.get_template("group_head.html")
@@ -1056,7 +1057,7 @@ def create_app() -> FastAPI:
                                 "rank": v["rank"],  # the view's: unseen idle sorts above idle
                                 "html": render_card(v),
                                 "session": v,
-                                "groups": group_heads(known),
+                                "groups": await group_heads(known),
                             }
                         )
                     )
@@ -1066,7 +1067,7 @@ def create_app() -> FastAPI:
                         # popping on it would one day evict a live session by coincidence
                         went = str(ev.get("id") or "")
                         known.pop(went, None)
-                        await ws.send_text(json.dumps({**ev, "groups": group_heads(known)}))
+                        await ws.send_text(json.dumps({**ev, "groups": await group_heads(known)}))
                         # A card's *under* chip names another record, so the session that went
                         # is not the only card now out of date: every card listing it as a
                         # controller has to be redrawn, or it keeps naming and linking to a

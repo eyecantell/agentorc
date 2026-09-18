@@ -338,7 +338,11 @@
     });
     sections().forEach((sec) => {
       if (keep.includes(sec)) return;
-      const home = $(".grid", keep[0]);  // a card the server did not list keeps its place on the page
+      // A card the server did not list keeps its place on the page — somewhere it can be seen: the
+      // first group may now be a stopped team, folded (review of PR #226), so *No team* or a live
+      // team is preferred.
+      const dest = keep.find((k) => !k.dataset.team) || keep.find((k) => +k.dataset.live) || keep[0];
+      const home = $(".grid", dest);
       $$(".sc", sec).forEach((c) => home.appendChild(c));
       sec.remove();
     });
