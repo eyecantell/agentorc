@@ -734,12 +734,17 @@ nodes:
   open; the repo's Dockerfile pins it (`useradd --uid 1000`).
 - **The home generates the container's definition from the repo's, and keeps the repo's mounts
   out of it.** `ao host up <name>` reads the repo's `devcontainer.json` and writes the node's own
-  under `~/.agentorc/nodes/<name>/`: the image (`build`, `image`, `features`), `remoteUser` and the
-  lifecycle commands kept; the repo's `mounts`, `customizations` and `containerEnv` **dropped**,
-  because they are the person's — contractmatch's mount carries `.netrc`, a kubeconfig and a Modal
-  token, the person's whole credential set, which no unattended worker holds; `workspaceMount` and
-  `workspaceFolder` set to the checkout's own path; and agentorc's two mounts added, the link
-  directory and the node's volume. It brings the container up with the devcontainer CLI — the
+  under `~/.agentorc/nodes/<name>/`: the image (`build`, `image`, `features`) kept, its relative
+  `dockerfile` and `context` re-anchored to absolute paths, since the file no longer sits beside
+  them; `remoteUser` and the lifecycle commands kept; the repo's `mounts`, `customizations` and
+  `containerEnv` **dropped**, because they are the person's — contractmatch's mount carries
+  `.netrc`, a kubeconfig and a Modal token, the person's whole credential set, which no unattended
+  worker holds — and **each dropped mount replaced by an empty tmpfs at the same target**, so a
+  lifecycle script that creates a directory under one, or tests for a file in one, runs as it
+  would beside an empty mount rather than dying on a path that is not there (contractmatch's
+  `postCreate.sh` does the first, under `set -e`); `workspaceMount` and `workspaceFolder` set to
+  the checkout's own path; and agentorc's two mounts added, the link directory and the node's
+  volume. It brings the container up with the devcontainer CLI — the
   reference implementation VS Code itself uses, a requirement of a home that runs containers as
   tmux is of every host — under agentorc's own id label, so it is a *second* container from the
   project's image beside any the person's VS Code opens, never that one.
@@ -748,9 +753,9 @@ nodes:
   `link: {socket: …}`), written by the home; `profiles.yml`; the profile's `CLAUDE_CONFIG_DIR`,
   logged in once by hand inside and kept; run logs, the hook socket and the store, so a rebuild
   reconnects with its history and not with an empty snapshot the home would take as the truth — and
-  a venv the home fills with **its own wheel**: the promote (TD-062) also writes the wheel it
-  installed, and a container node is re-provisioned from it, a `hello` refused for protocol being
-  the cue. The image supplies Python 3.12+ and tmux, and `ao host up` refuses, naming which, when
+  a venv the home fills with **its own wheel**: the promote (TD-062) gains one step, writing the
+  wheel of what it installed to `~/.agentorc/wheels/`, and a container node is re-provisioned from
+  the newest, a `hello` refused for protocol being the cue. The image supplies Python 3.12+ and tmux, and `ao host up` refuses, naming which, when
   it does not. What a worker needs beyond that is in `~/.agentorc/nodes/<name>/env` (`0600`), read
   into the container's environment: a fine-grained GitHub token scoped to the repo (`gh auth
   setup-git` at provisioning makes `git push` use it), the author name and email, and whatever the
