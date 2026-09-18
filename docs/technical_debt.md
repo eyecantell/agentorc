@@ -41,6 +41,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-063 | CI-only flakes on the 3.12 runner: the two timing-shaped tests and the record-revive race are fixed; the 26-minute hang of PR #192 is still unattributed | Low | Partly done |
 | TD-064 | Claude Code's own session-to-session messages reach an agentorc session around the mail gates, and an unattended session blocks on their approval prompt until a person answers | Medium | Open |
 | TD-065 | The controllers chips on the card and the Focus header ask for a `.chip` class that no stylesheet defines, so the one control that says who may act on a session is drawn as bare text | Low | Open |
+| TD-066 | Records grow without bound until TD-052 step 6 sets the mail bounds, and one `list` reply outgrew the client's 64 KiB line limit: every `ao` and the UI failed at once | High | Open |
 
 ---
 
@@ -571,3 +572,21 @@ It matters more than a Low priority suggests in one narrow way: design §4.5a's 
 **Fix:** either give `.chip` a rule, or — the cheaper and more consistent answer — use `.badge` on both, as every other chip on the page does, keeping `chip` only where a test or the JS needs a hook (neither does today; `app.js` selects by `data-act` and by id). Whichever is chosen, **three** places change together, not two: `card.html`, `focus.html`, and the line in `app.js` that rebuilds the Focus chips on a live delta — the card and the Focus header are two halves of one §4.5a row, and the page rewrites the second of them itself, so a fix that misses the JS looks right until the first state change. **Done when** the controllers chips are drawn as chips in both places, and a stylesheet rule exists for whatever class they name.
 
 **Related:** design §4.5a (the card *under* chip and the Focus controllers chip), §4.8 / TD-036 (what the control is for), TD-038 (the terminal's look — the same class of "it works and reads badly", and the same reason this entry stops at reading the files: judging it wants a browser), TD-053 step 6 (the out-of-work chip, which used `.badge` for exactly this reason).
+
+
+## TD-066: A `list` reply outgrew the client's line limit and every `ao` on the machine failed
+
+**Priority:** High
+**Added:** 2026-09-17 (anchor session, watching the samscrape team)
+
+**Status:** Open — the immediate cause is fixed (PR #PRNUM: the client and the stdio bridge open their streams with the same 8 MiB limit the link uses); the growth that caused it is not.
+
+**Location:** `src/sessionorc/client.py` (`LINE_LIMIT`), `src/sessionorc/link.py` (`FRAME_LIMIT`), `src/sessionorc/mail.py` (the bounds that are `None` until TD-052 step 6: `MAIL_RETENTION`, `MAILBOX_DEPTH`, `THREAD_BOUND`), `src/sessionorc/models.py` (`Session.view()`)
+
+**Why:** at about 20:00 MDT every `ao` command answered `ValueError: Separator is found, but chunk is longer than limit` and the Org page answered 500. One reply is one line, and asyncio's default line limit is 64 KiB; the `list` of six records had grown past it. The records themselves were 106–249 KB each: after seven hours of a four-session team with no retention, the lead's `outbox` held 173 KB and each grinder's `inbox` 77–107 KB. `view()` drops `inbox` and `outbox`, but what it keeps — `sends`, `threads`, `wakes`, `tail`, the reports — was enough across six records. The agent's server had been opened with an 8 MiB limit for the link (TD-057 step 3a); the client had not, so the agent wrote a reply nobody could read. Every session on the machine lost `ao` at once — the leads' rounds, the grinders' claims, the UI — for as long as it took a person to notice.
+
+**Fix:** (1) done: `LINE_LIMIT` on the client's two connections, with a test that reads a `list` past 64 KiB. (2) TD-052 step 6 is now urgent rather than pending measurement: `MAIL_RETENTION` and `MAILBOX_DEPTH` bound what a record carries; until they are set a long-running team's records grow without limit, and a 249 KB record is rewritten to disk on every change. (3) `view()` should carry only what a card needs — `threads` and `wakes` are the host agent's bookkeeping and could leave the view, or be summarised — so a `list` grows with the number of sessions, not with their history.
+
+**Done when** a team can run for days without any record or reply growing past a bound the design names, and a reply larger than the client can read is a logged refusal at the agent, never a silent failure at every client.
+
+**Related:** TD-052 (step 5's measurement and step 6's numbers — this is the first measurement: what seven hours of a four-session team weighs), TD-057 step 3a (where the agent's limit was raised), TD-062 (the same shape: the agent newer than what talks to it).

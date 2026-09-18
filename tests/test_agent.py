@@ -1370,3 +1370,14 @@ async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_u
         assert s["wrapup_sent_at"] is None
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
+
+
+async def test_a_reply_past_asyncios_default_line_limit_is_read(agent, tmp_path):
+    """TD-066: a `list` of six records grew past 64 KiB after a day of mail and every `ao` failed. The
+    client and the agent open their streams with the same 8 MiB limit."""
+    async with LocalClient() as c:
+        s = await c.call("create", name="big", dir=str(tmp_path), adapter="shell")
+        await c.call("progress", id=s["id"], ref="TD-1", status="claimed", why="x" * 200_000)
+        views = await c.call("list")
+        assert len(json.dumps(views)) > 65_536 and any(v["id"] == s["id"] for v in views)
+        await c.call("kill", id=s["id"])
