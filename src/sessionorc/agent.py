@@ -240,6 +240,7 @@ class HostAgent:
         server = await asyncio.start_unix_server(self._handle_conn, path=str(sock), limit=link.FRAME_LIMIT)
         os.chmod(sock, 0o600)
         log.info("listening on %s", sock)
+        link_servers = await self._bind_links() if self.mode == "home" else []
         ticker = asyncio.create_task(self._tick_loop())
         dialer = asyncio.create_task(self._dial_home()) if self.mode == "node" else None
         try:
@@ -253,6 +254,8 @@ class HostAgent:
                     await asyncio.get_running_loop().create_future()
                 finally:
                     server.close()
+                    for _, srv in link_servers:
+                        srv.close()
                     for w in list(self._conns):
                         w.close()
         finally:
@@ -263,6 +266,41 @@ class HostAgent:
                 m.close("the home is stopping")
             with contextlib.suppress(FileNotFoundError):
                 sock.unlink()
+            for lsock, _ in link_servers:
+                with contextlib.suppress(FileNotFoundError):
+                    lsock.unlink()
+
+    async def _bind_links(self) -> list[tuple[Path, asyncio.AbstractServer]]:
+        """The home's per-node link sockets (design §4.4a "A container node", TD-057 step 3c): one
+        listener per `nodes:` entry at `links/<name>/link.sock`, speaking only the link protocol. A
+        connection on it *is* that node — the name is the home's configuration, never the node's
+        argv — so it enters `_serve_link` as sshd's forced command would, with no bridge between.
+        Read once, here: a new node is a restart. The directory is `0700` and the socket `0600`,
+        and a container node is handed the directory, which outlives the socket file (re-bound on
+        every start of the home)."""
+        out: list[tuple[Path, asyncio.AbstractServer]] = []
+        for name in hosts.nodes():
+            lsock = paths.link_socket(name)
+            lsock.parent.mkdir(parents=True, exist_ok=True)
+            os.chmod(lsock.parent, 0o700)
+            with contextlib.suppress(FileNotFoundError):
+                lsock.unlink()
+
+            async def take(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, name: str = name) -> None:
+                self._conns.add(writer)
+                try:
+                    await self._serve_link({"host": name}, reader, writer)
+                except (ConnectionError, asyncio.IncompleteReadError):
+                    pass
+                finally:
+                    self._conns.discard(writer)
+                    writer.close()
+
+            srv = await asyncio.start_unix_server(take, path=str(lsock), limit=link.FRAME_LIMIT)
+            os.chmod(lsock, 0o600)
+            log.info("link socket for %s at %s", name, lsock)
+            out.append((lsock, srv))
+        return out
 
     async def _tick_loop(self) -> None:
         while True:
@@ -2121,7 +2159,7 @@ class HostAgent:
                 task.add_done_callback(self._bg.discard)
 
         await link.dial(
-            hosts.link_command(),
+            hosts.link_socket() or hosts.link_command(),
             host=self.host,
             handler=self._from_home,
             on_state=on_state,
@@ -2275,7 +2313,7 @@ class HostAgent:
         if self.mode != "home":
             return f"{self.host} is a node of {self.home}, not a home: there is one home, and a node takes no links"
         if not host:
-            return "the forced command named no host (`agentorc-agent link --host <name>` in authorized_keys)"
+            return "the link named no host (`agentorc-agent link --host <name>` in authorized_keys)"
         if host == self.host:
             return f"{host} is this home's own name: a node's key must be bound to the node's name"
         if host not in hosts.nodes():
@@ -2283,8 +2321,9 @@ class HostAgent:
         claimed = str(hello.get("host") or "")
         if claimed and claimed != host:
             return (
-                f"this key is bound to {host}, and the node calls itself {claimed}: the `--host` in "
-                "authorized_keys and the node's `local: {name: …}` must agree"
+                f"this link is bound to {host}, and the node calls itself {claimed}: the name the home binds "
+                "(the `--host` in authorized_keys, or the `nodes:` entry whose socket this is) and the node's "
+                "`local: {name: …}` must agree"
             )
         if hello.get("protocol") != link.PROTOCOL:
             return f"link protocol {hello.get('protocol')!r} here is {link.PROTOCOL}: promote both ends to one build"

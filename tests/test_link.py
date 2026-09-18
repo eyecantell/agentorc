@@ -159,10 +159,11 @@ async def home(tmp_path):
 
 
 @contextlib.asynccontextmanager
-async def node_agent(tmp_path, monkeypatch, command, name="laptop"):
+async def node_agent(tmp_path, monkeypatch, command=None, name="laptop", socket=None):
     d = tmp_path / name
     d.mkdir(exist_ok=True)
-    (d / "hosts.yml").write_text(f"home: kmaster\nlocal:\n  name: {name}\nlink:\n  command: {command!r}\n")
+    how = f"socket: {socket}" if socket is not None else f"command: {command!r}"
+    (d / "hosts.yml").write_text(f"home: kmaster\nlocal:\n  name: {name}\nlink:\n  {how}\n")
     monkeypatch.setenv("AGENTORC_HOME", str(d))
     monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(d / "claude"))
     monkeypatch.delenv("AGENTORC_SESSION", raising=False)
@@ -251,6 +252,46 @@ async def test_ssh_failed_and_agent_down_are_told_apart(tmp_path, monkeypatch):
     cmd = ["env", f"AGENTORC_HOME={empty}", sys.executable, "-m", "sessionorc.agent", "link", "--host", "laptop"]
     async with node_agent(tmp_path, monkeypatch, cmd) as node:
         assert await wait_for(lambda: "agent down on the home" in node.home_link["why"], timeout=10.0, step=0.05)
+
+
+async def test_a_container_node_dials_the_homes_socket_with_no_ssh_and_survives_its_restart(
+    home, tmp_path, monkeypatch
+):
+    """TD-057 step 3c.1: the home binds `links/<name>/link.sock` for each `nodes:` entry and the
+    node opens it directly — no ssh, no bridge — and what the node holds is the *directory*, so a
+    home that unlinks and re-binds its socket on restart is found again."""
+    sock = home.dir / "links" / "laptop" / "link.sock"
+    assert await wait_for(sock.exists, timeout=5.0, step=0.05)  # bound just after agent.sock, which start() waited on
+    assert (sock.parent.stat().st_mode & 0o777) == 0o700 and (sock.stat().st_mode & 0o777) == 0o600
+    async with node_agent(tmp_path, monkeypatch, socket=sock) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05), node.home_link
+        assert node.home_link["why"] == "linked to kmaster as laptop"
+        seen = await home.host_rpc()
+        assert seen["links"]["laptop"]["up"] is True
+        assert await node._home_mux.request("ping", timeout=10) == "pong"
+        home.stop()
+        assert await wait_for(lambda: not node.home_reachable(), timeout=10.0, step=0.05)
+        assert await wait_for(lambda: node.home_link["why"].startswith("cannot connect: "), timeout=10.0, step=0.05), (
+            node.home_link
+        )
+        assert not sock.exists()  # the home took its socket with it; the directory stayed
+        await home.start()
+        assert await wait_for(node.home_reachable, timeout=15.0, step=0.05), node.home_link
+        assert (await home.host_rpc())["links"]["laptop"]["up"] is True
+        # the socket is that node's: a second connection on it is *laptop* too, and replaces the first
+        r, w = await asyncio.open_unix_connection(str(sock), limit=link.FRAME_LIMIT)
+        other = link.Mux(r, w, nothing)
+        run = asyncio.ensure_future(other.run())
+        try:
+            hello = await other.request("hello", timeout=10, protocol=link.PROTOCOL, host="laptop")
+            assert hello["host"] == "laptop"
+            with pytest.raises(link.LinkError, match="bound to laptop, and the node calls itself desk"):
+                await other.request("hello", timeout=10, protocol=link.PROTOCOL, host="desk")
+        finally:
+            other.close()
+            run.cancel()
+    # a node that is not in `nodes:` gets no socket at all
+    assert not (home.dir / "links" / "desk").exists()
 
 
 async def test_a_node_takes_no_links_and_a_home_not_its_own_name(tmp_path, monkeypatch):

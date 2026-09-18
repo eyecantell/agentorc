@@ -21,8 +21,11 @@ link between them (step 3a) reads two more top-level keys:
 # on the home: who may dial in. A list of names, or a mapping when a node has flags.
 nodes:
   laptop: {volatile: true}
-# on a node: how to dial. Default: `ssh -T <home>` with the home's name as the ssh alias.
-link: {ssh: kmaster}        # or {command: [...]}, run as given (tests; any other transport)
+# on a node: how to dial — one `link:` key, of one of these shapes. Default: `ssh -T <home>`
+# with the home's name as the ssh alias.
+link: {ssh: kmaster}                        # or {command: [...]}, run as given (tests; any other transport)
+# link: {socket: /agentorc/link/link.sock}  # a container node on the home's own machine (step 3c):
+#                                           # the home's per-node socket, its directory mounted in
 ```
 
 Without the file the machine's short hostname stands in for `name` and `vscode_host`, and every
@@ -151,6 +154,16 @@ def link_command() -> list[str]:
     target = cfg.get("ssh")
     target = target.strip() if isinstance(target, str) and target.strip() else home_name()
     return ["ssh", *SSH_OPTIONS, target, "agentorc-agent", "link"]
+
+
+def link_socket() -> Path | None:
+    """A container node's way to its home (design §4.4a "A container node", TD-057 step 3c): the
+    per-node link socket the home binds, reached through the mounted directory — no ssh, no key,
+    no network. `link: {socket: <path>}`; None when the node dials by command."""
+    raw = _top().get("link")
+    cfg = raw if isinstance(raw, dict) else {}
+    s = cfg.get("socket")
+    return Path(s.strip()).expanduser() if isinstance(s, str) and s.strip() else None
 
 
 def is_node() -> bool:
