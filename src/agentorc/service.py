@@ -102,6 +102,13 @@ def install(*, bind: str = "127.0.0.1", port: int = 8765, home: str | None = Non
         # re-points the units (dev venv → stable install) must restart to take effect. Safe: the
         # agent unit never takes tmux down (KillMode=process); the UI's terminals reconnect.
         _systemctl("restart", *[f"{u}.service" for u in UNITS])
+    # The promote's one more step (design §4.4a "A container node", TD-057 step 3c.2): the wheel
+    # of what was just installed, which is what a container node is provisioned from.
+    from sessionorc import containers
+
+    wheel = containers.write_wheel()
+    if wheel is not None:
+        written.append(str(wheel))
     return written
 
 

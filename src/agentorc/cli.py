@@ -777,9 +777,7 @@ def cmd_progress(args: argparse.Namespace) -> int:
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
     # `force` only when asked (TD-062 fix (a)): unset is `None`, which the client leaves out of the
     # envelope, so a host agent older than TD-056 still answers every call that does not force
-    s = call_sync(
-        "progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, force=args.force or None
-    )
+    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, force=args.force or None)
     if (held := s.get("lease_overridden")) and not args.json:
         print(f"{s['id']}: claimed over {held['session']}'s lease (since {held['at']})", file=sys.stderr)
     return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
@@ -910,6 +908,61 @@ def cmd_service(args: argparse.Namespace) -> int:
         return emit(args, {"ok": True}, lambda: print("units disabled and removed (tmux sessions untouched)"))
     status = service.status()
     return emit(args, {"status": status}, lambda: print(status))
+
+
+def cmd_host(args: argparse.Namespace) -> int:
+    """`ao host up|rebuild|forget|status <name>` (design §4.4a "A container node", TD-057 step 3c):
+    the home brings a container node up from the repo's devcontainer definition, installs the
+    agent in it at its own version and starts it; `status` reads the container and the link;
+    `forget` is the removal path a runtime needs that a machine did not."""
+    from sessionorc import containers
+
+    try:
+        if args.action in ("up", "rebuild"):
+            out = containers.host_up(args.name, rebuild=args.action == "rebuild")
+            return emit(
+                args,
+                out,
+                lambda: print(
+                    f"{out['node']}: container {out['container'][:12]} as {out['user']}, {out['wheel']} installed; "
+                    + ("agent started" if out["started"] else f"agent already running (pid {out['pid']})")
+                    + " — `ao status` shows its card once it dials in"
+                ),
+            )
+        if args.action == "forget":
+            out = containers.host_forget(args.name, purge=args.purge)
+            try:
+                out["records"] = call_sync("forget_host", host=args.name)
+            except (AgentError, AgentUnavailable) as e:
+                out["records"] = {"error": str(e)}
+            return emit(
+                args,
+                out,
+                lambda: print(
+                    f"{out['node']}: container {'removed' if out['container'] else 'none'}, link directory removed, "
+                    f"`nodes:` entry {'removed' if out['entry_removed'] else 'not found'}, "
+                    f"volume {'kept' if out['volume_kept'] else 'purged'}; records at the home: {out['records']}"
+                ),
+            )
+        out = containers.host_status(args.name)
+        try:
+            links = call_sync("host").get("links") or {}
+            out["link"] = links.get(args.name) or {"up": False, "why": "never linked"}
+        except (AgentError, AgentUnavailable) as e:
+            out["link"] = {"up": False, "why": f"host agent: {e}"}
+
+        def prose() -> None:
+            print(f"{out['node']}: devcontainer {out['devcontainer']}")
+            print(f"  container: {(out['container'] or 'none')[:12]} {out['state'] or ''}".rstrip())
+            print(f"  agent pid: {out['pid'] if out['pid'] else 'none'}")
+            link = out["link"]
+            print(f"  link: {'up' if link.get('up') else 'down'} — {link.get('why', '')}")
+            for k, v in (out.get("reach") or {}).items():
+                print(f"  {k}: {v}")
+
+        return emit(args, out, prose)
+    except containers.ContainerError as e:
+        return fail(args, str(e), 2)
 
 
 def fail(args: argparse.Namespace, message: str, code: int, prose: str | None = None, **extra: Any) -> int:
@@ -1176,6 +1229,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bind", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
     p.set_defaults(fn=cmd_ui)
+
+    p = add("host", help="a container node: bring it up, rebuild it, forget it, or read its state (design §4.4a)")
+    p.add_argument("action", choices=["up", "rebuild", "forget", "status"])
+    p.add_argument("name", help="the `nodes:` entry in hosts.yml with a `container:` block")
+    p.add_argument("--purge", action="store_true", help="forget: also delete the node's volume (its run logs)")
+    p.set_defaults(fn=cmd_host)
 
     p = add("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
     p.add_argument("action", choices=["install", "uninstall", "status"])

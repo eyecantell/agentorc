@@ -21,6 +21,8 @@ link between them (step 3a) reads two more top-level keys:
 # on the home: who may dial in. A list of names, or a mapping when a node has flags.
 nodes:
   laptop: {volatile: true}
+  contractmatch: {container: {devcontainer: ~/contractmatch}}   # a container node the home runs
+                                                               # (§4.4a, `sessionorc.containers`)
 # on a node: how to dial — one `link:` key, of one of these shapes. Default: `ssh -T <home>`
 # with the home's name as the ssh alias.
 link: {ssh: kmaster}                        # or {command: [...]}, run as given (tests; any other transport)

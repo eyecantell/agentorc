@@ -705,7 +705,8 @@ decided here so both ends are written from one text.
   up would be the split-brain this section exists to rule out.
 
 **A container node (2026-09-17, after two Fable reviews and Paul's steer to the long-term shape;
-TD-057 step 3c — designed here, not yet built).** A devcontainer that runs an `agentorc-agent`
+TD-057 step 3c — the link socket and `ao host up` built 2026-09-17, 3c.1–3c.2; the supervisor,
+occupancy and reach are 3c.3–3c.5).** A devcontainer that runs an `agentorc-agent`
 beside a tmux server is a host (§10, 2026-09-13). On the home's own machine it is a node like any
 other — it dials out, nothing in it listens, and everything above holds for it — with one
 difference that decides the rest: **the home brings it up, installs the agent in it at its own
@@ -744,12 +745,18 @@ nodes:
   would beside an empty mount rather than dying on a path that is not there (contractmatch's
   `postCreate.sh` does the first, under `set -e`); `workspaceMount` and `workspaceFolder` set to
   the checkout's own path; agentorc's two mounts added, the link directory and the node's
-  volume; and **one feature of agentorc's own added**, a local feature written beside the generated
-  file (`features: {"./agentorc": {}}`, a `devcontainer-feature.json` and an `install.sh`, which the
-  devcontainer CLI runs as root at build), that installs tmux with whatever package manager the
-  image has — apt, apk or dnf — because tmux is what makes a host a host, and the person should not
-  edit their project's Dockerfile for agentorc's sake (Paul, 2026-09-17: the home installs the
-  client, so it installs tmux). It brings the container up with the devcontainer CLI — the
+  volume; and **one layer of agentorc's own added** that installs tmux with whatever package
+  manager the image has — apt, apk or dnf — because tmux is what makes a host a host, and the
+  person should not edit their project's Dockerfile for agentorc's sake (Paul, 2026-09-17: the
+  home installs the client, so it installs tmux). The layer is two generated definitions, not one:
+  `base.json`, the repo's image keys only (`image` or `build` re-anchored, its `features`), which
+  `devcontainer build` builds and tags `agentorc-node-<name>-base`; and the node's
+  `devcontainer.json`, built from a generated Dockerfile of one stage — `FROM` that base, tmux
+  installed as root, the image's own user restored. (The first shape was a local devcontainer
+  *feature* beside the generated file; built 2026-09-17, the CLI refused it: a local feature must
+  sit under the **workspace's** `.devcontainer/`, which is the repo's, so it would have meant
+  writing into the person's checkout — the very thing the feature was to avoid.) It brings the
+  container up with the devcontainer CLI — the
   reference implementation VS Code itself uses, a requirement of a home that runs containers as
   tmux is of every host — under agentorc's own id label, so it is a *second* container from the
   project's image beside any the person's VS Code opens, never that one.
@@ -768,7 +775,7 @@ nodes:
   wheel of what it installed to `~/.agentorc/wheels/`, and a container node is re-provisioned from
   the newest, a `hello` refused for protocol being the cue. The image supplies Python 3.12+ — a feature cannot put an interpreter in every image the
   same way, and the agent needs one to start — and `ao host up` refuses, naming it, when it does
-  not; tmux the generated definition brings itself (above). What a worker needs beyond that is in `~/.agentorc/nodes/<name>/env` (`0600`), read
+  not; tmux the generated Dockerfile brings itself (above). What a worker needs beyond that is in `~/.agentorc/nodes/<name>/env` (`0600`), read
   into the container's environment: a fine-grained GitHub token scoped to the repo (`gh auth
   setup-git` at provisioning makes `git push` use it), the author name and email, and whatever the
   repo's own briefs say a worker needs — for contractmatch a Doppler service token. Never the
