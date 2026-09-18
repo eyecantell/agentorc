@@ -713,8 +713,8 @@ decided here so both ends are written from one text.
   up would be the split-brain this section exists to rule out.
 
 **A container node (2026-09-17, after two Fable reviews and Paul's steer to the long-term shape;
-TD-057 step 3c — the link socket, `ao host up` and the supervisor built 2026-09-17, 3c.1–3c.3;
-occupancy and reach are 3c.4–3c.5).** A devcontainer that runs an `agentorc-agent`
+TD-057 step 3c — the link socket, `ao host up`, the supervisor and occupancy built 2026-09-17,
+3c.1–3c.4; reach is 3c.5).** A devcontainer that runs an `agentorc-agent`
 beside a tmux server is a host (§10, 2026-09-13). On the home's own machine it is a node like any
 other — it dials out, nothing in it listens, and everything above holds for it — with one
 difference that decides the rest: **the home brings it up, installs the agent in it at its own
@@ -736,7 +736,16 @@ nodes:
   invariant 2's "identity across a mount namespace" is what `occupants()` already compares, and
   the home *knows* the container's checkout is its own: a record on that node whose `dir` is under
   the mounted checkout is a directory on the home, and `create` checks occupancy across both —
-  derived from the `container:` entry, never configured. What is left is the person's own tool in
+  derived from the `container:` entry, never configured. **Built as 3c.4 (2026-09-17):**
+  `occupants()` at the home reads, beside its own records, every container node's records over the
+  directory while its link is up — down, the container is a blip from dialing back (the snapshot
+  then repairs its records) or stopped, and a stopped container's sessions are dead, so neither
+  holds the checkout against a create here — so a create here is refused by the anchor rule while
+  a session in the container holds the checkout, and the New session form shows it; and a create routed to a
+  container node (`--host`) is checked here first, over the same set, before it crosses — the
+  node then checks its own, since it cannot see this host's. A worktree is another directory,
+  as on one host. A machine node's records are never read for this: its `/home/x/repo` is not
+  this one. What is left is the person's own tool in
   the person's own VS Code container (another container, another pid namespace), which is theirs
   to avoid, as a terminal on another machine is today. The container's user carries the person's
   uid, so a file written inside is theirs outside and the home's `0600` sockets are the node's to
@@ -811,7 +820,9 @@ nodes:
   path a runtime needs that a machine did not — it removes the container, the link directory and
   the `nodes:` entry, closes the host's records at the home as a closed session is kept, and keeps
   `~/.agentorc/nodes/<name>/` (the run logs, invariant 3) unless told `--purge`; `volatile: true`
-  is right for one the person stops.
+  is right for one the person stops: the supervisor then never starts the container itself — a
+  stopped, paused or gone one is *left as the person left it* on the card — and still starts the
+  agent inside a running one (3c.4).
 - **Reach.** The terminal and the VS Code link go by `docker exec -u <user> -it <container> tmux
   attach` and `vscode-remote://dev-container+…`, derived from the `container:` entry rather than
   from `vscode_host` (§4.6; with the rest of the remote terminal, not yet built — until then the

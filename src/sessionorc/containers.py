@@ -94,6 +94,7 @@ class ContainerNode:
 
     name: str
     devcontainer: Path  # the checkout whose `.devcontainer/devcontainer.json` defines the image
+    volatile: bool = False  # `volatile: true`: one the person stops — a stopped container is left alone (3c.4)
 
     @property
     def repo_config(self) -> Path:
@@ -138,7 +139,11 @@ def container_nodes() -> dict[str, ContainerNode]:
     for name, flags in hosts.nodes().items():
         c = flags.get("container")
         if isinstance(c, dict) and isinstance(c.get("devcontainer"), str) and c["devcontainer"].strip():
-            out[name] = ContainerNode(name, Path(c["devcontainer"].strip()).expanduser().resolve())
+            out[name] = ContainerNode(
+                name,
+                Path(c["devcontainer"].strip()).expanduser().resolve(),
+                volatile=hosts._flag(flags.get("volatile")),
+            )
     return out
 
 
@@ -773,12 +778,21 @@ SUPERVISE_MAX = 300.0  # a build that keeps failing is tried every five minutes,
 SUPERVISE_GRACE = 30.0  # seconds a started agent gets to dial in before it is looked at again
 
 
-def decide(container_state: str | None, agent_alive: bool, link_why: str) -> tuple[str, str] | None:
+WAITING = "agent running inside, waiting for it to dial in"
+
+
+def decide(container_state: str | None, agent_alive: bool, link_why: str, *, volatile: bool = False) -> tuple[str, str]:
     """What to do for a node whose link is down: `(action, doing)` — `up` (the container is gone
     or stopped), `start` (running, no agent), `provision` (the agent is there but the home refused
-    its protocol), or None (running, the agent alive, the link merely not up yet: wait). A pure
-    function over what the tick observed, so the suite pins every row. A paused container is
-    the one state `up` cannot mend (`docker start` refuses it): `unpause`."""
+    its protocol), or `wait` (running, the agent alive, the link merely not up yet — and, for a
+    `volatile` node, a container that is not running: the person stops it on purpose, §4.4a, and
+    the home never starts a container it did not find running; an agent missing inside a running
+    one is still started). A pure function over what the tick observed, so the suite pins every
+    row. A paused container is the one state `up` cannot mend (`docker start` refuses it):
+    `unpause`."""
+    if container_state != "running" and volatile:
+        what = "gone" if container_state in (None, "gone") else container_state
+        return "wait", f"container {what} — volatile, left as the person left it"
     if container_state == "paused":
         return "unpause", "container paused — unpausing it"  # `up` cannot start a paused container
     if container_state != "running":
@@ -788,7 +802,7 @@ def decide(container_state: str | None, agent_alive: bool, link_why: str) -> tup
         return "start", "agent not running inside — starting it"
     if link_why.startswith("refused:") and "protocol" in link_why:
         return "provision", "agent inside is an older build — re-provisioning it"
-    return None
+    return "wait", WAITING
 
 
 def observe(n: ContainerNode, r: Runner) -> tuple[str | None, bool, str]:

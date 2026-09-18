@@ -571,6 +571,21 @@ async def test_acts_are_gated_at_the_home_executed_on_the_node_and_the_verdict_r
             await person.call("kill", id=lead["id"])
 
 
+async def test_a_node_refuses_an_act_for_a_record_that_is_not_its_own(agent):
+    """The node's side of *routes acts only to records whose host is that node's* (§4.4a): an `act`
+    naming another host's record, or a create for another host, is refused in words and nothing
+    runs — whatever the home (or anything on the link) sent."""
+    agent.mode, agent.home = "node", "kmaster"
+    with pytest.raises(link.LinkError, match="ao-x-w@desk is not on .*: not my host"):
+        await agent._act({"rpc": "kill", "params": {"id": "ao-x-w@desk"}, "caller": None})
+    with pytest.raises(link.LinkError, match="a create for desk is not .*: not my host"):
+        await agent._act({"rpc": "create", "params": {"name": "w", "dir": "/tmp", "host": "desk"}, "caller": None})
+    with pytest.raises(link.LinkError, match="'msg' is not an act a node executes"):
+        await agent._act({"rpc": "msg", "params": {"to": ["x"], "text": "hi"}, "caller": None})
+    with pytest.raises(link.LinkError, match="no session ao-nope"):
+        await agent._act({"rpc": "kill", "params": {"id": "ao-nope"}, "caller": None})
+
+
 async def test_an_act_on_an_unreachable_host_is_refused_and_never_runs_when_the_link_returns(
     home, hookstub, tmp_path, monkeypatch
 ):
@@ -616,3 +631,67 @@ async def test_a_create_with_a_host_lands_on_the_node_and_is_adopted_at_the_home
             assert check["verdict"] == "live" and check["holder"] == f"{rid}@laptop"  # addressed, like every reply
             await person.call("kill", id=v["id"])
             await person.call("kill", id=lead["id"])
+
+
+# -- occupancy across the home and its container nodes (step 3c.4) ----------------------------------------
+
+
+async def test_a_container_nodes_session_holds_the_checkout_at_the_home_and_the_reverse(agent, tmp_path, monkeypatch):
+    """Design §4.4a "A container node": the checkout is one directory here and there, so a record
+    of the node's over it is an occupant at the home — `create` here is refused by the anchor
+    rule, and a create routed to the node is refused here before it crosses. A machine node's
+    record over the same path is another directory and is not read."""
+    from sessionorc import containers
+
+    checkout = tmp_path / "repo"
+    (checkout / ".devcontainer").mkdir(parents=True)
+    (checkout / ".devcontainer" / "devcontainer.json").write_text('{"image": "python:3.12"}')
+    hosts_yml = paths.home() / "hosts.yml"
+    hosts_yml.write_text(
+        f"local:\n  name: {agent.host}\nnodes:\n  cm:\n    container: {{devcontainer: {checkout}}}\n  laptop: {{}}\n"
+    )
+    assert "cm" in containers.container_nodes()
+    agent.links["cm"] = {"up": True, "since": "t", "why": "linked"}
+    agent._take_records("cm", [record("ao-repo-w", host="cm", dir=str(checkout), kind="interactive")], whole=True)
+    agent._take_records(
+        "laptop", [record("ao-repo-l", host="laptop", dir=str(checkout), kind="interactive")], whole=True
+    )
+    async with LocalClient() as c:
+        assert (await c.call("occupancy", dir=str(checkout)))["occupants"] == ["ao-repo-w@cm (working)"]
+        with pytest.raises(AgentError, match="already has agent session ao-repo-w@cm .working.; anchor rule"):
+            await c.call("create", name="x", dir=str(checkout), adapter="claude-code")
+        # the link down: a blip, or a stopped container whose sessions are dead — it holds nothing here
+        agent.links["cm"] = {"up": False, "since": "t", "why": "closed by the other end"}
+        assert (await c.call("occupancy", dir=str(checkout)))["occupants"] == []
+        agent.links["cm"] = {"up": True, "since": "t", "why": "linked"}
+        s = await c.call(
+            "create", name="sh", dir=str(checkout), adapter="shell", argv=["bash", "--norc"]
+        )  # shells never count
+        await c.call("kill", id=s["id"])
+        # the reverse: a home session holds it, and a create for the container is refused here
+        agent._take_records(
+            "cm", [record("ao-repo-w", host="cm", dir=str(checkout), kind="interactive", state="exited")], whole=True
+        )
+        mine = await c.call("create", name="here", dir=str(checkout), adapter="shell", argv=["bash", "--norc"])
+        agent.sessions[mine["id"]].adapter = "claude-code"  # an agent session, as far as the rule is concerned
+        with pytest.raises(AgentError, match=f"already has agent session {mine['id']} .working.; anchor rule"):
+            await c.call("create", name="y", dir=str(checkout), adapter="claude-code", host="cm")
+        # a worktree of it is another directory: not held — and resolved as `create` resolves it, from the
+        # main checkout, so a `dir` inside the repo finds the same place (review of PR #215)
+        subprocess.run(["git", "-C", str(checkout), "init", "-q"], check=True)
+        (checkout / "sub").mkdir()
+        agent.links["cm"] = {"up": False, "since": "t", "why": "closed by the other end"}
+        with pytest.raises(AgentError, match="unreachable"):
+            await c.call("create", name="y", dir=str(checkout), adapter="claude-code", host="cm", worktree="y")
+        wt = checkout / ".claude" / "worktrees" / "y"
+        wt.mkdir(parents=True)
+        held = await c.call("create", name="in-wt", dir=str(wt), adapter="shell", argv=["bash", "--norc"])
+        agent.sessions[held["id"]].adapter = "claude-code"
+        with pytest.raises(AgentError, match=f"already has agent session {held['id']}"):
+            await c.call("create", name="y", dir=str(checkout / "sub"), adapter="claude-code", host="cm", worktree="y")
+        agent.sessions[held["id"]].adapter = "shell"
+        await c.call("kill", id=held["id"])
+        with pytest.raises(AgentError, match="unreachable"):  # a machine node: its path is another directory
+            await c.call("create", name="y", dir=str(checkout), adapter="claude-code", host="laptop")
+        agent.sessions[mine["id"]].adapter = "shell"
+        await c.call("kill", id=mine["id"])

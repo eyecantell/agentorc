@@ -3,6 +3,7 @@
 refusals by name, `forget`'s edit of hosts.yml, and the promote's wheel. Docker is not in
 `pdm run test`: the live check is on kmaster, by hand."""
 
+import asyncio
 import json
 import os
 import subprocess
@@ -471,13 +472,29 @@ def test_the_promote_writes_the_wheel_of_what_it_installed_and_keeps_the_newest(
             "refused: link protocol 0 here is 1: promote both ends to one build",
             ("provision", "agent inside is an older build — re-provisioning it"),
         ),
-        ("running", True, "refused: cm is not an authorised node", None),  # not ours to fix by rebuilding
-        ("running", True, "closed by the other end", None),  # alive and dialing: wait
-        ("running", True, "", None),
+        ("running", True, "refused: cm is not an authorised node", ("wait", containers.WAITING)),  # not ours to fix
+        ("running", True, "closed by the other end", ("wait", containers.WAITING)),  # alive and dialing: wait
+        ("running", True, "", ("wait", containers.WAITING)),
     ],
 )
 def test_the_decision_over_what_the_tick_observed(cstate, alive, why, expected):
     assert containers.decide(cstate, alive, why) == expected
+
+
+@pytest.mark.parametrize(
+    ("cstate", "alive", "expected"),
+    [
+        (None, False, ("wait", "container gone — volatile, left as the person left it")),
+        ("exited", False, ("wait", "container exited — volatile, left as the person left it")),
+        ("paused", False, ("wait", "container paused — volatile, left as the person left it")),
+        ("running", False, ("start", "agent not running inside — starting it")),  # inside a running one: still ours
+        ("running", True, ("wait", containers.WAITING)),
+    ],
+)
+def test_a_volatile_node_is_never_started_by_the_home(cstate, alive, expected):
+    """Design §4.4a: `volatile: true` is right for a container the person stops — the home starts
+    the agent inside a running one, and never the container itself (3c.4)."""
+    assert containers.decide(cstate, alive, "", volatile=True) == expected
 
 
 def test_observe_and_act_through_the_seam(home):
@@ -552,6 +569,32 @@ async def test_the_home_brings_a_gone_container_back_and_says_so_on_the_card(con
     agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}
     assert await wait_for(lambda: "cm" not in agent.supervision, timeout=5.0, step=0.05)
     assert "supervisor" not in agent._view(agent.remote["cm"]["ao-cm-w"])["host_link"]
+
+
+@pytest.fixture
+def volatile_home(container_home, tmp_path):
+    """`container_home` with `volatile: true` on the node and a stopped container — before the
+    `agent` fixture's first tick, which would otherwise bring it up."""
+    hosts_yml = tmp_path / "home" / "hosts.yml"
+    hosts_yml.write_text(hosts_yml.read_text().replace("    container:", "    volatile: true\n    container:"))
+    container_home["make"] = lambda: Fake(inspect="exited\n")
+    return container_home
+
+
+async def test_a_stopped_volatile_container_is_left_alone_and_the_card_says_so(volatile_home, agent):
+    from conftest import wait_for
+    from test_link import record
+
+    assert containers.container_nodes()["cm"].volatile is True
+    fakes = volatile_home["fakes"]
+    agent._take_records("cm", [record("ao-cm-w", host="cm")], whole=True)
+    assert await wait_for(
+        lambda: "volatile" in agent.supervision.get("cm", {}).get("doing", ""), timeout=5.0, step=0.05
+    )
+    await asyncio.sleep(0.4)  # a few rounds of the grace
+    assert agent.supervision["cm"]["doing"] == "container exited — volatile, left as the person left it"
+    assert not [c for f in fakes for c in f.calls if c[0] == f.cli]  # no `up`, ever
+    assert agent._view(agent.remote["cm"]["ao-cm-w"])["host_link"]["supervisor"]["doing"].startswith("container exited")
 
 
 async def test_a_failing_action_backs_off_and_the_card_says_why(container_home, agent):
