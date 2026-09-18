@@ -292,6 +292,19 @@ async def test_a_container_node_dials_the_homes_socket_with_no_ssh_and_survives_
             run.cancel()
     # a node that is not in `nodes:` gets no socket at all
     assert not (home.dir / "links" / "desk").exists()
+    # an authorised node on an older build is refused for protocol — and the refusal is recorded on
+    # the home's link state, which is what the container supervisor acts on (3c.3)
+    r, w = await asyncio.open_unix_connection(str(sock), limit=link.FRAME_LIMIT)
+    old_build = link.Mux(r, w, nothing)
+    run = asyncio.ensure_future(old_build.run())
+    try:
+        with pytest.raises(link.LinkError, match="link protocol 0 here is 1"):
+            await old_build.request("hello", timeout=10, protocol=0, host="laptop")
+    finally:
+        old_build.close()
+        run.cancel()
+    seen = (await home.host_rpc())["links"]["laptop"]
+    assert seen["up"] is False and seen["why"].startswith("refused: link protocol 0 here is 1")
 
 
 async def test_a_node_takes_no_links_and_a_home_not_its_own_name(tmp_path, monkeypatch):

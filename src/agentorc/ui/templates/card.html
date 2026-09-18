@@ -18,10 +18,12 @@
       {% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
-            title="{{ 'guessed from the screen' if s.scraped else 'reported by the tool' }}"><span class="dot"></span>{{ s.state_label }}</span>
+            title="{{ s.host_note or ('guessed from the screen' if s.scraped else 'reported by the tool') }}"><span class="dot"></span>{{ s.state_label }}</span>
     </div>
     <div class="row"><span class="meta strong">{{ s.place }}</span><span class="grow"></span><span class="meta age" data-since="{{ s.since }}">{{ s.age }}</span></div>
     <div class="row"><span class="meta strong">{{ s.where }}</span><span class="grow"></span>{% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}</div>
+    {# design §4.4a: an unreachable host's reason, and for a container node what the home is doing about it #}
+    {% if s.host_note %}<div class="row"><span class="meta" title="the host's link, as the home sees it">{{ s.host_note }}</span></div>{% endif %}
     <div class="meta">{{ s.profile_line }}</div>
     {# design §4.5a card **under `<controller>`** chip (§4.8, TD-036): who may act on this session. Shown
        only when the list is non-empty — a person's own session has none, which is the common case

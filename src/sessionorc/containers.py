@@ -736,3 +736,60 @@ def write_wheel(
     for old in built[:-keep]:
         old.unlink(missing_ok=True)
     return built[-1] if built else None
+
+
+# -- the supervisor (design §4.4a "The home supervises it", step 3c.3) ------------------------------
+#
+# There is no systemd inside. The home's tick, for each container node whose link is down, asks
+# three questions in order and acts on the first that is wrong: is the container running (gone or
+# stopped: the same idempotent `up`); is the agent inside (no live pid behind the pidfile: start
+# it); did the link refuse it for protocol (the wheel is older than the home: re-provision and
+# restart it). With backoff, and the answer on the card's overlay.
+
+SUPERVISE_FIRST = 5.0  # seconds before the first retry after an action
+SUPERVISE_MAX = 300.0  # a build that keeps failing is tried every five minutes, not every tick
+SUPERVISE_GRACE = 30.0  # seconds a started agent gets to dial in before it is looked at again
+
+
+def decide(container_state: str | None, agent_alive: bool, link_why: str) -> tuple[str, str] | None:
+    """What to do for a node whose link is down: `(action, doing)` — `up` (the container is gone
+    or stopped), `start` (running, no agent), `provision` (the agent is there but the home refused
+    its protocol), or None (running, the agent alive, the link merely not up yet: wait). A pure
+    function over what the tick observed, so the suite pins every row."""
+    if container_state != "running":
+        what = "gone" if container_state in (None, "gone") else container_state
+        return "up", f"container {what} — bringing it up"
+    if not agent_alive:
+        return "start", "agent not running inside — starting it"
+    if link_why.startswith("refused:") and "protocol" in link_why:
+        return "provision", "agent inside is an older build — re-provisioning it"
+    return None
+
+
+def observe(n: ContainerNode, r: Runner) -> tuple[str | None, bool, str]:
+    """The three facts `decide` wants, from docker: container state, whether the agent's pid is
+    alive inside, and the remote user (needed to act). Blocking; the agent calls it in a thread."""
+    cid = container_id(r, n.name)
+    if not cid:
+        return None, False, ""
+    state = container_state(r, cid)
+    if state != "running":
+        return state, False, ""
+    user = _remote_user(n)
+    return "running", agent_pid(r, cid, user) is not None, user
+
+
+def act(n: ContainerNode, r: Runner, action: str, user: str) -> None:
+    """Carry one decision out. `up` is `host_up` whole (idempotent: build, up, provision, start);
+    the other two skip what stands."""
+    if action == "up":
+        host_up(n.name, r)
+        return
+    cid = container_id(r, n.name)
+    if not cid:
+        raise ContainerError(f"{n.name}: the container went away while acting")
+    user = user or _remote_user(n)
+    if action == "provision":
+        provision(n, r, cid, user)
+        r.run(exec_cmd(cid, user, "sh", "-c", f"p=$(cat {PIDFILE} 2>/dev/null) && kill $p"), check=False)
+    start_agent(n, r, cid, user)

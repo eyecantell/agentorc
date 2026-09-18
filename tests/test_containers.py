@@ -450,3 +450,123 @@ def test_the_promote_writes_the_wheel_of_what_it_installed_and_keeps_the_newest(
     failing = lambda cmd: subprocess.CompletedProcess(cmd, 1, "", "no network")  # noqa: E731
     assert containers.write_wheel(failing) is None  # never fatal to the promote: None and a line
     assert containers.newest_wheel().name == "agentorc-9.9.9-py3-none-any.whl"  # the last one stands
+
+
+# -- the supervisor (design §4.4a "The home supervises it", step 3c.3) ---------------------------------
+
+
+@pytest.mark.parametrize(
+    ("cstate", "alive", "why", "expected"),
+    [
+        (None, False, "", ("up", "container gone — bringing it up")),
+        ("gone", False, "", ("up", "container gone — bringing it up")),
+        ("exited", False, "closed by the other end", ("up", "container exited — bringing it up")),
+        ("paused", False, "", ("up", "container paused — bringing it up")),
+        ("running", False, "", ("start", "agent not running inside — starting it")),
+        (
+            "running",
+            True,
+            "refused: link protocol 0 here is 1: promote both ends to one build",
+            ("provision", "agent inside is an older build — re-provisioning it"),
+        ),
+        ("running", True, "refused: cm is not an authorised node", None),  # not ours to fix by rebuilding
+        ("running", True, "closed by the other end", None),  # alive and dialing: wait
+        ("running", True, "", None),
+    ],
+)
+def test_the_decision_over_what_the_tick_observed(cstate, alive, why, expected):
+    assert containers.decide(cstate, alive, why) == expected
+
+
+def test_observe_and_act_through_the_seam(home):
+    n = containers.node("contractmatch")
+    assert containers.observe(n, Fake(ps="")) == (None, False, "")
+    assert containers.observe(n, Fake(inspect="exited\n")) == ("exited", False, "")
+    containers.write_node(n, "developer")
+    assert containers.observe(n, Fake(pid="")) == ("running", False, "developer")
+    assert containers.observe(n, Fake(pid="9\n")) == ("running", True, "developer")
+    r = Fake(pid="")
+    containers.act(n, r, "start", "developer")
+    assert len(r.execs("agentorc-agent serve")) == 1 and not [c for c in r.calls if c[0] == r.cli]
+    r = Fake(pid="9\n")
+    containers.act(n, r, "provision", "developer")
+    assert r.execs("pip install") and r.execs("kill $p") and r.execs("agentorc-agent serve")
+    r = Fake(ps="")
+    with pytest.raises(ContainerError, match="went away"):
+        containers.act(n, r, "start", "developer")
+    r = Fake()
+    containers.act(n, r, "up", "")
+    assert [c for c in r.calls if c[0] == r.cli][1][1] == "up"  # the whole idempotent host_up
+
+
+@pytest.fixture
+def container_home(tmp_path, monkeypatch):
+    """A home whose hosts.yml names a container node `cm`; set up before the `agent` fixture reads
+    the same AGENTORC_HOME."""
+    h = tmp_path / "home"
+    h.mkdir()
+    checkout = tmp_path / "cm"
+    (checkout / ".devcontainer").mkdir(parents=True)
+    (checkout / ".devcontainer" / "devcontainer.json").write_text('{"image": "python:3.12", "remoteUser": "developer"}')
+    (h / "hosts.yml").write_text(
+        f"local:\n  name: kmaster\nnodes:\n  cm:\n    container: {{devcontainer: {checkout}}}\n"
+    )
+    (h / "wheels").mkdir()
+    (h / "wheels" / "agentorc-0.0.1-py3-none-any.whl").write_bytes(b"wheel")
+    monkeypatch.setattr(containers, "SUPERVISE_FIRST", 0.05)
+    monkeypatch.setattr(containers, "SUPERVISE_MAX", 0.2)
+    monkeypatch.setattr(containers, "SUPERVISE_GRACE", 0.15)
+    # The agent's default runner is `containers.Runner(...)`, looked up per round — so the fake is
+    # in place before the agent's first tick, which runs the moment the `agent` fixture starts it.
+    holder = {"make": lambda: Fake(ps=""), "fakes": []}
+
+    def make(**kw):
+        f = holder["make"]()
+        holder["fakes"].append(f)
+        return f
+
+    monkeypatch.setattr(containers, "Runner", make)
+    return holder
+
+
+async def test_the_home_brings_a_gone_container_back_and_says_so_on_the_card(container_home, agent):
+    from conftest import wait_for
+    from test_link import record
+
+    fakes = container_home["fakes"]  # the default fake: the container is gone
+    agent._take_records("cm", [record("ao-cm-w", host="cm")], whole=True)
+    assert await wait_for(lambda: bool(fakes), timeout=5.0, step=0.05)
+    assert await wait_for(lambda: "done, waiting" in agent.supervision["cm"]["doing"], timeout=5.0, step=0.05)
+    sup = agent.supervision["cm"]
+    assert sup["doing"] == "container gone — bringing it up: done, waiting for it to dial in" and sup["attempts"] == 0
+    assert [c for c in fakes[0].calls if c[0] == fakes[0].cli][1][1] == "up"  # the whole idempotent host_up
+    assert fakes[0].execs("agentorc-agent serve")
+    v = agent._view(agent.remote["cm"]["ao-cm-w"])
+    assert v["state"] == "unreachable" and v["host_link"]["supervisor"]["doing"] == sup["doing"]
+    # the link comes up: the supervisor stands down and the overlay is plain again
+    agent.links["cm"] = {"up": True, "since": "now", "why": "linked"}
+    assert await wait_for(lambda: "cm" not in agent.supervision, timeout=5.0, step=0.05)
+    assert "supervisor" not in agent._view(agent.remote["cm"]["ao-cm-w"])["host_link"]
+
+
+async def test_a_failing_action_backs_off_and_the_card_says_why(container_home, agent):
+    from conftest import wait_for
+
+    fakes = container_home["fakes"]
+    container_home["make"] = lambda: Fake(
+        pid="", up=json.dumps({"outcome": "error", "message": "no space left"}) + "\n", ps=""
+    )
+    assert await wait_for(lambda: agent.supervision.get("cm", {}).get("attempts", 0) >= 2, timeout=5.0, step=0.05)
+    sup = agent.supervision["cm"]
+    assert "failed — devcontainer up failed for cm: no space left" in sup["doing"] and sup["error"]
+    assert len(fakes) >= 2  # retried, with backoff, not on every tick
+    # running, the agent alive, the link not up yet: nothing to do but wait
+    container_home["make"] = lambda: Fake(pid="9\n")
+    agent.supervision["cm"]["next"] = 0.0
+    assert await wait_for(
+        lambda: (
+            "waiting for it to dial in" in agent.supervision["cm"]["doing"] and not agent.supervision["cm"]["error"]
+        ),
+        timeout=5.0,
+        step=0.05,
+    )
