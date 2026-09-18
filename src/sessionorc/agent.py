@@ -2464,8 +2464,11 @@ class HostAgent:
         if mux is None:
             raise RpcError(f"{self.home} (home) is unreachable from {self.host}; refused, not queued (design §4.4a)")
         token = secrets.token_hex(8)
+        # A `wait` is bounded by its own timeout at the home; everything else within ACT_TIMEOUT —
+        # pings keep a link up past a dispatch that hangs (review of PR #217)
+        timeout = None if name == "wait" else ACT_TIMEOUT
         try:
-            reply = await mux.request("forward", timeout=None, rpc=name, params=params, caller=caller, token=token)
+            reply = await mux.request("forward", timeout=timeout, rpc=name, params=params, caller=caller, token=token)
         except asyncio.CancelledError:
             with contextlib.suppress(Exception):
                 await mux.notify("cancel", token=token)
@@ -2474,6 +2477,13 @@ class HostAgent:
             return {"id": rid, "error": f"{self.home}: {e}"}
         except link.LinkClosed:
             return {"id": rid, "error": f"the link to {self.home} dropped while {name} was out: its verdict is unknown"}
+        except TimeoutError:
+            with contextlib.suppress(Exception):
+                await mux.notify("cancel", token=token)
+            return {
+                "id": rid,
+                "error": f"{self.home} did not answer {name} within {timeout:g} s: its verdict is unknown",
+            }
         reply = reply if isinstance(reply, dict) else {}
         out = naming.readdress({k: v for k, v in reply.items() if k != "id"}, self._from_home_form)
         return {"id": rid, **out}
