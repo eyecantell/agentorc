@@ -752,7 +752,9 @@ def test_a_build_is_the_wheels_content_and_an_agent_on_an_older_one_is_restarted
     assert containers.decide("exited", False, "", stale=True, volatile=True)[0] == "wait"  # never starts a volatile one
 
 
-async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_level_is_left_alone(container_home, agent):
+async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_level_is_left_alone(
+    container_home, agent, monkeypatch
+):
     from conftest import wait_for
 
     fakes = container_home["fakes"]
@@ -766,8 +768,13 @@ async def test_a_linked_node_behind_the_homes_build_is_reprovisioned_and_one_lev
     before = len(fakes)
     await asyncio.sleep(0.3)
     assert not [f for f in fakes[before:] if f.execs("pip install")]  # level with the home: nothing to do
+    monkeypatch.setattr(containers, "SUPERVISE_GRACE", 0.6)
     agent._note_build("cm", "")  # an agent started before builds existed, or on an older wheel
     assert "the node runs build unknown" in agent.links["cm"]["stale"]
+    # behind, and linked: nothing for one grace — a promote restarts this agent a second after it
+    # writes the wheel, and the process being stopped must not start an install it cannot finish
+    await asyncio.sleep(0.3)
+    assert not [f for f in fakes[before:] if f.execs("pip install")] and "cm" in agent.supervision
     assert await wait_for(
         lambda: any(f.execs("pip install") and f.execs("kill $p") for f in fakes[before:]), timeout=5.0, step=0.05
     )
