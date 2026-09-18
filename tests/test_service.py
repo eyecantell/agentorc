@@ -13,3 +13,23 @@ def test_unit_text_shapes():
     u = service.unit_text("agentorc-ui", bind="127.0.0.1", port=8765)
     assert "--bind 127.0.0.1 --port 8765" in u and "After=agentorc-agent.service" in u
     assert "KillMode" not in u
+
+
+def test_install_writes_the_wheel_before_it_restarts_the_units(tmp_path, monkeypatch):
+    """The restarted agent takes its nodes' `hello`s at once and compares their build with the
+    newest wheel (design §4.4a "The home supervises it"): written after the restart, the wheel
+    left a window in which a node could be re-provisioned from the previous build (seen live at
+    the promote of PR #225)."""
+    from sessionorc import containers
+
+    order = []
+    monkeypatch.setattr(service, "UNIT_DIR", tmp_path / "units")
+    monkeypatch.setattr(containers, "write_wheel", lambda: order.append("wheel") or tmp_path / "w.whl")
+
+    class Done:
+        returncode, stdout, stderr = 0, "", ""
+
+    monkeypatch.setattr(service, "_systemctl", lambda *a: order.append(a[0]) or Done())
+    written = service.install()
+    assert order == ["wheel", "daemon-reload", "enable", "restart"]
+    assert written[-1] == str(tmp_path / "w.whl") and len(written) == len(service.UNITS) + 1
