@@ -2138,6 +2138,29 @@ class HostAgent:
             out["link"] = dict(self.home_link)
         return out
 
+    async def rpc_forget_host(self, host: str, caller: Any = None) -> dict[str, Any]:
+        """`ao host forget` (design §4.4a "A container node"): the host's records at the home are
+        closed as a closed session is kept — never deleted, their run logs are the node's volume —
+        and its link, if up, is dropped. A person's act: a session may not forget a host."""
+        if not mail.is_person(caller):
+            raise RpcError(f"{caller} cannot forget host {host}: a person's act, from a terminal or the UI")
+        if self.mode != "home":
+            raise RpcError(f"{self.host} is a node of {self.home}: hosts are forgotten at the home")
+        if host == self.host:
+            raise RpcError(f"{host} is this home: it cannot forget itself")
+        closed = 0
+        for s in self.remote.get(host, {}).values():
+            if s.state != "closed":
+                s.set_state("closed", confidence="scraped")
+                self._save(s)
+                closed += 1
+        mux = self._link_muxes.pop(host, None)
+        if mux is not None:
+            mux.close("the host was forgotten")
+        self.links.pop(host, None)
+        await self._push_changes()
+        return {"host": host, "closed": closed, "kept": len(self.remote.get(host, {}))}
+
     def home_reachable(self) -> bool:
         """The home is always in reach of itself; a node reaches it while its link is up (§4.4a)."""
         return self.mode == "home" or bool(self.home_link["up"])
