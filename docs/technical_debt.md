@@ -966,7 +966,7 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 
 **Done when** resuming from the page needs no typing, the resumed session has its old name, *Resume with changes…* reaches the filled-in form, and the unpushed-work row can be answered from the row.
 
-**Related:** TD-047 (the Details banner), TD-079 (outcomes; every row needs an answer it can be given), TD-080 (why this particular row was a false alarm), design §4.10 (*Resume carries mail forward*), §9 invariant 12 (names).
+**Related:** design §4.5a (*Focus (exited / closed)*: the exited banner), TD-079 (outcomes; every row needs an answer it can be given), TD-080 (why this particular row was a false alarm), design §4.10 (*Resume carries mail forward*), §9 invariant 12 (names).
 
 ## TD-082: The Inbox page needs a second design round
 
@@ -979,7 +979,7 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 1. **The blurbs are always on screen.** Each section opens with a paragraph saying what it is (*Needs you*'s runs to two lines at full width) and the page ends with another. They are reference, read once: they belong behind a mouseover or a clickable info mark on the section's title, not above every row for ever.
 2. **The word-wrap is wrong at full width.** A message's text wraps at a fixed measure — well under half of a 1900 px row — while the blurb above it and the controls below it run the full width, so the row reads as a narrow column in an empty box. Either the whole row shares one readable maximum, or the page itself is a centred column.
 3. **Sections blend into their messages.** A section is a bordered box and its rows are unboxed text inside it; with one row it is hard to say where the head ends and the message starts. Paul: *the messages could probably be cards themselves, to be easily selected* — a row as a card (its own surface, a hover and a focus state), sections as plain headings above a list of cards.
-4. **Seen on the same screenshot, for the same round:** a session named `push` shows as `push  push  [plain]  [No team]` (its name, then the same word again); the state row's one control is a bare *Details* at the far right (TD-081 gives it real answers); the steering row's countdown is filled in by script after load and is `…` until then.
+4. **Seen on the same screenshot, for the same round:** a session named `push` shows as `push  push  [plain]  [No team]` (its name, then the tool's own title — a separate value that here is the same word; the row should not print a title that only repeats the name); the state row's one control is a bare *Details* at the far right (TD-081 gives it real answers); the steering row's countdown is filled in by script after load and is `…` until then.
 
 **Done when** a design round (mockups first, then §4.5 screen 6 and the §4.5a rows it touches) has settled the four, and the page is built to it.
 
