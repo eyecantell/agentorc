@@ -1117,7 +1117,7 @@ Screens:
    number is exactly this section: a pending permission or question, `limited`, `stalled?`, an
    exited session with unpushed work, an open `ask` to the person (a `conflict` never names the person, §4.10 — a worker whose controllers cannot settle one `ask`s the person about it), a `steer` the person has **paused**, a due board item;
    what is on the tool's clock first (a permission's countdown), then oldest first. **Steering** —
-   not counted: open `steer`s whose clock is running, each with its default and the time left, soonest first; doing
+   not counted: open `steer`s whose clock is running (a paused one is under *Needs you*), each with its default and the time left, soonest first; doing
    nothing is a valid answer and the row says so. **FYI** — not counted, folded by default: `note`s,
    late replies, and what lapsed or was declined within the retention window. One row per thing with the
    controls of its kind in place (§4.5a), its session's name, team and `doing` line, and **Open**
@@ -2392,7 +2392,7 @@ now one of three things, and the envelope says which:
   person's number only while the person has **paused** it (*Pause*, below; §4.5a **Inbox**).
 - **FYI — a `note` to the person.** Unchanged, and never counted.
 
-**How the sender hears that one closed without a reply.** A lapse, a decline, a pause and *Go with it*
+**How the sender hears that one closed without a reply.** A lapse, a decline, a pause, a resume and *Go with it*
 (§4.5a) are events on the sender's *outgoing* entry (`asker_gone` tells nobody: there is no one left to tell), and everything that wakes a
 session is keyed on mail *arriving* — so the home **delivers a `note` from `system`** into the
 sender's inbox at that moment, naming the entry: *steer m-… lapsed: go with your default*; *ask
@@ -2404,8 +2404,10 @@ mailbox**: it does not pass through the send path, so no gate, no tally and no d
 no session can send as `system` — the name is refused as a sender and as an addressee. It cannot
 be replied to: `--reply-to` naming one is refused with *a system note reports what happened to
 your own message; there is nobody to reply to*, and no page offers Reply on one. It wakes as any `note` does, within the wake budget
-(§4.8) — except the two that are a person's act, *declined* and *Go with it*, which wake as a
-person's `reply` does and refill the budget. So a sender blocked in `ao wait` on its own `steer`
+(§4.8) — except the three by which a person releases a sender that may be blocked in `ao wait` —
+*declined*, *Go with it* and a **pause** — which wake as a person's `reply` does and refill the
+budget. A **resume**'s note is ordinary: it only says the clock runs again and what is left, so it
+wakes within the budget like any `note`. So a sender blocked in `ao wait` on its own `steer`
 is released at the bound, which is the whole use of the kind; one that carried on working meets
 the line at its next `ao inbox`.
 
@@ -2420,14 +2422,15 @@ every closed entry runs from `closed_at` or `expired_at`, whichever it has. Entr
 before this date have no `closed_reason`; they read as closed when `closed_by` or `expired_at` is
 set, which is the rule until now.
 
-**Pause (decided by Paul, 2026-09-19).** On a `steer` in the person inbox the person may **Pause**
+**Pause (decided by Paul, 2026-09-19; TD-069).** On a `steer` in the person inbox the person may **Pause**
 the timer — *I want to answer this; do not go on without me*. The `inbox_pause` RPC, refused to
 every session as `inbox_snooze` is, sets **`paused_at`** on the entry: the bound stops running,
 the sender is told by a `system` note that wakes it as a person's reply does (*steer m-… paused
 by the person: do not take your default yet*) so it turns to other work instead of waiting out a
 clock that has stopped, and the entry **moves to *Needs you* and is counted** — the person has
 made a preference into something a session is held on, which is what that section means.
-**Resume** clears `paused_at` and moves `bound` later by the time it was held, so what was left
+**While `paused_at` is set the lapse sweep skips the entry outright, whatever `bound` reads.**
+**Resume** moves `bound` later by the time it was held and then clears `paused_at`, in one step, so the sweep never sees a resumed entry with its old bound, so what was left
 is what is left, and the sender is told again; **Reply** and **Go with it** close a paused `steer`
 as they close a running one. A paused `steer` holds its sender's slot in the depths like any open
 one, and an `asker_gone` closes it like any other. Only a `steer` can be paused — an `ask` to
