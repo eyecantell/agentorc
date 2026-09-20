@@ -29,6 +29,7 @@ class FakeProc:
         self.procs = {p.pid: p for p in procs}
         self.cgroups = cgroups or {}
         self.script: dict[int, list[Proc | None]] = {}
+        self.comms: dict[int, str] = {1: "systemd"}
 
     def stat(self, pid: int) -> Proc | None:
         if self.script.get(pid):
@@ -37,6 +38,9 @@ class FakeProc:
 
     def cgroup(self, pid: int) -> str | None:
         return self.cgroups.get(pid)
+
+    def comm(self, pid: int) -> str | None:
+        return self.comms.get(pid)
 
 
 def P(pid: int, ppid: int, sid: int, tty: int = 0, start: int | None = None) -> Proc:
@@ -76,7 +80,8 @@ def test_a_fully_detached_process_is_outside_unless_the_cgroup_check_is_on():
     it would be the person with no `caller` — so where the agent's service cgroup holds every pane,
     it is *unknown*."""
     svc = "/user.slice/user-1000.slice/user@1000.service/app.slice/agentorc-agent.service"
-    fp = FakeProc([*BASE, P(400, 1, 400, 0)], cgroups={400: svc, 50: svc, 7: svc, 300: "/user.slice/session-3.scope"})
+    cg = {400: svc, 50: svc, 7: svc, 300: "/user.slice/session-3.scope"}
+    fp = FakeProc([*BASE, P(7, 1, 7), P(400, 1, 400, 0)], cgroups=cg)  # 7 is the agent, started by systemd
     assert identity.classify(400, PANES, fp) == identity.OUTSIDE
     on = identity.detached_check(fp, agent_pid=7, tmux_pid=50)
     assert on == svc
@@ -92,6 +97,14 @@ def test_the_detached_check_is_off_when_the_tmux_server_is_not_in_the_agents_own
     assert identity.detached_check(FakeProc([], {7: scope, 50: scope}), agent_pid=7, tmux_pid=50) is None  # a dev run
     assert identity.detached_check(FakeProc([], {7: "/", 50: "/"}), agent_pid=7, tmux_pid=50) is None  # a container
     assert identity.detached_check(FakeProc([], {7: svc}), agent_pid=7, tmux_pid=None) is None  # no server yet
+    # CI, and an agent a worker starts from inside an `ao` pane: one `.service` holds the agent, its
+    # tmux server *and the person standing in it* — the cgroup tells nobody apart, so the check is
+    # off unless systemd itself started the agent (the first push of this module failed CI on it)
+    shared = FakeProc([P(1, 0, 1), P(30, 1, 30), P(7, 30, 30)], {7: svc, 50: svc})
+    shared.comms[30] = "bash"
+    assert identity.detached_check(shared, agent_pid=7, tmux_pid=50) is None
+    shared.comms[30] = "systemd"
+    assert identity.detached_check(shared, agent_pid=7, tmux_pid=50) == svc
 
 
 def test_a_pid_reused_under_the_walk_ends_ancestry_and_never_lands_on_another_pane():

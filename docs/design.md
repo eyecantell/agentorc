@@ -1806,7 +1806,11 @@ the socket to a child and exits must not become whatever reuses its pid). A conn
   is read, and when it is off:** the agent compares `/proc/<peer>/cgroup` with
   `/proc/<tmux server pid>/cgroup` (cgroup v2's single line, or v1's `name=systemd` line), and
   the clause is **on only when the tmux server's cgroup is the agent's own
-  (`/proc/self/cgroup`) and that path is a systemd `.service`**. Otherwise it is a no-op and such
+  (`/proc/self/cgroup`), that path is a systemd `.service`, and the agent is that service's own
+  process — its parent is systemd**. The last condition is what CI taught on the first push of the
+  build: a test runner sits inside *some* `.service` together with the person standing in it, and
+  so does any agent a worker starts from inside an `ao` pane; there the cgroup tells nobody apart,
+  and with the clause on the person read as *unknown*. Otherwise it is a no-op and such
   a peer is plainly *outside* — never a silent refusal: a tmux server that predates the unit or
   was started from a person's shell, `pdm run agentorc-agent serve`, and **a container node**
   (no systemd, one cgroup for everything; and with `person: false` there is no person for a

@@ -66,6 +66,8 @@ class ProcReader(Protocol):
 
     def cgroup(self, pid: int) -> str | None: ...
 
+    def comm(self, pid: int) -> str | None: ...
+
 
 class LinuxProc:
     """`/proc` as it is. A process that is gone, or one we may not read, is `None` — never an error."""
@@ -83,6 +85,13 @@ class LinuxProc:
         try:
             return Proc(pid=int(pid), ppid=int(rest[1]), sid=int(rest[3]), tty_nr=int(rest[4]), start=int(rest[19]))
         except (IndexError, ValueError):
+            return None
+
+    def comm(self, pid: int) -> str | None:
+        try:
+            with open(f"/proc/{int(pid)}/comm", encoding="utf-8", errors="replace") as f:
+                return f.read().strip()
+        except (OSError, ValueError):
             return None
 
     def cgroup(self, pid: int) -> str | None:
@@ -146,15 +155,22 @@ OUTSIDE = Channel("outside")
 def detached_check(reader: ProcReader, *, agent_pid: int, tmux_pid: int | None) -> str | None:
     """The cgroup a detached process would still be in — or None when the check is **off**.
 
-    On only when the tmux server's cgroup is the agent's own and that path is a systemd `.service`
-    (the installed case: `KillMode=process` keeps the tmux server, and every pane, inside
-    `agentorc-agent.service`). A tmux server that predates the unit, a dev run from a shell, a
+    On only when the tmux server's cgroup is the agent's own, that path is a systemd `.service`,
+    **and the agent is that service's own process — started by systemd itself** (the installed
+    case: `KillMode=process` keeps the tmux server, and every pane, inside `agentorc-agent.service`).
+    The last condition is what CI taught on the first push of this module: a test runner is often
+    inside *some* `.service` together with the person standing in it, and so is any agent a worker
+    starts from inside an `ao` pane — there the cgroup tells nobody apart, and with the check on
+    the person read as *unknown*. A tmux server that predates the unit, a dev run from a shell, a
     container with one cgroup for everything: off, and such a peer is plainly *outside* — never a
     silent refusal (§4.8a)."""
     if not tmux_pid:
         return None
     mine, theirs = reader.cgroup(agent_pid), reader.cgroup(tmux_pid)
     if not mine or mine != theirs or not mine.rstrip("/").endswith(".service"):
+        return None
+    me = reader.stat(agent_pid)
+    if me is None or reader.comm(me.ppid) != "systemd":
         return None
     return mine
 
