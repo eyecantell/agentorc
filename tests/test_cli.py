@@ -1260,3 +1260,106 @@ def test_the_host_line_is_drawn_only_on_a_node(monkeypatch, capsys):
     monkeypatch.setattr(climod, "call_sync", lambda method, **kw: [])
     assert climod.cmd_status(argparse.Namespace(json=False, verbose=False)) == 0
     assert capsys.readouterr().err == ""
+
+
+@pytest.mark.unit
+def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to_start_one(monkeypatch, capsys):
+    """TD-086 item 2, `ao --skill`'s Never list. One line said two different things: the socket
+    could not be opened, *and* a call's reply never came because the connection closed under it —
+    which a promote causes (TD-062), three times on the evening of 2026-09-20 to a lead blocked in
+    `ao wait`. Both printed *start it with: agentorc-agent serve*: wrong in fact, because the agent
+    was `active` again at once, and wrong for a session, which its skill forbids to start one.
+
+    So the CLI asks again rather than reading the exception's words, and the hint is never printed
+    to a session whichever answer it gets. The exit code stays 3 in all three: what the caller
+    could not do, it could not do."""
+    from agentorc import cli as climod
+    from sessionorc.client import AgentUnavailable
+
+    def boom(args):
+        raise AgentUnavailable("host agent closed the connection")
+
+    args = argparse.Namespace(json=False, fn=boom, id=None)
+
+    # (a) an agent answers now: it was restarting, and *run it again* is the whole of the advice
+    monkeypatch.setattr(climod, "_agent_answers", lambda: True)
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    assert climod._run(args) == 3
+    err = capsys.readouterr().err
+    assert "restarted under this command — run it again" in err and "agentorc-agent serve" not in err
+
+    # …and a session gets the same sentence: it is the true one, and it names nothing to start
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-x-1")
+    assert climod._run(args) == 3
+    assert "agentorc-agent serve" not in capsys.readouterr().err
+
+    # (b) nothing answers, and the caller is a session: told to stop, in its skill's own words
+    monkeypatch.setattr(climod, "_agent_answers", lambda: False)
+    assert climod._run(args) == 3
+    err = capsys.readouterr().err
+    assert "stop here; a session never starts one" in err and "agentorc-agent serve" not in err
+
+    # (c) nothing answers, and the caller is a person: the hint is theirs, and only theirs
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    assert climod._run(args) == 3
+    assert "start it with: agentorc-agent serve" in capsys.readouterr().err
+
+    # --json says which it was without prose, for a caller that parses (TD-030)
+    monkeypatch.setattr(climod, "_agent_answers", lambda: True)
+    assert climod._run(argparse.Namespace(json=True, fn=boom, id=None)) == 3
+    got = json.loads(capsys.readouterr().out)
+    assert got["restarted"] is True and got["error"] == "host agent closed the connection"
+
+
+@pytest.mark.unit
+def test_the_probe_is_one_ping_it_never_raises_and_it_cannot_hang(monkeypatch, tmp_path):
+    """`_agent_answers` only ever chooses which sentence to print, so it must not raise, must not
+    turn a missing socket into a traceback on the way out of a command that already failed, and —
+    the one that is not obvious — **must not hang**.
+
+    Nothing in `sessionorc.client` times a read out, so an agent that is *accepting connections but
+    not yet serving* (a restarting unit, for a moment — the state this entry is about) would leave
+    an unbounded probe in `readline()` for ever, turning a deterministic exit 3 into a command that
+    never returns (review of PR #300). The bound is asserted against a real socket that accepts and
+    says nothing, because that is the only way to prove it."""
+    import asyncio as aio
+    import socket
+    import time
+
+    from agentorc import cli as climod
+
+    # nothing is listening: immediate, and a `no`
+    monkeypatch.setattr(climod.clientmod.paths, "socket_path", lambda: tmp_path / "nothing.sock")
+    assert climod._agent_answers() is False
+
+    # something accepts and never answers: bounded by `PROBE_TIMEOUT`, and still a `no`
+    sock = tmp_path / "deaf.sock"
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(sock))
+    server.listen(1)
+    try:
+        monkeypatch.setattr(climod.clientmod.paths, "socket_path", lambda: sock)
+        monkeypatch.setattr(climod, "PROBE_TIMEOUT", 0.3)
+        began = time.monotonic()
+        assert climod._agent_answers() is False
+        assert time.monotonic() - began < 3.0  # bounded at all, with room for a slow machine
+    finally:
+        server.close()
+
+    # and a `pong` is a `yes`, over one call
+    calls = []
+
+    class Stub:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def call(self, method, **kw):
+            calls.append(method)
+            return "pong"
+
+    monkeypatch.setattr(climod.clientmod, "LocalClient", Stub)
+    assert climod._agent_answers() is True and calls == ["ping"]
+    assert aio.get_event_loop_policy() is not None  # the probe left no loop of its own behind
