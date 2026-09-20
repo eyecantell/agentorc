@@ -68,6 +68,7 @@ from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 log = logging.getLogger("agentorc.agent")
 
 TICK_SECONDS = float(os.environ.get("AGENTORC_TICK", "2"))
+PUSH_OPEN = b'{"event": "session", "session": '  # a pushed view's envelope, measured not guessed (TD-066)
 TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
@@ -2891,16 +2892,14 @@ class HostAgent:
         mux = self._home_mux
         if self.mode != "node" or mux is None or not self._snapshot_sent:
             return
-        now, changed = time.monotonic(), []
+        now, changed, marks = time.monotonic(), [], []
         for s in self.sessions.values():
             urgent, payload = _urgent(s), json.dumps(s.to_dict(), sort_keys=True)
             was = self._reported.get(s.id)
             if was is None or was[0] != urgent or (was[1] != payload and now - was[2] >= REPORT_EVERY):
-                self._reported[s.id] = (urgent, payload, now)
+                marks.append((s.id, (urgent, payload, now)))
                 changed.append(s.to_dict())
         forgotten = [sid for sid in self._reported if sid not in self.sessions]
-        for sid in forgotten:
-            del self._reported[sid]
         # Bounded: this runs inside the tick and inside every RPC that pushes, and a write to a peer
         # that has gone blocks once the pipe is full — for `LINK_SILENCE`, were nothing to stop it.
         try:
@@ -2910,9 +2909,21 @@ class HostAgent:
                 if forgotten:
                     await mux.notify("gone", ids=forgotten)
         except link.LinkClosed:
-            pass
+            return
+        except link.LinkError as e:
+            # a frame this end refused to write, because the home could not have read it (TD-066).
+            # The link is started over, exactly as a failed snapshot above is: nothing is marked
+            # told over a write that did not happen, and the reconnect's snapshot repairs the gap.
+            log.error("a report to %s was not written: %s", self.home, e)
+            mux.close(f"a report could not be written: {e}")
+            return
         except TimeoutError:
             mux.close(f"a report could not be written within {REPORT_WRITE:g} s")  # the reconnect's snapshot repairs it
+            return
+        for sid, mark in marks:  # marked as told only once it went, as the intent push below is
+            self._reported[sid] = mark
+        for sid in forgotten:
+            del self._reported[sid]
 
     async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
         """What the home may ask of this node: a ping; an `act` (step 4a) — an RPC the home has
@@ -3474,6 +3485,10 @@ class HostAgent:
                     await mux.notify("intent", records=[item for _, _, item in out])
             except link.LinkClosed:
                 continue
+            except link.LinkError as e:  # refused here, unreadable there: start the link over (TD-066)
+                log.error("an intent push to %s was not written: %s", host, e)
+                mux.close(f"an intent push could not be written: {e}")
+                continue
             except TimeoutError:
                 mux.close(f"an intent push could not be written within {REPORT_WRITE:g} s")
                 continue
@@ -3854,7 +3869,8 @@ class HostAgent:
         # once — every tab, not just the card that grew (TD-066). One card is dropped from the
         # stream instead, and named in the log; `last` is left untouched, so the card returns to
         # the stream the moment it fits again. Logged once per card, not once a tick.
-        big = {sid for sid, payload in payloads.items() if len(payload) + 32 > link.FRAME_LIMIT}
+        room = link.FRAME_LIMIT - len(PUSH_OPEN) - len(b"}\n")  # the envelope `_send` puts around it
+        big = {sid for sid, payload in payloads.items() if len(payload.encode()) > room}
         for sid in big - self._oversize:
             log.error("the view of %s is past the %d-byte line limit: not pushed", sid, link.FRAME_LIMIT)
         for sid in self._oversize & (payloads.keys() - big):
@@ -3865,7 +3881,7 @@ class HostAgent:
             for sid, payload in payloads.items():
                 if last.get(sid) != payload:
                     last[sid] = payload
-                    await self._send(w, '{"event": "session", "session": ' + payload + "}")
+                    await self._send(w, PUSH_OPEN.decode() + payload + "}")
             for sid in gone:
                 await self._send(w, json.dumps({"event": "gone", "id": sid}))
 
