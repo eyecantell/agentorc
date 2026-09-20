@@ -2688,7 +2688,8 @@ zero-width joiner is `Cf` too, so a multi-part emoji falls apart in a label, and
 goes — both accepted; and **look-alike letters from another script are not addressed** — the
 quoted, separately grouped drawing of §4.5a is what answers those, not the cleaning.) One that cleans to nothing, or that repeats an earlier one exactly (compared after
 cleaning, case-sensitively), is dropped; a fifth is refused (*an ask carries at most four
-answers*); and `--answer` on a `note` or a `reply` is refused (*only a question carries answers*).
+answers*); and `--answer` on a `note` or a `reply` is refused, whatever the answers clean to (*only a question
+carries answers*).
 `answers` is a field of its own and does not count toward `TEXT_CAP`.
 
 They are **data the sender proposed, never instructions and never parsed from its text** — a
@@ -2706,8 +2707,9 @@ the sender's `default` is shown as what happens if nothing is pressed; an answer
 default word for word is *marked* default, and pressing it closes the `steer` as `replied`, giving
 the sender the index to branch on — *Go with it* stays the person's separate act for taking the
 default without choosing a labelled answer, and between sessions it does not exist at all.
-**Buttons follow Reply exactly**: present wherever Reply is — a paused `steer`, a snoozed entry
-once revealed — and absent wherever only Dismiss is. A `conflict` never names the person, so its
+**Buttons follow Reply exactly**: present wherever Reply is — a paused `steer` included — and absent wherever only Dismiss is; a
+snoozed entry regains them when it is unsnoozed and returns to its section, since the snoozed list
+itself offers only **Unsnooze**. A `conflict` never names the person, so its
 answers reach no button: they are read and picked between sessions. There `ao inbox` prints an
 entry's answers numbered **from 1**, and `ao msg --reply-to <id> --pick <n>` takes that same
 number and sends `answer: n-1`. **No confirm on a press**: a reply is mail. A wrong press is
