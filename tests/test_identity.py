@@ -289,3 +289,69 @@ async def test_off_classifies_nothing(agent, tmp_path):
         await c.call("list")
         assert (await c.call("identity"))["tally"] == {}
         assert (await c.call("whoami")) == {"channel": None, "session": None, "signal": None}
+
+
+async def test_a_bug_in_the_check_serves_as_before_in_observe_and_refuses_in_enforce(agent, tmp_path, monkeypatch):
+    """`observe` promises that nothing a caller sees changes — a check that raises included. Under
+    `enforce` a check that can be made to fail would be a way round it: all but a read is refused."""
+
+    async def boom(*_a, **_k):
+        raise RuntimeError("the classification fell over")
+
+    monkeypatch.setattr(agent, "_id_channel", boom)
+    agent.identity_mode = "observe"
+    async with LocalClient() as me:
+        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+    async with LocalClient(caller=a) as as_a:
+        assert (await as_a.call("doing", id=a, text="served"))["doing"]["text"] == "served"
+    agent.identity_mode = "enforce"
+    async with LocalClient() as me:
+        assert await me.call("list") is not None  # a read is still served
+        try:
+            await me.call("doing", id=a, text="nope")
+            raise AssertionError("a request was served past a failed check under enforce")
+        except Exception as e:  # noqa: BLE001
+            assert "identity check failed" in str(e)
+
+
+async def test_a_loop_of_forgeries_is_one_write_then_counts_in_memory_until_the_tick(agent, tmp_path, monkeypatch):
+    agent.identity_mode = "observe"
+    async with LocalClient() as me:
+        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+    s = agent.sessions[a]
+    saves: list[str] = []
+    real = agent._save
+    monkeypatch.setattr(agent, "_save", lambda rec: (saves.append(rec.id), real(rec))[1])
+    entry = {"channel": f"session {a}", "claimed": "ao-b", "rpc": "msg"}
+    for _ in range(500):
+        agent._id_alarm(dict(entry), a)
+    assert saves.count(a) == 1 and s.identity_alarms[0]["count"] == 500 and a in agent._id_dirty
+    agent._id_alarm({**entry, "rpc": "kill"}, a)  # a different alarm is written at once
+    assert saves.count(a) == 2
+    agent._id_flush()
+    assert saves.count(a) == 3 and not agent._id_dirty
+
+
+async def test_a_hook_is_bound_to_its_pane_end_to_end(agent, tmp_path):
+    agent.identity_mode = "enforce"
+    async with LocalClient() as me:
+        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        b = (await me.call("create", name="b", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+
+        def hook(session: str) -> dict:  # what hook.py sends: no `caller`, the session as a parameter
+            return {"id": 1, "method": "hook", "params": {"session": session, "state": "idle"}}
+
+        got = await _probe(me, tmp_path, a, "hook-own", hook(a))
+        assert got.get("error") != identity.MISMATCH
+        got = await _probe(me, tmp_path, a, "hook-other", hook(b))
+        assert got["error"] == identity.MISMATCH
+        alarms = (await me.call("get", id=a))["identity_alarms"]
+        assert [(x["claimed"], x["rpc"]) for x in alarms] == [(b, "hook")]
+        assert (await me.call("get", id=b))["identity_alarms"] == []
+    # and from outside every pane a hook is never a person's: refused
+    async with LocalClient() as me:
+        try:
+            await me.call("hook", session=a, state="idle")
+            raise AssertionError("a hook from outside every pane was served")
+        except Exception as e:  # noqa: BLE001
+            assert identity.MISMATCH in str(e)

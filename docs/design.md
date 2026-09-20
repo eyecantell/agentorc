@@ -1841,7 +1841,7 @@ never-gated read, **`whoami`**, returns the connection's classification and the 
 decided it, the UI calls it at startup and shows a banner when the answer is not *outside*, and
 `ao whoami` prints it for a person or a session checking their own channel. `ao identity` (below) is a never-gated read too: tallies and this host's alarms tell a session nothing it could not learn by trying.
 
-**An identity alarm** is `{at, channel, claimed, rpc}` — identical `{channel, claimed, rpc}` alarms coalesce into one entry carrying a `count` and its first and last time, so a loop cannot push a different alarm out of the list: kept on the record it is about (the last
+**An identity alarm** is `{at, channel, claimed, rpc}` — identical `{channel, claimed, rpc}` alarms coalesce into one entry carrying a `count` and its first and last time, so a loop cannot push a different alarm out of the list, and only a *new* alarm is written to disk at once — a repeat moves a count in memory and the next tick writes it, so a loop of forgeries is not a disk write each: kept on the record it is about (the last
 20, `identity_alarms`), or in a small list of the home's own when it is about no record. It is
 shown — a mark on the card, and a row under *Needs you* in the Inbox (§4.5 screen 6), because it
 is either a bug of ours or a session misbehaving and a person should know which — and it wakes
@@ -1860,7 +1860,7 @@ carries **`identity: off | observe | enforce`** — `local: {identity: observe}`
 beside `volatile:`; default `observe` for the release that introduces it; `off` classifies
 nothing and is today's behaviour, for an emergency and for the test suite (below), and the page
 says *identity: off* as loudly as it says *observe*: in `observe` it classifies, records alarms and serves every
-request exactly as before; `enforce` applies the table. The anchor turns a host to `enforce`
+request exactly as before; `enforce` applies the table. **A check that itself fails** — a bug of ours, tmux not answering — is logged, and the request is served exactly as before under `observe` (the promise that nothing a caller sees changes covers our own mistakes), while under `enforce` everything but a read is refused, since a check that can be made to fail would otherwise be a way round it; a person recovers with `identity: observe` in `hosts.yml`, which needs no RPC. The anchor turns a host to `enforce`
 after a day of `observe` there with no alarm that was not a real forgery — sessions, hooks, the
 UI, the systemd units, a person's terminal, VS Code's terminal, the SessionStart hook and a
 node's forwarded calls having all been seen. **`ao identity`** is what makes that checkable: the

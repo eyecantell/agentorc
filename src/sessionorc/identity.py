@@ -215,6 +215,10 @@ class Verdict:
 
 
 MISMATCH = "identity mismatch: this request did not come from the session it names (design §4.8a)"
+CHECK_FAILED = (
+    "the identity check failed and this host enforces it, so the request is refused: see the host agent's log; "
+    "`local: {identity: observe}` in hosts.yml serves requests while it is fixed (design §4.8a)"
+)
 
 
 def judge(channel: Channel, claimed: str | None, rpc: str, *, hook_session: str | None = None) -> Verdict:

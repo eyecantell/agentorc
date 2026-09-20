@@ -195,6 +195,7 @@ class HostAgent:
         self.proc: identity.ProcReader = proc or identity.LinuxProc()
         self._id_panes: list[identity.Pane] = []
         self._id_conns: dict[Any, identity.Channel] = {}  # a connection's classification, for its life
+        self._id_dirty: set[str] = set()  # records whose alarm counts moved since their last write
         self._id_listed_at = 0.0
         self._id_list_lock = asyncio.Lock()
         self._id_detached: str | None = None
@@ -418,6 +419,7 @@ class HostAgent:
         snapshot_at = datetime.now(UTC)
         panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
         self._id_note_panes(panes)
+        self._id_flush()
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
@@ -3581,8 +3583,20 @@ class HostAgent:
         if s is None:
             self.identity_alarms = identity.coalesce(self.identity_alarms, entry, at)
             return
+        known = len(s.identity_alarms)
         s.identity_alarms = identity.coalesce(s.identity_alarms, entry, at)
-        self._save(s)
+        # A new alarm is written at once; a repeat only bumps a count, and a loop of forged requests
+        # must not become a disk write each — the tick writes what is left (`_id_flush`).
+        if len(s.identity_alarms) != known or s.identity_alarms[-1]["count"] == 1:
+            self._save(s)
+        else:
+            self._id_dirty.add(s.id)
+
+    def _id_flush(self) -> None:
+        for sid in list(self._id_dirty):
+            self._id_dirty.discard(sid)
+            if (s := self.sessions.get(sid)) is not None:
+                self._save(s)
 
     async def rpc_identity(self) -> dict[str, Any]:
         """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,
@@ -3806,7 +3820,17 @@ class HostAgent:
         `caller` against; None for a link (identified by its key, never classified) and for a call
         made in-process. `conn`: the connection, which is what is classified — once, for its life."""
         if peer is not None and link_host is None and self.identity_mode != "off":
-            refused = await self._identify(req, peer, conn)
+            try:
+                refused = await self._identify(req, peer, conn)
+            except Exception:  # noqa: BLE001 — a bug in the check must never take the socket down with it
+                # `observe` promises that nothing a caller sees changes, so the request is served as
+                # before. Under `enforce` a check that can be made to fail would be a way round it, so
+                # everything but a read is refused — and a person recovers with `identity: observe`
+                # in hosts.yml, which needs no RPC.
+                log.exception("identity check failed on %s (%s)", req.get("method"), self.identity_mode)
+                refused = None
+                if self.identity_mode == "enforce" and str(req.get("method") or "") not in identity.READS:
+                    refused = {"id": req.get("id"), "error": identity.CHECK_FAILED}
             if refused is not None:
                 return refused
         resp = await self._dispatch_inner(req, link_host=link_host)
