@@ -55,7 +55,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
 | TD-078 | Two timing flakes in the suite: the restart test's migration assertion (fixed, PR #264) and a `send` that raced its pane in `test_send_wait_three_outcomes` (open) | Low | Partly done |
 | TD-079 | The Inbox is a queue: nothing leaves it without an answer, what resolves itself leaves a trail, FYI is counted, and an answer is followed to its outcome | High | Open |
-| TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Medium | Partly done |
+| TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Partly done |
 | TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Open |
 | TD-082 | The Inbox page needs a second design round: section blurbs always on screen, message text wrapped to a narrow column on a wide window, sections that blend into their rows | Medium | Open |
 
