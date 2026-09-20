@@ -42,10 +42,18 @@ def test_the_home_and_the_page_name_the_same_state_rows():
         view = {"state": s.state, "pending": s.pending.to_dict() if s.pending else None}
         assert state_kind(view) == want, s.state
     # `unpushed` is the one they read differently and deliberately: the page adds its own checklist
-    exited = _rec(state="exited", git={"dirty": 2, "ahead": 0, "upstream": "origin/x"})
+    exited = _rec(state="exited", git={"dirty": 2, "unpushed": 0, "upstream": "origin/x"})
     assert attention_kind(exited) == "unpushed"
     assert state_kind({"state": "exited", "flag": "dirty", "ready": [("tree clean", False)]}) == "unpushed"
-    assert attention_kind(_rec(state="exited", git={"dirty": 0, "ahead": 0})) == ""
+    assert attention_kind(_rec(state="exited", git={"dirty": 0, "unpushed": 0})) == ""
+    # and both read the **one measure** (§4.2, TD-080): a launch branch tracking `origin/main` and
+    # pushed to its own ref is *ahead* for ever, and is not a row on anyone's Inbox
+    launch = {"dirty": 0, "ahead": 308, "unpushed": 0, "upstream": "origin/main", "pushed_against": "origin/b"}
+    assert attention_kind(_rec(state="exited", git=launch)) == ""
+    assert state_kind({"state": "exited", "flag": "", "ready": [("branch pushed (vs origin/b)", True)]}) == ""
+    stranded = {"dirty": 0, "ahead": 0, "unpushed": 3, "upstream": "origin/main"}
+    assert attention_kind(_rec(state="exited", git=stranded)) == "unpushed"
+    assert state_kind({"state": "exited", "flag": "3 unpushed", "ready": [("branch pushed", False)]}) == "unpushed"
 
 
 async def test_a_row_that_resolves_itself_leaves_a_trail(agent, hookstub, tmp_path):

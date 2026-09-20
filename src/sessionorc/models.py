@@ -201,7 +201,10 @@ def attention_kind(s: Session) -> str:
 
     `unpushed` is the one the two read differently and deliberately: the page adds *what Ready to
     close says*, which is the page's own checklist, while the home reads the record's own git
-    facts. Both mean *exited with work that is not pushed*; the page's words are richer."""
+    facts. Both mean *exited with work that is not pushed*; the page's words are richer — and both
+    read the **one measure**, `git.unpushed`, never the porcelain's `ahead` (design §4.2, TD-080):
+    a launch branch tracking `origin/main` and pushed to its own ref is *ahead* for ever and is
+    not stranded work (review of PR #269)."""
     pend = s.pending.to_dict() if s.pending else {}
     if s.state == "needs-you":
         if pend.get("kind") == "permission" and pend.get("tool_use_id"):
@@ -212,7 +215,7 @@ def attention_kind(s: Session) -> str:
     if s.state == "limited":
         return "limited"
     git = s.git or {}
-    if s.state == "exited" and (git.get("dirty") or git.get("ahead")):
+    if s.state == "exited" and (git.get("dirty") or git.get("unpushed")):
         return "unpushed"
     return ""
 
