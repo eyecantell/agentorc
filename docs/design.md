@@ -1146,7 +1146,7 @@ Screens:
 6. **Inbox** (`/inbox`, 2026-09-19; TD-069 — the one place to work from): full width, a **view over
    three sources, none copied into another** — sessions' states (on their records), the person
    inbox (§4.10), and board items overdue or due today (in their repos' git history; step 3 of
-   TD-069, with §4.4's write-back). Three sections. **Needs you** — counted, and the top bar's
+   TD-069, with §4.4's write-back). **It is a queue** (2026-09-20, TD-079; §4.10 *The Inbox is a queue*): reading never changes a row, a row leaves only by an answer or by resolving with a trail, FYI carries a quiet count of its own, and an answered question is followed to its outcome in a fourth section, *Waiting on them*. Three sections. **Needs you** — counted, and the top bar's
    number is exactly this section: a pending permission or question, `limited`, `stalled?`, an
    exited session with unpushed work, an open `ask` to the person (a `conflict` never names the person, §4.10 — a worker whose controllers cannot settle one `ask`s the person about it), a `steer` the person has **paused**, a due board item;
    what is on the tool's clock first (a permission's countdown), then oldest first. **Steering** —
@@ -1290,10 +1290,12 @@ noted). If a control is not in this table it does not exist.
 | card `more ▾`, Focus header | **Message** | opens a composer that sends a `note` or `ask` from the person into this session's inbox (host agent RPC, ungated for a person; `from` is the person). Mail, not a send: it lands, may wake the session within its budget as any person's act does, and refills that budget (§4.10). Beside **Send**, which types into the pane and is the act of control — design 2026-09-16 (fourth Fable review), TD-052; built 2026-09-16, PR #165, as one dialog shared with Reply, an `ask` taking the default bound |
 | Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, 2026-09-19, TD-069). The top bar's **Inbox** opens it (the dialog it opened until then is retired when the page lands) and its number is the **Needs you** section only — a running `steer`, a `note` and anything snoozed are never counted (a **paused** `steer` is: a session is held on the person), so the number means *what is waiting on a person*. **It is not the Org's needs-you count**, which is session states alone: the Inbox's number adds open `ask`s to the person and due board items, so the two may differ, and each says what it counts on hover. The page's mail is polled from the `inbox` RPC as the dialog's was (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the pushed stream the Org uses. Team filter as on the Org (`team:name`, and `team:` alone for entries whose sender carried none), remembered in the browser — **built 2026-09-19, step 1, mail only**: the count is `inbox_sections`' **Needs you** list, one computation the page and the poll both read, and the poll marks nothing read (§4.10). **Step 2 built 2026-09-19**: the state rows below join *Needs you* in that same computation, so the two numbers still cannot disagree — and the hover on both now says *how* the Inbox's number differs from the Org's: the Org counts the session states, the Inbox counts those **and** open `ask`s to the person and paused `steer`s (and, from step 3, due board items). The states ride the page's own poll rather than the pushed stream, which is per record where this page is per person (§4.5 screen 6). Board items are step 3 |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Switch profile… / Wait**; exited with unpushed work: what Ready to close says (§4.2), **Open** (details). A state row leaves the list when the state does; none can be snoozed but `stalled?` and unpushed work, which are not on the tool's clock. **Built 2026-09-19 (TD-069 step 2)**, and two things it found: (a) **`limited` carries no Switch profile… / Wait**, because neither is built on the card either — the row says what the cap is doing and offers **Open**, and gains them when the card does; (b) **no Snooze on any state row**, because a state lives on its record and no field of ours holds a person's *not now* — the one this row allows on `stalled?` and unpushed work waits on a home-owned `attention_snoozed_until` set by a person-only RPC (the proposal is in TD-069). A state row is built from the card's own view, so its pill, `title`, `doing` line and badges are the card's; the pill is a `<span>`, and a state mark never looks pressable (TD-071 item 8). **One predicate** (`state_kind`) answers for the rows *and* for the Org's needs-you badge, so every session the Org counts has exactly one row here and the page's *the session states the Org counts too* is true: a `needs-you` record whose `pending` is empty, is not a dict, or names a kind this build does not know is a plain **needs you** row with **Open** and no Allow / Deny — nothing structured came with it, and a control built from what is not there is what §4.2 forbids (review of PR #251) |
-| Inbox row: identity alarm | **Acknowledge**, **Open** | design 2026-09-19, TD-077 step 2 — §4.5a first, so the control exists. One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and **counted**: an alarm is either a bug of ours or a session misbehaving, and a person should know which. The row lists the alarms in words — channel, what was claimed, the rpc, the count, and first–last in the person's own clock, with *(others)* read as *and n more distinct claims* — and says which identity mode the host is in, since *observe* records what *enforce* would refuse. **Acknowledge** clears that list (the record's, or the host's) so the row leaves: a person's own act, the `identity_ack` RPC called caller-less, refused to every session exactly as `inbox_delete` is and deliberately not among §4.8a's never-gated reads — a session that could clear the list could erase the evidence of its own forgery. Nothing is lost by it: the host agent's log keeps every alarm, a line each. **Open** focuses the session while its record is here; on the card the alarm is a **mark** and nothing more. **A node's record is acknowledged at that node**: alarms are node-owned, so an `id` naming another host is routed there like any other act (§4.4a step 4a), the node clears its own list and the home takes the cleared record from the reply — a home that cleared its replica would have the alarms back on the node's next report. The host's own list is whichever host was asked, and never travels |
+| Inbox row: identity alarm | **Acknowledge**, **Open** | design 2026-09-19, TD-077 step 2 — §4.5a first, so the control exists. One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and **counted**: an alarm is either a bug of ours or a session misbehaving, and a person should know which. The row lists the alarms in words — channel, what was claimed, the rpc, the count, and first–last in the person's own clock, with *(others)* read as *and n more distinct claims* — and says which identity mode the host is in, since *observe* records what *enforce* would refuse. **Acknowledge** clears that list (the record's, or the host's) so the row leaves: a person's own act, the `identity_ack` RPC called caller-less, refused to every session exactly as `inbox_delete` is and deliberately not among §4.8a's never-gated reads — a session that could clear the list could erase the evidence of its own forgery. Nothing is lost by it: the host agent's log keeps every alarm, a line each. **Open** focuses the session while its record is here; on the card the alarm is a **mark** and nothing more. **A node's record is acknowledged at that node**: alarms are node-owned, so an `id` naming another host is routed there like any other act (§4.4a step 4a), the node clears its own list and the home takes the cleared record from the reply — a home that cleared its replica would have the alarms back on the node's next report. The host's own list is whichever host was asked, and never travels. Acknowledging leaves a trail in FYI — *acknowledged by you* — like every row that resolves (§4.10 *The Inbox is a queue*, 2026-09-20) |
 | Inbox row: `ask` | **Reply**, **Delete**, **Snooze** | the whole text, sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms, closes it as `declined` and the asker is told by a `system` note (§4.10); **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of — the snoozed entry is listed behind *n snoozed — show* with **Unsnooze**, which clears it. Suggested answers, when the envelope carries them, are the row below. Built 2026-09-19, step 1 |
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*; up to four, 80 characters each, format characters stripped). **Drawn apart from the row's own controls** — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm — design 2026-09-20, TD-070; built 2026-09-20 (step 2), on the `ask` and `steer` rows, which is where **Reply** is drawn |
 | Inbox row: `steer` | **Reply**, **Go with it**, **Pause / Resume** | the text, **the default it will take, and the time left**; **Reply** says otherwise; **Go with it** closes it now — `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh, told to it by a `system` note that wakes it as a person's reply does — so it need not wait out the bound; doing nothing lets it lapse to the same end. **Pause** stops the clock and tells the sender not to take its default yet; the row moves to *Needs you* and **is counted while paused** — a session is now held on the person; **Resume** gives back the time that was left (§4.10 *Pause*). No Snooze on a `steer`. Not counted unless paused. Built 2026-09-19, step 1 |
+| Inbox section: **Waiting on them** | **Dismiss** | answered questions that owe an outcome (§4.10 *Outcomes*) and whose asker is still live: the question, the answer given, how long ago, the asker's name and `doing` line. Never counted — it waits on a session, not on the person. **Dismiss** says *I do not need to hear back*, ends the debt and tells the asker by a `system` note (`inbox_dismiss`, person-only). When the asker has **exited without reporting**, or reported **`blocked`**, the row is under *Needs you* instead, counted, with **Open** / **Reply** and **Dismiss** — design 2026-09-20, TD-079 |
+| Inbox: the FYI count, **Dismiss all** | the top bar's second number; one button | *Inbox 1 · 5*: the second number is FYI's entries, never added to the first (§4.10 *The Inbox is a queue*). The FYI section opens itself when its count is higher than this browser last saw. **Dismiss all** confirms once and dismisses **the ids this browser has on screen** — the trail and closed questions included, never an open question, never mail that arrived after the page was drawn — design 2026-09-20, TD-079 |
 | Inbox row: `note` and the rest of FYI | **Dismiss** | the text; Dismiss deletes. Lapsed `steer`s, declined `ask`s and late replies are listed for the retention window (`MAIL_RETENTION`, 12 h) and then pruned, as every closed entry is. **No Reply here** — an FYI row has the one control, and a `system` note could not be replied to in any case (§4.10). Built 2026-09-19, step 1 |
 | Org top bar | **Inbox** | the org's person inbox (§4.10), labelled **Inbox** on the page — *person inbox* is the design's word for whose it is, and on a page only a person reads it says nothing (2026-09-18): unread count, click to open; each entry with its sender session, kind, time and `about`, with **Reply** into the sender's inbox and delete. **From 2026-09-19 the design is the Inbox page (rows above): the top bar's control opens `/inbox` and counts only what needs a person. Built 2026-09-19 (TD-069 step 1): the control is a link to the page, its number is that page's **Needs you** section and says so on hover, and the dialog described here — its list, Reply and delete, template, JS and CSS — is retired. What stays is the Focus **Inbox** panel and the card's **unread** chip, which are a session's mailbox, not the person's.** Sessions reach it with `ao msg person`, ungated. Rings nothing; the count is polled from the `inbox` RPC, since the pushed stream carries session records and the person inbox belongs to none — design 2026-09-16 (Fable review), TD-052; built 2026-09-16, PR #168 |
 | Org top bar | **usage** chip | display only: per profile that reports usage, `<profile> 5h n% · wk n%` — the account's 5-hour and weekly windows from the adapter's `usage()` (§4.3, TD-001), red at a cap, reset times on hover; a profile whose adapter reports none is not shown. The labels were added 2026-09-18: two bare percentages said nothing. The two windows are Claude Code's, and they are named in the core's usage gate and in this chip — a second tool's windows will not fit them (TD-073) |
@@ -1479,7 +1481,7 @@ definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every ch
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills; `--close` also closes each member that settled clean and pushed, §4.9a);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
-its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC built 2026-09-16 by step 3): `ao msg <to>… "…"` `[--kind note|ask|steer|reply|conflict] [--default <line>] [--bound <seconds>] [--about <ref>] [--reply-to <id>] [--answer <line>]… [--pick <n>]` (`--answer` and `--pick` are design 2026-09-20, TD-070, built 2026-09-20 by its steps 1–3) (`steer`, `--default` and the rule that an `ask` to the person takes no `--bound` are design 2026-09-19, built 2026-09-19 by TD-069 step 0, which also added the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume` and `inbox_go_with_it`) addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — is a thin call to the host agent's `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC built 2026-09-16 by step 3): `ao msg <to>… "…"` `[--kind note|ask|steer|reply|conflict] [--default <line>] [--bound <seconds>] [--about <ref>] [--reply-to <id>] [--answer <line>]… [--pick <n>] [--outcome done|blocked|dropped --for <ask id>] [--thread <ask id>]` (`--outcome` and `--thread` are design 2026-09-20, TD-079 — not yet built) (`--answer` and `--pick` are design 2026-09-20, TD-070, built 2026-09-20 by its steps 1–3) (`steer`, `--default` and the rule that an `ask` to the person takes no `--bound` are design 2026-09-19, built 2026-09-19 by TD-069 step 0, which also added the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume` and `inbox_go_with_it`) addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — is a thin call to the host agent's `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -2735,6 +2737,113 @@ from the home, not a gate (the per-sender depth is the gate): when a session sen
 person while it **already holds three or more open `ask`s to the person** — `ask`s only, a `steer` is already the right kind; counted before this send — the reply
 to `ao msg` carries *you have n open asks to the person: is this one needed, or a steer?* beside
 the id, every time that is so.
+
+**The Inbox is a queue (2026-09-20, TD-079; decided by Paul after a day with the page).** *Reading
+an item should never change it, or make it disappear; every item should require an answer of some
+sort — snooze and dismiss are answers.* Four rules follow, and they bind every row kind, mail and
+state alike:
+
+1. **Nothing leaves without an answer.** Reading, opening, focusing, following a row's link: none
+   of them changes a row. A row leaves *Needs you*, *Steering* or FYI only by one of its own
+   controls (§4.5a) — Reply, a suggested answer, *Go with it*, Pause, Snooze, Delete, Dismiss,
+   Acknowledge, Allow / Deny — or by **resolving**, below; a question that closes by a road that is
+   not the person's — `asker_gone`, a session-to-session `expired` — already says so where it lands
+   (*One way of being closed*, above), which is the same thing for mail. What retention prunes is a
+   *trail*, never an item: an entry that was already answered or already resolved.
+2. **What resolves itself leaves a trail.** A state row is a view of a record, and its need can go
+   away by another road: the session is resumed, the permission is answered in the terminal, the
+   work is pushed, the limit resets. Until this date the row then vanished — which is what *it
+   disappeared when I read it* was: opening the row's session resumed it. Now the **home records
+   the ending**: when a record leaves a state the Inbox shows (§4.5a **Inbox row: state**), the home
+   appends `{id, name, team, kind, text, since, resolved_at, how}` — `id` being the record it is about — under an entry id of its own (`t-<hex>`, as mail's is `m-<hex>`; it is the entry id that `inbox_dismiss` takes) to a small **attention trail**
+   of its own (persisted beside the person inbox, the newest 100, each kept for `MAIL_RETENTION`),
+   where `how` is what the home can tell — *allowed by you*, *denied by you* (the `decide` RPC from
+   a person), *answered in the terminal* (the pending thing cleared with no `decide`), *resumed*,
+   *pushed*, *forgotten*, *the limit reset*, *acknowledged by you* (an identity alarm, §4.8a), and
+   plain *resolved* when it cannot tell (for a node's session the home sees the replica change and
+   knows its own `decide`s, so *by you* is always known and the rest is as good as the node's
+   report). `text` is cleaned and capped as a `doing` line is. FYI lists the trail; **Dismiss**
+   removes an entry early; a row offers **Open** only while the record it names still exists — after
+   a resume the trail names the record that ended, and says *resumed*. **Bounded like the identity
+   alarms (§4.8a):** a repeat of the same `{id, kind, how}` inside the retention window is one entry
+   with a `count` and its first and last time, so a session flapping in and out of `stalled?`
+   cannot push the rest out; and a state that lasted under five seconds leaves no trail unless a
+   person ended it — a permission a policy answered in 200 ms is not news. A state the page never
+   showed (it came and went between two polls) leaves a trail all the same: the trail is the
+   home's, not the browser's. The same small home-owned store is where a **state row's snooze**
+   lives (`attention_snoozed_until` per record and kind — TD-069's open gap), since a state has no
+   mail entry to carry one.
+3. **FYI is counted, quietly, and cannot hide mail.** Beside the main number the top bar shows a
+   second, smaller one — *Inbox 1 · 5* — the entries in FYI: `note`s, `system` notes, late replies,
+   the trail, and closed questions inside their retention — **except a question that still owes an
+   outcome**, which is under *Waiting on them* and in neither number (*Outcomes*, below). It is never added to the first: the
+   first is *what needs you*. On the page the FYI section **opens itself whenever its count is
+   higher than this browser last saw it**, and is otherwise as the person left it. A `note` to the
+   person leaves only by **Dismiss** — it is never marked read and so never ages out (*lifecycle*,
+   below) — and **Dismiss all** (one confirm) dismisses **the entries this browser has on screen, by id** —
+   never *everything FYI holds now*: mail that arrived after the page was drawn is exactly what must
+   not be dismissed unseen. Both go through one person-only RPC, **`inbox_dismiss`** (a list of ids,
+   mail and trail alike; an id that is gone is skipped; an open question is refused), refused to
+   every session as `inbox_delete` is and, like it, no never-gated read (§4.8a). Found on the day this was
+   written: five `note`s from 2026-09-17 and -18 sat in a folded, uncounted FYI, unseen, one
+   reporting a broken shared venv.
+4. **An answer is followed to its outcome.** Below.
+
+**Outcomes (2026-09-20, TD-079).** Paul: *if I give an answer, how do I know the work was
+completed — or do we just assume it gets done because we have a manager?* A manager sees its
+members' states, not whether a person's answer was acted on; so the thread itself carries it. A
+question to the person that closed as **`replied`** or **`go_with_it`** **owes an outcome**, and
+the asker settles it in one of two ways:
+- **`ao msg person --outcome done|blocked|dropped "<one line>" --for <ask id>`** — a `note` whose
+  envelope carries `outcome` and whose `root` is the question's thread. (`--for`, not `--about`:
+  `--about` is free text nobody checks, and this names an entry the home verifies.) The id is the
+  question's own — every copy of an entry shares it, and it survives a resume, since only `from`
+  follows the move. The home checks that the entry is the caller's own question to the person and
+  that it owes an outcome, then stamps **`outcome: {state, text, at, by}`** on the person's copy — `by` being the id of the reporting `note`, which is an ordinary entry of the person inbox in its own right (listed under its question, dismissed with it, pruned as any FYI entry is).
+  One line, cleaned and capped as a `doing` line is; *done* names its reference (a PR, a commit, a
+  TD) in the line, as a report does (§4.8). **Refused, in words:** a question still open (*it has
+  not been answered yet*), declined or lapsed (*nothing is owed on it*), already settled (*its
+  outcome is recorded — if more is needed, ask again with --thread*), dismissed by the person
+  (*the person does not need to hear back on this one*), or not the caller's.
+- **a new `ask` or `steer` on the thread** — `--thread <ask id>` — when more direction is needed:
+  it lands in *Needs you* (or *Steering*) **with the thread above it** — the first question and the
+  answer given, as far as the person inbox still holds them (an owing question is never pruned, so
+  the one being followed up always is) — and settles the first as `outcome: asked_again`; the new
+  one, once answered, owes its own. It is an ordinary `ask` for every bound, the per-thread
+  exchange bound included.
+**`blocked` is not a dead end.** A `blocked` outcome lands in ***Needs you***, counted, not in FYI —
+*blocked: <line>* under the question and the answer — with **Reply** (a person's reply on the
+thread, into the asker's inbox) and **Dismiss**: work that stopped on something only a person can
+move is a thing that needs a person, whether or not the session thought to ask again. **Reply
+answers it and the row leaves** (to FYI, as answered); **Dismiss** removes it unanswered. The
+person's reply is an ordinary reply, not a question, so it starts **no new debt**: one begins only
+if the session asks again with `--thread`.
+
+**The debt, and what keeps it paid.** A question that owes an outcome is **not pruned** while it
+owes one. It does **not** hold its sender's slot in the person-inbox depths — a busy worker with a
+long night of answered questions must not lose the ability to ask — but debts have a bound of
+their own: a sender that owes **ten** (`OUTCOMES_OWED_MAX`) is refused its next `ask` or `steer`
+to the person — *you owe ten outcomes to the person: report them first (ao msg person --outcome … --for <id>): m-…, …* — the remedy is one line each. Three things keep
+it from resting on a brief alone, since *briefs are skimmed, a refusal is not* (TD-072): **every
+`ao` reply to a session that owes an outcome says so** — *you owe 2 outcomes: m-…, m-…* — beside
+the unread-mail line (and like it home-owned: a node served alone says what the home last told it,
+the count riding with the unread-mail hint, §4.4a); **`ao progress none` is refused while one is owed**, naming them (`dropped`
+is an honest way out); and **Ready to close gains a row** for it (§4.2). A `go_with_it` close owes
+one too; its `system` note is unchanged, and the sender learns of the debt as of any other, from
+the line on its next `ao` reply. The debt ends when the outcome lands; when the person
+**Dismisses** the row (*I do not need to hear back* — the asker is told by a `system` note, as for
+every other act of the person's on its mail); or when the asker's record is **closed or
+forgotten**, which settles it as `outcome: asker_gone`. An asker that merely **exited** still
+owes: that row waits in *Needs you* until the person opens the session or dismisses it, and the
+manager's brief has it chase its members' debts before they exit.
+
+Where it shows: **Waiting on them** — a fourth section of the page, under *Steering*, in neither
+number: answered questions that owe an outcome and whose asker is still live, each with the answer
+given and its age. **Needs you** — counted — a `blocked` outcome, and a debt whose asker **exited
+without reporting**: only a person, or the asker's manager, can find out what happened; the row
+offers **Open** (the session's details, Resume) and **Dismiss**. **FYI** — a `done` or `dropped`
+outcome, shown under the question it closes: *you said "merge it" → done: merged as #261*. A
+lapsed `steer` owes nothing — nobody answered — and a declined question owes nothing either.
 
 **Snooze** (TD-069). A person-inbox entry may carry **`snoozed_until`**, set and cleared by the
 `inbox_snooze` RPC, which **every session is refused**, as `inbox_delete` is — a snooze is the
