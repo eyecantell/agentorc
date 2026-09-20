@@ -602,3 +602,11 @@
 19:57  tdgrind-ao-1: a wrap-up prompt reached it at 19:57 (its pane shows the standard 'this session is being wrapped up' text; wrapup_sent_at is unset on the record, so it did not come from my hand) → letting it finish; watching for out_of_work
 20:00  wrap-up: Paul wrapped this lead up. tdgrind-ao-1 exited clean (worktree clean, nothing unpushed) after its own wrap-up prompt at 19:57. Final cadence sweep --since 12h: 24 agentorc PRs, every one verdict pass; samscrape had none. Board line updated as PR #276 (fact-check running).
 20:05  wrap-up: board line updated — PR #276, Sonnet fact-check FIXED (2 findings, both fixed), cadence comment posted, squash-merged, check_cadence pass; worktree removed. ao progress none declared. Log branch pushed. Ending.
+--- run 6 end-of-run summary ---
+member tdgrind-ao-1: exited clean (worktree clean, nothing unpushed) after a wrap-up prompt at 19:57 that was not mine (wrapup_sent_at unset).
+landed: 9 references, 10 PRs — #258 TD-066, #259 TD-065, #261 TD-072 park note, #264 TD-078, #265 TD-077, #267 TD-079 step 1a, #270 TD-080, #271 TD-069, #272 TD-068, #273 board. Declined `none`: TD-032, TD-049, TD-063, TD-064, TD-067, TD-073-076 remain pickable.
+cadence: one fail, verified false (#258 worktree row = squash-merge leftover). Final --since 12h sweep: 24 agentorc PRs all pass, samscrape none. Every review row self-attested = recorded, not verified.
+sends: 3 ao msg notes, no ao send. TD-066 open claim -> declared + #258 merged; #264 merge-ready -> merged; #269 merge-ready -> answered that TD-079/mail/identity PRs are held for the anchor by Paul's 17:0Z instruction (standing exception, not re-flagged).
+escalations: one problem, PR #274 filed after steer m-4b0e11ec2e63 lapsed (default: park), PR #276 updated the same line. Both: Sonnet fact-check, cadence comment, squash merge, check_cadence pass.
+left for a person: PR #269 (anchor's to merge) and branch td072-mail-before-winddown. Both on the board, Due 2026-09-21.
+for §6: a member that writes an end-of-run summary and declines out_of_work has no ending — /exit does not leave, so it cannot go `exited`, so the restart rule cannot fire, and starting a replacement needs a close the lead's brief reserves for wrap-up. Make a submitted /exit an exit, or require `ao progress none` before a summary counts as one.
