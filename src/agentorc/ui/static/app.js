@@ -558,13 +558,21 @@
       const para = document.getElementById(b.dataset.info);
       if (!para) return;
       const key = "inboxinfo:" + b.dataset.info;
-      const show = (on) => { para.hidden = !on; b.setAttribute("aria-expanded", on ? "true" : "false"); };
+      const show = (on) => { para.hidden = !on; b.setAttribute("aria-expanded", on ? "true" : "false"); if (on) para.classList.remove("peek"); };
       show(store.get(key, false));
       b.addEventListener("click", (e) => {
         e.preventDefault(); e.stopPropagation();
         const on = para.hidden;
         show(on); store.set(key, on);
       });
+      // §4.5a: *a tooltip on hover **and keyboard focus***. `title` is the hover one — the UA's,
+      // which is also what a page with no script still has — but no browser shows a `title` to a
+      // keyboard, so focus gets the same words the other way: the very paragraph, floated over the
+      // rows rather than pushing them down, which is what a press does. The same node, so the
+      // tooltip and the description cannot drift apart. `:focus-visible`, so a mouse press — which
+      // focuses too, and opens the paragraph in place — does not also float a copy of it.
+      b.addEventListener("focus", () => { if (para.hidden && b.matches(":focus-visible")) para.classList.add("peek"); });
+      b.addEventListener("blur", () => para.classList.remove("peek"));
     });
   }
   AO.inbox = function () {

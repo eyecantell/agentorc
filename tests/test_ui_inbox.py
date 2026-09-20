@@ -1126,7 +1126,14 @@ def test_each_section_keeps_its_blurb_behind_an_i_mark_that_a_screen_reader_can_
     assert "Doing nothing is a valid answer" in para and f'title="{para}"' in html
     js = (UI / "static" / "app.js").read_text()
     assert "setupInfoMarks" in js and "stopPropagation" in js  # the i inside FYI's summary
-    assert 'store.set(key, on)' in js  # which are open is remembered in the browser
+    assert "store.set(key, on)" in js  # which are open is remembered in the browser
+    # *a tooltip on hover **and keyboard focus***: `title` is the hover one, and because no browser
+    # shows a `title` to a keyboard, focus floats the very paragraph instead — the same node, so
+    # the tooltip and the description cannot drift apart (review of PR #281)
+    assert 'b.matches(":focus-visible")' in js and 'para.classList.add("peek")' in js
+    css = (UI / "static" / "app.css").read_text()
+    peek = next(ln for ln in css.splitlines() if ".inboxpage .secinfo.peek[hidden]" in ln)
+    assert "position: absolute" in peek and "display: block !important" in peek  # floats, never pushes
 
 
 @pytest.mark.unit
@@ -1141,6 +1148,14 @@ def test_a_time_left_is_words_from_the_server_and_never_a_placeholder():
     assert _left(iso(now + timedelta(hours=1, minutes=5)), now) == "1h 5m"
     assert _left(iso(now - timedelta(minutes=1)), now) == ""  # already past: the sentence says so
     assert _left("half six", now) == "" and _left(None, now) == ""  # the `_age` rule, unraised
+    # a well-formed instant with **no offset** parses naive, and naive minus aware raises
+    # `TypeError` — which no `except ValueError` catches. One record from another build would have
+    # taken the page down rather than costing its row a line (review of PR #281). Read as UTC,
+    # which is what every stamp in the store means.
+    from agentorc.ui.app import _age
+
+    assert _left("2026-09-20T13:00:00", now) == "1h 0m" and _age("2026-09-20T11:00:00", now) == "1h 0m"
+    assert _left(12345, now) == "" and _age({"at": "x"}, now) == ""  # not even a string
     assert _countdown(iso(now + timedelta(minutes=3)), now) == "via hook · 3m 00s left"
     assert _countdown(iso(now - timedelta(minutes=3)), now) == "via hook · falling through to the terminal"
 

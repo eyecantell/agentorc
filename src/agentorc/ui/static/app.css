@@ -114,8 +114,13 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .inboxpage .imark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
 /* the paragraph it holds: always in the page (a description may point at a hidden node, never at a
    missing one), opened **in place** under the heading so it pushes the rows down, never covers one */
+.inboxpage .isec { position: relative; }
 .inboxpage .secinfo { margin: 0; max-width: 90ch; }
 .inboxpage .secinfo[hidden] { display: none; }
+/* the **keyboard** half of *a tooltip on hover and keyboard focus* (§4.5a): the same paragraph,
+   floated over the rows instead of pushing them down — a press is what pushes them. `!important`
+   because it has to beat the UA's `[hidden] { display: none }` on the very node it floats. */
+.inboxpage .secinfo.peek[hidden] { display: block !important; position: absolute; z-index: 5; left: 0;  /* no `top`: an auto offset keeps its static place, which is under the heading */ max-width: min(60ch, 100%); padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
 /* **A row is a card**: its own surface, a hover state and a focus ring, and a tab stop of its own
    (the template's `tabindex="0"`), so where one thing ends and the next begins is never in doubt */
 .inboxpage .mailrow { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); display: flex; flex-direction: column; gap: 5px; }
