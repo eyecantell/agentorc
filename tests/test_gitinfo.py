@@ -49,6 +49,50 @@ def test_git_info_ahead_of_upstream(tmp_path):
     assert git_info(tmp_path / "not-a-repo") is None or True  # a non-repo returns None or a parent's info
 
 
+def test_unpushed_is_one_measure_of_exists_only_on_this_machine(tmp_path):
+    """Design §4.2 *one measure* (TD-080): *does this work exist only on this machine*, never *is
+    it merged*. The three rules, in the order they apply — a launch branch that tracks
+    `origin/main` and is pushed to its own ref read *308 unpushed* for ever before this."""
+    origin = tmp_path / "origin.git"
+    run("git", "init", "-q", "--bare", "-b", "main", str(origin), cwd=tmp_path)
+    repo = tmp_path / "r"
+    run("git", "clone", "-q", str(origin), str(repo), cwd=tmp_path)
+    run("git", "config", "user.email", "t@t", cwd=repo)
+    run("git", "config", "user.name", "t", cwd=repo)
+    (repo / "f").write_text("1")
+    run("git", "add", "f", cwd=repo)
+    run("git", "commit", "-q", "-m", "one", cwd=repo)
+    run("git", "push", "-q", "-u", "origin", "main", cwd=repo)
+
+    # rule 2: no `origin/<branch>` of its own, but an upstream — the porcelain's ahead, as before
+    run("git", "checkout", "-q", "-b", "work", cwd=repo)
+    run("git", "branch", "-q", "--set-upstream-to=origin/main", cwd=repo)
+    (repo / "f").write_text("2")
+    run("git", "commit", "-q", "-am", "two", cwd=repo)
+    info = git_info(repo)
+    assert info and (info.unpushed, info.pushed_against) == (1, "origin/main")
+
+    # rule 1: the branch has its own remote ref — counted against *that*, whatever the upstream is.
+    # This is TD-080's case: still ahead of origin/main, and no longer *unpushed*.
+    run("git", "push", "-q", "origin", "work", cwd=repo)
+    info = git_info(repo)
+    assert info and info.ahead == 1, "still ahead of the upstream it tracks"
+    assert (info.unpushed, info.pushed_against) == (0, "origin/work"), "and its work is not only here"
+    (repo / "f").write_text("3")
+    run("git", "commit", "-q", "-am", "three", cwd=repo)
+    info = git_info(repo)
+    assert info and (info.unpushed, info.pushed_against) == (1, "origin/work")
+
+    # rule 3: neither — a detached HEAD on what origin has is pushed; a commit on no remote is not
+    run("git", "checkout", "-q", "--detach", "origin/main", cwd=repo)
+    info = git_info(repo)
+    assert info and (info.unpushed, info.pushed_against) == (0, "remote branches")
+    (repo / "f").write_text("4")
+    run("git", "commit", "-q", "-am", "four", cwd=repo)
+    info = git_info(repo)
+    assert info and (info.unpushed, info.pushed_against) == (1, "remote branches")
+
+
 def test_ensure_worktree_creates_reuses_and_validates(tmp_path):
     from sessionorc.gitinfo import WorktreeError, ensure_worktree
 

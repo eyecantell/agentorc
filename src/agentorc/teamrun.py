@@ -13,7 +13,6 @@ a terminal or a page — the callers do that from the returned records.
 
 from __future__ import annotations
 
-import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -299,29 +298,22 @@ def _close_settled(call: Call, entry: dict[str, Any], record: dict[str, Any] | N
 
 def _unsafe_to_close(record: dict[str, Any]) -> str | None:
     """Why this member's checkout is not *clean and pushed*, or None when it is. Unknown is unsafe:
-    a record with no `git` yet is left open, as Ready to close leaves it unchecked. `ahead: 0`
-    proves nothing without an upstream — a branch never pushed has no `branch.ab` line at all
-    (review of PR #192) — so with none, the commit itself is looked for on the remote-tracking
-    branches: a worker that merged and sits on a detached `origin/main` is pushed; one that
-    committed to a fresh branch and never pushed is not."""
+    a record with no `git` yet is left open, as Ready to close leaves it unchecked.
+
+    **One measure** (design §4.2, 2026-09-20, TD-080): `git.unpushed` is computed once by the host
+    agent — against the branch's own `origin/<branch>` where it has one, the upstream where it does
+    not, and the remote-tracking branches where there is neither — and read here, by the card's
+    flag and by Ready to close alike. This function used to run a third test of its own
+    (`git branch -r --contains HEAD` for a branch with no upstream), which is now rule 3 of the
+    measure and needs no subprocess here."""
     git = record.get("git")
     if not git:
         return "git state unknown"
     if git.get("dirty"):
         return f"{git['dirty']} uncommitted"
-    if git.get("upstream"):
-        return f"{git['ahead']} unpushed" if git.get("ahead") else None
-    try:
-        cp = subprocess.run(
-            ["git", "-C", str(record.get("dir") or ""), "branch", "-r", "--contains", "HEAD"],
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return "no upstream, and the remote branches could not be read"
-    if cp.returncode != 0 or not cp.stdout.strip():
-        return "no upstream, and its commit is on no remote branch"
+    if git.get("unpushed"):
+        against = git.get("pushed_against") or "its remote"
+        return f"{git['unpushed']} unpushed (vs {against})"
     return None
 
 

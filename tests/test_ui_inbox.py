@@ -529,6 +529,9 @@ PERMISSION = {"kind": "permission", "text": "run rm -rf /tmp/x?", "tool_use_id":
               "deadline": "2026-09-19T12:05:00Z"}  # fmt: skip
 
 
+_ahead3 = {"ahead": 3, "dirty": 0, "upstream": "origin/main", "unpushed": 3, "pushed_against": "origin/main"}
+
+
 @pytest.mark.unit
 def test_each_state_row_kind_carries_its_own_controls_and_no_others(tmp_path, monkeypatch):
     """§4.5a **Inbox row: state**: a permission gets **Allow / Deny** on the hook channel and the
@@ -541,7 +544,7 @@ def test_each_state_row_kind_carries_its_own_controls_and_no_others(tmp_path, mo
         rec("ao-q", "needs-you", pending={"kind": "question", "text": "which branch?"}),
         rec("ao-s", "stalled?", pending={"kind": "note", "text": "stood down: another device took over"}),
         rec("ao-l", "limited", pending={"kind": "limit", "text": "resets 14:00"}),
-        rec("ao-e", "exited", exit_code=0, git={"ahead": 3, "dirty": 0, "upstream": "origin/main"}),
+        rec("ao-e", "exited", exit_code=0, git=_ahead3),
     ]
     by = {r["row"]: r for r in state_rows_of(records)}
     assert sorted(by) == ["limited", "permission", "question", "stalled", "unpushed"]

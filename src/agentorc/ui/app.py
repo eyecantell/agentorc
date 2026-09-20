@@ -423,8 +423,9 @@ def view(
     flags = []
     if git.get("dirty"):
         flags.append("dirty")
-    if git.get("ahead"):
-        flags.append(f"{git['ahead']} unpushed")
+    if git.get("unpushed"):
+        # the one measure (design §4.2, TD-080): *exists only on this machine*, never *unmerged*
+        flags.append(f"{git['unpushed']} unpushed")
     d["flag"] = " · ".join(flags) if state in ("idle", "exited", "stalled?", "needs-you") and flags else ""
     prof = s.get("profile") or ""
     if s.get("adapter") == "shell":
@@ -543,7 +544,12 @@ def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ())
     checks = []
     if s.get("dir") and git:
         checks.append(("tree clean", git.get("dirty", 0) == 0))
-        checks.append(("branch pushed", git.get("ahead", 0) == 0 and bool(git.get("upstream"))))
+        # one measure, computed by the host agent and read here (design §4.2, TD-080): a branch
+        # with no upstream is no longer *not pushed* by definition — rule 3 looks for the commit
+        # on the remote-tracking branches, which is what a merged worker on a detached HEAD needs
+        pushed = git.get("unpushed", 0) == 0
+        label = "branch pushed" if pushed or not git.get("pushed_against") else f"branch pushed (vs {git['pushed_against']})"  # noqa: E501
+        checks.append((label, pushed))
     checks.append(("no subagents running", (s.get("subagents") or 0) == 0))
     # design §4.2 / §4.10 *Outcomes* (TD-079): the person answered this session's question and has
     # not been told what came of it. `ao progress none` is refused on the same fact; this row is
