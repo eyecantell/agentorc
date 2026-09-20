@@ -57,6 +57,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-079 | The Inbox is a queue: nothing leaves it without an answer, what resolves itself leaves a trail, FYI is counted, and an answer is followed to its outcome | High | Open |
 | TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Open |
 | TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Open |
+| TD-082 | The Inbox page needs a second design round: section blurbs always on screen, message text wrapped to a narrow column on a wide window, sections that blend into their rows | Medium | Open |
 
 ---
 
@@ -961,6 +962,25 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 
 **Why:** to resume `orchestrator-ao-1` on 2026-09-20 Paul had to **type a name**: the banner's link carries the directory and the adapter and no name, the form's name box arrives empty, and what he typed (`push`) became the new session — `ao-orchestrator-ao-1-push` — beside the exited record it was a resume *of*. Nothing refused the old name: the name check already answers `supersede` for a name an exited record holds, and a create under it replaces that record in place (`_name_verdict`, `_take_name`). The page simply never offers it. **Fix:** *Resume* prefills the old record's name, so the ordinary path is the superseding one — the resumed session takes the bare name, the old record is closed and its mail moves (§4.10 *Resume carries mail forward*) — and the form says that is what will happen. **And the row:** *exited with unpushed work* offers only **Details** today. Paul's *Reopen session and push*: one control that resumes the session under its own name with a fixed, page-written first prompt — *push your branch and open or update its PR; then report the outcome* — never text a session wrote; it is a person's act (a `create` with `resume`), and its result comes back as an outcome (TD-079).
 
-**Done when** resuming from the page needs no typing, the resumed session has its old name, and the unpushed-work row can be answered from the row.
+**Paul, later on 2026-09-20 — two controls, not a prefilled form:** *when a session needs to be resumed, I should have a resume option that requires no input from me, and a "resume with changes" (or similar) that goes to the normal resume screen where name etc. can be changed if desired.* So: **Resume** is one press — same name, directory, adapter, profile, role and team as the record it resumes, no form — and **Resume with changes…** opens the New session form with all of those filled in. The design round settles what the one-press path does when it cannot be silent (the name is held by a *live* record; the directory is gone; the profile no longer exists): it falls through to the form with the reason shown, never a guess.
 
-**Related:** TD-047 (the Details banner), TD-079 (outcomes; every row needs an answer it can be given), TD-080 (why this particular row was a false alarm), design §4.10 (*Resume carries mail forward*), §9 invariant 12 (names).
+**Done when** resuming from the page needs no typing, the resumed session has its old name, *Resume with changes…* reaches the filled-in form, and the unpushed-work row can be answered from the row.
+
+**Related:** design §4.5a (*Focus (exited / closed)*: the exited banner), TD-079 (outcomes; every row needs an answer it can be given), TD-080 (why this particular row was a false alarm), design §4.10 (*Resume carries mail forward*), §9 invariant 12 (names).
+
+## TD-082: The Inbox page needs a second design round
+
+**Priority:** Medium
+**Added:** 2026-09-20 (the anchor session; Paul, from the page at full width — his screenshot, and the anchor's own of the live page)
+**Status:** Open — Paul's direction; design first (§4.5 screen 6, mockups), and **after** the builds already decided (TD-079's steps) unless one of these is in their way. Paul: *the design review work can wait if it makes more sense to have our ao team catch up on the designs already decided.*
+**Location:** `src/agentorc/ui/templates/inbox.html` (the section heads and their blurbs, the footer paragraph), `inbox_row.html`, `src/agentorc/ui/static/app.css` (`.inboxpage .mailrow .body`: `max-width: 110ch`), `docs/mockups/gen.py`
+
+**Why:** Paul's findings, each confirmed on a 1920-wide screenshot of the live page:
+1. **The blurbs are always on screen.** Each section opens with a paragraph saying what it is (*Needs you*'s runs to two lines at full width) and the page ends with another. They are reference, read once: they belong behind a mouseover or a clickable info mark on the section's title, not above every row for ever.
+2. **The word-wrap is wrong at full width.** A message's text wraps at a fixed measure — well under half of a 1900 px row — while the blurb above it and the controls below it run the full width, so the row reads as a narrow column in an empty box. Either the whole row shares one readable maximum, or the page itself is a centred column.
+3. **Sections blend into their messages.** A section is a bordered box and its rows are unboxed text inside it; with one row it is hard to say where the head ends and the message starts. Paul: *the messages could probably be cards themselves, to be easily selected* — a row as a card (its own surface, a hover and a focus state), sections as plain headings above a list of cards.
+4. **Seen on the same screenshot, for the same round:** a session named `push` shows as `push  push  [plain]  [No team]` (its name, then the tool's own title — a separate value that here is the same word; the row should not print a title that only repeats the name); the state row's one control is a bare *Details* at the far right (TD-081 gives it real answers); the steering row's countdown is filled in by script after load and is `…` until then.
+
+**Done when** a design round (mockups first, then §4.5 screen 6 and the §4.5a rows it touches) has settled the four, and the page is built to it.
+
+**Related:** TD-069 (the Inbox), TD-079 (the queue — its page step and this one touch the same templates: build that first, or fold this into it), TD-081 (the state row's answers), TD-071 (mockups), TD-076 (friendlier titles on the same rows).
