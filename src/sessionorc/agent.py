@@ -39,6 +39,7 @@ from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktre
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
     ASK_KINDS,
+    ATTENTION_KINDS,
     GRANTS,
     HOME_OWNED,
     MAIL_KINDS,
@@ -57,12 +58,13 @@ from sessionorc.models import (
     Tally,
     apply_home,
     apply_node,
+    attention_kind,
     canonical_grants,
     has_control,
     normalize_ref,
     now_iso,
 )
-from sessionorc.store import EventQueue, IdentityAlarmStore, PersonInboxStore, SessionStore
+from sessionorc.store import AttentionStore, EventQueue, IdentityAlarmStore, PersonInboxStore, SessionStore
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, PaneInfo, Tmux
 
 log = logging.getLogger("agentorc.agent")
@@ -95,6 +97,8 @@ SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # wh
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs_keep_days`)
 ID_RECHECK = 30.0  # seconds between re-reads of the tmux server's pid (design §4.8a, TD-077)
+TRAIL_KEEP = 100  # attention-trail entries kept, newest first (design §4.10, TD-079)
+TRAIL_FLOOR = timedelta(seconds=5)  # a row this short leaves no trail unless a person ended it
 # A session past its `run_until` is asked to wrap up and then killed (design §6, TD-026): this is how
 # long it is given to finish after the ask. It is a grace, not a deadline the session can see — a
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
@@ -236,6 +240,22 @@ class HostAgent:
         # that says *no alarms* about the night the agent was restarted. The tally does not: it
         # says *since the agent started*, and §4.8a means that literally.
         self.identity_store = IdentityAlarmStore()
+        # The attention trail and the state rows' snoozes (design §4.10 *The Inbox is a queue*,
+        # TD-079). A state row is a view of a record: when its need goes away by some road that is
+        # not the person's — the session was resumed, the permission was answered in the terminal,
+        # the work was pushed — the row used to vanish with no trace, which is what *it disappeared
+        # when I read it* was. The home records the ending instead.
+        self.attention_store = AttentionStore()
+        self.trail, self.attention_snoozed = self.attention_store.load()
+        # `<sid>|state` / `<sid>|alarm` → (the row kind it is showing, when that row began, what it
+        # said). Empty on load **on purpose**: the first tick after a restart reads every live row
+        # as one that has just begun, so a row that was already up leaves no trail when it ends —
+        # one ending lost per restart, which is better than inventing one the agent never saw, and
+        # the record itself is still there to be read.
+        self._attention: dict[str, tuple[str, str, str]] = {}
+        # sid → how its current row will have ended, when the home knows better than *resolved*:
+        # written by the act that ended it (`decide`, `identity_ack`, a resume, a forget).
+        self._attention_how: dict[str, str] = {}
         self.identity_alarms: list[dict[str, Any]] = self.identity_store.load()
         self._id_host_dirty = False  # counts moved since the last write; the tick writes them
         self.identity_tally: dict[str, int] = defaultdict(int)
@@ -462,6 +482,7 @@ class HostAgent:
         await self._id_recheck_detached()
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
+        self._note_attention(snapshot_at)
         await self._refresh_git(snapshot_at)
         await self._refresh_model(snapshot_at)
         if self._derive_task is None or self._derive_task.done():
@@ -893,6 +914,10 @@ class HostAgent:
             self._mail_hints,
         ):
             side.pop(sid, None)
+        for key in [k for k in self._attention_how if k.split("|", 1)[0] == sid]:
+            del self._attention_how[key]
+        for key in [k for k in self._attention if k.split("|", 1)[0] == sid]:
+            del self._attention[key]  # belt and braces: `_attention_gone` wrote these out already
 
     def _forget(self, sid: str) -> None:
         gone = self.sessions.get(sid)
@@ -905,6 +930,7 @@ class HostAgent:
         for e in [e for e in gone.inbox if e.open and e.kind != "steer"]:
             self._close_entry(e.id, "expired", now_iso())
         self._asker_gone(gone, self._address(gone))
+        self._attention_gone(gone, "forgotten")
         self.sessions.pop(sid, None)
         self.store.delete(sid)
         # Scrub the id from every subscriber's map and queue the one `gone`: whichever
@@ -913,6 +939,116 @@ class HostAgent:
             last.pop(sid, None)
         self._scrub(sid)
         self._gone.append(sid)
+
+    # -- the attention trail (design §4.10 *The Inbox is a queue*, TD-079) -------------------------
+
+    def _note_attention(self, now: datetime) -> None:
+        """Once a tick: every record's state row, compared with the one it was showing. A row that
+        **ended** leaves a trail entry; a row that began is remembered. Nothing here decides what a
+        person sees — that is the page's — it only records what went away, because a state row is
+        derived and leaves no entry of its own to find afterwards."""
+        graph = self._graph()
+        for sid, s in list(graph.items()):
+            # two slots per record, because the page draws two rows: its state, and its identity
+            # alarms (§4.5a **Inbox row: state** / **identity alarm**). One ends without the other.
+            for slot, kind, began, what in (
+                ("state", attention_kind(s), s.since, (s.pending.text if s.pending else "") or ""),
+                ("alarm", "alarm" if s.identity_alarms else "", _alarm_since(s) or s.since, _alarm_words(s)),
+            ):
+                key = f"{sid}|{slot}"
+                was, since, text = self._attention.get(key, ("", "", ""))
+                if kind == was:
+                    continue
+                if was:
+                    # what the row *said*, remembered from when it began: by the time it ends the
+                    # pending is cleared, and a trail entry with no words is no use to a person
+                    self._trail_append(s, was, since, now, text=text)
+                if kind:
+                    # `began`, never the old row's: `kind != was` here (the `continue` above), so
+                    # this is always a row starting — one that inherited the previous row's start
+                    # would misreport how long *it* had been up (review of PR #269)
+                    self._attention[key] = (kind, began, what)
+                else:
+                    self._attention.pop(key, None)
+        for key in [x for x in self._attention if x.split("|", 1)[0] not in graph]:
+            del self._attention[key]  # a record that is gone left through `_forget`, not here
+
+    def _trail_append(
+        self, s: Session, kind: str, since: str, now: datetime, how: str = "", text: str = ""
+    ) -> None:
+        """One ending, coalesced. A repeat of the same `{sid, kind, how}` inside the retention
+        window is one entry carrying a `count` and its first and last time, so a session flapping
+        in and out of `stalled?` cannot push the rest of the trail out (the identity alarms' rule,
+        §4.8a). A row that lasted under `TRAIL_FLOOR` leaves nothing **unless a person ended it**:
+        a permission a policy answered in 200 ms is not news."""
+        slot = "alarm" if kind == "alarm" else "state"
+        # the address, not the bare id: a node's record is keyed `id@host` everywhere the graph and
+        # the attention bookkeeping touch it, and the word the home wrote for it was keyed that way
+        who = self._address(s)
+        how = how or self._attention_how.pop(f"{who}|{slot}", "") or self._attention_how.get(f"{who}|*", "")
+        # A resumed record says so on its own face, so the word is right for a **node's** session
+        # too, where the resume ran at the node and this home never saw the act (review of PR #269).
+        how = how or ("resumed" if s.superseded_by else "") or "resolved"
+        stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        if not how.endswith("by you") and since:
+            with contextlib.suppress(ValueError, TypeError):
+                if now - _parse(since) < TRAIL_FLOOR:
+                    return
+        for e in self.trail:
+            if (e.get("sid"), e.get("kind"), e.get("how")) == (who, kind, how):
+                e["count"] = int(e.get("count") or 1) + 1
+                e["last"] = stamp
+                self.attention_store.save(self.trail, self.attention_snoozed)
+                return
+        doing = text or (s.doing or {}).get("text") or ""
+        self.trail.insert(
+            0,
+            {
+                # the entry's own id, which `inbox_dismiss` takes, as mail's is `m-`
+                "id": "t-" + secrets.token_hex(6),
+                "sid": who,
+                "name": s.name,
+                "team": s.team or "",
+                "kind": kind,
+                "text": _clean(str(doing))[: mail.DEFAULT_CAP],
+                "since": since,
+                "resolved_at": stamp,
+                "how": how,
+                "count": 1,
+                "first": stamp,
+                "last": stamp,
+            },
+        )
+        del self.trail[TRAIL_KEEP:]
+        self.attention_store.save(self.trail, self.attention_snoozed)
+
+    def _attention_gone(self, s: Session, how: str) -> None:
+        """A record **leaving the graph** — forgotten, or replaced in place by a new session that
+        took its name (`_take_name`) — writes its live rows' endings here rather than on the next
+        tick's comparison: nothing would be left to compare, and an id handed straight back would
+        give the new record the old one's words, `kind` and start time (review of PR #269). A word
+        the act that ended the row already left wins over `how`, which is the default. **The
+        record's snoozes go with it**: they were that row's *not now*, and a reused id must not
+        arrive pre-silenced."""
+        who = self._address(s)
+        now = datetime.now(UTC)
+        for key in [k for k in self._attention if k.split("|", 1)[0] == s.id]:
+            was, since, text = self._attention.pop(key)
+            slot = key.split("|", 1)[1]
+            word = self._attention_how.get(f"{who}|{slot}") or self._attention_how.get(f"{who}|*") or how
+            self._trail_append(s, was, since, now, how=word, text=text)
+        gone = [k for k in self.attention_snoozed if k.split("|", 1)[0] in (s.id, who)]
+        for key in gone:
+            del self.attention_snoozed[key]
+        if gone:
+            self.attention_store.save(self.trail, self.attention_snoozed)
+
+    def _attention_ended(self, sid: str, how: str, slot: str = "state") -> None:
+        """What ended a row, said by the act that ended it (`decide`, `identity_ack`, a resume, a
+        forget): the next tick's comparison uses it instead of a plain *resolved*. `slot` is which
+        of the record's two rows it is about — `"*"` for an act that ends both, a resume or a
+        forget — and a slot's own word is spent once, while `*` stands until the record goes."""
+        self._attention_how[f"{sid}|{slot}"] = how
 
     def _asker_gone(self, s: Session, *ids: str) -> None:
         """Design §4.10 *What a person is asked*: an `ask` to the person cannot expire, so the
@@ -1186,6 +1322,9 @@ class HostAgent:
             await asyncio.to_thread(self.tmux.kill_session, holder)
             return None, holder
         await asyncio.to_thread(self.tmux.kill_session, holder.id)  # a dead pane, if it still has one
+        # The replaced record's rows end here, with the record: it is gone from the graph, and the
+        # new session under its id must not inherit what it was showing (review of PR #269).
+        self._attention_gone(holder, "forgotten")
         self._scrub(holder.id)  # the side tables are about the old session, not the new one
         log.info("%s superseded the %s session of the same name", holder.name, holder.state)
         return holder.run_log, holder.id
@@ -1227,6 +1366,9 @@ class HostAgent:
             self.store.save(new)
 
     def _move_mail(self, old: Session, new: Session) -> None:
+        # The row the old record was showing ends here, and the trail says *resumed* — which is
+        # what Paul saw vanish: opening a row's session resumed it (design §4.10, TD-079).
+        self._attention_ended(old.id, "resumed", "*")
         now = datetime.now(UTC)
         new.inbox = self._rename([self._copy(e) for e in old.inbox if self._keep(e, now, inbox=True)], old.id, new.id)
         new.outbox = self._rename(
@@ -2432,6 +2574,12 @@ class HostAgent:
                     "threads": {},
                     "sends": [],
                     "unread": sum(1 for e in self.person_inbox if not e.read_at),
+                    # design §4.10 *The Inbox is a queue* (TD-079): the endings of the state rows
+                    # the Inbox showed, newest first, and the person's *not now* on a state row.
+                    # Neither is mail and both belong to the home, so the person's read carries
+                    # them here rather than making the page ask twice.
+                    "trail": [dict(e) for e in self.trail],
+                    "attention_snoozed": dict(self.attention_snoozed),
                 }
             s = self._find(self._addr(id))  # another host's too: the mailbox is the home's (step 5)
             mark = False
@@ -2536,6 +2684,78 @@ class HostAgent:
         self._mark(msg, snoozed_until=str(until) if until else None)
         return {"id": PERSON, "msg": msg, "snoozed_until": e.snoozed_until}
 
+    async def rpc_inbox_dismiss(self, msg: list[str] | str, caller: Any = None) -> dict[str, Any]:
+        """**Dismiss** and **Dismiss all** (design §4.10 *The Inbox is a queue*, TD-079): the one
+        way a `note` or a trail entry leaves the person's Inbox — *reading never removes a row; an
+        answer does, and dismissing is an answer.*
+
+        Takes a **list of ids**, mail (`m-`) and trail (`t-`) alike, because *Dismiss all*
+        dismisses **the entries this browser has on screen**, never *everything FYI holds now*:
+        mail that arrived after the page was drawn is exactly what must not go unseen. An id that
+        is already gone is skipped — two browsers may press it at once — and an **open question is
+        refused**, naming it: a question is answered, declined or snoozed, never swept away.
+
+        **A person's only**, refused to every session exactly as `inbox_delete` is and, like it, no
+        never-gated read (§4.8a): a session that could dismiss the person's rows could bury its own
+        question."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot dismiss the person's rows: dismissing is a person's answer to them "
+                "(design §4.10 *The Inbox is a queue*)"
+            )
+        ids = [str(x) for x in ([msg] if isinstance(msg, str) else list(msg or [])) if str(x).strip()]
+        if not ids:
+            raise RpcError("dismiss names the entries to dismiss, by id (design §4.10)")
+        held = {e.id: e for e in self.person_inbox}
+        if still_open := [i for i in ids if i in held and held[i].open]:
+            raise RpcError(
+                f"{', '.join(still_open)} is still open: a question is answered, declined or snoozed, never "
+                "dismissed with the rest (design §4.10 *The Inbox is a queue*)",
+                open=still_open,
+            )
+        wanted = set(ids)
+        # *The debt ends when the person **Dismisses** the row — I do not need to hear back — and
+        # the asker is told by a `system` note, as for every other act of the person's on its mail*
+        # (design §4.10 *Outcomes*). Only now that both halves of step 1 are in one tree.
+        at = now_iso()
+        for e in [x for x in self.person_inbox if x.id in wanted and x.owes]:
+            self._mark(e.id, outcome={"state": "dismissed", "text": "", "at": at, "by": ""})
+            self._system_note(e.from_, f"the person dismissed {e.id}: no outcome is owed on it")
+        dismissed = [e.id for e in self.person_inbox if e.id in wanted]
+        if dismissed:
+            self.person_inbox = [e for e in self.person_inbox if e.id not in wanted]
+            self.person_store.save(self.person_inbox)
+        dropped = [e["id"] for e in self.trail if e.get("id") in wanted]
+        if dropped:
+            self.trail = [e for e in self.trail if e.get("id") not in wanted]
+            self.attention_store.save(self.trail, self.attention_snoozed)
+        return {
+            "id": PERSON,
+            "dismissed": [*dismissed, *dropped],
+            "skipped": [i for i in ids if i not in (*dismissed, *dropped)],
+            "unread": sum(1 for e in self.person_inbox if not e.read_at),
+        }
+
+    async def rpc_attention_snooze(
+        self, id: str, kind: str, until: str | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """A **state row's** Snooze (design §4.10 *The Inbox is a queue*; TD-069's open gap): a
+        state lives on the record and has no mail entry to carry a `snoozed_until`, so the person's
+        *not now* is kept in the home's own attention store, per record **and row kind** — a
+        session's permission and its stalled row are two rows, and snoozing one is not snoozing the
+        other. No `until` clears it. A person's only, as every act on the person's Inbox is."""
+        if not mail.is_person(caller):
+            raise RpcError(f"{caller} cannot snooze the person's rows: a snooze is the person's own (design §4.10)")
+        if kind not in (*ATTENTION_KINDS, "alarm"):
+            raise RpcError(f"unknown row kind {kind!r}; the state rows are: {', '.join(ATTENTION_KINDS)}, alarm")
+        key = f"{self._addr(id)}|{kind}"
+        if until:
+            self.attention_snoozed[key] = str(until)
+        else:
+            self.attention_snoozed.pop(key, None)
+        self.attention_store.save(self.trail, self.attention_snoozed)
+        return {"id": PERSON, "row": key, "snoozed_until": self.attention_snoozed.get(key)}
+
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
         """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer
         this; do not go on without me*. `paused_at` stops the bound running (the sweep skips the
@@ -2618,6 +2838,12 @@ class HostAgent:
                 self._lapse_or_expire(e, stamp)
         if mail.MAIL_RETENTION is None:
             return
+        # the trail is kept like read mail: each entry for the retention window from when it ended
+        # (design §4.10 *The Inbox is a queue*), so FYI does not grow without bound
+        trail = [e for e in self.trail if not _older(e.get("last") or e.get("resolved_at"), now)]
+        if len(trail) != len(self.trail):
+            self.trail = trail
+            self.attention_store.save(self.trail, self.attention_snoozed)
         kept = [e for e in self.person_inbox if self._keep(e, now, inbox=True)]
         if len(kept) != len(self.person_inbox):
             self.person_inbox = kept
@@ -2829,6 +3055,9 @@ class HostAgent:
         if behavior not in ("allow", "deny"):
             raise RpcError("behavior must be allow or deny")
         fut.set_result({"behavior": behavior, "reason": reason})
+        # the row ends here and the home knows how (design §4.10 *The Inbox is a queue*): a person
+        # pressed it, so the trail says so — and a person's answer is never too quick to record
+        self._attention_ended(s.id, "allowed by you" if behavior == "allow" else "denied by you")
         s.set_state("working", confidence="hook")
         self._refill(s)  # an answer to its permission is a person's act toward it (design §4.10)
         self.store.save(s)
@@ -3483,6 +3712,15 @@ class HostAgent:
             ) from None
         except TimeoutError:
             raise RpcError(f"{host} did not answer {method} within {timeout:g} s: its verdict is unknown") from None
+        # §4.10 rule 2: *for a node's session the home sees the replica change and knows its own
+        # `decide`s, so `by you` is always known*. The act itself ran at the node, on the node's own
+        # bookkeeping, so the home records the word here — where it knows both the record and what
+        # was pressed — or the trail would read *resolved* for every node-hosted row (review of #269).
+        if method == "decide" and rid:
+            pressed = "allowed by you" if params.get("behavior") == "allow" else "denied by you"
+            self._attention_ended(f"{rid}@{host}", pressed)
+        elif method == "identity_ack" and rid:
+            self._attention_ended(f"{rid}@{host}", "acknowledged by you", "alarm")
         reply = reply if isinstance(reply, dict) else {}
         if reply.get("record"):
             self._take_records(host, [reply["record"]], whole=False)
@@ -3929,6 +4167,7 @@ class HostAgent:
             self.identity_store.save(self.identity_alarms)
             return {"id": PERSON, "cleared": True, "alarms": []}
         s = self._get(self._addr(id))
+        self._attention_ended(s.id, "acknowledged by you", "alarm")  # the trail says who ended it (§4.10)
         s.identity_alarms = []
         self._id_dirty.discard(s.id)
         self._save(s)
@@ -4405,6 +4644,30 @@ def _renamed_grants(s: Session, where: str) -> bool:
     )
     del s.renamed_grants
     return True
+
+
+def _alarm_since(s: Session) -> str:
+    """When an alarm row began: the first alarm's own time, not the record's state transition."""
+    first = (s.identity_alarms or [{}])[0]
+    return str(first.get("at") or first.get("first") or "")
+
+
+def _alarm_words(s: Session) -> str:
+    """What an identity-alarm row says, in one line: the first alarm's own words, as §4.8a has the
+    list keep the first and count the rest."""
+    first = (s.identity_alarms or [{}])[0]
+    return str(first.get("words") or first.get("claimed") or "an identity alarm")
+
+
+def _older(stamp: Any, now: datetime) -> bool:
+    """Past the retention window, for a trail entry's own stamp. An unreadable stamp is kept: the
+    trail is evidence, and losing it to a bad clock would be worse than one stale row."""
+    if mail.MAIL_RETENTION is None or not stamp:
+        return False
+    try:
+        return _parse(str(stamp)) + mail.MAIL_RETENTION <= now
+    except (ValueError, TypeError):
+        return False
 
 
 def _urgent(s: Session) -> str:

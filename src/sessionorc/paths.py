@@ -49,6 +49,14 @@ def identity_alarms_file() -> Path:
     return home() / "identity_alarms.json"
 
 
+def attention_file() -> Path:
+    """The home's **attention trail** and the state rows' snoozes (design §4.10 *The Inbox is a
+    queue*, TD-079): a state row is a view of a record and leaves no entry behind, so what became
+    of it — and a person's *not now* on it — have nowhere else to live. Beside
+    `person_inbox.json`, one file, written whole."""
+    return home() / "attention.json"
+
+
 def socket_path() -> Path:
     return home() / "agent.sock"
 
