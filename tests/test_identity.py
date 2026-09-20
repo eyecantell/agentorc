@@ -162,10 +162,13 @@ def test_identical_alarms_coalesce_so_a_loop_cannot_evict_a_different_one():
     assert len(alarms) == 2
     assert alarms[0]["rpc"] == "kill" and alarms[0]["count"] == 1
     assert alarms[1]["count"] == 1000 and alarms[1]["at"] == "t1" and alarms[1]["last"] == "t1000"
-    many = []
-    for i in range(identity.ALARMS_KEEP + 5):
-        many = identity.coalesce(many, {"channel": "outside", "claimed": f"ao-{i}", "rpc": "msg"}, "t")
-    assert len(many) == identity.ALARMS_KEEP
+    # a flood of *distinct* alarms cannot bury the first ones either: the list keeps the earliest
+    # and counts the rest in one closing entry (red-team of PR #248)
+    many = identity.coalesce([], {"channel": "session ao-a", "claimed": "ao-REAL-TARGET", "rpc": "msg"}, "t0")
+    for i in range(identity.ALARMS_KEEP + 30):
+        many = identity.coalesce(many, {"channel": "session ao-a", "claimed": f"ao-junk-{i}", "rpc": "msg"}, f"t{i}")
+    assert len(many) == identity.ALARMS_KEEP and many[0]["claimed"] == "ao-REAL-TARGET"
+    assert many[-1]["claimed"] == identity.OTHERS and many[-1]["count"] == 30 + 1 + 1
 
 
 def test_the_cgroup_line_and_the_mode():
@@ -355,3 +358,30 @@ async def test_a_hook_is_bound_to_its_pane_end_to_end(agent, tmp_path):
             raise AssertionError("a hook from outside every pane was served")
         except Exception as e:  # noqa: BLE001
             assert identity.MISMATCH in str(e)
+
+
+def test_no_read_decides_anything_on_its_caller():
+    """The rule `identity.READS` rests on: a read is served under any claim, so it must not
+    authorise on one. `host_files` was listed until the red-team of PR #248 — it serves the person
+    or a `control` holder, so a session that left `caller` out read a checkout as the person."""
+    import inspect
+
+    from sessionorc.agent import HostAgent
+
+    for name in sorted(identity.READS):
+        fn = getattr(HostAgent, f"rpc_{name}")
+        assert "caller" not in inspect.signature(fn).parameters, f"{name} takes a caller: it is not a plain read"
+    assert "host_files" not in identity.READS
+    # and from under a pane even a read runs as that pane's session (judge leaves the claim; the
+    # agent's step replaces it) — checked end to end below
+
+
+async def test_host_files_from_under_a_pane_is_that_session_never_the_person(agent, tmp_path):
+    agent.identity_mode = "enforce"
+    async with LocalClient() as me:
+        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        req = {"id": 1, "method": "host_files", "params": {"host": agent.host, "dir": str(tmp_path), "paths": []}}
+        got = await _probe(me, tmp_path, a, "hostfiles", req)  # no caller: it used to pass as the person
+        assert "error" in got and "control" in got["error"]
+        got = await _probe(me, tmp_path, a, "badparams", {"id": 1, "method": "list", "params": 5})
+        assert got["error"] == "params must be an object"  # and the connection answered, not dropped

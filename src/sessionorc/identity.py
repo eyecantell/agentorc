@@ -28,6 +28,10 @@ ALARMS_KEEP = 20
 
 # Never-gated reads (§4.4a's first table row, less `wait`, which answers *for* a caller): served on
 # every channel, no alarm — they tell a caller nothing the socket's mode did not already grant.
+# **A read here must not decide anything on its `caller`**: the envelope's claim reaches it
+# unjudged from outside a pane. `host_files` was listed until the red-team of PR #248 — it
+# authorises on `caller` (the person, or a `control` holder), so a session that left its `caller`
+# out read a checkout as the person. `tests/test_identity.py` pins the rule for every name here.
 READS = frozenset(
     {
         "list",
@@ -42,7 +46,6 @@ READS = frozenset(
         "ping",
         "whoami",
         "identity",
-        "host_files",
     }
 )
 
@@ -248,20 +251,28 @@ def judge(channel: Channel, claimed: str | None, rpc: str, *, hook_session: str 
     return alarm(None)  # unknown: refused, reads aside
 
 
+OTHERS = "(others)"  # the `claimed` of the one entry that stands for every distinct alarm past the list's room
+
+
 def coalesce(alarms: list[dict[str, Any]], entry: dict[str, Any], at: str) -> list[dict[str, Any]]:
-    """`alarms` with `entry` recorded at `at`: identical `{channel, claimed, rpc}` alarms are one
-    entry with a `count` and its first and last time, so a loop cannot push a different alarm out
-    of the list; the newest `ALARMS_KEEP` distinct ones are kept."""
+    """`alarms` with `entry` recorded at `at`. Identical `{channel, claimed, rpc}` alarms are one
+    entry with a `count` and its first and last time, so a loop cannot push a different alarm out.
+    The list keeps the **first** `ALARMS_KEEP - 1` distinct alarms and then counts the rest in one
+    closing `(others)` entry — never the newest-N: a session that has raised one alarm could
+    otherwise bury it under twenty made-up ones (red-team of PR #248). The host agent's log has
+    every alarm, one line each; this list is what a page shows."""
     key = (entry.get("channel"), entry.get("claimed"), entry.get("rpc"))
-    out: list[dict[str, Any]] = []
-    merged: dict[str, Any] | None = None
-    for a in alarms:
-        if merged is None and (a.get("channel"), a.get("claimed"), a.get("rpc")) == key:
-            merged = {**a, "count": int(a.get("count") or 1) + 1, "last": at}
-        else:
-            out.append(a)
-    out.append(merged or {**entry, "count": 1, "at": at, "last": at})
-    return out[-ALARMS_KEEP:]
+    out = [dict(a) for a in alarms]
+    for a in out:
+        if (a.get("channel"), a.get("claimed"), a.get("rpc")) == key:
+            a["count"], a["last"] = int(a.get("count") or 1) + 1, at
+            return out
+    if len(out) < ALARMS_KEEP - 1:
+        return [*out, {**entry, "count": 1, "at": at, "last": at}]
+    if out and out[-1].get("claimed") == OTHERS:
+        out[-1]["count"], out[-1]["last"] = int(out[-1].get("count") or 1) + 1, at
+        return out
+    return [*out, {"channel": "", "claimed": OTHERS, "rpc": "", "count": 1, "at": at, "last": at}]
 
 
 def mode_of(value: Any) -> str:

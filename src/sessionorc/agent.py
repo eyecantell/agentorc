@@ -3561,7 +3561,8 @@ class HostAgent:
             return {"id": req.get("id"), "result": {"channel": ch.kind, "session": ch.session, "signal": ch.signal}}
         claimed = req.get("caller")
         named = None if mail.is_person(claimed) else self._addr(claimed)
-        hooked = (req.get("params") or {}).get("session") if rpc == "hook" else None
+        params = req.get("params")
+        hooked = params.get("session") if rpc == "hook" and isinstance(params, dict) else None
         verdict = identity.judge(ch, named, rpc, hook_session=self._addr(hooked) if hooked else None)
         if verdict.alarm is not None:
             self._id_alarm(verdict.alarm, verdict.about)
@@ -3574,6 +3575,11 @@ class HostAgent:
                 req.pop("caller", None)
             else:
                 req["caller"] = verdict.caller
+        elif ch.kind == "session":
+            # A read is served whatever it claims, but from under a pane it runs as that pane's
+            # session all the same — no refusal and no alarm, only no borrowed name (the unread-mail
+            # line on a reply is the caller's, for one).
+            req["caller"] = ch.session
         return None
 
     def _id_alarm(self, entry: dict[str, Any], about: str | None) -> None:
@@ -3587,7 +3593,7 @@ class HostAgent:
         s.identity_alarms = identity.coalesce(s.identity_alarms, entry, at)
         # A new alarm is written at once; a repeat only bumps a count, and a loop of forged requests
         # must not become a disk write each — the tick writes what is left (`_id_flush`).
-        if len(s.identity_alarms) != known or s.identity_alarms[-1]["count"] == 1:
+        if len(s.identity_alarms) != known:
             self._save(s)
         else:
             self._id_dirty.add(s.id)
@@ -3865,6 +3871,10 @@ class HostAgent:
         method = getattr(self, f"rpc_{name}", None)
         if method is None:
             return {"id": rid, "error": f"unknown method {name!r}"}
+        if not isinstance(req.get("params") or {}, dict):
+            # raw JSON from any local process: `"params": 5` used to raise outside the handler's
+            # `try` and drop the connection without a reply (red-team of PR #248)
+            return {"id": rid, "error": "params must be an object"}
         params = dict(req.get("params") or {})
         if ignored := _drop_unknown(method, params):
             # logged with the method, because the reply cannot tell a client newer than this agent

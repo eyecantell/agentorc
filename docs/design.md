@@ -1811,7 +1811,7 @@ the socket to a child and exits must not become whatever reuses its pid). A conn
   was started from a person's shell, `pdm run agentorc-agent serve`, and **a container node**
   (no systemd, one cgroup for everything; and with `person: false` there is no person for a
   detached process to pass as). `ao status -v` says *detached-process check: on | off* beside
-  the mode, so a host where it is off is not taken for one where it is on.
+  the mode, so a host where it is off is not taken for one where it is on: **where it is off and the host carries a person, `enforce` does not stop a fully detached process that sends no `caller`** — it reads as *outside*, which is the person. That is a dev run or an old tmux server, never the installed home (check on) nor an agents-only node (no person to pass as).
 
 The classification is the connection's for its life, and is never asked again.
 
@@ -1827,7 +1827,12 @@ The classification is the connection's for its life, and is never asked again.
 
 Reads that are never gated (`status`, `tail`, `explain`, `ping`, …; §4.4a's first table row) are
 served on every channel and raise no alarm: they tell a caller nothing the socket's mode did not
-already grant. The **`hook` RPC** is bound the same way: its `session` parameter must be the
+already grant. **A read on that list must decide nothing on its `caller`** — the claim reaches it
+unjudged from outside a pane — so `host_files`, which serves the person or a `control` holder, is
+*not* on it and is judged like any act (the red-team of the build found it listed: a session that
+left its `caller` out read a checkout as the person; a test now holds every name on the list to
+the rule). From under a pane even a read runs as that pane's session — no refusal, no alarm, only
+no borrowed name. The **`hook` RPC** is bound the same way: its `session` parameter must be the
 channel's session, or it is refused with an alarm — a hook runs under its tool, under its pane.
 `ao … --id <other>` is unchanged: that is a parameter the gates already judge, not an identity.
 **Where it lives:** one step at the head of dispatch, before the node table and before any gate —
@@ -1841,7 +1846,7 @@ never-gated read, **`whoami`**, returns the connection's classification and the 
 decided it, the UI calls it at startup and shows a banner when the answer is not *outside*, and
 `ao whoami` prints it for a person or a session checking their own channel. `ao identity` (below) is a never-gated read too: tallies and this host's alarms tell a session nothing it could not learn by trying.
 
-**An identity alarm** is `{at, channel, claimed, rpc}` — identical `{channel, claimed, rpc}` alarms coalesce into one entry carrying a `count` and its first and last time, so a loop cannot push a different alarm out of the list, and only a *new* alarm is written to disk at once — a repeat moves a count in memory and the next tick writes it, so a loop of forgeries is not a disk write each: kept on the record it is about (the last
+**An identity alarm** is `{at, channel, claimed, rpc}` — identical `{channel, claimed, rpc}` alarms coalesce into one entry carrying a `count` and its first and last time, so a loop cannot push a different alarm out of the list; the list keeps the **first** nineteen distinct alarms and counts every later one in a closing *(others)* entry — never the newest twenty, which a session could use to bury its one real forgery under twenty made-up ones (the host agent's log has every alarm, a line each; the list is what a page shows), and only a *new* alarm is written to disk at once — a repeat moves a count in memory and the next tick writes it, so a loop of forgeries is not a disk write each: kept on the record it is about (the last
 20, `identity_alarms`), or in a small list of the home's own when it is about no record. It is
 shown — a mark on the card, and a row under *Needs you* in the Inbox (§4.5 screen 6), because it
 is either a bug of ours or a session misbehaving and a person should know which — and it wakes
