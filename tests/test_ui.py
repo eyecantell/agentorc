@@ -779,7 +779,10 @@ def test_the_composer_says_whether_send_starts_a_turn_or_steers_one():
     assert '"closed"' in dead and '"unreachable"' in dead and "compose.disabled = true" in dead
     assert "this session's process has ended" in dead and "cannot be reached" in dead
     # the banner offers Resume only on `exited` with an adapter id, so the hint must not promise it
-    assert 'v.state === "exited" && v.adapter_id' in dead and "start a new session here" in dead
+    # from TD-081 step 2 a `closed` record resumes too: the hint promises Resume exactly where the
+    # banner offers it — on a record that holds a tool session id, whichever of the two states
+    assert '(v.state === "exited" || v.state === "closed") && v.adapter_id' in dead
+    assert "start a new session here" in dead and "resume it under its own name" in dead
 
     # `stalled?` is a working session that stopped producing output (§4.2) — a turn in flight, so
     # it steers. `limited` must not claim a turn starts now: §4.2 says nothing the person does

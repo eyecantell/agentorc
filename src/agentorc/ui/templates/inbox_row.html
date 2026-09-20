@@ -319,9 +319,15 @@
   <span class="grow"></span>
   {{ open_btn(e, 'Open') }}
   {%- elif e.row == 'unpushed' %}
+  {#- §4.5a **Inbox row: state** (TD-081): the row had only **Details**, which is not an answer to
+      it. **Reopen and push** is the one-press Resume with a first prompt **the page wrote** —
+      fixed text in the source, never anything a session said (§4.2) — and what comes of it returns
+      as an outcome (§4.10). **Resume** is the same press without the prompt. -#}
   <span class="st">exited with work that is only here — the row goes when it is pushed, or the session is forgotten</span>
   <span class="grow"></span>
   {{ state_snooze(e) }}
+  <button class="btn sm primary" data-act="reopen-push" data-id="{{ e.sid }}" data-confirm="Reopen {{ e.name }} under its own name and ask it to push? It resumes the conversation, attended, with one prompt this page wrote — push the branch, open or update the PR, then report the outcome.">Reopen and push</button>
+  <button class="btn sm" data-act="resume" data-id="{{ e.sid }}">Resume</button>
   {{ open_btn(e, 'Details') }}
   {%- else %}
   <span class="st">{% if e.row == 'stalled' %}no output for a while: it may be thinking, or stuck{% else %}answer it in the terminal{% endif %}</span>

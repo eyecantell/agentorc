@@ -168,6 +168,23 @@
         if (!who) return;
         action2 = "controllers"; body = { add: [who.trim()] };
       }
+      // design §4.5a **Resume** / **Resume with changes…** / **Reopen and push** (TD-081 step 2).
+      // One press: the server builds the create from the record and answers either the new
+      // session's id or the filled-in form to finish by hand — *it is not a guess*. **Resume with
+      // changes…** and **Reopen and push** are the same route: the first asks for the form
+      // outright, the second adds the page's own first prompt.
+      if (action === "resume-form") {
+        const r = await act(id, "resume", { form: true });
+        location.href = r.form || `/new`;
+        return;
+      }
+      if (action === "resume" || action === "reopen-push") {
+        const r = await act(id, "resume", { push: action === "reopen-push" });
+        if (r.form) { AO.toast(`resume needs the form: ${r.why}`, true); location.href = r.form; return; }
+        AO.toast("resumed — same name, same record, its mail came with it", true);
+        location.href = `/focus/${r.id}`;
+        return;
+      }
       const res = await act(id, action2 || action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/")) location.href = "/"; }
@@ -977,14 +994,15 @@
         // to sit enabled here and say nothing, which was merely useless; saying "starts a new
         // turn" at a dead session would be a lie, so the state that made the hint necessary is
         // the state that has to be excluded from it. The exited banner below offers the two real
-        // next steps (Resume this conversation, New session here). TD-047.
+        // next steps (Resume, New session here). TD-047.
         compose.disabled = true;
-        // The banner below offers **Resume this conversation** only on `exited` with an adapter id
-        // (a closed session gets New session here and Forget), so the hint must not promise it.
+        // The banner below offers **Resume** only on a record that holds a tool session id — an
+        // `exited` or a `closed` one, from TD-081 step 2 — so the hint must not promise it where
+        // there is none (a `shell`, a command run).
         $("#composehint").textContent = v.state === "unreachable"
           ? "the host agent cannot be reached: nothing can be sent until it is back"
-          : v.state === "exited" && v.adapter_id
-            ? "this session's process has ended: resume the conversation or start a new one, below"
+          : (v.state === "exited" || v.state === "closed") && v.adapter_id
+            ? "this session's process has ended: resume it under its own name, or start a new one, below"
             : "this session's process has ended: start a new session here, below";
       } else {
         // design §4.3: one button, two jobs. A message to an `idle` session starts a turn; a
@@ -1015,7 +1033,16 @@
         const q = `dir=${encodeURIComponent(v.dir || "")}&adapter=${encodeURIComponent(v.adapter || "claude-code")}`;
         const kept = v.state === "exited" && v.pane !== false;  // a kill/close destroys the pane (TD-023)
         ex.innerHTML = `This session's process has ${esc(v.state)}${esc(code)}. ${kept ? "The pane is kept so its last screen and run log stay readable." : "Its pane is gone (killed, or the tmux server restarted); the run log stays readable."} `
-          + (v.adapter_id && v.state === "exited" ? `<a class="btn sm primary" href="/new?${q}&resume=${encodeURIComponent(v.adapter_id)}">Resume this conversation</a> ` : "")
+          // design §4.5a **Focus (exited / closed)** (TD-081 step 2, Paul: *a resume option that
+          // requires no input from me*): **Resume** is one press and no form — the same name, so
+          // the record is replaced in place and keeps its mail — and **Resume with changes…** is
+          // that same create as a filled-in form. A `closed` record resumes too: §4.5a says
+          // *`exited` or `closed` holding a tool session id*, and the link that stood here
+          // offered neither, which is how a resume became a second record beside the first.
+          + (v.adapter_id && (v.state === "exited" || v.state === "closed")
+            ? `<button class="btn sm primary" data-act="resume" data-id="${id}">Resume</button> `
+              + `<button class="btn sm" data-act="resume-form" data-id="${id}">Resume with changes…</button> `
+            : "")
           + `<a class="btn sm" href="/new?${q}">New session here</a> <button class="btn sm ghost" data-act="remove" data-id="${id}">Forget</button>`;
         ex.classList.remove("hidden");
       } else ex.classList.add("hidden");
