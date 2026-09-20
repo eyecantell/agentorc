@@ -1874,7 +1874,12 @@ the socket to a child and exits must not become whatever reuses its pid). A conn
   a peer is plainly *outside* — never a silent refusal: a tmux server that predates the unit or
   was started from a person's shell, `pdm run agentorc-agent serve`, and **a container node**
   (no systemd, one cgroup for everything; and with `person: false` there is no person for a
-  detached process to pass as). `ao status -v` says *detached-process check: on | off* beside
+  detached process to pass as). The check is a fact about the tmux server **now running**: a server
+  that is replaced under a running agent — kmaster's was, on 2026-09-20 — moves it, so the host
+  agent re-reads the server's pid — with its start time, since a pid alone would read a
+  replacement that landed on the same one as the server it replaced — on its own cadence (every `ID_RECHECK` seconds, from the tick,
+  beside the pane list it already takes) and recomputes the check only when that pid has moved; no
+  server at all reads as *not yet known*, never as off. `ao status -v` says *detached-process check: on | off* beside
   the mode, so a host where it is off is not taken for one where it is on: **where it is off and the host carries a person, `enforce` does not stop a fully detached process that sends no `caller`** — it reads as *outside*, which is the person. That is a dev run or an old tmux server, never the installed home (check on) nor an agents-only node (no person to pass as).
 
 The classification is the connection's for its life, and is never asked again.
