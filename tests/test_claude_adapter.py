@@ -414,6 +414,8 @@ def test_title_is_the_tools_own_name_for_the_session_or_nothing():
     assert ad.title("  ✻  TD-074 steps 3 and 4  ") == "TD-074 steps 3 and 4"
     assert ad.title("⣷ Error Checker") == "Error Checker"  # a spinner frame is a glyph too
     assert ad.title("Error Checker") == "Error Checker"  # undecorated, and still a name
+    # one mark and only before a space: a name a person chose may open with a character of its own
+    assert ad.title("* priority fix") == "* priority fix" and ad.title("•bullet") == "•bullet"
     # not a name: nothing there, the tool's own default, a shell's
     assert ad.title("") is None and ad.title("   ") is None and ad.title("✳") is None
     assert ad.title("Claude Code") is None and ad.title("✳ claude") is None

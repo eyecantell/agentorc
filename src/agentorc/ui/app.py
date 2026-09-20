@@ -244,14 +244,14 @@ ICON_TTL = 5.0  # seconds a resolved role icon is kept, the `DEFS_TTL` idiom (de
 _icon_cache: dict[tuple[str, str], tuple[float, str]] = {}
 
 
-def _icon_for(repo: str, role: str) -> str:
+def _icon_for(repo: str, role: str, org_roles: Any) -> str:
     """The role's icon in that repo (design §4.8): the repo's own `roles:` over the org's over the
     built-in, resolved by `repoconfig` — the core never keys on a role, and the UI is free to
     (§9 invariant 9). A repo with no file, an unreadable one, a role nothing defines: no icon,
     never an error on the page."""
     try:
         cfg = repoconfig.load(repo) if repo else repoconfig.RepoConfig()
-        return repoconfig.resolve_role(cfg, role, org_here()[0].roles).icon or ""
+        return repoconfig.resolve_role(cfg, role, org_roles).icon or ""
     except (KeyError, ValueError, OSError):
         return ""
 
@@ -263,7 +263,15 @@ async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, st
     now = time.monotonic()
     want = {(str(s.get("repo") or ""), str(s.get("role") or "")) for s in sessions if s.get("role")}
     if stale := [k for k in want if now - _icon_cache.get(k, (0.0, ""))[0] > ICON_TTL]:
-        got = await asyncio.to_thread(lambda: {k: _icon_for(*k) for k in stale})
+
+        def resolve() -> dict[tuple[str, str], str]:
+            try:
+                org_roles = org_here()[0].roles  # read once per batch, not once per pair (review of PR #240)
+            except (ValueError, OSError):
+                org_roles = None
+            return {k: _icon_for(*k, org_roles) for k in stale}
+
+        got = await asyncio.to_thread(resolve)
         _icon_cache.update({k: (now, v) for k, v in got.items()})
     return {k: _icon_cache[k][1] for k in want if k in _icon_cache}
 
