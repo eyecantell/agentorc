@@ -710,10 +710,14 @@ def test_a_partial_start_still_says_the_brief_names_one_run(world, capsys, monke
     assert "TD-042" in err and "a clock time" in err
 
 
-def test_on_a_node_the_org_lives_on_the_home_and_status_says_offline(world, capsys):
+def test_on_a_node_the_org_lives_on_the_home_and_status_says_what_the_listing_is(world, capsys):
     """Design §4.4a, TD-057 step 2: `org.yml` lives on the home, so a node reads no local copy; and
     what `ao status` shows there is this host's sessions only, labelled — on stderr, so `--json`
-    stays the records."""
+    stays the records.
+
+    From TD-084 the line no longer says *offline … unreachable* on every node: this fixture's stub
+    agent answers no `host`, so the link state cannot be read, and **not knowing is not knowing it
+    is down**. What is always true is still said."""
     tmp_path, state = world
     (tmp_path / "home" / "hosts.yml").write_text("home: elsewhere\n")  # this host is `kmaster` (the fixture)
     assert cli.main(["team", "start", "ao-grind"]) == 1
@@ -721,7 +725,9 @@ def test_on_a_node_the_org_lives_on_the_home_and_status_says_offline(world, caps
     assert "the org lives on elsewhere (home)" in err and not creates(state)
     assert cli.main(["status", "--json"]) == 0
     out = capsys.readouterr()
-    assert out.out.strip() == "[]" and "offline" in out.err and "node of elsewhere" in out.err
+    assert out.out.strip() == "[]" and "node of elsewhere" in out.err
+    assert "this host's sessions only" in out.err and "the org and your mail are at the home" in out.err
+    assert "is not known" in out.err and "unreachable" not in out.err  # it was never asked
 
 
 # ── ao focus on a container node's session (design §4.4a "Reach", TD-057 3c.5) ───────────────

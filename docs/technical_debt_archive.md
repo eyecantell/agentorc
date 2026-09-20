@@ -744,3 +744,28 @@ rightly calls the first step. No unattended session may open the live UI, and th
 proof. **The other answer is still open and is the anchor's:** splitting the header into an
 identity line and a control line is a §4.5a decision about what a person sees first on a narrow
 window, and the wrap does not foreclose it.
+
+## TD-084: On a node, `ao status` says its home is unreachable without asking
+
+**Priority:** Low
+**Added:** 2026-09-20 (the anchor session; seen while sampling a node's calls for TD-077)
+**Status:** Resolved
+**Location:** `src/agentorc/cli.py` (`cmd_status`, the `hosts.is_node()` branch), design §4.4a (*on a node out of reach of its home*)
+
+**Why:** `ao status` inside the contractmatch container printed *offline — contractmatch is a node of kmaster, which is unreachable: this host's sessions only; no mail, no org* while the home's journal showed the link **up** and the node freshly re-provisioned. `cmd_status` prints that line whenever the host is a node; nothing checks the link. What is true on a linked node is narrower — *this listing is this host's sessions only* — and the word *unreachable* sends a reader looking for an outage that is not there (it sent the anchor to the journal).
+
+**Done when** the line says *unreachable* only when the node's agent reports its link down, and otherwise says what the listing is (this host's sessions; the org is at the home), with a test for each.
+
+**Related:** TD-057 (nodes), TD-077 (where it was seen).
+
+**Resolved:** 2026-09-20 (PR #294) — `cmd_status`'s node branch is `_node_status_line()`, which
+asks. The `host` RPC has carried `home_reachable` since TD-057, so nothing new is reported and no
+change was needed in `sessionorc`. **Three answers, one per state the agent can be in**, and the
+third is the point: a `host` call that *fails* says the link could not be read and that whether the
+home is in reach **is not known** — claiming an outage on a failed read is the very mistake this
+entry is about. What is always true on a node is said in all three: *this listing is this host's
+sessions only — the org and your mail are at the home*. The stronger sentence is kept word for word
+for the state that earns it. The line stays on stderr, so `--json` is the records and nothing else.
+Tests: `tests/test_cli.py::test_a_nodes_status_line_says_unreachable_only_when_it_is` (the three
+states, and `--json` unpolluted) and `::test_the_host_line_is_drawn_only_on_a_node` — the home says
+nothing, because its listing is the whole org's.
