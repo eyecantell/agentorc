@@ -1385,3 +1385,43 @@ def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_pat
     assert 'data-act="allow"' not in html and "answer in the terminal (Focus)" in html
     with_id = {**s, "pending": {**s["pending"], "tool_use_id": "tu"}}
     assert 'data-act="allow"' in templates.get_template("card.html").render(s=view(with_id))
+
+
+@pytest.mark.unit
+def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, monkeypatch):
+    """TD-085, design §4.5a **Focus header**: the row had no wrap, and three things were added to
+    it on 2026-09-19 and -20 — the tool's title, the **out of work** chip and the **doing** line.
+    Without wrap a flex row shrinks its shrinkable children rather than moving anything to a second
+    line, and the session's path is the most shrinkable thing there: redrawn at 1440 it broke over
+    four lines, the title was squeezed to nothing and the doing line never appeared.
+
+    The rule is *the name and its state must never be the things that shrink*, so it is pinned
+    here: the row wraps, those two do not shrink, and the two long derived strings do."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    head = next(ln for ln in css.splitlines() if ln.startswith(".focus #fhead {"))
+    assert "flex-wrap: wrap" in head
+    keep = next(ln for ln in css.splitlines() if ln.startswith(".focus #fhead > .title,"))
+    assert "#fstate" in keep and "flex: 0 0 auto" in keep  # the name and the state: never shrunk
+    give = next(ln for ln in css.splitlines() if ln.startswith(".focus #fhead > .tool-title,"))
+    assert "flex: 0 1 auto" in give and "text-overflow: ellipsis" in give  # these give way instead
+
+    # …and every one of the things that crowded it is still in the row it now wraps
+    v = view({
+        "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "idle", "since": "2026-09-19T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],
+        "created": "2026-09-19T15:00:00Z", "title": "Error Checker", "unattended": True,
+        "doing": {"text": "rebasing #269", "at": "2026-09-19T15:50:00Z"},
+        "out_of_work": {"why": "the lane is done", "at": "2026-09-19T15:55:00Z"},
+        "team": "ao-grind", "role": "grinder",
+    })  # fmt: skip
+    html = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")
+    head_html = html[html.index('id="fhead"') : html.index('id="fbanner"')]
+    for piece in ("Error Checker", "rebasing #269", "out of work", "fstop", "fgrants", "fcontrollers"):
+        assert piece in head_html, piece
+    # the doing line reads as it does on a card and in an Inbox row — it read "· says · 10m ago"
+    # here, which nobody had seen, because the line never fitted (TD-085)
+    # the age is measured against now, so the shape is what is pinned, not the number
+    assert "rebasing #269 · says " in head_html and " ago" in head_html and "· says ·" not in head_html

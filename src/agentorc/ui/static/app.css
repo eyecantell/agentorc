@@ -243,6 +243,25 @@ details.more .menu button { text-align: left; background: none; border: 0; paddi
 .page.focus { flex-direction: row; align-items: flex-start; gap: 14px; }
 .focus .main { flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; } .focus .side { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
 .focus .title { font-size: 15px; font-weight: 500; }
+/* design §4.5a **Focus header** (TD-085). The row had no wrap, and 2026-09-19 and -20 put three
+   more things in it — the tool's title, the **out of work** chip and the **doing** line, beside
+   the path, the state, the mode toggle, the stop badge, team, role, grants, controllers and, on a
+   `needs-you` session, Allow / Deny with the tool and its command. Without wrap a flex row shrinks
+   its shrinkable children rather than moving anything to a second line, and the session's path is
+   the most shrinkable thing there: at 1440 it broke over four lines, the title was squeezed to
+   nothing and the doing line never appeared.
+
+   **The name and its state must never be the things that shrink.** So the row wraps — which is
+   what the Focus artboard in `docs/mockups/gen.py` draws — and the two that say *which session
+   this is* are told not to shrink, while the two long derived strings are. Splitting the header
+   into an identity line and a control line is the other answer in TD-085 and is a §4.5a decision,
+   not this. */
+.focus #fhead { flex-wrap: wrap; row-gap: 6px; }
+.focus #fhead > .title, .focus #fhead > #fstate { flex: 0 0 auto; }
+/* the two long ones the row may take back instead: both are a session's own words or its tool's,
+   both are shown and never acted on, and both keep the whole of it on hover */
+.focus #fhead > .tool-title, .focus #fhead > .doing { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.focus #fhead > .doing { max-width: 32em; }
 .termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 6px; } .termbox .xterm { height: 100%; }
 .composer { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 .composer textarea { width: 100%; height: 72px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font: 13px/1.4 inherit; font-family: inherit; resize: vertical; }

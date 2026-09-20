@@ -708,3 +708,36 @@ Not proposed: **the lead describing each member** (second-hand, a token cost eve
 **Resolved:** 2026-09-20 (PR #291) — the last step, which waited on the running host agent enforcing leases. It does: with `tdgrind-ao-1` holding `TD-078`, `tdgrind-ao-2`'s `ao progress claim TD-078` answered, on the installed build and from a second live session — *TD-078 is claimed by ao-agentorc-tdgrind-ao-1 since 2026-09-20T20:43:08Z (a lease, design §4.8): pick another reference, or claim it anyway with `--force`*. It refused, named the holder, named when, cited the rule and offered the override. So the at-claim `note` to siblings (TD-052 step 4) is out of `src/agentorc/briefs/grinder.md` and `docs/briefs/tdgrind-ao-1.md`, replaced by what the lease actually does; design §4.8 records the change and the evidence. The lasting content is design §4.8 *A claim is a lease*, `rpc_progress`'s `force` and `_lease_holder`, and `tests/test_agent.py::test_a_claim_is_a_lease_on_its_reference`. **Not built, and still waiting for a case that needs them:** path reservations and how two globs overlap.
 
 **Related:** ADR 2026-09-16 (messaging prior art); TD-052 step 4; TD-028 (the report channels); design §4.8, §4.10.
+
+## TD-085: The Focus header outgrew its row — it does not wrap, so the name and the newest chips squeeze each other
+
+**Priority:** Low
+**Added:** 2026-09-20 (`tdgrind-ao-1`, from the TD-074 step 6 mockup redraw)
+**Status:** Resolved
+**Location:** `src/agentorc/ui/templates/focus.html` (`#fhead`, a `row gap`), `src/agentorc/ui/static/app.css` (`.row` — `flex-wrap` is only on `.wrap`)
+
+**Why:** `#fhead` is one flex row with no wrap, and 2026-09-19 and -20 added three things to it: the tool's **title** (TD-074), the **out of work** chip (TD-053 step 6) and the **doing** line (TD-074), beside what was already there — back link, `host / repo / name`, state, the unattended toggle, the stop badge, team, role, grants, controllers, and on a `needs-you` session Allow / Deny with the tool and its command. Redrawing the Focus artboard at 1440 with all of it showed the failure shape: the session's path broke over four lines, the title was squeezed to nothing and the doing line never appeared. Without wrap a flex row shrinks its shrinkable children rather than moving anything to a second line, and the session's name is the most shrinkable thing there. **The artboard is not proof** — it is a copy of the same row at the same width, not the page — so the first step is a browser at 1440 and at a laptop's 1280.
+
+**Fix:** the row wraps (`flex-wrap: wrap` on `#fhead`, which is what the mockup's Focus artboard now does and what the lead's artboard always did), or the header is split — the identity line above, the chips and controls below. The second is a design question for §4.5a, since it decides what a person sees first on a narrow window; the first is a line of CSS that stops the name disappearing. Whatever is chosen, the **name and its state must never be the things that shrink**.
+
+**Done when** the Focus header at 1440 and at 1280 shows the session's name whole, its state, and every chip it carries, on a `needs-you` session with a title, a stop time, a team, a role, grants, a controller and a doing line.
+
+**Related:** TD-074 (what was added), TD-053 step 6 (the out-of-work chip), TD-003 (the phone layout, which has the same row and less of it), design §4.5a (*Focus header*).
+
+**Resolved:** 2026-09-20 (PR #292) — the first of the entry's two answers, which is the one that is
+not a design question: `#fhead` wraps (`flex-wrap: wrap` with a `row-gap`, which is what the Focus
+artboard draws), and the rule the entry ends on is made explicit in the CSS — **the name and its
+state never shrink** (`flex: 0 0 auto` on `.title` and `#fstate`), while the two long derived
+strings give way instead (`flex: 0 1 auto` with an ellipsis on the tool's title and the `doing`
+line, both of which keep the whole of it on hover). A test pins all three rules and asserts that
+every one of the things that crowded the row is still in it.
+
+**Found because the line never fitted:** the Focus header's `doing` line read *rebasing #269 ·
+says · 10m ago*, where the card and the Inbox row both write *· says 10m ago*. Fixed in the same
+PR, with the shape pinned by the same test.
+
+**Left to a person, on `docs/user_attention.md`:** the browser at 1440 and at 1280 that this entry
+rightly calls the first step. No unattended session may open the live UI, and the artboard is not
+proof. **The other answer is still open and is the anchor's:** splitting the header into an
+identity line and a control line is a §4.5a decision about what a person sees first on a narrow
+window, and the wrap does not foreclose it.
