@@ -955,7 +955,7 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 
 **Priority:** Medium
 **Added:** 2026-09-20 (the anchor session; Paul, from the page at full width — his screenshot, and the anchor's own of the live page)
-**Status:** Open — Paul's direction; design first (§4.5 screen 6, mockups), and **after** the builds already decided (TD-079's steps) unless one of these is in their way. Paul: *the design review work can wait if it makes more sense to have our ao team catch up on the designs already decided.*
+**Status:** Open — **designed 2026-09-20, not built**: Paul picked mockup A (one centred column) over B (a grid); the design is §4.5 screen 6 *Layout*, the §4.5a row *Inbox: section heading, the **i** mark*, and the artboard `docs/mockups/Inbox.dc.html` (`gen.py` `inbox()`), which also draws TD-079's *Waiting on them*, the trail and the FYI count and TD-081's *Reopen and push* so the page step has one picture. Build it with TD-079 step 2 (same templates), by `tdgrind-ao-2`. Earlier: Paul's direction; design first (§4.5 screen 6, mockups), and **after** the builds already decided (TD-079's steps) unless one of these is in their way. Paul: *the design review work can wait if it makes more sense to have our ao team catch up on the designs already decided.*
 **Location:** `src/agentorc/ui/templates/inbox.html` (the section heads and their blurbs, the footer paragraph), `inbox_row.html`, `src/agentorc/ui/static/app.css` (`.inboxpage .mailrow .body`: `max-width: 110ch`), `docs/mockups/gen.py`
 
 **Why:** Paul's findings, each confirmed on a 1920-wide screenshot of the live page:
