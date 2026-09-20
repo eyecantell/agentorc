@@ -587,3 +587,4 @@
 16:39  tdgrind-ao-1: replied to my note by merging #264 (TD-078) — cadence check all rows pass merged; its note says TD-078 stays open for a second flake sighting. Now claimed TD-077 and TD-079 → ok (TD-077 has no result yet; watching).
 16:45–17:05 quiet
 16:58  tdgrind-ao-1: PR #265 (TD-077) and #268 (TD-080/TD-081 design) merged — both cadence-check all rows pass → ok. Its record still shows TD-077 claimed, not done; watching for the declaration.
+17:08  tdgrind-ao-1: TD-077 and TD-079 both declared done (#265, #267) — #267 cadence check all rows pass → ok
