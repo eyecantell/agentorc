@@ -555,8 +555,7 @@ def test_every_class_the_controllers_chips_name_is_one_the_stylesheet_draws(tmp_
     root = pathlib.Path(ui.__file__).parent
     css = (root / "static" / "app.css").read_text()
     sources = {
-        name: (root / name).read_text()
-        for name in ("templates/card.html", "templates/focus.html", "static/app.js")
+        name: (root / name).read_text() for name in ("templates/card.html", "templates/focus.html", "static/app.js")
     }
     for name, text in sources.items():
         assert "badge controller" in text, f"{name} does not draw the controllers chip as a badge"

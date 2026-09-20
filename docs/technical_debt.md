@@ -933,6 +933,8 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 
 **Done when** the design says all of it, a row never leaves the Inbox except by a person's answer or by resolving with a trail, FYI cannot hide unseen mail, and a person can see for every answer they gave whether it was carried out.
 
+**Fixed 2026-09-20 (#263), one line of this entry:** dismissing an FYI entry no longer closes the FYI list — the click handler folded the nearest `<details>` of any kind; it folds a `details.more` menu and nothing else.
+
 **Related:** TD-069 (the Inbox; its steps 3–4 and the state-row snooze are unaffected), TD-070 (suggested answers — an answer index is what an outcome refers back to), TD-072 (mail triage by sessions — the same idea from the other side), TD-075 (a go-between would owe outcomes too), design §4.10 (*What a person is asked*), §9 invariant 13 (mail is not durable: an outcome that must outlive the record is still a board line).
 
 ## TD-080: A manager's round log reads as unpushed work forever
