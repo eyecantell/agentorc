@@ -280,7 +280,7 @@ class HostAgent:
         self._reported: dict[str, tuple[str, str, float]] = {}
         # A node's hint of each record's mail, as the home last pushed it: `(unread, budget spent)`.
         # Never an inbox — the mailbox is the home's — only what a reply's mail line needs.
-        self._mail_hints: dict[str, tuple[int, bool]] = {}
+        self._mail_hints: dict[str, tuple[int, bool, list[str]]] = {}
         self._snapshot_sent = False
         self._bg: set[asyncio.Task[None]] = set()  # fire-and-forget tasks, held so they are not collected
         if self.mode == "node":
@@ -922,6 +922,13 @@ class HostAgent:
         at = now_iso()
         for e in [e for e in self.person_inbox if e.from_ in (s.id, *ids) and e.open]:
             self._close_entry(e.id, "asker_gone", at)
+        # And the debt goes with the asker (design §4.10 *Outcomes*): a question the person
+        # answered whose asker was **closed or forgotten** is settled `asker_gone` — nobody is left
+        # to report it, and the row must not wait in the Inbox for a session that cannot come back.
+        # An asker that merely **exited** still owes: that row waits until the person opens the
+        # session or dismisses it, which is why this runs from close and forget and not from exit.
+        for e in [e for e in self.person_inbox if e.from_ in (s.id, *ids) and e.owes]:
+            self._mark(e.id, outcome={"state": "asker_gone", "text": "", "at": at, "by": ""})
 
     # -- RPC methods -----------------------------------------------------------------------------
 
@@ -1699,6 +1706,15 @@ class HostAgent:
                 'ao progress none needs --why "<the search that came up empty>": a declaration without its '
                 "reason is refused (design §4.9a)"
             )
+        if owed := s.owed():
+            # Design §4.10 *Outcomes*: the person answered; what became of it is owed before this
+            # session stops. `dropped` is an honest way out, and one line settles each.
+            raise RpcError(
+                f"{s.id} owes {len(owed)} outcome{'s' if len(owed) != 1 else ''} to the person: report each with "
+                f'ao msg person --outcome done|blocked|dropped "<one line>" --for <id> before declaring yourself '
+                f"out of work — {', '.join(owed)} (design §4.9a, §4.10 *Outcomes*)",
+                owed=owed,
+            )
         s.out_of_work = {"at": now_iso(), "why": why.strip()}
         return await self._report(s, True, None)
 
@@ -1765,6 +1781,9 @@ class HostAgent:
         default: str | None = None,
         answers: list[str] | str | None = None,
         answer: Any = None,
+        outcome: str | None = None,
+        for_: str | None = None,
+        thread: str | None = None,
         nonce: str | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
@@ -1788,7 +1807,9 @@ class HostAgent:
                 raise error
             return dict(result or {})
         try:
-            result = await self._msg(sender, text, to, kind, about, reply_to, bound, cites, default, answers, answer)
+            result = await self._msg(
+                sender, text, to, kind, about, reply_to, bound, cites, default, answers, answer, outcome, for_, thread
+            )
         except RpcError as e:
             if key:
                 self._remember_nonce(key, (None, e))
@@ -1796,6 +1817,32 @@ class HostAgent:
         if key:
             self._remember_nonce(key, (result, None))
         return result
+
+    def _owing_question(self, sender: str, mid: str) -> MailEntry:
+        """The person's copy of `mid`, checked to be the caller's own question that owes an outcome
+        (design §4.10 *Outcomes*). Every refusal says which of the five it is, because the remedy
+        differs: wait, nothing, ask again, nothing, and it is not yours."""
+        held = [e for e in self.person_inbox if e.id == mid]
+        if not held or held[0].from_ != sender:
+            raise RpcError(
+                f"the person inbox holds no question {mid} from {sender}: an outcome names your own question to "
+                "the person, by the id `ao msg` printed when it landed (design §4.10 *Outcomes*)"
+            )
+        e = held[0]
+        if e.kind not in ASK_KINDS:
+            raise RpcError(f"{mid} is a {e.kind}: only a question to the person is answered, and only one owes back")
+        if e.open:
+            raise RpcError(f"{mid} has not been answered yet: there is nothing to report on it (design §4.10)")
+        if e.outcome:
+            raise RpcError(
+                f"{mid} is settled — its outcome is recorded as {e.outcome.get('state')}. If more is needed, "
+                "ask again on the thread: --thread <id> (design §4.10 *Outcomes*)"
+            )
+        if e.closed_reason not in ("replied", "go_with_it"):
+            raise RpcError(
+                f"{mid} closed as {e.closed_reason}: nothing is owed on a question nobody answered (design §4.10)"
+            )
+        return e
 
     def _remember_nonce(self, key: tuple[str, str], verdict: Any) -> None:
         self._nonces[key] = verdict
@@ -1815,6 +1862,9 @@ class HostAgent:
         default: str | None = None,
         answers: list[str] | str | None = None,
         answer: Any = None,
+        outcome: str | None = None,
+        for_: str | None = None,
+        thread: str | None = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -1948,6 +1998,43 @@ class HostAgent:
                     "<the line you will go with> --bound <seconds> if you can go on without an answer "
                     "(design §4.10)"
                 )
+        # -- outcomes: an answer is followed to what became of it (§4.10 *Outcomes*, TD-079) -------
+        # `--outcome … --for <id>` settles a question the person answered; `--thread <id>` asks
+        # again on the same thread and settles the first as `asked_again`. Both name an entry the
+        # **home** verifies — unlike `--about`, which is free text nobody checks.
+        settle: MailEntry | None = None
+        state = str(outcome or "").strip()
+        if state and not for_:
+            raise RpcError(
+                'an outcome names the question it settles: --for <ask id> (design §4.10 *Outcomes*)'
+            )
+        if for_ and not state:
+            raise RpcError(
+                "--for names the question an outcome settles: give it one, --outcome done|blocked|dropped "
+                "(design §4.10 *Outcomes*)"
+            )
+        if state:
+            if state not in mail.OUTCOME_STATES:
+                raise RpcError(
+                    f"unknown outcome {state!r}; an asker reports one of: {', '.join(mail.OUTCOME_STATES)} "
+                    "(design §4.10 *Outcomes*)"
+                )
+            if kind != "note":
+                raise RpcError(f"an outcome is a note about how the work went, not a {kind} (design §4.10)")
+            if named != [PERSON]:
+                raise RpcError(
+                    "an outcome is reported to the person who answered: ao msg person --outcome … --for <id>"
+                )
+            settle = self._owing_question(sender, str(for_))
+        if thread:
+            if kind not in ("ask", "steer"):
+                raise RpcError(
+                    f"--thread asks again on a question's own thread: a {kind} settles nothing "
+                    "(design §4.10 *Outcomes*)"
+                )
+            if named != [PERSON]:
+                raise RpcError("--thread follows up a question put to the person: name `person` as the addressee")
+            settle = self._owing_question(sender, str(thread))
         # -- forwarding: a closed record a live one superseded hands its mail on -------------------
         forwarded: dict[str, str] = {}
         resolved: list[str] = []
@@ -1988,12 +2075,24 @@ class HostAgent:
         # -- what this message counts as ------------------------------------------------------------
         closes = replied is not None and kind == "reply" and replied.open
         counts = sender != PERSON and not closes  # a person's message is never counted; a first reply is free
-        root = replied.root if replied is not None else ""
+        root = replied.root if replied is not None else (settle.root if settle is not None and thread else "")
         now = datetime.now(UTC)
         if counts and (mail.THREAD_BOUND is not None or mail.PAIR_BOUND is not None):
             self._check_bounds(sender, named, root, now)
         advice = None
         if PERSON in named:
+            if kind in ("ask", "steer") and me is not None and mail.OUTCOMES_OWED_MAX is not None:
+                # The debt's own bound (design §4.10 *Outcomes*): it never holds the sender's slot
+                # in the person-inbox depths — a long night of answered questions must not cost a
+                # worker the ability to ask — but an asker that has stopped reporting is stopped.
+                owed = [x for x in me.owed() if x != (settle.id if settle is not None else None)]
+                if len(owed) >= mail.OUTCOMES_OWED_MAX:
+                    raise RpcError(
+                        f"you owe {len(owed)} outcomes to the person: report them first "
+                        f"(ao msg person --outcome done|blocked|dropped \"<one line>\" --for <id>): "
+                        f"{', '.join(owed[: mail.OUTCOMES_OWED_MAX])} (design §4.10 *Outcomes*)",
+                        owed=owed,
+                    )
             self._check_person_depth(sender)
             if kind == "ask":
                 # One line of advice from the home, not a gate — the per-sender depth is the gate
@@ -2057,6 +2156,19 @@ class HostAgent:
                         t.count = len(t.at)  # the window's count, kept as a field so pruning cannot reset it
         if closes and replied is not None:
             self._mark(replied.id, closed_by=mid, closed_at=at, closed_reason="replied")
+        if settle is not None:
+            # Written on every copy, as a close is: the person's Inbox lists it under the question,
+            # and the asker's own card stops saying it owes one. `by` is this entry — an ordinary
+            # note of the person inbox, listed under its question and pruned as any FYI entry is.
+            self._mark(
+                settle.id,
+                outcome={
+                    "state": state or "asked_again",
+                    "text": _clean(text)[: mail.DEFAULT_CAP],
+                    "at": at,
+                    "by": mid,
+                },
+            )
         if sender == PERSON and reply_to:
             # A person's message into a thread resets it (design §4.10): tally and `bound_hit`
             # cleared on every record holding it, so the sessions may reply to the ruling.
@@ -2509,7 +2621,10 @@ class HostAgent:
         """Lifecycle stage 3 (design §4.10): a read entry is kept for the retention window from
         `read_at` — or, for an `ask`, from when it closed or expired — and an open `ask` is never
         pruned. An unread inbox entry never ages out. The sender's copy runs from `at`."""
-        if e.open or mail.MAIL_RETENTION is None:
+        if e.open or e.owes or mail.MAIL_RETENTION is None:
+            # `owes`: a question that was answered and not reported back is kept until it is
+            # (design §4.10 *Outcomes*) — the follow-up `--thread` names it, and the person's
+            # Inbox lists it under *Waiting on them*, so pruning it would strand both.
             return True
         since = e.expired_at or e.closed_at or (e.read_at if inbox else e.at)
         if since is None:
@@ -3006,7 +3121,11 @@ class HostAgent:
             if s is None:
                 continue
             with contextlib.suppress(TypeError, ValueError):
-                self._mail_hints[s.id] = (int(raw.get("unread") or 0), bool(raw.get("wake_budget_spent")))
+                self._mail_hints[s.id] = (
+                    int(raw.get("unread") or 0),
+                    bool(raw.get("wake_budget_spent")),
+                    [str(x) for x in (raw.get("owed") or [])],
+                )
             fields = {k: raw[k] for k in INTENT_FIELDS if k in raw}
             before, stop_before = s.to_dict(), s.run_until
             try:
@@ -3472,6 +3591,7 @@ class HostAgent:
                     **{k: d[k] for k in sorted(INTENT_FIELDS) if k in d},
                     "unread": r.unread(),
                     "wake_budget_spent": r.wake_budget_spent(),
+                    "owed": r.owed(),  # the outcome debt rides with the unread hint (§4.10 *Outcomes*)
                 }
                 payload = json.dumps(item, sort_keys=True)
                 if sent.get(rid) != payload:
@@ -4004,16 +4124,22 @@ class HostAgent:
         if not mail.is_person(caller) and self.mode == "node" and not via_home and "mail" not in resp:
             # A read this node served alone (§4.4a, step 4b.2): the inbox is at the home, and the
             # count it last pushed is what the line says — a hint, as fresh as the link.
-            unread, spent = self._mail_hints.get(naming.split_address(str(caller))[0], (0, False))
-            if unread:
+            unread, spent, owed = self._mail_hints.get(naming.split_address(str(caller))[0], (0, False, []))
+            if unread or owed:
                 resp["mail"] = {"unread": unread, "wake_budget_spent": spent}
+                if owed:
+                    resp["mail"]["owed"] = owed
         if not mail.is_person(caller) and self.mode == "home":
             # The line on every `ao` reply (design §4.10): the response to a session with unread
             # mail says so — result or refusal alike — read after the method ran, so an `ao inbox`
             # that just read everything carries no line. It types nothing and starts nothing.
             s = self._graph().get(self._caller_address(caller, link_host))
-            if s is not None and (n := s.unread()):
+            if s is not None and ((n := s.unread()) or (owed := s.owed())):
+                # The same line carries the debt (design §4.10 *Outcomes*): *briefs are skimmed, a
+                # refusal is not*, and this is the cheapest thing that is neither.
                 resp["mail"] = {"unread": n, "wake_budget_spent": s.wake_budget_spent()}
+                if owed := s.owed():
+                    resp["mail"]["owed"] = owed
         return resp
 
     def _caller_address(self, caller: Any, link_host: str | None) -> str:

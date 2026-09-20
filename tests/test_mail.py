@@ -1670,3 +1670,104 @@ async def test_answers_of_the_wrong_shape_or_size_are_refused_before_any_work(ag
             await c.call("msg", to="person", text="?", kind="ask", answers=[f"a{i}" for i in range(50_000)])
         ok = await c.call("msg", to="person", text="?", kind="ask", answers=["yes", "yes", "", "no", " ", "yes"])
         assert ok["entry"]["answers"] == ["yes", "no"]  # blanks and repeats dropped within the bound
+
+
+async def test_an_answer_is_followed_to_its_outcome(agent, tmp_path):
+    """TD-079 step 1, design §4.10 *Outcomes*: a question to the person that the person answered
+    owes an outcome back. The debt is on the asker's own record — the `ao` reply line, `ao progress
+    none` and Ready to close all read it there — the entry is not pruned while it stands, and one
+    line settles it on every copy."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        worker = await mk("w", unattended=True)
+        async with LocalClient(caller=worker) as w:
+            asked = (await w.call("msg", to="person", text="rebase or merge?", kind="ask"))["entry"]
+            rec = await person.call("get", id=worker)
+            assert rec["mail"]["owed"] == []  # nothing is owed until the person answers
+            # the person answers, and from that moment the asker owes
+            await person.call("msg", to=worker, text="merge it", kind="reply", reply_to=asked["id"])
+            assert (await person.call("get", id=worker))["mail"]["owed"] == [asked["id"]]
+            # every `ao` reply to the asker says so, beside the unread line
+            # …and the session cannot declare itself out of work while it owes one
+            with pytest.raises(AgentError, match="owes 1 outcome") as refused:
+                await w.call("progress", id=worker, status="none", why="nothing open")
+            assert refused.value.data["owed"] == [asked["id"]]
+
+            # the refusal ladder, each with its own remedy
+            open_q = (await w.call("msg", to="person", text="and this one?", kind="ask"))["entry"]
+            for params, match in (
+                (dict(outcome="done", for_=open_q["id"]), "has not been answered yet"),
+                (dict(outcome="done", for_="m-nothing"), "no question m-nothing"),
+                (dict(outcome="done"), "names the question it settles"),
+                (dict(for_=asked["id"]), "give it one"),
+                (dict(outcome="sideways", for_=asked["id"]), "unknown outcome"),
+                (dict(outcome="done", for_=asked["id"], kind="ask"), "is a note about how the work went"),
+            ):
+                with pytest.raises(AgentError, match=match):
+                    await w.call("msg", to="person", text="merged as #1", **params)
+
+            # one line settles it, on every copy
+            rep = await w.call("msg", to="person", text="done: merged as #1", outcome="done", for_=asked["id"])
+            held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == asked["id"]][0]
+            assert held["outcome"]["state"] == "done" and held["outcome"]["by"] == rep["entry"]["id"]
+            # only the open question is left, and an unanswered one owes nothing
+            assert (await person.call("get", id=worker))["mail"]["owed"] == []
+            # …and a settled question is not settled twice
+            with pytest.raises(AgentError, match="is settled"):
+                await w.call("msg", to="person", text="again", outcome="done", for_=asked["id"])
+        await person.call("kill", id=worker)
+
+
+async def test_asking_again_on_the_thread_settles_the_first_and_owes_its_own(agent, tmp_path):
+    """Design §4.10 *Outcomes*: when more direction is needed the asker follows up **on the
+    thread** — the first is settled `asked_again`, the new question carries the same `root`, and
+    once answered it owes an outcome of its own."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        worker = await mk("w", unattended=True)
+        async with LocalClient(caller=worker) as w:
+            first = (await w.call("msg", to="person", text="rebase or merge?", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match="has not been answered yet"):
+                await w.call("msg", to="person", text="still?", kind="ask", thread=first["id"])
+            await person.call("msg", to=worker, text="merge it", kind="reply", reply_to=first["id"])
+            again = (await w.call("msg", to="person", text="merge into what?", kind="ask", thread=first["id"]))
+            assert again["entry"]["root"] == first["root"]  # the thread the person can read above it
+            entries = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
+            assert entries[first["id"]]["outcome"]["state"] == "asked_again"
+            assert (await person.call("get", id=worker))["mail"]["owed"] == []  # the new one is not answered yet
+            await person.call("msg", to=worker, text="into main", kind="reply", reply_to=again["entry"]["id"])
+            assert (await person.call("get", id=worker))["mail"]["owed"] == [again["entry"]["id"]]
+        await person.call("kill", id=worker)
+
+
+async def test_the_debt_has_a_bound_of_its_own_and_is_never_pruned(agent, tmp_path, monkeypatch):
+    """Design §4.10 *Outcomes*: an owing question is not pruned while it owes — the follow-up names
+    it and the person's Inbox lists it — and a sender that owes `OUTCOMES_OWED_MAX` is refused its
+    next question to the person, which is a bound on the *unreported*, never on the mailbox."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        worker = await mk("w", unattended=True)
+        monkeypatch.setattr(mail, "OUTCOMES_OWED_MAX", 2)
+        async with LocalClient(caller=worker) as w:
+            owed = []
+            for i in range(2):
+                e = (await w.call("msg", to="person", text=f"q{i}?", kind="ask"))["entry"]
+                await person.call("msg", to=worker, text="go on", kind="reply", reply_to=e["id"])
+                owed.append(e["id"])
+            with pytest.raises(AgentError, match="you owe 2 outcomes") as refused:
+                await w.call("msg", to="person", text="one more?", kind="ask")
+            assert refused.value.data["owed"] == owed
+            await w.call("msg", to="person", text="a note is not a question", kind="note")  # never refused
+            # read, and long past retention: an owing question stays, because nothing else records it
+            await person.call("inbox")
+            monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(seconds=0))
+            await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
+            assert [e["id"] for e in (await person.call("inbox"))["entries"] if e["id"] in owed] == owed
+            # reporting one frees the next question
+            await w.call("msg", to="person", text="done: nothing to do", outcome="dropped", for_=owed[0])
+            assert (await w.call("msg", to="person", text="one more?", kind="ask"))["entry"]["id"]
+        # a closed asker settles what it owed: nobody is left to report it
+        await person.call("kill", id=worker)
+        await person.call("close", id=worker)
+        left = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
+        assert left[owed[1]]["outcome"]["state"] == "asker_gone"

@@ -1081,7 +1081,7 @@ async def test_the_home_pushes_each_record_its_intent_and_its_unread_count_and_n
     (item,) = params["records"]
     assert method == "intent" and item["id"] == "ao-x-w" and item["host"] == "laptop" and item["unread"] == 1
     assert item["controllers"] == [f"ao-lead@{agent.host}", "ao-x-sib"]  # the node's form, as stored
-    assert set(item) <= INTENT_FIELDS | {"id", "host", "unread", "wake_budget_spent"}
+    assert set(item) <= INTENT_FIELDS | {"id", "host", "unread", "wake_budget_spent", "owed"}
     for never in ("inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "state", "tail"):
         assert never not in item
     assert "SECRET" not in str(mux.sent)
@@ -1109,6 +1109,7 @@ async def test_a_node_takes_the_homes_intent_by_owner_and_keeps_the_count_as_a_h
                     {
                         "id": s.id, "host": agent.host, "team": "grind", "run_until": "2026-09-18T11:00:00Z",
                         "controllers": ["ao-lead@kmaster"], "unread": 3, "wake_budget_spent": True,
+                        "owed": ["m-9"],  # the outcome debt rides with the hint (§4.10 *Outcomes*)
                         "inbox": [{"id": "m-1", "from": "person", "text": "SECRET"}], "state": "exited",
                     },
                     {"id": s.id, "host": "desk", "team": "not-mine"},
@@ -1118,12 +1119,12 @@ async def test_a_node_takes_the_homes_intent_by_owner_and_keeps_the_count_as_a_h
         assert (s.team, s.controllers, s.run_until) == ("grind", ["ao-lead@kmaster"], "2026-09-18T11:00:00Z")
         assert s.wrapup_sent_at is None  # a new stop time is a new run, as `set_stop` has it
         assert s.state == "idle" and s.inbox == []  # nothing the node owns, and never the mailbox
-        assert agent._mail_hints[s.id] == (3, True)
+        assert agent._mail_hints[s.id] == (3, True, ["m-9"])
         async with LocalClient(caller=s.id) as c:
             from sessionorc import client as clientmod
 
             await c.call("list")  # a read this node serves alone carries the line
-            assert clientmod.last_mail == {"unread": 3, "wake_budget_spent": True}
+            assert clientmod.last_mail == {"unread": 3, "wake_budget_spent": True, "owed": ["m-9"]}
     finally:
         agent.sessions.pop(s.id)
 
