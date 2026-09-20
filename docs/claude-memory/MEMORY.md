@@ -13,3 +13,4 @@
 - [Scratchpad too long for unix sockets](scratchpad-too-long-for-unix-sockets.md) — a scratch AGENTORC_HOME needs a short path like ~/.cache/ao<topic>
 - [Check in-flight work before a TD step](check-in-flight-before-a-td-step.md) — another session may hold the next step; conformance-read instead; `ao msg` for leads, never a peer message
 - [Headless screenshots on kmaster](headless-screenshots-on-kmaster.md) — snap Firefox `--headless --screenshot`; profile and output under a plain home dir, not /tmp or hidden
+- [Open the PR before writing its number](open-the-pr-before-writing-its-number.md) — a guessed `PR #N` in the ledger points at someone else's PR
