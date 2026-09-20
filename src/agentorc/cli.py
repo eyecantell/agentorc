@@ -184,6 +184,10 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
             if ow := s.get("out_of_work"):
                 print(f"{'':<{w}}      out of work {_age(ow['at'])}: {ow['why']}")
+            # design §4.8 `doing` (TD-074): what the session says it is doing, always with its age —
+            # which is what makes a stale line read as stale
+            if (doing := s.get("doing")) and doing.get("text"):
+                print(f"{'':<{w}}      doing {_age(str(doing.get('at') or ''))} ago: {doing['text']}")
             # Mail (design §4.10): the unread count and the marks — never a body, which `ao inbox`
             # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
             if unread := s.get("unread"):
@@ -803,6 +807,26 @@ def cmd_progress(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
 
 
+def cmd_doing(args: argparse.Namespace) -> int:
+    """`ao doing "<line>"` (design §4.8, TD-074): one line, this session's own word for what it is
+    doing now — said when it claims and whenever what it is doing changes; a lead says its round.
+    The last line replaces the one before, and `--clear` empties it. It lands on this session's own
+    record and no other: the host agent refuses it from anyone but the session (§9 invariant 14),
+    so there is no `--id` to aim it elsewhere."""
+    sid = _own_session(args)
+    if sid is None:
+        return 2
+    if args.clear:
+        if args.words:
+            return fail(args, "ao doing --clear takes no line", 2)
+        s = call_sync("doing", id=sid, clear=True)
+        return emit(args, s, lambda: print(f"{s['id']}: doing cleared"))
+    if not args.words:
+        return fail(args, 'ao doing needs a line: ao doing "<what you are doing now>", or --clear', 2)
+    s = call_sync("doing", id=sid, text=" ".join(args.words))
+    return emit(args, s, lambda: print(f"{s['id']}: doing — {s['doing']['text']}"))
+
+
 def cmd_finding(args: argparse.Namespace) -> int:
     """`ao finding <ref> [--priority …]` (design §4.8): a reference this session filed on the side."""
     sid = _own_session(args)
@@ -1240,6 +1264,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--force", action="store_true", help="claim a reference another live session holds (design §4.8)")
     p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
     p.set_defaults(fn=cmd_progress)
+
+    p = add("doing", help="say in one line what this session is doing now (design §4.8)")
+    p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
+    p.add_argument("--clear", action="store_true", help="empty the line: this session is saying nothing")
+    p.set_defaults(fn=cmd_doing)
 
     p = add("finding", help="declare a reference this session filed on the side (design §4.8)")
     p.add_argument("ref")

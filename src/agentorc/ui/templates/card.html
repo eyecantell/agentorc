@@ -67,8 +67,14 @@
     {% elif s.state in ('working', 'stalled?') %}
       {# design §4.2: "a `stalled?` that can say why" — a screen rule's note, above the tail (TD-032) #}
       {% if s.state == 'stalled?' and s.pending %}<div class="status needs">{{ s.pending.text }}</div>{% endif %}
-      <div class="term tail">{% for line in s.tail[-3:] %}{{ line }}
-{% endfor %}</div>
+      {# design §4.5a card **doing** line (§4.8, TD-074): what the session says it is doing comes
+         before the tail — for a TUI the tail is the tool's chrome. A session that has said nothing
+         keeps the tail, which is what every card showed before 2026-09-19. Text a model wrote:
+         escaped, shown, and never a control. #}
+      {% if s.doing %}<div class="status doing" title="what this session says it is doing (design §4.8): its own words">{{ s.doing.text }}</div>
+      <div class="row"><span class="meta">says{% if s.doing.age %} · {{ s.doing.age }} ago{% endif %}</span></div>
+      {% else %}<div class="term tail">{% for line in s.tail[-3:] %}{{ line }}
+{% endfor %}</div>{% endif %}
     {% elif s.state == 'exited' %}
       <div class="status {{ 'bad' if s.exit_code else '' }}">exited{% if s.exit_code is not none %} · code {{ s.exit_code }}{% endif %}{% if s.ready and not (s.ready | map(attribute=1) | select('equalto', false) | list) %} · ready to close ✓{% endif %}</div>
       <div class="row gap"><button class="btn sm" data-act="remove" data-id="{{ s.id }}">Forget</button></div>
@@ -77,6 +83,10 @@
     {% elif s.state == 'idle' and s.ready and not (s.ready | map(attribute=1) | select('equalto', false) | list) %}
       <div class="status ok">ready to close ✓</div>
       <div class="row gap"><button class="btn sm" data-act="close" data-id="{{ s.id }}">Close session</button></div>
+    {% elif s.doing %}
+      {# the same line, for an idle session: its last word stands until it says another (§4.8) #}
+      <div class="status doing" title="what this session says it is doing (design §4.8): its own words">{{ s.doing.text }}</div>
+      <div class="row"><span class="meta">says{% if s.doing.age %} · {{ s.doing.age }} ago{% endif %}</span></div>
     {% else %}
       <div class="status">{% if s.tail %}last: {{ s.tail[-1] }}{% else %}at prompt{% endif %}</div>
     {% endif %}

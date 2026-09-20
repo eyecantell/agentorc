@@ -88,7 +88,7 @@ def test_home_owned_edits_the_mailbox_and_reports_are_refused_to_a_person_too():
     for m in ("msg", "inbox", "inbox_delete"):
         assert "the mailbox is at the home" in refusal(m), m
         assert "the mailbox is at the home" in refusal(m, "ao-x-w"), m
-    for m in ("progress", "finding"):
+    for m in ("progress", "finding", "doing"):  # `doing` is the third channel (§4.8, TD-074)
         assert "reports are written at the home" in refusal(m, "ao-x-w", id="ao-x-w"), m
 
 

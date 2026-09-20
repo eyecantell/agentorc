@@ -21,8 +21,10 @@ HOME_EDITS = frozenset({"set_controllers", "set_grants", "set_stop", "set_mode"}
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the
 # writes: an empty inbox would say *no mail*, and the truth is *not known from here*.
 MAILBOX = frozenset({"msg", "inbox", "inbox_delete"})
-# Reports are home-owned, and a claim is a lease checked against every sibling (TD-056).
-REPORTS = frozenset({"progress", "finding"})
+# Reports are home-owned, and a claim is a lease checked against every sibling (TD-056). `doing` is
+# the third channel (§4.8, TD-074) and is home-owned like the other two, so it travels the same way:
+# refused while the link is down, forwarded to the home while it is up.
+REPORTS = frozenset({"progress", "finding", "doing"})
 # What a session may do to itself offline, and a person to any session on this host: the node is
 # the single tmux writer for its host, whether or not home can be reached.
 NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})

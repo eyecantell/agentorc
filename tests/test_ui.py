@@ -1008,6 +1008,72 @@ def test_the_focus_header_carries_the_out_of_work_chip_from_the_record(client, t
     call_sync("kill", id=sid)
 
 
+def test_the_card_shows_what_the_session_says_it_is_doing_before_the_tail(tmp_path, monkeypatch):
+    """design §4.5a card **doing** line (§4.8, TD-074): the slot shows what needs a person first,
+    then the `doing` line with its age, then the tail. A session that has said nothing keeps exactly
+    the tail it showed before 2026-09-19, which is what a `shell` — whose tail *is* the work — always
+    does. The text is a model's: escaped, shown, and never a control."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-3", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "working", "since": "2026-09-19T16:00:00Z", "confidence": "hook", "pane": True,
+        "tail": ["▸▸ bypass permissions on (shift+tab…"],
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    # said nothing: the tail, exactly as before
+    assert view(base)["doing"] is None
+    assert "bypass permissions on" in card.render(s=view(base))
+
+    at = (datetime.now(UTC) - timedelta(minutes=11)).isoformat().replace("+00:00", "Z")
+    text = "rebasing the branch onto main and re-running the suite"
+    said = view({**base, "doing": {"text": text, "at": at}})
+    assert said["doing"] == {"text": text, "age": "11m"}
+    html = card.render(s=said)
+    assert text in html and "says · 11m ago" in html
+    assert "bypass permissions on" not in html  # the tool's chrome gives way to the session's word
+    # and the same line for an idle session, in place of *last: …* (one that is not ready to close:
+    # that checklist and its Close button are what an idle card shows when it has earned them)
+    idle = card.render(s=view({**base, "state": "idle", "subagents": 1, "doing": {"text": text, "at": at}}))
+    assert text in idle and "last:" not in idle
+    # it is shown, never acted on: no button, and the text is escaped (Jinja autoescape)
+    marked = card.render(s=view({**base, "doing": {"text": "<b>claim</b> & go", "at": at}}))
+    assert "&lt;b&gt;claim&lt;/b&gt; &amp; go" in marked and 'data-act="doing' not in marked
+    # a malformed field costs that card its line and nothing else — `view` runs for every card
+    for junk in ("doing", ["nope"], 7, {"at": at}, {"text": "", "at": at}, {"text": 7, "at": at}):
+        d = view({**base, "doing": junk})
+        assert d["doing"] is None
+        assert "bypass permissions on" in card.render(s=d)
+    # an instant it cannot read is still a line: the age is empty, the words stand
+    noage = view({**base, "doing": {"text": text, "at": "half six"}})
+    assert noage["doing"] == {"text": text, "age": ""}
+    assert text in card.render(s=noage)
+
+
+def test_a_teams_header_shows_its_leads_doing_line(tmp_path, monkeypatch):
+    """design §4.5a **team groups** (§4.8, TD-074): the team card's header carries the lead's line,
+    with its age — the lead reporting on the team without narrating each member."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import team_groups, templates, view
+
+    at = (datetime.now(UTC) - timedelta(minutes=11)).isoformat().replace("+00:00", "Z")
+    records = [
+        {"id": "ao-orc", "name": "orc", "state": "idle", "dir": str(tmp_path), "kind": "agent",
+         "team": "ao-grind", "capabilities": ["control"], "doing": {"text": "round 3: reviewing PR 236", "at": at}},
+        {"id": "ao-g1", "name": "g1", "state": "working", "dir": str(tmp_path), "kind": "agent",
+         "team": "ao-grind", "controllers": ["ao-orc"], "tail": ["…"]},
+    ]  # fmt: skip
+    (g,) = team_groups([view(r, records) for r in records])
+    assert g["lead"]["doing"]["text"] == "round 3: reviewing PR 236"
+    head = templates.get_template("group_head.html").render(g=g)
+    assert "round 3: reviewing PR 236" in head and "says · 11m ago" in head
+    # a lead that has said nothing adds no line
+    (quiet,) = team_groups([view({**rec, "doing": None}, records) for rec in records])
+    assert quiet["lead"]["doing"] is None
+    assert "says" not in templates.get_template("group_head.html").render(g=quiet)
+
+
 def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_dialog(tmp_path, monkeypatch):
     """§4.4a "Permission prompts follow the same line" (TD-057 step 4b.1): with the host's link down
     the waiter is out of reach, so the card offers no Allow / Deny — whose `decide` would be refused —
