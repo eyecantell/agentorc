@@ -3078,7 +3078,7 @@ Outside those stages an entry leaves only with its record or by a person's hand:
   resumes the conversation that holder held** (`resume` = the holder's tool session id), the new
   record **keeps** the holder's mail — every entry inside the retention window, the tallies,
   `sends`, the decided-mail and wake state — with no id to rewrite, since the id did not change,
-  and an `ask` left pending by the exit is open again, exactly as above; the holder may be `exited`
+  and an `ask` left pending by the exit is open again (*A recipient that exits*, below); the holder may be `exited`
   or `closed`. A superseding create that resumes nothing, or resumes some other conversation, keeps
   none of it, as now. (Resume stays on one host: a
   tool's conversation lives in that host's files, and a resume across hosts is not supported.)
