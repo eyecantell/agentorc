@@ -242,3 +242,33 @@ async def test_a_nodes_row_is_trailed_under_its_address_and_keeps_by_you(agent, 
     finally:
         agent.remote.pop("laptop", None)
         agent.trail.clear()
+
+
+async def test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows(agent, hookstub, tmp_path):
+    """§4.1's name rule replaces a record **in place**, at the same id (`_take_name`), so the
+    bookkeeping a row leaves behind must not outlive it: the old record's row ends with the record
+    — *forgotten*, named for the record it was about — and the new session of that id starts with
+    no row, no words and no snooze of the old one's (review of PR #269)."""
+    async with LocalClient() as person, LocalClient() as feeder:
+        sid = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await feeder.call("hook", session=sid, state="needs-you", pending={"kind": "question", "text": "which one?"})
+        await wait_state(person, sid, "needs-you")
+        await agent.tick()
+        assert agent._attention[f"{sid}|state"][0] == "question"
+        agent._attention[f"{sid}|state"] = ("question", "2026-09-20T00:00:00Z", "which one?")
+        await person.call("attention_snooze", id=sid, kind="question", until="2026-09-21T00:00:00Z")
+        await person.call("kill", id=sid)
+        await wait_state(person, sid, "exited")
+        again = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        assert again == sid  # the name was taken back, and with it the id
+        # the old record's row ended with it, said once and attributed to it
+        got = (await person.call("inbox"))["trail"]
+        assert [(e["sid"], e["kind"], e["how"], e["text"]) for e in got] == [
+            (sid, "question", "forgotten", "which one?")
+        ]
+        # and the new session arrives with nothing of the old row's: no state, no snooze
+        assert f"{sid}|state" not in agent._attention
+        assert agent.attention_snoozed == {}
+        await agent.tick()
+        assert (await person.call("inbox"))["trail"] == got  # nothing fabricated on the new record
+        await person.call("kill", id=sid)

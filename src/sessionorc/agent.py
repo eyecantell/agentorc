@@ -910,6 +910,8 @@ class HostAgent:
             side.pop(sid, None)
         for key in [k for k in self._attention_how if k.split("|", 1)[0] == sid]:
             del self._attention_how[key]
+        for key in [k for k in self._attention if k.split("|", 1)[0] == sid]:
+            del self._attention[key]  # belt and braces: `_attention_gone` wrote these out already
 
     def _forget(self, sid: str) -> None:
         gone = self.sessions.get(sid)
@@ -922,11 +924,7 @@ class HostAgent:
         for e in [e for e in gone.inbox if e.open and e.kind != "steer"]:
             self._close_entry(e.id, "expired", now_iso())
         self._asker_gone(gone, self._address(gone))
-        for key in [k for k in self._attention if k.split("|", 1)[0] == sid]:
-            # the record is about to go, so its rows' endings are written here rather than on the
-            # next tick's comparison: nothing would be left to compare (design §4.10, TD-079)
-            was, since, text = self._attention.pop(key)
-            self._trail_append(gone, was, since, datetime.now(UTC), how="forgotten", text=text)
+        self._attention_gone(gone, "forgotten")
         self.sessions.pop(sid, None)
         self.store.delete(sid)
         # Scrub the id from every subscriber's map and queue the one `gone`: whichever
@@ -1017,6 +1015,27 @@ class HostAgent:
         )
         del self.trail[TRAIL_KEEP:]
         self.attention_store.save(self.trail, self.attention_snoozed)
+
+    def _attention_gone(self, s: Session, how: str) -> None:
+        """A record **leaving the graph** — forgotten, or replaced in place by a new session that
+        took its name (`_take_name`) — writes its live rows' endings here rather than on the next
+        tick's comparison: nothing would be left to compare, and an id handed straight back would
+        give the new record the old one's words, `kind` and start time (review of PR #269). A word
+        the act that ended the row already left wins over `how`, which is the default. **The
+        record's snoozes go with it**: they were that row's *not now*, and a reused id must not
+        arrive pre-silenced."""
+        who = self._address(s)
+        now = datetime.now(UTC)
+        for key in [k for k in self._attention if k.split("|", 1)[0] == s.id]:
+            was, since, text = self._attention.pop(key)
+            slot = key.split("|", 1)[1]
+            word = self._attention_how.get(f"{who}|{slot}") or self._attention_how.get(f"{who}|*") or how
+            self._trail_append(s, was, since, now, how=word, text=text)
+        gone = [k for k in self.attention_snoozed if k.split("|", 1)[0] in (s.id, who)]
+        for key in gone:
+            del self.attention_snoozed[key]
+        if gone:
+            self.attention_store.save(self.trail, self.attention_snoozed)
 
     def _attention_ended(self, sid: str, how: str, slot: str = "state") -> None:
         """What ended a row, said by the act that ended it (`decide`, `identity_ack`, a resume, a
@@ -1297,6 +1316,9 @@ class HostAgent:
             await asyncio.to_thread(self.tmux.kill_session, holder)
             return None, holder
         await asyncio.to_thread(self.tmux.kill_session, holder.id)  # a dead pane, if it still has one
+        # The replaced record's rows end here, with the record: it is gone from the graph, and the
+        # new session under its id must not inherit what it was showing (review of PR #269).
+        self._attention_gone(holder, "forgotten")
         self._scrub(holder.id)  # the side tables are about the old session, not the new one
         log.info("%s superseded the %s session of the same name", holder.name, holder.state)
         return holder.run_log, holder.id
