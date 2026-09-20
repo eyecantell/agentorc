@@ -3,10 +3,11 @@ TD-079 step 1b). A state row is a view of a record and leaves no entry behind, s
 what became of it; these are the rules that keeps the Inbox a queue rather than a list that empties
 itself."""
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import wait_state
+from conftest import FAST_TICK, wait_state
 
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import Pending, Session, attention_kind
@@ -252,11 +253,19 @@ async def test_a_nodes_row_is_trailed_under_its_address_and_keeps_by_you(agent, 
         agent.trail.clear()
 
 
-async def test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows(agent, hookstub, tmp_path):
+async def test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows(agent, hookstub, tmp_path, monkeypatch):
     """§4.1's name rule replaces a record **in place**, at the same id (`_take_name`), so the
     bookkeeping a row leaves behind must not outlive it: the old record's row ends with the record
     — *forgotten*, named for the record it was about — and the new session of that id starts with
     no row, no words and no snooze of the old one's (review of PR #269)."""
+    # **No background tick inside the window below** (TD-088). The `agent` fixture runs a live
+    # tick loop at `FAST_TICK`, and a tick between the `kill` and the `create` ends the row on its
+    # own — the record is `exited`, so its kind is `""` — and writes *resolved* before the name
+    # rule can say what really ended it. That is a race in the test *and* a word this build has no
+    # better answer for; the entry holds the second half. Here the loop is parked and every tick
+    # this test wants is taken by hand.
+    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 3600)
+    await asyncio.sleep(FAST_TICK * 2)  # the sleep already scheduled at 0.3 s runs out first
     async with LocalClient() as person, LocalClient() as feeder:
         sid = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
         await feeder.call("hook", session=sid, state="needs-you", pending={"kind": "question", "text": "which one?"})
@@ -282,11 +291,19 @@ async def test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows(agen
         await person.call("kill", id=sid)
 
 
-async def test_a_name_taken_back_by_a_resume_says_resumed(agent, hookstub, tmp_path):
+async def test_a_name_taken_back_by_a_resume_says_resumed(agent, hookstub, tmp_path, monkeypatch):
     """The other half of the one above: when the create that takes the name also **resumes the
     conversation that held it** (TD-081 step 1), the record did not go — the person opened it — so
     its row's ending is *resumed*, not the *forgotten* of a record replaced by a new conversation
     of its name. Same id, one card, and the trail says which road the row left by (§4.10 rule 2)."""
+    # **No background tick inside the window below** (TD-088). The `agent` fixture runs a live
+    # tick loop at `FAST_TICK`, and a tick between the `kill` and the `create` ends the row on its
+    # own — the record is `exited`, so its kind is `""` — and writes *resolved* before the name
+    # rule can say what really ended it. That is a race in the test *and* a word this build has no
+    # better answer for; the entry holds the second half. Here the loop is parked and every tick
+    # this test wants is taken by hand.
+    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 3600)
+    await asyncio.sleep(FAST_TICK * 2)  # the sleep already scheduled at 0.3 s runs out first
     async with LocalClient() as person, LocalClient() as feeder:
         sid = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
         await feeder.call("hook", session=sid, adapter_id="conv-81", state="needs-you", pending={"kind": "question"})

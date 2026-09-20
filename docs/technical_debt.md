@@ -56,6 +56,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-083 | A worker that ends its run on purpose, with work still on the ledger, is neither *finished* nor *exited*: no rule of its manager's fires, and the team sits parked until a person restarts it | Medium | Open |
 | TD-086 | A promote restarts the host agent, which ends every lead's blocked `ao wait` — and the CLI then tells the session to start a host agent, the one thing it must never do | Medium | Open |
 | TD-087 | The usage chip is empty: the usage endpoint answers 429, the adapter turns every failure into silence, the poll never backs off, and a capped session is not marked `limited` meanwhile | Medium | Open |
+| TD-088 | A row that ends because its session exited is trailed as *resolved*, and two trail tests raced the tick for it | Low | Partly done |
 
 ---
 
@@ -936,3 +937,20 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** (1) the adapter tells the core *why* there is no reading — a small structured result (`ok`, `rate_limited` with `Retry-After` when given, `no_credentials`, `error`), never prose — and the host agent logs a change of reason once; (2) a 429 backs the poll off (honour `Retry-After`, else double up to a ceiling) and a success resets it; (3) the last good reading survives a restart with its `fetched` time, and the chip shows it as stale rather than vanishing (a design line in §4.5a's usage row first: a stale chip is a new state of a mark); (4) `USAGE_EVERY` is reconsidered — five minutes is plenty for a five-hour window; (5) tests for each reason and for the backoff.
 
 **Related:** TD-073 (the windows and the chip), TD-001 (the poll), TD-062 (promotes restart the agent).
+
+## TD-088: A row that ends because its session exited is trailed as *resolved*, and two trail tests race the tick for it
+
+**Priority:** Low
+**Added:** 2026-09-20 (`tdgrind-ao-1`, from a CI failure the anchor saw on the docs-only PR #294, `test (3.12)` on `a825242`)
+**Status:** Partly done — **the test race is fixed (PR #296)**; the word is a design question and is open.
+**Location:** `tests/test_attention.py` (`test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows`, `test_a_name_taken_back_by_a_resume_says_resumed`), `src/sessionorc/agent.py` (`_note_attention`, `_trail_append`), design §4.10 *The Inbox is a queue* rule 2
+
+**Why:** CI read `how='resolved'` where the test expects `'forgotten'`. It is not a timing artefact of the assertion — it is the tick doing its job. The `agent` fixture runs a live tick loop at 0.3 s; between the test's `kill` and its `create` a tick sees the record `exited`, whose `attention_kind` is `""`, so **the row ends there** and `_trail_append` writes it with no word to hand: `_attention_how` is empty, `superseded_by` is unset, and the fallback is *resolved*. `_take_name`'s `_attention_gone` then finds the slot already popped and says nothing. Reproduced on demand by putting one tick's worth of sleep in that window: the entry comes out `('…-w', 'question', 'resolved', 'which one?')` against the expected `'forgotten'`, which is the CI line exactly.
+
+**Two halves.** The **test** half is this entry's family — a test that raced the loop instead of driving it — and is fixed: both tests park the tick loop (`TICK_SECONDS`) for the window and take every tick they want by hand, so the name rule, not the clock, decides what the trail says. The **word** half is real and is left open: the row a person was looking at ended *because the session exited*, and the home knows that — but the vocabulary §4.10 rule 2 builds has no word for it (*allowed / denied / acknowledged by you*, *resumed*, *forgotten*, else *resolved*), so it falls to *resolved*, which the design defines as **when the home cannot tell**. On the live system a person whose question a worker died holding reads *resolved*, as if it had sorted itself out.
+
+**Fix (the open half):** decide the word in §4.10 rule 2 — *the session exited* is the obvious candidate, beside the three the design already lists as unbuilt (*answered in the terminal*, *pushed*, *the limit reset*) — then derive it in `_note_attention`, where the record's new state is in hand, rather than in `_trail_append`'s fallback. Worth deciding with those three rather than alone: they are one list, and each is a case where the home can tell and does not say.
+
+**Done when** the trail says why a row ended for every ending the home can name, and *resolved* means only what the design says it means.
+
+**Related:** TD-079 (the trail), TD-078 (the same family of test: a wait bounded on something other than the thing waited for), design §4.10 rule 2.
