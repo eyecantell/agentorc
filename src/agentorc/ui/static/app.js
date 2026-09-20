@@ -185,7 +185,6 @@
       if (action === "identity_ack") AO.toast("acknowledged — the agent's log keeps every alarm", true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
-      if (["dismiss", "attention_snooze"].includes(action) && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       // the state is answered, so the row is gone: it is taken out here rather than waited for, and
       // the refresh below puts back whatever the record actually says
       if (staterow) staterow.remove();

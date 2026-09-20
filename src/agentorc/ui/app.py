@@ -606,7 +606,11 @@ def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ())
         # with no upstream is no longer *not pushed* by definition — rule 3 looks for the commit
         # on the remote-tracking branches, which is what a merged worker on a detached HEAD needs
         pushed = git.get("unpushed", 0) == 0
-        label = "branch pushed" if pushed or not git.get("pushed_against") else f"branch pushed (vs {git['pushed_against']})"  # noqa: E501
+        label = (
+            "branch pushed"
+            if pushed or not git.get("pushed_against")
+            else f"branch pushed (vs {git['pushed_against']})"
+        )  # noqa: E501
         checks.append((label, pushed))
     checks.append(("no subagents running", (s.get("subagents") or 0) == 0))
     # design §4.2 / §4.10 *Outcomes* (TD-079): the person answered this session's question and has
@@ -904,6 +908,13 @@ def _needs_key(item: dict[str, Any]) -> tuple[int, str]:
 # page. It is duplicated rather than imported because the page reads entries, not models — and it
 # is the *one* rule that decides which section a settled question is in, so it says so out loud.
 OWING_CLOSES = ("replied", "go_with_it")
+# …and **every** kind that can be one, which is not `PERSON_ASK_KINDS`: that pair is about which
+# *open* entry is a question in *Needs you*, where a `steer` has its own branch. A debt is the
+# model's `ASK_KINDS`, `steer` included — *a `go_with_it` close owes one too* (§4.10 *Outcomes*),
+# and `go_with_it` is a `steer`'s own close reason. The agent enforces the debt on that set, so a
+# narrower one here would leave a `steer`'s debt sitting in FYI, uncounted, while `ao progress
+# none` was still refusing its sender (review of PR #287).
+OWING_KINDS = ("ask", "steer", "conflict")
 
 
 def _owing(e: dict[str, Any], record: dict[str, Any] | None, now: datetime) -> None:
@@ -918,7 +929,7 @@ def _owing(e: dict[str, Any], record: dict[str, Any] | None, now: datetime) -> N
     outcome = _outcome_of(e)
     e["owes"] = bool(
         "person" in (e.get("to") or [])
-        and e.get("kind") in PERSON_ASK_KINDS
+        and e.get("kind") in OWING_KINDS
         and e.get("closed_reason") in OWING_CLOSES
         and not outcome
     )
@@ -932,7 +943,13 @@ def _owing(e: dict[str, Any], record: dict[str, Any] | None, now: datetime) -> N
     e["answer_given"] = str(answers[idx]) if isinstance(idx, int) and 0 <= idx < len(answers) else ""
     e["answer_how"] = "you let it go with its default" if e.get("closed_reason") == "go_with_it" else "you answered"
     e["asker_state"] = str((record or {}).get("state") or "")
-    e["asker_doing"] = (record or {}).get("doing")
+    # the record here is the raw one off `list`, not a `view()` — so its `doing` is `{text, at}`
+    # and the row wants `{text, age}`, as the card and the Focus header draw it (§4.8, TD-074)
+    doing = (record or {}).get("doing")
+    doing = doing if isinstance(doing, dict) else {}
+    e["asker_doing"] = (
+        {"text": str(doing.get("text") or ""), "age": _age(doing.get("at"), now)} if doing.get("text") else None
+    )
     e["asker_gone_quiet"] = bool(e["owes"] and e["asker_state"] in ("exited", "closed"))
     if outcome:
         e["outcome_age"] = _age(outcome.get("at"), now)

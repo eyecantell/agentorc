@@ -447,16 +447,20 @@ def test_pause_moves_a_steer_into_needs_you_and_counts_it_and_resume_gives_the_t
 
 
 @pytest.mark.integration
-def test_go_with_it_closes_a_steer_now_and_the_row_moves_to_fyi(client, tmp_path):
+def test_go_with_it_closes_a_steer_now_and_the_row_moves_to_waiting_on_them(client, tmp_path):
     """§4.5a **Inbox row: `steer`** → **Go with it**: closes it `go_with_it`, the sender is told and
-    need not wait out the bound; doing nothing would have lapsed to the same end."""
+    need not wait out the bound; doing nothing would have lapsed to the same end.
+
+    From TD-079 step 2 the row lands in **Waiting on them**, not FYI: *a `go_with_it` close owes an
+    outcome too* (§4.10 *Outcomes*), so the sender still has to say what came of it — and the page
+    says so where the agent already enforces it. Still in **neither** number, as it was in FYI."""
     sender = sender_session(client, tmp_path)
     steer = send(sender, text="branching", kind="steer", default="off main")["id"]
     r = client.post("/api/person/gowithit", json={"msg": steer})
     assert r.status_code == 200 and r.json()["closed_reason"] == "go_with_it"
     got = client.get("/api/person/inbox").json()
-    assert got["sections"]["fyi"] == [steer] and got["needs"] == 0
-    assert "closed · go with it" in got["html"]["fyi"]
+    assert got["sections"]["waiting"] == [steer] and got["sections"]["fyi"] == [] and got["needs"] == 0
+    assert "you let it go with its default" in got["html"]["waiting"]
     assert client.post("/api/person/gowithit", json={"msg": steer}).status_code == 400  # already closed
 
 
@@ -1361,3 +1365,51 @@ def test_a_row_control_carries_its_border_and_the_hosts_alarm_row_has_no_team(tm
     # every other state row keeps the badge, which is also its team filter
     mine = {**host_row, "row": "alarm", "sid": "ao-w1", "name": "w1", "id": "ao-w1:alarm"}
     assert 'class="badge team"' in rows("needs", [mine])
+
+
+@pytest.mark.unit
+def test_a_steer_the_person_let_go_owes_an_outcome_exactly_as_a_question_does():
+    """§4.10 *Outcomes*: *a `go_with_it` close owes one too* — and `go_with_it` is a `steer`'s own
+    close reason. The agent enforces the debt on `ASK_KINDS`, `steer` included (`MailEntry.owes`),
+    so the page must read the same set: a narrower one left a `steer`'s debt in FYI, uncounted,
+    while `ao progress none` was still refusing its sender (review of PR #287)."""
+    from agentorc.ui.app import OWING_KINDS
+    from sessionorc.models import ASK_KINDS
+
+    assert set(OWING_KINDS) == set(ASK_KINDS)  # one rule, two readings of it
+    gone = entry("m-1", "steer", default="off main", closed_reason="go_with_it",
+                 closed_at="2026-09-19T11:00:00Z", closed_by="person")  # fmt: skip
+    got = sections_of([gone], fleet=[{"id": "ao-w1", "state": "working"}])
+    assert [x["id"] for x in got["waiting"]] == ["m-1"] and not got["fyi"] and got["count"] == 0
+    assert "you let it go with its default" in rows("waiting", got["waiting"])
+    # and the same steer whose asker has exited is counted, as an answered question's would be
+    quiet = sections_of([dict(gone)], fleet=[{"id": "ao-w1", "state": "exited"}])
+    assert [x["id"] for x in quiet["needs"]] == ["m-1"] and quiet["count"] == 1
+    # a steer nobody answered owes nothing: it lapsed, and the sender took its default unasked
+    assert sections_of([entry("m-2", "steer", closed_reason="lapsed")])["waiting"] == []
+
+
+@pytest.mark.unit
+def test_the_asker_doing_line_is_the_shape_every_other_surface_draws():
+    """The fleet record the page reads is the raw one off `list`, whose `doing` is `{text, at}` —
+    a row wants `{text, age}`, as the card and the Focus header draw it (§4.8, TD-074). Read the
+    raw shape straight and the *says … ago* half of the line silently never renders."""
+    e = answered("m-1")
+    got = sections_of([e], fleet=[{"id": "ao-w1", "state": "working",
+                                   "doing": {"text": "rebasing #269", "at": "2026-09-19T11:30:00Z"}}])  # fmt: skip
+    html = rows("waiting", got["waiting"])
+    assert "doing: rebasing #269 · says 30m ago" in html
+    # no `doing`, no line — and a malformed one costs the line, never the page
+    assert "doing:" not in rows("waiting", sections_of([answered("m-2")], fleet=[{"id": "ao-w1"}])["waiting"])
+    assert "doing:" not in rows(
+        "waiting", sections_of([answered("m-3")], fleet=[{"id": "ao-w1", "doing": 7}])["waiting"]
+    )
+
+
+@pytest.mark.unit
+def test_a_person_act_refreshes_the_page_once():
+    """Every control on this page carries `data-id="person"`, and the dispatcher already refreshes
+    on that — a second, per-action refresh meant two `/inbox` fetches per press (review of #287)."""
+    js = (UI / "static" / "app.js").read_text()
+    assert '(staterow || id === "person") && typeof AO.refreshInboxPage === "function"' in js
+    assert '["dismiss", "attention_snooze"].includes(action) && typeof AO.refreshInboxPage' not in js
