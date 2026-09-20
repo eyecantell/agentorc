@@ -94,6 +94,7 @@ SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # wh
 # callers that always read it from the agent.
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs_keep_days`)
+ID_RECHECK = 30.0  # seconds between re-reads of the tmux server's pid (design §4.8a, TD-077)
 # A session past its `run_until` is asked to wrap up and then killed (design §6, TD-026): this is how
 # long it is given to finish after the ask. It is a grace, not a deadline the session can see — a
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
@@ -228,6 +229,8 @@ class HostAgent:
         self._id_listed_at = 0.0
         self._id_list_lock = asyncio.Lock()
         self._id_detached: str | None = None
+        self._id_tmux_pid: int | None = None  # the server the answer above was computed against
+        self._id_rechecked = 0.0  # monotonic; the check is re-read on a cadence, not per connection
         # The home's own alarms **persist** (TD-077 step 2): a forgery aimed at no record — a claim
         # from outside every pane — is evidence, and evidence that dies with the process is a page
         # that says *no alarms* about the night the agent was restarted. The tally does not: it
@@ -456,6 +459,7 @@ class HostAgent:
         panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
         self._id_note_panes(panes)
         self._id_flush()
+        await self._id_recheck_detached()
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
@@ -3615,16 +3619,44 @@ class HostAgent:
         ]
         self._id_listed_at = time.monotonic()
 
+    async def _id_read_detached(self, tmux_pid: int | None) -> None:
+        """Compute the detached-process check against the tmux server now running. `None` while
+        there is no server, which is *not yet known* rather than *off*: the next connection asks
+        again."""
+        self._id_tmux_pid, self._id_rechecked = tmux_pid, time.monotonic()
+        if not tmux_pid:
+            self._id_detached = None
+            return
+        was = self._id_detached
+        self._id_detached = identity.detached_check(self.proc, agent_pid=os.getpid(), tmux_pid=tmux_pid) or ""
+        if (was or "") != self._id_detached:
+            log.info(
+                "detached-process check %s (tmux server pid %s)", "on" if self._id_detached else "off", tmux_pid
+            )
+
+    async def _id_recheck_detached(self) -> None:
+        """A tmux server can be **replaced** while the agent runs — kmaster's was, on 2026-09-20 —
+        and the check is a fact about *that* server's cgroup. Computed once and kept, it went on
+        describing a server that no longer existed until the agent was restarted, which is a host
+        reading `enforce` off a dead process's cgroup (TD-077). So the tick re-reads the server's
+        pid on a cadence of its own, and only a pid that moved costs the check itself. One
+        `display-message` every `ID_RECHECK` seconds, in a thread, beside the pane list the tick
+        already takes."""
+        if time.monotonic() - self._id_rechecked < ID_RECHECK:
+            return
+        pid = await asyncio.to_thread(self.tmux.server_pid)
+        if pid == self._id_tmux_pid and self._id_detached is not None:
+            self._id_rechecked = time.monotonic()
+            return
+        await self._id_read_detached(pid)
+
     async def _id_channel(self, peer: int) -> identity.Channel:
         """Classify one connection's peer. A peer that matches no pane we know may belong to one the
         tick has not listed yet — a session's first hook can beat the first tick after `create` —
         so it waits for a fresh list (one at a time, at most one a second) before it is judged
         *outside* or *unknown*; never against the old one."""
         if self._id_detached is None:
-            tmux_pid = await asyncio.to_thread(self.tmux.server_pid)
-            if tmux_pid:  # no server yet: asked again on the next connection
-                check = identity.detached_check(self.proc, agent_pid=os.getpid(), tmux_pid=tmux_pid)
-                self._id_detached = check or ""
+            await self._id_read_detached(await asyncio.to_thread(self.tmux.server_pid))
         detached = self._id_detached or None
         ch = identity.classify(peer, self._id_panes, self.proc, detached=detached)
         listed = {p.session for p in self._id_panes}

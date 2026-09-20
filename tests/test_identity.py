@@ -299,6 +299,37 @@ async def test_observe_records_the_alarm_and_refuses_nothing(agent, tmp_path):
     assert [(x["channel"], x["claimed"], x["rpc"]) for x in report["alarms"]] == [("outside", a, "doing")]
 
 
+async def test_the_detached_check_follows_the_tmux_server_it_is_about(agent, monkeypatch):
+    """TD-077: the check is a fact about *that* tmux server's cgroup, and a server can be replaced
+    while the agent runs — kmaster's was, on 2026-09-20. Computed once and kept, the answer went on
+    describing a process that no longer existed until the agent restarted. The tick re-reads the
+    server's pid on its own cadence; only a pid that moved costs the check itself."""
+    import sessionorc.agent as agent_mod
+
+    pid, checks = 50, []
+
+    def check(_reader, *, agent_pid, tmux_pid):
+        checks.append(tmux_pid)
+        return "/system.slice/agentorc-agent.service" if tmux_pid == 50 else None
+
+    monkeypatch.setattr(agent_mod.identity, "detached_check", check)
+    monkeypatch.setattr(agent.tmux, "server_pid", lambda: pid)
+    monkeypatch.setattr(agent_mod, "ID_RECHECK", 0.0)  # every tick, so the test is not a sleep
+
+    await agent._id_recheck_detached()
+    assert checks == [50] and agent._id_detached  # on, against this server
+    await agent._id_recheck_detached()
+    assert checks == [50], "the same server is not re-checked, only its pid re-read"
+
+    pid = 51  # the server was replaced under the running agent
+    await agent._id_recheck_detached()
+    assert checks == [50, 51] and agent._id_detached == "", "off: the new server is judged on its own cgroup"
+
+    pid = None  # and no server at all is *not yet known*, so the next connection asks again
+    await agent._id_recheck_detached()
+    assert agent._id_detached is None
+
+
 async def test_off_classifies_nothing(agent, tmp_path):
     assert agent.identity_mode == "off"  # conftest: the suite's default
     async with LocalClient(caller="ao-anything") as c:
