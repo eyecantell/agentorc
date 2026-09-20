@@ -41,7 +41,12 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 15px; color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
 .tabs { display: flex; gap: 2px; } .tab { padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; } .tab.on { background: var(--tab-on); color: #fff; } .tab.off { opacity: .45; cursor: default; }
 #hostchip { font-size: 11px; color: var(--topdim); } #hostdot.down { color: var(--stalled); }
-#usagechip { font-size: 11px; color: var(--topdim); } #usagechip .cap { color: var(--limited); }
+/* The chips sit side by side and are measured against this width to decide what still fits
+   (TD-073): `max-width` plus `overflow: hidden` is what makes scrollWidth > clientWidth mean
+   "one too many", and inline-block is what gives a span a width to measure at all. */
+#usagechip { font-size: 11px; color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
+#usagechip .cap { color: var(--limited); } #usagechip .near { color: var(--topfg); font-weight: 600; }
+#usagemore { cursor: default; }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }

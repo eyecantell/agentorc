@@ -582,3 +582,40 @@ It matters more than a Low priority suggests in one narrow way: design §4.5a's 
 **Related:** TD-042 (briefs that name one run), TD-067 (the operator's guide should say how long a brief may be), design §4.3 (adapters own the tool's launch), §4.9 (`ao team start` is all or nothing).
 
 **Resolved:** 2026-09-20 — in two parts. **The delivery (PR #256, the anchor's):** past `LONG_COMMAND` (8 KB of the whole tmux command line, the environment counted in) `Tmux._fit` writes the argv to a launch script under the home, mode `0700`, that `exec`s it — so the pane's first process is still the command itself and the kernel's far larger limit is the one that applies; `tests/test_tmux.py::test_a_command_too_long_for_tmux_is_launched_through_a_script` carries a ~40 KB brief through it with its quotes and newlines intact. **The refusal (PR #272, a worker):** what no path can deliver is one argument past `ARG_LIMIT` (120 KB, under the kernel's `MAX_ARG_STRLEN`), and `create` now says so **before it makes a worktree** — the 2026-09-18 failure left one behind with no record pointing at it, which is the half of *done when* the delivery alone did not cover. Option (2) of the entry, delivering the brief through `_submit` once the composer is up, was not needed and is not built.
+
+## TD-073: Usage is shaped like Claude Code's two windows — a second tool's quota has nowhere to go
+
+**Priority:** Medium
+**Added:** 2026-09-18 (the anchor session; Paul asked whether Claude, Codex, Grok and on-prem agents side by side break the top bar's usage display)
+**Status:** Resolved
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`Usage`: `five_hour_pct`, `weekly_pct`, `five_hour_resets`, `weekly_resets`), `src/sessionorc/agent.py` (`_cap`, which loops over the literal keys `five_hour` and `weekly`), `src/sessionorc/adapters.py` (the `Adapter` protocol's `usage_for` docstring, which spells out the same five field names as the contract), `src/agentorc/ui/templates/base.html` and `src/agentorc/ui/static/app.js` (`onUsage`), which print those two fields by name
+
+**Why:** design §4.3 puts tool-specific names inside the adapter, and usage is where that leaks. The adapter's `usage()` is per **profile** — an account of a tool — which is the right key, and a profile whose adapter reports nothing simply has no chip, so a shell, an on-prem model with no quota, or a tool with no usage endpoint costs nothing. But the *shape* of what is reported is Claude Code's: a 5-hour window and a weekly one. The core's cap check reads exactly those two keys, and the top bar prints exactly those two numbers. A tool with a daily window, a monthly credit balance, a token budget, or three windows cannot be represented, and its adapter would have to lie in Claude's field names to get a `limited` state at all. The chip also grows by one span per profile, unbounded, in a top bar with no room for six.
+
+**Fix (as built):** the adapter reports a list, the core and UI iterate it: `windows: [{label: "5h", pct: 19, resets: <iso>}, {label: "wk", pct: 49, resets: <iso>}]`, labels chosen by the adapter. `_cap` becomes *any window at or over 100 whose reset has not passed*; the chip prints each window's label and number; a budget that is not a percentage is the adapter's to convert or to leave out. The Claude Code adapter keeps reading the same endpoint and maps its two windows into the list; the stored `_usage` and the `usage` event change shape together (one release with both, as the `orchestrate` → `control` rename did). For the top bar: the chip shows the **worst** window of each profile and the rest on hover, and collapses to the profiles at or near a cap when there are more than fits.
+
+**Several providers in the top bar (Paul, 2026-09-19: should the chip rotate — *Claude window 5% week 18%*, then *OpenAI window 3% week 10%* — showing one when only one is in use?).** Agreed: **only profiles a live session is running under are shown**, so one tool in use is one chip, and each chip names its profile and carries its tool's mark. The anchor's recommendation against the rotation itself: a display that rotates hides a number at the moment it is looked at, and the one that matters — a profile near its cap — may be the one off screen. Instead: chips side by side while they fit; past that, the worst profile's chip and *+n* opening the rest; **a profile at or near a cap is always shown**. **Decided by Paul 2026-09-19: side by side, no rotation.**
+
+**Done when** a test adapter reporting one daily window drives `limited` and shows in the chip without any Claude field name appearing outside `adapters/claude_code/`, and §4.3 and §6 describe the list.
+
+**Related:** TD-001 (the usage chip), design §4.3 (adapters own tool-specific names), §6 (usage gate), §4.5a (the **usage** chip row), TD-071 item 8 (the label fix that prompted the question).
+
+**Resolved:** 2026-09-20 (PR #279) — built as the **Fix** above says. The adapter reports
+`Usage(windows=[Window(label, pct, resets)], fetched)` and the labels are its own; the Claude Code
+adapter maps the same endpoint into `5h` and `wk`, so nothing changed for the one tool that reports
+usage today. `_cap` (`src/sessionorc/agent.py`) iterates the list — any window at or over 100% whose
+reset has not passed — and names no window of any tool; `src/sessionorc/adapters.py`'s protocol
+docstring says the list shape. The chip (`base.html`, `app.js`, `app.css`) prints each profile's
+**worst** window with the rest on hover, side by side while they fit and collapsing to `+n` past
+that, a profile at or near a cap (80%) never the one collapsed — measured against the chip's
+`max-width` rather than a hard-coded count. The core also prunes a profile no live session runs
+under and sends `usage: null` to take its chip off the bar (*only profiles a live session is
+running under are shown*). Design: §4.3, §4.4, §4.5a's **usage** row, §6's usage gate, whose config
+example is now one percentage with an optional per-label override. Tests:
+`test_limited_from_one_daily_window` (the *done when* — a stub adapter whose whole quota is one
+window labelled `day`) and `test_usage_chip_prints_each_profiles_worst_window`.
+
+**Not built here:** the usage **gate** itself is still design-only — nothing in `src/` reads
+`usage_gate` — so §6's shape is a contract waiting for its policy, not a regression of this entry.
+The `+n` collapse is browser-measured and was not exercised against a live top bar from an
+unattended session: **merged, live check pending** on `docs/user_attention.md`.

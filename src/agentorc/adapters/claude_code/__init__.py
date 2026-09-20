@@ -46,11 +46,22 @@ log = logging.getLogger("agentorc.claude-code")
 
 
 @dataclass
+class Window:
+    """One quota window of this tool, as the core and the UI see it (design §4.3, TD-073). The
+    label is the adapter's — nothing above reads it, it is only printed."""
+
+    label: str
+    pct: int
+    resets: str | None
+
+
+@dataclass
 class Usage:
-    five_hour_pct: int
-    weekly_pct: int
-    five_hour_resets: str | None
-    weekly_resets: str | None
+    """Every window this account has, worst last or not — the order is the endpoint's. A tool with
+    a daily window, three windows or none reports exactly what it has; no field here is Claude's
+    shape imposed on it."""
+
+    windows: list[Window]
     fetched: str
 
 
@@ -384,7 +395,8 @@ class ClaudeCodeAdapter:
         return datetime.fromtimestamp(int(exp) / 1000, UTC) > datetime.now(UTC)
 
     def usage_for(self, profile: str) -> dict | None:
-        """The core-facing form of `usage()`: by profile name, as a plain dict (TD-001)."""
+        """The core-facing form of `usage()`: by profile name, as a plain dict —
+        `{"windows": [{"label", "pct", "resets"}, ...], "fetched"}` (TD-001, TD-073)."""
         try:
             u = self.usage(profiles_mod.get(profile or None))
         except (KeyError, ValueError):
@@ -392,8 +404,9 @@ class ClaudeCodeAdapter:
         return asdict(u) if u else None
 
     def usage(self, profile: Profile, timeout: float = 10.0) -> Usage | None:
-        """5-hour and weekly utilisation from the OAuth usage endpoint tdgrind already polls.
-        The token never touches argv; a failure returns None (never gates anything)."""
+        """This account's quota windows from the OAuth usage endpoint tdgrind already polls —
+        for Claude Code the 5-hour and the weekly one, labelled `5h` and `wk`. The token never
+        touches argv; a failure returns None (never gates anything)."""
         import urllib.request
 
         c = self._creds(profile)
@@ -432,10 +445,10 @@ def parse_usage(d: dict) -> Usage | None:
     try:
         f, w = d["five_hour"], d["seven_day"]
         return Usage(
-            five_hour_pct=int(f["utilization"]),
-            weekly_pct=int(w["utilization"]),
-            five_hour_resets=f.get("resets_at"),
-            weekly_resets=w.get("resets_at"),
+            windows=[
+                Window(label="5h", pct=int(f["utilization"]), resets=f.get("resets_at")),
+                Window(label="wk", pct=int(w["utilization"]), resets=w.get("resets_at")),
+            ],
             fetched=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         )
     except (KeyError, TypeError, ValueError):

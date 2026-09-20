@@ -408,7 +408,11 @@ class Adapter(Protocol):
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
     def quirks(self) -> Quirks                      # first-run dialogs, settings pre-seed
-    def usage(self, profile: Profile) -> Usage | None     # quota + reset time, per account
+    def usage(self, profile: Profile) -> Usage | None     # this account's quota windows: Usage(windows=[Window(label, pct,
+                                                          # resets), ...], fetched). The *labels are the adapter's* and
+                                                          # nothing above reads them — one daily window, three windows or
+                                                          # none are all legal, and no tool's field name leaves this file
+                                                          # (TD-073). A tool with no quota endpoint reports None: no chip
     def usage_for(self, profile: str) -> dict | None      # the same by profile name, for the core (it cannot build a Profile)
     def composer(self, tail_raw: list[str]) -> str | None  # optional: the text painted in the tool's input line ("" empty,
                                                            # None when no composer is on screen); lets `send` confirm a submit (TD-027)
@@ -468,8 +472,11 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Usage: each live agent session's profile is asked its adapter's `usage_for` once a minute in
   a thread (never per tick); the last answer is cached, served by `usage`, streamed as a `usage`
   event for the top bar's per-profile figure, and drives the `limited` rule of §4.2 (an
-  interactive session on a profile at 100% of a window shows `limited` with the reset time,
-  `working` again once the window resets). A fetch failure keeps the last answer (TD-001).
+  interactive session on a profile with **any** reported window at 100% shows `limited` with that
+  window's label and reset time, `working` again once the window resets — the core iterates the
+  adapter's list and names no window of any tool, TD-073). A fetch failure keeps the last answer
+  (TD-001). A profile no live session runs under is dropped from the cache and a `usage` event
+  with `usage: null` takes its chip off the top bar, so one tool in use is one chip.
 - Attachment drop: accept an uploaded file (the UI copies it over ssh) into
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file
@@ -1350,7 +1357,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox: the FYI count, **Dismiss all** | the top bar's second number; one button | *Inbox 1 · 5*: the second number is FYI's entries, never added to the first (§4.10 *The Inbox is a queue*). The FYI section opens itself when its count is higher than this browser last saw. **Dismiss all** confirms once and dismisses **the ids this browser has on screen** — the trail and closed questions included, never an open question, never mail that arrived after the page was drawn — design 2026-09-20, TD-079 |
 | Inbox row: `note` and the rest of FYI | **Dismiss** | the text; Dismiss deletes. Lapsed `steer`s, declined `ask`s and late replies are listed for the retention window (`MAIL_RETENTION`, 12 h) and then pruned, as every closed entry is. **No Reply here** — an FYI row has the one control, and a `system` note could not be replied to in any case (§4.10). Built 2026-09-19, step 1 |
 | Org top bar | **Inbox** | the org's person inbox (§4.10), labelled **Inbox** on the page — *person inbox* is the design's word for whose it is, and on a page only a person reads it says nothing (2026-09-18): unread count, click to open; each entry with its sender session, kind, time and `about`, with **Reply** into the sender's inbox and delete. **From 2026-09-19 the design is the Inbox page (rows above): the top bar's control opens `/inbox` and counts only what needs a person. Built 2026-09-19 (TD-069 step 1): the control is a link to the page, its number is that page's **Needs you** section and says so on hover, and the dialog described here — its list, Reply and delete, template, JS and CSS — is retired. What stays is the Focus **Inbox** panel and the card's **unread** chip, which are a session's mailbox, not the person's.** Sessions reach it with `ao msg person`, ungated. Rings nothing; the count is polled from the `inbox` RPC, since the pushed stream carries session records and the person inbox belongs to none — design 2026-09-16 (Fable review), TD-052; built 2026-09-16, PR #168 |
-| Org top bar | **usage** chip | display only: per profile that reports usage, `<profile> 5h n% · wk n%` — the account's 5-hour and weekly windows from the adapter's `usage()` (§4.3, TD-001), red at a cap, reset times on hover; a profile whose adapter reports none is not shown. The labels were added 2026-09-18: two bare percentages said nothing. The two windows are Claude Code's, and they are named in the core's usage gate and in this chip — a second tool's windows will not fit them (TD-073) |
+| Org top bar | **usage** chip | display only: one chip per profile **a live session is running under**, printing that profile's **worst** window — `<profile> <label> n%`, the label and the number the adapter gave (§4.3) — with every window and its reset time on hover, red at a cap. A profile whose adapter reports no quota has no chip, and neither has one no live session uses. Chips sit **side by side while they fit**; past that the rest collapse to **+n**, which lists them on hover, and a profile at or near a cap (80%) is never the one collapsed. **No rotation**: a display that rotates hides the number at the moment it is looked at, and the one that matters may be the one off screen — decided by Paul 2026-09-19. The labels were added 2026-09-18: two bare percentages said nothing; the list of windows replaced Claude Code's two named fields 2026-09-20 (TD-001, TD-073) |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `control` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
 | New session | **Where**: this directory / new worktree | for a git repo, the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
@@ -3214,7 +3221,7 @@ unattended:
   workers: 3
   brief: ~/.tdgrind/{name}-prompt.md
   window: {weekday: "20:00-06:00", weekend: all}
-  usage_gate: {five_hour_pct: 70, weekly_pct: 70}
+  usage_gate: {pct: 70, per_window: {wk: 60}}   # any window at or above `pct`; a label may set its own (§4.3)
   wrapup_minutes: 15
   creds_min_hours: 0.25
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
@@ -3292,9 +3299,11 @@ the block. A policy is agent code and needs no grant; a session doing the same w
   has no page equivalent yet. Still TD-026's, still open: `start_at` and the `scheduled` state, window
   overrides with an expiry, calendar-shaped schedules, and editing a stop time from the page.
 - **Run window**: start missing workers inside the window; wrap-up-then-kill outside.
-- **Usage gate** (per profile): pause unattended sessions on a profile above its 5-hour /
-  weekly thresholds; resume when usage drops; a fetch failure never pauses. Interactive
-  sessions on a capped profile are shown `limited`, never paused.
+- **Usage gate** (per profile): pause unattended sessions on a profile **any** of whose reported
+  windows is at or above the threshold; resume when usage drops; a fetch failure never pauses. The
+  windows and their labels are the adapter's (§4.3, TD-073), so the gate is one percentage with an
+  optional per-label override rather than a field per window of one tool. Interactive sessions on a
+  capped profile are shown `limited`, never paused.
 - **Credential lapse**: adapter `credentials_ok()` false → don't start; running workers get a
   send when fresh credentials land (tdgrind's `.nudged` marker).
 - **Stall**: `working` with no output past `stall_after` → flag `stalled?`, send one prompt, then

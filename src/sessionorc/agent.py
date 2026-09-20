@@ -735,6 +735,12 @@ class HostAgent:
                 if isinstance(r, dict) and r != self._usage.get(prof):
                     self._usage[prof] = r
                     await self._broadcast({"event": "usage", "profile": prof, "usage": r})
+        # Only profiles a live session is running under are shown (TD-073, Paul 2026-09-19): one
+        # tool in use is one chip, and last night's profile does not sit in the top bar all day.
+        for prof in [p for p in self._usage if p not in {s.profile for s in live}]:
+            self._usage.pop(prof, None)
+            self._usage_checked.pop(prof, None)
+            await self._broadcast({"event": "usage", "profile": prof, "usage": None})
         for s in live:
             cap = _cap(self._usage.get(s.profile))
             if cap and s.state not in ("limited", "needs-you"):
@@ -4525,25 +4531,30 @@ def _clean_answer(text: Any) -> str:
 
 
 def _cap(usage: dict[str, Any] | None) -> str | None:
-    """The pending text for a capped profile, or None. A window whose `resets_at` has passed is
-    not a cap any more even before the next poll says so."""
+    """The pending text for a capped profile, or None: **any** window the adapter reports at or
+    over 100% whose `resets` has not passed (TD-073). The windows and their labels are the
+    adapter's — a tool with one daily window, three windows or none says so and this package names
+    none of them (design §4.3). A window whose `resets` has passed is not a cap any more even
+    before the next poll says so."""
     if not usage:
         return None
     now = datetime.now(UTC)
-    for key, label in (("five_hour", "5-hour"), ("weekly", "weekly")):
+    for w in usage.get("windows") or ():
+        if not isinstance(w, dict):
+            continue
         try:
-            pct = int(usage.get(f"{key}_pct") or 0)
+            pct = int(w.get("pct") or 0)
         except (TypeError, ValueError):
             continue
-        resets = usage.get(f"{key}_resets")
         if pct < 100:
             continue
         try:
-            at = _parse(str(resets)) if resets else None
+            at = _parse(str(w.get("resets"))) if w.get("resets") else None
         except (TypeError, ValueError):
             at = None  # unparseable: still a cap, reset time unknown
         if at is not None and at <= now:
             continue
+        label = _clean(str(w.get("label") or "usage"))[:24] or "usage"
         return f"{label} cap · resets {at.strftime('%H:%MZ') if at else 'unknown'}"
     return None
 
