@@ -912,11 +912,44 @@ INBOX_HEADER = (
 )
 
 
+def _offered(reply_to: str) -> list[str] | None:
+    """The suggested answers on one entry of **the caller's own inbox** (design §4.10 *Suggested
+    answers*, TD-070), or None when it holds no such entry. `--pick <n>` reads them here rather
+    than taking the text from the command line: the number is all a session should have to carry,
+    and what it sends is then the answer itself, which is what the home re-checks."""
+    for e in call_sync("inbox")["entries"]:
+        if e.get("id") == reply_to:
+            got = e.get("answers")
+            return [a for a in got if isinstance(a, str)] if isinstance(got, list) else []
+    return None
+
+
 def cmd_msg(args: argparse.Namespace) -> int:
     """`ao msg <to>… "<text>"` (design §4.10): an attributed entry in each addressee's inbox, nothing
     typed anywhere. `person` is the org's person inbox. With `--reply-to` the addressee may be left
-    out: the reply goes to whoever sent the entry. Refusals print as the host agent words them."""
-    *to, text = args.words
+    out: the reply goes to whoever sent the entry. `--answer "<line>"`, once per answer, offers the
+    likely answers on a question; `--pick <n>` answers one of them by the number `ao inbox` prints
+    (from 1) and sends that answer's own text. Refusals print as the host agent words them."""
+    words = list(args.words)
+    answer: int | None = None
+    if args.pick is not None:
+        if words:
+            return fail(args, "ao msg --reply-to <id> --pick <n> sends the answer itself: leave the text out", 2)
+        if not args.reply_to:
+            return fail(args, "--pick answers one entry's suggested answers: name it with --reply-to <id>", 2)
+        offered = _offered(args.reply_to)
+        if offered is None:
+            return fail(args, f"your inbox holds no entry {args.reply_to}", 2)
+        if not offered:
+            return fail(args, f"{args.reply_to} carries no suggested answers: reply in your own words", 2)
+        if not 1 <= args.pick <= len(offered):
+            n = len(offered)
+            return fail(args, f"--pick {args.pick}: {args.reply_to} offers {n}, numbered 1-{n}", 2)
+        to, text, answer = [], offered[args.pick - 1], args.pick - 1
+    else:
+        if not words:
+            return fail(args, 'ao msg <to>… "<text>": name who the message is for (or --reply-to <id>)', 2)
+        *to, text = words
     if not to and not args.reply_to:
         return fail(args, 'ao msg <to>… "<text>": name who the message is for (or --reply-to <id>)', 2)
     params: dict[str, Any] = {
@@ -928,6 +961,10 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "bound": args.bound,
         "cites": _refs(args.cites) if args.cites else None,
         "default": args.default,
+        # design §4.10 *Suggested answers* (TD-070): the sender's own likely answers, and the index
+        # of the one a `--pick` reply chose. The home cleans, bounds and re-checks both.
+        "answers": args.answer or None,
+        "answer": answer,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
 
@@ -939,6 +976,10 @@ def cmd_msg(args: argparse.Namespace) -> int:
         )
         if e.get("default"):
             print(f"unless told otherwise: {e['default']}")
+        for i, a in enumerate(e.get("answers") or [], 1):  # what the reader may pick (design §4.10)
+            print(f"  {i}. {a}")
+        if e.get("answer") is not None:
+            print(f'answered {e["answer"] + 1}: "{e["text"]}"')
         if got.get("advice"):  # one line from the home, not a refusal (design §4.10)
             print(got["advice"])
         if got.get("closed"):
@@ -972,6 +1013,17 @@ def _left(iso: str) -> str:
     if secs < 86400:
         return f"{secs // 3600}h"
     return f"{secs // 86400}d"
+
+
+def _open_entry(e: dict[str, Any]) -> bool:
+    """Design §4.10 *One way of being closed*, for the dicts the RPC hands this command: open
+    exactly when it is an `ask`, `steer` or `conflict` with no `closed_reason` — and, for entries
+    written before 2026-09-19, with no `closed_by` and no `expired_at`."""
+    if e.get("kind") not in ("ask", "steer", "conflict"):
+        return False
+    if e.get("closed_reason"):
+        return False
+    return not (e.get("closed_by") or e.get("expired_at"))
 
 
 def _inbox_status(e: dict[str, Any]) -> str:
@@ -1025,6 +1077,15 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  {line}")
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
+            # design §4.10 *Suggested answers* (TD-070): an open question's answers, **numbered
+            # from 1**, which is the number `ao msg --reply-to <id> --pick <n>` takes. The one that
+            # is a `steer`'s default word for word is marked, since doing nothing takes it anyway.
+            if _open_entry(e):
+                for i, a in enumerate(e.get("answers") or [], 1):
+                    print(f"  {i}. {a}" + (" — default" if a == e.get("default") else ""))
+            # a reply that picked one says which, so a sender branches on the number (design §4.10)
+            if e.get("answer") is not None:
+                print(f'  answered {e["answer"] + 1}: "{e["text"]}"')
 
     return emit(args, got, prose)
 
@@ -1386,7 +1447,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_finding)
 
     p = add("msg", help="put a message in a session's inbox, or the person inbox (design §4.10)")
-    p.add_argument("words", nargs="+", metavar='to… "text"', help="addressees (ids, names, or person), then the text")
+    # `nargs="*"`: `--pick <n>` sends the suggested answer's own text, so it takes no words at all
+    p.add_argument("words", nargs="*", metavar='to… "text"', help="addressees (ids, names, or person), then the text")
     p.add_argument(
         "--kind",
         choices=["note", "ask", "steer", "reply", "conflict"],
@@ -1401,6 +1463,19 @@ def build_parser() -> argparse.ArgumentParser:
         help="a steer's or an ask's bound in seconds (default: the host agent's; an ask to the person takes none)",
     )
     p.add_argument("--cites", help="a conflict: the `sends` ids it cannot reconcile, comma-separated")
+    # design §4.10 *Suggested answers* (TD-070): the likely answers on a question, and how a reply
+    # picks one of them by the number `ao inbox` prints.
+    p.add_argument(
+        "--answer",
+        action="append",
+        metavar="LINE",
+        help="a question: one likely answer, repeatable (up to four, 80 characters each)",
+    )
+    p.add_argument(
+        "--pick",
+        type=int,
+        help="answer --reply-to's suggested answer number <n>, as `ao inbox` numbers them (from 1)",
+    )
     p.set_defaults(fn=cmd_msg)
 
     p = add("inbox", help="read your inbox; with no session, the person inbox (design §4.10)")

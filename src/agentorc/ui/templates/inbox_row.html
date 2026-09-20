@@ -29,6 +29,34 @@
 {%- if e['from'] not in ('person', 'system') %}<button class="btn sm ghost" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}">Reply</button>{% endif %}
 {%- endmacro %}
 
+{# design §4.5a **Inbox row: suggested answers** (§4.10 *Suggested answers*; TD-070). The sender's
+   own likely answers, one real `<button>` each — keyboard reachable like every other control, and
+   drawn from `answers`, **a structured field of the envelope**, which is the only reason a page
+   may build a control from what a session sent (TD-071 item 8). Nothing here is parsed out of the
+   message text.
+
+   **A group of its own, apart from the row's own controls**, labelled *suggested by <sender>* and
+   each label in quotation marks, so a sender's chosen words (*Delete*, *Allow*) never sit among
+   the controls a person reads as the page's. Jinja escapes every label, so `<b>Delete</b>` is
+   those characters and not markup. A label too long for its button is cut with an ellipsis in CSS
+   and whole on `title`, and the group is its own row, never wrapped into the controls.
+
+   A press sends the **index**; the server looks the text up from the entry it holds and the RPC
+   re-checks that the two agree, so the label is a label and nothing more. No confirm: a reply is
+   mail (§4.10). It follows **Reply** exactly — rendered only by the macros that offer Reply, and
+   so absent from an FYI row, a closed question, a `system` note and the snoozed list. #}
+{% macro answers(e) -%}
+{%- set opts = suggested_answers(e) %}
+{%- if opts and e['from'] not in ('person', 'system') %}
+<div class="row gap wrap sugg" role="group" aria-label="suggested answers from {{ e.from_name or e['from'] }}">
+  <span class="st sugglabel">suggested by {{ e.from_name or e['from'] }}</span>
+  {%- for a in opts %}
+  <button class="btn sm answer" data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}" title="{{ a }}"><span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
+  {%- endfor %}
+</div>
+{%- endif %}
+{%- endmacro %}
+
 {# §4.5a **Snooze** on an `ask`: 1 h · tomorrow 08:00 · a date. The person's own bookkeeping — the
    sender is never told (§4.10 *Snooze*). A `steer` has Pause instead and is offered no Snooze. #}
 {% macro snooze_btn(e) -%}
@@ -57,6 +85,7 @@
 {% macro ask(e, section) -%}
 {{ head(e) }}
 {{ body(e) }}
+{{ answers(e) }}
 <div class="row gap wrap mfoot">
   <span class="st">open · no bound — it waits until you answer it</span>
   <span class="grow"></span>
@@ -74,6 +103,7 @@
 {{ head(e) }}
 {{ body(e) }}
 <div class="st dflt">unless you say otherwise: {{ e.default or '—' }}</div>
+{{ answers(e) }}
 <div class="row gap wrap mfoot">
   {%- if e.paused_at %}
   <span class="st">paused · the clock is stopped, and the sender was told not to take its default yet</span>

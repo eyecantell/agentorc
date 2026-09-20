@@ -918,3 +918,134 @@ def test_every_session_the_org_counts_as_needs_you_has_exactly_one_row(tmp_path,
     # the one with a permission kind but no tool_use_id gets no Allow either: the route would 409
     no_id = rows("needs", [r for r in rows_out if r["sid"] == "ao-g"])
     assert 'data-act="allow"' not in no_id and "no id came with it" in no_id
+
+
+# -- suggested answers (design §4.5a **Inbox row: suggested answers**, §4.10; TD-070 step 2) -------
+
+
+@pytest.mark.unit
+def test_the_answers_are_a_group_of_their_own_apart_from_the_rows_controls():
+    """§4.5a **Inbox row: suggested answers**: one real `<button>` per answer, **drawn apart from
+    the row's own controls** — a group of its own, labelled *suggested by <sender>*, each label in
+    quotation marks — so a sender's chosen words never sit among the controls a person reads as
+    the page's. A press carries the entry and the **index**, never the label."""
+    html = rows("needs", [entry("m-1", "ask", text="merge PR 9?", answers=["merge it", "hold it"])])
+    assert 'class="row gap wrap sugg"' in html and "suggested by w1" in html
+    assert html.index('class="row gap wrap sugg"') < html.index('class="row gap wrap mfoot"')  # its own row, first
+    for i, a in enumerate(("merge it", "hold it")):
+        assert f'data-act="answer" data-id="person" data-msg="m-1" data-index="{i}"' in html
+        assert f"&ldquo;{a}&rdquo;" in html  # in quotation marks, so the words read as the sender's
+        assert f'title="{a}"' in html  # cut with an ellipsis in CSS, whole on hover
+    assert "<button" in html and "<a " not in html.split('class="row gap wrap sugg"')[1].split("</div>")[0]
+    css = (UI / "static" / "app.css").read_text()
+    assert ".inboxpage .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis;" in css
+    assert "#" not in css.split(".inboxpage .sugg")[1].split("\n")[0]  # colours are tokens, never literals
+
+
+@pytest.mark.unit
+def test_a_steers_default_answer_is_marked_and_its_answers_sit_above_its_controls():
+    """§4.5a: on a `steer` the answer that is the `default` **word for word** is marked *default* —
+    pressing it is a reply like any other, and *Go with it* stays the person's separate act."""
+    e = entry("m-2", "steer", default="off main", bound="2026-09-19T20:00:00Z", answers=["off main", "off develop"])
+    html = rows("steering", [e])
+    first = html.split('data-index="1"')[0]
+    assert "default</span>" in first.split('data-index="0"')[1]  # marked on the one that matches
+    assert html.split('data-index="1"')[1].split("</button>")[0].count("default") == 0
+    # and a steer whose default is worded differently marks nothing
+    other = rows("steering", [{**e, "default": "off  main"}])
+    assert "adflt" not in other
+
+
+@pytest.mark.unit
+def test_answers_are_offered_exactly_where_reply_is_and_nowhere_else():
+    """§4.10 *Suggested answers*: **buttons follow Reply exactly** — present wherever Reply is,
+    absent wherever only Dismiss is. So a closed question in **FYI**, the snoozed list, a `system`
+    note and a session's state row carry none, whatever their envelope says."""
+    answers = ["merge it", "hold it"]
+    for section, e in (
+        ("fyi", entry("m-1", "ask", answers=answers, closed_reason="replied", closed_by="m-9")),
+        ("fyi", entry("m-2", "steer", answers=answers, default="off main", closed_reason="lapsed")),
+        ("fyi", entry("m-3", "note", answers=answers)),
+        ("snoozed", entry("m-4", "ask", answers=answers, snoozed_until="2026-09-20T10:00:00Z")),
+        ("needs", entry("m-5", "ask", answers=answers, from_="system", from_name="system")),
+    ):
+        html = rows(section, [e])
+        assert 'data-act="answer"' not in html, (section, e["id"])
+        assert "suggested by" not in html, (section, e["id"])
+        # …and none of them offers Reply either, which is the rule they follow
+        assert 'data-act="reply"' not in html, (section, e["id"])
+    # where Reply is, they are: an open ask, a running steer, a paused one
+    for section, e in (
+        ("needs", entry("m-6", "ask", answers=answers)),
+        ("steering", entry("m-7", "steer", answers=answers, default="off main")),
+        ("needs", entry("m-8", "steer", answers=answers, default="off main", paused_at="2026-09-19T11:00:00Z")),
+    ):
+        html = rows(section, [e])
+        assert 'data-act="reply"' in html and html.count('data-act="answer"') == 2, e["id"]
+
+
+@pytest.mark.unit
+def test_a_hostile_label_is_text_and_a_malformed_answers_field_shows_nothing():
+    """TD-071 item 8: what a session sent is **text**, escaped by the template and never markup —
+    the one control built from it is built from `answers`, a structured field, and the page must
+    survive a record whose field is not what the agent writes (a non-list, an item that is not a
+    string). `Cf` characters the agent strips never reach here; the escaping is what answers the
+    rest."""
+    html = rows("needs", [entry("m-1", "ask", answers=["<b>Delete</b>", 'say "yes"', "a & b"])])
+    assert "<b>Delete</b>" not in html and "&lt;b&gt;Delete&lt;/b&gt;" in html
+    assert 'say "yes"' not in html and "say &#34;yes&#34;" in html
+    assert "a &amp; b" in html and html.count('data-act="answer"') == 3
+    for junk in ("merge it", {"a": 1}, [{"pressable": True}], [""], ["ok", 7], None, 0):
+        row = rows("needs", [entry("m-2", "ask", answers=junk)])
+        assert "<div" in row and 'data-act="reply"' in row, junk  # the row is still a row
+        assert row.count('data-act="answer"') == (1 if junk == ["ok", 7] else 0), junk
+    # a record that somehow carries more than the bound shows the bound's worth
+    many = rows("needs", [entry("m-3", "ask", answers=[f"a{i}" for i in range(9)])])
+    assert many.count('data-act="answer"') == 4
+
+
+@pytest.mark.integration
+def test_a_press_sends_the_index_and_the_server_looks_up_what_it_means(client, tmp_path):
+    """§4.5a and §4.10: the press POSTs the entry and the **index** to the same `/api/person/reply`
+    the typed Reply uses; **the server looks the text up from the entry it holds**, so a tampered
+    DOM cannot make the person say something else under a given index, and the RPC re-checks. The
+    reply closes the question as `replied` and reaches the sender with its index."""
+    sender = sender_session(client, tmp_path)
+    ask = send(sender, text="merge PR 9?", kind="ask", answers=["merge it", "hold it"])["id"]
+    steer = send(sender, text="which branch?", kind="steer", default="off main", answers=["off main", "off develop"])
+
+    got = client.get("/api/person/inbox").json()
+    assert got["html"]["needs"].count('data-act="answer"') == 2
+    assert got["html"]["steering"].count('data-act="answer"') == 2
+
+    r = client.post("/api/person/reply", json={"reply_to": ask, "answer": 1})
+    assert r.status_code == 200 and r.json()["delivered"] == [sender]
+    closed = [e for e in client.get("/api/person/inbox").json()["entries"] if e["id"] == ask][0]
+    assert closed["closed_reason"] == "replied"
+    # the sender holds the reply, with the answer the person pressed — its own text, not the DOM's
+    held = asyncio.run(_inbox_of(sender))
+    picked = [e for e in held if e["kind"] == "reply"][0]
+    assert picked["text"] == "hold it" and picked["answer"] == 1
+
+    # an index that is not one of them, of the wrong type, or on an entry carrying none: refused,
+    # and nothing is sent — the row is still open
+    for body in (
+        {"reply_to": steer["id"], "answer": 9},
+        {"reply_to": steer["id"], "answer": -1},
+        {"reply_to": steer["id"], "answer": "1"},
+        {"reply_to": steer["id"], "answer": True},
+    ):
+        assert client.post("/api/person/reply", json=body).status_code == 400, body
+    still = [e for e in client.get("/api/person/inbox").json()["entries"] if e["id"] == steer["id"]][0]
+    assert still["closed_reason"] is None
+    # an absent index is the typed Reply, unchanged
+    assert client.post("/api/person/reply", json={"reply_to": steer["id"], "text": "off develop"}).status_code == 200
+    after = [e for e in asyncio.run(_inbox_of(sender)) if e["kind"] == "reply"]
+    assert [e["answer"] for e in after] == [1, None]
+
+
+async def _inbox_of(sid):
+    from sessionorc.client import LocalClient
+
+    async with LocalClient() as person:
+        return (await person.call("inbox", id=sid))["entries"]

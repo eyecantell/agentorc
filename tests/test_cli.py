@@ -942,6 +942,55 @@ def test_msg_steer_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, 
     call_sync("kill", id=sid)
 
 
+def test_msg_answer_and_pick_and_the_inbox_lines_that_show_them(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-070 step 1 (design §4.10 *Suggested answers*): `ao msg --answer` offers the likely
+    answers on a question and is refused on a `note`; `ao inbox` prints an open entry's answers
+    **numbered from 1**, marks the one that is a `steer`'s default word for word, and says which
+    one a reply picked; `ao msg --reply-to <id> --pick <n>` takes that same number, sends that
+    answer's own text, and says clearly what is not one."""
+    sid = call_sync("create", name="asker", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    ask_argv = ["--json", "msg", "person", "merge PR 9?", "--kind", "ask"]
+    assert cli.main([*ask_argv, "--answer", "merge it", "--answer", "hold it"]) == 0
+    ask = json.loads(capsys.readouterr().out)["entry"]
+    assert ask["answers"] == ["merge it", "hold it"]
+    steer_argv = ["--json", "msg", "person", "which branch?", "--kind", "steer", "--default", "off main"]
+    assert cli.main([*steer_argv, "--answer", "off main", "--answer", "off develop"]) == 0
+    steer = json.loads(capsys.readouterr().out)["entry"]
+    # only a question carries them: the refusal is the host agent's own words
+    assert cli.main(["msg", "person", "fyi", "--answer", "sure"]) == 1
+    assert "only a question carries answers" in capsys.readouterr().err
+    # the person reads them numbered from 1, with the steer's default marked and nothing else
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert "  1. merge it" in out and "  2. hold it" in out
+    assert "  1. off main — default" in out and "  2. off develop" in out
+    assert "hold it — default" not in out
+    # --pick sends the answer itself, by the number printed above, and closes the question
+    assert cli.main(["--json", "msg", "--reply-to", ask["id"], "--pick", "2"]) == 0
+    sent = json.loads(capsys.readouterr().out)
+    assert sent["entry"]["text"] == "hold it" and sent["entry"]["answer"] == 1 and sent["closed"] == ask["id"]
+    # …and each way of getting it wrong is a clear error, exit 2, before anything is sent
+    for argv, said in (
+        (["msg", "--reply-to", steer["id"], "--pick", "1", "off main"], "leave the text out"),
+        (["msg", "--pick", "1"], "--reply-to"),
+        (["msg", "--reply-to", "m-nope", "--pick", "1"], "holds no entry"),
+        (["msg", "--reply-to", steer["id"], "--pick", "9"], "offers 2, numbered 1-2"),
+        (["msg", "--reply-to", steer["id"], "--pick", "0"], "offers 2, numbered 1-2"),
+    ):
+        assert cli.main(argv) == 2, argv
+        assert said in capsys.readouterr().err, argv
+    # a closed question keeps its answers on the record but is no longer offered them to press
+    assert cli.main(["inbox"]) == 0
+    assert "  1. merge it" not in capsys.readouterr().out
+    # the sender reads which answer it was, so it branches on the number and not on the text
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["inbox"]) == 0
+    assert 'answered 2: "hold it"' in capsys.readouterr().out
+    call_sync("kill", id=sid)
+
+
 def test_every_ao_reply_ends_with_the_unread_line_while_the_caller_has_mail(subprocess_agent, tmp_path, capsys):
     """Design §4.10 "Busy for hours: a line on every `ao` reply": present while the calling session
     has unread mail — on a refusal too — absent without it, and on stderr under `--json`, so a

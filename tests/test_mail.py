@@ -1462,3 +1462,183 @@ async def test_a_lapse_wakes_uncharged_across_a_resume_and_a_restart(agent, hook
         assert got is not None and got["charged"] is False and got["cause"] == "mail"
         assert agent.sessions[w2].wake_refilled_at is None  # it refilled nothing either
         await person.call("kill", id=w2)
+
+
+# -- suggested answers (design §4.10 *Suggested answers*, 2026-09-20; TD-070 step 1) --------------
+
+
+async def test_a_question_carries_its_likely_answers_cleaned_more_strictly_than_its_text(agent, tmp_path):
+    """Design §4.10 *Suggested answers*: an `ask`, a `steer` or a `conflict` may carry up to four
+    `answers`, each one line capped at `ANSWER_CAP` and cleaned **more strictly than displayed text
+    is** — the tail's cleaning *and* every Unicode format character (`Cf`), because an answer
+    becomes the label of something a person presses. One that cleans to nothing or repeats an
+    earlier one exactly is dropped; a fifth is refused; a `note` and a `reply` are refused
+    outright; and they do not count toward `TEXT_CAP`."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        loner = await mk("loner", unattended=True)
+        async with LocalClient(caller=loner) as c:
+            got = await c.call(
+                "msg",
+                to="person",
+                text="merge it?",
+                kind="ask",
+                answers=[
+                    "\x1b[31mmerge it\x1b[0m",  # ANSI: the tail's cleaning
+                    "hold\x07 it",  # a byte under U+0020
+                    "‮thgir ot tfel⁦",  # Cf: a bidi override and an isolate
+                    "za​p­it",  # Cf: a zero-width space and a soft hyphen
+                ],
+            )
+            assert got["entry"]["answers"] == ["merge it", "hold it", "thgir ot tfel", "zapit"]
+            # one line, and capped at 80 characters after cleaning
+            long = await c.call("msg", to="person", text="?", kind="ask", answers=["x" * 200, "one\ntwo"])
+            assert long["entry"]["answers"] == ["x" * mail.ANSWER_CAP, "one"]
+            # cleaning to nothing, and repeating an earlier one exactly, are drops — not refusals;
+            # the comparison is after cleaning and is case-sensitive
+            thin = await c.call(
+                "msg", to="person", text="?", kind="ask", answers=["\x1b[0m", "yes", "\x1b[1myes", "YES"]
+            )
+            assert thin["entry"]["answers"] == ["yes", "YES"]
+            # a fifth is refused in the design's words
+            with pytest.raises(AgentError, match="at most four answers"):
+                await c.call("msg", to="person", text="?", kind="ask", answers=["a", "b", "c", "d", "e"])
+            # …counted after the drops: five given, four left, is a send
+            five = await c.call("msg", to="person", text="?", kind="ask", answers=["a", "b", "", "c", "d"])
+            assert five["entry"]["answers"] == ["a", "b", "c", "d"]
+            # only a question carries them
+            for kind in ("note", "reply"):
+                with pytest.raises(AgentError, match="only a question carries answers"):
+                    await c.call("msg", to="person", text="x", kind=kind, answers=["a"], reply_to=got["entry"]["id"])
+            # `answers` is a field of its own: a body at the cap sends with four answers beside it
+            full = await c.call("msg", to="person", text="m" * mail.TEXT_CAP, kind="ask", answers=["a", "b"])
+            assert full["entry"]["answers"] == ["a", "b"] and len(full["entry"]["text"]) == mail.TEXT_CAP
+            # a typed reply carries `answer: None`, and no answers of its own
+            typed = await person.call("msg", text="merge it", kind="reply", reply_to=got["entry"]["id"])
+            assert typed["entry"]["answer"] is None and typed["entry"]["answers"] == []
+        await person.call("kill", id=loner)
+
+
+async def test_a_conflicts_answers_reach_every_controllers_copy(agent, tmp_path):
+    """Design §4.10: a `conflict` never names the person, so its answers reach no button — they are
+    read and picked between sessions, which means **every addressee's copy must carry them**
+    (`_copy`), the sender's `outbox` copy included."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        lead, lead2, worker = [await mk(n, unattended=True) for n in ("l1", "l2", "w")]
+        await person.call("set_controllers", id=worker, add=[lead, lead2])
+        await wait_state(person, worker, "idle")
+        await person.call("send", id=worker, text="echo hi")
+        sends = (await person.call("get", id=worker))["sends"]
+        async with LocalClient(caller=worker) as w:
+            got = await w.call(
+                "msg",
+                to=[lead, lead2],
+                text="two of you told me different things",
+                kind="conflict",
+                cites=[sends[-1]["id"]],
+                answers=["do what l1 said", "do what l2 said"],
+            )
+        mid = got["entry"]["id"]
+        for sid in (lead, lead2):
+            async with LocalClient(caller=sid) as c:
+                held = [e for e in (await c.call("inbox"))["entries"] if e["id"] == mid][0]
+                assert held["answers"] == ["do what l1 said", "do what l2 said"]
+        stored = json.loads((paths.sessions_dir() / f"{worker}.json").read_text())
+        assert [e["answers"] for e in stored["outbox"] if e["id"] == mid] == [["do what l1 said", "do what l2 said"]]
+        # …and the copies are the copy's own list, not one list shared between records
+        agent.sessions[lead].inbox[-1].answers.append("tampered")
+        assert agent.sessions[lead2].inbox[-1].answers == ["do what l1 said", "do what l2 said"]
+        for sid in (lead, lead2, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_the_home_checks_that_a_picked_answer_is_one_of_them(agent, tmp_path):
+    """Design §4.10: **the home checks it** — `answer` must index the `answers` of the entry
+    `reply_to` names and `text` must equal that answer exactly, else the reply is refused (*that is
+    not one of the suggested answers*). A session can call this RPC directly, and a receiver must
+    not be asked to trust an index the text does not bear out."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        loner = await mk("loner", unattended=True)
+        async with LocalClient(caller=loner) as c:
+            asked = (await c.call("msg", to="person", text="merge?", kind="ask", answers=["merge it", "hold it"]))[
+                "entry"
+            ]["id"]
+            plain = (await c.call("msg", to="person", text="fyi"))["entry"]["id"]
+        for bad in (
+            {"text": "merge it", "answer": 1},  # the index and the text disagree
+            {"text": "merge it", "answer": 2},  # out of range
+            {"text": "merge it", "answer": -1},  # negative
+            {"text": "merge it", "answer": "1"},  # not a whole number
+            {"text": "merge it", "answer": 1.0},
+            {"text": "merge it", "answer": True},
+        ):
+            with pytest.raises(AgentError, match="not one of the suggested answers"):
+                await person.call("msg", kind="reply", reply_to=asked, **bad)
+        # an entry that carries none, and an answer with no entry named at all
+        with pytest.raises(AgentError, match="carries no answers at all"):
+            await person.call("msg", kind="reply", reply_to=plain, text="ok", answer=0)
+        with pytest.raises(AgentError, match="not one of the suggested answers"):
+            await person.call("msg", to=loner, kind="note", text="merge it", answer=0)
+        # and the valid one goes through, index and text agreeing
+        ok = await person.call("msg", kind="reply", reply_to=asked, text="hold it", answer=1)
+        assert ok["entry"]["answer"] == 1 and ok["entry"]["text"] == "hold it"
+        await person.call("kill", id=loner)
+
+
+async def test_a_picked_answer_is_an_ordinary_reply_on_an_ask_and_on_a_steer(agent, tmp_path):
+    """Design §4.10: **it is always a reply, on a `steer` too** — the same gate, the same tallies,
+    the same close (`replied`, never `go_with_it`) and the same wake as the free-text Reply, so
+    nothing can be said through a button that Reply could not say."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        loner = await mk("loner", unattended=True)
+        async with LocalClient(caller=loner) as c:
+            asked = (await c.call("msg", to="person", text="merge?", kind="ask", answers=["merge it", "hold it"]))[
+                "entry"
+            ]["id"]
+            steered = (
+                await c.call(
+                    "msg",
+                    to="person",
+                    text="which branch?",
+                    kind="steer",
+                    default="off main",
+                    answers=["off main", "off develop"],
+                )
+            )["entry"]["id"]
+        for mid, index, text in ((asked, 1, "hold it"), (steered, 0, "off main")):
+            got = await person.call("msg", kind="reply", reply_to=mid, text=text, answer=index)
+            assert got["delivered"] == [loner] and got["closed"] == mid
+            held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == mid][0]
+            # closed `replied` — never `go_with_it`, which is the person's separate act
+            assert held["closed_reason"] == "replied" and held["closed_by"] == got["entry"]["id"]
+        async with LocalClient(caller=loner) as c:
+            got = [e for e in (await c.call("inbox"))["entries"] if e["kind"] == "reply"]
+            # the sender reads the index and need not compare strings
+            assert [(e["answer"], e["text"]) for e in got] == [(1, "hold it"), (0, "off main")]
+        # a person's reply refills the sender's wake budget, picked or typed alike
+        assert agent.sessions[loner].wake_refilled_at is not None
+        await person.call("kill", id=loner)
+
+
+async def test_a_picked_answer_wakes_the_sender_as_a_reply_does(agent, tmp_path, start_wait):
+    """Design §4.10: *the same wake as the free-text Reply* — a sender blocked in `ao wait` on its
+    own question is returned by a picked answer exactly as a typed one returns it."""
+    async with LocalClient() as person:
+        lead, worker = await _team(person, tmp_path)
+        async with LocalClient(caller=lead) as ld:
+            asked = (await ld.call("msg", to=worker, text="rebase?", kind="ask", answers=["rebase", "merge"]))["entry"]
+        client, task = await start_wait(lead)
+        async with LocalClient(caller=worker) as w:
+            await w.call("inbox")  # the worker reads its own mail, which is what marks it read
+            await w.call("msg", kind="reply", reply_to=asked["id"], text="merge", answer=1)
+        got = await asyncio.wait_for(task, 10)
+        await client.__aexit__()
+        assert got["wake"]["cause"] == "mail" and [m["kind"] for m in got["mail"]] == ["reply"]
+        async with LocalClient(caller=lead) as ld:
+            back = [e for e in (await ld.call("inbox"))["entries"] if e["kind"] == "reply"]
+            assert [(e["answer"], e["text"]) for e in back] == [(1, "merge")]
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)

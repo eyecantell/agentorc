@@ -105,6 +105,17 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
 .inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
 .inboxpage .mfoot, .inboxpage .mhead { row-gap: 4px; }
+/* design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): the sender's words, drawn **apart
+   from the row's own controls** — its own row, indented behind a *suggested by …* label and set
+   off by a rule, so *Delete* or *Allow* proposed by a session never reads as one of the page's
+   controls. Its own row is also what keeps it from wrapping into the controls row. A label too
+   long for its button is cut with an ellipsis here and whole on `title` (the template). Colours
+   are tokens, as every colour on the page is (TD-071 item 8). */
+.inboxpage .sugg { row-gap: 4px; padding: 4px 0 2px 10px; border-left: 2px solid var(--line); }
+.inboxpage .sugg .sugglabel { font-style: italic; }
+.inboxpage .btn.answer { max-width: 30ch; }
+.inboxpage .btn.answer .alabel { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inboxpage .btn.answer .adflt { text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 /* design §4.5a **Inbox row: state** (TD-069 step 2): a state row wears the card's own pill, which
    is a span and never a control. The alarms list is text, one line per alarm. */
 .inboxpage .staterow .pill { cursor: default; }
