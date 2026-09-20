@@ -37,7 +37,14 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "see
 # would otherwise be readable from any laptop, where its `get` is not) and a `wait`, which is
 # scoped to the node's host. A person may still message anyone. Checked at the home, in `_forwarded`.
 # `NODE_ACTS` is in the set as a second line only: a person's act on a pane never leaves the node.
-PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox", "inbox_delete"})) - frozenset({"hook"})
+# `identity_ack` joins the bound list rather than `NODE_ACTS`: it is a person's act and no
+# session's, so nothing about it belongs in "what a session may do to itself offline" — but a
+# person at a node may no more clear a home record's alarms than delete its mail (§4.8a, §4.4a).
+# Today a node refuses a home record itself (it is *no session here*, as a `kill` of one is) and
+# the call never reaches this check; it is listed so the bound holds if it ever does.
+PERSON_NODE_BOUND = (HOME_EDITS | NODE_ACTS | frozenset({"inbox", "inbox_delete", "identity_ack"})) - frozenset(
+    {"hook"}
+)
 # Never served to a call forwarded from a node, whoever makes it (step 4b.3): a checkout's files on
 # any host are read by a caller at the home, for a team start there — `_forwarded` refuses it.
 HOME_ONLY = frozenset({"host_files"})

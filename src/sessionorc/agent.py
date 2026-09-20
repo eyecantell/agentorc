@@ -104,7 +104,11 @@ ACT_TIMEOUT = 120.0
 # What the home routes to the node whose name is the record's `host` (design §4.4a "A node reports
 # and executes; the home decides"): the acts that touch a pane or the node's waiters, executed
 # there with no gate of their own. `name_check` is a read, routed with a `host` for a team start.
-NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "create", "name_check"})
+# `identity_ack` is here for the same reason (§4.8a, review of PR #251): a record's identity alarms
+# are **node-owned**, observed where the socket is, so the node clears its own list and the home
+# learns it from the reply's record — a home that cleared its replica would have it back on the
+# next report. Without an `id` the RPC is the home's own list and never leaves this host.
+NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "create", "name_check", "identity_ack"})
 # What the home owns and edits on its own copy (§4.4a "Each field has one owner"), and pushes to
 # the node's replica in the same call so its stopping policies read the same intent. 4b generalises
 # the push to every home-owned field on reconnect.
@@ -3630,7 +3634,14 @@ class HostAgent:
         **A person's only**, refused to every session exactly as `inbox_delete` is, and deliberately
         **not** in `identity.READS`: a session that could clear the list could erase the evidence of
         its own forgery, which is the one thing the alarm exists to prevent. Nothing is lost either
-        way — the host agent's log keeps every alarm, one line each (§4.8a)."""
+        way — the host agent's log keeps every alarm, one line each (§4.8a).
+
+        **A node's record is acknowledged at that node** (§4.8a): alarms are node-owned, so an `id`
+        naming another host is routed there like any other act (`NODE_ACTS`, §4.4a step 4a), the
+        node clears its own list and the home takes the cleared record from the reply — a home that
+        cleared its replica would have the alarms back on the node's next report. A person at a
+        node may clear only that node's records (`PERSON_NODE_BOUND`); the host's own list is
+        whichever host was asked, and never travels."""
         if not mail.is_person(caller):
             raise RpcError(
                 f"{caller} cannot acknowledge an identity alarm: the list is cleared only by a person, "

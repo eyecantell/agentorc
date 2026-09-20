@@ -832,3 +832,89 @@ def test_acknowledge_is_a_persons_own_route_and_the_agents_rule_decides(client, 
     assert ok.status_code == 200 and ok.json()["cleared"] is True and ok.json()["id"] == "person"
     bad = client.post("/api/person/identity_ack", json={"id": "ao-nope"})
     assert bad.status_code == 400 and "no session ao-nope" in bad.json()["detail"]
+
+
+# -- what the review of PR #251 found -------------------------------------------------------------
+
+
+@pytest.mark.unit
+def test_one_poll_reads_the_fleet_once(tmp_path, monkeypatch):
+    """The Inbox's mail needs the fleet for its senders' names and its states need the records
+    themselves, and both run on every page load and every poll. One `list` per request, then —
+    two on the hot path would be two for no reason (review of PR #251)."""
+    from fastapi.testclient import TestClient
+
+    from agentorc.ui import app as uiapp
+
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("AGENTORC_HOME", str(home))
+    (home / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    calls: list[str] = []
+    idreport = {"host": "kmaster", "mode": "off", "detached_check": False, "tally": {}}
+    answers = {
+        "list": [rec("ao-p", "needs-you", pending=PERMISSION)],
+        "inbox": {"id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0},
+        "identity": {**idreport, "alarms": [], "sessions": {}},
+        "usage": {},
+        "host": {"host": "kmaster", "home": "kmaster", "mode": "home", "home_reachable": True, "links": {}},
+    }
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *exc):
+            return False
+
+        async def call(self, method, **params):
+            calls.append(method)
+            return answers[method]
+
+    monkeypatch.setattr(uiapp, "LocalClient", FakeClient)
+    with TestClient(uiapp.create_app()) as c:
+        got = c.get("/api/person/inbox")
+        assert got.status_code == 200 and got.json()["needs"] == 1
+        assert calls.count("list") == 1
+        calls.clear()
+        assert c.get("/inbox").status_code == 200
+        assert calls.count("list") == 1
+
+
+@pytest.mark.unit
+def test_every_session_the_org_counts_as_needs_you_has_exactly_one_row(tmp_path, monkeypatch):
+    """The Inbox says it counts *the session states the Org counts too*, so a `needs-you` record
+    the Inbox does not list would be the two pages disagreeing in public. One predicate
+    (`state_kind`) answers for both — including the edges: an empty `pending`, a `pending` that is
+    not a dict at all, and a kind this build does not know. A plain *needs you* row carries
+    **Open** and no Allow / Deny: nothing structured came with it, and a control built from what is
+    not there is what §4.2 forbids (review of PR #251)."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import NEEDS_YOU_ROWS, state_kind, view
+
+    records = [
+        rec("ao-a", "needs-you", pending=PERMISSION),
+        rec("ao-b", "needs-you", pending={"kind": "question", "text": "a or b?"}),
+        rec("ao-c", "needs-you", pending={}),
+        rec("ao-d", "needs-you"),
+        rec("ao-e", "needs-you", pending="a string, from another build"),
+        rec("ao-f", "needs-you", pending={"kind": "somethingnew", "text": "?"}),
+        rec("ao-g", "needs-you", pending={"kind": "permission", "text": "no id came with it"}),
+        rec("ao-h", "working"),
+    ]
+    vs = [view(r, records) for r in records]
+    assert [state_kind(v) for v in vs] == [
+        "permission", "question", "needs", "needs", "needs", "question", "question", "",
+    ]  # fmt: skip
+    org_counts = sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)
+    rows_out = state_rows_of(records)
+    assert org_counts == sum(1 for v in vs if v["state"] == "needs-you") == 7
+    assert len([r for r in rows_out if r["row"] in NEEDS_YOU_ROWS]) == org_counts
+    assert sorted(r["sid"] for r in rows_out) == ["ao-a", "ao-b", "ao-c", "ao-d", "ao-e", "ao-f", "ao-g"]
+
+    plain = rows("needs", [r for r in rows_out if r["row"] == "needs"][:1])
+    assert ">Open<" in plain and 'data-act="allow"' not in plain and 'data-act="deny"' not in plain
+    assert "nothing came with it saying what for" in plain
+    # the one with a permission kind but no tool_use_id gets no Allow either: the route would 409
+    no_id = rows("needs", [r for r in rows_out if r["sid"] == "ao-g"])
+    assert 'data-act="allow"' not in no_id and "no id came with it" in no_id

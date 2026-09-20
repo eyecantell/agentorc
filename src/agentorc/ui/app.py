@@ -420,7 +420,12 @@ def view(
         elif declared:
             line += f" · {declared} (profile)"
         d["profile_line"] = line
-    pend = s.get("pending") or {}
+    # A record whose `pending` is not a dict — another build, a hand repair — costs its card its
+    # pending line and nothing more, the rule `doing` and `out_of_work` already follow: every
+    # reader below (the card, the Focus header, `state_kind`) gets one shape (review of PR #251).
+    pend = s.get("pending")
+    pend = pend if isinstance(pend, dict) else {}
+    d["pending"] = pend
     d["deadline"] = pend.get("deadline") or ""
     # The report channels (design §4.8, §4.5a card **report line**, TD-028 step 4). One line, shown
     # only when a channel is non-empty: `report_line` is the same text `ao status -v` prints — one
@@ -644,6 +649,39 @@ def _find_text(*parts: Any) -> str:
     return " ".join(str(p).strip() for p in parts if str(p or "").strip()).lower()
 
 
+# design §4.5a **Inbox row: state**: the row kinds that are a *needs you* session, and so exactly
+# what the Org's needs-you count counts. Kept beside `state_kind` because the two are one rule.
+NEEDS_YOU_ROWS = ("permission", "question", "needs")
+
+
+def state_kind(v: dict[str, Any]) -> str:
+    """Which state row this session is, or "" for one that needs nobody (design §4.5a **Inbox row:
+    state**). **The one predicate the Inbox and the Org's needs-you count both read**, so every
+    session the Org counts as `needs-you` has exactly one row on the Inbox and the page's hover
+    text — *the session states the Org counts too* — is true (review of PR #251).
+
+    A `needs-you` record whose `pending` is empty, is not a dict, or names a kind this build does
+    not know is still a session stopped for a person: it becomes a plain **needs** row with
+    **Open** and no Allow / Deny, because nothing structured came with it and a control built from
+    what is not there is the thing §4.2 and TD-071 item 8 forbid."""
+    state = v.get("state")
+    pend = v.get("pending")
+    pend = pend if isinstance(pend, dict) else {}
+    if state == "needs-you":
+        if pend.get("kind") == "permission" and pend.get("tool_use_id"):
+            return "permission"
+        return "question" if pend.get("text") or pend.get("kind") else "needs"
+    if state == "stalled?":
+        return "stalled"
+    if state == "limited":
+        return "limited"
+    if state == "exited" and v.get("flag") and [name for name, ok in (v.get("ready") or []) if not ok]:
+        # "exited with unpushed work" (§4.5a, TD-069): what Ready to close says, in its own words —
+        # the row goes when the work is pushed or the session is forgotten.
+        return "unpushed"
+    return ""
+
+
 def state_rows(
     views: Collection[dict[str, Any]],
     *,
@@ -694,24 +732,23 @@ def state_rows(
         }
 
     for v in sorted(views, key=lambda v: (str(v.get("since") or ""), str(v.get("id") or ""))):
-        pend = v.get("pending") or {}
+        pend = v.get("pending")
         pend = pend if isinstance(pend, dict) else {}
         text = str(pend.get("text") or "")
-        state = v.get("state")
-        if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
-            rows.append(base(v, "permission", text))
-        elif state == "needs-you" and pend:
-            rows.append(base(v, "question", f"{pend.get('kind')}: {text}" if pend.get("kind") else text))
-        elif state == "stalled?":
-            rows.append(base(v, "stalled", text or v.get("host_note") or "no output for a while, and no note"))
-        elif state == "limited":
-            rows.append(base(v, "limited", text or "the profile is at its cap"))
-        elif state == "exited":
-            # "exited with unpushed work" (§4.5a, TD-069): what Ready to close says, in its own
-            # words — the row goes when the work is pushed or the session is forgotten.
+        kind = state_kind(v)
+        if kind == "permission":
+            rows.append(base(v, kind, text))
+        elif kind == "question":
+            rows.append(base(v, kind, f"{pend.get('kind')}: {text}" if pend.get("kind") else text))
+        elif kind == "needs":
+            rows.append(base(v, kind, "it is waiting on a person, and nothing came with it saying what for"))
+        elif kind == "stalled":
+            rows.append(base(v, kind, text or v.get("host_note") or "no output for a while, and no note"))
+        elif kind == "limited":
+            rows.append(base(v, kind, text or "the profile is at its cap"))
+        elif kind == "unpushed":
             unmet = [name for name, ok in (v.get("ready") or []) if not ok]
-            if v.get("flag") and unmet:
-                rows.append(base(v, "unpushed", f"{v['flag']} — {', '.join(unmet)}", extra=v.get("where") or ""))
+            rows.append(base(v, kind, f"{v['flag']} — {', '.join(unmet)}", extra=v.get("where") or ""))
         if alarms := v.get("alarms"):
             row = base(v, "alarm", alarm_note(alarms))
             # an alarm row is as old as its newest alarm, not as its session: what the order is
@@ -919,7 +956,10 @@ def create_app() -> FastAPI:
             sessions, agent_down = [], True
         icons = await role_icons(sessions)
         vs = sorted((view(s, sessions, icons=icons) for s in sessions), key=lambda v: (v["rank"], v["name"]))
-        counts = {k: sum(1 for v in vs if v["state"] == k) for k in ("needs-you", "limited", "stalled?")}
+        # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
+        # record the Org counts and the Inbox did not list was the two pages disagreeing in public
+        counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
+        counts.update({k: sum(1 for v in vs if v["state"] == k) for k in ("limited", "stalled?")})
         strip = teams_view(sessions)
         id_info = {} if agent_down else await identity_info()
         if entries or vs:
@@ -1371,32 +1411,33 @@ def create_app() -> FastAPI:
                 identity_cache.update(at=now, info={})
         return identity_cache["info"] or {}
 
-    async def person_states() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-        """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), and the
-        fleet they were built from. Every host the home knows, exactly as the Org shows them —
-        the same `list` and the same `view()` — plus this host's own identity alarms (§4.8a).
+    async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
+        fleet the request already read. Every host the home knows, exactly as the Org shows them —
+        the same records and the same `view()` — plus this host's own identity alarms (§4.8a).
 
         Rendered server-side on the page's load *and* on its poll: a state that changed between
         polls is corrected by the next one, and nothing here has to ride the pushed stream to be
         no more than a few seconds behind the Org."""
-        try:
-            fleet = await call("list")
-        except HTTPException:
-            return [], []
         icons = await role_icons(fleet)
         views = [view(s, fleet, icons=icons) for s in fleet]
         info = await identity_info()
-        return (
-            state_rows(
-                views,
-                host_alarms=alarm_view(info.get("alarms")),
-                host=str(info.get("host") or host_name()),
-                identity_mode=str(info.get("mode") or ""),
-            ),
+        return state_rows(
             views,
+            host_alarms=alarm_view(info.get("alarms")),
+            host=str(info.get("host") or host_name()),
+            identity_mode=str(info.get("mode") or ""),
         )
 
-    async def person_inbox() -> dict[str, Any]:
+    async def person_view() -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """The mail and the state rows of one Inbox request — over **one** `list`. Both halves need
+        the fleet (the mail for its senders' names, the states for the records themselves), and
+        this runs on every page load and every poll: two fleet lists on that path would be two for
+        no reason (review of PR #251)."""
+        fleet = await call("list")
+        return await person_inbox(fleet), await person_states(fleet)
+
+    async def person_inbox(fleet: list[dict[str, Any]]) -> dict[str, Any]:
         """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
         caller and no id — **a person's read, which sets no `read_at`**, because a person is not
         the session. That is what lets the Inbox page poll it every few seconds without marking
@@ -1405,7 +1446,6 @@ def create_app() -> FastAPI:
         sender gets the name it is known by, and `from_open` the id **Open** goes to while that
         record still exists (§4.5 screen 6: a row opens the session that needs the person)."""
         got = await call("inbox")
-        fleet = await call("list")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
         at = datetime.now(UTC)
         for e in got["entries"]:
@@ -1429,12 +1469,11 @@ def create_app() -> FastAPI:
         waiting on a person*. Board items are step 3 and join the same sections here."""
         agent_down = False
         try:
-            got = await person_inbox()
+            got, states = await person_view()
         except HTTPException as e:
             if e.status_code != 503:
                 raise
-            got, agent_down = {"entries": []}, True  # the banner + Retry, never a bare 503
-        states, _views = await person_states()
+            got, states, agent_down = {"entries": []}, [], True  # the banner + Retry, never a bare 503
         sections = inbox_sections(got["entries"], states=states)
         return templates.TemplateResponse(
             request,
@@ -1463,8 +1502,7 @@ def create_app() -> FastAPI:
         the simplest correct thing is one snapshot per poll — a row whose state changed in between
         is corrected by the next one, and a permission answered here leaves at once because the
         press refreshes."""
-        got = await person_inbox()
-        states, _views = await person_states()
+        got, states = await person_view()
         sections = inbox_sections(got["entries"], states=states)
         got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
         got["needs"] = sections["count"]
