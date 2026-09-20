@@ -1596,8 +1596,13 @@ says what it is doing now:
   invariant 10), and neither are `done` / `dropped` writes. What a lease covers is exactly a
   reference as canonicalised above — a `TD-NNN`, a PR, a board line; **path reservations**
   (mcp_agent_mail's globs, and how two globs overlap) are not built and wait for a case that needs
-  them. The at-claim `note` to siblings (TD-052 step 4) stays in the briefs until the running host
-  agent enforces leases, then goes.
+  them. The at-claim `note` to siblings (TD-052 step 4) was the stopgap
+  until the running host agent enforced leases; **it is gone from the briefs** (2026-09-20), which
+  now say that a claim is refused and name the holder. What replaced it was checked on the live
+  system, not in a test: with `tdgrind-ao-1` holding `TD-078`, `tdgrind-ao-2`'s
+  `ao progress claim TD-078` answered *TD-078 is claimed by ao-agentorc-tdgrind-ao-1 since
+  2026-09-20T20:43:08Z (a lease, design §4.8): pick another reference, or claim it anyway with
+  `--force`*.
 - `findings`: references the session filed. Entries `{ref, priority, at, source}`.
 - `doing` (2026-09-19, TD-074; decided by Paul): **one line, the session's own word for what it is
   doing now.** `ao doing "<line>"` sets `doing: {text, at}` on the record — a field beside the
