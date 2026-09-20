@@ -865,6 +865,7 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "reply_to": args.reply_to,
         "bound": args.bound,
         "cites": _refs(args.cites) if args.cites else None,
+        "default": args.default,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
 
@@ -872,8 +873,12 @@ def cmd_msg(args: argparse.Namespace) -> int:
         e = got["entry"]
         print(
             f"{e['id']} {e['kind']} → {', '.join(got['delivered'])}"
-            + (f"  (ask bound {e['bound']})" if e.get("bound") else "")
+            + (f"  (bound {e['bound']})" if e.get("bound") else "")
         )
+        if e.get("default"):
+            print(f"unless told otherwise: {e['default']}")
+        if got.get("advice"):  # one line from the home, not a refusal (design §4.10)
+            print(got["advice"])
         if got.get("closed"):
             print(f"closed {got['closed']}")
         if got.get("copies"):
@@ -888,15 +893,47 @@ def cmd_msg(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def _left(iso: str) -> str:
+    """How long a bound still has to run, in `_age`'s units; `overdue` once it has passed (the
+    sweep closes it on the host agent's next tick)."""
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return "?"
+    secs = int((dt - datetime.now(UTC)).total_seconds())
+    if secs <= 0:
+        return "overdue"
+    if secs < 60:
+        return f"{secs}s"
+    if secs < 3600:
+        return f"{secs // 60}m"
+    if secs < 86400:
+        return f"{secs // 3600}h"
+    return f"{secs // 86400}d"
+
+
 def _inbox_status(e: dict[str, Any]) -> str:
+    """What an entry's line says about where it stands (design §4.10 "One way of being closed"):
+    its `closed_reason` when it has one — `lapsed` for a `steer` whose bound passed, where nothing
+    failed — else how long is left on its bound, or that the person has paused its clock. An `ask`
+    to the person carries no bound at all, and says so."""
     parts = ["read" if e.get("read_at") else "unread"]
-    if e.get("kind") in ("ask", "conflict"):
-        if e.get("closed_by"):
-            parts.append(f"closed by {e['closed_by']}")
+    if e.get("kind") in ("ask", "steer", "conflict"):
+        when = e.get("closed_at") or e.get("expired_at") or ""
+        if e.get("closed_reason") == "replied" or e.get("closed_by"):
+            parts.append(f"closed by {e.get('closed_by') or 'a reply'}")
+        elif e.get("closed_reason"):
+            parts.append(f"{e['closed_reason']} {when}".strip())
         elif e.get("expired_at"):
             parts.append(f"expired {e['expired_at']}")
+        elif e.get("paused_at"):
+            parts.append(f"open, paused by the person {_age(e['paused_at'])} ago")
         elif e.get("bound"):
-            parts.append(f"open, bound {e['bound']}")
+            parts.append(f"open, {_left(e['bound'])} left")
+        else:
+            parts.append("open, no bound — it never expires")
+    if e.get("snoozed_until"):
+        parts.append(f"snoozed until {e['snoozed_until']}")
     return ", ".join(parts)
 
 
@@ -924,6 +961,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             print(f"\n{head} · {_inbox_status(e)}")
             for line in str(e["text"]).splitlines() or [""]:
                 print(f"  {line}")
+            if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
+                print(f"  default: {e['default']}")
 
     return emit(args, got, prose)
 
@@ -1282,10 +1321,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("msg", help="put a message in a session's inbox, or the person inbox (design §4.10)")
     p.add_argument("words", nargs="+", metavar='to… "text"', help="addressees (ids, names, or person), then the text")
-    p.add_argument("--kind", choices=["note", "ask", "reply", "conflict"], help="default: note (reply with --reply-to)")
+    p.add_argument(
+        "--kind",
+        choices=["note", "ask", "steer", "reply", "conflict"],
+        help="default: note (reply with --reply-to)",
+    )
     p.add_argument("--about", help="the reference it concerns: a session id, a TD-NNN, a PR")
     p.add_argument("--reply-to", dest="reply_to", help="the entry this answers (the addressee defaults to its sender)")
-    p.add_argument("--bound", type=float, help="an ask's bound in seconds (default: the host agent's)")
+    p.add_argument("--default", help="a steer: the one line you will go with unless told otherwise (required on it)")
+    p.add_argument(
+        "--bound",
+        type=float,
+        help="a steer's or an ask's bound in seconds (default: the host agent's; an ask to the person takes none)",
+    )
     p.add_argument("--cites", help="a conflict: the `sends` ids it cannot reconcile, comma-separated")
     p.set_defaults(fn=cmd_msg)
 

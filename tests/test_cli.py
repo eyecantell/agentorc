@@ -894,7 +894,7 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert out.startswith(cli.INBOX_HEADER)
     assert "from person" in out.splitlines()[1]  # the last send into this pane was the person's
     assert "[person] person" in out and f"[controller] {lead}" in out and "rebase first" in out
-    assert "open, bound" in out and "about TD-001" in out
+    assert "open, 23h left" in out and "about TD-001" in out  # the bound, as the time left (TD-069 step 0)
     # the read above marked both: `--unread` now shows nothing, and `--json` is the RPC result
     assert cli.main(["inbox", "--unread"]) == 0
     assert "0 shown, 0 unread" in capsys.readouterr().out
@@ -913,6 +913,33 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert f"reply → {peer}" in capsys.readouterr().out
     for sid in (lead, worker, peer):
         call_sync("kill", id=sid)
+
+
+def test_msg_steer_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-069 step 0 (design §4.10 *What a person is asked*): `ao msg --kind steer --default` sends
+    the line the session will go with; `ao msg person --kind ask --bound` is refused and the
+    refusal names `steer`; `ao inbox` prints a steer's default and how long is left, `[system]`
+    beside a note from the home, and `lapsed` once the bound has passed."""
+    sid = call_sync("create", name="steerer", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["msg", "person", "which branch?", "--kind", "steer", "--default", "off main"]) == 0
+    out = capsys.readouterr().out
+    assert "steer → person" in out and "bound" in out and "unless told otherwise: off main" in out
+    # a steer with no default, and an ask to the person with a bound, are both refused
+    assert cli.main(["msg", "person", "which?", "--kind", "steer"]) == 1
+    assert "a steer says what it will do" in capsys.readouterr().err
+    assert cli.main(["msg", "person", "merge?", "--kind", "ask", "--bound", "60"]) == 1
+    err = capsys.readouterr().err
+    assert "never expires" in err and "steer" in err
+    # …and the unbounded ask says so where it is read
+    assert cli.main(["msg", "person", "merge?", "--kind", "ask"]) == 0
+    capsys.readouterr()
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert "steer" in out and "default: off main" in out and "left" in out
+    assert "open, no bound — it never expires" in out
+    call_sync("kill", id=sid)
 
 
 def test_every_ao_reply_ends_with_the_unread_line_while_the_caller_has_mail(subprocess_agent, tmp_path, capsys):

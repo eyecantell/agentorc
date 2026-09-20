@@ -1093,7 +1093,9 @@ def create_app() -> FastAPI:
             if not ref:
                 raise HTTPException(400, "delete needs the entry's id")
             got = await call("inbox_delete", msg=ref)
-            return JSONResponse({"ok": True, "unread": got["unread"]})
+            # design §4.10 *Deleting is declining*: on an open `ask` or `steer` the entry is not
+            # stripped — it closes as `declined`, the asker is told, and it stays for retention.
+            return JSONResponse({"ok": True, "unread": got["unread"], "declined": bool(got.get("declined"))})
         raise HTTPException(404, f"no action {action}")
 
     @app.get("/api/sessions")

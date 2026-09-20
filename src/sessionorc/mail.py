@@ -20,7 +20,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
-from sessionorc.models import GRANTS, PERSON, MailEntry, Session, canonical_grants, has_control
+from sessionorc.models import GRANTS, PERSON, SYSTEM, MailEntry, Session, canonical_grants, has_control
 
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
 RECIPIENT_CAP = 5  # addressees the *sender* names; automatic copies are exempt
@@ -29,9 +29,14 @@ THREAD_BOUND: int | None = 40  # entries per thread before a send is refused; me
 PAIR_BOUND: int | None = 300  # reply-less entries between one pair inside PAIR_WINDOW; measured: 48 in 8 h
 PAIR_WINDOW = timedelta(hours=24)  # the rolling window a reply-less pair is counted in
 MAILBOX_DEPTH: int | None = 100  # unread entries an inbox holds before a send to it is refused; measured: 19
-PERSON_INBOX_DEPTH: int | None = 200  # unread entries the org's person inbox holds before a send is refused
+# The person inbox's depths count, from 2026-09-19 (TD-069), every entry that is unread **or** an
+# open `ask` or `steer` — one set, each entry once — so reading the page frees no slot an
+# unanswered question still holds, and one worker cannot fill it with questions that never lapse.
+PERSON_INBOX_DEPTH: int | None = 200  # entries the org's person inbox holds before a send is refused
 PERSON_SENDER_DEPTH: int | None = 20  # …and of those, how many one sender may hold there
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
+DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
+OPEN_ASK_ADVICE = 3  # open `ask`s to the person at which `ao msg` advises asking whether this one is a steer
 MAIL_RETENTION: timedelta | None = timedelta(hours=12)  # how long a read entry is kept; an open `ask` is exempt
 SENDS_KEEP = 20  # `sends` entries a record keeps
 NONCES_KEEP = 256  # verdicts remembered per host agent for a client's same-nonce retry
@@ -184,7 +189,10 @@ def from_role(records: Mapping[str, Session], holder: str, sender: str, *, contr
     """What `ao inbox` says beside every entry (design §4.10 "Surface"): whether its sender is one
     of the holder's controllers, a person, or neither — read at the moment the text is weighed,
     because instructions come from controllers and people, and mail from anyone else is
-    information."""
+    information. `system` is the fourth value (design §4.10, 2026-09-19): the home reporting what
+    became of the reader's own message, and never an instruction."""
+    if sender == SYSTEM:
+        return "system"
     if sender == PERSON:
         return "person"
     me = records.get(holder)

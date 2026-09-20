@@ -42,6 +42,7 @@ from sessionorc.models import (
     PERSON,
     PROGRESS_STATUSES,
     SOURCES,
+    SYSTEM,
     FindingEntry,
     MailEntry,
     NotTheSameSession,
@@ -816,9 +817,11 @@ class HostAgent:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
         # Its open `ask`s expire with it (design §4.10 lifecycle): the record and its inbox go, and
         # every other holder of those asks — the askers — is told so. Done while it is still in the
-        # map so `_mark` reaches it, harmlessly, along with the rest.
-        for e in [e for e in gone.inbox if e.open]:
-            self._mark(e.id, expired_at=now_iso())
+        # map so `_mark` reaches it, harmlessly, along with the rest. A `steer` is the exception:
+        # its bound runs whatever becomes of the addressee, so the sender's copy lapses on time.
+        for e in [e for e in gone.inbox if e.open and e.kind != "steer"]:
+            self._close_entry(e.id, "expired", now_iso())
+        self._asker_gone(gone, self._address(gone))
         self.sessions.pop(sid, None)
         self.store.delete(sid)
         # Scrub the id from every subscriber's map and queue the one `gone`: whichever
@@ -827,6 +830,25 @@ class HostAgent:
             last.pop(sid, None)
         self._scrub(sid)
         self._gone.append(sid)
+
+    def _asker_gone(self, s: Session, *ids: str) -> None:
+        """Design §4.10 *What a person is asked*: an `ask` to the person cannot expire, so the
+        other half of its lifecycle is the **asker's** — closing or forgetting a record closes the
+        open `ask`s and `steer`s it put to the person, `closed_reason: asker_gone`, or a forgotten
+        worker's questions would stand forever. An asker that merely **exited** leaves them open: a
+        resume may still want the answer. Nothing is told — there is no one left to tell.
+
+        **A record a resume superseded is not a gone asker** (review of PR #245): the conversation
+        continues under the new id, `_move_mail` moved its questions' `from` there with it, and this
+        record is closed only as the bookkeeping of that move — forgetting it a day later must not
+        close a question the resumed session is still waiting on. The id rewrite is what makes this
+        so; this is the second line, for a superseded record whose person-inbox copy was pruned and
+        written again, or a rewrite a future path misses."""
+        if s.superseded_by:
+            return
+        at = now_iso()
+        for e in [e for e in self.person_inbox if e.from_ in (s.id, *ids) and e.open]:
+            self._close_entry(e.id, "asker_gone", at)
 
     # -- RPC methods -----------------------------------------------------------------------------
 
@@ -1114,6 +1136,18 @@ class HostAgent:
         # not decided (and charged) a second time, and a spent budget is not reset by a resume
         new.mail_decided, new.wakes, new.wake_refilled_at = old.mail_decided, list(old.wakes), old.wake_refilled_at
         old.inbox, old.outbox, old.threads, old.sends = [], [], {}, []
+        # **The person inbox's copies follow the move too** (§4.10 "Ids follow the move"; review of
+        # PR #245). An `ask` to the person does not expire, so a question the old id put there can
+        # outlive the record that sent it — and its `from` is load-bearing in four places: the
+        # per-sender depth, the advice line, where a `system` note about it is delivered, and where
+        # the person's Reply is addressed. Left naming the old id, the question would be closed
+        # `asker_gone` when the superseded record is forgotten a day later, although the
+        # conversation it belongs to is still running.
+        moved = [e for e in self.person_inbox if e.from_ == old.id]
+        for e in moved:
+            e.from_ = new.id
+        if moved:
+            self.person_store.save(self.person_inbox)
         for r in self.sessions.values():
             if r.id in (old.id, new.id):
                 continue
@@ -1130,10 +1164,16 @@ class HostAgent:
 
     @staticmethod
     def _rename(entries: list[MailEntry], old: str, new: str) -> list[MailEntry]:
+        """The old id rewritten to the new one in entries the resume carries. `from_` too, on the
+        copies this record owns — its **outbox**, where `from_` is this conversation and the home
+        reads it to deliver a `system` note about the entry (review of PR #245). A delivered copy
+        in someone else's inbox is never passed here and keeps `from` as it was (§4.10)."""
         for e in entries:
             e.to = [new if x == old else x for x in e.to]
             e.copies = [new if x == old else x for x in e.copies]
             e.pending = [x for x in e.pending if x != old]
+            if e.from_ == old:
+                e.from_ = new
         return entries
 
     def occupants(self, directory: Path) -> list[str]:
@@ -1224,6 +1264,7 @@ class HostAgent:
         # way — but it would make the guard's one-tick bound untrue (review of PR #199).
         self._killed_at.pop(id, None)
         self.store.save(s)
+        self._asker_gone(s, self._address(s))  # its open questions to the person close with it (§4.10)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
 
@@ -1648,6 +1689,7 @@ class HostAgent:
         reply_to: str | None = None,
         bound: float | None = None,
         cites: list[str] | None = None,
+        default: str | None = None,
         nonce: str | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
@@ -1657,9 +1699,10 @@ class HostAgent:
         cap on the addressees the sender named, all or nothing across them, a copy to the other
         controllers of the session it is `about` (exempt from both), the exchange bound per thread
         and per pair, the mailbox depth, the body cap, and an `ask`'s wall-clock bound. `bound` is
-        the `ask`'s, in seconds, else `mail.ASK_BOUND`. A retry carrying the same `nonce` returns
-        the first send's verdict. The reply names what landed, what was copied, and what was
-        forwarded to a resumed successor."""
+        the `ask`'s, in seconds, else `mail.ASK_BOUND` — and an `ask` to the person carries none at
+        all (§4.10 *What a person is asked*, 2026-09-19): `default` is a `steer`'s, required on it.
+        A retry carrying the same `nonce` returns the first send's verdict. The reply names what
+        landed, what was copied, and what was forwarded to a resumed successor."""
         sender = PERSON if mail.is_person(caller) else str(caller)
         key = (sender, str(nonce)) if nonce else None
         if key and key in self._nonces:
@@ -1668,7 +1711,7 @@ class HostAgent:
                 raise error
             return dict(result or {})
         try:
-            result = await self._msg(sender, text, to, kind, about, reply_to, bound, cites)
+            result = await self._msg(sender, text, to, kind, about, reply_to, bound, cites, default)
         except RpcError as e:
             if key:
                 self._remember_nonce(key, (None, e))
@@ -1692,6 +1735,7 @@ class HostAgent:
         reply_to: str | None,
         bound: float | None,
         cites: list[str] | None,
+        default: str | None = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -1707,6 +1751,10 @@ class HostAgent:
             raise RpcError(
                 f"message body over {mail.TEXT_CAP} bytes: cite a `sends` id or a reference instead (design §4.10)"
             )
+        if sender == SYSTEM:
+            raise RpcError(
+                f"{SYSTEM!r} is the home's own name on a note about your message: no session sends as it (design §4.10)"
+            )
         me = records.get(sender) if sender != PERSON else None
         if sender != PERSON and me is None:
             raise RpcError(f"{sender} cannot send mail: this host agent has no record of it (design §4.10)")
@@ -1714,6 +1762,19 @@ class HostAgent:
         named = list(dict.fromkeys(named))
         if PERSON in named and sender == PERSON:
             raise RpcError("the person inbox is how a session reaches a person; a person's own note is a board line")
+        if SYSTEM in named:
+            raise RpcError(
+                f"{SYSTEM!r} is the home's own name on a note about your message: it addresses nobody (design §4.10)"
+            )
+        # -- a `steer` carries the one line it will go with, cleaned and capped as a `doing` line --
+        line = _clean(str(default or "").split("\n", 1)[0]).strip()[: mail.DEFAULT_CAP]
+        if kind == "steer" and not line:
+            raise RpcError(
+                'a steer says what it will do unless told otherwise: --default "<the line you will go with>" '
+                "(design §4.10)"
+            )
+        if kind != "steer" and line:
+            raise RpcError(f"only a steer carries a default: {kind} says what it says (design §4.10)")
         # -- a reply belongs to its root's thread, and answers an entry the replier holds ----------
         replied: MailEntry | None = None
         copies: list[str] = []
@@ -1727,6 +1788,11 @@ class HostAgent:
                     f"copied (design §4.10)"
                 )
             replied = held[0]
+            if replied.from_ == SYSTEM:
+                raise RpcError(
+                    "a system note reports what happened to your own message; there is nobody to reply to "
+                    "(design §4.10)"
+                )
             if not named:
                 if replied.from_ == PERSON and sender == PERSON:
                     raise RpcError(f"{reply_to} is a person's own message: name the addressee")
@@ -1742,6 +1808,24 @@ class HostAgent:
             raise RpcError(
                 f"{len(named)} addressees is more than the cap of {mail.RECIPIENT_CAP} (design §4.10: no broadcast)"
             )
+        # -- what a person is asked (design §4.10, 2026-09-19): alone, unbounded, never a conflict --
+        if PERSON in named:
+            if kind == "conflict":
+                raise RpcError(
+                    "a conflict never names the person: it is put to your controllers, and if they cannot "
+                    "settle it, ask the person about it with --kind ask (design §4.10)"
+                )
+            if kind in ("ask", "steer") and len(named) > 1:
+                raise RpcError(
+                    f"the person is asked alone: a {kind} naming the person names nobody else — send it to the "
+                    f"person on its own, and a note to the others (design §4.10)"
+                )
+            if kind == "ask" and bound is not None:
+                raise RpcError(
+                    "an ask to the person carries no bound and never expires: send a steer with --default "
+                    "<the line you will go with> --bound <seconds> if you can go on without an answer "
+                    "(design §4.10)"
+                )
         # -- forwarding: a closed record a live one superseded hands its mail on -------------------
         forwarded: dict[str, str] = {}
         resolved: list[str] = []
@@ -1786,8 +1870,15 @@ class HostAgent:
         now = datetime.now(UTC)
         if counts and (mail.THREAD_BOUND is not None or mail.PAIR_BOUND is not None):
             self._check_bounds(sender, named, root, now)
+        advice = None
         if PERSON in named:
             self._check_person_depth(sender)
+            if kind == "ask":
+                # One line of advice from the home, not a gate — the per-sender depth is the gate
+                # (design §4.10 "Which to send is the brief's to teach"): counted before this send.
+                held = sum(1 for e in self.person_inbox if e.from_ == sender and e.kind == "ask" and e.open)
+                if held >= mail.OPEN_ASK_ADVICE:
+                    advice = f"you have {held} open asks to the person: is this one needed, or a steer?"
         if mail.MAILBOX_DEPTH is not None:
             for sid in named:
                 if sid != PERSON and records[sid].unread() >= mail.MAILBOX_DEPTH:
@@ -1803,7 +1894,11 @@ class HostAgent:
             id=mid, from_=sender, to=list(named), at=at, kind=kind, text=text, about=about, reply_to=reply_to, root=root
         )
         entry.cites = cited
-        if kind in ASK_KINDS:
+        entry.default = line or None
+        entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
+        if kind in ASK_KINDS and not (kind == "ask" and PERSON in named):
+            # `bound` is None exactly when the addressee is the person and the kind is `ask`: that
+            # one never expires, and the person inbox's depths are what bound it instead (§4.10).
             span = timedelta(seconds=float(bound)) if bound is not None else mail.ASK_BOUND
             entry.bound = (now + span).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         landed: list[str] = []
@@ -1837,7 +1932,7 @@ class HostAgent:
                         t.at.append(at)
                         t.count = len(t.at)  # the window's count, kept as a field so pruning cannot reset it
         if closes and replied is not None:
-            self._mark(replied.id, closed_by=mid, closed_at=at)
+            self._mark(replied.id, closed_by=mid, closed_at=at, closed_reason="replied")
         if sender == PERSON and reply_to:
             # A person's message into a thread resets it (design §4.10): tally and `bound_hit`
             # cleared on every record holding it, so the sessions may reply to the ruling.
@@ -1874,6 +1969,8 @@ class HostAgent:
             "copies_failed": failed,
             "forwarded": forwarded,
             "closed": replied.id if closes and replied is not None else None,
+            # advice, not a refusal: the id comes back either way (design §4.10)
+            "advice": advice,
         }
 
     @staticmethod
@@ -1948,15 +2045,19 @@ class HostAgent:
 
     def _check_person_depth(self, sender: str) -> None:
         """The person inbox's depth and per-sender depth (design §4.10): it fills exactly when the
-        person has been away, so the refusal is a redirect to the channel with a `Due:` date."""
-        unread = [e for e in self.person_inbox if not e.read_at]
+        person has been away, so the refusal is a redirect to the channel with a `Due:` date.
+
+        From 2026-09-19 (TD-069) they count **every entry that is unread or is an open `ask` or
+        `steer`** — one set, each entry once — so reading the page frees no slot an unanswered
+        question still holds, and one worker cannot fill the Inbox with asks that never lapse."""
+        counted = [e for e in self.person_inbox if not e.read_at or e.open]
         full = None
-        if mail.PERSON_INBOX_DEPTH is not None and len(unread) >= mail.PERSON_INBOX_DEPTH:
-            full = f"the person inbox holds {mail.PERSON_INBOX_DEPTH} unread entries"
+        if mail.PERSON_INBOX_DEPTH is not None and len(counted) >= mail.PERSON_INBOX_DEPTH:
+            full = f"the person inbox holds {mail.PERSON_INBOX_DEPTH} entries unread or unanswered"
         elif mail.PERSON_SENDER_DEPTH is not None and (
-            sum(1 for e in unread if e.from_ == sender) >= mail.PERSON_SENDER_DEPTH
+            sum(1 for e in counted if e.from_ == sender) >= mail.PERSON_SENDER_DEPTH
         ):
-            full = f"the person inbox holds {mail.PERSON_SENDER_DEPTH} unread entries from {sender}"
+            full = f"the person inbox holds {mail.PERSON_SENDER_DEPTH} entries unread or unanswered from {sender}"
         if full:
             raise RpcError(
                 f"{full}: the person is away — write the line on user_attention.md with a Due: date, "
@@ -1988,6 +2089,62 @@ class HostAgent:
                     setattr(e, k, v)
         if mine:
             self.person_store.save(self.person_inbox)
+
+    def _close_entry(self, msg_id: str, reason: str, at: str) -> None:
+        """Design §4.10 "One way of being closed": `closed_reason` is set whenever an entry closes,
+        by whatever path, and the fields that existed before it are kept and still written —
+        `expired` sets `expired_at` as today, and `lapsed`, `declined`, `go_with_it` and
+        `asker_gone` set `closed_at` alone. (`replied` is the send path's, which writes `closed_by`
+        and `closed_at` with the reply that answered.)"""
+        if reason == "expired":
+            self._mark(msg_id, expired_at=at, closed_reason=reason)
+        else:
+            self._mark(msg_id, closed_at=at, closed_reason=reason)
+
+    def _system_note(self, to: str, text: str, *, wake: str = "note") -> None:
+        """A `note` from `system` written **straight into the sender's mailbox** (design §4.10 "How
+        the sender hears that one closed without a reply"): it does not pass through the send path,
+        so no gate, no tally and no depth sees it, and no session can send as `system`. It reports
+        what happened to the reader's own message and is never an instruction; `--reply-to` naming
+        one is refused.
+
+        `wake` is which of the section's three rules applies:
+
+        - `person` — a decline, a *Go with it* or a **pause**, the three by which a person releases
+          a sender that may be blocked in `ao wait`: they wake as a person's `reply` does and
+          **refill** the budget;
+        - `note` — a **resume**, ordinary: it wakes within the budget like any `note`;
+        - `uncharged` — a **lapse**: outside the budget, neither spending nor refilling it, so a
+          spent budget cannot hold a sender past the bound it set itself. It is carried on the note
+          (`MailEntry.uncharged`) rather than beside the records, so it survives the two things
+          that happen between a lapse and the wake it earns: a **resume**, which moves the note to
+          the new record, and a host-agent **restart**, which reloads it (review of PR #245).
+
+        A sender that has since been resumed is followed to its successor, as mail addressed to a
+        superseded record is (§4.10 lifecycle): the note is about the conversation, not the id."""
+        entry = MailEntry(id="m-" + secrets.token_hex(6), from_=SYSTEM, to=[to], at=now_iso(), kind="note", text=text)
+        entry.uncharged = wake == "uncharged"
+        if to == PERSON:
+            self.person_inbox.append(entry)
+            self.person_store.save(self.person_inbox)
+            return
+        records = self._graph()
+        sid, seen = to, {to}
+        while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
+            sid = r.superseded_by
+            if sid in seen:
+                break
+            seen.add(sid)
+        r = records.get(sid)
+        if r is None:
+            return  # the sender's record is gone: there is nobody left to tell
+        entry.to = [sid]
+        r.inbox.append(entry)
+        if wake == "person":
+            self._refill(r)  # saves the record and pokes the waits
+        else:
+            self._save(r)
+            self._poke_waits()
 
     async def rpc_inbox(self, id: str | None = None, unread: bool = False, caller: Any = None) -> dict[str, Any]:
         """`ao inbox [--unread]` (design §4.10): a session reads its own inbox and nobody else's;
@@ -2046,18 +2203,36 @@ class HostAgent:
         session, itself included: a session's inbox is read-only to it through the RPCs, and an
         entry leaves outside its lifecycle only with its record or by a person's hand. Naming no
         session (or `person`) deletes from the org's person inbox — the top bar's delete — and the
-        sender's copy stays there too."""
+        sender's copy stays there too.
+
+        **Deleting is declining, and nothing vanishes at once** (design §4.10, 2026-09-19): in the
+        person inbox, deleting an *open* `ask` or `steer` closes it `declined` — a deletion is an
+        answer, and silence is not — and the entry stays for the retention window like any closed
+        one; the asker is told by a `system` note that wakes it as a person's reply does. A `note`,
+        or anything already closed, is removed outright, as it always was."""
         if not mail.is_person(caller):
             raise RpcError(
                 f"{caller} cannot delete mail: an entry is deleted only by a person, in the Inbox panel (design §4.10)"
             )
         if not id or id == PERSON:
-            kept = [e for e in self.person_inbox if e.id != msg]
-            if len(kept) == len(self.person_inbox):
+            held = [e for e in self.person_inbox if e.id == msg]
+            if not held:
                 raise RpcError(f"the person inbox holds no entry {msg}")
+            if held[0].open:
+                e = held[0]
+                self._close_entry(msg, "declined", now_iso())
+                self._system_note(e.from_, f"{e.kind} {msg} declined by the person", wake="person")
+                await self._push_changes()
+                return {
+                    "id": PERSON,
+                    "deleted": msg,
+                    "declined": True,
+                    "unread": sum(1 for x in self.person_inbox if not x.read_at),
+                }
+            kept = [e for e in self.person_inbox if e.id != msg]
             self.person_inbox = kept
             self.person_store.save(kept)
-            return {"id": PERSON, "deleted": msg, "unread": sum(1 for e in kept if not e.read_at)}
+            return {"id": PERSON, "deleted": msg, "declined": False, "unread": sum(1 for e in kept if not e.read_at)}
         s = self._find(self._addr(id))
         kept = [e for e in s.inbox if e.id != msg]
         if len(kept) == len(s.inbox):
@@ -2068,25 +2243,115 @@ class HostAgent:
         await self._push_changes()
         return {"id": self._address(s), "deleted": msg, "unread": s.unread()}
 
+    # -- the person's own bookkeeping on their inbox (design §4.10, TD-069 step 0) ----------------
+    # Each is refused to every session exactly as `inbox_delete` is, and each acts on the org's
+    # person inbox: a snooze, a pause and a *Go with it* are the person's, and no session has them.
+
+    def _person_entry(self, msg: str, caller: Any, what: str) -> MailEntry:
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot {what} mail: it is the person's own bookkeeping on their inbox (design §4.10)"
+            )
+        held = [e for e in self.person_inbox if e.id == msg]
+        if not held:
+            raise RpcError(f"the person inbox holds no entry {msg}")
+        return held[0]
+
+    async def rpc_inbox_snooze(self, msg: str, until: str | None = None, caller: Any = None) -> dict[str, Any]:
+        """**Snooze** (design §4.10, TD-069): `snoozed_until` on a person-inbox entry, set by this
+        RPC and cleared by it with no `until`. A snooze is the person's own bookkeeping, as editing
+        a `Due:` date is, and the sender is not told. It persists with the person inbox and affects
+        **the Inbox page only** — the entry leaves its section and the page's count until that time
+        — and nothing else: it is still unread if it was, it still occupies the depths, and a
+        snoozed `ask` stays open. A `steer` has **Pause** instead, so it is refused one: snooze
+        hides a row while its clock runs, pause stops the clock, and both on one row invite the
+        wrong press."""
+        e = self._person_entry(msg, caller, "snooze")
+        if e.kind == "steer":
+            raise RpcError(f"{msg} is a steer: it has Pause, which stops its clock, and no Snooze (design §4.10)")
+        self._mark(msg, snoozed_until=str(until) if until else None)
+        return {"id": PERSON, "msg": msg, "snoozed_until": e.snoozed_until}
+
+    async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer
+        this; do not go on without me*. `paused_at` stops the bound running (the sweep skips the
+        entry outright, whatever `bound` reads), the sender is told by a `system` note that wakes it
+        as a person's reply does, so it turns to other work instead of waiting out a clock that has
+        stopped, and the entry is counted while paused: a preference has become something a session
+        is held on. Only a `steer` can be paused — an `ask` to the person has no clock — and a
+        `steer` addressed to a session cannot be: the pause is the person's."""
+        e = self._person_entry(msg, caller, "pause")
+        if e.kind != "steer":
+            raise RpcError(f"only a steer can be paused: {msg} is a {e.kind}, and has no clock to stop (design §4.10)")
+        if not e.open:
+            raise RpcError(f"{msg} is closed ({e.closed_reason}): there is no clock left to stop (design §4.10)")
+        if e.paused_at:
+            raise RpcError(f"{msg} is already paused")
+        self._mark(msg, paused_at=now_iso())
+        self._system_note(e.from_, f"steer {msg} paused by the person: do not take your default yet", wake="person")
+        await self._push_changes()
+        return {"id": PERSON, "msg": msg, "paused_at": e.paused_at, "bound": e.bound}
+
+    async def rpc_inbox_resume(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """**Resume** (design §4.10, TD-069): moves `bound` later by the time it was held and then
+        clears `paused_at`, **in one step**, so the sweep never sees a resumed entry with its old
+        bound — what was left is what is left — and the sender is told again. That note is an
+        ordinary one: it only says the clock runs again and what is left, so it wakes within the
+        wake budget like any `note`."""
+        e = self._person_entry(msg, caller, "resume")
+        if not e.paused_at:
+            raise RpcError(f"{msg} is not paused")
+        held = datetime.now(UTC) - _parse(e.paused_at)
+        bound = (_parse(e.bound) + held).replace(microsecond=0).isoformat().replace("+00:00", "Z") if e.bound else None
+        self._mark(msg, bound=bound, paused_at=None)
+        self._system_note(e.from_, f"steer {msg} resumed by the person: the clock runs again, until {bound}")
+        await self._push_changes()
+        return {"id": PERSON, "msg": msg, "paused_at": None, "bound": bound}
+
+    async def rpc_inbox_go_with_it(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """**Go with it** (design §4.5a **Inbox**, §4.10): closes a `steer` now —
+        `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh — so the
+        sender need not wait out the bound; doing nothing would let it lapse to the same end. The
+        sender is told by a `system` note that wakes it as a person's reply does. It closes a
+        paused `steer` as it closes a running one."""
+        e = self._person_entry(msg, caller, "answer")
+        if e.kind != "steer":
+            raise RpcError(f"Go with it answers a steer, which carries the default: {msg} is a {e.kind} (§4.10)")
+        if not e.open:
+            raise RpcError(f"{msg} is already closed ({e.closed_reason})")
+        self._close_entry(msg, "go_with_it", now_iso())
+        self._system_note(e.from_, f"steer {msg} — the person says: go with your default", wake="person")
+        await self._push_changes()
+        return {"id": PERSON, "msg": msg, "closed_reason": "go_with_it"}
+
     async def _sweep_mail(self, now: datetime) -> None:
-        """Once a tick: an `ask` past its bound expires on every copy; an addressee that exited
-        leaves the `ask`s addressed to it pending, a closed one expires them (design §4.10
-        lifecycle); read entries past retention are pruned, open asks exempt."""
+        """Once a tick: an `ask` past its bound expires on every copy and a `steer` past its bound
+        **lapses**; an addressee that exited leaves the `ask`s addressed to it pending, a closed one
+        expires them (design §4.10 lifecycle); read entries past retention are pruned, open asks
+        exempt. Two things a `steer` does differently (§4.10 *What a person is asked*): its bound
+        runs whatever becomes of the addressee — an exit leaves it no `pending` and a close expires
+        nothing, it lapses on time — and while the person has **paused** it the sweep skips it
+        outright, whatever `bound` reads. An `ask` to the person carries no bound at all, so nothing
+        here ever reaches it."""
         stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         for r in list(self._graph().values()):
             for e in list(r.inbox):
-                if not e.open:
+                if not e.open or e.paused_at:
                     continue
-                if (e.bound and _parse(e.bound) <= now) or r.state == "closed":
-                    self._mark(e.id, expired_at=stamp)
+                if e.bound and _parse(e.bound) <= now:
+                    self._lapse_or_expire(e, stamp)
+                elif e.kind == "steer":
+                    continue  # the sender goes on: nothing the addressee does closes it early
+                elif r.state == "closed":
+                    self._close_entry(e.id, "expired", stamp)
                 elif r.state == "exited" and r.id not in e.pending:
                     self._mark(e.id, pending=r.id)
             for e in list(r.outbox):
-                if e.open and e.bound and _parse(e.bound) <= now:
-                    self._mark(e.id, expired_at=stamp)
-        for e in list(self.person_inbox):  # an `ask` to the person expires on its bound like any other
-            if e.open and e.bound and _parse(e.bound) <= now:
-                self._mark(e.id, expired_at=stamp)
+                if e.open and not e.paused_at and e.bound and _parse(e.bound) <= now:
+                    self._lapse_or_expire(e, stamp)
+        for e in list(self.person_inbox):  # a `steer` to the person lapses on its bound; an `ask` has none
+            if e.open and not e.paused_at and e.bound and _parse(e.bound) <= now:
+                self._lapse_or_expire(e, stamp)
         if mail.MAIL_RETENTION is None:
             return
         kept = [e for e in self.person_inbox if self._keep(e, now, inbox=True)]
@@ -2100,6 +2365,17 @@ class HostAgent:
                 r.inbox, r.outbox = inbox, outbox
                 _prune_tallies(r)
                 self._save(r)
+
+    def _lapse_or_expire(self, e: MailEntry, stamp: str) -> None:
+        """A bound that ran out (design §4.10): a `steer` **lapses** — `closed_reason: lapsed`,
+        never `expired_at`, because nothing failed — and the sender is told by a `system` note that
+        wakes it **uncharged**, so a spent budget cannot hold it past the bound it set itself. An
+        `ask` or a `conflict` expires, as it always has."""
+        if e.kind == "steer":
+            self._close_entry(e.id, "lapsed", stamp)
+            self._system_note(e.from_, f"steer {e.id} lapsed: go with your default", wake="uncharged")
+        else:
+            self._close_entry(e.id, "expired", stamp)
 
     @staticmethod
     def _keep(e: MailEntry, now: datetime, *, inbox: bool) -> bool:
@@ -2197,6 +2473,11 @@ class HostAgent:
         - none, or `s` is a person's session (never woken by mail) → None, nothing recorded;
         - a member's change is waking it anyway → a **free** wake: recorded `charged: False`,
           watermark advanced over all of it;
+        - one of the undecided entries is a note the home marked `uncharged` — a `steer` of its own
+          **lapsed** → a free wake, free in the same sense and for the same reason it is not a
+          refill: it is the home's clock, not another session's message (design §4.10), so a spent
+          budget cannot hold a sender past its own bound. The mark is on the note, so it survives a
+          resume and a restart between the lapse and the moment the session is next reachable;
         - the budget holds → one unit spent however many entries it covers, `charged: True`,
           watermark advanced;
         - the budget is spent → None: the mail has landed, nothing wakes, **the watermark stays**,
@@ -2209,12 +2490,13 @@ class HostAgent:
         if not fresh:
             return None
         now = datetime.now(UTC)
-        if not member_change and mail.wake_budget_spent(s, now):
+        free = member_change or any(e.uncharged for e in fresh)
+        if not free and mail.wake_budget_spent(s, now):
             return None
         decision = {
             "at": now.isoformat(timespec="microseconds"),
             "cause": "member" if member_change else "mail",
-            "charged": not member_change,
+            "charged": not free,
             "covered": len(fresh),
         }
         s.wakes = (s.wakes + [decision])[-mail.WAKES_KEEP :]
