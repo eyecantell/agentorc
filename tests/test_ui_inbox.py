@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import pathlib
 import shutil
 import subprocess
@@ -1049,3 +1050,16 @@ async def _inbox_of(sid):
 
     async with LocalClient() as person:
         return (await person.call("inbox", id=sid))["entries"]
+
+
+def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
+    """Paul, 2026-09-20 (TD-079): dismissing an FYI entry closed the FYI list. The click handler
+    closed the nearest `<details>` of any kind, and a control that sits in no menu has the *section*
+    as its nearest one. It closes a `details.more` and nothing else — and every menu is one."""
+    js = (UI / "static" / "app.js").read_text(encoding="utf-8")
+    assert 'b.closest("details.more")' in js and 'b.closest("details")' not in js
+    for tpl in (UI / "templates").glob("*.html"):
+        for tag in re.findall(r"<details[^>]*>", tpl.read_text(encoding="utf-8")):
+            menu = 'class="more"' in tag
+            section = 'id="sec-fyi"' in tag or 'id="snoozedbox"' in tag
+            assert menu != section, f"{tpl.name}: {tag} is neither a menu the handler folds nor a known section"

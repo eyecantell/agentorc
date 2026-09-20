@@ -91,7 +91,11 @@
     // state and not a copy of it, leaves the moment the state is answered.
     const staterow = b.closest(".staterow");
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
-    const details = b.closest("details"); if (details) details.open = false;
+    // A choice made in a row's *more ▾* or *Snooze* menu folds that menu — and only a menu: the
+    // nearest `<details>` of any kind used to be closed, and a control that sits in no menu (an FYI
+    // row's Dismiss, the snoozed list's Unsnooze) has the *section* as its nearest one, so dismissing
+    // an entry closed the FYI list under the person (Paul, 2026-09-20; TD-079).
+    const menu = b.closest("details.more"); if (menu) menu.open = false;
     try {
       let body = {};
       if (action === "mode") body = { unattended: !b.classList.contains("on") };
