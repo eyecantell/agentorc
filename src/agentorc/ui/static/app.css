@@ -91,24 +91,53 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .maildlg { width: min(560px, 92vw); color: var(--fg); } .maildlg::backdrop { background: rgba(0,0,0,.35); }
 .maildlg .row[hidden] { display: none; }
 #personinbox .badge { margin-left: 4px; }
-/* the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**): full width, three sections, one row
-   per thing. Every colour is a token — a light theme is required later (TD-071 item 8). */
+/* the Inbox page (design §4.5 screen 6 *Layout*, §4.5a **Inbox page**; design round 2, TD-082).
+   **One centred column**, 1100 px at most: a queue reads top to bottom, and a message's text runs
+   the width of its row instead of wrapping at a measure of its own inside an empty box — the
+   `max-width: 110ch` that did that to `.body` is gone, the column is the measure now. **A section
+   is a heading, not a box** (no `.card`, no border). **A row is a card.** Every colour is a token —
+   a light theme is required later (TD-071 item 8). */
+.inboxpage { max-width: 1100px; width: 100%; margin: 0 auto; }
 .inboxpage .isec { display: flex; flex-direction: column; gap: 8px; }
-.inboxpage details.isec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+.inboxpage .sechead { align-items: baseline; }
+/* FYI's fold **is** its heading: the disclosure's own ▾ before the name, and no second control */
+.inboxpage details.isec > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; }
 .inboxpage details.isec > summary::-webkit-details-marker { display: none; }
 .inboxpage details.isec > summary::before { content: "▸"; color: var(--muted); font-size: 11px; }
 .inboxpage details.isec[open] > summary::before { content: "▾"; }
 .inboxpage .snoozedbox > summary { list-style: none; cursor: pointer; color: var(--muted); }
 .inboxpage .snoozedbox > summary::-webkit-details-marker { display: none; }
-.inboxpage .mailrow { padding: 10px 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 5px; }
+/* the **i** mark: a real button (Enter and Space press it), small and quiet, and the one bordered
+   thing in a heading — everything bordered is a control, and this is one (§4.5a) */
+.inboxpage .imark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 10px/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
+.inboxpage .imark:hover { background: var(--hover); color: var(--fg); }
+.inboxpage .imark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
+/* the paragraph it holds: always in the page (a description may point at a hidden node, never at a
+   missing one), opened **in place** under the heading so it pushes the rows down, never covers one */
+.inboxpage .isec { position: relative; }
+.inboxpage .secinfo { margin: 0; max-width: 90ch; }
+.inboxpage .secinfo[hidden] { display: none; }
+/* the **keyboard** half of *a tooltip on hover and keyboard focus* (§4.5a): the same paragraph,
+   floated over the rows instead of pushing them down — a press is what pushes them. `!important`
+   because it has to beat the UA's `[hidden] { display: none }` on the very node it floats. */
+.inboxpage .secinfo.peek[hidden] { display: block !important; position: absolute; z-index: 5; left: 0;  /* no `top`: an auto offset keeps its static place, which is under the heading */ max-width: min(60ch, 100%); padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+/* **A row is a card**: its own surface, a hover state and a focus ring, and a tab stop of its own
+   (the template's `tabindex="0"`), so where one thing ends and the next begins is never in doubt */
+.inboxpage .mailrow { padding: 10px 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); display: flex; flex-direction: column; gap: 5px; }
+.inboxpage .inboxrows { display: flex; flex-direction: column; gap: 8px; }
+.inboxpage .mailrow:hover { border-color: var(--border); }
+.inboxpage .mailrow:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
 .inboxpage .mailrow[hidden] { display: none; }
-.inboxpage .mailrow:first-child { border-top: 0; }
 .inboxpage .mailrow .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; font-weight: 600; }
 .inboxpage .mailrow .st { font-size: 10.5px; color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
 /* the whole text, no scroll box: a 2,000-character message reads in full, and an unbroken token wraps */
-.inboxpage .mailrow .body { font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 110ch; }
+.inboxpage .mailrow .body { font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
 .inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
+/* §4.5 screen 6 *Layout* (Paul's rule, 2026-09-19): what says **what a row is** — the kind mark,
+   the role badge, the state pill (which never had a border) — is flat and unbordered; everything
+   bordered on a row is a control. The team badge keeps its border, because it is a button. */
+.inboxpage .mailrow .badge:not(.team) { border-color: transparent; }
 .inboxpage .mfoot, .inboxpage .mhead { row-gap: 4px; }
 /* design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): the sender's words, drawn **apart
    from the row's own controls** — its own row, indented behind a *suggested by …* label and set

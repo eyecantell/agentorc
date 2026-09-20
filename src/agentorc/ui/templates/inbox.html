@@ -1,9 +1,27 @@
 {% extends "base.html" %}
 {% block title %}Inbox · agentorc{% endblock %}
-{# design §4.5 screen 6, §4.5a **Inbox page** (TD-069 steps 1 and 2): full width, the one place to
-   work from — the person's mail and the sessions' states in one list. Due board items (step 3)
-   join these same sections later, each with a row renderer of its own in `inbox_row.html`. #}
+{# design §4.5 screen 6 *Layout* (design round 2, 2026-09-20 — TD-082; mockup `docs/mockups/Inbox.dc.html`),
+   §4.5a **Inbox page** and **Inbox: section heading, the i mark** (TD-069 steps 1–2).
+
+   **One centred column.** A queue reads in order, top to bottom, and a message's text runs the
+   width of its row instead of wrapping at a measure of its own inside an empty box. **A section is
+   a heading, not a box**: its name, its count, and an **i** mark holding the paragraph that says
+   what the section is — reference, read once. **A row is a card** (`inbox_row.html`).
+
+   Each blurb is written once, in `info`, and used twice: as the **i** button's `title` (its hover)
+   and as the paragraph the button opens, which is also the button's `aria-describedby` — so a
+   screen reader hears it without pressing. That is why the paragraph is always in the page and
+   merely `hidden`: a description may point at a hidden node, never at a missing one. Plain text,
+   with no inline markup, because half of its two uses is an attribute. #}
 {% block body %}
+{% set info = {
+  'needs': 'Sessions that stopped for you — a permission, a question, a cap, a stall, work that was never pushed, an identity alarm — questions a session cannot go on without, and steering you have paused. What is on the tool’s clock first, then oldest first. This section is the number in the top bar; the Org’s “needs you” counts the session states alone. A state row is the session’s own: its controls are the card’s, and a mark that is not a control never looks like one. Reading this page marks nothing and rings nothing — a person is not the session; and anything with a date on it belongs on the board.',
+  'steering': 'Each says what it will do unless you say otherwise, and when. Soonest first. Doing nothing is a valid answer: at the time shown the sender goes with its default, and nothing has failed. Reply says otherwise; Go with it closes it now; Pause stops the clock.',
+  'fyi': 'Notes, what the home reported about your own messages, late replies, and what lapsed or was declined — kept for 12 hours and then pruned. Nothing here is counted. Newest first. Dismiss removes an entry; the sender keeps its copy.',
+} %}
+{% macro imark(sec, name) -%}
+<button class="imark" type="button" data-info="info-{{ sec }}" id="i-{{ sec }}" aria-controls="info-{{ sec }}" aria-expanded="false" aria-describedby="info-{{ sec }}" aria-label="About {{ name }}" title="{{ info[sec] }}">i</button>
+{%- endmacro %}
 <div class="page inboxpage">
   <div class="row gap wrap">
     <span class="h1">Inbox</span>
@@ -22,28 +40,29 @@
     <div class="inboxrows" id="rows-snoozed">{% with rows = sections.snoozed, section = 'snoozed' %}{% include "inbox_rows.html" %}{% endwith %}</div>
   </details>
 
-  <section class="card pad isec" id="sec-needs">
-    <div class="row gap wrap"><span class="h2">Needs you</span><span class="meta" id="n-needs"></span></div>
-    <div class="note">Sessions that stopped for you — a permission, a question, a cap, a stall, work that was never pushed, an identity alarm — questions a session cannot go on without, and steering you have paused. What is on the tool's clock first, then oldest first. This section <b>is</b> the number in the top bar; the Org's <i>needs you</i> counts the session states alone.</div>
+  <section class="isec" id="sec-needs">
+    <div class="row gap wrap sechead"><span class="h2">Needs you</span><span class="meta" id="n-needs"></span>{{ imark('needs', 'Needs you') }}</div>
+    <p class="note secinfo" id="info-needs" hidden>{{ info['needs'] }}</p>
     <div class="inboxrows" id="rows-needs">{% with rows = sections.needs, section = 'needs' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing is waiting on you.</div>
   </section>
 
-  <section class="card pad isec" id="sec-steering">
-    <div class="row gap wrap"><span class="h2">Steering</span><span class="meta" id="n-steering"></span></div>
-    <div class="note">Each says what it will do unless you say otherwise, and when. Soonest first. <b>Doing nothing is a valid answer</b>: at the time shown the sender goes with its default, and nothing has failed.</div>
+  <section class="isec" id="sec-steering">
+    <div class="row gap wrap sechead"><span class="h2">Steering</span><span class="meta" id="n-steering"></span>{{ imark('steering', 'Steering') }}</div>
+    <p class="note secinfo" id="info-steering" hidden>{{ info['steering'] }}</p>
     <div class="inboxrows" id="rows-steering">{% with rows = sections.steering, section = 'steering' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing is steering.</div>
   </section>
 
-  <details class="card pad isec" id="sec-fyi">
-    <summary class="row gap wrap"><span class="h2">FYI</span><span class="meta" id="n-fyi"></span></summary>
-    <div class="note">Notes, what the home reported about your own messages, late replies, and what lapsed or was declined — kept for 12 hours and then pruned. Nothing here is counted. Newest first.</div>
+  {# FYI's fold **is** its heading (§4.5 screen 6 *Layout*): the disclosure's own ▾ before the name
+     and no second fold control anywhere. The **i** inside the summary is a button, so the script
+     stops its press from reaching the disclosure. #}
+  <details class="isec" id="sec-fyi">
+    <summary class="row gap wrap sechead"><span class="h2">FYI</span><span class="meta" id="n-fyi"></span>{{ imark('fyi', 'FYI') }}</summary>
+    <p class="note secinfo" id="info-fyi" hidden>{{ info['fyi'] }}</p>
     <div class="inboxrows" id="rows-fyi">{% with rows = sections.fyi, section = 'fyi' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing here.</div>
   </details>
-
-  <div class="note">A state row is the session's own: its controls are the card's, and a mark that is not a control never looks like one. Mail sessions sent you with <code>ao msg person</code>. Reading it marks nothing and rings nothing — a person is not the session. <b>Reply</b> lands in the sender's inbox; <b>Delete</b> on a question declines it and the sender is told; <b>Dismiss</b> removes an entry. Anything with a date on it belongs on the board.</div>
 </div>
 {% endblock %}
 {% block scripts %}<script>AO.inbox();</script>{% endblock %}

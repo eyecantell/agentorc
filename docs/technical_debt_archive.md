@@ -619,3 +619,45 @@ window labelled `day`) and `test_usage_chip_prints_each_profiles_worst_window`.
 `usage_gate` — so §6's shape is a contract waiting for its policy, not a regression of this entry.
 The `+n` collapse is browser-measured and was not exercised against a live top bar from an
 unattended session: **merged, live check pending** on `docs/user_attention.md`.
+
+## TD-082: The Inbox page needs a second design round
+
+**Priority:** Medium
+**Added:** 2026-09-20 (the anchor session; Paul, from the page at full width — his screenshot, and the anchor's own of the live page)
+**Status:** Resolved — **designed 2026-09-20 (#280), built 2026-09-20 (#281)**: Paul picked mockup A (one centred column) over B (a grid); the design is §4.5 screen 6 *Layout*, the §4.5a row *Inbox: section heading, the **i** mark*, and the artboard `docs/mockups/Inbox.dc.html` (`gen.py` `inbox()`), which also draws TD-079's *Waiting on them*, the trail and the FYI count and TD-081's *Reopen and push* so the page step has one picture. Finding 4's three: the repeated name is settled here (printed once), the bare *Details* is TD-081's (*Reopen and push*, **Resume**, **Open**), and the `…` countdown is settled here (durations are server-rendered in words; the script only keeps them moving). Build it with TD-079 step 2 (same templates), by `tdgrind-ao-2`. Earlier: Paul's direction; design first (§4.5 screen 6, mockups), and **after** the builds already decided (TD-079's steps) unless one of these is in their way. Paul: *the design review work can wait if it makes more sense to have our ao team catch up on the designs already decided.*
+**Location:** `src/agentorc/ui/templates/inbox.html` (the section heads and their blurbs, the footer paragraph), `inbox_row.html`, `src/agentorc/ui/static/app.css` (`.inboxpage .mailrow .body`: `max-width: 110ch`), `docs/mockups/gen.py`
+
+**Why:** Paul's findings, each confirmed on a 1920-wide screenshot of the live page:
+1. **The blurbs are always on screen.** Each section opens with a paragraph saying what it is (*Needs you*'s runs to two lines at full width) and the page ends with another. They are reference, read once: they belong behind a mouseover or a clickable info mark on the section's title, not above every row for ever.
+2. **The word-wrap is wrong at full width.** A message's text wraps at a fixed measure — well under half of a 1900 px row — while the blurb above it and the controls below it run the full width, so the row reads as a narrow column in an empty box. Either the whole row shares one readable maximum, or the page itself is a centred column.
+3. **Sections blend into their messages.** A section is a bordered box and its rows are unboxed text inside it; with one row it is hard to say where the head ends and the message starts. Paul: *the messages could probably be cards themselves, to be easily selected* — a row as a card (its own surface, a hover and a focus state), sections as plain headings above a list of cards.
+4. **Seen on the same screenshot, for the same round:** a session named `push` shows as `push  push  [plain]  [No team]` (its name, then the tool's own title — a separate value that here is the same word; the row should not print a title that only repeats the name); the state row's one control is a bare *Details* at the far right (TD-081 gives it real answers); the steering row's countdown is filled in by script after load and is `…` until then.
+
+**Done when** a design round (mockups first, then §4.5 screen 6 and the §4.5a rows it touches) has settled the four, and the page is built to it.
+
+**Related:** TD-069 (the Inbox), TD-079 (the queue — its page step and this one touch the same templates: build that first, or fold this into it), TD-081 (the state row's answers), TD-071 (mockups), TD-076 (friendlier titles on the same rows).
+
+**Resolved:** 2026-09-20 (PR #281) — the page is built to the round. **Finding 1:** each section's
+paragraph is now the **i** mark's (§4.5a) — a `<button>` with `aria-expanded` / `aria-controls`,
+labelled *About <section>*, whose `title` is the same text as the paragraph it describes through
+`aria-describedby`; the paragraph is in the page always and merely `hidden`, opens in place under
+the heading when pressed, and which are open is remembered in the browser. The page's closing
+paragraph is gone into the blurbs it repeated, and inside FYI's `<summary>` the press does not also
+fold the section. **Finding 2:** `.inboxpage` is one centred column at 1100 px and `.body`'s
+`max-width: 110ch` is gone — the column is the measure. **Finding 3:** a section is a heading (no
+`.card`), a row is a card with a hover state, a focus ring and `tabindex="0"` so it is a tab stop;
+what says *what a row is* — kind mark, role badge, state pill — is flat and unbordered, and the
+team badge keeps its border because it is a button. **Finding 4:** a state row prints the session's
+name once (the title is dropped when it only repeats it), and every duration is rendered server
+side by `_left` / `_countdown` in the exact words `fmtLeft` in `app.js` uses — the `…` is gone from
+the steer countdown, the snoozed row and an alarm's instants, and nothing jumps on the first tick;
+the two client formatters became that one function. Tests: four in `tests/test_ui_inbox.py`
+(`…is_one_centred_column…`, `…i_mark_that_a_screen_reader_can_hear`, `…words_from_the_server…`,
+`…prints_the_session_name_once`).
+
+**Not built here, and said so in §4.5 screen 6:** the FYI **new** mark, which is compared against
+**the FYI count** — that count is TD-079's (§4.5a *the FYI count*), so the mark lands with it. The
+unpushed row's bare *Details* is TD-081's. The page step's other half, TD-079 step 2's row controls
+in these same templates, follows this PR (agreed with `tdgrind-ao-1`, 2026-09-20: the page is one
+worker's, the host agent the other's). **Live check pending** on `docs/user_attention.md`: how the
+column reads at 1920 is what this round was about, and no unattended session may open the live UI.

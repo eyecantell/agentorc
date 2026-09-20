@@ -55,7 +55,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-079 | The Inbox is a queue: nothing leaves it without an answer, what resolves itself leaves a trail, FYI is counted, and an answer is followed to its outcome | High | Open |
 | TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Partly done |
 | TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Open |
-| TD-082 | The Inbox page needs a second design round: section blurbs always on screen, message text wrapped to a narrow column on a wide window, sections that blend into their rows | Medium | Open |
 | TD-083 | A worker that ends its run on purpose, with work still on the ledger, is neither *finished* nor *exited*: no rule of its manager's fires, and the team sits parked until a person restarts it | Medium | Open |
 | TD-084 | On a node, `ao status` always says its home *is unreachable* — it never asks | Low | Open |
 
@@ -933,23 +932,6 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 **Done when** resuming from the page needs no typing, the resumed session has its old name, *Resume with changes…* reaches the filled-in form, and the unpushed-work row can be answered from the row.
 
 **Related:** design §4.5a (*Focus (exited / closed)*: the exited banner), TD-079 (outcomes; every row needs an answer it can be given), TD-080 (why this particular row was a false alarm), design §4.10 (*Resume carries mail forward*), §9 invariant 12 (names).
-
-## TD-082: The Inbox page needs a second design round
-
-**Priority:** Medium
-**Added:** 2026-09-20 (the anchor session; Paul, from the page at full width — his screenshot, and the anchor's own of the live page)
-**Status:** Open — **designed 2026-09-20, not built**: Paul picked mockup A (one centred column) over B (a grid); the design is §4.5 screen 6 *Layout*, the §4.5a row *Inbox: section heading, the **i** mark*, and the artboard `docs/mockups/Inbox.dc.html` (`gen.py` `inbox()`), which also draws TD-079's *Waiting on them*, the trail and the FYI count and TD-081's *Reopen and push* so the page step has one picture. Finding 4's three: the repeated name is settled here (printed once), the bare *Details* is TD-081's (*Reopen and push*, **Resume**, **Open**), and the `…` countdown is settled here (durations are server-rendered in words; the script only keeps them moving). Build it with TD-079 step 2 (same templates), by `tdgrind-ao-2`. Earlier: Paul's direction; design first (§4.5 screen 6, mockups), and **after** the builds already decided (TD-079's steps) unless one of these is in their way. Paul: *the design review work can wait if it makes more sense to have our ao team catch up on the designs already decided.*
-**Location:** `src/agentorc/ui/templates/inbox.html` (the section heads and their blurbs, the footer paragraph), `inbox_row.html`, `src/agentorc/ui/static/app.css` (`.inboxpage .mailrow .body`: `max-width: 110ch`), `docs/mockups/gen.py`
-
-**Why:** Paul's findings, each confirmed on a 1920-wide screenshot of the live page:
-1. **The blurbs are always on screen.** Each section opens with a paragraph saying what it is (*Needs you*'s runs to two lines at full width) and the page ends with another. They are reference, read once: they belong behind a mouseover or a clickable info mark on the section's title, not above every row for ever.
-2. **The word-wrap is wrong at full width.** A message's text wraps at a fixed measure — well under half of a 1900 px row — while the blurb above it and the controls below it run the full width, so the row reads as a narrow column in an empty box. Either the whole row shares one readable maximum, or the page itself is a centred column.
-3. **Sections blend into their messages.** A section is a bordered box and its rows are unboxed text inside it; with one row it is hard to say where the head ends and the message starts. Paul: *the messages could probably be cards themselves, to be easily selected* — a row as a card (its own surface, a hover and a focus state), sections as plain headings above a list of cards.
-4. **Seen on the same screenshot, for the same round:** a session named `push` shows as `push  push  [plain]  [No team]` (its name, then the tool's own title — a separate value that here is the same word; the row should not print a title that only repeats the name); the state row's one control is a bare *Details* at the far right (TD-081 gives it real answers); the steering row's countdown is filled in by script after load and is `…` until then.
-
-**Done when** a design round (mockups first, then §4.5 screen 6 and the §4.5a rows it touches) has settled the four, and the page is built to it.
-
-**Related:** TD-069 (the Inbox), TD-079 (the queue — its page step and this one touch the same templates: build that first, or fold this into it), TD-081 (the state row's answers), TD-071 (mockups), TD-076 (friendlier titles on the same rows).
 
 ## TD-083: A worker that ends its run on purpose parks its team
 

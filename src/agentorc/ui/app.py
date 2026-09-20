@@ -239,6 +239,25 @@ def vscode_url(directory: str) -> str:
 # -- view model ------------------------------------------------------------------------------------
 
 
+def _instant(iso: Any) -> datetime | None:
+    """An instant off a record, or None for anything this cannot read — the shape check `_age` and
+    `_left` share (review of PR #281).
+
+    A well-formed ISO string **with no offset** parses fine and comes back *naive*, and subtracting
+    a naive instant from an aware one raises `TypeError`, which no caller was catching: one record
+    written by another build, or repaired by hand, would have taken down the page rather than cost
+    its row a line. Today's writers always stamp `Z` (`sessionorc.models.now_iso`), so this is the
+    `_age` rule kept rather than a bug anyone has seen — and a naive stamp is read as UTC, which is
+    what every stamp in the store means."""
+    if not isinstance(iso, str) or not iso:
+        return None
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+
+
 def _age(iso: str | None, now: datetime) -> str:
     """An instant off a record as *2h 5m*, or "" for anything this cannot read.
 
@@ -247,11 +266,8 @@ def _age(iso: str | None, now: datetime) -> str:
     record's timestamps are written by the agent and are well-formed, but a state file that a
     different build, a bug or a hand repair left holding a number or a dict must cost its card a
     line and nothing more, so the shape is checked rather than trusted (review of PR #203)."""
-    if not isinstance(iso, str) or not iso:
-        return ""
-    try:
-        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
-    except ValueError:
+    dt = _instant(iso)
+    if dt is None:
         return ""
     secs = max(0, int((now - dt).total_seconds()))
     if secs < 60:
@@ -261,6 +277,37 @@ def _age(iso: str | None, now: datetime) -> str:
     if secs < 86400:
         return f"{secs // 3600}h {(secs % 3600) // 60}m"
     return f"{secs // 86400}d"
+
+
+def _left(iso: str | None, now: datetime) -> str:
+    """A deadline off an entry as *3m 05s* or *1h 5m*, "" for a deadline already past or for
+    anything this cannot read — `_age`'s rule, pointed the other way (design §4.5 screen 6
+    *Layout*, TD-082).
+
+    **Times never draw as a placeholder.** A time left is a duration and needs no time zone, so it
+    is rendered here, in exactly the words `fmtLeft` in `app.js` uses, and the script only keeps it
+    moving: a screenshot, a slow phone and a script error all show the number rather than `…`, and
+    nothing on the row jumps when the first tick lands. Same defensiveness as `_age`: a malformed
+    instant costs its row a line, never the page."""
+    dt = _instant(iso)
+    if dt is None:
+        return ""
+    secs = int((dt - now).total_seconds())
+    if secs <= 0:
+        return ""
+    if secs < 3600:
+        return f"{secs // 60}m {secs % 60:02d}s"
+    if secs < 86400:
+        return f"{secs // 3600}h {(secs % 3600) // 60}m"
+    return f"{secs // 86400}d"
+
+
+def _countdown(iso: str | None, now: datetime) -> str:
+    """The permission row's countdown, in `app.js`'s own words (§4.5a **Inbox row: state**)."""
+    if not iso:
+        return ""
+    left = _left(iso, now)
+    return f"via hook · {left} left" if left else "via hook · falling through to the terminal"
 
 
 def stop_fields(until: str, unattended: bool) -> dict[str, str]:
@@ -350,12 +397,23 @@ def alarm_view(raw: Any) -> list[dict[str, Any]]:
     if not isinstance(raw, list):
         return []
     out = []
+    now = datetime.now(UTC)  # one instant for the whole render, as every other call site takes one
     for a in raw:
         if not isinstance(a, dict):
             continue
         at = a.get("at") if isinstance(a.get("at"), str) else ""
         last = a.get("last") if isinstance(a.get("last"), str) else ""
-        out.append({"words": alarm_words(a), "at": at, "last": last or at, "count": _count(a.get("count"))})
+        # §4.5 screen 6 *Layout* (TD-082): every time on the page is in words from here. These two
+        # are instants, so the row upgrades them to the browser's own clock once its script runs —
+        # but a page that never runs it, or a screenshot of one, still reads *2h 5m ago*, not `…`.
+        out.append({
+            "words": alarm_words(a),
+            "at": at,
+            "last": last or at,
+            "at_words": f"{_age(at, now)} ago" if _age(at, now) else "",
+            "last_words": f"{_age(last or at, now)} ago" if _age(last or at, now) else "",
+            "count": _count(a.get("count")),
+        })  # fmt: skip
     return out
 
 
@@ -741,6 +799,7 @@ def state_rows(
     to keep a person's *not now* (the gap is written up in TD-069 step 2's entry). It leaves the
     list the moment the state does, which is the next poll."""
     rows: list[dict[str, Any]] = []
+    now = datetime.now(UTC)  # one instant for the whole list, as `inbox_sections` takes one
 
     def base(v: dict[str, Any], row: str, text: str, *, extra: str = "") -> dict[str, Any]:
         doing = v.get("doing") or {}
@@ -761,6 +820,9 @@ def state_rows(
             "host": v.get("host") or "",
             "text": text,
             "deadline": v.get("deadline") or "" if row == "permission" else "",
+            # §4.5 screen 6 *Layout* (TD-082): the countdown is rendered in words here, not left as
+            # `…` for the client's first tick. The words are `fmtLeft`'s, so nothing jumps.
+            "left": _countdown(v.get("deadline") if row == "permission" else None, now),
             "at": v.get("since") or "",
             "age": v.get("age") or "",
             "find": _find_text(v.get("name"), v.get("title"), doing.get("text"), text, extra),
@@ -1487,6 +1549,11 @@ def create_app() -> FastAPI:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
             e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
+            # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the
+            # client fills in — `left` for a `steer`'s bound, `until_words` for a snoozed entry,
+            # whose row upgrades to the browser's own clock once the script runs.
+            e["left"] = _left(e.get("bound"), at)
+            e["until_words"] = _left(e.get("snoozed_until"), at)
         return got
 
     def inbox_html(sections: dict[str, Any]) -> dict[str, str]:

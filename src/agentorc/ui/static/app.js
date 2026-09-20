@@ -280,21 +280,29 @@
     if (s < 60) return s + "s"; if (s < 3600) return Math.floor(s / 60) + "m";
     if (s < 86400) return Math.floor(s / 3600) + "h " + Math.floor((s % 3600) / 60) + "m"; return Math.floor(s / 86400) + "d";
   }
+  // A time left, in the very words `_left` in `ui/app.py` renders it into the row (§4.5 screen 6
+  // *Layout*, TD-082): the server draws the number, this only keeps it moving, and because both
+  // spell it the same way nothing on the row jumps when the first tick lands. "" = already past.
+  function fmtLeft(iso) {
+    const s = Math.floor((Date.parse(iso) - Date.now()) / 1000);
+    if (!(s > 0)) return "";
+    if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+    return `${Math.floor(s / 86400)}d`;
+  }
   setInterval(() => {
     $$(".age[data-since]").forEach((el) => (el.textContent = fmtAge(el.dataset.since)));
     $$(".countdown[data-deadline]").forEach((el) => {
       if (!el.dataset.deadline) return;
-      const left = Math.floor((Date.parse(el.dataset.deadline) - Date.now()) / 1000);
-      el.textContent = left > 0 ? `via hook · ${Math.floor(left / 60)}m ${String(left % 60).padStart(2, "0")}s left` : "via hook · falling through to the terminal";
+      const left = fmtLeft(el.dataset.deadline);
+      el.textContent = left ? `via hook · ${left} left` : "via hook · falling through to the terminal";
     });
     // design §4.5a **Inbox row: `steer`**: the time left, ticking here — the lapse itself is the
     // home's, and arrives as a changed entry on the next poll, never from this clock.
     $$(".timeleft[data-deadline]").forEach((el) => {
       if (!el.dataset.deadline) return;
-      const left = Math.floor((Date.parse(el.dataset.deadline) - Date.now()) / 1000);
-      el.textContent = left > 0
-        ? `${left >= 3600 ? Math.floor(left / 3600) + "h " + Math.floor((left % 3600) / 60) + "m" : Math.floor(left / 60) + "m " + String(left % 60).padStart(2, "0") + "s"} left — then it goes with its default`
-        : "the time is up: the sender goes with its default";
+      const left = fmtLeft(el.dataset.deadline);
+      el.textContent = left ? `${left} left — then it goes with its default` : "the time is up: the sender goes with its default";
     });
     showLocalTimes();
   }, 1000);
@@ -539,8 +547,37 @@
     return iso(t);
   }
 
+  // design §4.5a **Inbox: section heading, the i mark** (§4.5 screen 6 *Layout*, TD-082). The mark
+  // is a `<button>`, so Enter and Space press it; the paragraph it holds is in the page always and
+  // merely `hidden`, because it is also the button's `aria-describedby` and a description may
+  // point at a hidden node but never at a missing one. Pressed, it opens **in place** under the
+  // heading, pushing the rows down rather than covering one; which are open is remembered here.
+  // Inside FYI's `<summary>` the press must not also fold the section, which is the stopPropagation.
+  function setupInfoMarks() {
+    $$(".inboxpage .imark").forEach((b) => {
+      const para = document.getElementById(b.dataset.info);
+      if (!para) return;
+      const key = "inboxinfo:" + b.dataset.info;
+      const show = (on) => { para.hidden = !on; b.setAttribute("aria-expanded", on ? "true" : "false"); if (on) para.classList.remove("peek"); };
+      show(store.get(key, false));
+      b.addEventListener("click", (e) => {
+        e.preventDefault(); e.stopPropagation();
+        const on = para.hidden;
+        show(on); store.set(key, on);
+      });
+      // §4.5a: *a tooltip on hover **and keyboard focus***. `title` is the hover one — the UA's,
+      // which is also what a page with no script still has — but no browser shows a `title` to a
+      // keyboard, so focus gets the same words the other way: the very paragraph, floated over the
+      // rows rather than pushing them down, which is what a press does. The same node, so the
+      // tooltip and the description cannot drift apart. `:focus-visible`, so a mouse press — which
+      // focuses too, and opens the paragraph in place — does not also float a copy of it.
+      b.addEventListener("focus", () => { if (para.hidden && b.matches(":focus-visible")) para.classList.add("peek"); });
+      b.addEventListener("blur", () => para.classList.remove("peek"));
+    });
+  }
   AO.inbox = function () {
     const f = $("#ifilter");
+    setupInfoMarks();
     f.value = store.get("inboxfilter", "");
     $("#sec-fyi").open = store.get("inboxfyi", false);  // folded by default, remembered here
     $("#sec-fyi").addEventListener("toggle", () => store.set("inboxfyi", $("#sec-fyi").open));
