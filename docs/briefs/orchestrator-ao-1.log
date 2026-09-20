@@ -579,3 +579,4 @@
 15:40  run 6 round 1 — tdgrind-ao-1: working (started 15:39) → ok; scope = 1 member; no merges since run start; relay: nothing to send (member started after every cadence-changes entry landed, hooks wired via cadence_hooks.sh)
 15:50–16:00 quiet
 16:00  tdgrind-ao-1: TD-065 done → PR #259 cadence check all-pass (review recorded: SHIP · Sonnet · code · 0 findings) → ok. Noted: TD-066 claimed 15:40 still has no result declared while TD-065 was claimed and finished after it — raise at its next idle.
+16:01  tdgrind-ao-1: working, third claim (TD-072) with TD-066 still unresolved → ao msg note m-c288b82a2114 asking it to declare TD-066's result
