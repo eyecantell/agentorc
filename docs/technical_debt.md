@@ -942,7 +942,7 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Priority:** Low
 **Added:** 2026-09-20 (`tdgrind-ao-1`, from a CI failure the anchor saw on the docs-only PR #294, `test (3.12)` on `a825242`)
-**Status:** Partly done — **the test race is fixed (PR #296)**; the word is a design question and is open.
+**Status:** Partly done — **the test race is fixed (PR #297)**; the word is a design question and is open.
 **Location:** `tests/test_attention.py` (`test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows`, `test_a_name_taken_back_by_a_resume_says_resumed`), `src/sessionorc/agent.py` (`_note_attention`, `_trail_append`), design §4.10 *The Inbox is a queue* rule 2
 
 **Why:** CI read `how='resolved'` where the test expects `'forgotten'`. It is not a timing artefact of the assertion — it is the tick doing its job. The `agent` fixture runs a live tick loop at 0.3 s; between the test's `kill` and its `create` a tick sees the record `exited`, whose `attention_kind` is `""`, so **the row ends there** and `_trail_append` writes it with no word to hand: `_attention_how` is empty, `superseded_by` is unset, and the fallback is *resolved*. `_take_name`'s `_attention_gone` then finds the slot already popped and says nothing. Reproduced on demand by putting one tick's worth of sleep in that window: the entry comes out `('…-w', 'question', 'resolved', 'which one?')` against the expected `'forgotten'`, which is the CI line exactly.
