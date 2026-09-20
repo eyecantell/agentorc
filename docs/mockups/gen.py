@@ -83,6 +83,24 @@ CSS = """
   .switch { display: inline-flex; align-items: center; width: 34px; height: 20px; border-radius: 10px; background: #cbd0d6; padding: 2px; box-sizing: border-box; flex-shrink: 0; }
   .switch .knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
   .switch.on { background: #1c2128; justify-content: flex-end; }
+  /* Inbox (design round 2, 2026-09-20, TD-082): a centred column, sections as plain headings, a row as a card */
+  .inboxcol { width: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
+  .isec-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 2px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; position: relative; }
+  .isec-h .n { font-family: "JetBrains Mono", monospace; letter-spacing: 0; color: #374151; }
+  .info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #cbd0d6; background: #fff; color: #4b5563; font-size: 10px; font-weight: 600; text-transform: none; font-style: italic; font-family: Georgia, serif; }
+  .info.on { background: #1c2128; color: #fff; border-color: #1c2128; }
+  .pop { flex: 0 0 100%; box-sizing: border-box; padding: 8px 12px; border-left: 2px solid #1c2128; background: #fff; color: #374151; border-radius: 0 4px 4px 0; font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.5; }
+  .mcard { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 12px 17px; background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
+  .mcard.hover { border-color: #9aa3b0; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .mcard.focus { outline: 2px solid #1f5fa8; outline-offset: 1px; }
+  .mcard .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .mcard .who .nm { font-family: "JetBrains Mono", monospace; font-weight: 600; color: #111418; }
+  .mcard .txt { font-size: 13px; line-height: 1.5; color: #1c2128; }
+  .mcard .ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .kind { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6b7280; }
+  .sugg { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; border: 1px dashed #cbd0d6; border-radius: 4px; }
+  .sugg .lbl { font-size: 11px; color: #6b7280; }
+  .quoted { padding: 6px 10px; border-left: 2px solid #cbd0d6; color: #4b5563; font-size: 12.5px; }
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 """
@@ -120,7 +138,7 @@ def head(title):
 TAIL = "</x-dc>\n</body>\n</html>\n"
 
 def topbar(active="Org", narrow=False):
-    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in ["Org", "Resumable", "Commands", "Attention"])
+    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in ["Org", "Inbox 4 · 2", "Resumable", "Commands", "Attention"])
     return f'''<div class="topbar">
   <span class="wordmark">agent<b>orc</b></span>
   <div style="display: flex; gap: 2px;">{tabs}</div>
@@ -333,7 +351,7 @@ def team_desktop():
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
     grid += group("No team", f"{len(rest)} sessions started on their own", "".join(card(h, r, x) for h, r, x in rest))
     cards = grid
-    return head("Org") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
+    return head("Org") + f'''<div style="width: 1440px; min-height: 1640px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   <div style="display: flex; align-items: center; gap: 10px;">
@@ -820,6 +838,88 @@ def attention():
 </div>
 ''' + TAIL
 
+# ---------------- Inbox (design round 2, 2026-09-20, TD-082 — option A, Paul's pick) ----------------
+INBOX_BLURB = {
+    "Needs you": "Counted — the top bar's first number is exactly this list. A pending permission or question, a limited or stalled session, an exited session with unpushed work, an open ask, a paused steer, an outcome reported blocked. What is on a tool's clock first, then oldest first.",
+    "Steering": "Not counted. Open steers whose clock is running, soonest first, each with the default it will take. Doing nothing is a valid answer: at its bound the session goes with its default.",
+    "Waiting on them": "Not counted — these wait on a session, not on you. Questions you answered whose asker has not yet said what came of it. Dismiss says you do not need to hear back.",
+    "FYI": "The second number, never added to the first. Notes, what resolved itself (the trail), and closed questions, kept for 12 hours. Nothing here has to be acted on; it opens itself when there is something new.",
+}
+
+
+def isec(title, count, extra="", opened=False):
+    pop = f'<div class="pop">{INBOX_BLURB[title]}</div>' if opened else ""
+    mark = '<span style="font-size: 9px;">▾</span>' if title == "FYI" else ""
+    return f'''<div class="isec-h">{mark}<span>{title}</span><span class="n">{count}</span><span class="info{" on" if opened else ""}">i</span><span style="flex-grow: 1;"></span>{extra}{pop}</div>'''
+
+
+def mcard(bar, kind, name, team, age, body, controls, cls="", state=None):
+    badge = f'<span class="badge">{team}</span>' if team else '<span class="badge" style="border-style: dashed;">no team</span>'
+    return f'''<div class="mcard {cls}"><span class="sbar" style="background: {bar};"></span>
+  <div class="who">{pill(*state) if state else f'<span class="kind">{kind}</span>'}<span class="nm">{name}</span>{badge}<span style="flex-grow: 1;"></span><span class="meta">{age}</span></div>
+  {body}
+  <div class="ctl">{controls}</div>
+</div>'''
+
+
+def inbox():
+    b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
+    gap = '<span style="flex-grow: 1;"></span>'
+    needs = [
+        mcard(BAR["needs"], "", "tdgrind-ao-2", "ao-grind", "asked 40s ago · 4m 20s left",
+              '<div class="txt">Permission · <span class="mono">Bash</span> · <span class="mono">git push origin td073-usage-chips</span></div><div class="meta">doing 3m ago: TD-073: usage chips side by side — pushing for review</div>',
+              b("Allow", "primary") + b("Deny") + gap + b(ICON["focus"] + "Open", "ghost"), cls="hover", state=("needs", "permission")),
+        mcard(BAR["needs"], "ask", "tdgrind-ao-1", "ao-grind", "18m ago · about TD-079",
+              '<div class="txt">The trail coalesces by <span class="mono">{sid, kind, how}</span>. A permission answered from Focus and one answered from the Inbox within five seconds are two <i>hows</i> — two trail rows, or one? The design text supports either reading; going on with the wrong one means a migration later.</div>'
+              '<div class="sugg"><span class="lbl">suggested by tdgrind-ao-1</span>' + b("“Two rows — the how is the point”") + b("“One row, the later how wins”") + '</div>',
+              b("Reply", "primary") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost"), cls="focus"),
+        mcard(BAR["exited"], "", "push", "", "exited 2h ago",
+              '<div class="txt">Exited with unpushed work — <b>2 commits only on this machine</b>, measured against <span class="mono">origin/td068-prompt-refused</span>.</div><div class="meta">Ready to close: tree clean ✓ · pushed ✗ · PR none</div>',
+              b(ICON["resume"] + "Reopen and push", "primary") + b("Resume") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), state=("exited", "exited")),
+        mcard(BAR["stalled"], "outcome · blocked", "lead-cm-1", "cm-grind", "reported 6m ago",
+              '<div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>',
+              b("Reply", "primary") + b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
+    ]
+    steering = [
+        mcard(BAR["working"], "steer", "orchestrator-ao-1", "ao-grind", "9m ago · <b>21m left</b>",
+              '<div class="txt">tdgrind-ao-1 has ended its run with the ledger still holding work. Restart it with fresh context, or stop the team for the night?</div><div class="meta">will go with: <b style="color: #374151;">Restart it once</b> — doing nothing is a valid answer</div>'
+              '<div class="sugg"><span class="lbl">suggested by orchestrator-ao-1</span>' + b("“Restart it once” · default") + b("“Stop the team”") + '</div>',
+              b("Reply") + b("Go with it", "primary") + b("Pause") + gap + b(ICON["focus"] + "Open", "ghost")),
+    ]
+    waiting = [
+        mcard("#cbd0d6", "answered · waiting for the outcome", "tdgrind-ao-1", "ao-grind", "answered 52m ago",
+              '<div class="quoted">You answered “Rebase, do not merge main in” to: <i>#269 conflicts with main since #267 — rebase or merge?</i></div><div class="meta">doing 4m ago: TD-079 1b: rebased, re-running the suite before the review</div>',
+              b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
+    ]
+    fyi = [
+        mcard("#cbd0d6", "trail · new", "tdgrind-ao-2", "ao-grind", "12m ago",
+              '<div class="txt muted">A permission (<span class="mono">Bash · pdm run test</span>) was <b style="color: #374151;">allowed from Focus</b>.</div>', b("Dismiss", "ghost")),
+        mcard("#cbd0d6", "note · new", "tdgrind-ao-1", "ao-grind", "31m ago",
+              '<div class="txt">done: TD-068 — PR #272 merged</div>', b("Dismiss", "ghost")),
+    ]
+    filters = '<div class="input" style="width: 260px; height: 28px; color: #6b7280;">filter — sender, text, about</div><span class="btn ghost">team: all ▾</span>'
+    fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
+    return head("Inbox") + f'''<div style="width: 1440px; min-height: 1640px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Inbox 4 · 2")}
+<div style="padding: 16px 20px 28px;">
+<div class="inboxcol">
+  {page_head("Inbox", "4 need you · 2 new in FYI", filters)}
+  {isec("Needs you", 4, opened=True)}
+  {"".join(needs)}
+  {isec("Steering", 1)}
+  {"".join(steering)}
+  {isec("Waiting on them", 1)}
+  {"".join(waiting)}
+  {isec("FYI", "2 new · 14", fyi_extra)}
+  {"".join(fyi)}
+  <div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>One centred column</b> (1100 px at most) on a wide window — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb — a tooltip on hover and focus, and pressed it opens in place under the heading, pushing the rows down rather than covering one (drawn open on <i>Needs you</i>); the browser remembers which are open. <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second), and its text runs the card’s width. The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. A session’s name is printed once — the tool’s title is left out when it only repeats it. Suggested answers stay in their own dashed group, in quotation marks.</div>
+</div>
+</div>
+</div>
+''' + TAIL
+
+
 DARK = [
  ("background: #f4f5f7; color: #1c2128;", "background: #0e1116; color: #d7dce3;"),
  ("#f4f5f7", "#0e1116"), ("background: #fff;", "background: #171b22;"), ("#dfe3e8", "#2a313b"), ("#eceef1", "#242a33"),
@@ -848,6 +948,7 @@ files = {
     "Resumable.dc.html": resumable(),
     "Commands.dc.html": commands(),
     "Attention.dc.html": attention(),
+    "Inbox.dc.html": inbox(),
 }
 for n, s in files.items():
     (OUT / n).write_text(s)
@@ -859,6 +960,7 @@ for n, s in files.items():
 LAYOUT = [
     # (file, title, column)
     ("Main.dc.html", "Org — desktop", 0),
+    ("Inbox.dc.html", "Inbox", 0),
     ("Focus.dc.html", "Focus — member", 0),
     ("FocusOrc.dc.html", "Focus — orchestrator", 0),
     ("Legend.dc.html", "States & badges", 0),

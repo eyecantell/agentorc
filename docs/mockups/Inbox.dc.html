@@ -106,93 +106,64 @@
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 1440px; min-height: 1280px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 1440px; min-height: 1640px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
   <span class="wordmark">agent<b>orc</b></span>
-  <div style="display: flex; gap: 2px;"><span class="tab on">Org</span><span class="tab">Inbox 4 · 2</span><span class="tab">Resumable</span><span class="tab">Commands</span><span class="tab">Attention</span></div>
+  <div style="display: flex; gap: 2px;"><span class="tab">Org</span><span class="tab on">Inbox 4 · 2</span><span class="tab">Resumable</span><span class="tab">Commands</span><span class="tab">Attention</span></div>
   <div style="flex-grow: 1;"></div>
   <span class="mono" style="font-size: 11px; color: #aab3bf;">usage 5h 41% · wk 58%</span><span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>
   <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Shell</span><span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
 </div>
-<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
-  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <a href="#" class="muted">← Org</a>
-      <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
-      <span class="pill s-needs"><span class="dot"></span>needs you</span><span class="badge toggle on" title="click: switch to interactive">unattended</span>
-      <span class="badge">samscrape-grind</span><span class="badge">grinder</span>
-      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: none</span>
-      <span class="badge" title="the sessions that may act on this one; + adds one">under orc-1 ×  +</span>
-      <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
-      <span style="flex-grow: 1;"></span>
-      <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="btn">Wrap up</span><span class="btn danger"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"></path></svg>Kill</span>
-    </div>
-    <div class="term" style="height: 560px;"><span class="d">● tdgrind-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/tdgrind-1</span>
-
-<span class="p">&gt;</span> Pick up TD-301 per the brief; branch td301-fix.
-
-<span class="d">⏺</span> Read(docs/technical_debt.md)
-<span class="d">⏺</span> Bash(pdm run test tests/test_scripts/test_recover_stuck_notices.py)
-  <span class="g">412 passed in 38.2s</span>
-<span class="d">⏺</span> Edit(scripts/recover_stuck_notices.py)
-
-<span class="d">⏺</span> Bash(git push -u origin td301-fix)
-<span class="q">  ⏳ waiting for permission (agentorc hook · answer above, or the terminal dialog appears in 9m 12s)</span>
-<span class="d">▌</span></div>
-    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-      <div class="input" style="height: 64px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt… multi-line, paste-friendly. Drop files or paste a screenshot here; the terminal above takes keys directly for menus and questions.</div>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</span>
-        <span class="badge">~/.agentorc/attachments/tdgrind-1/spec.pdf</span><span class="badge">screenshot-1402.png</span>
-        <span style="flex-grow: 1;"></span>
-        <span class="btn primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8h10M8.5 3.5L13 8l-4.5 4.5"></path></svg>Send</span>
-      </div>
-    </div>
+<div style="padding: 16px 20px 28px;">
+<div class="inboxcol">
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <span style="font-size: 16px; font-weight: 600;">Inbox</span>
+    <span class="muted">4 need you · 2 new in FYI</span>
+    <span style="flex-grow: 1;"></span><div class="input" style="width: 260px; height: 28px; color: #6b7280;">filter — sender, text, about</div><span class="btn ghost">team: all ▾</span>
   </div>
-  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
-    <div class="card" style="padding: 12px;">
-      <div style="font-weight: 600; margin-bottom: 8px;">Session</div>
-      <dl class="kv" style="margin: 0;">
-        <dt>profile</dt><dd class="mono" style="font-size: 11px;">claude-code · grind (pro) · sonnet</dd>
-        <dt>adapter id</dt><dd class="mono" style="font-size: 11px;">1c8e0b2f…f42a</dd>
-        <dt>tmux</dt><dd class="mono">ao-samscrape-tdgrind-1</dd>
-        <dt>started</dt><dd>2026-09-04 20:02 MDT · 3h 14m</dd>
-        <dt>last output</dt><dd>14 s ago</dd>
-        <dt>policy</dt><dd>window 20:00–06:00 · gate 70/70</dd>
-        <dt>run log</dt><dd><a href="#">tdgrind-1-20260904.log</a> · 1.2 MB</dd>
-      </dl>
-    </div>
-    <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><span style="font-weight: 600;">Git</span><span class="mono muted" style="font-size: 11px;">td301-fix · 2 ahead of origin/main</span></div>
-      <div class="mono" style="font-size: 11px; line-height: 1.7;">
-        <div><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>
-        <div><span style="color: #065f46;">M</span> tests/test_scripts/test_recover_stuck_notices.py</div>
-        <div><span style="color: #1f5fa8;">A</span> docs/claude-memory/project_td301.md</div>
-      </div>
-      <div style="display: flex; gap: 6px; margin-top: 10px;"><span class="btn" style="height: 24px; font-size: 11px;">diff</span><span class="btn" style="height: 24px; font-size: 11px;">log</span><span class="btn" style="height: 24px; font-size: 11px;">PRs</span></div>
-    </div>
-    <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">1/3 done · 2 filed</span></div>
-      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-301</span><span class="pill s-working">claimed</span><a href="#">#811</a><span class="meta">20:04</span><span style="flex-grow: 1;"></span><span class="badge">declared</span><span class="btn sm ghost">Drop</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-299</span><span class="pill s-done">done</span><a href="#">#809</a><span class="meta">18:40</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-288</span><span class="pill s-idle">dropped</span><span class="meta">held by tdgrind-3</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
-        <div style="border-top: 1px solid #eceef1; padding-top: 6px; display: flex; align-items: center; gap: 6px;"><span class="mono">TD-402</span><span class="badge">filed · medium</span><span class="meta">19:12</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-403</span><span class="badge">filed · low</span><span class="meta">19:48</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
-      </div>
-      <div class="note" style="margin-top: 8px;">Both channels, as the session declared them or the agent derived them from the branch and its PRs (dashed). <b>Drop</b> records the person's decision as a declaration, so the next tick cannot put the claim back.</div>
-    </div>
-    <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm" style="opacity: .5;">Close</span></div>
-      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
-        <div><span style="color: #065f46;">✓</span> tree clean</div>
-        <div><span style="color: #991b1b;">✗</span> branch pushed</div>
-        <div><span style="color: #991b1b;">✗</span> PR merged</div>
-        <div><span style="color: #065f46;">✓</span> no subagents running</div>
-        <div><span style="color: #991b1b;">✗</span> ledger / attention board updated</div>
-      </div>
-    </div>
-  </div>
+  <div class="isec-h"><span>Needs you</span><span class="n">4</span><span class="info on">i</span><span style="flex-grow: 1;"></span><div class="pop">Counted — the top bar's first number is exactly this list. A pending permission or question, a limited or stalled session, an exited session with unpushed work, an open ask, a paused steer, an outcome reported blocked. What is on a tool's clock first, then oldest first.</div></div>
+  <div class="mcard hover"><span class="sbar" style="background: #f59e0b;"></span>
+  <div class="who"><span class="pill s-needs"><span class="dot"></span>permission</span><span class="nm">tdgrind-ao-2</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">asked 40s ago · 4m 20s left</span></div>
+  <div class="txt">Permission · <span class="mono">Bash</span> · <span class="mono">git push origin td073-usage-chips</span></div><div class="meta">doing 3m ago: TD-073: usage chips side by side — pushing for review</div>
+  <div class="ctl"><span class="btn sm primary">Allow</span><span class="btn sm ">Deny</span><span style="flex-grow: 1;"></span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
+</div><div class="mcard focus"><span class="sbar" style="background: #f59e0b;"></span>
+  <div class="who"><span class="kind">ask</span><span class="nm">tdgrind-ao-1</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">18m ago · about TD-079</span></div>
+  <div class="txt">The trail coalesces by <span class="mono">{sid, kind, how}</span>. A permission answered from Focus and one answered from the Inbox within five seconds are two <i>hows</i> — two trail rows, or one? The design text supports either reading; going on with the wrong one means a migration later.</div><div class="sugg"><span class="lbl">suggested by tdgrind-ao-1</span><span class="btn sm ">“Two rows — the how is the point”</span><span class="btn sm ">“One row, the later how wins”</span></div>
+  <div class="ctl"><span class="btn sm primary">Reply</span><span class="btn sm ">Snooze ▾</span><span style="flex-grow: 1;"></span><span class="btn sm ghost danger">Delete</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
+</div><div class="mcard "><span class="sbar" style="background: #9ca3af;"></span>
+  <div class="who"><span class="pill s-exited"><span class="dot"></span>exited</span><span class="nm">push</span><span class="badge" style="border-style: dashed;">no team</span><span style="flex-grow: 1;"></span><span class="meta">exited 2h ago</span></div>
+  <div class="txt">Exited with unpushed work — <b>2 commits only on this machine</b>, measured against <span class="mono">origin/td068-prompt-refused</span>.</div><div class="meta">Ready to close: tree clean ✓ · pushed ✗ · PR none</div>
+  <div class="ctl"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8a5 5 0 019-3M13 8a5 5 0 01-9 3"></path><path d="M12 2v3H9M4 14v-3h3"></path></svg>Reopen and push</span><span class="btn sm ">Resume</span><span class="btn sm ">Snooze ▾</span><span style="flex-grow: 1;"></span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
+</div><div class="mcard "><span class="sbar" style="background: #dc2626;"></span>
+  <div class="who"><span class="kind">outcome · blocked</span><span class="nm">lead-cm-1</span><span class="badge">cm-grind</span><span style="flex-grow: 1;"></span><span class="meta">reported 6m ago</span></div>
+  <div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>
+  <div class="ctl"><span class="btn sm primary">Reply</span><span class="btn sm ">Dismiss</span><span style="flex-grow: 1;"></span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
+</div>
+  <div class="isec-h"><span>Steering</span><span class="n">1</span><span class="info">i</span><span style="flex-grow: 1;"></span></div>
+  <div class="mcard "><span class="sbar" style="background: #2563eb;"></span>
+  <div class="who"><span class="kind">steer</span><span class="nm">orchestrator-ao-1</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">9m ago · <b>21m left</b></span></div>
+  <div class="txt">tdgrind-ao-1 has ended its run with the ledger still holding work. Restart it with fresh context, or stop the team for the night?</div><div class="meta">will go with: <b style="color: #374151;">Restart it once</b> — doing nothing is a valid answer</div><div class="sugg"><span class="lbl">suggested by orchestrator-ao-1</span><span class="btn sm ">“Restart it once” · default</span><span class="btn sm ">“Stop the team”</span></div>
+  <div class="ctl"><span class="btn sm ">Reply</span><span class="btn sm primary">Go with it</span><span class="btn sm ">Pause</span><span style="flex-grow: 1;"></span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
+</div>
+  <div class="isec-h"><span>Waiting on them</span><span class="n">1</span><span class="info">i</span><span style="flex-grow: 1;"></span></div>
+  <div class="mcard "><span class="sbar" style="background: #cbd0d6;"></span>
+  <div class="who"><span class="kind">answered · waiting for the outcome</span><span class="nm">tdgrind-ao-1</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">answered 52m ago</span></div>
+  <div class="quoted">You answered “Rebase, do not merge main in” to: <i>#269 conflicts with main since #267 — rebase or merge?</i></div><div class="meta">doing 4m ago: TD-079 1b: rebased, re-running the suite before the review</div>
+  <div class="ctl"><span class="btn sm ">Dismiss</span><span style="flex-grow: 1;"></span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
+</div>
+  <div class="isec-h"><span style="font-size: 9px;">▾</span><span>FYI</span><span class="n">2 new · 14</span><span class="info">i</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span></div>
+  <div class="mcard "><span class="sbar" style="background: #cbd0d6;"></span>
+  <div class="who"><span class="kind">trail · new</span><span class="nm">tdgrind-ao-2</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">12m ago</span></div>
+  <div class="txt muted">A permission (<span class="mono">Bash · pdm run test</span>) was <b style="color: #374151;">allowed from Focus</b>.</div>
+  <div class="ctl"><span class="btn sm ghost">Dismiss</span></div>
+</div><div class="mcard "><span class="sbar" style="background: #cbd0d6;"></span>
+  <div class="who"><span class="kind">note · new</span><span class="nm">tdgrind-ao-1</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">31m ago</span></div>
+  <div class="txt">done: TD-068 — PR #272 merged</div>
+  <div class="ctl"><span class="btn sm ghost">Dismiss</span></div>
+</div>
+  <div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>One centred column</b> (1100 px at most) on a wide window — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb — a tooltip on hover and focus, and pressed it opens in place under the heading, pushing the rows down rather than covering one (drawn open on <i>Needs you</i>); the browser remembers which are open. <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second), and its text runs the card’s width. The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. A session’s name is printed once — the tool’s title is left out when it only repeats it. Suggested answers stay in their own dashed group, in quotation marks.</div>
+</div>
 </div>
 </div>
 </x-dc>
