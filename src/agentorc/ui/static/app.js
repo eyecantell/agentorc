@@ -545,10 +545,15 @@
     if (down) {
       // the banner the page renders at load, turned on and off by the poll: a host agent that goes
       // away under an open page must not leave its rows looking current (design §4.5)
-      down.hidden = !(got && got.agent_down);
+      // `.hidden` the class, never the attribute: `.warn` sets `display`, which beats the UA's
+      // `[hidden]` rule — the trap `.badge[hidden]` is commented for in app.css, and the Org's own
+      // banner avoids the same way (review of PR #271)
+      down.classList.toggle("hidden", !(got && got.agent_down));
       if (got && got.agent_down && got.why) $("#agentdownwhy").textContent = got.why;
     }
-    if (!got || !got.html) return;
+    // …and nothing else changes while it is down: an empty `html` would blank every section and a
+    // `needs` of 0 would claim nothing is waiting, which is precisely what is not known (§4.5)
+    if (!got || got.agent_down || !got.html) return;
     IN_SECS.forEach((k) => {
       const el = $("#rows-" + k);
       if (AO.maySwapSection(el, document.activeElement)) el.innerHTML = got.html[k] || "";

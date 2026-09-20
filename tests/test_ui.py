@@ -278,6 +278,14 @@ def test_the_inbox_poll_says_the_agent_is_down_instead_of_a_bare_503(tmp_path, m
 
         js = (pathlib.Path(ui.__file__).parent / "static" / "app.js").read_text()
         assert "agentdown" in js and "got.needs !== null" in js
+        # …and the two things the review of PR #271 caught: the banner is hidden by the **class**,
+        # because `.warn` sets `display` and beats the UA's `[hidden]` rule (the trap `.badge[hidden]`
+        # is commented for in app.css); and an agent that is down blanks no rows and claims no count
+        tpl = (pathlib.Path(ui.__file__).parent / "templates" / "inbox.html").read_text()
+        assert 'class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown"' in tpl
+        assert 'class="warn" id="agentdown"' in page  # this run's agent *is* down: shown
+        assert 'classList.toggle("hidden", !(got && got.agent_down))' in js
+        assert "if (!got || got.agent_down || !got.html) return;" in js
 
 
 def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
