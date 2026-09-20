@@ -229,7 +229,7 @@ class HostAgent:
         self._id_listed_at = 0.0
         self._id_list_lock = asyncio.Lock()
         self._id_detached: str | None = None
-        self._id_tmux_pid: int | None = None  # the server the answer above was computed against
+        self._id_tmux: tuple[int, int] | None = None  # (pid, start time): the server the answer is about
         self._id_rechecked = 0.0  # monotonic; the check is re-read on a cadence, not per connection
         # The home's own alarms **persist** (TD-077 step 2): a forgery aimed at no record — a claim
         # from outside every pane — is evidence, and evidence that dies with the process is a page
@@ -3623,7 +3623,7 @@ class HostAgent:
         """Compute the detached-process check against the tmux server now running. `None` while
         there is no server, which is *not yet known* rather than *off*: the next connection asks
         again."""
-        self._id_tmux_pid, self._id_rechecked = tmux_pid, time.monotonic()
+        self._id_tmux, self._id_rechecked = self._id_server(tmux_pid), time.monotonic()
         if not tmux_pid:
             self._id_detached = None
             return
@@ -3645,10 +3645,19 @@ class HostAgent:
         if time.monotonic() - self._id_rechecked < ID_RECHECK:
             return
         pid = await asyncio.to_thread(self.tmux.server_pid)
-        if pid == self._id_tmux_pid and self._id_detached is not None:
+        if self._id_server(pid) == self._id_tmux and self._id_detached is not None:
             self._id_rechecked = time.monotonic()
             return
         await self._id_read_detached(pid)
+
+    def _id_server(self, pid: int | None) -> tuple[int, int] | None:
+        """A server's name for life: its pid **and its start time**. A pid alone would read a
+        replacement that landed on the same pid inside one `ID_RECHECK` window as the same server
+        — the identity.py walk pairs the two for exactly this reason (review of PR #265)."""
+        if not pid:
+            return None
+        st = self.proc.stat(pid)
+        return (pid, st.start if st else 0)
 
     async def _id_channel(self, peer: int) -> identity.Channel:
         """Classify one connection's peer. A peer that matches no pane we know may belong to one the

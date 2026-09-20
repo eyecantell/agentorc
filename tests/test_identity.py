@@ -305,6 +305,7 @@ async def test_the_detached_check_follows_the_tmux_server_it_is_about(agent, mon
     describing a process that no longer existed until the agent restarted. The tick re-reads the
     server's pid on its own cadence; only a pid that moved costs the check itself."""
     import sessionorc.agent as agent_mod
+    from sessionorc import identity
 
     pid, checks = 50, []
 
@@ -324,6 +325,16 @@ async def test_the_detached_check_follows_the_tmux_server_it_is_about(agent, mon
     pid = 51  # the server was replaced under the running agent
     await agent._id_recheck_detached()
     assert checks == [50, 51] and agent._id_detached == "", "off: the new server is judged on its own cgroup"
+
+    # a replacement that lands on the same pid is still a different server: the start time is
+    # read with it, as the ancestry walk pairs the two (review of PR #265)
+    pid, started = 50, 4242
+    monkeypatch.setattr(agent.proc, "stat", lambda p: identity.Proc(pid=p, ppid=1, sid=p, tty_nr=0, start=started))
+    await agent._id_recheck_detached()
+    assert checks == [50, 51, 50] and agent._id_detached  # on again: this is pid 50's cgroup
+    started = 9999  # the same pid, a server that started later
+    await agent._id_recheck_detached()
+    assert checks == [50, 51, 50, 50], "a reused pid is not taken for the server it replaced"
 
     pid = None  # and no server at all is *not yet known*, so the next connection asks again
     await agent._id_recheck_detached()
