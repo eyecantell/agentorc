@@ -1401,11 +1401,18 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     from agentorc.ui.app import templates, view
 
     css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
-    head = next(ln for ln in css.splitlines() if ln.startswith(".focus #fhead {"))
-    assert "flex-wrap: wrap" in head
-    keep = next(ln for ln in css.splitlines() if ln.startswith(".focus #fhead > .title,"))
+
+    def rule(prefix):
+        """The CSS rule beginning `prefix`, as an assertion rather than a `StopIteration` — a
+        reformat or a rename should say *which* rule went, not raise from inside a generator."""
+        found = [ln for ln in css.splitlines() if ln.startswith(prefix)]
+        assert len(found) == 1, f"expected exactly one rule starting {prefix!r}, found {len(found)}"
+        return found[0]
+
+    assert "flex-wrap: wrap" in rule(".focus #fhead {")
+    keep = rule(".focus #fhead > .title,")
     assert "#fstate" in keep and "flex: 0 0 auto" in keep  # the name and the state: never shrunk
-    give = next(ln for ln in css.splitlines() if ln.startswith(".focus #fhead > .tool-title,"))
+    give = rule(".focus #fhead > .tool-title,")
     assert "flex: 0 1 auto" in give and "text-overflow: ellipsis" in give  # these give way instead
 
     # …and every one of the things that crowded it is still in the row it now wraps

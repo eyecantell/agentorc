@@ -733,8 +733,11 @@ line, both of which keep the whole of it on hover). A test pins all three rules 
 every one of the things that crowded the row is still in it.
 
 **Found because the line never fitted:** the Focus header's `doing` line read *rebasing #269 ·
-says · 10m ago*, where the card and the Inbox row both write *· says 10m ago*. Fixed in the same
-PR, with the shape pinned by the same test.
+says · 10m ago* — a stray dot, from a template that nobody had been able to read. It now matches
+the Inbox row's `doing_line`, which writes *<text> · says 10m ago* on one line. (The **card** is a
+third shape and deliberately so: it puts the text in its own block and *says · 10m ago* on the line
+under it, because a card's slot is a column. Only the two one-line forms had to agree.) Fixed in
+the same PR, with the shape pinned by the same test.
 
 **Left to a person, on `docs/user_attention.md`:** the browser at 1440 and at 1280 that this entry
 rightly calls the first step. No unattended session may open the live UI, and the artboard is not
