@@ -1960,8 +1960,9 @@ shown — a mark on the card, and a row under *Needs you* in the Inbox (§4.5 sc
 is either a bug of ours or a session misbehaving and a person should know which — and it wakes
 nobody and blocks nothing by itself. **Built 2026-09-19 (step 2)**: the card's mark is a `<span>`
 in a token colour of its own, never pressable and never the amber needs-you ring, carrying the
-newest alarm in words on hover; the Inbox row lists them all and offers **Acknowledge** — to be
-renamed **Dismiss**, *An alarm's answers* below — (§4.5a
+newest alarm in words on hover; the Inbox row lists them all and offers **Dismiss** (built as
+*Acknowledge* on 2026-09-19 and renamed 2026-09-20, the wire name kept — *An alarm's answers*
+below) (§4.5a
 **Inbox row: identity alarm**), which clears that list — a person's own act, the `identity_ack`
 RPC, refused to every session and **not** a never-gated read, since a session that could clear the
 list could erase the evidence of its own forgery; the log keeps every alarm either way. **That refusal is only as strong as the host's mode**: under `observe` or `off` a session that leaves its `caller` out *is* the person to this RPC, as to `inbox_delete` and every other person-only act, so an acknowledged list means what it says only on a host that enforces — one more reason the page says when a host does not, and the log, which no RPC clears, is the record. **The
@@ -2913,7 +2914,7 @@ state alike:
 1. **Nothing leaves without an answer.** Reading, opening, focusing, following a row's link: none
    of them changes a row. A row leaves *Needs you*, *Steering* or FYI only by one of its own
    controls (§4.5a) — Reply, a suggested answer, *Go with it*, Pause, Snooze, Delete, Dismiss,
-   Log TD, Allow / Deny (an identity alarm's *Acknowledge* is a Dismiss, and is being renamed one: §4.8a *An alarm's answers*) — or by **resolving**, below; a question that closes by a road that is
+   Log TD, Allow / Deny (an identity alarm's *Acknowledge* was a Dismiss under another name, and is one since 2026-09-20 — its wire name `identity_ack` unchanged, because a wire name is not a control: §4.8a *An alarm's answers*, §4.5a's row) — or by **resolving**, below; a question that closes by a road that is
    not the person's — `asker_gone`, a session-to-session `expired` — already says so where it lands
    (*One way of being closed*, above), which is the same thing for mail. What retention prunes is a
    *trail*, never an item: an entry that was already answered or already resolved.

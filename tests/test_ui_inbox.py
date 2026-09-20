@@ -681,6 +681,10 @@ def test_the_card_marks_a_record_with_identity_alarms_and_the_mark_is_not_a_cont
     assert '<span class="badge alarmmark"' in html and "<button" not in html.split("alarmmark")[1].split(">")[0]
     assert "session ao-x claimed to be ao-y on msg ×3" in html
     assert 'data-act="identity_ack"' not in html  # the control lives on the Inbox row, not here
+    # …and the mark's hover names no control by a name the row no longer uses: the card and the
+    # row are the two places a person reads about an alarm, and a rename that reached one and not
+    # the other would send them looking for a button that is not there (review of PR #298)
+    assert "Acknowledge" not in html and "what can be done about it" in html
 
     junk = view(rec("ao-x", "idle", identity_alarms=["not a dict", None, {"claimed": "ao-y"}, ALARM]))
     assert len(junk["alarms"]) == 2 and "ao-y" in junk["alarm_note"]
