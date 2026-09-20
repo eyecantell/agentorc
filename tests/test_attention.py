@@ -280,3 +280,39 @@ async def test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows(agen
         await agent.tick()
         assert (await person.call("inbox"))["trail"] == got  # nothing fabricated on the new record
         await person.call("kill", id=sid)
+
+
+async def test_a_name_taken_back_by_a_resume_says_resumed(agent, hookstub, tmp_path):
+    """The other half of the one above: when the create that takes the name also **resumes the
+    conversation that held it** (TD-081 step 1), the record did not go — the person opened it — so
+    its row's ending is *resumed*, not the *forgotten* of a record replaced by a new conversation
+    of its name. Same id, one card, and the trail says which road the row left by (§4.10 rule 2)."""
+    async with LocalClient() as person, LocalClient() as feeder:
+        sid = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
+        await feeder.call("hook", session=sid, adapter_id="conv-81", state="needs-you", pending={"kind": "question"})
+        await wait_state(person, sid, "needs-you")
+        await agent.tick()
+        agent._attention[f"{sid}|state"] = ("question", "2026-09-20T00:00:00Z", "which one?")
+        await person.call("kill", id=sid)
+        await wait_state(person, sid, "exited")
+        again = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, resume="conv-81"))[
+            "id"
+        ]
+        assert again == sid
+        got = (await person.call("inbox"))["trail"]
+        assert [(e["sid"], e["kind"], e["how"]) for e in got] == [(sid, "question", "resumed")]
+        # and the word is spent on that ending alone: the **live** record keeps the id, and its
+        # next row must not wear *resumed* with nothing resumed (review of PR #282)
+        await feeder.call("hook", session=sid, state="needs-you", pending={"kind": "question"})
+        await wait_state(person, sid, "needs-you")
+        await agent.tick()
+        agent._attention[f"{sid}|state"] = ("question", "2026-09-20T00:00:00Z", "and now?")
+        await feeder.call("hook", session=sid, state="idle")
+        await wait_state(person, sid, "idle")
+        await agent.tick()
+        assert [(e["kind"], e["how"], e["text"]) for e in (await person.call("inbox"))["trail"]][0] == (
+            "question",
+            "resolved",
+            "and now?",
+        )
+        await person.call("kill", id=sid)

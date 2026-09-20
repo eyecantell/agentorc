@@ -1183,6 +1183,10 @@ class HostAgent:
                 raise RpcError(str(e).strip('"')) from None
             if argv:
                 spec.argv = argv
+            if isinstance(holder, Session) and resume and holder.adapter_id == resume:
+                # its row ended because the person opened it, which is the word the trail wants —
+                # `_take_name` would otherwise write the ending of a record merely replaced (§4.10)
+                self._attention_ended(holder.id, "resumed", "*")
             previous_run, freed = await self._take_name(holder)
             # read after the supersede, so the id it freed is not `taken` and gets reused
             live = await asyncio.to_thread(lambda: [p.session for p in self.tmux.list_panes()])
@@ -1234,7 +1238,7 @@ class HostAgent:
             self.store.save(s)
             self._remember_dir(directory)
             if resume:
-                await self._supersede(resume, sid)
+                await self._supersede(resume, sid, replaced=holder if isinstance(holder, Session) else None)
         return s.view()
 
     async def rpc_name_check(
@@ -1340,7 +1344,7 @@ class HostAgent:
                 return candidate
         return f"{stem}-{now_iso()}"
 
-    async def _supersede(self, adapter_id: str, new_sid: str) -> None:
+    async def _supersede(self, adapter_id: str, new_sid: str, replaced: Session | None = None) -> None:
         """A resumed conversation continues in the new session: the exited record it came from is
         closed (kept a day, sorted last) and its dead pane dropped, so the Org shows one card.
 
@@ -1351,7 +1355,15 @@ class HostAgent:
         move: the old id is rewritten to the new one in the moved entries' `to`, and in every other
         record's pair tallies and pending-`ask` addressees; an `ask` left pending by the exit is
         open again. The old record remembers its successor, so a message addressed to it is
-        forwarded there (`rpc_msg`) while an act on it is refused, as on any closed record."""
+        forwarded there (`rpc_msg`) while an act on it is refused, as on any closed record.
+
+        **A resume under the same name** has no such old record to find: §4.1's name rule replaced
+        it **in place, at the same id** (`_take_name`), so the loop below — which looks for a
+        *different*, `exited` record — finds nothing and the conversation's mail would be dropped
+        by the very path that exists to carry it. `replaced` is what the name rule superseded, and
+        when it is the record this resume continues (the same conversation, at the id the new
+        session now holds) its mail moves from it (TD-081). Nothing is closed or forwarded in that
+        case: there is one record and one id, and the successor *is* the record."""
         new = self.sessions.get(new_sid)
         for other in list(self.sessions.values()):
             if other.id != new_sid and other.adapter_id == adapter_id and other.state == "exited":
@@ -1362,13 +1374,20 @@ class HostAgent:
                 if new is not None:
                     self._move_mail(other, new)
                 self.store.save(other)
+        if replaced is not None and new is not None and replaced.id == new_sid and replaced.adapter_id == adapter_id:
+            self._move_mail(replaced, new)
         if new is not None:
             self.store.save(new)
 
     def _move_mail(self, old: Session, new: Session) -> None:
         # The row the old record was showing ends here, and the trail says *resumed* — which is
-        # what Paul saw vanish: opening a row's session resumed it (design §4.10, TD-079).
-        self._attention_ended(old.id, "resumed", "*")
+        # what Paul saw vanish: opening a row's session resumed it (design §4.10, TD-079). **Only
+        # when there are two ids**: under the same name the ending was marked in `rpc_create`,
+        # before the name was taken, and marking it again here would leave the word on the id the
+        # **live** record now holds — where `*` stands until the record goes, so its next, unrelated
+        # ending would wear *resumed* with nothing resumed (review of PR #282).
+        if old.id != new.id:
+            self._attention_ended(old.id, "resumed", "*")
         now = datetime.now(UTC)
         new.inbox = self._rename([self._copy(e) for e in old.inbox if self._keep(e, now, inbox=True)], old.id, new.id)
         new.outbox = self._rename(
