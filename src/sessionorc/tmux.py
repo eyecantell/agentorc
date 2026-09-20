@@ -22,6 +22,7 @@ _FMT = (
     "\t#{window_index}\t#{pane_index}\t#{pane_tty}\t#{pane_title}"
 )
 _FIELDS = 10  # fields in `_FMT`; the title is last, so a tab inside it cannot shift the ones before
+ARG_LIMIT = 120_000  # bytes in one argument: under the kernel's 128 KB (MAX_ARG_STRLEN), with room to spare
 LONG_COMMAND = 8192  # bytes of argv past which `new_session` launches through a script (tmux's limit is ~16 KB)
 MIN_VERSION = (3, 2)  # `new-session -e` and `paste-buffer -p`
 _PASTE_SEQ = itertools.count()  # with the pid, makes each paste buffer name unique on a shared server (TD-043)
@@ -138,7 +139,7 @@ class Tmux:
         for k, v in env.items():
             args += ["-e", f"{k}={v}"]
         if argv:
-            args += ["--", *self._fit(name, argv)]
+            args += ["--", *self._fit(name, argv, around=sum(len(a.encode()) + 1 for a in args))]
         args += [";", "set-option", "-w", "-t", f"={name}:", "remain-on-exit", "on"]
         if logfile is not None:
             logfile.parent.mkdir(parents=True, exist_ok=True)
@@ -151,14 +152,24 @@ class Tmux:
             raise TmuxError(f"tmux new-session {name}: {err}")
 
     @staticmethod
-    def _fit(name: str, argv: list[str]) -> list[str]:
+    def _fit(name: str, argv: list[str], around: int = 0) -> list[str]:
         """`argv` as tmux can take it. tmux refuses a command line past its message size — *command
         too long*, at about 16 KB — and a session's brief rides in its argv: on 2026-09-20 a team
         would not start because a brief had grown to 16,194 bytes. Past `LONG_COMMAND` the argv is
         written to a launch script (mode 0700, under the home) that `exec`s it, so the pane's first
         process is still the command itself and the kernel's far larger limit is the one that
         applies. Short commands are passed as they always were."""
-        if sum(len(a.encode("utf-8", "surrogateescape")) + 1 for a in argv) <= LONG_COMMAND:
+        sizes = [len(a.encode("utf-8", "surrogateescape")) + 1 for a in argv]
+        if max(sizes, default=0) > ARG_LIMIT:
+            # the kernel refuses one argument past 128 KB, and the refusal would surface as a dead
+            # pane with `sh`'s own words in a run log — say it here, where the start is asked for
+            raise TmuxError(
+                f"tmux new-session {name}: one argument is {max(sizes):,} bytes — past what a process can be "
+                f"started with ({ARG_LIMIT:,}); a brief that long belongs in a file the session is told to read"
+            )
+        # `around` is the rest of the tmux command line (the name, the cwd, every `-e KEY=VALUE`):
+        # what tmux limits is the whole line, so a large environment counts against the same room.
+        if sum(sizes) + around <= LONG_COMMAND:
             return argv
         script = paths.launch_dir() / f"{name}.sh"
         script.parent.mkdir(parents=True, exist_ok=True)

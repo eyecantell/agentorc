@@ -155,4 +155,12 @@ def test_a_command_too_long_for_tmux_is_launched_through_a_script(tmux, tmp_path
     assert pane.current_command == "sh" and not pane.dead  # `exec`: the command itself is the pane's process
 
     assert tmux_mod.Tmux._fit("ao-short", ["bash", "--norc"]) == ["bash", "--norc"]  # short: untouched
+    # the room is the whole tmux command line's, so a large environment sends a modest argv through
+    # the script too; and an argument no process could be started with is refused here, in words
+    assert tmux_mod.Tmux._fit("ao-env", ["bash", "--norc"], around=9000) == [
+        "/bin/sh",
+        str(script.parent / "ao-env.sh"),
+    ]
+    with pytest.raises(tmux_mod.TmuxError, match="past what a process can be started with"):
+        tmux_mod.Tmux._fit("ao-huge", ["claude", "x" * 130_000])
     assert not (tmp_path / "home" / "launch" / "ao-short.sh").exists()
