@@ -1434,22 +1434,34 @@ async def test_a_prompt_no_process_can_take_is_refused_before_anything_is_create
 
     repo = tmp_path / "repo"
     repo.mkdir()
-    await asyncio.to_thread(subprocess.run, ["git", "init", "-q", str(repo)], check=True)
+    # a real repo with a commit, so `git worktree add` would genuinely succeed: the assertion below
+    # is that nothing was created, and it means nothing against a repo that could not have one
+    for args in (["init", "-q", "-b", "main"], ["commit", "-q", "--allow-empty", "-m", "one"]):
+        await asyncio.to_thread(
+            subprocess.run,
+            ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *args],
+            check=True,
+            capture_output=True,
+        )
     async with LocalClient() as c:
-        with pytest.raises(AgentError, match="past what a process can be started with") as refused:
-            await c.call(
-                "create", name="huge", dir=str(repo), adapter="shell", repo=str(repo),
-                worktree="huge-wt", prompt="x" * (ARG_LIMIT + 1),
-            )  # fmt: skip
-        assert "read it" in str(refused.value)
-        assert not (repo / ".claude" / "worktrees" / "huge-wt").exists(), "nothing is created on a refusal"
-        assert all(v["name"] != "huge" for v in await c.call("list"))
-        # …and a brief the script path can carry is not refused: 32 KB starts a session
+        # exactly `ARG_LIMIT` is refused too: `_fit` counts the argument's NUL and this must count
+        # it the same way, or the one case that slips past here is refused there — after the
+        # worktree, which is the whole failure (review of PR #272)
+        for size in (ARG_LIMIT, ARG_LIMIT + 1):
+            with pytest.raises(AgentError, match="past what a process can be started with") as refused:
+                await c.call(
+                    "create", name="huge", dir=str(repo), adapter="shell", repo=str(repo),
+                    worktree="huge-wt", prompt="x" * size,
+                )  # fmt: skip
+            assert "read it" in str(refused.value)
+            assert not (repo / ".claude" / "worktrees" / "huge-wt").exists(), "nothing is created on a refusal"
+            assert all(v["name"] != "huge" for v in await c.call("list"))
+        # …and one byte under it is not refused here — what carries a brief that long to the pane
+        # is the launch script, which `tests/test_tmux.py` exercises with a ~40 KB argv
         s = await c.call(
             "create", name="big-brief", dir=str(tmp_path), adapter="shell",
-            argv=["bash", "--norc"], prompt="a brief. " * 4_000,
+            argv=["bash", "--norc"], prompt="x" * (ARG_LIMIT - 1),
         )  # fmt: skip
-        assert len(("a brief. " * 4_000).encode()) > 32_000
         await c.call("kill", id=s["id"])
 
 

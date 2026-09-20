@@ -992,11 +992,13 @@ class HostAgent:
         # adapter hands it to the tool as one argument, and the kernel refuses one past `ARG_LIMIT`.
         # `_fit` says the same thing at the tmux layer, but by then `create` has made a worktree
         # that no record points at — which is exactly what happened on 2026-09-18.
-        if prompt and len(str(prompt).encode("utf-8", "surrogateescape")) > ARG_LIMIT:
+        # `+ 1` for the argument's NUL, exactly as `_fit` counts it: a prompt of *exactly*
+        # `ARG_LIMIT` bytes passes a bare `>` here and is still refused there — after the worktree
+        # (review of PR #272).
+        if prompt and (size := len(str(prompt).encode("utf-8", "surrogateescape")) + 1) > ARG_LIMIT:
             raise RpcError(
-                f"the prompt is {len(str(prompt).encode('utf-8', 'surrogateescape')):,} bytes — past what a "
-                f"process can be started with ({ARG_LIMIT:,}): put a brief that long in a file and tell the "
-                "session to read it (design §4.9, TD-068)"
+                f"the prompt is {size - 1:,} bytes — past what a process can be started with ({ARG_LIMIT:,}): "
+                "put a brief that long in a file and tell the session to read it (design §4.9, TD-068)"
             )
         if worktree:
             # Design §4.5 New session "new worktree": the checkout is the repo, the session runs in
