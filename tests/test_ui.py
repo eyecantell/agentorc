@@ -1279,3 +1279,21 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
     assert "ricon" not in plain and "ricon" not in none
     # a caller that resolved no icons still renders the badge's word, and nothing breaks
     assert "ricon" not in card.render(s=uiapp.view(records[0], records))
+
+
+def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_path, monkeypatch):
+    """Review of PR #251: the Allow / Deny route 409s without a `tool_use_id`, and the Inbox's row
+    already read such a permission as something to answer in the terminal — the card now agrees,
+    instead of offering two buttons that cannot work."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    s = {
+        "id": "ao-x-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/x",
+        "state": "needs-you", "since": "2026-09-18T10:00:00Z", "confidence": "hook", "pane": True, "tail": [],
+        "pending": {"kind": "permission", "text": "Bash: git push"},
+    }  # fmt: skip
+    html = templates.get_template("card.html").render(s=view(s))
+    assert 'data-act="allow"' not in html and "answer in the terminal (Focus)" in html
+    with_id = {**s, "pending": {**s["pending"], "tool_use_id": "tu"}}
+    assert 'data-act="allow"' in templates.get_template("card.html").render(s=view(with_id))

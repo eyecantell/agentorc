@@ -60,7 +60,10 @@
     </div>{% endif %}
   </div>
   <div class="sc-slot">
-    {% if s.state == 'needs-you' and s.pending and s.pending.kind == 'permission' %}
+    {# Allow / Deny only when the hook gave something to answer (`tool_use_id`): the route 409s without
+       it, and the Inbox's row (`state_kind`) already reads it that way — a permission with none falls to
+       the *answer in the terminal* branch below (review of PR #251) #}
+    {% if s.state == 'needs-you' and s.pending and s.pending.kind == 'permission' and s.pending.tool_use_id %}
       <div class="status needs">{{ s.pending.text }}</div>
       <div class="row gap">
         <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>

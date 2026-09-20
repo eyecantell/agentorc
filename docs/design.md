@@ -1002,7 +1002,8 @@ decides* means call by call.
 
 - **The `act` link method, home → node.** The home asks the node `act {rpc, params, caller}` and
   the node runs that RPC through its own handler — `send`, `keys`, `kill`, `close`, `remove`,
-  `decide`, `create`, and `name_check` for a team start — with **no gate of its own** and without
+  `decide`, `create`, `name_check` for a team start, and (2026-09-19) `identity_ack`, whose own
+  person-only check still runs at the node, since it is the RPC's and not the link's (§4.8a) — with **no gate of its own** and without
   its offline table: the request came over the link, which is the home. The node's result, or its
   refusal in words, is the home's reply to the caller, and the reply carries the record as it now
   stands, which the home applies before it answers — a `kill`'s `exited` is on the card when `ao`
@@ -1883,7 +1884,7 @@ in a token colour of its own, never pressable and never the amber needs-you ring
 newest alarm in words on hover; the Inbox row lists them all and offers **Acknowledge** (§4.5a
 **Inbox row: identity alarm**), which clears that list — a person's own act, the `identity_ack`
 RPC, refused to every session and **not** a never-gated read, since a session that could clear the
-list could erase the evidence of its own forgery; the log keeps every alarm either way. **The
+list could erase the evidence of its own forgery; the log keeps every alarm either way. **That refusal is only as strong as the host's mode**: under `observe` or `off` a session that leaves its `caller` out *is* the person to this RPC, as to `inbox_delete` and every other person-only act, so an acknowledged list means what it says only on a host that enforces — one more reason the page says when a host does not, and the log, which no RPC clears, is the record. **The
 host's own list persists** (`identity_alarms.json`, mode `0600`, beside the person inbox) and is
 loaded at start, by the same rule the records follow — a new alarm written at once, a repeat
 counted in memory until the tick — because an alarm that died with the process would make the page
