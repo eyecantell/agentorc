@@ -326,15 +326,42 @@
     }
     open();
   }
-  // ---- usage chip: one span per profile, "5h n% · wk n%", red at a cap (TD-001) ----
+  // ---- usage chip: one span per profile, its **worst** window, the rest on hover (TD-001, TD-073) ----
+  // The windows and their labels are the adapter's — this file names no window of any one tool, so a
+  // tool with one daily window or three windows prints what it has. `usage: null` means that profile
+  // has no live session any more (the core prunes it): its chip goes.
+  const NEAR_CAP = 80;  // "at or near a cap": never collapsed into +n, whatever the room (Paul 2026-09-19)
   function onUsage(ev) {
-    const chip = $("#usagechip"); if (!chip || !ev.usage) return;
+    const chip = $("#usagechip"); if (!chip) return;
     let el = chip.querySelector(`[data-profile="${CSS.escape(ev.profile)}"]`);
-    if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.appendChild(el); chip.appendChild(document.createTextNode(" ")); }
-    const u = ev.usage, capped = u.five_hour_pct >= 100 || u.weekly_pct >= 100;
-    el.textContent = `${ev.profile} 5h ${u.five_hour_pct}% · wk ${u.weekly_pct}%`;  // the numbers say what they are (2026-09-18)
-    el.classList.toggle("cap", capped);
-    el.title = `5-hour ${u.five_hour_pct}% (resets ${u.five_hour_resets || "?"}) · weekly ${u.weekly_pct}% (resets ${u.weekly_resets || "?"})`;
+    const windows = (ev.usage && ev.usage.windows) || [];
+    if (!windows.length) { if (el) el.remove(); fitUsage(); return; }
+    if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.insertBefore(el, $("#usagemore")); chip.insertBefore(document.createTextNode(" "), $("#usagemore")); }
+    const sorted = windows.slice().sort((a, b) => (b.pct || 0) - (a.pct || 0)), worst = sorted[0];
+    el.dataset.pct = worst.pct;
+    el.textContent = `${ev.profile} ${worst.label} ${worst.pct}%`;  // the numbers say what they are (2026-09-18)
+    el.classList.toggle("cap", worst.pct >= 100);
+    el.classList.toggle("near", worst.pct < 100 && worst.pct >= NEAR_CAP);
+    el.title = sorted.map((w) => `${w.label} ${w.pct}% (resets ${w.resets || "?"})`).join(" · ");
+    fitUsage();
+  }
+  // Chips side by side while they fit; past that the worst profiles and `+n`, which shows the rest
+  // on hover. No rotation: a display that rotates hides the number at the moment it is looked at,
+  // and the one that matters may be the one off screen (TD-073, decided by Paul 2026-09-19).
+  function fitUsage() {
+    const chip = $("#usagechip"); if (!chip) return;
+    const more = $("#usagemore"), spans = [...chip.querySelectorAll("[data-profile]")];
+    spans.forEach((s) => s.classList.remove("hidden"));
+    if (!more) return;
+    more.classList.add("hidden"); more.textContent = ""; more.title = "";
+    // Hide the least important first: lowest worst-window percentage, and never one at or near a cap.
+    const droppable = spans.filter((s) => (+s.dataset.pct || 0) < NEAR_CAP).sort((a, b) => (+a.dataset.pct || 0) - (+b.dataset.pct || 0));
+    const hidden = [];
+    while (chip.scrollWidth > chip.clientWidth + 1 && droppable.length) {
+      const s = droppable.shift(); s.classList.add("hidden"); hidden.push(s);
+      more.textContent = `+${hidden.length}`; more.classList.remove("hidden");
+    }
+    if (hidden.length) more.title = hidden.map((s) => `${s.textContent} — ${s.title}`).join("\n");
   }
   function setDown(down) {
     const dot = $("#hostdot"); if (dot) dot.classList.toggle("down", down);
@@ -1032,5 +1059,9 @@
       if (ev.event === "gone" && ev.id === id) banner("session removed");
     });
   };
+  // The top bar is on every page and its chips are rendered server-side, so the fit is set up here
+  // rather than in any one page's init (the script tag is at the end of the body: the DOM is up).
+  window.addEventListener?.("resize", fitUsage);  // `?.`: the node probe of test_ui_inbox has no real window
+  fitUsage();
   function esc(t) { return String(t == null ? "" : t).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 })();

@@ -256,3 +256,35 @@ def test_the_teams_line_says_the_identity_mode_unless_the_host_enforces_it(tmp_p
     html = page(identity_note({"mode": "observe"}))
     assert 'id="identitynote"' in html and "identity: observe" in html
     assert 'id="identitynote"' not in page(identity_note({"mode": "enforce"}))
+
+
+def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
+    """TD-073: the top bar's chip is one span per profile showing that profile's **worst** window —
+    the label and number the adapter gave — with every window on hover. No field name of any one
+    tool appears in the template, so a profile with one daily window renders the same way."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import templates
+
+    usage = {
+        "grind": {
+            "windows": [
+                {"label": "5h", "pct": 19, "resets": "2026-09-20T22:00:00Z"},
+                {"label": "wk", "pct": 88, "resets": "2026-09-24T00:00:00Z"},
+            ],
+            "fetched": "2026-09-20T20:00:00Z",
+        },
+        "openai": {"windows": [{"label": "day", "pct": 100, "resets": None}], "fetched": "x"},
+        "quietly": {"windows": [], "fetched": "x"},  # an adapter that reports no quota: no chip
+    }
+    html = templates.get_template("org.html").render(
+        sessions=[], groups=None, strip={"teams": [], "source": "", "notes": [], "elsewhere": ""},
+        counts={}, host="kmaster", active="Org", agent_down=False, volatile=False, usage=usage,
+        person_needs=0, node_banner="", identity_note="",
+    )  # fmt: skip
+    assert "grind wk 88%" in html and "5h 19%" not in html.split("grind wk 88%")[1].split("</span>")[0]
+    assert 'data-profile="grind" data-pct="88" class="near"' in html
+    assert "wk 88% (resets 2026-09-24T00:00:00Z) · 5h 19% (resets 2026-09-20T22:00:00Z)" in html
+    assert 'data-profile="openai" data-pct="100" class="cap"' in html and "openai day 100%" in html
+    assert 'data-profile="quietly"' not in html  # no windows, no chip
+    assert "five_hour" not in html and "weekly" not in html

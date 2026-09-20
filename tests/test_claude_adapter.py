@@ -244,7 +244,10 @@ def test_parse_usage_and_credentials(tmp_path):
     u = parse_usage(
         {"five_hour": {"utilization": 42.7, "resets_at": "2026-09-07T02:00:00Z"}, "seven_day": {"utilization": 9}}
     )
-    assert u and u.five_hour_pct == 42 and u.weekly_pct == 9 and u.five_hour_resets.startswith("2026")
+    # TD-073: the endpoint's two windows become two labelled entries of a list; nothing above the
+    # adapter knows what `5h` and `wk` are, and a tool with other windows says what it has instead.
+    assert u and [(w.label, w.pct) for w in u.windows] == [("5h", 42), ("wk", 9)]
+    assert u.windows[0].resets.startswith("2026") and u.windows[1].resets is None
     assert parse_usage({}) is None
     prof = profiles.Profile(name="t", config_dir=tmp_path)
     ad = ClaudeCodeAdapter()
@@ -370,18 +373,21 @@ def test_usage_for_by_profile_name(tmp_path, monkeypatch):
     """TD-001: the core asks by profile name and gets a plain dict; unknown profile or no data → None."""
     import unittest.mock as um
 
-    from agentorc.adapters.claude_code import Usage
+    from agentorc.adapters.claude_code import Usage, Window
 
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))  # no profiles.yml: only `default` exists
     ad = ClaudeCodeAdapter()
     assert ad.usage_for("no-such-profile") is None
-    u = Usage(five_hour_pct=42, weekly_pct=7, five_hour_resets="2026-09-10T04:00:00Z", weekly_resets=None, fetched="x")
+    u = Usage(
+        windows=[Window(label="5h", pct=42, resets="2026-09-10T04:00:00Z"), Window(label="wk", pct=7, resets=None)],
+        fetched="x",
+    )
     with um.patch.object(ClaudeCodeAdapter, "usage", return_value=u):
         assert ad.usage_for("") == {
-            "five_hour_pct": 42,
-            "weekly_pct": 7,
-            "five_hour_resets": "2026-09-10T04:00:00Z",
-            "weekly_resets": None,
+            "windows": [
+                {"label": "5h", "pct": 42, "resets": "2026-09-10T04:00:00Z"},
+                {"label": "wk", "pct": 7, "resets": None},
+            ],
             "fetched": "x",
         }
     with um.patch.object(ClaudeCodeAdapter, "usage", return_value=None):

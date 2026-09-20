@@ -58,10 +58,13 @@ class Adapter(Protocol):
     #                                                      says anywhere (TD-031); None = cannot tell. Keyed by
     #                                                      the profile *name*, like `usage_for`
     #   short_model(model: str) -> str                     that name as a display shortens it
-    #   usage_for(profile: str) -> dict | None            {"five_hour_pct", "weekly_pct", "five_hour_resets",
-    #                                                      "weekly_resets", "fetched"}; None = unknown, never
-    #                                                      gates anything (design §4.3 `usage()`, keyed by the
-    #                                                      profile *name* because this package cannot build a Profile)
+    #   usage_for(profile: str) -> dict | None            {"windows": [{"label", "pct", "resets"}, ...],
+    #                                                      "fetched"} — every quota window this account has, the
+    #                                                      labels the adapter's and printed by nothing but the
+    #                                                      chip (TD-073); one window, three or none are all
+    #                                                      legal. None = unknown, never gates anything (design
+    #                                                      §4.3 `usage()`, keyed by the profile *name* because
+    #                                                      this package cannot build a Profile)
 
 
 def short_model(adapter: str, model: str | None) -> str:

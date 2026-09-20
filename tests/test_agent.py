@@ -228,7 +228,8 @@ async def test_occupancy_sees_own_and_external_sessions(agent, tmp_path, monkeyp
 async def test_limited_from_usage_cap(agent, hookstub, tmp_path, monkeypatch):
     """TD-001: a profile at 100% of a window makes its interactive sessions `limited` with the reset
     time; the cap lifting (or the reset time passing) brings them back to `working`; a session that
-    needs you keeps that; subscribers get the usage figure."""
+    needs you keeps that; subscribers get the usage figure. TD-073: the windows are a list the
+    adapter labels, and **any** of them at 100% is the cap — the core names none of them."""
     from datetime import UTC, datetime, timedelta
 
     monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
@@ -236,46 +237,77 @@ async def test_limited_from_usage_cap(agent, hookstub, tmp_path, monkeypatch):
     async with LocalClient() as c, LocalClient() as sub:
         s = await c.call("create", name="cap", dir=str(tmp_path), adapter="hookstub", profile="p1")
         await sub.call("subscribe")
-        hookstub.usage_value = {"five_hour_pct": 100, "weekly_pct": 12, "five_hour_resets": soon, "weekly_resets": None}
+        hookstub.usage_value = {
+            "windows": [{"label": "5h", "pct": 100, "resets": soon}, {"label": "wk", "pct": 12, "resets": None}]
+        }
         got = await wait_state(c, s["id"], "limited")
         assert got["pending"] == {
             "kind": "limit",
-            "text": f"5-hour cap · resets {soon[11:16]}Z",
+            "text": f"5h cap · resets {soon[11:16]}Z",
             "deadline": None,
             "tool_use_id": None,
         }
         assert got["confidence"] == "hook"
-        assert (await c.call("usage"))["p1"]["five_hour_pct"] == 100
+        assert (await c.call("usage"))["p1"]["windows"][0]["pct"] == 100
         while (ev := json.loads(await asyncio.wait_for(sub._reader.readline(), 5)))["event"] != "usage":
             pass
-        assert ev["profile"] == "p1" and ev["usage"]["five_hour_pct"] == 100
+        assert ev["profile"] == "p1" and ev["usage"]["windows"][0]["pct"] == 100
         # the window resets: back to what it was (working)
-        hookstub.usage_value = {"five_hour_pct": 3, "weekly_pct": 12, "five_hour_resets": soon, "weekly_resets": None}
+        hookstub.usage_value = {
+            "windows": [{"label": "5h", "pct": 3, "resets": soon}, {"label": "wk", "pct": 12, "resets": None}]
+        }
         await wait_state(c, s["id"], "working")
         # an idle session comes back idle, not working — no hook would correct a wrong `working`
         await c.call("hook", session=s["id"], state="idle")
         hookstub.usage_value = {
-            "five_hour_pct": 100,
-            "weekly_pct": 12,
-            "five_hour_resets": "garbage",
-            "weekly_resets": None,
+            "windows": [{"label": "5h", "pct": 100, "resets": "garbage"}, {"label": "wk", "pct": 12, "resets": None}]
         }
         got = await wait_state(c, s["id"], "limited")
-        assert got["pending"]["text"] == "5-hour cap · resets unknown"
-        hookstub.usage_value = {"five_hour_pct": 3, "weekly_pct": 12, "five_hour_resets": soon, "weekly_resets": None}
+        assert got["pending"]["text"] == "5h cap · resets unknown"
+        hookstub.usage_value = {
+            "windows": [{"label": "5h", "pct": 3, "resets": soon}, {"label": "wk", "pct": 12, "resets": None}]
+        }
         await wait_state(c, s["id"], "idle")
         # a cap whose reset time is already behind us is no cap
         past = (datetime.now(UTC) - timedelta(minutes=1)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-        hookstub.usage_value = {"five_hour_pct": 100, "weekly_pct": 12, "five_hour_resets": past, "weekly_resets": None}
+        hookstub.usage_value = {
+            "windows": [{"label": "5h", "pct": 100, "resets": past}, {"label": "wk", "pct": 12, "resets": None}]
+        }
         await asyncio.sleep(0.8)
         assert (await c.call("get", id=s["id"]))["state"] == "idle"  # unchanged
         # needs-you is never overridden by a cap
         await c.call("hook", session=s["id"], state="needs-you", pending={"kind": "question", "text": "a or b?"})
-        hookstub.usage_value = {"five_hour_pct": 5, "weekly_pct": 100, "five_hour_resets": None, "weekly_resets": soon}
+        hookstub.usage_value = {
+            "windows": [{"label": "5h", "pct": 5, "resets": None}, {"label": "wk", "pct": 100, "resets": soon}]
+        }
         await asyncio.sleep(0.8)
         assert (await c.call("get", id=s["id"]))["state"] == "needs-you"
         hookstub.usage_value = None
         await c.call("kill", id=s["id"])
+
+
+async def test_limited_from_one_daily_window(agent, hookstub, tmp_path, monkeypatch):
+    """TD-073 *Done when*: an adapter whose quota is **one daily window** — no Claude field name
+    anywhere — drives `limited` with its own label, and its profile leaves the top bar's figure
+    once no live session runs under it."""
+    from datetime import UTC, datetime, timedelta
+
+    monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    soon = (datetime.now(UTC) + timedelta(hours=2)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    async with LocalClient() as c:
+        s = await c.call("create", name="daily", dir=str(tmp_path), adapter="hookstub", profile="pd")
+        hookstub.usage_value = {"windows": [{"label": "day", "pct": 100, "resets": soon}], "fetched": soon}
+        got = await wait_state(c, s["id"], "limited")
+        assert got["pending"]["text"] == f"day cap · resets {soon[11:16]}Z"
+        assert (await c.call("usage"))["pd"]["windows"] == [{"label": "day", "pct": 100, "resets": soon}]
+        # only profiles a live session runs under are shown: the record goes, and so does the figure
+        hookstub.usage_value = None
+        await c.call("kill", id=s["id"])
+        for _ in range(40):
+            if "pd" not in await c.call("usage"):
+                break
+            await asyncio.sleep(0.2)
+        assert "pd" not in await c.call("usage")
 
 
 async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
