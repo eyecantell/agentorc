@@ -1687,6 +1687,11 @@ async def test_an_answer_is_followed_to_its_outcome(agent, tmp_path):
             # the person answers, and from that moment the asker owes
             await person.call("msg", to=worker, text="merge it", kind="reply", reply_to=asked["id"])
             assert (await person.call("get", id=worker))["mail"]["owed"] == [asked["id"]]
+            # …and every `ao` reply to the asker says so, from the envelope the agent stamps on it
+            from sessionorc import client as clientmod
+
+            await w.call("list")
+            assert (clientmod.last_mail or {}).get("owed") == [asked["id"]]
             # every `ao` reply to the asker says so, beside the unread line
             # …and the session cannot declare itself out of work while it owes one
             with pytest.raises(AgentError, match="owes 1 outcome") as refused:
@@ -1710,6 +1715,9 @@ async def test_an_answer_is_followed_to_its_outcome(agent, tmp_path):
             rep = await w.call("msg", to="person", text="done: merged as #1", outcome="done", for_=asked["id"])
             held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == asked["id"]][0]
             assert held["outcome"]["state"] == "done" and held["outcome"]["by"] == rep["entry"]["id"]
+            # the reporting note is on the question's own thread, so the person reads the answer
+            # and what came of it in one place (review of PR #267)
+            assert rep["entry"]["root"] == held["root"]
             # only the open question is left, and an unanswered one owes nothing
             assert (await person.call("get", id=worker))["mail"]["owed"] == []
             # …and a settled question is not settled twice

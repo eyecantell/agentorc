@@ -2075,7 +2075,10 @@ class HostAgent:
         # -- what this message counts as ------------------------------------------------------------
         closes = replied is not None and kind == "reply" and replied.open
         counts = sender != PERSON and not closes  # a person's message is never counted; a first reply is free
-        root = replied.root if replied is not None else (settle.root if settle is not None and thread else "")
+        # A reporting note and a follow-up both belong to the **question's own thread** (design
+        # §4.10 *Outcomes*): the person reads the answer and what came of it in one place, and the
+        # thread's exchange bound counts them where they belong (review of PR #267).
+        root = settle.root if settle is not None else (replied.root if replied is not None else "")
         now = datetime.now(UTC)
         if counts and (mail.THREAD_BOUND is not None or mail.PAIR_BOUND is not None):
             self._check_bounds(sender, named, root, now)
@@ -4134,11 +4137,12 @@ class HostAgent:
             # mail says so — result or refusal alike — read after the method ran, so an `ao inbox`
             # that just read everything carries no line. It types nothing and starts nothing.
             s = self._graph().get(self._caller_address(caller, link_host))
-            if s is not None and ((n := s.unread()) or (owed := s.owed())):
+            owed = s.owed() if s is not None else []
+            if s is not None and ((n := s.unread()) or owed):
                 # The same line carries the debt (design §4.10 *Outcomes*): *briefs are skimmed, a
                 # refusal is not*, and this is the cheapest thing that is neither.
                 resp["mail"] = {"unread": n, "wake_budget_spent": s.wake_budget_spent()}
-                if owed := s.owed():
+                if owed:
                     resp["mail"]["owed"] = owed
         return resp
 
