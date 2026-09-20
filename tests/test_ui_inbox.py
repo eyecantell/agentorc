@@ -502,3 +502,333 @@ def test_the_page_opens_the_session_a_row_is_about_only_while_its_record_is_here
     assert got["needs"] == 0 and got["sections"]["fyi"] == [ask]
     assert "/focus/" not in got["html"]["fyi"] and "closed · the asker is gone" in got["html"]["fyi"]
     assert "merge PR 9?" in got["html"]["fyi"]  # still readable: the record is gone, the mail is not
+
+
+# -- the state rows (design §4.5 screen 6, §4.5a **Inbox row: state**; TD-069 step 2) -------------
+
+
+def rec(sid, state, **kw):
+    """A session record as `list` hands it to `view()`."""
+    s = {
+        "id": sid, "name": kw.pop("name", sid.replace("ao-", "")), "kind": "interactive",
+        "adapter": "claude-code", "dir": "/w", "repo": "/w", "state": state, "pane": True, "tail": [],
+        "since": kw.pop("since", "2026-09-19T10:00:00Z"), "confidence": kw.pop("confidence", "hook"),
+    }  # fmt: skip
+    s.update(kw)
+    return s
+
+
+def state_rows_of(records, **kw):
+    from agentorc.ui.app import state_rows, view
+
+    return state_rows([view(r, list(records)) for r in records], **kw)
+
+
+PERMISSION = {"kind": "permission", "text": "run rm -rf /tmp/x?", "tool_use_id": "t-1",
+              "deadline": "2026-09-19T12:05:00Z"}  # fmt: skip
+
+
+@pytest.mark.unit
+def test_each_state_row_kind_carries_its_own_controls_and_no_others(tmp_path, monkeypatch):
+    """§4.5a **Inbox row: state**: a permission gets **Allow / Deny** on the hook channel and the
+    time left; a question and `stalled?` get the text and **Open**; `limited` says the cap holds
+    it; an exited session with unpushed work says what Ready to close says. No row offers another
+    row's control, and none offers Snooze — a state has nowhere to keep one (TD-069 step 2)."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    records = [
+        rec("ao-p", "needs-you", pending=PERMISSION, team="ao-grind"),
+        rec("ao-q", "needs-you", pending={"kind": "question", "text": "which branch?"}),
+        rec("ao-s", "stalled?", pending={"kind": "note", "text": "stood down: another device took over"}),
+        rec("ao-l", "limited", pending={"kind": "limit", "text": "resets 14:00"}),
+        rec("ao-e", "exited", exit_code=0, git={"ahead": 3, "dirty": 0, "upstream": "origin/main"}),
+    ]
+    by = {r["row"]: r for r in state_rows_of(records)}
+    assert sorted(by) == ["limited", "permission", "question", "stalled", "unpushed"]
+
+    perm = rows("needs", [by["permission"]])
+    assert 'data-act="allow" data-id="ao-p"' in perm and 'data-act="deny" data-id="ao-p"' in perm
+    assert 'class="meta countdown" data-deadline="2026-09-19T12:05:00Z"' in perm
+    assert "run rm -rf /tmp/x?" in perm and 'data-act="snooze"' not in perm and ">Open<" not in perm
+
+    for kind, text in (("question", "which branch?"), ("stalled", "stood down"), ("limited", "resets 14:00")):
+        html = rows("needs", [by[kind]])
+        assert text in html and ">Open<" in html, kind
+        assert 'data-act="allow"' not in html and 'data-act="snooze"' not in html, kind
+
+    gone = rows("needs", [by["unpushed"]])
+    assert "3 unpushed" in gone and "branch pushed" in gone  # what Ready to close says (§4.2)
+    assert ">Details<" in gone and 'href="/focus/ao-e"' in gone and 'data-act="allow"' not in gone
+
+
+@pytest.mark.unit
+def test_a_state_row_carries_the_cards_own_marks_and_none_of_them_is_pressable(tmp_path, monkeypatch):
+    """§4.5 screen 6: the row shows the session's name, team, role badge, its `title` and its
+    `doing` line with age — the card's own view, so the two cannot drift. TD-071 item 8: the state
+    mark is the card's pill, a `<span>`, and what a session wrote is text and nothing else."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    r = rec("ao-p", "needs-you", pending={"kind": "permission", "text": "run <b>rm</b>?", "tool_use_id": "t"},
+            team="ao-grind", role="grinder", title="Error <i>Checker</i>",
+            doing={"text": "reading <script>x</script>", "at": "2026-09-19T09:50:00Z"})  # fmt: skip
+    [row] = state_rows_of([r])
+    html = rows("needs", [row])
+    assert '<span class="pill s-needs' in html and '<button class="pill' not in html
+    assert ">w1<" not in html and 'href="/focus/ao-p"' in html  # the name links to Focus
+    assert "ao-grind" in html and "grinder" in html
+    assert "&lt;i&gt;Checker&lt;/i&gt;" in html and "<i>Checker</i>" not in html
+    assert "&lt;script&gt;" in html and "<script>" not in html
+    assert "&lt;b&gt;rm&lt;/b&gt;" in html and "<b>rm</b>" not in html
+    assert "doing: reading" in html and "says" in html
+
+
+@pytest.mark.unit
+def test_needs_you_is_the_tools_clock_first_then_oldest_across_states_and_mail(tmp_path, monkeypatch):
+    """§4.5 screen 6: *what is on the tool's clock first (a permission's countdown), then oldest
+    first* — and the order is one order over states and mail together, not two lists stapled."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import inbox_sections
+
+    now = datetime(2026, 9, 19, 12, tzinfo=UTC)
+    soon = {**PERMISSION, "deadline": iso(now + timedelta(minutes=2))}
+    later = {**PERMISSION, "deadline": iso(now + timedelta(minutes=5))}
+    states = state_rows_of([
+        rec("ao-p", "needs-you", since="2026-09-19T11:50:00Z", pending=later),
+        rec("ao-p2", "needs-you", since="2026-09-19T11:55:00Z", pending=soon),
+        rec("ao-s", "stalled?", since="2026-09-19T07:00:00Z", pending={"kind": "note", "text": "quiet"}),
+    ])  # fmt: skip
+    mail = [entry("m-1", "ask", at="2026-09-19T09:00:00Z"), entry("m-2", "ask", at="2026-09-19T06:00:00Z")]
+    got = inbox_sections(mail, states=states, now=now)
+    assert [e["id"] for e in got["needs"]] == ["ao-p2:permission", "ao-p:permission", "m-2", "ao-s:stalled", "m-1"]
+    assert got["count"] == 5  # states + open asks; nothing snoozed, nothing paused
+
+
+@pytest.mark.unit
+def test_the_count_is_states_plus_asks_plus_paused_steers_minus_snoozed(tmp_path, monkeypatch):
+    """§4.5a **Inbox page**: one computation, and what it counts. A running `steer`, a `note` and a
+    snoozed entry are outside it; a state row is inside it and cannot be snoozed away."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import inbox_sections
+
+    now = datetime(2026, 9, 19, 12, tzinfo=UTC)
+    hour = iso(now + timedelta(hours=1))
+    states = state_rows_of([rec("ao-p", "needs-you", pending=PERMISSION), rec("ao-w", "working")])
+    assert len(states) == 1  # a working session needs nobody
+    mail = [
+        entry("m-1", "ask"),
+        entry("m-2", "steer", default="off main", bound=hour),
+        entry("m-3", "steer", default="off main", bound=hour, paused_at="2026-09-19T11:00:00Z"),
+        entry("m-4", "note"),
+        entry("m-5", "ask", snoozed_until=iso(now + timedelta(hours=2))),
+    ]
+    got = inbox_sections(mail, states=states, now=now)
+    assert got["count"] == 3 and sorted(e["id"] for e in got["needs"]) == ["ao-p:permission", "m-1", "m-3"]
+    assert [e["id"] for e in got["steering"]] == ["m-2"] and [e["id"] for e in got["snoozed"]] == ["m-5"]
+
+
+@pytest.mark.unit
+def test_the_filters_cover_state_rows(tmp_path, monkeypatch):
+    """§4.5 screen 6: the team filter narrows all three sections — a state carries its session's
+    badge — and the free-text filter matches the name, the title, the `doing` line and the pending
+    text, which `data-find` carries in one place, lowercased on the server."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    r = rec("ao-p", "needs-you", name="w1", team="ao-grind", title="Error Checker",
+            doing={"text": "reading the fetcher", "at": "2026-09-19T09:00:00Z"},
+            pending={"kind": "permission", "text": "run PYTEST?", "tool_use_id": "t"})  # fmt: skip
+    html = rows("needs", state_rows_of([r]))
+    assert 'data-team="ao-grind"' in html
+    find = html.split('data-find="')[1].split('"')[0]
+    assert find == "w1 error checker reading the fetcher run pytest?"
+    none = rows("needs", state_rows_of([rec("ao-q", "needs-you", pending={"kind": "q", "text": "?"})]))
+    assert 'data-team=""' in none and ">No team<" in none
+
+
+@pytest.mark.unit
+def test_a_state_row_is_not_a_mail_row_and_nothing_a_session_wrote_becomes_a_control(tmp_path, monkeypatch):
+    """One row renderer per kind (§4.5 screen 6): a state row is dispatched by `row`, marked as a
+    state, and carries none of the mail controls — Reply, Delete, Dismiss, Snooze, Pause."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    html = rows("needs", state_rows_of([rec("ao-p", "needs-you", pending=PERMISSION)]))
+    assert 'class="mailrow staterow"' in html and 'data-kind="state"' in html and 'data-row="permission"' in html
+    for dead in ("reply", "unmail", "snooze", "pause", "gowithit", "resume"):
+        assert f'data-act="{dead}"' not in html, dead
+
+
+# -- identity alarms on the card and in the Inbox (design §4.8a; TD-077 step 2) --------------------
+
+
+ALARM = {"channel": "session ao-x", "claimed": "ao-y", "rpc": "msg", "count": 3, "at": "2026-09-19T10:00:00Z",
+         "last": "2026-09-19T10:30:00Z"}  # fmt: skip
+
+
+@pytest.mark.unit
+def test_the_card_marks_a_record_with_identity_alarms_and_the_mark_is_not_a_control(tmp_path, monkeypatch):
+    """§4.8a: *a mark on the card*. It says the newest alarm in words on hover, it is a `<span>` —
+    never pressable (TD-071 item 8) — and a malformed alarm entry costs that card its mark and not
+    the grid, exactly as a malformed `doing` or `run_until` does."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    card = templates.get_template("card.html")
+    assert "alarmmark" not in card.render(s=view(rec("ao-x", "idle")))
+    html = card.render(s=view(rec("ao-x", "idle", identity_alarms=[ALARM])))
+    assert '<span class="badge alarmmark"' in html and "<button" not in html.split("alarmmark")[1].split(">")[0]
+    assert "session ao-x claimed to be ao-y on msg ×3" in html
+    assert 'data-act="identity_ack"' not in html  # the control lives on the Inbox row, not here
+
+    junk = view(rec("ao-x", "idle", identity_alarms=["not a dict", None, {"claimed": "ao-y"}, ALARM]))
+    assert len(junk["alarms"]) == 2 and "ao-y" in junk["alarm_note"]
+    assert "alarmmark" in card.render(s=junk)
+    assert view(rec("ao-x", "idle", identity_alarms="broken"))["alarms"] == []  # not even a list
+    assert view(rec("ao-x", "idle", identity_alarms=[{"claimed": "ao-y", "rpc": "msg", "count": "lots"}]))["alarms"]
+
+
+@pytest.mark.unit
+def test_the_inbox_has_a_row_per_record_with_alarms_and_one_for_the_hosts_own_list(tmp_path, monkeypatch):
+    """§4.8a: *a row under Needs you*, counted, because it is either a bug of ours or a session
+    misbehaving and a person should know which. The row lists the alarms in words, says which mode
+    the host is in, and offers **Acknowledge**; the host's own list is a row of its own, blaming no
+    record. `(others)` is read as what it stands for, never printed as a row of empty fields."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import alarm_view, inbox_sections
+
+    others = {"channel": "", "claimed": "(others)", "rpc": "", "count": 7,
+              "at": "2026-09-19T10:00:00Z", "last": "2026-09-19T11:00:00Z"}  # fmt: skip
+    host_alarm = {"channel": "outside", "claimed": "ao-x", "rpc": "kill", "count": 1,
+                  "at": "2026-09-19T09:00:00Z", "last": "2026-09-19T09:00:00Z"}  # fmt: skip
+    states = state_rows_of(
+        [rec("ao-x", "idle", identity_alarms=[ALARM, others])],
+        host_alarms=alarm_view([host_alarm]),
+        host="kmaster",
+        identity_mode="observe",
+    )
+    assert [r["row"] for r in states] == ["alarm", "alarm_host"]
+    got = inbox_sections([], states=states, now=datetime(2026, 9, 19, 12, tzinfo=UTC))
+    assert got["count"] == 2 and [e["id"] for e in got["needs"]] == ["host:alarm", "ao-x:alarm"]
+
+    html = rows("needs", got["needs"])
+    assert "session ao-x claimed to be ao-y on msg ×3" in html
+    assert "and 7 more distinct claims" in html
+    assert "outside claimed to be ao-x on kill" in html and ">kmaster<" in html
+    assert "identity: observe" in html
+    assert 'data-act="identity_ack" data-id="person" data-who="ao-x"' in html  # the record's list
+    assert 'data-act="identity_ack" data-id="person" data-who=""' in html  # the host's own
+    # every instant is handed to the browser to put in the person's own clock, as the snoozed row is
+    assert 'class="localtime" data-at="2026-09-19T10:30:00Z"' in html
+    assert ">2026-09-19T10:30:00Z<" not in html
+
+
+@pytest.mark.unit
+def test_the_two_counts_say_how_they_differ(tmp_path, monkeypatch):
+    """§4.5a **Inbox page**: the top bar and the page both say the Inbox number is not the Org's
+    needs-you count — and from step 2 they say precisely how: the states are in both, the asks and
+    paused steers only in this one."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import inbox_sections, templates
+
+    sections = inbox_sections([], states=[])
+    html = templates.get_template("inbox.html").render(
+        sections=sections, person_needs=0, host="kmaster", active="Inbox",
+        agent_down=False, volatile=False, usage={},
+    )  # fmt: skip
+    for text in ("the session states the Org counts too", "open questions sessions asked you", "anything snoozed"):
+        assert text in html, text
+    base = (UI / "templates" / "base.html").read_text()
+    assert "the session states the Org counts too" in base and "the states alone" in base
+
+
+# -- the routes, against a live agent -------------------------------------------------------------
+
+
+@pytest.mark.integration
+def test_a_permission_is_a_row_the_page_the_poll_and_the_top_bar_all_count(client, tmp_path):
+    """§4.5 screen 6 / §4.5a **Inbox row: state**: a session waiting on a permission is a row of
+    the Inbox, counted in the same number the Org's top bar shows — one `inbox_sections`, so the
+    page, the poll and the bar cannot disagree. **Allow** posts to the card's own route, through
+    the hook channel, and the row leaves with the state; answering it a second time is the 409 the
+    page turns into *already answered* rather than a failure the person has to read."""
+    import os
+    import subprocess
+    import sys
+
+    before = client.get("/api/person/inbox").json()["needs"]
+    r = client.post("/new", data={"dir": str(tmp_path), "name": "perm", "adapter": "hookstub"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    env = {**os.environ, "AGENTORC_SESSION": sid, "AGENTORC_PERMISSION_WAIT": "30"}
+    payload = {"hook_event_name": "PermissionRequest", "tool_name": "Bash",
+               "tool_input": {"command": "rm -rf x"}, "tool_use_id": "tu-inbox"}  # fmt: skip
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "agentorc.adapters.claude_code.hook"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=env,
+    )  # fmt: skip
+    proc.stdin.write(json.dumps(payload))
+    proc.stdin.close()
+    try:
+        for _ in range(60):
+            got = client.get("/api/person/inbox").json()
+            if f"{sid}:permission" in got["sections"]["needs"]:
+                break
+            time.sleep(0.1)
+        else:
+            raise AssertionError("the pending permission never became an Inbox row")
+        assert got["needs"] == before + 1
+        assert f'data-act="allow" data-id="{sid}"' in got["html"]["needs"] and "rm -rf x" in got["html"]["needs"]
+        assert f'class="badge needs" id="personneeds">{got["needs"]}</span>' in client.get("/").text
+        assert f'<span id="needsn">{got["needs"]}</span> needs you' in client.get("/inbox").text
+
+        assert client.post(f"/api/sessions/{sid}/allow", json={}).json() == {"ok": True}
+        assert proc.wait(timeout=15) == 0
+        assert json.loads(proc.stdout.read())["hookSpecificOutput"]["decision"]["behavior"] == "allow"
+        for _ in range(60):
+            after = client.get("/api/person/inbox").json()
+            if f"{sid}:permission" not in after["sections"]["needs"]:
+                break
+            time.sleep(0.1)
+        assert f"{sid}:permission" not in after["sections"]["needs"] and after["needs"] == before
+        again = client.post(f"/api/sessions/{sid}/allow", json={})
+        assert again.status_code == 409 and "no pending permission" in again.json()["detail"]
+        js = (UI / "static" / "app.js").read_text()
+        assert "no pending permission" in js and "already answered" in js  # the page says so, not *failed*
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+        client.post(f"/api/sessions/{sid}/kill")
+
+
+@pytest.mark.integration
+def test_an_exited_session_with_unpushed_work_is_a_row_until_it_is_forgotten(client, tmp_path):
+    """§4.5a **Inbox row: state**: *exited with unpushed work* — what Ready to close says, and
+    **Details**. Only a person resolves it, so it is counted; it goes when the session is
+    forgotten, which is one of the two ways §4.5a says it leaves."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for argv in (["init", "-q", "-b", "main"], ["add", "-A"]):
+        subprocess.run(["git", *argv], cwd=repo, check=True)
+    (repo / "f.txt").write_text("work nobody else has\n")
+    before = client.get("/api/person/inbox").json()["needs"]
+    sid = sender_session(client, repo, name="dirty")
+    client.post(f"/api/sessions/{sid}/kill")
+    for _ in range(60):
+        got = client.get("/api/person/inbox").json()
+        if f"{sid}:unpushed" in got["sections"]["needs"]:
+            break
+        time.sleep(0.1)
+    else:
+        raise AssertionError("an exited session with work only here never became a row")
+    assert got["needs"] == before + 1
+    assert "dirty" in got["html"]["needs"] and "tree clean" in got["html"]["needs"]  # Ready to close's words
+    assert f'href="/focus/{sid}"' in got["html"]["needs"] and ">Details<" in got["html"]["needs"]
+    assert client.post(f"/api/sessions/{sid}/remove").status_code == 200
+    got = client.get("/api/person/inbox").json()
+    assert f"{sid}:unpushed" not in got["sections"]["needs"] and got["needs"] == before
+
+
+@pytest.mark.integration
+def test_acknowledge_is_a_persons_own_route_and_the_agents_rule_decides(client, tmp_path):
+    """§4.5a **Inbox row: identity alarm** → **Acknowledge**: `/api/person/identity_ack` calls the
+    `identity_ack` RPC caller-less, exactly as every other control on this page calls its own. The
+    UI adds no rule of its own — a record this host does not have comes back as the agent's
+    refusal, in the toast every other error uses. (That a session is refused the RPC, and that the
+    list is really cleared, are `tests/test_identity.py`'s.)"""
+    ok = client.post("/api/person/identity_ack", json={})
+    assert ok.status_code == 200 and ok.json()["cleared"] is True and ok.json()["id"] == "person"
+    bad = client.post("/api/person/identity_ack", json={"id": "ao-nope"})
+    assert bad.status_code == 400 and "no session ao-nope" in bad.json()["detail"]

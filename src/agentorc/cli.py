@@ -137,6 +137,26 @@ def cmd_wait(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def _identity_line() -> None:
+    """The host's identity mode, once (design §4.8a: *`ao status -v` and the Org's teams line say
+    which mode a host is in*, since `observe` is a host that is not yet protected). One line for
+    the host, never one per session, and beside it whether the detached-process check is on — a
+    host where it is off is not to be taken for one where it is on. An agent too old to answer
+    `identity`, or one that is down, simply says nothing: this is a note on a listing, not the
+    listing."""
+    try:
+        r = call_sync("identity")
+    except (AgentError, AgentUnavailable, OSError):
+        return
+    if not isinstance(r, dict) or not r.get("mode"):
+        return
+    check = "on" if r.get("detached_check") else "off"
+    alarms = len(r.get("alarms") or []) + sum(len(v or []) for v in (r.get("sessions") or {}).values())
+    note = "" if r["mode"] == "enforce" else " — this host is not enforcing it yet (design §4.8a)"
+    tail = f" · {alarms} identity alarm{'' if alarms == 1 else 's'} (`ao identity`)" if alarms else ""
+    print(f"{r.get('host') or ''}: identity {r['mode']} · detached-process check {check}{note}{tail}")
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     sessions = call_sync("list")
     if hosts.is_node():
@@ -150,6 +170,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     if args.json:
         print(json.dumps(sessions, indent=1))
         return 0
+    if args.verbose:
+        _identity_line()
     if not sessions:
         print("no sessions")
         return 0

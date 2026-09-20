@@ -398,3 +398,99 @@ async def test_host_files_from_under_a_pane_is_that_session_never_the_person(age
         assert "error" in got and "control" in got["error"]
         got = await _probe(me, tmp_path, a, "badparams", {"id": 1, "method": "list", "params": 5})
         assert got["error"] == "params must be an object"  # and the connection answered, not dropped
+
+
+# -- the host's own list persists, and Acknowledge (TD-077 step 2) ---------------------------------
+
+
+async def test_the_hosts_own_alarms_persist_across_a_restart_and_the_tally_does_not(agent, tmp_path):
+    """§4.8a (step 2): an alarm about **no record** — a claim from outside every pane — has nowhere
+    but the host's own list to live, and evidence that died with the process would make the page
+    say *no alarms* about the night the agent was restarted. It follows the records' own write
+    rule: a new alarm at once, a repeat counted in memory until the tick. The **tally** is not
+    persisted: it says *since the agent started*, and means it."""
+    from sessionorc.agent import HostAgent
+    from sessionorc.store import IdentityAlarmStore
+
+    entry = {"channel": "outside", "claimed": "ao-x", "rpc": "msg"}
+    agent._id_alarm(dict(entry), None)
+    assert paths.identity_alarms_file().is_file()
+    assert paths.identity_alarms_file().stat().st_mode & 0o777 == 0o600
+    assert [a["claimed"] for a in IdentityAlarmStore().load()] == ["ao-x"]
+
+    for _ in range(50):  # a loop of repeats is one count in memory, not fifty disk writes
+        agent._id_alarm(dict(entry), None)
+    assert agent.identity_alarms[0]["count"] == 51 and agent._id_host_dirty
+    assert IdentityAlarmStore().load()[0]["count"] == 1  # not written yet
+    agent._id_flush()
+    assert IdentityAlarmStore().load()[0]["count"] == 51 and not agent._id_host_dirty
+
+    agent.identity_tally["outside"] += 3
+    fresh = HostAgent(tmux=agent.tmux)  # what a restart reads
+    assert [(a["claimed"], a["count"]) for a in fresh.identity_alarms] == [("ao-x", 51)]
+    assert dict(fresh.identity_tally) == {}
+
+
+async def test_acknowledge_clears_a_list_for_a_person_and_for_nobody_else(agent, tmp_path):
+    """§4.5a **Inbox row: identity alarm** → **Acknowledge** (`identity_ack`): a person clears one
+    record's alarms, or — naming none — the host's own, and the row leaves the Inbox. It is
+    refused to **every** session, its own alarms included: a session that could clear the list
+    could erase the evidence of its own forgery. The agent's log keeps every alarm, so nothing is
+    lost by acknowledging."""
+    from sessionorc.store import IdentityAlarmStore
+
+    async with LocalClient() as me:
+        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+    agent._id_alarm({"channel": f"session {a}", "claimed": "ao-b", "rpc": "msg"}, a)
+    agent._id_alarm({"channel": "outside", "claimed": a, "rpc": "kill"}, None)
+
+    # a session is refused — including the one the alarms are about, and with identity `off`, where
+    # the person gate is the only thing standing between it and the list
+    assert agent.identity_mode == "off"
+    for who in (a, "ao-somebody-else"):
+        async with LocalClient(caller=who) as session:
+            for params in ({"id": a}, {}):
+                try:
+                    await session.call("identity_ack", **params)
+                    raise AssertionError(f"{who} cleared an alarm list")
+                except AssertionError:
+                    raise
+                except Exception as e:  # noqa: BLE001 — the client's error type is not under test
+                    assert "only by a person" in str(e)
+    assert (await agent.rpc_identity())["sessions"][a]  # nothing was cleared by any of that
+
+    async with LocalClient() as person:
+        got = await person.call("identity_ack", id=a)
+        assert got["cleared"] is True and got["alarms"] == []
+        report = await person.call("identity")
+        assert a not in report["sessions"] and [x["claimed"] for x in report["alarms"]] == [a]
+        assert (await person.call("identity_ack"))["id"] == "person"
+        assert (await person.call("identity"))["alarms"] == []
+    assert IdentityAlarmStore().load() == []  # and the cleared list is what a restart reads
+
+
+async def test_a_session_under_a_pane_cannot_acknowledge_its_own_alarms_under_enforce(agent, tmp_path):
+    """The same rule where the channel decides rather than the envelope (§4.8a): from inside its own
+    pane, with no `caller` at all, a session is still a session — and `identity_ack` is not among
+    the never-gated reads, so the evidence stays where it is."""
+    agent.identity_mode = "enforce"
+    async with LocalClient() as me:
+        a = (await me.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        agent._id_alarm({"channel": f"session {a}", "claimed": "ao-b", "rpc": "msg"}, a)
+        got = await _probe(me, tmp_path, a, "ack", {"id": 1, "method": "identity_ack", "params": {"id": a}})
+        assert "error" in got and "only by a person" in got["error"]
+        assert (await me.call("get", id=a))["identity_alarms"]
+        assert "identity_ack" not in identity.READS
+
+
+def test_a_nodes_session_alarms_reach_the_home_on_the_replica():
+    """§4.4a / §4.8a: alarms are **observed where the socket is**, so they are node-owned on the
+    record like `tail` — and they reach the home's card and Inbox row through the ordinary replica,
+    with nothing built for them. The host's own list of a node is that node's: `identity` names no
+    `id`, so nothing routes it over a link, and the home's page shows the home's own (TD-077)."""
+    from sessionorc.models import NODE_OWNED, Session, apply_node
+
+    assert "identity_alarms" in NODE_OWNED
+    here = Session(id="ao-x@node", name="x", kind="agent", adapter="shell", dir="/w", host="node")
+    alarm = {"channel": "session ao-x", "claimed": "ao-y", "rpc": "msg", "count": 2, "at": "t0", "last": "t1"}
+    assert apply_node(here, {"identity_alarms": [alarm]}).identity_alarms == [alarm]

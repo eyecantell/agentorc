@@ -61,7 +61,7 @@ from sessionorc.models import (
     normalize_ref,
     now_iso,
 )
-from sessionorc.store import EventQueue, PersonInboxStore, SessionStore
+from sessionorc.store import EventQueue, IdentityAlarmStore, PersonInboxStore, SessionStore
 from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 
 log = logging.getLogger("agentorc.agent")
@@ -199,7 +199,13 @@ class HostAgent:
         self._id_listed_at = 0.0
         self._id_list_lock = asyncio.Lock()
         self._id_detached: str | None = None
-        self.identity_alarms: list[dict[str, Any]] = []
+        # The home's own alarms **persist** (TD-077 step 2): a forgery aimed at no record — a claim
+        # from outside every pane — is evidence, and evidence that dies with the process is a page
+        # that says *no alarms* about the night the agent was restarted. The tally does not: it
+        # says *since the agent started*, and §4.8a means that literally.
+        self.identity_store = IdentityAlarmStore()
+        self.identity_alarms: list[dict[str, Any]] = self.identity_store.load()
+        self._id_host_dirty = False  # counts moved since the last write; the tick writes them
         self.identity_tally: dict[str, int] = defaultdict(int)
         self.tmux = tmux or Tmux()
         self.store = store or SessionStore()
@@ -3587,7 +3593,16 @@ class HostAgent:
         log.warning("identity alarm (%s): %s claimed %r on %s", self.identity_mode, *entry.values())
         s = self.sessions.get(about) if about else None
         if s is None:
+            # The host's own list follows the record's rule (§4.8a): a *new* alarm is written at
+            # once, a repeat moves a count in memory and the next tick writes it, so a loop of
+            # forgeries is not a disk write each.
+            known = len(self.identity_alarms)
             self.identity_alarms = identity.coalesce(self.identity_alarms, entry, at)
+            if len(self.identity_alarms) != known:
+                self.identity_store.save(self.identity_alarms)
+                self._id_host_dirty = False
+            else:
+                self._id_host_dirty = True
             return
         known = len(s.identity_alarms)
         s.identity_alarms = identity.coalesce(s.identity_alarms, entry, at)
@@ -3603,6 +3618,35 @@ class HostAgent:
             self._id_dirty.discard(sid)
             if (s := self.sessions.get(sid)) is not None:
                 self._save(s)
+        if self._id_host_dirty:
+            self._id_host_dirty = False
+            self.identity_store.save(self.identity_alarms)
+
+    async def rpc_identity_ack(self, id: str | None = None, caller: Any = None) -> dict[str, Any]:
+        """**Acknowledge** an identity alarm list (design §4.8a, §4.5a **Inbox row: identity
+        alarm**): clears one record's `identity_alarms`, or — with no `id` — the host's own list,
+        so the row leaves the person's Inbox. *A person has seen this and decided what it was.*
+
+        **A person's only**, refused to every session exactly as `inbox_delete` is, and deliberately
+        **not** in `identity.READS`: a session that could clear the list could erase the evidence of
+        its own forgery, which is the one thing the alarm exists to prevent. Nothing is lost either
+        way — the host agent's log keeps every alarm, one line each (§4.8a)."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot acknowledge an identity alarm: the list is cleared only by a person, "
+                "in the Inbox (design §4.8a)"
+            )
+        if not id or id == PERSON:
+            self.identity_alarms = []
+            self._id_host_dirty = False
+            self.identity_store.save(self.identity_alarms)
+            return {"id": PERSON, "cleared": True, "alarms": []}
+        s = self._get(self._addr(id))
+        s.identity_alarms = []
+        self._id_dirty.discard(s.id)
+        self._save(s)
+        await self._push_changes()
+        return {"id": s.id, "cleared": True, "alarms": []}
 
     async def rpc_identity(self) -> dict[str, Any]:
         """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,
