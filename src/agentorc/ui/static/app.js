@@ -137,7 +137,9 @@
       if (action === "answer") { action2 = "reply"; body = { reply_to: b.dataset.msg, answer: Number(b.dataset.index) }; }
       if (action === "unmail") body = { msg: b.dataset.msg };
       // design §4.5a **Inbox row: identity alarm** (§4.8a): a record's list, or — with no id — the
-      // host's own. A person's act; the agent refuses it to every session.
+      // host's own. A person's act; the agent refuses it to every session. The control is
+      // **Dismiss** and the wire name is `identity_ack`: a wire name is not a control, so the
+      // rename of 2026-09-20 did not touch it (§4.5a).
       if (action === "identity_ack") body = { id: b.dataset.who || "" };
       // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
@@ -199,7 +201,8 @@
       if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);
       if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
       if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
-      if (action === "identity_ack") AO.toast("acknowledged — the agent's log keeps every alarm", true);
+      // the wire name stays `identity_ack`; the control is **Dismiss** (§4.5a, renamed 2026-09-20)
+      if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
       // the state is answered, so the row is gone: it is taken out here rather than waited for, and

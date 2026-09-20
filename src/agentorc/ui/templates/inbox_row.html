@@ -340,9 +340,18 @@
 
 {# ── design §4.5a **Inbox row: identity alarm** (§4.8a; TD-077 step 2) ──────────────────────────
    A request whose claim disagreed with the channel it arrived on. It is either a bug of ours or a
-   session misbehaving and a person should know which, so it is counted — and **Acknowledge** is
-   the person's own act saying they have seen it: the list is cleared and the row leaves. The host
-   agent's log keeps every alarm, so acknowledging loses nothing. #}
+   session misbehaving and a person should know which, so it is counted.
+
+   **Dismiss** — the control first built as *Acknowledge*, renamed 2026-09-20 on Paul's direction
+   (*"Acknowledge" seems like a dismiss*): it is the person's own act saying they have seen it, the
+   list is cleared and the row leaves, as **Dismiss** does on every other row. The wire name
+   `identity_ack` stays, because a wire name is not a control. The host agent's log keeps every
+   alarm, so it loses nothing.
+
+   §4.5a gives the row three more — **Suspend**, **Log TD** and **Open** — of which only **Open**
+   is buildable today: *Suspend* and *Log TD* each need an RPC of the host agent's that does not
+   exist yet, and a control drawn against a method that is not there is the one thing §4.2 forbids.
+   They arrive with those. #}
 {% macro alarm(e, section) -%}
 {{ state_head(e) }}
 <div class="body">{% if e.row == 'alarm_host' %}Requests to this host that named a session they did not come from — kept here because they are about no record, so nobody is blamed for someone else's claim.{% else %}Requests that named this session and did not come from it.{% endif %}</div>
@@ -355,7 +364,7 @@
   <span class="st">identity: {{ e.mode or 'unknown' }}{% if e.mode == 'observe' %} — recorded and served exactly as before (design §4.8a){% elif e.mode == 'enforce' %} — the request was refused{% elif e.mode == 'off' %} — nothing is classified on this host{% endif %}</span>
   <span class="grow"></span>
   {%- if e.sid %}{{ open_btn(e, 'Open') }}{% endif %}
-  <button class="btn sm ghost" data-act="identity_ack" data-id="person" data-who="{{ e.sid }}" data-confirm="Acknowledge these alarms? The list is cleared and the row leaves; the host agent's log keeps every one of them.">Acknowledge</button>
+  <button class="btn sm ghost" data-act="identity_ack" data-id="person" data-who="{{ e.sid }}" data-confirm="Dismiss these alarms? The list is cleared and the row leaves; the host agent's log keeps every one of them, a line each.">Dismiss</button>
 </div>
 {%- endmacro %}
 
