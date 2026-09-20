@@ -203,6 +203,12 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
   never through the person's interactive shell: rc files change directories, set aliases and
   print banners, and any of those moves or breaks a launch (the same ADR saw a `.bashrc` `cd`
   relocate every pane). The `shell` adapter is the one place the person's shell is the point.
+  **One exception to *directly*, and it keeps the rule's point (2026-09-20):** tmux refuses a command
+  line past its message size — *command too long*, at about 16 KB — and a session's brief rides in
+  its argv; on that date a team would not start because a brief had reached 16,194 bytes. Past
+  8 KB the argv is written to a launch script under the home (`launch/<tmux name>.sh`, mode `0700`)
+  that `exec`s it under `/bin/sh` — never the person's shell, no rc file — so the pane's first
+  process is still the command itself and the limit that applies is the kernel's.
 - `history-limit` raised at creation; `pipe-pane` streams output to
   `~/.agentorc/runs/<session>-<created>.log` continuously (replaces tdgrind's per-tick
   snapshot; a reboot loses nothing that reached the pipe).

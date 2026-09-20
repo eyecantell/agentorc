@@ -3,6 +3,7 @@
 import os
 import subprocess
 import threading
+import time
 
 import conftest
 import pytest
@@ -127,3 +128,31 @@ def test_the_stale_server_sweep_leaves_a_concurrent_runs_server_alone():
             owner.terminate()
             owner.wait(timeout=5)
         kill_private_server(t)  # a failed assertion above must not leave a server behind
+
+
+def test_a_command_too_long_for_tmux_is_launched_through_a_script(tmux, tmp_path, monkeypatch):
+    """2026-09-20: `ao team start` failed with tmux's *command too long* — a session's brief rides in
+    its argv, and one had grown to 16,194 bytes. Past `LONG_COMMAND` the argv goes through a launch
+    script that `exec`s it; every byte arrives, the pane's first process is still the command, and
+    a short command is passed exactly as before."""
+    from sessionorc import tmux as tmux_mod
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    out = tmp_path / "out"
+    brief = "- a brief with 'quotes', \"doubles\", $dollars, `ticks` and a\nnewline; " * 600  # ~40 KB
+    assert len(brief.encode()) > 16_384
+    argv = ["sh", "-c", 'printf %s "$1" > "$2"; printf %s "$0" > "$2.zero"; sleep 30', "marker", brief, str(out)]
+    tmux.new_session("ao-long", tmp_path, argv, {"X": "1"})
+    for _ in range(100):
+        if out.exists() and out.read_text() == brief:
+            break
+        time.sleep(0.05)
+    assert out.read_text() == brief  # every byte, quoting and newlines intact
+    assert (tmp_path / "out.zero").read_text() == "marker"  # and the argv's own shape
+    script = tmp_path / "home" / "launch" / "ao-long.sh"
+    assert script.exists() and oct(script.stat().st_mode & 0o777) == "0o700"
+    pane = tmux.main_panes("ao-")["ao-long"]
+    assert pane.current_command == "sh" and not pane.dead  # `exec`: the command itself is the pane's process
+
+    assert tmux_mod.Tmux._fit("ao-short", ["bash", "--norc"]) == ["bash", "--norc"]  # short: untouched
+    assert not (tmp_path / "home" / "launch" / "ao-short.sh").exists()
