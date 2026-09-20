@@ -1556,7 +1556,7 @@ class HostAgent:
         injected by the dispatcher: every send that reaches the pane is recorded on the record as
         `sends`, with who typed it (design §4.10)."""
         s = self._get(id)
-        self._refuse_closed(s)
+        self._refuse_gone(s)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
         entry = self._record_send(s, caller, text)
@@ -1603,12 +1603,20 @@ class HostAgent:
         return self._get(id).view()
 
     @staticmethod
-    def _refuse_closed(s: Session) -> None:
-        """An act on a closed record is refused (design §4.10 lifecycle) — a resumed conversation's
-        old id in particular: only mail is forwarded to the successor, never keystrokes."""
+    def _refuse_gone(s: Session) -> None:
+        """A record with **no turn to type into** is refused in words (design §4.5a *Focus
+        composer*, §4.10 lifecycle). Two of them: a **closed** record — a resumed conversation's
+        old id in particular, where only mail is forwarded to the successor, never keystrokes —
+        and an **exited** one, whose pane is gone or dead. Exited was not refused until 2026-09-20
+        (TD-078): the page disabled its composer, the RPC did not, and a send that arrived anyway
+        went to tmux, which answered `no current target` — a tmux error for a records question,
+        with nothing in it to say which session had gone or when. That is how the flake was read."""
         if s.state == "closed":
             where = f"; it was resumed as {s.superseded_by}" if s.superseded_by else ""
             raise RpcError(f"{s.id} is closed{where}: nothing is typed into a closed session")
+        if s.state == "exited":
+            code = f" (code {s.exit_code})" if s.exit_code is not None else ""
+            raise RpcError(f"{s.id} has exited{code}: there is no turn to type into — resume it, or forget it")
 
     def _record_send(self, s: Session, caller: Any, text: str) -> SendEntry:
         """`sends` (design §4.10): what was typed into this pane and by whom, minted and stamped
@@ -1686,7 +1694,7 @@ class HostAgent:
 
     async def rpc_keys(self, id: str, keys: list[str], caller: Any = None) -> None:
         s = self._get(id)
-        self._refuse_closed(s)
+        self._refuse_gone(s)
         self._record_send(s, caller, " ".join(str(k) for k in keys))
         if mail.is_person(caller):
             self._refill(s)  # keys are how a person answers a menu or a question in the pane

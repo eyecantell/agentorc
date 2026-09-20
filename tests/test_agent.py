@@ -409,6 +409,25 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         agent.tmux.kill_session(s["id"])
 
 
+async def test_send_to_an_exited_record_is_refused_in_words(agent, hookstub, tmp_path):
+    """Design §4.5a *Focus composer*, TD-078: a record with no turn to type into is refused by the
+    **host agent**, not only by the page that disables its composer. Until 2026-09-20 an `exited`
+    record was not: the paste went to tmux, which answered `no current target` — a tmux error for
+    a question about a record, naming neither the session that had gone nor when. It is what a CI
+    flake looked like, and the reason it read as a race rather than as a send to a dead pane."""
+    async with LocalClient() as c, LocalClient() as feeder:
+        s = await c.call("create", name="w", dir=str(tmp_path), adapter="hookstub")
+        await feeder.call("hook", session=s["id"], state="idle")
+        await wait_state(c, s["id"], "idle")
+        await c.call("kill", id=s["id"])
+        await wait_state(c, s["id"], "exited")
+        for call, kw in (("send", {"text": "anyone?"}), ("keys", {"keys": ["Enter"]})):
+            with pytest.raises(AgentError, match="has exited.*no turn to type into"):
+                await c.call(call, id=s["id"], **kw)
+        # and it is the record's state that refuses, not a missing pane: nothing was typed
+        assert (await c.call("get", id=s["id"]))["sends"] == []
+
+
 async def test_a_session_started_outside_agentorc_gets_no_card(agent, hookstub, tmp_path):
     """Design §4.1 (2026-09-17): a live session the adapter sees outside agentorc is not shown —
     the Org is what agentorc started or adopted, and a person's own session is theirs. The registry

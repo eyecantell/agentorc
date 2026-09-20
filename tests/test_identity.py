@@ -204,7 +204,7 @@ def test_proc_is_read_as_it_is():
 
 PROBE = textwrap.dedent(
     """
-    import json, socket, sys, time
+    import json, os, socket, sys, time
     sock_path, out, delay, req = sys.argv[1], sys.argv[2], float(sys.argv[3]), json.loads(sys.argv[4])
     time.sleep(delay)
     s = socket.socket(socket.AF_UNIX); s.connect(sock_path)
@@ -215,7 +215,12 @@ PROBE = textwrap.dedent(
         if not chunk:
             break
         buf += chunk
-    open(out, "w").write(buf.decode())
+    # Written beside the path and renamed onto it, so `out` exists only once it is **whole**:
+    # `open(out, "w")` creates the file empty, and the waiter — which polls for the path — then
+    # read nothing and died in the JSON decoder (TD-078, a third sighting 2026-09-20). A rename
+    # within one directory is atomic, so existence is the right signal again.
+    open(out + ".part", "w").write(buf.decode())
+    os.replace(out + ".part", out)
     """
 )
 
