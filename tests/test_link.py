@@ -93,6 +93,24 @@ async def test_a_frame_past_the_limit_ends_the_link_with_a_reason_never_an_excep
     w1.close()
 
 
+async def test_a_frame_too_large_to_send_is_refused_here_not_discovered_there(tmp_path, monkeypatch):
+    """TD-066: a frame past the limit is unreadable at the other end, which ends the link with a
+    reason but cannot say which frame did it. The writing end refuses it instead: a reply becomes an
+    error reply and the link lives; a request raises, which every caller already handles."""
+
+    async def wide(method, params):
+        return {"pad": "a" * 4096}
+
+    async with pair(tmp_path, nothing, wide) as (a, _b, _):
+        monkeypatch.setattr(link, "FRAME_LIMIT", 1024)
+        with pytest.raises(link.LinkError, match="too large to send"):
+            await a.request("wide")  # the reply is refused at the end that built it
+        with pytest.raises(link.FrameTooLarge, match="too large to send"):
+            await a.request("x", pad="a" * 4096)  # and so is an outgoing request
+        monkeypatch.setattr(link, "FRAME_LIMIT", 8 * 1024 * 1024)
+        assert await a.request("wide") == {"pad": "a" * 4096}  # the link survived both
+
+
 def test_backoff_doubles_to_a_ceiling_with_jitter():
     d = link.backoff_delays(1.0, 8.0)
     got = [next(d) for _ in range(6)]

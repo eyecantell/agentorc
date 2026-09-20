@@ -181,6 +181,29 @@ def _peer_pid(writer: asyncio.StreamWriter) -> int | None:
     return struct.unpack("3i", raw)[0] or None
 
 
+def _reply_line(req: dict[str, Any], reply: dict[str, Any]) -> bytes:
+    """One reply is one line. A line longer than the limit every client opens its stream with is a
+    line no client can read: the reader raises `Separator is found, but chunk is longer than
+    limit`, the connection is lost, and the agent's log says nothing — on 2026-09-17 a `list` that
+    had grown past asyncio's 64 KiB default took every `ao` on the machine down at once, and a
+    person had to work out why (TD-066). So the agent refuses its own oversize reply rather than
+    writing it: the request is answered, in words, against its own id, and the method that produced
+    it is logged."""
+    line = (json.dumps(reply) + "\n").encode()
+    if len(line) <= link.FRAME_LIMIT:
+        return line
+    method = req.get("method")
+    log.error("reply to %s is %d bytes, past the %d-byte line limit: refused", method, len(line), link.FRAME_LIMIT)
+    refusal = {
+        "id": reply.get("id", req.get("id")),
+        "error": (
+            f"the reply to {method!r} is {len(line)} bytes, past the {link.FRAME_LIMIT}-byte line "
+            "limit — ask for less of it, or raise the limit at both ends"
+        ),
+    }
+    return (json.dumps(refusal) + "\n").encode()
+
+
 class HostAgent:
     def __init__(
         self,
@@ -331,6 +354,7 @@ class HostAgent:
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
+        self._oversize: set[str] = set()  # ids whose view is past the line limit, logged once each
         self._backed_up = ""  # the local date of the last nightly tarball tried (a home only)
         self._backup_task: asyncio.Task[None] | None = None
 
@@ -3826,6 +3850,17 @@ class HostAgent:
             return
         # sort_keys: the payload is the comparison key too (the UI reads fields by name, never order)
         payloads = {v["id"]: json.dumps(v, sort_keys=True) for v in self._views()}
+        # A push is a line like a reply, and one past the limit ends every open subscription at
+        # once — every tab, not just the card that grew (TD-066). One card is dropped from the
+        # stream instead, and named in the log; `last` is left untouched, so the card returns to
+        # the stream the moment it fits again. Logged once per card, not once a tick.
+        big = {sid for sid, payload in payloads.items() if len(payload) + 32 > link.FRAME_LIMIT}
+        for sid in big - self._oversize:
+            log.error("the view of %s is past the %d-byte line limit: not pushed", sid, link.FRAME_LIMIT)
+        for sid in self._oversize & (payloads.keys() - big):
+            log.info("the view of %s fits again: pushing", sid)
+        self._oversize = big  # so a record that has gone leaves the set with its view
+        payloads = {sid: payload for sid, payload in payloads.items() if sid not in big}
         for w, last in list(self._subscribers.items()):
             for sid, payload in payloads.items():
                 if last.get(sid) != payload:
@@ -3876,9 +3911,7 @@ class HostAgent:
                         await self._send(writer, json.dumps({"event": "usage", "profile": prof, "usage": u}))
                     await self._push_changes()
                     continue
-                writer.write(
-                    (json.dumps(await self._dispatch(req, peer=_peer_pid(writer), conn=writer)) + "\n").encode()
-                )
+                writer.write(_reply_line(req, await self._dispatch(req, peer=_peer_pid(writer), conn=writer)))
                 await writer.drain()
         except (ConnectionError, asyncio.IncompleteReadError):
             pass
@@ -3906,7 +3939,7 @@ class HostAgent:
                     line.cancel()
                     with contextlib.suppress(asyncio.CancelledError, ConnectionError):
                         await line
-                    writer.write((json.dumps(task.result()) + "\n").encode())
+                    writer.write(_reply_line(req, task.result()))
                     await writer.drain()
                     return
                 try:

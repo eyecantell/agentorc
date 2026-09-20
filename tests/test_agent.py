@@ -1436,6 +1436,51 @@ async def test_a_reply_past_asyncios_default_line_limit_is_read(agent, tmp_path)
         await c.call("kill", id=s["id"])
 
 
+async def test_a_reply_past_the_line_limit_is_refused_in_words_not_written(agent, tmp_path, monkeypatch, caplog):
+    """TD-066, the other half: a reply the client's reader cannot frame is a `ValueError` at every
+    client and nothing in the agent's log. So the agent refuses its own oversize reply — against the
+    request's id, naming the method — and the connection lives to serve the next call."""
+    from sessionorc import link
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="wide", dir=str(tmp_path), adapter="shell")
+        await c.call("progress", id=s["id"], ref="TD-1", status="claimed", why="x" * 4_000)
+        monkeypatch.setattr(link, "FRAME_LIMIT", 2_048)
+        with caplog.at_level("ERROR", logger="agentorc.agent"), pytest.raises(AgentError, match="line limit"):
+            await c.call("list")
+        assert "reply to list" in caplog.text
+        # the same connection still serves what fits: one refusal, not a broken client
+        monkeypatch.setattr(link, "FRAME_LIMIT", 8 * 1024 * 1024)
+        assert any(v["id"] == s["id"] for v in await c.call("list"))
+        await c.call("kill", id=s["id"])
+
+
+async def test_a_view_past_the_line_limit_is_dropped_from_the_stream_not_the_stream(agent, tmp_path, monkeypatch):
+    """TD-066: a push is a line like a reply, and one past the limit would end every open
+    subscription — every tab — over one card that grew. The card leaves the stream instead, and the
+    others keep arriving."""
+    from sessionorc import link
+
+    async def next_event(sub: LocalClient, timeout: float) -> dict:
+        return json.loads(await asyncio.wait_for(sub._reader.readline(), timeout))
+
+    async with LocalClient() as c, LocalClient() as sub:
+        big = await c.call("create", name="wide", dir=str(tmp_path), adapter="shell")
+        await c.call("progress", id=big["id"], ref="TD-1", status="claimed", why="x" * 4_000)
+        small = await c.call("create", name="thin", dir=str(tmp_path), adapter="shell")
+        monkeypatch.setattr(link, "FRAME_LIMIT", 2_048)
+        await sub.call("subscribe")
+        seen = set()
+        while small["id"] not in seen:
+            ev = await next_event(sub, 5)
+            if ev.get("event") == "session":
+                seen.add(ev["session"]["id"])
+        assert big["id"] not in seen, "the oversize card is not pushed"
+        monkeypatch.setattr(link, "FRAME_LIMIT", 8 * 1024 * 1024)
+        for sid in (big["id"], small["id"]):
+            await c.call("kill", id=sid)
+
+
 async def test_the_tools_own_title_is_observed_from_the_pane(agent, hookstub, tmp_path, monkeypatch):
     """TD-074 step 3, design §4.5a **title** / §4.3 `title()`: the pane's terminal title is read with
     the pane list each tick and handed to the session's adapter, which alone says what of it is a

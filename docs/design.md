@@ -461,6 +461,15 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   picker, and clipboard paste (screenshots) on desktop; the share sheet on the phone.
 - Permission decisions: the `PermissionRequest` hook script asks the host agent over the socket and
   blocks until the UI answers or the hook times out (§4.2).
+- **A reply is one line, and one no client can read is refused here** (TD-066). Every stream — the
+  agent's socket, the client's, the link's — is opened with the same `FRAME_LIMIT` (8 MiB, §4.4a
+  *Frames*), since asyncio's 64 KiB default is smaller than a `list` of a day's records. A longer
+  line raises in the *reader*, which loses the connection and can say nothing about what caused it;
+  on 2026-09-17 one oversize `list` took every `ao` on the machine down at once. So the agent never
+  writes one: a reply past the limit is answered as that request's **error**, in words and against
+  its own id, and logged with the method that produced it; a session **view** past the limit is
+  dropped from the subscription stream — that one card, logged once, never the stream every tab
+  shares — and returns to it as soon as it fits.
 - **Version skew is survivable** (2026-09-17, TD-062). The live install is promoted by a person, so
   a merged RPC change reaches every session's `ao` before the running host agent knows it. Two
   halves keep the window harmless, and they are properties of the envelope rather than of any one
@@ -794,7 +803,9 @@ decided here so both ends are written from one text.
   served concurrently; a reply may overtake an earlier one. A frame is one line of at most
   `FRAME_LIMIT` (8 MiB) — every stream it crosses is opened with that limit, since asyncio's 64 KiB
   default is smaller than a node's snapshot — and a longer one **ends the link with a reason**: the
-  stream cannot be re-framed after it, and an exception there would end the dialer for good.
+  stream cannot be re-framed after it, and an exception there would end the dialer for good. The
+  writing end refuses an oversize frame rather than leaving it to be discovered there (TD-066): a
+  reply becomes that request's error and the link lives, a request or a notification raises.
 - **What step 3a sends.** `hello` from the node — `{protocol: 1, host: <what the node calls
   itself>}` — answered with `{protocol, home, host: <the name the key is bound to>}`; the node's
   own name is a diagnostic, and a mismatch is refused in words, because it means a key is
