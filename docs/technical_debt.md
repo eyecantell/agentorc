@@ -49,6 +49,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Open |
 | TD-072 | Sessions exit with unread mail: nothing makes a worker read its inbox before it says it is out of work, and an unread `note` outlives the run it was sent to | Medium | Open |
 | TD-073 | Usage is shaped like Claude Code's two windows in the core and the UI (`five_hour_pct`, `weekly_pct`): a second tool's quota — other windows, a token budget, or none — has nowhere to go | Medium | Open |
+| TD-074 | A card's preview is the last lines of the terminal, which for a Claude Code session is its mode line and an empty composer: the session should say what it is doing, with the tool's own title as the fallback | Medium | Open |
 
 ---
 
@@ -762,3 +763,26 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Done when** a test adapter reporting one daily window drives `limited` and shows in the chip without any Claude field name appearing outside `adapters/claude_code/`, and §4.3 and §6 describe the list.
 
 **Related:** TD-001 (the usage chip), design §4.3 (adapters own tool-specific names), §6 (usage gate), §4.5a (the **usage** chip row), TD-071 item 8 (the label fix that prompted the question).
+
+
+## TD-074: A card's preview is the tool's chrome — the session should say what it is doing
+
+**Priority:** Medium
+**Added:** 2026-09-19 (the anchor session; Paul, during the look-and-feel pass — TD-071 item 8)
+**Status:** Open — a proposal put to Paul 2026-09-19, not yet approved. Design first: a new report channel is §4.8, the card's slot is §4.5 screen 1 and §4.5a, a role's icon is §4.8 *Role presets* and §5.
+**Location:** `src/agentorc/ui/templates/card.html` (the `sc-slot`: `s.tail[-3:]` while working, `last: {{ s.tail[-1] }}` when idle), `src/sessionorc/agent.py` (`rpc_progress` and the report channels), `src/agentorc/cli.py` (`ao progress`), `src/agentorc/adapters/claude_code/__init__.py` (`composer()` already tells the tool's input line from its output), `src/agentorc/repoconfig.py` (`Role`), the briefs
+
+**Why:** the card's slot shows the last three lines of the pane while a session works and the last line when it is idle. For a shell or a command run that is the right thing. For Claude Code it is the bottom of a TUI: on 2026-09-18 an idle worker's card read *last: ▸▸ bypass permissions on (shift+tab…* and another *last: new task? /clear to save 392.6k tokens* — the tool's chrome, never the work. The record already knows **which item** a worker holds (`ao progress claim`, the card's report line, *TD-431 → #923 · 10/11*), and nothing says **what it is doing about it**.
+
+**Proposed, in the order the slot would prefer them:**
+1. **What needs a person** — unchanged: the pending permission or question (hook channel, §4.2).
+2. **What the session says it is doing** — a third report channel beside `progress` and `findings` (§4.8): `ao doing "<one line>"`, ungated like the others, bounded (one line, a couple of hundred characters, the last value only — not a log), stamped, shown with its age (*says · 11m ago*) so a stale line reads as stale. The briefs tell a worker to say it when it claims and when what it is doing changes; a lead says its round in the same channel, and **the team card's header shows the lead's line** — which is the lead reporting on the team without the lead being asked to narrate each member.
+3. **The tool's own title, labelled as such** — Claude Code sets its terminal title to a short summary of the conversation, and tmux holds it (`#{pane_title}`; seen 2026-09-19 on a live pane as *✳ Error Checker*). An adapter method (`title()`), so the core names no tool (§4.3); rendered like every derived value, dashed and labelled (*the tool's own title · it has not said*). It is text a model wrote: shown, never acted on, never given a button (TD-071 item 8).
+4. **The pane's tail** — for adapters where the tail is the work (`shell`, command runs), and as the last resort elsewhere, with the tool's chrome trimmed by the adapter that knows it.
+Not proposed: **the lead describing each member** (second-hand, a token cost every round, stale between rounds), and **the member's latest mail as its status** (mail is addressed to someone and is about whatever it is about; a claim note is not a status).
+
+**Layout per role: no; a role icon: yes, small.** A role is a label and *nothing keys on it* (§4.8 *Role presets*, §9 invariant 9) — a card layout chosen by role would be the first thing that does. The card already draws whichever channels are non-empty, which is what makes a lead's card differ from a grinder's and a hunter's without a rule saying so: a grinder fills `progress`, a hunter `findings`, a lead its round. If a role later needs to say which channel leads its card, that is an ordering hint in the preset, not a layout. An **icon** is only a label's picture: `icon:` on the role preset (`repoconfig.Role`, overridable per repo like every other key), chosen from a fixed set the UI ships (no free-form SVG from a config file), drawn small and monochrome inside the role badge — the state tile stays the one coloured thing on a card.
+
+**Done when** a Claude Code worker's card shows what it said it is doing, with its age, and falls back to the tool's title and then the tail; the team header shows the lead's line; a role may carry an icon; the briefs say when to say it; and §4.8, §4.5, §4.5a, §4.3 and §5 describe all of it.
+
+**Related:** design §4.8 (report channels, role presets), §4.5a (the card **report line**), §4.3 (adapter contract), TD-028 (the report channels), TD-071 item 8 (the look-and-feel pass and *no control parses agent output*), TD-069 (the Inbox, which would show the same line on a row).
