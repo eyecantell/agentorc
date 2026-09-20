@@ -42,7 +42,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-062 | A merge that changes an RPC's parameters breaks the `ao` CLI on the live system until the host agent restarts: the install is editable, so the client is new at once and the agent is not | Medium | Partly done |
 | TD-063 | CI-only flakes on the 3.12 runner: the two timing-shaped tests and the record-revive race are fixed; the 26-minute hang of PR #192 is still unattributed | Low | Partly done |
 | TD-064 | Claude Code's own session-to-session messages reach an agentorc session around the mail gates, and an unattended session blocks on their approval prompt until a person answers | Medium | Open |
-| TD-066 | Records grow without bound until TD-052 step 6 sets the mail bounds, and one `list` reply outgrew the client's 64 KiB line limit: every `ao` and the UI failed at once | High | Open |
 | TD-067 | Standing up a team has no operator's guide: the briefs README predates `ao team start`, design §4.9 is a spec, and `ao --skill` is for a session, not for the person or the Claude session that sets a team up | Medium | Open |
 | TD-068 | A brief over about 16 KB cannot start a session: the prompt is passed on tmux's command line, and `tmux new-session` answers *command too long* | Medium | Open |
 | TD-069 | One place to work from: an Inbox page listing everything that needs a person — session states, mail, due board items — each with its controls, filtered by team; today they are in three places and the mail dialog is too narrow to read | Medium | Open |
@@ -636,24 +635,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** an unattended session started by agentorc cannot be stopped by another Claude Code session's message, and §4.10 names the channel and the policy.
 
 **Related:** TD-052 (mail), design §9 invariant 13, ADR 2026-09-16 (why agentorc builds its own messaging rather than using Claude Code's — this is the other half of that decision: what to do about theirs).
-
-
-## TD-066: A `list` reply outgrew the client's line limit and every `ao` on the machine failed
-
-**Priority:** High
-**Added:** 2026-09-17 (anchor session, watching the samscrape team)
-
-**Status:** Open — the immediate cause is fixed (PR #209: the client and the stdio bridge open their streams with the same 8 MiB limit the link uses). **The growth is bounded since 2026-09-18 (TD-052 step 6, PR #214):** read mail is kept 12 hours, a mailbox refuses past 100 unread, a thread's tally leaves with its last entry, and `list`, the stream and `wait` no longer carry `threads` or `wakes` (a `get` of one record still does). Left: a reply larger than the client can read should be a logged refusal at the agent rather than a silent failure at every client.
-
-**Location:** `src/sessionorc/client.py` (`LINE_LIMIT`), `src/sessionorc/link.py` (`FRAME_LIMIT`), `src/sessionorc/mail.py` (the bounds that are `None` until TD-052 step 6: `MAIL_RETENTION`, `MAILBOX_DEPTH`, `THREAD_BOUND`), `src/sessionorc/models.py` (`Session.view()`)
-
-**Why:** at about 20:00 MDT every `ao` command answered `ValueError: Separator is found, but chunk is longer than limit` and the Org page answered 500. One reply is one line, and asyncio's default line limit is 64 KiB; the `list` of six records had grown past it. The records themselves were 106–249 KB each: after seven hours of a four-session team with no retention, the lead's `outbox` held 173 KB and each grinder's `inbox` 77–107 KB. `view()` drops `inbox` and `outbox`, but what it keeps — `sends`, `threads`, `wakes`, `tail`, the reports — was enough across six records. The agent's server had been opened with an 8 MiB limit for the link (TD-057 step 3a); the client had not, so the agent wrote a reply nobody could read. Every session on the machine lost `ao` at once — the leads' rounds, the grinders' claims, the UI — for as long as it took a person to notice.
-
-**Fix:** (1) done: `LINE_LIMIT` on the client's two connections, with a test that reads a `list` past 64 KiB. (2) TD-052 step 6 is now urgent rather than pending measurement: `MAIL_RETENTION` and `MAILBOX_DEPTH` bound what a record carries; until they are set a long-running team's records grow without limit, and a 249 KB record is rewritten to disk on every change. (3) `view()` should carry only what a card needs — `threads` and `wakes` are the host agent's bookkeeping and could leave the view, or be summarised — so a `list` grows with the number of sessions, not with their history.
-
-**Done when** a team can run for days without any record or reply growing past a bound the design names, and a reply larger than the client can read is a logged refusal at the agent, never a silent failure at every client.
-
-**Related:** TD-052 (step 5's measurement and step 6's numbers — this is the first measurement: what seven hours of a four-session team weighs), TD-057 step 3a (where the agent's limit was raised), TD-062 (the same shape: the agent newer than what talks to it).
 
 ## TD-067: Standing up a team has no operator's guide — for a person, and for the Claude session Paul tells to do it
 
