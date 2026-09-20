@@ -584,3 +584,4 @@
 16:22  tdgrind-ao-1: TD-072 dropped (not approved, overlaps TD-079/#260; work parked on td072-mail-before-winddown, named on its record) and its park-note PR #261 cadence-passes all rows; now claimed TD-078 → ok
 16:28  tdgrind-ao-1: TD-078 declared done against PR #264 — #264 still OPEN, cadence check passes every row (review SHIP · Sonnet · code · 0 findings, CI green, pushed). Worker has moved on to TD-077; watching whether #264 gets merged.
 16:29  tdgrind-ao-1: #264 still open 15 min after TD-078 was declared done, worker now on td077 branch → ao msg note m-5c3f0861a287 to squash-merge it or record why it is held
+16:39  tdgrind-ao-1: replied to my note by merging #264 (TD-078) — cadence check all rows pass merged; its note says TD-078 stays open for a second flake sighting. Now claimed TD-077 and TD-079 → ok (TD-077 has no result yet; watching).
