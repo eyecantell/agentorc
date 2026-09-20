@@ -831,6 +831,46 @@ def cmd_doing(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: doing — {s['doing']['text']}"))
 
 
+def cmd_whoami(args: argparse.Namespace) -> int:
+    """`ao whoami` (design §4.8a): what the host agent takes this process to be — a session (and by
+    which signal: ancestry, session id or terminal), *outside* every pane, or *unknown* — read from
+    the connection, never from `AGENTORC_SESSION`. For a person or a session checking its own channel."""
+    w = call_sync("whoami")
+
+    def human() -> None:
+        if w.get("channel") is None:
+            print("identity is off on this host: nothing is classified (design §4.8a)")
+        elif w["channel"] == "session":
+            print(f"session {w['session']} (by {w['signal']})")
+        else:
+            print(w["channel"] + (f" ({w['signal']})" if w.get("signal") else ""))
+
+    return emit(args, w, human)
+
+
+def cmd_identity(args: argparse.Namespace) -> int:
+    """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,
+    connections by class and deciding signal since the host agent started, and the identity alarms —
+    what a host is turned from `observe` to `enforce` on."""
+    r = call_sync("identity")
+
+    def human() -> None:
+        check = "on" if r["detached_check"] else "off"
+        print(f"{r['host']}: identity {r['mode']} · detached-process check {check}")
+        tally = " · ".join(f"{k} {v:,}" for k, v in r["tally"].items()) or "no connection classified yet"
+        print(f"  since start: {tally}")
+        rows = [("(no record)", a) for a in r["alarms"]]
+        rows += [(sid, a) for sid, alarms in r["sessions"].items() for a in alarms]
+        if not rows:
+            print("  no identity alarms")
+        for about, a in rows:
+            claimed = a["claimed"] or "no caller"
+            times = a["at"] if a["count"] == 1 else f"{a['at']} … {a['last']}"
+            print(f"  ALARM {about}: {a['channel']} claimed {claimed} on {a['rpc']} ×{a['count']} ({times})")
+
+    return emit(args, r, human)
+
+
 def cmd_finding(args: argparse.Namespace) -> int:
     """`ao finding <ref> [--priority …]` (design §4.8): a reference this session filed on the side."""
     sid = _own_session(args)
@@ -1308,6 +1348,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
     p.set_defaults(fn=cmd_progress)
 
+    p = add("whoami", help="what the host agent takes this process to be, from its connection (design §4.8a)")
+    p.set_defaults(fn=cmd_whoami)
+    p = add("identity", help="this host's identity mode, the connections it has classified, and its alarms (§4.8a)")
+    p.set_defaults(fn=cmd_identity)
     p = add("doing", help="say in one line what this session is doing now (design §4.8)")
     p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
     p.add_argument("--clear", action="store_true", help="empty the line: this session is saying nothing")

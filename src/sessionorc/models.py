@@ -64,6 +64,7 @@ CLOSED_REASONS = ("replied", "declined", "asker_gone", "lapsed", "go_with_it", "
 # every field of `Session` is in one and only one of the three.
 NODE_OWNED = frozenset(
     {
+        "identity_alarms",
         "state",
         "since",
         "pending",
@@ -418,6 +419,10 @@ class Session:
     # writes it. None when the adapter has no opinion or there is no name to show; it changes
     # rarely and no wake fires on it (it is out of `wake_digest`).
     title: str | None = None
+    # design §4.8a: requests on this host's socket whose claim disagreed with their channel —
+    # `{channel, claimed, rpc, count, at, last}`, coalesced, the newest `identity.ALARMS_KEEP`. Observed
+    # where the socket is, so the node's to write, like `tail`.
+    identity_alarms: list[dict[str, Any]] = field(default_factory=list)
     exit_code: int | None = None
     # A tmux pane (live or dead) still backs this record. False after `kill`/`close` (the session is
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).

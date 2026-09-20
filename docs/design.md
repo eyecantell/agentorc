@@ -1764,8 +1764,10 @@ Putting a cheaper, less-trusted model beside a high-trust one (TD-075) waits on 
 this section.
 
 **The channel.** On every connection to its own socket the host agent reads the peer's
-credentials (`SO_PEERCRED`: pid, uid) once, at accept, and classifies the connection — not the
-request — as one of:
+credentials (`SO_PEERCRED`: pid, uid) and classifies **the connection — not the request — once, at
+its first request, for its life**: the pid is the one that connected, and asking `/proc` about it
+again later could be asking about whoever holds that pid *now* (a process that connects, hands
+the socket to a child and exits must not become whatever reuses its pid). A connection is one of:
 
 - **session X** — the peer belongs to the pane of a record on this host whose pane is live, by
   the first of three signals that answers, each read from `/proc/<pid>/stat`: **ancestry** — the
@@ -1787,8 +1789,10 @@ request — as one of:
   that is already another session's. Everything a session runs is under its pane: the tool, its
   shells, its hooks (which send no `caller` at all today), `ao`. **A pane the tick has not listed
   yet** — a session's first hook can arrive before the first tick after `create` — is looked up
-  on demand: a connection that matches no known pane triggers one pane list before it is
-  classified, at most once a second — and a connection that arrives while one is in flight, or
+  on demand: **while some live record on this host has a pane the last list did not show**, a
+  connection that matches no known pane triggers one pane list before it is classified, at most
+  once a second (when every live record's pane is known, a peer that matched none is under none,
+  so the person's terminal and the UI — nearly every such connection — never wait) — and a connection that arrives while one is in flight, or
   inside that second, **waits for the next list rather than being judged against the old one**;
   only a connection that matches nothing once a fresh list has landed is *outside* or *unknown*.
 - **outside** — no ancestor is a pane of ours: a person's terminal, the UI's process, a systemd
@@ -1809,8 +1813,7 @@ request — as one of:
   detached process to pass as). `ao status -v` says *detached-process check: on | off* beside
   the mode, so a host where it is off is not taken for one where it is on.
 
-The classification is cached per `(pid, process start time)` for the connection's life; a pid
-that is reused is a different start time.
+The classification is the connection's for its life, and is never asked again.
 
 **The rule: the channel decides, and a claim that disagrees is never innocent.**
 

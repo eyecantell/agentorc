@@ -20,7 +20,9 @@ import os
 import re
 import secrets
 import signal
+import socket
 import stat
+import struct
 import sys
 import tarfile
 import time
@@ -31,7 +33,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, containers, hosts, link, mail, modes, naming, paths, reports, waits
+from sessionorc import adapters, containers, hosts, identity, link, mail, modes, naming, paths, reports, waits
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktree_path
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
@@ -161,11 +163,43 @@ class _Wait:
         self.poke = asyncio.Event()
 
 
+def _peer_pid(writer: asyncio.StreamWriter) -> int | None:
+    """The pid at the other end of a unix socket (`SO_PEERCRED`: pid, uid, gid), or None when the
+    transport cannot say — an in-memory stream, a platform without it."""
+    sock = writer.get_extra_info("socket")
+    if sock is None or not hasattr(socket, "SO_PEERCRED"):
+        return None
+    try:
+        raw = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+    except OSError:
+        return None
+    return struct.unpack("3i", raw)[0] or None
+
+
 class HostAgent:
     def __init__(
-        self, *, tmux: Tmux | None = None, store: SessionStore | None = None, events: EventQueue | None = None
+        self,
+        *,
+        tmux: Tmux | None = None,
+        store: SessionStore | None = None,
+        events: EventQueue | None = None,
+        identity_mode: str | None = None,
+        proc: identity.ProcReader | None = None,
     ):
         paths.ensure_layout()
+        # Who is calling (design §4.8a, TD-077): `off | observe | enforce` from `local: {identity: …}`,
+        # the panes the last list saw, the home's own alarms (about no record), and a tally of
+        # connections by class and deciding signal since start — what `ao identity` prints, and what
+        # turning a host from `observe` to `enforce` is decided on.
+        self.identity_mode = identity.mode_of(identity_mode or hosts.local_host().identity)
+        self.proc: identity.ProcReader = proc or identity.LinuxProc()
+        self._id_panes: list[identity.Pane] = []
+        self._id_conns: dict[Any, identity.Channel] = {}  # a connection's classification, for its life
+        self._id_listed_at = 0.0
+        self._id_list_lock = asyncio.Lock()
+        self._id_detached: str | None = None
+        self.identity_alarms: list[dict[str, Any]] = []
+        self.identity_tally: dict[str, int] = defaultdict(int)
         self.tmux = tmux or Tmux()
         self.store = store or SessionStore()
         self.events = events or EventQueue()
@@ -383,6 +417,7 @@ class HostAgent:
     async def tick(self) -> None:
         snapshot_at = datetime.now(UTC)
         panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
+        self._id_note_panes(panes)
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
@@ -3462,6 +3497,112 @@ class HostAgent:
             return f"link protocol {hello.get('protocol')!r} here is {link.PROTOCOL}: promote both ends to one build"
         return None
 
+    # -- who is calling (design §4.8a, TD-077) -----------------------------------------------------
+
+    def _id_note_panes(self, panes: dict[str, PaneInfo]) -> None:
+        """The live panes of this host's records, as the classification reads them. On the loop,
+        from a pane list a thread already took."""
+        self._id_panes = [
+            identity.Pane(sid, p.pane_pid, identity.tty_nr_of(p.tty) if p.tty else 0)
+            for sid, p in panes.items()
+            if not p.dead and sid in self.sessions
+        ]
+        self._id_listed_at = time.monotonic()
+
+    async def _id_channel(self, peer: int) -> identity.Channel:
+        """Classify one connection's peer. A peer that matches no pane we know may belong to one the
+        tick has not listed yet — a session's first hook can beat the first tick after `create` —
+        so it waits for a fresh list (one at a time, at most one a second) before it is judged
+        *outside* or *unknown*; never against the old one."""
+        if self._id_detached is None:
+            tmux_pid = await asyncio.to_thread(self.tmux.server_pid)
+            if tmux_pid:  # no server yet: asked again on the next connection
+                check = identity.detached_check(self.proc, agent_pid=os.getpid(), tmux_pid=tmux_pid)
+                self._id_detached = check or ""
+        detached = self._id_detached or None
+        ch = identity.classify(peer, self._id_panes, self.proc, detached=detached)
+        listed = {p.session for p in self._id_panes}
+        unlisted = any(
+            sid not in listed and r.pane and (r.host or self.host) == self.host and r.state not in ("exited", "closed")
+            for sid, r in self.sessions.items()
+        )
+        if ch.kind == "session" or not unlisted:
+            # Every live record's pane is known, so a peer that matched none is under none: the
+            # person's terminal and the UI — nearly every such connection — never wait for a list.
+            return ch
+        asked = time.monotonic()
+        async with self._id_list_lock:
+            if self._id_listed_at <= asked:  # nobody listed while this one waited for the lock
+                wait = 1.0 - (time.monotonic() - self._id_listed_at)
+                if self._id_listed_at and wait > 0:
+                    await asyncio.sleep(wait)
+                self._id_note_panes(await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX))
+        return identity.classify(peer, self._id_panes, self.proc, detached=detached)
+
+    async def _identify(self, req: dict[str, Any], peer: int, conn: Any = None) -> dict[str, Any] | None:
+        """The one step at the head of dispatch (§4.8a *Where it lives*): judge the envelope's
+        `caller` against the channel, record an alarm when they disagree, and — under `enforce` —
+        replace the claim with the verdict or refuse. Under `observe` nothing a caller sees
+        changes. Returns the refusal to send, or None to go on."""
+        rpc = str(req.get("method") or "")
+        # The connection is classified once, at its first request, and keeps that for its life: the
+        # peer pid is the one that connected, and asking `/proc` about it again later could be asking
+        # about whoever holds that pid *now* — a process that connects, hands the socket to a child
+        # and exits must not become whatever reuses its pid.
+        ch = self._id_conns.get(conn) if conn is not None else None
+        if ch is None:
+            ch = await self._id_channel(peer)
+            self.identity_tally[f"{ch.kind}:{ch.signal}" if ch.signal else ch.kind] += 1
+            if conn is not None:
+                self._id_conns[conn] = ch
+        if rpc == "whoami":
+            return {"id": req.get("id"), "result": {"channel": ch.kind, "session": ch.session, "signal": ch.signal}}
+        claimed = req.get("caller")
+        named = None if mail.is_person(claimed) else self._addr(claimed)
+        hooked = (req.get("params") or {}).get("session") if rpc == "hook" else None
+        verdict = identity.judge(ch, named, rpc, hook_session=self._addr(hooked) if hooked else None)
+        if verdict.alarm is not None:
+            self._id_alarm(verdict.alarm, verdict.about)
+        if self.identity_mode != "enforce":
+            return None
+        if verdict.refusal is not None:
+            return {"id": req.get("id"), "error": verdict.refusal}
+        if rpc not in identity.READS:
+            if verdict.caller is None:
+                req.pop("caller", None)
+            else:
+                req["caller"] = verdict.caller
+        return None
+
+    def _id_alarm(self, entry: dict[str, Any], about: str | None) -> None:
+        at = now_iso()
+        log.warning("identity alarm (%s): %s claimed %r on %s", self.identity_mode, *entry.values())
+        s = self.sessions.get(about) if about else None
+        if s is None:
+            self.identity_alarms = identity.coalesce(self.identity_alarms, entry, at)
+            return
+        s.identity_alarms = identity.coalesce(s.identity_alarms, entry, at)
+        self._save(s)
+
+    async def rpc_identity(self) -> dict[str, Any]:
+        """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,
+        the tally of connections by class and deciding signal since the agent started, and the
+        alarms — the host's own and each record's. A never-gated read: it tells a session nothing
+        it could not learn by trying."""
+        return {
+            "host": self.host,
+            "mode": self.identity_mode,
+            "detached_check": bool(self._id_detached),
+            "tally": dict(sorted(self.identity_tally.items())),
+            "alarms": list(self.identity_alarms),
+            "sessions": {sid: list(s.identity_alarms) for sid, s in self.sessions.items() if s.identity_alarms},
+        }
+
+    async def rpc_whoami(self) -> dict[str, Any]:
+        """Answered at the head of dispatch, where the channel is known; reached here only when
+        identity is `off` or the call was made in-process."""
+        return {"channel": None, "session": None, "signal": None}
+
     # -- helpers ---------------------------------------------------------------------------------
 
     def _gate(self, caller: Any, method: str, params: dict[str, Any]) -> None:
@@ -3605,12 +3746,15 @@ class HostAgent:
                         await self._send(writer, json.dumps({"event": "usage", "profile": prof, "usage": u}))
                     await self._push_changes()
                     continue
-                writer.write((json.dumps(await self._dispatch(req)) + "\n").encode())
+                writer.write(
+                    (json.dumps(await self._dispatch(req, peer=_peer_pid(writer), conn=writer)) + "\n").encode()
+                )
                 await writer.drain()
         except (ConnectionError, asyncio.IncompleteReadError):
             pass
         finally:
             self._conns.discard(writer)
+            self._id_conns.pop(writer, None)
             self._subscribers.pop(writer, None)
             writer.close()
 
@@ -3621,7 +3765,7 @@ class HostAgent:
         for the close. The moment the client goes away — a Ctrl-C, a cancelled turn — the wait is
         cancelled, so no ghost wait is left to be charged a wake and hand the mail to nobody.
         Requests are serial per connection; one sent mid-wait is answered with an error."""
-        task = asyncio.ensure_future(self._dispatch(req))
+        task = asyncio.ensure_future(self._dispatch(req, peer=_peer_pid(writer), conn=writer))
         try:
             while True:
                 line = asyncio.ensure_future(reader.readline())
@@ -3653,9 +3797,18 @@ class HostAgent:
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
 
-    async def _dispatch(self, req: dict[str, Any], *, link_host: str | None = None) -> dict[str, Any]:
+    async def _dispatch(
+        self, req: dict[str, Any], *, link_host: str | None = None, peer: int | None = None, conn: Any = None
+    ) -> dict[str, Any]:
         """`link_host`: the request came over that node's link (step 5), so its caller is that
-        host's session — `id@host` here — and never this socket's."""
+        host's session — `id@host` here — and never this socket's. `peer`: the pid at the other end
+        of this host's own socket, from its credentials — what design §4.8a judges the envelope's
+        `caller` against; None for a link (identified by its key, never classified) and for a call
+        made in-process. `conn`: the connection, which is what is classified — once, for its life."""
+        if peer is not None and link_host is None and self.identity_mode != "off":
+            refused = await self._identify(req, peer, conn)
+            if refused is not None:
+                return refused
         resp = await self._dispatch_inner(req, link_host=link_host)
         via_home = resp.pop("_via_home", False)
         caller = req.get("caller")

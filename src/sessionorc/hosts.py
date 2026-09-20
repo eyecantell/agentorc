@@ -57,6 +57,10 @@ class Host:
     volatile: bool = False
     repos_registry: Path = Path(DEFAULT_REPOS_REGISTRY).expanduser()
     runs_keep_days: int = DEFAULT_RUNS_KEEP_DAYS
+    # design §4.8a: `off | observe | enforce`, read by `sessionorc.identity.mode_of` ('' = the default)
+    identity: str = ""
+    # design §4.4a *A node that carries no person*: false on an agents-only node
+    person: bool = True
 
     def repos(self) -> list[str]:
         """The registry's main-checkout paths, in file order; a missing file is an empty list."""
@@ -206,4 +210,6 @@ def local_host() -> Host:
         volatile=_flag(data.get("volatile")),
         repos_registry=Path(str(registry) if registry else DEFAULT_REPOS_REGISTRY).expanduser(),
         runs_keep_days=_days(data.get("runs_keep_days", DEFAULT_RUNS_KEEP_DAYS)),
+        identity=str(data.get("identity") or ""),
+        person=data.get("person") is not False,
     )
