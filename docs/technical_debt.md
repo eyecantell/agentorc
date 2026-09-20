@@ -56,6 +56,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-076 | Rename the lifecycle role `lead` → `manager`, name the go-between `techlead`, and retire the bare word `lead` — never re-point it | Medium | Open |
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
 | TD-078 | `tests/test_agent_restart.py::test_restart_reloads_and_reconciles` failed once in a full run and passed alone and on the re-run: a timing flake to pin down before it costs a merge | Low | Open |
+| TD-079 | The Inbox is a queue: nothing leaves it without an answer, what resolves itself leaves a trail, FYI is counted, and an answer is followed to its outcome | High | Open |
 
 ---
 
@@ -938,3 +939,25 @@ Not proposed: **the lead describing each member** (second-hand, a token cost eve
 **Done when** the failure is reproduced (run the file in a loop under load — the full suite beside it) and its wait or ordering assumption is fixed, or a week of CI and local full runs passes without it and the entry is closed as not reproduced.
 
 **Related:** `tests/README.md` (the fixtures' timing rules), TD-069 (where it was seen).
+
+## TD-079: The Inbox is a queue — nothing leaves without an answer, and an answer is followed to its outcome
+
+**Priority:** High
+**Added:** 2026-09-20 (the anchor session; Paul, after a day with the Inbox page)
+**Status:** Open — Paul's direction and the anchor's proposal, **not yet decided part by part**. Design first (§4.5 screen 6, §4.5a's Inbox rows, §4.10).
+**Location:** `src/agentorc/ui/app.py` (`inbox_sections`, `state_rows`), `src/agentorc/ui/templates/inbox*.html`, `src/agentorc/ui/static/app.js` (the FYI fold), `src/sessionorc/agent.py` (`_msg`, the person inbox), `src/sessionorc/models.py` (`MailEntry`), the briefs
+
+**Why:** Paul, 2026-09-20: *when I read an inbox message it disappeared. Our inbox concept is maybe more like a queue — reading an item should never change it (or make it disappear); every item should require an answer of some sort (snooze and dismiss are answers). Also, if I give an answer, how do I know the work was completed — or do we just assume it gets done because we have a manager? Does work completed based on answers show up in FYI (it could show up in questions again if more direction is needed)?*
+
+What had happened, as far as the anchor could establish: nothing was deleted — `person_inbox.json` still held all five of its entries, unread. The row that vanished was almost certainly a **state row** (*`orchestrator-ao-1` exited with unpushed work*): a state row is a live view of a record, so when Paul opened and resumed that session the state changed and the row left with no trace. And looking found something worse: **the five entries are `note`s from samscrape sessions of 2026-09-17 and -18, sitting in FYI — folded by default and counted nowhere — so they had very likely never been seen**, among them *the shared Python venv on kmaster is broken for every Claude…* and a report of an agentorc tool defect. A section that is closed and uncounted is a place for mail to be lost in.
+
+**Proposed (each part Paul's to accept or change):**
+1. **Nothing leaves without an answer.** Reading, opening, focusing or following a row's link never changes it. The answers are the row's controls — Reply, a suggested answer, *Go with it*, Snooze, Dismiss, Acknowledge, Allow / Deny — and nothing else removes a row a person has not answered.
+2. **What resolves itself leaves a trail.** A state row whose state went away by some other road — the session was resumed, the permission was answered in the terminal, the work was pushed — moves to FYI as *resolved: <how>* and stays for the retention window, instead of vanishing. That needs the home to remember that a row was shown (a small list of resolved attention items), since a state row is otherwise derived and leaves no entry behind.
+3. **FYI is counted, quietly, and opens itself when it has something new.** A second, smaller number beside the main one (*Inbox 1 · 5*); the section unfolds when it holds an entry the person has not yet had on screen; a `note` leaves only by **Dismiss** (or *Dismiss all*, with a confirm). The main number stays *what needs you*.
+4. **An answer is followed to its outcome.** Once a person has answered a question, the asker **owes an outcome on the same thread**: `ao msg person --outcome done|blocked|dropped "<one line>" --about <ask id>` (a `note` that names the thread and says how it ended, with the PR when there is one) — or a new `ask` on the thread if more direction is needed, which returns to *Needs you* with the thread's history above it. The Inbox lists **answered, no outcome yet** with its age, and flags **the asker exited without reporting one**; the manager's brief gains chasing those for its members. Assuming it gets done because there is a manager is not enough: the manager sees its members' states, not whether the person's answer was acted on. Outcomes land in FYI under the question they close.
+5. **The briefs** say: report the outcome of every answered question before you exit; an outcome is one line and a reference, not a narrative.
+
+**Done when** the design says all of it, a row never leaves the Inbox except by a person's answer or by resolving with a trail, FYI cannot hide unseen mail, and a person can see for every answer they gave whether it was carried out.
+
+**Related:** TD-069 (the Inbox; its steps 3–4 and the state-row snooze are unaffected), TD-070 (suggested answers — an answer index is what an outcome refers back to), TD-072 (mail triage by sessions — the same idea from the other side), TD-075 (a go-between would owe outcomes too), design §4.10 (*What a person is asked*), §9 invariant 13 (mail is not durable: an outcome that must outlive the record is still a board line).
