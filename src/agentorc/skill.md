@@ -15,7 +15,7 @@ Print this text again with `ao --skill`.
 2. `ao status --json` — every session on this host. Parse ids and states from the JSON, never
    from prose, a card, or a screen.
 3. Put `--json` on every call: it prints only the RPC result, or `{"error": …}` with exit 1
-   (exit 3: the host agent is down — stop, do not start one).
+   (exit 3: the host agent is down — stop, do not start one; *restarted under this command* means it is up again: run it again).
 
 ## States (design §4.2)
 

@@ -1566,10 +1566,49 @@ def _run(args: argparse.Namespace) -> int:
             args.id = resolve(args.id)  # a full id, or a bare name resolved here (TD-030 step 5)
         return args.fn(args)
     except AgentUnavailable as e:
-        return fail(args, str(e), 3, hint="start it with: agentorc-agent serve")
+        return _unavailable(args, e)
     except AgentError as e:
         # the holder's id and state under --json (TD-030); `fail`'s own keywords are not overridable
         return fail(args, str(e), 1, **{k: v for k, v in e.data.items() if k not in ("prose", "code", "message")})
+
+
+def _unavailable(args: argparse.Namespace, e: AgentUnavailable) -> int:
+    """Exit 3, with the right sentence and the hint only where it belongs (TD-086 item 2).
+
+    **One line said two different things.** `AgentUnavailable` is raised where the socket cannot be
+    opened *and* where a call's reply never came because the connection closed under it — and a
+    promote restarts the unit (TD-062), so the second happened three times on the evening of
+    2026-09-20, seconds apart, to a lead blocked in `ao wait`. Both printed *start it with:
+    agentorc-agent serve*. It was wrong twice over: the agent was restarting, not down — it was
+    `active` again at once — and **a session is forbidden to start one** (`ao --skill`: *exit 3:
+    the host agent is down — stop, do not start one*), so the CLI told it to do the one thing its
+    Never list rules out.
+
+    So the CLI **asks again** rather than reading the exception's words: one `ping`, now. An agent
+    that answers was restarting, and the honest sentence is *run it again* — the state a person
+    acts on is the state now, not the one a call failed in. One that does not answer is down, and
+    only then is there anything to start. **The hint is never printed to a session** whichever it
+    is: a session is told to stop, in its skill's own words. The exit code is 3 either way, because
+    what the caller could not do, it could not do."""
+    session = os.environ.get("AGENTORC_SESSION")
+    if _agent_answers():
+        prose = "error: the host agent restarted under this command — run it again"
+        return fail(args, str(e), 3, prose=prose, restarted=True)
+    if session:
+        # `ao --skill`'s Never list, in its own words: a session never starts a host agent
+        return fail(args, str(e), 3, hint="the host agent is down — stop here; a session never starts one")
+    return fail(args, str(e), 3, hint="start it with: agentorc-agent serve")
+
+
+def _agent_answers() -> bool:
+    """Whether an agent answers *now* — one `ping`, once, never retried. Any failure is a no: this
+    only ever chooses which sentence to print, so it must not raise, hang a second command on the
+    way out of a failed one, or turn a missing socket into a traceback."""
+    try:
+        _call_sync("ping")
+    except Exception:  # noqa: BLE001 — a probe: not answering is the answer
+        return False
+    return True
 
 
 def skew_line(args: argparse.Namespace) -> None:
