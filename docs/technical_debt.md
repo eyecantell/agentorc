@@ -57,6 +57,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Partly done |
 | TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Open |
 | TD-082 | The Inbox page needs a second design round: section blurbs always on screen, message text wrapped to a narrow column on a wide window, sections that blend into their rows | Medium | Open |
+| TD-083 | A worker that ends its run on purpose, with work still on the ledger, is neither *finished* nor *exited*: no rule of its manager's fires, and the team sits parked until a person restarts it | Medium | Open |
 
 ---
 
@@ -967,3 +968,20 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 **Done when** a design round (mockups first, then §4.5 screen 6 and the §4.5a rows it touches) has settled the four, and the page is built to it.
 
 **Related:** TD-069 (the Inbox), TD-079 (the queue — its page step and this one touch the same templates: build that first, or fold this into it), TD-081 (the state row's answers), TD-071 (mockups), TD-076 (friendlier titles on the same rows).
+
+## TD-083: A worker that ends its run on purpose parks its team
+
+**Priority:** Medium
+**Added:** 2026-09-20 (the anchor session; found by `orchestrator-ao-1` at the end of ao-grind's first run and written up in its summary and on the board, PRs #274 and #276)
+**Status:** Open — design first (§4.8 the manager's round, §4.9a, the two briefs). Not the same gap as TD-053's, which is a worker that *declared* itself out of work.
+**Location:** `docs/briefs/orchestrator-ao-1.md` (the round's state rules), `docs/briefs/tdgrind-ao-1.md` (*Shutdown*), `src/sessionorc/agent.py` (`_out_of_work`, the `progress` channel), `src/agentorc/adapters/claude_code/` (what a submitted `/exit` is), design §4.8 and §4.9a
+
+**Why:** 2026-09-20, 18:36 UTC: `tdgrind-ao-1` ended its run deliberately after ten merged PRs — its context was long, the ledger still held pickable entries, and it said a restart with fresh context would pick up cleanly. It could not say so in any way its manager can act on. It was not **out of work**, so `ao progress none` would have been a lie and it rightly did not send it. A Claude Code `/exit` does not leave the session (TD-053 records that), so it was never **`exited`**, and the manager's restart rule fires only on `exited`. It was `idle` with a written end-of-run summary, which the brief says is *not* idle-with-open-work. Closing it is reserved for wrap-up. So the manager put a steer to Paul, the steer lapsed at its bound to its default — park — and the team did nothing for ninety minutes with work on the ledger, until a person ran `ao team stop --close` and `ao team start`, and closed the manager by hand because its own `/exit` had not left either.
+
+Two things are missing, and the design round chooses between them or takes both:
+1. **A worker cannot say *restart me*.** A third declaration beside `done` and `none` — the run is over, the lane is not — that a manager may act on by closing the record and starting it again under the same name and brief, inside the restart ceiling (three in two hours). It is a structured field, never text the manager parses.
+2. **A submitted `/exit` is not an exit.** Either the adapter makes it one (the session is closed when the tool has plainly been told to leave and has settled), or a summary without a declaration does not count as an ending and the manager's idle rule applies to it.
+
+**Done when** a worker that ends its run with work left is back at work, with fresh context, without a person — and one that is truly finished still is never restarted.
+
+**Related:** TD-053 (out of work, §4.9a — the declared case), TD-081 (a same-name start keeps the record's mail: a restart here must too), TD-026 (schedules), TD-076 (the manager's brief is rewritten by the rename).
