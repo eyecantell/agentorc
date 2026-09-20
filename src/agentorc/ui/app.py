@@ -1097,6 +1097,12 @@ def resume_create(rec: dict[str, Any], *, prompt: str = "") -> dict[str, Any]:
     the old `prompt`, and `capabilities` — the grants come from the record's **role**, through the
     same preset path the form takes, so nothing is copied and nothing is dropped."""
     lane = rec.get("lane")
+    # *a `create` **on the record's host***: a record of a node's is addressed `id@host` and its
+    # `host` is its own, so a resume without it would create the session on the **home** instead —
+    # under the name that should have superseded the node's record (review of PR #290). Sent only
+    # when it lands elsewhere, which is `Member.create_params`'s convention and §4.4's rule that a
+    # client never sends a parameter it has not set.
+    host = str(rec.get("host") or "")
     got: dict[str, Any] = {
         "name": str(rec.get("name") or ""),
         "dir": str(rec.get("dir") or ""),
@@ -1109,6 +1115,7 @@ def resume_create(rec: dict[str, Any], *, prompt: str = "") -> dict[str, Any]:
         "controllers": [str(c) for c in (rec.get("controllers") or [])],
         "resume": str(rec.get("adapter_id") or ""),
         "unattended": False,
+        **({"host": host} if host and host != host_name() else {}),
     }
     if prompt:
         got["prompt"] = prompt
@@ -1149,11 +1156,20 @@ def resume_form_url(rec: dict[str, Any], why: str = "") -> str:
     """**Resume with changes…**: New session with every field of `resume_create` filled in, which
     is also where a press that cannot be silent lands, with its reason (§4.5a)."""
     got = resume_create(rec)
-    q = {k: v for k, v in got.items() if k not in ("lane", "controllers", "unattended") and v}
+    # `capabilities` and `ledger` are the create's, not the form's — §4.5a says capabilities are
+    # **not carried**, and the form derives both from the Role picker. `host` likewise: the form
+    # has no host field, and phase 1 starts a session on the host the page is served from.
+    q = {k: v for k, v in got.items() if k in RESUME_CARRIES and k not in ("lane", "controllers") and v}
+    q["resume"] = got["resume"]
     q["lane"] = ", ".join(got["lane"])
     q["controllers"] = ",".join(got["controllers"])
     # *Unattended* as the record had it — on the form, where it is next to its stop time
     q["unattended"] = "on" if rec.get("unattended") else ""
+    # **The form is filled in from a record, not opened blank** — which is what lets an *empty*
+    # controllers list mean *this record had none* rather than *nothing was said*. Without it the
+    # repo's default would be re-ticked and a person who did not notice would Start a session with
+    # controllers the record never had (review of PR #290).
+    q["prefilled"] = "1"
     if why:
         q["why"] = why
     return "/new?" + urlencode({k: v for k, v in q.items() if v})
@@ -1339,6 +1355,7 @@ def create_app() -> FastAPI:
         lane: str = "",
         controllers: str = "",
         unattended: str = "",
+        prefilled: str = "",
         why: str = "",
     ):
         profs, default = profiles_mod.load()
@@ -1395,6 +1412,7 @@ def create_app() -> FastAPI:
                     "lane": lane,
                     "controllers": [c for c in controllers.split(",") if c.strip()],
                     "unattended": unattended == "on",
+                    "prefilled": prefilled == "1",
                     "why": why,
                 },
             },

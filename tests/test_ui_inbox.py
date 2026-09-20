@@ -1436,14 +1436,25 @@ def test_a_one_press_resume_carries_the_record_and_never_its_unattended_flag(tmp
         "unattended": True, "run_until": "2026-09-20T06:00:00Z", "wrapup_prompt": "wrap up",
         "prompt": "the old brief", "capabilities": ["control"],
     }  # fmt: skip
+    # a repo whose `grinder` preset grants nothing — so what the record carried cannot survive
+    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {lane: [TD-9]}}\n")
     got = resume_create(rec)
     assert got["name"] == "tdgrind-ao-2" and got["resume"] == "u-1"
     assert got["team"] == "ao-grind" and got["project"] == "agentorc" and got["controllers"] == ["ao-lead"]
     assert got["lane"] == ["TD-073"] and got["dir"] == str(tmp_path)
     assert got["unattended"] is False  # the whole point of the rule
     assert "run_until" not in got and "wrapup_prompt" not in got and "prompt" not in got
-    # the grants come from the role preset, not off the old record: nothing copied, nothing dropped
-    assert got.get("capabilities") != ["control"] or rec["role"] == "grinder"
+    # the grants come from the **role preset**, not off the old record: the record carried
+    # `control` and this preset grants nothing, so a copy would show and an empty list is the proof
+    assert got["capabilities"] == []
+    (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {grants: [control], lane: [TD-9]}}\n")
+    assert resume_create(rec)["capabilities"] == ["control"]  # …and one it grants is granted
+    # the record's own lane wins over the preset's; a record with none takes the preset's
+    assert resume_create({**rec, "lane": []})["lane"] == ["TD-9"]
+    # a record of a node's creates **on that node** — without this the session lands on the home,
+    # under the name that should have superseded the node's record
+    assert "host" not in got  # this record is the local host's: a parameter never set is never sent
+    assert resume_create({**rec, "host": "worker1"})["host"] == "worker1"
     # *Reopen and push* is the same create with a first prompt **the page wrote**
     from agentorc.ui.app import REOPEN_AND_PUSH
 
@@ -1469,6 +1480,12 @@ def test_when_a_resume_cannot_be_silent_it_is_the_filled_in_form_and_not_a_guess
     url = resume_form_url({**ok, "role": "grinder", "lane": ["TD-1"], "unattended": True}, "the directory is gone")
     assert url.startswith("/new?") and "name=w" in url and "resume=u-1" in url and "role=grinder" in url
     assert "lane=TD-1" in url and "unattended=on" in url and "why=the+directory+is+gone" in url
+    # the form is told it **is** a prefill, which is what lets an empty controllers list mean
+    # *this record had none* rather than *nothing was said* (review of PR #290)
+    assert "prefilled=1" in url
+    # and it carries only what the form takes: `capabilities` is not carried at all (§4.5a), and
+    # `ledger` and `host` are the create's, derived on the form from its own Role and host
+    assert "capabilities=" not in url and "ledger=" not in url and "host=" not in url
 
 
 @pytest.mark.unit
@@ -1493,16 +1510,35 @@ def test_the_form_says_which_control_was_pressed_and_fills_in_what_it_knew(tmp_p
 
     filled = page({"dir": "/repo", "adapter": "claude-code", "resume": "u-1", "project": "", "name": "w1",
                    "profile": "", "role": "grinder", "team": "", "lane": "TD-1", "controllers": ["ao-lead"],
-                   "unattended": True, "why": "the directory is gone"})  # fmt: skip
+                   "unattended": True, "prefilled": True, "why": "the directory is gone"})  # fmt: skip
     assert 'name="name" value="w1"' in filled and 'value="u-1"' in filled and 'name="lane" value="TD-1"' in filled
     assert 'value="grinder" selected' in filled and 'name="unattended" checked' in filled
     assert 'value="ao-lead" data-name="lead" checked' in filled
     assert 'id="resumewhy"' in filled and "the directory is gone" in filled
     # and an ordinary New session is untouched: no banner, nothing prefilled, `plain` selected
     plain = page({"dir": "", "adapter": "claude-code", "resume": "", "project": "", "name": "", "profile": "",
-                  "role": "", "team": "", "lane": "", "controllers": [], "unattended": False, "why": ""})  # fmt: skip
+                  "role": "", "team": "", "lane": "", "controllers": [], "unattended": False,
+                  "prefilled": False, "why": ""})  # fmt: skip
     assert 'id="resumewhy"' not in plain and 'name="name" value=""' in plain
     assert 'value="plain" selected' in plain and 'name="unattended" checked' not in plain
+
+    # **a record that had no controllers keeps none.** An ordinary New session takes the repo's
+    # default; a form filled in from a record with an empty list must not re-tick it, or a person
+    # who does not notice Starts a session with a controller the record never had (review of #290)
+    def ctl(prefill):
+        return templates.get_template("new.html").render(
+            host="kmaster", active="Org", profiles={}, default_profile="default", recent=[],
+            adapters=["claude-code"], control_holders=[{"id": "ao-lead", "name": "lead"}], grants_all=[],
+            grant_notes={}, roles=[{"name": "plain", "source": "built-in", "lane": [], "controllers": [],
+                                    "grants": []}],
+            default_controllers=["ao-lead"], projects=[],
+            prefill={"dir": "", "adapter": "claude-code", "resume": "", "project": "", "name": "",
+                     "profile": "", "role": "", "team": "", "lane": "", "why": "", **prefill},
+        )  # fmt: skip
+
+    assert 'value="ao-lead" data-name="lead" checked' in ctl({"controllers": [], "prefilled": False})
+    assert 'value="ao-lead" data-name="lead" checked' not in ctl({"controllers": [], "prefilled": True})
+    assert 'value="ao-lead" data-name="lead" checked' in ctl({"controllers": ["ao-lead"], "prefilled": True})
 
 
 @pytest.mark.unit

@@ -87,7 +87,7 @@
       <label>Controllers</label>
       {% if control_holders %}
         <div class="row gap wrap">
-          {% for o in control_holders %}<label class="radio"><input type="checkbox" name="controller" value="{{ o.id }}" data-name="{{ o.name }}"{% if o.id in prefill.controllers or o.name in prefill.controllers or ((not prefill.controllers) and (o.name in default_controllers or o.id in default_controllers)) %} checked{% endif %}>
+          {% for o in control_holders %}<label class="radio"><input type="checkbox" name="controller" value="{{ o.id }}" data-name="{{ o.name }}"{% if o.id in prefill.controllers or o.name in prefill.controllers or ((not prefill.prefilled) and (o.name in default_controllers or o.id in default_controllers)) %} checked{% endif %}>
             <div><div>{{ o.name }}</div><div class="note mono">{{ o.id }}</div></div></label>{% endfor %}
         </div>
         <div class="note">The sessions that may act on this one (send, wrap up, kill, close). None selected: nobody may — you can add one later from the session's Focus or with <code>ao control</code>. Ticked in advance: the repo's or the role's <code>controllers:</code> from <code>.agentorc.yml</code>.</div>
