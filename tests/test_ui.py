@@ -544,6 +544,27 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
+def test_every_class_the_controllers_chips_name_is_one_the_stylesheet_draws(tmp_path):
+    """TD-065: the chips named `chip`, and `chip` was in no stylesheet — so the one control that
+    says who may act on a session was drawn as bare text, differently on the card (an `<a>`) and in
+    the Focus header (a `<button>`). The two halves are one §4.5a row and the page rewrites the
+    second of them itself, so all three places are checked: both templates and the `app.js` line
+    that rebuilds the chips on a live delta."""
+    import agentorc.ui as ui
+
+    root = pathlib.Path(ui.__file__).parent
+    css = (root / "static" / "app.css").read_text()
+    sources = {
+        name: (root / name).read_text()
+        for name in ("templates/card.html", "templates/focus.html", "static/app.js")
+    }
+    for name, text in sources.items():
+        assert "badge controller" in text, f"{name} does not draw the controllers chip as a badge"
+        assert 'class="chip' not in text, f"{name} still names the undefined class"
+    for rule in (".badge.controller", ".badge.controller.scraped"):
+        assert rule in css, f"{rule} is named by the chips and defined by nothing"
+
+
 def test_the_membership_controls(client, tmp_path):
     """TD-036 step 3, design §4.5a: the card's **under `<controller>`** chip, the Focus **controllers**
     chip, the lead's **Members** list, and the New session **Controllers** picker. Both
@@ -565,7 +586,7 @@ def test_the_membership_controls(client, tmp_path):
     assert 'href="/focus/ao-orc"' in html and ">orc<" in html and "scraped" not in html
     gone = {**base, "controllers": ["ao-vanished"]}
     html = card.render(s=view(gone, [gone]))
-    assert ">ao-vanished<" in html and "chip scraped" in html and "re-attach or remove it" in html
+    assert ">ao-vanished<" in html and "badge controller scraped" in html and "re-attach or remove it" in html
 
     # the live pages
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "mw"}, follow_redirects=False)
