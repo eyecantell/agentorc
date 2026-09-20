@@ -43,7 +43,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-063 | CI-only flakes on the 3.12 runner: the two timing-shaped tests and the record-revive race are fixed; the 26-minute hang of PR #192 is still unattributed | Low | Partly done |
 | TD-064 | Claude Code's own session-to-session messages reach an agentorc session around the mail gates, and an unattended session blocks on their approval prompt until a person answers | Medium | Open |
 | TD-067 | Standing up a team has no operator's guide: the briefs README predates `ao team start`, design §4.9 is a spec, and `ao --skill` is for a session, not for the person or the Claude session that sets a team up | Medium | Open |
-| TD-068 | A brief over about 16 KB cannot start a session: the prompt is passed on tmux's command line, and `tmux new-session` answers *command too long* | Medium | Open |
 | TD-069 | One place to work from: an Inbox page listing everything that needs a person — session states, mail, due board items — each with its controls, filtered by team; today they are in three places and the mail dialog is too narrow to read | Medium | Open |
 | TD-070 | Neither an `ask` nor a board item can offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, and an answers field on the board entry (a dev-cadence format change), rendered as buttons | Medium | Open |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Open |
@@ -653,24 +652,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** a Claude Code session on kmaster with no prior context, given `ao team --skill` and the sentence "stand up a grind team for contractmatch", writes the definition, starts the team and reports its `ao team status` without reading design.md; and a person can do the same from the README section alone.
 
 **Related:** TD-057 (3c.2, 4a — the steps the guide waits on), TD-019 (`ao --skill`), design §4.7, §4.9, §4.4a; `docs/briefs/README.md`.
-
-## TD-068: A brief over about 16 KB cannot start a session — tmux refuses the command line
-
-**Priority:** Medium
-**Added:** 2026-09-18 (the anchor's worktree session, launching TD-057 step 4b's worker)
-**Status:** Open
-**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`launch`: the prompt is appended to `argv`), `src/sessionorc/tmux.py` (`new_session`), `src/agentorc/teams.py` (`_brief` → `Launch.prompt`), `docs/briefs/`
-
-**Why:** `ao new --prompt "$(cat docs/briefs/td057-step4b.md)"` answered `TmuxError: tmux new-session ao-agentorc-td057-step4b: command too long`. The brief is 16,495 bytes; the largest that has ever launched is `orchestrator-ao-1.md` at 14,230. The adapter hands the whole prompt to the tool as one argv element and tmux caps the command it will take, so the limit is somewhere between the two and nothing says so until the launch fails — after `create` has already made the worktree (it stayed, with no record; the second launch reused it). `ao team start` has the same path: a role's brief plus a Project block is the prompt, so a team whose lead brief grows past the limit stops starting, all of it (§4.9: never half a team), with tmux's words rather than agentorc's.
-
-**Worked around** for that launch with a short prompt telling the worker to read the brief from its own worktree, which works because a team session's worktree is cut from the repo that holds the brief — and is not a fix: a `brief:` override may live outside the checkout, and the Project block is composed, not a file.
-
-**Fix:** pass a long prompt by file, not by argv. Options, cheapest first: (1) the adapter writes the prompt under the session's run directory and launches the tool with a one-line prompt naming the file (what the workaround did by hand), above a threshold well under the limit; (2) start the tool with no prompt and deliver the brief through `_submit` once the composer is up (the paste path `ao send` already uses, which has no such limit); either way (3) `create` refuses a prompt it cannot deliver **before** it makes a worktree, naming the size and the limit. Measure tmux's actual limit first (it is a build constant, not a setting) and pin it in a test.
-
-**Done when** a 32 KB brief starts a session through `ao new --prompt` and through `ao team start`, and a prompt no path can deliver is refused by agentorc, in its own words, before anything is created.
-
-**Related:** TD-042 (briefs that name one run), TD-067 (the operator's guide should say how long a brief may be), design §4.3 (adapters own the tool's launch), §4.9 (`ao team start` is all or nothing).
-
 
 ## TD-069: One place to work from — the Inbox as the list of everything that needs a person
 
