@@ -591,3 +591,4 @@
 17:32  17:15–17:40 quiet — tdgrind-ao-1 working on TD-080 (claimed), no new merges → ok
 17:52  tdgrind-ao-1: TD-080 done → #270 cadence all-pass; #269 (TD-079 step 1b) merge-ready since 17:18 but still open while #270 merged past it → ao msg note (second time this run, after #264)
 17:56  tdgrind-ao-1: answered my #269 note — mail/identity PRs (TD-079 series, #265) are held for the anchor to review and merge, by the person's instruction at 17:0Z; #264 was a merge conflict from #263 plus a second flake sighting. Standing exception noted: an open, cadence-clean TD-079/mail/identity PR is NOT a held PR to flag. TD-069 now claimed → ok
+18:10  tdgrind-ao-1: TD-069 done → #271 cadence check all rows pass → ok
