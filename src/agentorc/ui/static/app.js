@@ -150,7 +150,12 @@
       if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);
       if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
       if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
-      if (id === "person" && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+      if (id === "person" && typeof AO.refreshInboxPage === "function") {
+        // the control that was pressed is about to go with its row, and while it holds the focus
+        // the refresh below would politely decline to redraw the section it sits in
+        if (document.activeElement === b) b.blur();
+        AO.refreshInboxPage();
+      }
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
       if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
       if (action2 === "controllers") {
@@ -255,7 +260,21 @@
         ? `${left >= 3600 ? Math.floor(left / 3600) + "h " + Math.floor((left % 3600) / 60) + "m" : Math.floor(left / 60) + "m " + String(left % 60).padStart(2, "0") + "s"} left — then it goes with its default`
         : "the time is up: the sender goes with its default";
     });
+    showLocalTimes();
   }, 1000);
+
+  // A stored instant (UTC) shown in the browser's own clock: a person who snoozed until *tomorrow
+  // 08:00* must read back tomorrow 08:00, not the UTC instant behind it — which stays on the
+  // element's title. It does not change once written, so each element is written once; the callers
+  // are the tick above and whatever has just put new rows on the page.
+  function showLocalTimes() {
+    $$(".localtime[data-at]").forEach((el) => {
+      if (el.dataset.shown === "1") return;
+      const d = new Date(Date.parse(el.dataset.at || ""));
+      el.textContent = isNaN(d) ? el.dataset.at || "" : d.toLocaleString();
+      el.dataset.shown = "1";
+    });
+  }
 
   // ---- events websocket with backoff; a reconnect reloads the snapshot once ----
   function connectEvents(onEvent) {
@@ -473,10 +492,25 @@
     refreshInbox();
   };
 
+  // Whether the poll may replace this section's rows now. It may not while the person is inside
+  // them: an open Snooze menu would close under the press, and a swap would take the focus of
+  // someone tabbing through a row's controls. Neither is worth a few seconds' freshness — the next
+  // poll does it, and the count above never waits. Kept pure (element in, boolean out) so the rule
+  // is one readable line rather than conditions spread through the swap.
+  AO.maySwapSection = function (el, focused) {
+    if (!el) return false;
+    if (el.querySelector("details[open]")) return false;  // a menu the person has opened
+    return !(focused && focused !== document.body && el.contains(focused));
+  };
+
   async function refreshInbox() {
     const got = await AO.refreshInboxCount();
     if (!got || !got.html) return;
-    IN_SECS.forEach((k) => { const el = $("#rows-" + k); if (el) el.innerHTML = got.html[k] || ""; });
+    IN_SECS.forEach((k) => {
+      const el = $("#rows-" + k);
+      if (AO.maySwapSection(el, document.activeElement)) el.innerHTML = got.html[k] || "";
+    });
+    showLocalTimes();
     $("#needsn").textContent = got.needs || 0;
     $("#needspill").classList.toggle("hidden", !got.needs);
     const sn = got.snoozed_n || 0;

@@ -10,7 +10,11 @@ agent through the sync `TestClient`, as the rest of the UI's tests do.
 from __future__ import annotations
 
 import asyncio
+import json
 import pathlib
+import shutil
+import subprocess
+import tempfile
 import time
 from datetime import UTC, datetime, timedelta
 
@@ -184,11 +188,17 @@ def test_an_fyi_row_dismisses_and_a_system_note_has_no_reply():
 
 
 @pytest.mark.unit
-def test_a_snoozed_row_offers_unsnooze_which_clears_it():
+def test_a_snoozed_row_offers_unsnooze_and_says_when_in_the_persons_own_clock():
+    """§4.10 *Snooze* — and the rule every clock on this page follows: the entry stores a UTC
+    instant, and the person set that time in their own clock, so the row hands the instant to the
+    browser to format and never prints the bare `Z` string. The raw instant stays on hover."""
     html = rows("snoozed", [entry("m-1", "ask", snoozed_until="2026-09-19T18:00:00Z")])
     assert 'data-act="unsnooze" data-id="person" data-msg="m-1"' in html
-    assert "snoozed until 2026-09-19T18:00:00Z" in html
+    assert 'class="localtime" data-at="2026-09-19T18:00:00Z" title="2026-09-19T18:00:00Z"' in html
+    assert ">2026-09-19T18:00:00Z<" not in html  # never the stored instant as the visible text
     assert 'data-act="snooze"' not in html
+    js = (UI / "static" / "app.js").read_text()
+    assert ".localtime[data-at]" in js and "toLocaleString()" in js
 
 
 @pytest.mark.unit
@@ -274,6 +284,61 @@ def test_the_retired_dialog_leaves_nothing_behind_that_still_points_at_it():
     assert "refreshPersonInbox" not in js and 'owner === "person"' not in js  # and no half of it is left
     assert "AO.mailEntry" in js and "/api/sessions/" in js and ".badge.unread" in css
     assert "AO.refreshInboxPage" in js and 'href="/inbox"' in base
+
+
+SWAP_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = (o) => Object.assign({
+  dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false,
+}, o);
+const document = { documentElement: el(), body: el(), activeElement: null,
+  querySelector: () => null, querySelectorAll: () => [], addEventListener: noop, createElement: () => el() };
+const window = {};
+global.window = window; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/inbox", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const may = window.AO.maySwapSection;
+const quiet = el();
+const menu = el({ querySelector: (s) => (s === "details[open]" ? el() : null) });
+const button = el();
+const busy = el({ contains: (x) => x === button });
+console.log(JSON.stringify({
+  quiet: may(quiet, document.body),
+  missing: may(null, null),
+  menu_open: may(menu, null),
+  focus_inside: may(busy, button),
+  focus_elsewhere: may(quiet, button),
+}));
+"""
+
+
+@pytest.mark.unit
+def test_a_poll_never_swaps_rows_out_from_under_the_person():
+    """The 20 s poll replaces a section's markup, which would close a Snooze menu mid-press and
+    take the focus of someone tabbing through a row's controls. The rule that decides is pure, so
+    it is run here as itself: no swap while a `details` in the section is open or while the focus
+    is inside it — the next poll does it, and the count above never waits."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "swap_probe.js"
+    probe.write_text(SWAP_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == {
+        "quiet": True,  # nobody is in it: swap
+        "missing": False,  # no such section on this page
+        "menu_open": False,  # a Snooze menu the person opened
+        "focus_inside": False,  # tabbing through this section's controls
+        "focus_elsewhere": True,  # the focus is in another section, or the filter box
+    }
 
 
 # -- the routes behind the controls ---------------------------------------------------------------
