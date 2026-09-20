@@ -746,7 +746,7 @@ decided here so both ends are written from one text.
   `ssh -T <target> agentorc-agent link` (the forced command replaces whatever it asks for), speaks
   on that process's stdin and stdout, and starts it again when it ends.
 - **Who may connect.** The home's `hosts.yml` carries `nodes:` — a list of names, or a mapping
-  `name: {volatile: true}` — and a link naming a host that is not in it is answered *not an
+  `name: {volatile: true}` (an entry may also carry `container:` and, from 2026-09-19, `person:` — below) — and a link naming a host that is not in it is answered *not an
   authorised node* and closed. An agent that is itself a node refuses every link: there is one
   home. A second link for a host that already has one **replaces** it (the node reconnected before
   the home noticed the first had died), and the old one is closed.
@@ -1770,9 +1770,13 @@ request — as one of:
 - **session X** — the peer belongs to the pane of a record on this host whose pane is live, by
   the first of three signals that answers, each read from `/proc/<pid>/stat`: **ancestry** — the
   peer pid or an ancestor of it (the `ppid` chain, walked at most 64 steps) is the **pane pid**
-  (a parent must have started no later than its child — `stat` field 22 — so a hop whose start
-  time is later than the child's it was read from is a reused pid, and the walk is abandoned as
-  *unknown* rather than trusted);
+  (each hop is **read twice**: the parent's `(pid, start time)` — `stat` field 22 — is read, then
+  the child's `ppid` is read again and the parent's pair once more, and a hop where either
+  changed between the reads is a pid that was reused under the walk. Start times are not
+  *compared* between parent and child: a subreaper that adopts an older orphan legitimately
+  started after it. A hop that fails the double read ends the ancestry signal and nothing more —
+  **ancestry did not answer**, and the next signal is asked, exactly as when the chain simply runs
+  out at init);
   the host agent already reads `#{pane_pid}` with the pane list each tick (§4.1), and reads
   `#{pane_tty}` beside it from this date; else **the POSIX session id** — the pane's first process
   is a session leader, so what it started carries its pid as `sid` unless it called `setsid`;
@@ -1862,8 +1866,8 @@ signal (*session · ancestry 4,102 · sid 37 · tty 2; outside 880; unknown 0*) 
 caller that would be refused shows up as an alarm in `observe` exactly as it would in `enforce`. `ao status -v` and the Org's teams line say which
 mode a host is in, since *observe* is a host that is not yet protected.
 
-**Tests.** The suite drives the socket from the pytest process — under no pane — and some ninety
-calls pass `caller=<id>` to stand for a session, which is precisely what the table calls a
+**Tests.** The suite drives the socket from the pytest process — under no pane — and over a hundred
+calls pass `caller=<id>` to stand for a session (112 on this date), which is precisely what the table calls a
 forgery. So: the fixtures' agent runs **`identity: off`**, and the gate, mail and link tests go on
 asserting what they assert; the classification is a function over a small `/proc` reader, tested
 directly against fabricated process trees (every row of the table, each signal, the cgroup
