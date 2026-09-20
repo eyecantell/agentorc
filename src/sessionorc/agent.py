@@ -1833,7 +1833,16 @@ class HostAgent:
         # Design §4.10 *Suggested answers* (TD-070). Each is cleaned more strictly than displayed
         # text is (`_clean_answer`); one that cleans to nothing, or that repeats an earlier one
         # exactly (compared after cleaning, case-sensitively), is dropped; a fifth is refused.
+        # RPC input is raw JSON from any local process, so the shape is checked and the work bounded
+        # before any of it is cleaned: a list of strings, and no more of them than could ever matter
+        # (`ANSWERS_MAX` kept plus as many again dropped as blanks or repeats).
+        if answers is not None and not isinstance(answers, (str, list)):
+            raise RpcError("answers must be a list of lines (design §4.10)")
         offered = [answers] if isinstance(answers, str) else list(answers or [])
+        if any(not isinstance(a, str) for a in offered):
+            raise RpcError("answers must be a list of lines (design §4.10)")
+        if len(offered) > mail.ANSWERS_MAX * 2:
+            raise RpcError(f"an ask carries at most four answers: {len(offered)} given (design §4.10)")
         picks: list[str] = []
         for raw in offered:
             one = _clean_answer(raw)
@@ -4255,6 +4264,9 @@ def _clean(text: str) -> str:
     return text[:200]
 
 
+_LINE_BREAKS = re.compile("[\n\r\x0b\x0c\x85\u2028\u2029]")
+
+
 def _clean_answer(text: Any) -> str:
     """One suggested answer, cleaned **more strictly than displayed text is** (design §4.10
     *Suggested answers*, TD-070): the tail's cleaning (`_clean` — ANSI, bytes under U+0020) and
@@ -4270,7 +4282,12 @@ def _clean_answer(text: Any) -> str:
     separately grouped drawing of §4.5a is what answers those, not the cleaning.
 
     `_clean` itself is untouched: displayed text stays displayed text, and this is the label rule."""
-    line = _clean(str(text or "").split("\n", 1)[0])
+    # Every line break a renderer honours ends the label, not `\n` alone: `\r`, NEL (U+0085, a
+    # control `_clean` keeps because it is above U+0020), and the line and paragraph separators
+    # (U+2028, U+2029: categories Zl and Zp, so the `Cf` strip below does not see them). And the
+    # work is bounded by the cap, not by what was sent: a 10 MB item costs what 320 characters do.
+    raw = str(text or "")[: mail.ANSWER_CAP * 4]
+    line = _clean(_LINE_BREAKS.split(raw, 1)[0])
     line = "".join(ch for ch in line if unicodedata.category(ch) != "Cf")
     return line.strip()[: mail.ANSWER_CAP]
 

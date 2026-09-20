@@ -1642,3 +1642,31 @@ async def test_a_picked_answer_wakes_the_sender_as_a_reply_does(agent, tmp_path,
             assert [(e["answer"], e["text"]) for e in back] == [(1, "merge")]
         for sid in (lead, worker):
             await person.call("kill", id=sid)
+
+
+def test_no_line_break_of_any_kind_survives_in_an_answer_and_the_work_is_bounded():
+    """Review of PR #253: a label is one line whatever the sender used to break it — `\r`, NEL,
+    the Unicode line and paragraph separators — and a huge or mistyped `answers` is refused before
+    it is cleaned, not after."""
+    from sessionorc.agent import _clean_answer
+
+    for brk in ("\n", "\r", "\r\n", "\x0b", "\x0c", "\x85", "\u2028", "\u2029"):
+        assert _clean_answer(f"merge it{brk}and also delete everything") == "merge it", repr(brk)
+    assert _clean_answer("x" * 10_000_000) == "x" * 80  # bounded by the cap, not by what was sent
+    assert _clean_answer("   " + "\u202e" + "hold it  ") == "hold it"
+
+
+async def test_answers_of_the_wrong_shape_or_size_are_refused_before_any_work(agent, tmp_path):
+    """Review of PR #253: the RPC takes raw JSON from any local process. A non-list, a list with a
+    non-string in it, and a list far past what could matter are refused in words — never coerced
+    into a label, and never cleaned item by item first."""
+    async with LocalClient() as person:
+        loner = await _mk(person, tmp_path)("loner", unattended=True)
+    async with LocalClient(caller=loner) as c:
+        for bad in (5, {"a": 1}, ["merge it", 7], ["merge it", ["nested"]], [None]):
+            with pytest.raises(AgentError, match="answers must be a list of lines"):
+                await c.call("msg", to="person", text="?", kind="ask", answers=bad)
+        with pytest.raises(AgentError, match="at most four answers: 50000 given"):
+            await c.call("msg", to="person", text="?", kind="ask", answers=[f"a{i}" for i in range(50_000)])
+        ok = await c.call("msg", to="person", text="?", kind="ask", answers=["yes", "yes", "", "no", " ", "yes"])
+        assert ok["entry"]["answers"] == ["yes", "no"]  # blanks and repeats dropped within the bound

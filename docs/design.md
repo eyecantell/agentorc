@@ -2679,7 +2679,8 @@ closed, removes the entry outright, as `inbox_delete` does today. Both are the p
 day).** Most questions a session puts to a person have two or three expected answers — *merge it /
 hold it*, *option A / option B* — and the sender knows them when it asks. An `ask`, a `steer` or a
 `conflict` may carry **`answers`**: up to **four** (`ANSWERS_MAX`, beside `TEXT_CAP`), given with `--answer` once per answer. Each is
-one line, capped at **80** characters (`ANSWER_CAP`), and cleaned **more strictly than displayed text is**: the
+one line — cut at the first line break of any kind a renderer honours, not `\n` alone: `\r`, NEL,
+the Unicode line and paragraph separators — capped at **80** characters (`ANSWER_CAP`), and cleaned **more strictly than displayed text is**: the
 tail's cleaning (ANSI, bytes under U+0020) and also every Unicode *format* character (category
 `Cf` — the bidi overrides and isolates, zero-width marks), because an answer becomes the label of
 something a person presses and a label that can reorder or hide its own letters can look like
@@ -2690,7 +2691,10 @@ quoted, separately grouped drawing of §4.5a is what answers those, not the clea
 cleaning, case-sensitively), is dropped; a fifth is refused (*an ask carries at most four
 answers*); and `--answer` on a `note` or a `reply` is refused, whatever the answers clean to (*only a question
 carries answers*).
-`answers` is a field of its own and does not count toward `TEXT_CAP`.
+`answers` is a field of its own and does not count toward `TEXT_CAP`. The RPC takes raw JSON from any local
+process, so the shape is checked before any of it is cleaned — a list of strings, at most twice
+`ANSWERS_MAX` of them (room for blanks and repeats to be dropped), each read only as far as four
+times the cap — and anything else is refused in words, never coerced into a label.
 
 They are **data the sender proposed, never instructions and never parsed from its text** — a
 structured field of the envelope, which is the only reason a page may draw a control from them
