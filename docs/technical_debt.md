@@ -54,7 +54,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Partly done |
 | TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Partly done |
 | TD-083 | A worker that ends its run on purpose, with work still on the ledger, is neither *finished* nor *exited*: no rule of its manager's fires, and the team sits parked until a person restarts it | Medium | Open |
-| TD-084 | On a node, `ao status` always says its home *is unreachable* — it never asks | Low | Open |
 | TD-086 | A promote restarts the host agent, which ends every lead's blocked `ao wait` — and the CLI then tells the session to start a host agent, the one thing it must never do | Medium | Open |
 | TD-087 | The usage chip is empty: the usage endpoint answers 429, the adapter turns every failure into silence, the poll never backs off, and a capped session is not marked `limited` meanwhile | Medium | Open |
 
@@ -909,19 +908,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a worker that ends its run with work left is back at work, with fresh context, without a person — and one that is truly finished still is never restarted.
 
 **Related:** TD-053 (out of work, §4.9a — the declared case), TD-081 (a same-name start keeps the record's mail: a restart here must too), TD-026 (schedules), TD-076 (the manager's brief is rewritten by the rename).
-
-## TD-084: On a node, `ao status` says its home is unreachable without asking
-
-**Priority:** Low
-**Added:** 2026-09-20 (the anchor session; seen while sampling a node's calls for TD-077)
-**Status:** Open — small; a wrong sentence, not a wrong behaviour.
-**Location:** `src/agentorc/cli.py` (`cmd_status`, the `hosts.is_node()` branch), design §4.4a (*on a node out of reach of its home*)
-
-**Why:** `ao status` inside the contractmatch container printed *offline — contractmatch is a node of kmaster, which is unreachable: this host's sessions only; no mail, no org* while the home's journal showed the link **up** and the node freshly re-provisioned. `cmd_status` prints that line whenever the host is a node; nothing checks the link. What is true on a linked node is narrower — *this listing is this host's sessions only* — and the word *unreachable* sends a reader looking for an outage that is not there (it sent the anchor to the journal).
-
-**Done when** the line says *unreachable* only when the node's agent reports its link down, and otherwise says what the listing is (this host's sessions; the org is at the home), with a test for each.
-
-**Related:** TD-057 (nodes), TD-077 (where it was seen).
 
 
 ## TD-086: A promote ends every lead's `ao wait`, and the CLI then tells a session to start a host agent

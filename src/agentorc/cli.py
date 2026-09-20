@@ -157,16 +157,36 @@ def _identity_line() -> None:
     print(f"{r.get('host') or ''}: identity {r['mode']} · detached-process check {check}{note}{tail}")
 
 
+def _node_status_line() -> str:
+    """What a node's listing is (design §4.4a), and **`unreachable` only when it is** (TD-084).
+
+    The line said *offline — … which is unreachable* on every node, whatever its link was doing:
+    on 2026-09-20 it printed that inside the contractmatch container while the home's journal
+    showed the link up, and sent a reader looking for an outage that was not there. What is always
+    true on a node is narrower — this listing is this host's sessions only, and the org and the
+    mail are at the home — so that is what it says, and the stronger word is kept for the state the
+    agent actually reports (`home_reachable`, which the `host` RPC has carried since TD-057).
+
+    A `host` call that fails is a **third** answer, not the bad one: not knowing whether the link
+    is up is not the same as knowing it is down, and claiming an outage on a failed read is the
+    very mistake this entry is about."""
+    where = f"{hosts.local_host().name} is a node of {hosts.home_name()}"
+    listing = "this listing is this host's sessions only — the org and your mail are at the home"
+    try:
+        reachable = bool(call_sync("host").get("home_reachable"))
+    except Exception:  # noqa: BLE001 — any failure to ask is "not known", never "down"
+        return f"{where}; {listing}. Its link could not be read, so whether the home is in reach is not known"
+    if reachable:
+        return f"{where}, and the link is up; {listing}"
+    return f"offline — {where}, which is unreachable: this host's sessions only; no mail, no org"
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     sessions = call_sync("list")
     if hosts.is_node():
-        # design §4.4a: on a node out of reach of its home, this host's sessions only, labelled.
-        # stderr, so `--json` stays the records and nothing else.
-        print(
-            f"offline — {hosts.local_host().name} is a node of {hosts.home_name()}, which is unreachable: "
-            "this host's sessions only; no mail, no org",
-            file=sys.stderr,
-        )
+        # design §4.4a: what this listing is, and *unreachable* only when the agent says so
+        # (TD-084). stderr, so `--json` stays the records and nothing else.
+        print(_node_status_line(), file=sys.stderr)
     if args.json:
         print(json.dumps(sessions, indent=1))
         return 0

@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 import time
+import types
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
@@ -1200,3 +1201,62 @@ def test_status_v_says_which_identity_mode_this_host_is_in_once(subprocess_agent
     assert len(lines) == 1 and "identity off" in lines[0] and "detached-process check" in lines[0]
     assert "not enforcing it yet" in lines[0]
     assert cli.main(["kill", sid]) == 0
+
+
+@pytest.mark.unit
+def test_a_nodes_status_line_says_unreachable_only_when_it_is(monkeypatch, capsys):
+    """TD-084, design §4.4a: `ao status` on a node printed *offline — … which is unreachable*
+    whatever the link was doing. On 2026-09-20 it said that inside the contractmatch container
+    while the home's journal showed the link **up**, and sent a reader looking for an outage that
+    was not there. Three answers now, one per state the agent can be in — and a failed read is the
+    third, not the bad one: not knowing is not the same as knowing it is down."""
+    from agentorc import cli as climod
+
+    monkeypatch.setattr(climod.hosts, "is_node", lambda: True)
+    monkeypatch.setattr(climod.hosts, "home_name", lambda: "kmaster")
+    monkeypatch.setattr(climod.hosts, "local_host", lambda: types.SimpleNamespace(name="contractmatch"))
+
+    def answers(value):
+        def call(method, **kw):
+            if method == "host":
+                if isinstance(value, Exception):
+                    raise value
+                return {"home_reachable": value}
+            return []
+
+        return call
+
+    monkeypatch.setattr(climod, "call_sync", answers(True))
+    assert climod.cmd_status(argparse.Namespace(json=False, verbose=False)) == 0
+    up = capsys.readouterr().err
+    assert "contractmatch is a node of kmaster, and the link is up" in up
+    assert "this host's sessions only" in up and "unreachable" not in up and "offline" not in up
+
+    monkeypatch.setattr(climod, "call_sync", answers(False))
+    assert climod.cmd_status(argparse.Namespace(json=False, verbose=False)) == 0
+    down = capsys.readouterr().err
+    assert down.startswith("offline —") and "which is unreachable" in down and "no mail, no org" in down
+
+    monkeypatch.setattr(climod, "call_sync", answers(RuntimeError("socket gone")))
+    assert climod.cmd_status(argparse.Namespace(json=False, verbose=False)) == 0
+    unknown = capsys.readouterr().err
+    assert "is not known" in unknown and "unreachable" not in unknown and "offline" not in unknown
+    assert "this host's sessions only" in unknown  # what is true whatever the link is doing
+
+    # and the line is stderr, so `--json` is the records and nothing else (§4.4a)
+    monkeypatch.setattr(climod, "call_sync", answers(True))
+    assert climod.cmd_status(argparse.Namespace(json=True, verbose=False)) == 0
+    out = capsys.readouterr()
+    assert json.loads(out.out) == [] and "node of kmaster" in out.err
+
+
+@pytest.mark.unit
+def test_the_host_line_is_drawn_only_on_a_node(monkeypatch, capsys):
+    """The home says nothing: its listing is the whole org's, and a line about *this host only*
+    would be false there (design §4.4a)."""
+    from agentorc import cli as climod
+
+    monkeypatch.setattr(climod.hosts, "is_node", lambda: False)
+    monkeypatch.setattr(climod, "call_sync", lambda method, **kw: [])
+    assert climod.cmd_status(argparse.Namespace(json=False, verbose=False)) == 0
+    assert capsys.readouterr().err == ""
