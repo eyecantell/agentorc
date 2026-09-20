@@ -885,7 +885,11 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
     for rel in ("src/agentorc/briefs/lead.md", "docs/briefs/orchestrator-ao-1.md"):
         text = (root / rel).read_text()
         assert "owed:" in text, rel  # where a manager reads a member's debt
-        assert "Never report an outcome **for** a" in text, rel
+        assert "report an outcome for a" in text, rel  # and never in its place
+        # the chase does not reach past the one rule §4.9a makes absolute (review of PR #295)
+        assert "finished member is never sent to" in text or "finished worker is still never sent to" in text, rel
+        assert "not ready to close" in text, rel  # what keeps a finished member's debt from vanishing
+        assert "tell me if you want less" in text, rel  # the same kind rule as the workers', not a second one
 
 
 def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
