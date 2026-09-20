@@ -2755,7 +2755,7 @@ state alike:
    work is pushed, the limit resets. Until this date the row then vanished — which is what *it
    disappeared when I read it* was: opening the row's session resumed it. Now the **home records
    the ending**: when a record leaves a state the Inbox shows (§4.5a **Inbox row: state**), the home
-   appends `{id, name, team, kind, text, since, resolved_at, how}` to a small **attention trail**
+   appends `{id, name, team, kind, text, since, resolved_at, how}` — `id` being the record it is about — under an entry id of its own (`t-<hex>`, as mail's is `m-<hex>`; it is the entry id that `inbox_dismiss` takes) to a small **attention trail**
    of its own (persisted beside the person inbox, the newest 100, each kept for `MAIL_RETENTION`),
    where `how` is what the home can tell — *allowed by you*, *denied by you* (the `decide` RPC from
    a person), *answered in the terminal* (the pending thing cleared with no `decide`), *resumed*,
@@ -2799,7 +2799,7 @@ the asker settles it in one of two ways:
   `--about` is free text nobody checks, and this names an entry the home verifies.) The id is the
   question's own — every copy of an entry shares it, and it survives a resume, since only `from`
   follows the move. The home checks that the entry is the caller's own question to the person and
-  that it owes an outcome, then stamps **`outcome: {state, text, at, note}`** on the person's copy.
+  that it owes an outcome, then stamps **`outcome: {state, text, at, by}`** on the person's copy — `by` being the id of the reporting `note`, which is an ordinary entry of the person inbox in its own right (listed under its question, dismissed with it, pruned as any FYI entry is).
   One line, cleaned and capped as a `doing` line is; *done* names its reference (a PR, a commit, a
   TD) in the line, as a report does (§4.8). **Refused, in words:** a question still open (*it has
   not been answered yet*), declined or lapsed (*nothing is owed on it*), already settled (*its
@@ -2814,18 +2814,23 @@ the asker settles it in one of two ways:
 **`blocked` is not a dead end.** A `blocked` outcome lands in ***Needs you***, counted, not in FYI —
 *blocked: <line>* under the question and the answer — with **Reply** (a person's reply on the
 thread, into the asker's inbox) and **Dismiss**: work that stopped on something only a person can
-move is a thing that needs a person, whether or not the session thought to ask again.
+move is a thing that needs a person, whether or not the session thought to ask again. **Reply
+answers it and the row leaves** (to FYI, as answered); **Dismiss** removes it unanswered. The
+person's reply is an ordinary reply, not a question, so it starts **no new debt**: one begins only
+if the session asks again with `--thread`.
 
 **The debt, and what keeps it paid.** A question that owes an outcome is **not pruned** while it
 owes one. It does **not** hold its sender's slot in the person-inbox depths — a busy worker with a
 long night of answered questions must not lose the ability to ask — but debts have a bound of
 their own: a sender that owes **ten** (`OUTCOMES_OWED_MAX`) is refused its next `ask` or `steer`
-to the person, and the refusal lists what it owes; the remedy is one line each. Three things keep
+to the person — *you owe ten outcomes to the person: report them first (ao msg person --outcome … --for <id>): m-…, …* — the remedy is one line each. Three things keep
 it from resting on a brief alone, since *briefs are skimmed, a refusal is not* (TD-072): **every
 `ao` reply to a session that owes an outcome says so** — *you owe 2 outcomes: m-…, m-…* — beside
-the unread-mail line; **`ao progress none` is refused while one is owed**, naming them (`dropped`
+the unread-mail line (and like it home-owned: a node served alone says what the home last told it,
+the count riding with the unread-mail hint, §4.4a); **`ao progress none` is refused while one is owed**, naming them (`dropped`
 is an honest way out); and **Ready to close gains a row** for it (§4.2). A `go_with_it` close owes
-one too, and its `system` note says so. The debt ends when the outcome lands; when the person
+one too; its `system` note is unchanged, and the sender learns of the debt as of any other, from
+the line on its next `ao` reply. The debt ends when the outcome lands; when the person
 **Dismisses** the row (*I do not need to hear back* — the asker is told by a `system` note, as for
 every other act of the person's on its mail); or when the asker's record is **closed or
 forgotten**, which settles it as `outcome: asker_gone`. An asker that merely **exited** still
