@@ -40,6 +40,10 @@
   .btn.ghost:hover { background: #eef0f3; }
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
+  /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
+  .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
+  /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
+  .badge .ricon { vertical-align: -2px; margin-right: 3px; }
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
   svg { width: 14px; height: 14px; }
@@ -47,7 +51,9 @@
   .card { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
   .sc { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; position: relative; }
   .sc-body { display: flex; flex-direction: column; gap: 8px; }
-  .sc-slot { height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
+  /* `min-height`, as the page has it (app.css): a fixed height clipped the doing line's second
+     row and stacked the stalled note on top of it (TD-074 step 6) */
+  .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
   .sc-foot { display: flex; gap: 6px; align-items: center; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
   .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -120,16 +126,27 @@
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / orc-1</span>
       <span class="pill s-idle"><span class="dot"></span>idle</span><span class="badge toggle on" title="click: switch to interactive">unattended</span>
-      <span class="badge">samscrape-grind</span><span class="badge">orchestrator</span>
-      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: orchestrate ×</span>
+      <span class="badge">samscrape-grind</span><span class="badge"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>lead</span>
+      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: control ×</span>
       <span class="badge" title="the sessions that may act on this one; + adds one">no controller  +</span>
+      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">round 41: reading four members, two claims to re-check · says · 2m ago</span>
       <span style="flex-grow: 1;"></span>
-      <span class="btn">{ICON["term"]}Open shell here</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{ICON["kill"]}Kill</span>
+      <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="btn">Wrap up</span><span class="btn danger"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"></path></svg>Kill</span>
     </div>
-    <div class="term" style="height: 520px;">{term}</div>
+    <div class="term" style="height: 520px;"><span class="d">● orc-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/orc-1</span>
+
+<span class="p">&gt;</span> Tick: check every member, nudge what is stalled, wrap up what is done.
+
+<span class="d">⏺</span> Bash(ao status -v --json)
+  <span class="g">4 sessions · tdgrind-1 working · tdgrind-2 stalled? · tdgrind-3 limited</span>
+<span class="d">⏺</span> Bash(ao send --wait tdgrind-2 "no output for 47m — say where you are")
+  <span class="g">idle · answered in 31s</span>
+<span class="d">⏺</span> Bash(scripts/check_cadence.py --pr 811)
+  <span class="g">review ✓ · squash ✓ · CI ✓ · ledger ✓ · worktree ✓ · pushed ✓</span>
+<span class="d">▌</span></div>
     <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
       <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
-      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">{ICON["clip"]}Attach</span><span style="flex-grow: 1;"></span><span class="btn primary">{ICON["send"]}Send</span></div>
+      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</span><span style="flex-grow: 1;"></span><span class="btn primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8h10M8.5 3.5L13 8l-4.5 4.5"></path></svg>Send</span></div>
     </div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
@@ -149,7 +166,7 @@
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-404</span><span class="badge">filed · medium</span><span class="meta">tdgrind-2 stood down</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
       </div>
     </div>
-    <div class="note">A lead's own channels read like anyone's: what it claimed, what it filed. Its members are the panel above, derived from their <span class="mono">controllers</span> on each tick and never cached (§4.8). Nothing keys on the <span class="mono">orchestrator</span> role — the panel is there because the session holds the <span class="mono">orchestrate</span> grant (§9 invariant 9).</div>
+    <div class="note">A lead's own channels read like anyone's: what it claimed, what it filed. Its members are the panel above, derived from their <span class="mono">controllers</span> on each tick and never cached (§4.8). Nothing keys on the <span class="mono">lead</span> role — the panel is there because the session holds the <span class="mono">control</span> grant (§9 invariant 9).</div>
   </div>
 </div>
 </div>

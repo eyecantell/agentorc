@@ -40,6 +40,10 @@
   .btn.ghost:hover { background: #eef0f3; }
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
+  /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
+  .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
+  /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
+  .badge .ricon { vertical-align: -2px; margin-right: 3px; }
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
   svg { width: 14px; height: 14px; }
@@ -47,7 +51,9 @@
   .card { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
   .sc { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; position: relative; }
   .sc-body { display: flex; flex-direction: column; gap: 8px; }
-  .sc-slot { height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
+  /* `min-height`, as the page has it (app.css): a fixed height clipped the doing line's second
+     row and stacked the stalled note on top of it (TD-074 step 6) */
+  .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
   .sc-foot { display: flex; gap: 6px; align-items: center; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
   .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -142,9 +148,9 @@
       <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>orc-1</div><div class="note mono">ao-samscrape-orc-1</div></div></div>
       <div class="radio" style="gap: 8px;"><span class="rb"></span><div><div>orchestrator-ao-1</div><div class="note mono">ao-agentorc-orchestrator-ao-1</div></div></div>
     </div>
-    <span class="note">The sessions that may act on this one (send, wrap up, kill, close) — the ones holding <span class="mono">orchestrate</span>, since nothing else could. None ticked: nobody may, which is the default; add one later from Focus or with <span class="mono">ao control</span>. Ticked in advance: the role's or the repo's <span class="mono">controllers:</span>.</span>
+    <span class="note">The sessions that may act on this one (send, wrap up, kill, close) — the ones holding <span class="mono">control</span>, since nothing else could. None ticked: nobody may, which is the default; add one later from Focus or with <span class="mono">ao control</span>. Ticked in advance: the role's or the repo's <span class="mono">controllers:</span>.</span>
   </div>
-  <div class="warn">{ICON["warn"]}<span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
+  <div class="warn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg><span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
   <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px;"><span class="btn">Cancel</span><span class="btn primary">Start session</span></div>
 </div>
 </div>

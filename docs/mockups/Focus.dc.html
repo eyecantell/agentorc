@@ -40,6 +40,10 @@
   .btn.ghost:hover { background: #eef0f3; }
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
+  /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
+  .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
+  /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
+  .badge .ricon { vertical-align: -2px; margin-right: 3px; }
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
   svg { width: 14px; height: 14px; }
@@ -47,7 +51,9 @@
   .card { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
   .sc { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; position: relative; }
   .sc-body { display: flex; flex-direction: column; gap: 8px; }
-  .sc-slot { height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
+  /* `min-height`, as the page has it (app.css): a fixed height clipped the doing line's second
+     row and stacked the stalled note on top of it (TD-074 step 6) */
+  .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
   .sc-foot { display: flex; gap: 6px; align-items: center; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
   .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -116,13 +122,15 @@
 </div>
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    <div style="display: flex; align-items: center; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
       <span class="pill s-needs"><span class="dot"></span>needs you</span><span class="badge toggle on" title="click: switch to interactive">unattended</span>
-      <span class="badge">samscrape-grind</span><span class="badge">grinder</span>
+      <span class="meta" title="the session's name as its tool holds it — set in the tool, not in agentorc">DIU fetcher</span>
+      <span class="badge">samscrape-grind</span><span class="badge"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>grinder</span>
       <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: none</span>
       <span class="badge" title="the sessions that may act on this one; + adds one">under orc-1 ×  +</span>
+      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review · says · 14s ago</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
       <span style="flex-grow: 1;"></span>
       <span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="btn">Wrap up</span><span class="btn danger"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4l8 8M12 4l-8 8"></path></svg>Kill</span>
