@@ -1312,22 +1312,54 @@ def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to
 
 
 @pytest.mark.unit
-def test_the_probe_is_one_ping_and_never_raises(monkeypatch):
-    """`_agent_answers` only ever chooses which sentence to print, so it must not raise, and must
-    not turn a missing socket into a traceback on the way out of a command that already failed."""
+def test_the_probe_is_one_ping_it_never_raises_and_it_cannot_hang(monkeypatch, tmp_path):
+    """`_agent_answers` only ever chooses which sentence to print, so it must not raise, must not
+    turn a missing socket into a traceback on the way out of a command that already failed, and —
+    the one that is not obvious — **must not hang**.
+
+    Nothing in `sessionorc.client` times a read out, so an agent that is *accepting connections but
+    not yet serving* (a restarting unit, for a moment — the state this entry is about) would leave
+    an unbounded probe in `readline()` for ever, turning a deterministic exit 3 into a command that
+    never returns (review of PR #300). The bound is asserted against a real socket that accepts and
+    says nothing, because that is the only way to prove it."""
+    import asyncio as aio
+    import socket
+    import time
+
     from agentorc import cli as climod
 
+    # nothing is listening: immediate, and a `no`
+    monkeypatch.setattr(climod.clientmod.paths, "socket_path", lambda: tmp_path / "nothing.sock")
+    assert climod._agent_answers() is False
+
+    # something accepts and never answers: bounded by `PROBE_TIMEOUT`, and still a `no`
+    sock = tmp_path / "deaf.sock"
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(sock))
+    server.listen(1)
+    try:
+        monkeypatch.setattr(climod.clientmod.paths, "socket_path", lambda: sock)
+        monkeypatch.setattr(climod, "PROBE_TIMEOUT", 0.3)
+        began = time.monotonic()
+        assert climod._agent_answers() is False
+        assert time.monotonic() - began < 3.0  # bounded at all, with room for a slow machine
+    finally:
+        server.close()
+
+    # and a `pong` is a `yes`, over one call
     calls = []
 
-    def once(method, **kw):
-        calls.append(method)
-        return "pong"
+    class Stub:
+        async def __aenter__(self):
+            return self
 
-    monkeypatch.setattr(climod, "_call_sync", once)
+        async def __aexit__(self, *exc):
+            return False
+
+        async def call(self, method, **kw):
+            calls.append(method)
+            return "pong"
+
+    monkeypatch.setattr(climod.clientmod, "LocalClient", Stub)
     assert climod._agent_answers() is True and calls == ["ping"]
-
-    def raises(method, **kw):
-        raise OSError("no such file")
-
-    monkeypatch.setattr(climod, "_call_sync", raises)
-    assert climod._agent_answers() is False
+    assert aio.get_event_loop_policy() is not None  # the probe left no loop of its own behind
