@@ -42,6 +42,19 @@ from sessionorc.agent import HostAgent
 from sessionorc.tmux import Tmux
 
 HERE = Path(__file__).parent
+
+
+@pytest.fixture(autouse=True)
+def _identity_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Design §4.8a *Tests*: the suite drives the socket from the pytest process — under no pane —
+    and passes `caller=<id>` to stand for a session, which is exactly what the rule table calls a
+    forgery. So an agent built here with no mode of its own runs `off`; the classification is
+    tested directly (tests/test_identity.py), and `enforce` against real panes there too."""
+    from sessionorc import identity
+
+    monkeypatch.setattr(identity, "DEFAULT_MODE", "off")
+
+
 CHILD = HERE / "_agent_child.py"
 FAST_TICK = 0.3
 

@@ -11,6 +11,7 @@ pending-task traceback — `test_agent_restart.py` asserts exactly that on this 
 
 import asyncio
 import logging
+import os
 import sys
 
 from _stubs import HookFedStub
@@ -23,7 +24,9 @@ from sessionorc.tmux import Tmux
 async def _run(socket_name: str) -> None:
     adapters.load_all()
     adapters.register(HookFedStub())  # test-only, hook-fed: see _stubs.py
-    await serve_until_signal(HostAgent(tmux=Tmux(socket_name=socket_name)))
+    await serve_until_signal(
+        HostAgent(tmux=Tmux(socket_name=socket_name), identity_mode=os.environ.get("AO_TEST_IDENTITY", "off"))
+    )
 
 
 def main() -> int:
