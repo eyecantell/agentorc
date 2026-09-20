@@ -924,6 +924,8 @@ Not proposed: **the lead describing each member** (second-hand, a token cost eve
 
 **Why:** during the fix round of PR #249 a full local run had this one test fail; it passed alone (the file's 6 tests) and on the clean full re-run (538 passed), and the branch touched nothing it exercises. CI has not shown it. A test that can go red on a full run costs a merge sooner or later, and the way to lose an hour to it is to meet it for the first time with a deadline.
 
+**A second one, seen in CI 2026-09-20 on a ledger-only PR (#262, Python 3.13 only; 3.12 passed the same commit):** `tests/test_agent.py::test_send_wait_three_outcomes` — `TmuxError: tmux paste-buffer -p -d -b ao-paste-… -t =ao-test-send-wait-three-outcomes0-w:: no current target`: the send raced the pane (the target session was not there, or not yet, when the paste ran). The job was re-run. Same family as the first: a wait that assumes a pane is up. Both belong to whoever takes this entry.
+
 **Done when** the failure is reproduced (run the file in a loop under load — the full suite beside it) and its wait or ordering assumption is fixed, or a week of CI and local full runs passes without it and the entry is closed as not reproduced.
 
 **Related:** `tests/README.md` (the fixtures' timing rules), TD-069 (where it was seen).
