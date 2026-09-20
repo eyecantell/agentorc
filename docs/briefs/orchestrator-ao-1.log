@@ -599,3 +599,4 @@
 19:14  19:00–19:25 quiet — tdgrind-ao-1 parked idle, steer m-4b0e11ec2e63 unanswered, #269 still with the anchor → ok
 19:47  steer m-4b0e11ec2e63 lapsed at its bound → going with the default: tdgrind-ao-1 stays parked idle, team ao-grind stays up, lead keeps running rounds. Filing the board line so it outlives this session.
 19:53  escalated: board line filed for the parked worker and #269 — PR #274, Sonnet fact-check SHIP, cadence comment posted, squash-merged b6b075e, check_cadence pass; orch-parked-worker worktree removed
+19:57  tdgrind-ao-1: a wrap-up prompt reached it at 19:57 (its pane shows the standard 'this session is being wrapped up' text; wrapup_sent_at is unset on the record, so it did not come from my hand) → letting it finish; watching for out_of_work
