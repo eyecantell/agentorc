@@ -597,3 +597,4 @@
 18:37  tdgrind-ao-1: wrote its end-of-run summary and went idle, note m-098df8bd1a51 — 9 references resolved, 10 PRs merged this run, NOT out of work (pickable entries remain), invites a restart with fresh context. #273 (board live-check) cadence all rows pass. Holding: if it exits with its free-pick lane open, the restart rule applies (restart 1 of 3).
 18:47  tdgrind-ao-1: idle since 18:36 with its summary written and no out-of-work declaration; a Claude Code /exit does not leave, so it will not exit for the restart rule → steer m-4b0e11ec2e63 to Paul (park / close-and-restart / stop the team), default park, bound 60 min
 19:14  19:00–19:25 quiet — tdgrind-ao-1 parked idle, steer m-4b0e11ec2e63 unanswered, #269 still with the anchor → ok
+19:47  steer m-4b0e11ec2e63 lapsed at its bound → going with the default: tdgrind-ao-1 stays parked idle, team ao-grind stays up, lead keeps running rounds. Filing the board line so it outlives this session.
