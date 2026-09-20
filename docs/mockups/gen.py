@@ -849,7 +849,8 @@ INBOX_BLURB = {
 
 def isec(title, count, extra="", opened=False):
     pop = f'<div class="pop">{INBOX_BLURB[title]}</div>' if opened else ""
-    return f'''<div class="isec-h"><span>{title}</span><span class="n">{count}</span><span class="info{" on" if opened else ""}">i</span><span style="flex-grow: 1;"></span>{extra}{pop}</div>'''
+    mark = '<span style="font-size: 9px;">▾</span>' if title == "FYI" else ""
+    return f'''<div class="isec-h">{mark}<span>{title}</span><span class="n">{count}</span><span class="info{" on" if opened else ""}">i</span><span style="flex-grow: 1;"></span>{extra}{pop}</div>'''
 
 
 def mcard(bar, kind, name, team, age, body, controls, cls="", state=None):
@@ -897,7 +898,7 @@ def inbox():
               '<div class="txt">done: TD-068 — PR #272 merged</div>', b("Dismiss", "ghost")),
     ]
     filters = '<div class="input" style="width: 260px; height: 28px; color: #6b7280;">filter — sender, text, about</div><span class="btn ghost">team: all ▾</span>'
-    fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span><span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">fold ▴</span>'
+    fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     return head("Inbox") + f'''<div style="width: 1440px; min-height: 1640px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Inbox 4 · 2")}
 <div style="padding: 16px 20px 28px;">
