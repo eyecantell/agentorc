@@ -713,7 +713,9 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
 # -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
 
 PERSON_ASK_KINDS = ("ask", "conflict")  # what reads as a question to the person; `steer` has its own rules
-INBOX_SECTIONS = ("needs", "steering", "fyi", "snoozed")
+# design §4.5 screen 6 / §4.10 *Outcomes* (TD-079 step 2): **Waiting on them** is the fourth
+# section, under *Steering* and in neither number — it waits on a session, not on the person.
+INBOX_SECTIONS = ("needs", "steering", "waiting", "fyi", "snoozed")
 
 
 def _entry_open(e: dict[str, Any]) -> bool:
@@ -898,11 +900,76 @@ def _needs_key(item: dict[str, Any]) -> tuple[int, str]:
     return (1, str(item.get("at") or ""))
 
 
+# design §4.10 *Outcomes*: the same predicate as `MailEntry.owes`, over the dict the RPC hands the
+# page. It is duplicated rather than imported because the page reads entries, not models — and it
+# is the *one* rule that decides which section a settled question is in, so it says so out loud.
+OWING_CLOSES = ("replied", "go_with_it")
+
+
+def _owing(e: dict[str, Any], record: dict[str, Any] | None, now: datetime) -> None:
+    """Stamp a question the person answered with what *Waiting on them* and *Needs you* need
+    (§4.10 *Outcomes*, §4.5a): whether it still owes an outcome, how long it has owed it, what the
+    person answered as far as the inbox still holds it, and whether its asker has **exited without
+    reporting** — which is what moves the row into the counted section, because then only a person
+    or the asker's manager can find out what happened.
+
+    An asker whose record is **gone** is not this row: the home settles that as `asker_gone` and
+    the question stops owing. `exited` is the live record that will not report by itself."""
+    outcome = _outcome_of(e)
+    e["owes"] = bool(
+        "person" in (e.get("to") or [])
+        and e.get("kind") in PERSON_ASK_KINDS
+        and e.get("closed_reason") in OWING_CLOSES
+        and not outcome
+    )
+    e["owed_age"] = _age(e.get("closed_at"), now) if e["owes"] else ""
+    # what the person answered, as far as the person inbox still holds it: a pressed suggested
+    # answer is in the entry itself (§4.10 *Suggested answers*), and a typed reply is not — the
+    # reply went to the asker's inbox, not to this one — so the row says which of the two it was
+    # rather than inventing words the person did not write
+    answers = e.get("answers") if isinstance(e.get("answers"), list) else []
+    idx = e.get("answer")
+    e["answer_given"] = str(answers[idx]) if isinstance(idx, int) and 0 <= idx < len(answers) else ""
+    e["answer_how"] = "you let it go with its default" if e.get("closed_reason") == "go_with_it" else "you answered"
+    e["asker_state"] = str((record or {}).get("state") or "")
+    e["asker_doing"] = (record or {}).get("doing")
+    e["asker_gone_quiet"] = bool(e["owes"] and e["asker_state"] in ("exited", "closed"))
+    if outcome:
+        e["outcome_age"] = _age(outcome.get("at"), now)
+
+
+def _outcome_of(e: dict[str, Any]) -> dict[str, Any]:
+    """An entry's `outcome` (§4.10 *Outcomes*) as a dict, or `{}` — read as a shape, never trusted:
+    an entry from another build may carry anything there and it must cost a row a line, not the
+    page (the `_age` rule)."""
+    o = e.get("outcome")
+    return o if isinstance(o, dict) else {}
+
+
+def _trail_rows(trail: Collection[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
+    """The trail as FYI rows (§4.10 *The Inbox is a queue*, TD-079): what a state row's **ending**
+    left behind, so a row that resolved by some other road does not simply vanish. The home writes
+    these, and they are not mail — the page gives them `at` and `age` so they sort and read beside
+    the entries, and a `row` of `trail` so one renderer draws them."""
+    out = []
+    for t in trail:
+        if not isinstance(t, dict) or not t.get("id"):
+            continue
+        at = str(t.get("last") or t.get("resolved_at") or "")
+        # *up for* is how long the row **stood**, which is its ending minus its start — not its
+        # age now, which is a different number and the one a reader would misread it as
+        ended = _instant(at) or now
+        out.append({**t, "row": "trail", "at": at, "age": _age(at, now), "for_words": _age(t.get("since"), ended)})
+    return out
+
+
 def inbox_sections(
     entries: Collection[dict[str, Any]],
     *,
     now: datetime | None = None,
     states: Collection[dict[str, Any]] = (),
+    trail: Collection[dict[str, Any]] = (),
+    attention_snoozed: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
@@ -924,28 +991,61 @@ def inbox_sections(
     waiting on a person, never unread mail. One computation, used by the page and by the poll.
     An unreadable `snoozed_until` reads as *not snoozed*: mail is never hidden by a bad field.
 
-    A **state row carries no snooze**: §4.5a allows one on `stalled?` and unpushed work, but a
-    state lives on its record and no field of ours holds a person's *not now* — so the rows are
-    built without Snooze and the gap is TD-069 step 2's to close (a home-owned
-    `attention_snoozed_until`, set by a person-only RPC, is the proposal)."""
+    - **Waiting on them** (§4.10 *Outcomes*, TD-079 step 2) — answered questions that owe an
+      outcome and whose asker is still live: it waits on a session, not on the person, so it is in
+      neither number. A debt whose asker **exited without reporting** is in *Needs you* instead,
+      counted — only a person, or the asker's manager, can find out what happened — and so is a
+      **`blocked`** outcome, which is not a dead end but work stopped on something only a person
+      can move. A `done` or `dropped` outcome is FYI, shown under the question it closes.
+
+    **A state row's snooze** (§4.10 *The Inbox is a queue*, TD-079 step 1b) lives in the home's own
+    attention store, per record and row kind, because a state has no mail entry to carry one:
+    `attention_snoozed` is that store as the RPC hands it over, and a row whose time is still
+    ahead is in no section and no count, exactly as a snoozed entry is.
+
+    The **trail** (§4.10) is FYI too: what a state row's ending left behind, so a row that resolved
+    by some other road — the session was resumed, the permission was answered in the terminal —
+    does not simply vanish."""
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
-    out["needs"].extend(states)
+    snoozed_rows = attention_snoozed or {}
+    for r in states:
+        raw = snoozed_rows.get(f"{r.get('sid') or ''}|{r.get('row') or ''}")
+        until = _iso(raw)
+        if until and until > at:
+            out["snoozed"].append({**r, "snoozed_until": str(raw), "until_words": _left(str(raw), at)})
+        else:
+            out["needs"].append(r)
+    # The outcome `note` that settles a question is an ordinary entry in its own right, and is
+    # **listed under its question** rather than beside it (§4.10 *Outcomes*) — so it is taken out
+    # of the FYI list here and hung on the question's own row by `id`.
+    settles = {str(_outcome_of(e)["by"]): e["id"] for e in entries if _outcome_of(e).get("by")}
     for e in entries:
         snoozed = _iso(e.get("snoozed_until"))
+        outcome = _outcome_of(e)
         if snoozed and snoozed > at:
             out["snoozed"].append(e)
         elif _entry_open(e) and (e.get("kind") in PERSON_ASK_KINDS or e.get("paused_at")):
             out["needs"].append(e)
         elif _entry_open(e) and e.get("kind") == "steer":
             out["steering"].append(e)
+        elif outcome and outcome.get("state") == "blocked":
+            out["needs"].append(e)  # counted: work stopped on something only a person can move
+        elif e.get("owes"):
+            # the asker exited without reporting: only a person or its manager can find out what
+            # happened, so that one is counted; the rest wait on a live session and are not
+            (out["needs"] if e.get("asker_gone_quiet") else out["waiting"]).append(e)
+        elif e["id"] in settles:
+            continue  # the reporting note: drawn under the question it closes, not beside it
         else:
             out["fyi"].append(e)
+    out["fyi"].extend(_trail_rows(trail or (), at))
     out["needs"].sort(key=_needs_key)
     out["steering"].sort(key=lambda e: (not e.get("bound"), str(e.get("bound") or "")))
+    out["waiting"].sort(key=lambda e: str(e.get("closed_at") or e.get("at") or ""))
     out["fyi"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["snoozed"].sort(key=lambda e: str(e.get("snoozed_until") or ""))
-    return {**out, "count": len(out["needs"])}
+    return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"])}
 
 
 # -- app -------------------------------------------------------------------------------------------
@@ -1030,7 +1130,7 @@ def create_app() -> FastAPI:
         # (design §4.5 unreachable hosts), never a bare 503.
         agent_down = False
         usage: dict[str, Any] = {}
-        person_needs = 0
+        person_needs = person_fyi = 0
         info: dict[str, Any] | None = None
         entries: list[dict[str, Any]] = []
         try:
@@ -1060,7 +1160,7 @@ def create_app() -> FastAPI:
         strip = teams_view(sessions)
         id_info = {} if agent_down else await identity_info()
         if entries or vs:
-            person_needs = inbox_sections(
+            secs = inbox_sections(
                 entries,
                 states=state_rows(
                     vs,
@@ -1068,7 +1168,8 @@ def create_app() -> FastAPI:
                     host=str(id_info.get("host") or host_name()),
                     identity_mode=str(id_info.get("mode") or ""),
                 ),
-            )["count"]
+            )
+            person_needs, person_fyi = secs["count"], secs["fyi_n"]
         return templates.TemplateResponse(
             request,
             "org.html",
@@ -1083,6 +1184,7 @@ def create_app() -> FastAPI:
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
                 "person_needs": person_needs,
+                "person_fyi": person_fyi,
                 "node_banner": node_banner(info),
                 "identity_note": identity_note(id_info),
             },
@@ -1544,10 +1646,12 @@ def create_app() -> FastAPI:
         record still exists (§4.5 screen 6: a row opens the session that needs the person)."""
         got = await call("inbox")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        records = {o.get("id"): o for o in fleet}
         at = datetime.now(UTC)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
+            _owing(e, records.get(e["from"]), at)
             e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
             # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the
             # client fills in — `left` for a `steer`'s bound, `until_words` for a snoozed entry,
@@ -1576,13 +1680,16 @@ def create_app() -> FastAPI:
             if e.status_code != 503:
                 raise
             got, states, agent_down = {"entries": []}, [], True  # the banner + Retry, never a bare 503
-        sections = inbox_sections(got["entries"], states=states)
+        sections = inbox_sections(
+            got["entries"], states=states, trail=got.get("trail") or (), attention_snoozed=got.get("attention_snoozed")
+        )
         return templates.TemplateResponse(
             request,
             "inbox.html",
             {
                 "sections": sections,
                 "person_needs": sections["count"],
+                "person_fyi": sections["fyi_n"],
                 "host": host_name(),
                 "active": "Inbox",
                 "agent_down": agent_down,
@@ -1618,16 +1725,23 @@ def create_app() -> FastAPI:
                 "entries": [],
                 "sections": {k: [] for k in INBOX_SECTIONS},
                 "needs": None,  # not zero: nothing is *known* to be waiting, which is not *nothing is*
+                "fyi_n": None,  # the same rule for the second number: not known is not zero
                 "snoozed_n": 0,
                 "html": {},
                 "unread": None,
                 "agent_down": True,
                 "why": str(e.detail),
             }
-        sections = inbox_sections(got["entries"], states=states)
+        sections = inbox_sections(
+            got["entries"], states=states, trail=got.get("trail") or (), attention_snoozed=got.get("attention_snoozed")
+        )
         got["agent_down"] = False
         got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
         got["needs"] = sections["count"]
+        # §4.10 *The Inbox is a queue*: FYI's own quiet number, **never added to the first** — the
+        # first is *what needs you*. The page opens the section by itself when this is higher than
+        # the browser last saw, which is what stops a folded FYI hiding mail nobody counted.
+        got["fyi_n"] = sections["fyi_n"]
         got["snoozed_n"] = len(sections["snoozed"])
         got["html"] = inbox_html(sections)
         return got
@@ -1657,6 +1771,28 @@ def create_app() -> FastAPI:
                 got = await call("inbox_snooze", msg=ref, until=until)
             else:
                 got = await call(PERSON_ACTS[action], msg=ref)
+            return JSONResponse({"ok": True, **got})
+        if action == "dismiss":
+            # design §4.10 *The Inbox is a queue* (TD-079 step 2): **Dismiss** and **Dismiss all**.
+            # A **list of ids**, because *Dismiss all* dismisses the entries **this browser has on
+            # screen** — mail that arrived after the page was drawn is exactly what must not go
+            # unseen — and the ids are the browser's, mail (`m-`) and trail (`t-`) alike. The agent
+            # refuses an id that is still an open question, naming it; that comes back as the toast.
+            raw = body.get("msg")
+            ids = [str(x).strip() for x in (raw if isinstance(raw, list) else [raw]) if str(x or "").strip()]
+            if not ids:
+                raise HTTPException(400, "dismiss names the entries to dismiss, by id")
+            got = await call("inbox_dismiss", msg=ids)
+            return JSONResponse({"ok": True, **got})
+        if action == "attention_snooze":
+            # design §4.5a **Inbox row: state** / §4.10: a **state row's** snooze — `stalled?` and
+            # unpushed work, the two that are not on the tool's clock. It is keyed on the record
+            # **and the row kind**, because a session's permission and its stalled row are two rows
+            # and snoozing one is not snoozing the other; no `until` is the clear (*Unsnooze*).
+            sid, kind = str(body.get("id") or "").strip(), str(body.get("kind") or "").strip()
+            if not sid or not kind:
+                raise HTTPException(400, "a state row's snooze names the session and the row kind")
+            got = await call("attention_snooze", id=sid, kind=kind, until=str(body.get("until") or "").strip() or None)
             return JSONResponse({"ok": True, **got})
         if action == "identity_ack":
             # design §4.5a **Inbox row: identity alarm** (§4.8a, TD-077 step 2): a person has seen
