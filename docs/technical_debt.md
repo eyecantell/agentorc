@@ -56,6 +56,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Open |
 | TD-083 | A worker that ends its run on purpose, with work still on the ledger, is neither *finished* nor *exited*: no rule of its manager's fires, and the team sits parked until a person restarts it | Medium | Open |
 | TD-084 | On a node, `ao status` always says its home *is unreachable* — it never asks | Low | Open |
+| TD-085 | The Focus header outgrew its row — it does not wrap, so the session's name and the newest chips squeeze each other | Low | Open |
 
 ---
 
@@ -935,3 +936,18 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the line says *unreachable* only when the node's agent reports its link down, and otherwise says what the listing is (this host's sessions; the org is at the home), with a test for each.
 
 **Related:** TD-057 (nodes), TD-077 (where it was seen).
+
+## TD-085: The Focus header outgrew its row — it does not wrap, so the name and the newest chips squeeze each other
+
+**Priority:** Low
+**Added:** 2026-09-20 (`tdgrind-ao-1`, from the TD-074 step 6 mockup redraw)
+**Status:** Open — seen in the artboard, not yet in a browser against the live page.
+**Location:** `src/agentorc/ui/templates/focus.html` (`#fhead`, a `row gap`), `src/agentorc/ui/static/app.css` (`.row` — `flex-wrap` is only on `.wrap`)
+
+**Why:** `#fhead` is one flex row with no wrap, and 2026-09-19 and -20 added three things to it: the tool's **title** (TD-074), the **out of work** chip (TD-053 step 6) and the **doing** line (TD-074), beside what was already there — back link, `host / repo / name`, state, the unattended toggle, the stop badge, team, role, grants, controllers, and on a `needs-you` session Allow / Deny with the tool and its command. Redrawing the Focus artboard at 1440 with all of it showed the failure shape: the session's path broke over four lines, the title was squeezed to nothing and the doing line never appeared. Without wrap a flex row shrinks its shrinkable children rather than moving anything to a second line, and the session's name is the most shrinkable thing there. **The artboard is not proof** — it is a copy of the same row at the same width, not the page — so the first step is a browser at 1440 and at a laptop's 1280.
+
+**Fix:** the row wraps (`flex-wrap: wrap` on `#fhead`, which is what the mockup's Focus artboard now does and what the lead's artboard always did), or the header is split — the identity line above, the chips and controls below. The second is a design question for §4.5a, since it decides what a person sees first on a narrow window; the first is a line of CSS that stops the name disappearing. Whatever is chosen, the **name and its state must never be the things that shrink**.
+
+**Done when** the Focus header at 1440 and at 1280 shows the session's name whole, its state, and every chip it carries, on a `needs-you` session with a title, a stop time, a team, a role, grants, a controller and a doing line.
+
+**Related:** TD-074 (what was added), TD-053 step 6 (the out-of-work chip), TD-003 (the phone layout, which has the same row and less of it), design §4.5a (*Focus header*).

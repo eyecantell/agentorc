@@ -39,7 +39,7 @@ CSS = """
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
-  .status.doing { white-space: normal; overflow-wrap: anywhere; }
+  .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
   /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
   .badge .ricon { vertical-align: -2px; margin-right: 3px; }
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
@@ -250,8 +250,9 @@ EXTRA = {
                   "doing": ("TD-301: pushing the branch for review", "14s"), "title": "DIU fetcher"},
     "tdgrind-2": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-296 → #437 · 2/2 done", "derived": True,
                   "doing": ("TD-296: waiting on CI for #437", "39m")},
-    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed",
-                  "doing": ("TD-290: reading the summariser before choosing a fix", "9m")},
+    # no `doing` on tdgrind-3 on purpose: it is `limited`, and the slot shows the cap — what needs
+    # a person comes first (§4.5a), so a line here would be data no branch draws (review of PR #288)
+    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed"},
     "main":      {"findings": "1 filed"},
     "errors-alerts": {"title": "Error Checker"},
 }
@@ -486,7 +487,7 @@ def focus():
 {topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    <div style="display: flex; align-items: center; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
       {pill("needs")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
@@ -494,6 +495,7 @@ def focus():
       <span class="badge">samscrape-grind</span><span class="badge">{role_icon("grinder")}grinder</span>
       <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: none</span>
       <span class="badge" title="the sessions that may act on this one; + adds one">under orc-1 ×  +</span>
+      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review · says · 14s ago</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
       <span style="flex-grow: 1;"></span>
       <span class="btn">{ICON["term"]}Open shell here</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{ICON["kill"]}Kill</span>
@@ -583,6 +585,7 @@ def focus_orchestrator():
       <span class="badge">samscrape-grind</span><span class="badge">{role_icon("lead")}lead</span>
       <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: control ×</span>
       <span class="badge" title="the sessions that may act on this one; + adds one">no controller  +</span>
+      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">round 41: reading four members, two claims to re-check · says · 2m ago</span>
       <span style="flex-grow: 1;"></span>
       <span class="btn">{ICON["term"]}Open shell here</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{ICON["kill"]}Kill</span>
     </div>
