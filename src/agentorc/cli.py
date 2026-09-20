@@ -965,6 +965,11 @@ def cmd_msg(args: argparse.Namespace) -> int:
         # of the one a `--pick` reply chose. The home cleans, bounds and re-checks both.
         "answers": args.answer or None,
         "answer": answer,
+        # design §4.10 *Outcomes* (TD-079): what became of an answer the person gave, and a
+        # follow-up on the same thread when more direction is needed. The home verifies both ids.
+        "outcome": args.outcome,
+        "for_": args.for_,
+        "thread": args.thread,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
 
@@ -1476,6 +1481,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         help="answer --reply-to's suggested answer number <n>, as `ao inbox` numbers them (from 1)",
     )
+    # design §4.10 *Outcomes* (TD-079): an answer the person gave is followed to what became of it.
+    p.add_argument(
+        "--outcome",
+        choices=["done", "blocked", "dropped"],
+        help="report what became of an answered question: one line, with --for <its id>",
+    )
+    p.add_argument("--for", dest="for_", metavar="ID", help="the question an --outcome settles (its own id)")
+    p.add_argument(
+        "--thread",
+        metavar="ID",
+        help="ask again on an answered question's thread: it lands with the thread above it and settles the first",
+    )
     p.set_defaults(fn=cmd_msg)
 
     p = add("inbox", help="read your inbox; with no session, the person inbox (design §4.10)")
@@ -1560,14 +1577,20 @@ def unread_line(args: argparse.Namespace) -> None:
     goes to stderr, so a caller parsing stdout never meets it. A command that never reached the
     agent (`ao --skill`, `ao roles`) has no response to read and prints nothing."""
     m = clientmod.last_mail
-    if not m or not m.get("unread"):
+    if not m or not (m.get("unread") or m.get("owed")):
         return
-    n = int(m["unread"])
-    line = f"[agentorc] you have {n} unread messages — run ao inbox"
-    if m.get("wake_budget_spent"):
-        line += " (wake budget spent)"
+    lines = []
+    if n := int(m.get("unread") or 0):
+        lines.append(f"[agentorc] you have {n} unread messages — run ao inbox")
+        if m.get("wake_budget_spent"):
+            lines[-1] += " (wake budget spent)"
+    # Design §4.10 *Outcomes*: the person answered and is waiting to hear what came of it. One line
+    # each settles them — `ao msg person --outcome done|blocked|dropped "<line>" --for <id>`.
+    if owed := [str(x) for x in (m.get("owed") or [])]:
+        lines.append(f"[agentorc] you owe {len(owed)} outcome{'s' if len(owed) != 1 else ''}: {', '.join(owed)}")
     sys.stdout.flush()
-    print(line, file=sys.stderr if getattr(args, "json", False) else sys.stdout)
+    for line in lines:
+        print(line, file=sys.stderr if getattr(args, "json", False) else sys.stdout)
 
 
 if __name__ == "__main__":

@@ -44,6 +44,12 @@ DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as 
 ANSWERS_MAX = 4
 ANSWER_CAP = 80
 OPEN_ASK_ADVICE = 3  # open `ask`s to the person at which `ao msg` advises asking whether this one is a steer
+# Outcomes owed to the person before an `ask` or a `steer` to it is refused (design §4.10
+# *Outcomes*, TD-079). Ten, because the remedy is one line each and a worker with a long night of
+# answered questions must be able to keep asking — the debt bounds the *unreported*, never the
+# mailbox: an owing question does not hold its sender's slot in the person-inbox depths.
+OUTCOMES_OWED_MAX: int | None = 10
+OUTCOME_STATES = ("done", "blocked", "dropped")  # what an asker may report; the home writes two more
 MAIL_RETENTION: timedelta | None = timedelta(hours=12)  # how long a read entry is kept; an open `ask` is exempt
 SENDS_KEEP = 20  # `sends` entries a record keeps
 NONCES_KEEP = 256  # verdicts remembered per host agent for a client's same-nonce retry

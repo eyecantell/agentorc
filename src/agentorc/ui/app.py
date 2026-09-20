@@ -545,6 +545,11 @@ def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ())
         checks.append(("tree clean", git.get("dirty", 0) == 0))
         checks.append(("branch pushed", git.get("ahead", 0) == 0 and bool(git.get("upstream"))))
     checks.append(("no subagents running", (s.get("subagents") or 0) == 0))
+    # design §4.2 / §4.10 *Outcomes* (TD-079): the person answered this session's question and has
+    # not been told what came of it. `ao progress none` is refused on the same fact; this row is
+    # for a session that exits some other way and never declares anything.
+    owed = (s.get("mail") or {}).get("owed") or []
+    checks.append((f"outcomes reported ({len(owed)} owed)" if owed else "outcomes reported", not owed))
     if members is None:
         checks.append(("members unknown — the host agent did not list the sessions; reload", False))
     elif members:

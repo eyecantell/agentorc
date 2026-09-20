@@ -234,9 +234,31 @@ class MailEntry:
     # survives what the entry survives: a resume moves it with the note, and a host-agent restart
     # reloads it — the wake is decided when the session is next reachable, which may be after both.
     uncharged: bool = False
+    # What became of the answer (design §4.10 *Outcomes*, 2026-09-20, TD-079): `{state, text, at,
+    # by}` on a question the person answered, where `state` is `done`, `blocked` or `dropped` as
+    # the asker reported it, `asked_again` when the asker put a follow-up on the thread, or
+    # `asker_gone` when its record was closed or forgotten. `by` is the id of the reporting `note`
+    # — an ordinary entry in its own right — and is empty on the two the home writes itself.
+    # Written on every copy, as `read_at` and `closed_reason` are, so the asker's card and the
+    # person's Inbox say the same thing.
+    outcome: dict[str, Any] | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
+
+    @property
+    def owes(self) -> bool:
+        """Design §4.10 *Outcomes*: a question **to the person** that the person **answered** owes
+        an outcome back, until one is reported or the home writes one. Read from the entry alone,
+        so the asker's own copy in its outbox answers it — which is what the card, the `ao` reply
+        line, `ao progress none` and Ready to close all read. A `declined` or `lapsed` close owes
+        nothing: nobody answered."""
+        return (
+            PERSON in self.to
+            and self.kind in ASK_KINDS
+            and self.closed_reason in ("replied", "go_with_it")
+            and not self.outcome
+        )
 
     @property
     def open(self) -> bool:
@@ -563,9 +585,15 @@ class Session:
             "expired": [e.id for e in self.outbox if e.expired_at],
             "addressee_exited": [e.id for e in self.outbox if e.pending and e.open],
             "copies_failed": [e.id for e in self.outbox if e.copies_failed],
+            "owed": self.owed(),
             "bound_hit": [k for k, t in self.threads.items() if t.bound_hit],
             "wake_budget_spent": self.wake_budget_spent(),
         }
+
+    def owed(self) -> list[str]:
+        """The questions this session put to the person that were answered and still owe an
+        outcome (design §4.10 *Outcomes*): its own copies, in the order they were sent."""
+        return [e.id for e in self.outbox if e.owes]
 
     def wake_budget_spent(self) -> bool:
         """Exhaustion is visible (design §4.10): on the record, and so on the card and every `ao`

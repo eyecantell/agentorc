@@ -1037,6 +1037,25 @@ def test_the_unread_line_says_when_the_wake_budget_is_spent(capsys):
     assert capsys.readouterr().out == ""
 
 
+def test_the_same_line_says_what_outcomes_are_owed(capsys):
+    """Design §4.10 *Outcomes* (TD-079): the person answered and is waiting to hear what came of
+    it, so every `ao` reply says so — a line of its own beside the unread one, and present when
+    there is no unread mail at all, which is the usual case for a session that is working."""
+    import argparse
+
+    from sessionorc import client as clientmod
+
+    args = argparse.Namespace(json=False)
+    clientmod.last_mail = {"unread": 0, "wake_budget_spent": False, "owed": ["m-1", "m-2"]}
+    cli.unread_line(args)
+    assert capsys.readouterr().out == "[agentorc] you owe 2 outcomes: m-1, m-2\n"
+    clientmod.last_mail = {"unread": 1, "wake_budget_spent": False, "owed": ["m-1"]}
+    cli.unread_line(args)
+    out = capsys.readouterr().out.splitlines()
+    assert out == ["[agentorc] you have 1 unread messages — run ao inbox", "[agentorc] you owe 1 outcome: m-1"]
+    clientmod.last_mail = None
+
+
 def test_ao_wait_against_an_agent_without_the_wait_rpc_says_so_and_exits(monkeypatch, capsys):
     """The running lead's agent may predate the RPC: one line, non-zero, never a loop."""
     from sessionorc.client import AgentError
