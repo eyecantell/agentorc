@@ -4,7 +4,11 @@
    section by gaining a macro here and changing nothing else.
 
    Everything a session wrote is rendered as text by Jinja's escaping and never as markup, and a
-   kind mark is a `<span>`: nothing on the page that is not a control looks like one (TD-071 item 8). #}
+   kind mark is a `<span>`: nothing on the page that is not a control looks like one (TD-071 item 8).
+
+   **A row is a card** (§4.5 screen 6 *Layout*, TD-082): its own surface, a hover state and a focus
+   ring, and `tabindex="0"` so the row itself is a tab stop and its controls follow it in tab order
+   — where one thing ends and the next begins is never in doubt. #}
 
 {% macro head(e) -%}
 <div class="row gap wrap mhead">
@@ -108,7 +112,10 @@
   {%- if e.paused_at %}
   <span class="st">paused · the clock is stopped, and the sender was told not to take its default yet</span>
   {%- else %}
-  <span class="st timeleft" data-deadline="{{ e.bound or '' }}">{% if e.bound %}…{% else %}no bound{% endif %}</span>
+  {#- §4.5 screen 6 *Layout*: **times never draw as a placeholder**. A time left is a duration and
+      needs no time zone, so the server renders it in words and the script below only keeps it
+      moving — the `…` a row showed until its script ran is gone (TD-082). -#}
+  <span class="st timeleft" data-deadline="{{ e.bound or '' }}">{% if not e.bound %}no bound{% elif e.left %}{{ e.left }} left — then it goes with its default{% else %}the time is up: the sender goes with its default{% endif %}</span>
   {%- endif %}
   <span class="grow"></span>
   {{ reply_btn(e) }}
@@ -144,7 +151,7 @@
 <div class="row gap wrap mfoot">
   {#- the instant is stored UTC; the person set it in their own clock and reads it back in it,
       as every other time on the page is shown. The raw instant stays on hover. -#}
-  <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">…</span></span>
+  <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">{% if e.until_words %}in {{ e.until_words }}{% else %}any moment now{% endif %}</span></span>
   <span class="grow"></span>
   <button class="btn sm ghost" data-act="unsnooze" data-id="person" data-msg="{{ e.id }}" title="bring it back into its section now">Unsnooze</button>
 </div>
@@ -160,7 +167,9 @@
 <div class="row gap wrap mhead">
   {%- if e.sid %}<a class="ref" href="/focus/{{ e.sid }}" title="{{ e.sid }}{% if e.host %} on {{ e.host }}{% endif %}">{{ e.name }}</a>
   {%- else %}<span class="ref" title="this host's own alarms: they are about no record">{{ e.name }}</span>{% endif %}
-  {%- if e.title %} <span class="meta tool-title" title="the session's name as its tool holds it (design §4.5a): {{ e.title }}">{{ e.title }}</span>{% endif %}
+  {#- §4.5 screen 6 *Layout*: a session's name is printed **once** — the tool's own title is left
+      out when it only repeats it (`push  push` on Paul's screenshot, TD-082 finding 4). -#}
+  {%- if e.title and e.title != e.name %} <span class="meta tool-title" title="the session's name as its tool holds it (design §4.5a): {{ e.title }}">{{ e.title }}</span>{% endif %}
   {%- if e.role %} <span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ role_svg(e.role_icon) }}{{ e.role }}</span>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
   <span class="grow"></span>
@@ -187,7 +196,7 @@
   {%- if e.row == 'permission' %}
   <span class="st">waiting on your answer — through the hook channel, not the terminal (§4.2)</span>
   <span class="grow"></span>
-  <span class="meta countdown" data-deadline="{{ e.deadline }}">via hook</span>
+  <span class="meta countdown" data-deadline="{{ e.deadline }}">{{ e.left or 'via hook' }}</span>
   <button class="btn sm primary" data-act="allow" data-id="{{ e.sid }}">Allow</button>
   <button class="btn sm" data-act="deny" data-id="{{ e.sid }}">Deny</button>
   {%- elif e.row == 'limited' %}
@@ -219,7 +228,7 @@
 <div class="body">{% if e.row == 'alarm_host' %}Requests to this host that named a session they did not come from — kept here because they are about no record, so nobody is blamed for someone else's claim.{% else %}Requests that named this session and did not come from it.{% endif %}</div>
 <ul class="alarms">
   {%- for a in e.alarms %}
-  <li>{{ a.words }} <span class="st">{% if a.count > 1 %}first <span class="localtime" data-at="{{ a.at }}" title="{{ a.at }}">…</span>, last <span class="localtime" data-at="{{ a.last }}" title="{{ a.last }}">…</span>{% else %}<span class="localtime" data-at="{{ a.at }}" title="{{ a.at }}">…</span>{% endif %}</span></li>
+  <li>{{ a.words }} <span class="st">{% if a.count > 1 %}first <span class="localtime" data-at="{{ a.at }}" title="{{ a.at }}">{{ a.at_words or 'just now' }}</span>, last <span class="localtime" data-at="{{ a.last }}" title="{{ a.last }}">{{ a.last_words or 'just now' }}</span>{% else %}<span class="localtime" data-at="{{ a.at }}" title="{{ a.at }}">{{ a.at_words or 'just now' }}</span>{% endif %}</span></li>
   {%- endfor %}
 </ul>
 <div class="row gap wrap mfoot">
@@ -232,11 +241,11 @@
 
 {% macro row(e, section) -%}
 {%- if e.row %}
-<div class="mailrow staterow" data-msg="{{ e.id }}" data-kind="state" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ e.find }}">
+<div class="mailrow staterow" tabindex="0" data-msg="{{ e.id }}" data-kind="state" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ e.find }}">
 {%- if e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 </div>
 {%- else %}
-<div class="mailrow" data-msg="{{ e.id }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '')) | lower }}">
+<div class="mailrow" tabindex="0" data-msg="{{ e.id }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '')) | lower }}">
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
 {%- if section == 'snoozed' %}{{ snoozed(e, section) }}

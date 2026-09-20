@@ -1066,3 +1066,102 @@ def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
             menu = 'class="more"' in tag
             section = 'id="sec-fyi"' in tag or 'id="snoozedbox"' in tag
             assert menu != section, f"{tpl.name}: {tag} is neither a menu the handler folds nor a known section"
+
+
+# -- design round 2: one centred column, sections as headings, rows as cards (TD-082) -------------
+
+
+@pytest.mark.unit
+def test_the_page_is_one_centred_column_and_a_section_is_a_heading_not_a_box(monkeypatch, tmp_path):
+    """§4.5 screen 6 *Layout* (TD-082 findings 1–3): the page is one centred column of at most
+    1100 px — so a message's text runs the width of its row instead of wrapping at a measure of its
+    own inside an empty box — and a section is a heading, not a bordered card."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import inbox_sections, templates
+
+    now = datetime(2026, 9, 19, 12, tzinfo=UTC)
+    sections = inbox_sections([entry("m-1", "ask")], now=now)
+    html = templates.get_template("inbox.html").render(
+        sections=sections, person_needs=sections["count"], host="kmaster", active="Inbox",
+        agent_down=False, volatile=False, usage={},
+    )  # fmt: skip
+    # a section is a heading: no `card pad` on any of the three, and no closing paragraph
+    assert 'class="isec" id="sec-needs"' in html and 'class="card pad isec"' not in html
+    assert "A state row is the session" not in html.split('id="sec-needs"')[0]  # not above the rows
+    css = (UI / "static" / "app.css").read_text()
+    col = next(ln for ln in css.splitlines() if ln.startswith(".inboxpage {"))
+    assert "max-width: 1100px" in col and "margin: 0 auto" in col
+    body = next(ln for ln in css.splitlines() if ".inboxpage .mailrow .body" in ln)
+    assert "max-width" not in body  # the column is the measure now, not the paragraph
+    row = next(ln for ln in css.splitlines() if ln.startswith(".inboxpage .mailrow {"))
+    assert "border:" in row and "background: var(--card)" in row  # a row is a card
+    assert ".inboxpage .mailrow:focus-visible" in css  # …with a focus ring, because it is a tab stop
+    assert 'class="mailrow" tabindex="0"' in rows("needs", [entry("m-1", "ask")])
+
+
+@pytest.mark.unit
+def test_each_section_keeps_its_blurb_behind_an_i_mark_that_a_screen_reader_can_hear(monkeypatch, tmp_path):
+    """§4.5a **Inbox: section heading, the i mark**: the paragraph that said what a section is used
+    to sit above every row for ever. It is now the **i** mark's — a `<button>`, so Enter and Space
+    press it, carrying `aria-expanded` and `aria-controls`; its `title` is the same text as the
+    paragraph it describes, and the paragraph is in the page **always**, merely `hidden`, because
+    `aria-describedby` may point at a hidden node and never at a missing one."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import inbox_sections, templates
+
+    now = datetime(2026, 9, 19, 12, tzinfo=UTC)
+    sections = inbox_sections([entry("m-1", "ask")], now=now)
+    html = templates.get_template("inbox.html").render(
+        sections=sections, person_needs=sections["count"], host="kmaster", active="Inbox",
+        agent_down=False, volatile=False, usage={},
+    )  # fmt: skip
+    for sec, name in (("needs", "Needs you"), ("steering", "Steering"), ("fyi", "FYI")):
+        assert f'aria-controls="info-{sec}" aria-expanded="false" aria-describedby="info-{sec}"' in html
+        assert f'aria-label="About {name}"' in html
+        assert f'<p class="note secinfo" id="info-{sec}" hidden>' in html
+    # the same words twice: the button's hover and the paragraph it opens
+    para = html.split('id="info-steering" hidden>')[1].split("</p>")[0]
+    assert "Doing nothing is a valid answer" in para and f'title="{para}"' in html
+    js = (UI / "static" / "app.js").read_text()
+    assert "setupInfoMarks" in js and "stopPropagation" in js  # the i inside FYI's summary
+    assert 'store.set(key, on)' in js  # which are open is remembered in the browser
+
+
+@pytest.mark.unit
+def test_a_time_left_is_words_from_the_server_and_never_a_placeholder():
+    """§4.5 screen 6 *Layout* (TD-082 finding 4): a duration needs no time zone, so the server
+    renders it — a screenshot, a slow phone and a script error all read the number rather than the
+    `…` the row showed until its script ran. The words are `fmtLeft`'s, so nothing jumps."""
+    from agentorc.ui.app import _countdown, _left
+
+    now = datetime(2026, 9, 20, 12, tzinfo=UTC)
+    assert _left(iso(now + timedelta(minutes=21, seconds=5)), now) == "21m 05s"
+    assert _left(iso(now + timedelta(hours=1, minutes=5)), now) == "1h 5m"
+    assert _left(iso(now - timedelta(minutes=1)), now) == ""  # already past: the sentence says so
+    assert _left("half six", now) == "" and _left(None, now) == ""  # the `_age` rule, unraised
+    assert _countdown(iso(now + timedelta(minutes=3)), now) == "via hook · 3m 00s left"
+    assert _countdown(iso(now - timedelta(minutes=3)), now) == "via hook · falling through to the terminal"
+
+    html = rows("steering", [entry("m-2", "steer", default="off main", bound="x", left="21m 05s")])
+    assert "21m 05s left — then it goes with its default" in html and "…" not in html
+    lapsed = rows("steering", [entry("m-3", "steer", default="off main", bound="x", left="")])
+    assert "the time is up: the sender goes with its default" in lapsed
+    snoozed = rows("snoozed", [entry("m-4", "ask", snoozed_until="2026-09-21T09:00:00Z", until_words="21h 0m")])
+    assert "snoozed until <span" in snoozed and ">in 21h 0m<" in snoozed and "…" not in snoozed
+    js = (UI / "static" / "app.js").read_text()
+    assert "function fmtLeft(iso)" in js and 'String(s % 60).padStart(2, "0")' in js
+
+
+@pytest.mark.unit
+def test_a_state_row_prints_the_session_name_once(tmp_path, monkeypatch):
+    """§4.5 screen 6 *Layout* (TD-082 finding 4): on Paul's screenshot a session named `push` read
+    `push  push` — its name, then the tool's own title, which happened to be the same word. A title
+    that only repeats the name is left out; a title that says something else stays."""
+    same = {"row": "question", "id": "s:question", "sid": "s", "name": "push", "title": "push",
+            "text": "a or b?", "state_label": "needs you", "state_class": "needs", "at": "", "age": ""}  # fmt: skip
+    assert rows("needs", [same]).count(">push<") == 1
+    other = {**same, "title": "Error Checker"}
+    html = rows("needs", [other])
+    assert ">push<" in html and ">Error Checker<" in html

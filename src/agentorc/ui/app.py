@@ -263,6 +263,40 @@ def _age(iso: str | None, now: datetime) -> str:
     return f"{secs // 86400}d"
 
 
+def _left(iso: str | None, now: datetime) -> str:
+    """A deadline off an entry as *3m 05s* or *1h 5m*, "" for a deadline already past or for
+    anything this cannot read — `_age`'s rule, pointed the other way (design §4.5 screen 6
+    *Layout*, TD-082).
+
+    **Times never draw as a placeholder.** A time left is a duration and needs no time zone, so it
+    is rendered here, in exactly the words `fmtLeft` in `app.js` uses, and the script only keeps it
+    moving: a screenshot, a slow phone and a script error all show the number rather than `…`, and
+    nothing on the row jumps when the first tick lands. Same defensiveness as `_age`: a malformed
+    instant costs its row a line, never the page."""
+    if not isinstance(iso, str) or not iso:
+        return ""
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    secs = int((dt - now).total_seconds())
+    if secs <= 0:
+        return ""
+    if secs < 3600:
+        return f"{secs // 60}m {secs % 60:02d}s"
+    if secs < 86400:
+        return f"{secs // 3600}h {(secs % 3600) // 60}m"
+    return f"{secs // 86400}d"
+
+
+def _countdown(iso: str | None, now: datetime) -> str:
+    """The permission row's countdown, in `app.js`'s own words (§4.5a **Inbox row: state**)."""
+    if not iso:
+        return ""
+    left = _left(iso, now)
+    return f"via hook · {left} left" if left else "via hook · falling through to the terminal"
+
+
 def stop_fields(until: str, unattended: bool) -> dict[str, str]:
     """The New session **Until** field (design §6, §4.5a, TD-026). Same rule as `ao new --until`:
     the friendly shapes are parsed here, in the caller's clock, and the agent is handed an instant;
@@ -355,7 +389,18 @@ def alarm_view(raw: Any) -> list[dict[str, Any]]:
             continue
         at = a.get("at") if isinstance(a.get("at"), str) else ""
         last = a.get("last") if isinstance(a.get("last"), str) else ""
-        out.append({"words": alarm_words(a), "at": at, "last": last or at, "count": _count(a.get("count"))})
+        now = datetime.now(UTC)
+        # §4.5 screen 6 *Layout* (TD-082): every time on the page is in words from here. These two
+        # are instants, so the row upgrades them to the browser's own clock once its script runs —
+        # but a page that never runs it, or a screenshot of one, still reads *2h 5m ago*, not `…`.
+        out.append({
+            "words": alarm_words(a),
+            "at": at,
+            "last": last or at,
+            "at_words": f"{_age(at, now)} ago" if _age(at, now) else "",
+            "last_words": f"{_age(last or at, now)} ago" if _age(last or at, now) else "",
+            "count": _count(a.get("count")),
+        })  # fmt: skip
     return out
 
 
@@ -761,6 +806,9 @@ def state_rows(
             "host": v.get("host") or "",
             "text": text,
             "deadline": v.get("deadline") or "" if row == "permission" else "",
+            # §4.5 screen 6 *Layout* (TD-082): the countdown is rendered in words here, not left as
+            # `…` for the client's first tick. The words are `fmtLeft`'s, so nothing jumps.
+            "left": _countdown(v.get("deadline") if row == "permission" else None, datetime.now(UTC)),
             "at": v.get("since") or "",
             "age": v.get("age") or "",
             "find": _find_text(v.get("name"), v.get("title"), doing.get("text"), text, extra),
@@ -1487,6 +1535,11 @@ def create_app() -> FastAPI:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
             e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
+            # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the
+            # client fills in — `left` for a `steer`'s bound, `until_words` for a snoozed entry,
+            # whose row upgrades to the browser's own clock once the script runs.
+            e["left"] = _left(e.get("bound"), at)
+            e["until_words"] = _left(e.get("snoozed_until"), at)
         return got
 
     def inbox_html(sections: dict[str, Any]) -> dict[str, str]:
