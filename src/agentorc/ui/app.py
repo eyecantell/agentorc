@@ -26,7 +26,7 @@ from agentorc import org as orgmod
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig, teamrun, teams
 from agentorc.cli import stop_time as clistop
-from sessionorc import hosts, identity, naming, paths
+from sessionorc import hosts, identity, mail, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
@@ -42,6 +42,30 @@ templates = Jinja2Templates(directory=str(HERE / "templates"))
 # The role badge's picture (design §4.8 *Role presets*, TD-074): the markup lives in one place and
 # the template asks for it by name, so no config file ever carries an SVG.
 templates.env.globals["role_svg"] = role_svg
+
+
+def suggested_answers(e: Any) -> list[str]:
+    """The suggested answers a mail row may draw buttons from (design §4.5a **Inbox row: suggested
+    answers**, §4.10 *Suggested answers*; TD-070) — **the one place a row's answers are shaped**,
+    so no template ever iterates whatever the record happens to hold.
+
+    They are the only thing on this page that a control is built from, and only because they are a
+    **structured field of the envelope** and not parsed out of what a session wrote (TD-071 item
+    8). What the agent stores is always a short list of clean strings, so this is about a record
+    that is somehow otherwise — a hand-edited store, a host agent older or newer than this UI: a
+    non-list, or an item that is not a string or is blank, is dropped and the row simply shows no
+    buttons. A row never breaks the page over its own envelope.
+
+    Registered as a template global rather than folded into `person_inbox`, so that every path
+    that renders a row — the page, the poll, a test rendering the template directly — shapes it
+    the same way, and so that an entry's answers reach the markup nowhere else."""
+    raw = e.get("answers") if hasattr(e, "get") else None
+    if not isinstance(raw, list):
+        return []
+    return [a for a in raw if isinstance(a, str) and a.strip()][: mail.ANSWERS_MAX]
+
+
+templates.env.globals["suggested_answers"] = suggested_answers
 
 # The New session form's `controller` field when nothing is ticked: an empty list means nobody may
 # act on the session, which is design §4.8's explicit default. Module-level so the signature keeps
@@ -1547,7 +1571,21 @@ def create_app() -> FastAPI:
             ref = str(body.get("reply_to") or "").strip()
             if not ref:
                 raise HTTPException(400, "a reply names the entry it answers")
-            got = await call("msg", text=str(body.get("text") or ""), kind="reply", reply_to=ref)
+            # design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): a press sends **the
+            # index**, never the label. The text is looked up here, from the entry the home holds,
+            # so a tampered DOM cannot make the person "say" something else under a given index —
+            # and the RPC re-checks that the two agree, because this route is not the only caller.
+            answer = body.get("answer")
+            text = str(body.get("text") or "")
+            if answer is not None:
+                if isinstance(answer, bool) or not isinstance(answer, int):
+                    raise HTTPException(400, "a suggested answer is picked by its index")
+                held = next((e for e in (await call("inbox"))["entries"] if e.get("id") == ref), None)
+                offered = suggested_answers(held or {})
+                if not 0 <= answer < len(offered):
+                    raise HTTPException(400, "that is not one of the suggested answers")
+                text = offered[answer]
+            got = await call("msg", text=text, kind="reply", reply_to=ref, answer=answer)
             return JSONResponse({"ok": True, "id": got["entry"]["id"], "delivered": got["delivered"]})
         if action == "unmail":
             ref = str(body.get("msg") or "").strip()

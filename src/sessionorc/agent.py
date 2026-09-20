@@ -26,6 +26,7 @@ import struct
 import sys
 import tarfile
 import time
+import unicodedata
 from collections import OrderedDict, defaultdict
 from collections.abc import Callable
 from dataclasses import replace
@@ -1737,6 +1738,8 @@ class HostAgent:
         bound: float | None = None,
         cites: list[str] | None = None,
         default: str | None = None,
+        answers: list[str] | str | None = None,
+        answer: Any = None,
         nonce: str | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
@@ -1748,8 +1751,10 @@ class HostAgent:
         and per pair, the mailbox depth, the body cap, and an `ask`'s wall-clock bound. `bound` is
         the `ask`'s, in seconds, else `mail.ASK_BOUND` — and an `ask` to the person carries none at
         all (§4.10 *What a person is asked*, 2026-09-19): `default` is a `steer`'s, required on it.
-        A retry carrying the same `nonce` returns the first send's verdict. The reply names what
-        landed, what was copied, and what was forwarded to a resumed successor."""
+        `answers` are the sender's likely answers on a question, and `answer` the zero-based index
+        of the one a reply picked (§4.10 *Suggested answers*, 2026-09-20, TD-070). A retry carrying
+        the same `nonce` returns the first send's verdict. The reply names what landed, what was
+        copied, and what was forwarded to a resumed successor."""
         sender = PERSON if mail.is_person(caller) else str(caller)
         key = (sender, str(nonce)) if nonce else None
         if key and key in self._nonces:
@@ -1758,7 +1763,7 @@ class HostAgent:
                 raise error
             return dict(result or {})
         try:
-            result = await self._msg(sender, text, to, kind, about, reply_to, bound, cites, default)
+            result = await self._msg(sender, text, to, kind, about, reply_to, bound, cites, default, answers, answer)
         except RpcError as e:
             if key:
                 self._remember_nonce(key, (None, e))
@@ -1783,6 +1788,8 @@ class HostAgent:
         bound: float | None,
         cites: list[str] | None,
         default: str | None = None,
+        answers: list[str] | str | None = None,
+        answer: Any = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -1822,6 +1829,29 @@ class HostAgent:
             )
         if kind != "steer" and line:
             raise RpcError(f"only a steer carries a default: {kind} says what it says (design §4.10)")
+        # -- the sender's likely answers: a field of its own, not counted toward `TEXT_CAP` --------
+        # Design §4.10 *Suggested answers* (TD-070). Each is cleaned more strictly than displayed
+        # text is (`_clean_answer`); one that cleans to nothing, or that repeats an earlier one
+        # exactly (compared after cleaning, case-sensitively), is dropped; a fifth is refused.
+        # RPC input is raw JSON from any local process, so the shape is checked and the work bounded
+        # before any of it is cleaned: a list of strings, and no more of them than could ever matter
+        # (`ANSWERS_MAX` kept plus as many again dropped as blanks or repeats).
+        if answers is not None and not isinstance(answers, (str, list)):
+            raise RpcError("answers must be a list of lines (design §4.10)")
+        offered = [answers] if isinstance(answers, str) else list(answers or [])
+        if any(not isinstance(a, str) for a in offered):
+            raise RpcError("answers must be a list of lines (design §4.10)")
+        if len(offered) > mail.ANSWERS_MAX * 2:
+            raise RpcError(f"an ask carries at most four answers: {len(offered)} given (design §4.10)")
+        picks: list[str] = []
+        for raw in offered:
+            one = _clean_answer(raw)
+            if one and one not in picks:
+                picks.append(one)
+        if offered and kind not in ASK_KINDS:
+            raise RpcError(f"only a question carries answers: a {kind} says what it says (design §4.10)")
+        if len(picks) > mail.ANSWERS_MAX:  # the word below is `mail.ANSWERS_MAX`, which is 4
+            raise RpcError(f"an ask carries at most four answers: {len(picks)} given (design §4.10)")
         # -- a reply belongs to its root's thread, and answers an entry the replier holds ----------
         replied: MailEntry | None = None
         copies: list[str] = []
@@ -1849,6 +1879,26 @@ class HostAgent:
             # other addressees, so the other lead of a `conflict` sees how it was settled
             same_set = dict.fromkeys([*replied.copies, *replied.copies_failed, *replied.to, replied.from_])
             copies = [x for x in same_set if x not in (sender, PERSON, *named)]
+        # -- a reply may *pick* one of the answers the entry it answers carries (§4.10, TD-070) ----
+        # **The home checks it**: `answer` must index the `answers` of the entry `reply_to` names
+        # and `text` must equal that answer exactly, else the reply is refused — a session can call
+        # this RPC directly, and a receiver must not be asked to trust an index the text does not
+        # bear out. Everything else about the reply is unchanged: same gate, same tallies, same
+        # close (`replied`), same wake.
+        picked: int | None = None
+        if answer is not None:
+            no = "that is not one of the suggested answers"
+            if replied is None:
+                raise RpcError(f"{no}: an answer picks one on an entry — name it with --reply-to <id> (design §4.10)")
+            if isinstance(answer, bool) or not isinstance(answer, int):
+                raise RpcError(f"{no}: the index is a whole number, counted from 0 (design §4.10)")
+            if not replied.answers:
+                raise RpcError(f"{no}: {replied.id} carries no answers at all (design §4.10)")
+            if not 0 <= answer < len(replied.answers):
+                raise RpcError(f"{no}: {replied.id} carries {len(replied.answers)} of them (design §4.10)")
+            if text != replied.answers[answer]:
+                raise RpcError(f"{no}: the text of a picked answer is that answer, word for word (design §4.10)")
+            picked = answer
         if not named:
             raise RpcError("a message names its addressees: there is no broadcast (design §4.10)")
         if len(named) > mail.RECIPIENT_CAP:
@@ -1942,6 +1992,8 @@ class HostAgent:
         )
         entry.cites = cited
         entry.default = line or None
+        entry.answers = list(picks)  # data the sender proposed, on the envelope (§4.10, TD-070)
+        entry.answer = picked
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
         if kind in ASK_KINDS and not (kind == "ask" and PERSON in named):
             # `bound` is None exactly when the addressee is the person and the kind is `ask`: that
@@ -2030,6 +2082,9 @@ class HostAgent:
             copies_failed=list(entry.copies_failed),
             pending=list(entry.pending),
             cites=list(entry.cites),
+            # every addressee's copy carries the answers — a `conflict` is read and picked between
+            # sessions, so each controller's copy must hold them (§4.10 *Suggested answers*)
+            answers=list(entry.answers),
         )
 
     def _pair(self, r: Session, other: str, now: datetime) -> Tally:
@@ -4207,6 +4262,34 @@ def _clean(text: str) -> str:
     text = _ESC_OTHER.sub("", text)
     text = "".join(ch for ch in text if ch == "\t" or ch >= " ")
     return text[:200]
+
+
+_LINE_BREAKS = re.compile("[\n\r\x0b\x0c\x85\u2028\u2029]")
+
+
+def _clean_answer(text: Any) -> str:
+    """One suggested answer, cleaned **more strictly than displayed text is** (design §4.10
+    *Suggested answers*, TD-070): the tail's cleaning (`_clean` — ANSI, bytes under U+0020) and
+    also **every Unicode format character** (category `Cf`: the bidi overrides and isolates, the
+    zero-width marks), because an answer becomes the label of something a person presses and a
+    label that can reorder or hide its own letters can look like what it is not. One line — the
+    first, taken before `_clean`, which would otherwise drop the newline and run two lines
+    together — stripped, and capped at `ANSWER_CAP`.
+
+    Two things this costs and one it does not cover, so nobody reads it as more: a zero-width
+    joiner is `Cf` too, so a multi-part emoji falls apart in a label, and a soft hyphen goes —
+    both accepted; and look-alike letters from another script are not addressed — the quoted,
+    separately grouped drawing of §4.5a is what answers those, not the cleaning.
+
+    `_clean` itself is untouched: displayed text stays displayed text, and this is the label rule."""
+    # Every line break a renderer honours ends the label, not `\n` alone: `\r`, NEL (U+0085, a
+    # control `_clean` keeps because it is above U+0020), and the line and paragraph separators
+    # (U+2028, U+2029: categories Zl and Zp, so the `Cf` strip below does not see them). And the
+    # work is bounded by the cap, not by what was sent: a 10 MB item costs what 320 characters do.
+    raw = str(text or "")[: mail.ANSWER_CAP * 4]
+    line = _clean(_LINE_BREAKS.split(raw, 1)[0])
+    line = "".join(ch for ch in line if unicodedata.category(ch) != "Cf")
+    return line.strip()[: mail.ANSWER_CAP]
 
 
 def _cap(usage: dict[str, Any] | None) -> str | None:

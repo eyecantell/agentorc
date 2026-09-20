@@ -195,3 +195,40 @@ def test_has_control_reads_either_name():
     assert Session.from_dict(
         {"id": "x", "name": "x", "kind": "interactive", "adapter": "shell", "dir": "/", "capabilities": ["orchestrate"]}
     ).capabilities == ["control"]
+
+
+def test_an_entry_written_before_suggested_answers_loads_with_none_of_them():
+    """Design §4.10 *Suggested answers* (2026-09-20, TD-070): `answers` and `answer` are new fields
+    on `MailEntry`, so every entry already in a store was written without them and must load — with
+    an empty list and no index — and round-trip once it has them."""
+    from sessionorc.models import MailEntry
+
+    old = {
+        "id": "m-1",
+        "from": "ao-lead",
+        "to": ["ao-x"],
+        "at": "2026-09-16T10:00:00Z",
+        "kind": "ask",
+        "text": "?",
+        "root": "m-1",
+    }
+    e = MailEntry.from_dict(old)
+    assert e.answers == [] and e.answer is None and e.open
+    assert MailEntry.from_dict(e.to_dict()) == e
+    picked = MailEntry(
+        id="m-2",
+        from_="person",
+        to=["ao-lead"],
+        at="2026-09-16T10:01:00Z",
+        kind="reply",
+        text="hold it",
+        reply_to="m-1",
+        answer=1,
+    )
+    e.answers = ["merge it", "hold it"]
+    for one in (e, picked):
+        assert MailEntry.from_dict(json.loads(json.dumps(one.to_dict()))) == one
+    # two entries loaded from the same shape do not share one list
+    a, b = MailEntry.from_dict(old), MailEntry.from_dict(old)
+    a.answers.append("x")
+    assert b.answers == []

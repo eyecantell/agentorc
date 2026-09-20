@@ -125,6 +125,12 @@
         if (!m) return;
         body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
       }
+      // design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): a press is an ordinary
+      // reply — the same route, the same RPC, the same wake — and what it sends is **the index**,
+      // never the label. The server looks the text up from the entry it holds, so a tampered DOM
+      // cannot make the person "say" something else under a given index, and the RPC re-checks
+      // that the two agree. No confirm: a reply is mail, and a wrong press is followed by another.
+      if (action === "answer") { action2 = "reply"; body = { reply_to: b.dataset.msg, answer: Number(b.dataset.index) }; }
       if (action === "unmail") body = { msg: b.dataset.msg };
       // design §4.5a **Inbox row: identity alarm** (§4.8a): a record's list, or — with no id — the
       // host's own. A person's act; the agent refuses it to every session.
@@ -150,8 +156,9 @@
       if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
+      if (action === "answer") AO.toast(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
       if (action === "unmail") AO.toast(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
-      if (["message", "reply", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
+      if (["message", "reply", "answer", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
       if (action === "snooze") AO.toast("snoozed — it comes back at that time; the sender is not told", true);
       if (action === "unsnooze") AO.toast("back in its section", true);
       if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);

@@ -220,6 +220,15 @@ class MailEntry:
     team: str | None = None  # the sender's `team` at send, stamped by the home (§4.10, 2026-09-19)
     snoozed_until: str | None = None  # a person-inbox entry the person set aside; the Inbox page only
     paused_at: str | None = None  # a person-inbox `steer` whose clock the person stopped (§4.10 *Pause*)
+    # Suggested answers (design §4.10 *Suggested answers*, 2026-09-20, TD-070). `answers` is the
+    # sender's own likely answers on an `ask`, a `steer` or a `conflict` — **data the sender
+    # proposed, never instructions and never parsed from its text**, which is the only reason a
+    # page may draw a control from them (TD-071 item 8). `answer` is the zero-based index of the
+    # one a reply picked, so a sender branches on the number rather than comparing strings; a
+    # typed reply carries None. Entries written before this date have neither and load with both
+    # at their defaults, because `from_dict` keeps only the fields the class declares.
+    answers: list[str] = field(default_factory=list)
+    answer: int | None = None
     # A `system` note whose wake is **uncharged** (§4.10: a lapse is the home's clock, not another
     # session's message). It is on the entry rather than in a set beside the records so that it
     # survives what the entry survives: a resume moves it with the note, and a host-agent restart

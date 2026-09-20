@@ -36,6 +36,13 @@ PERSON_INBOX_DEPTH: int | None = 200  # entries the org's person inbox holds bef
 PERSON_SENDER_DEPTH: int | None = 20  # …and of those, how many one sender may hold there
 ASK_BOUND = timedelta(hours=24)  # an `ask`'s default bound, wall-clock on the home's clock
 DEFAULT_CAP = 200  # characters of a `steer`'s `default`, cleaned and capped as a `doing` line is (§4.8)
+# Suggested answers (§4.10 *Suggested answers*, 2026-09-20, TD-070): how many an `ask`, a `steer`
+# or a `conflict` may carry, and how long each may be. They are a field of their own and do not
+# count toward `TEXT_CAP`. Each is cleaned **more strictly than displayed text is** (the tail's
+# cleaning and also every Unicode format character), because an answer becomes the label of
+# something a person presses.
+ANSWERS_MAX = 4
+ANSWER_CAP = 80
 OPEN_ASK_ADVICE = 3  # open `ask`s to the person at which `ao msg` advises asking whether this one is a steer
 MAIL_RETENTION: timedelta | None = timedelta(hours=12)  # how long a read entry is kept; an open `ask` is exempt
 SENDS_KEEP = 20  # `sends` entries a record keeps
