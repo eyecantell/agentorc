@@ -12,7 +12,7 @@ unattended workers with run windows and usage caps. Sessions live on the host, s
 laptop changes nothing.
 
 **Status: phase 1 in progress.** The host agent, the Claude Code adapter, the Org, Focus and
-Inbox pages (the Inbox is mail only so far — TD-069), New session and the CLI are built and
+Inbox pages (mail and the sessions' states; due board items are still to come — TD-069), New session and the CLI are built and
 running; phase 2 (a second host over ssh) is not.
 Read [`docs/design.md`](docs/design.md) — §7 has the phase plan, and what is deferred is in
 [`docs/technical_debt.md`](docs/technical_debt.md).
@@ -133,7 +133,8 @@ The package installs `agentorc` and an `ao` alias. Reading: `ao status [-v]`, `a
 this session is doing now — its card shows it with its age; `--clear` empties it). Who is calling
 (design §4.8a): `ao whoami` (what the host agent takes this process to be, from its connection),
 `ao identity` (this host's mode — `local: {identity: off | observe | enforce}` in `hosts.yml`,
-`observe` by default — its tally of connections, and its identity alarms). Serving: `ao ui`,
+`observe` by default — its tally of connections, and its identity alarms, which the Inbox also lists with
+**Acknowledge**; `ao status -v` prints the mode and whether the detached-process check is on). Serving: `ao ui`,
 `ao service`. A container node (design §4.4a): `ao host up|rebuild|forget|status <name>`; `ao new
 --host <name>` starts a session on it, every act on the `<id>@<name>` it prints is gated here
 and run there, and `ao focus <id>@<name>` attaches through `docker exec`. `ao new

@@ -120,7 +120,92 @@
 </div>
 {%- endmacro %}
 
+{# ── design §4.5a **Inbox row: state** (§4.5 screen 6; TD-069 step 2) ───────────────────────────
+   A session's state, with **the card's own controls**: a permission's Allow / Deny is the same
+   `data-act` the card carries, answered through the `PermissionRequest` hook channel and nothing
+   else — nothing here is built from what the session printed (TD-071 item 8). The state mark is
+   the card's pill, a `<span>`: a state must never look like something to press. #}
+
+{% macro state_head(e) -%}
+<div class="row gap wrap mhead">
+  {%- if e.sid %}<a class="ref" href="/focus/{{ e.sid }}" title="{{ e.sid }}{% if e.host %} on {{ e.host }}{% endif %}">{{ e.name }}</a>
+  {%- else %}<span class="ref" title="this host's own alarms: they are about no record">{{ e.name }}</span>{% endif %}
+  {%- if e.title %} <span class="meta tool-title" title="the session's name as its tool holds it (design §4.5a): {{ e.title }}">{{ e.title }}</span>{% endif %}
+  {%- if e.role %} <span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ role_svg(e.role_icon) }}{{ e.role }}</span>{% endif %}
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <span class="grow"></span>
+  {%- if e.state_label %}<span class="pill s-{{ e.state_class }}{% if e.scraped %} scraped{% endif %}" title="{{ 'guessed from the screen' if e.scraped else 'reported by the tool' }} — the state, not a control">{{ e.state_label }}</span>{% endif %}
+  {%- if e.at %} <span class="st age" data-since="{{ e.at }}">{{ e.age or '' }}</span>{% endif %}
+</div>
+{%- endmacro %}
+
+{# The `doing` line as the card draws it, with its age (§4.8, TD-074): the session's own words,
+   shown and never acted on. #}
+{% macro doing_line(e) -%}
+{%- if e.doing %}<div class="st dflt" title="what this session says it is doing (design §4.8): its own words">doing: {{ e.doing.text }}{% if e.doing.age %} · says {{ e.doing.age }} ago{% endif %}</div>{% endif %}
+{%- endmacro %}
+
+{% macro open_btn(e, label) -%}
+<a class="btn sm ghost" href="/focus/{{ e.sid }}" title="Focus on {{ e.name }}">{{ label }}</a>
+{%- endmacro %}
+
+{% macro state(e, section) -%}
+{{ state_head(e) }}
+<div class="body">{{ e.text }}</div>
+{{ doing_line(e) }}
+<div class="row gap wrap mfoot">
+  {%- if e.row == 'permission' %}
+  <span class="st">waiting on your answer — through the hook channel, not the terminal (§4.2)</span>
+  <span class="grow"></span>
+  <span class="meta countdown" data-deadline="{{ e.deadline }}">via hook</span>
+  <button class="btn sm primary" data-act="allow" data-id="{{ e.sid }}">Allow</button>
+  <button class="btn sm" data-act="deny" data-id="{{ e.sid }}">Deny</button>
+  {%- elif e.row == 'limited' %}
+  {#- §4.5a gives this row **Switch profile… / Wait**, which are the card's controls — and neither
+      is built on the card. Until they are, the row says what the cap is doing and opens the
+      session (§4.5a, 2026-09-19). -#}
+  <span class="st">nothing here clears a cap (§4.2) — Switch profile… / Wait are unbuilt on the card too</span>
+  <span class="grow"></span>
+  {{ open_btn(e, 'Open') }}
+  {%- elif e.row == 'unpushed' %}
+  <span class="st">exited with work that is only here — the row goes when it is pushed, or the session is forgotten</span>
+  <span class="grow"></span>
+  {{ open_btn(e, 'Details') }}
+  {%- else %}
+  <span class="st">{% if e.row == 'stalled' %}no output for a while: it may be thinking, or stuck{% else %}answer it in the terminal{% endif %}</span>
+  <span class="grow"></span>
+  {{ open_btn(e, 'Open') }}
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{# ── design §4.5a **Inbox row: identity alarm** (§4.8a; TD-077 step 2) ──────────────────────────
+   A request whose claim disagreed with the channel it arrived on. It is either a bug of ours or a
+   session misbehaving and a person should know which, so it is counted — and **Acknowledge** is
+   the person's own act saying they have seen it: the list is cleared and the row leaves. The host
+   agent's log keeps every alarm, so acknowledging loses nothing. #}
+{% macro alarm(e, section) -%}
+{{ state_head(e) }}
+<div class="body">{% if e.row == 'alarm_host' %}Requests to this host that named a session they did not come from — kept here because they are about no record, so nobody is blamed for someone else's claim.{% else %}Requests that named this session and did not come from it.{% endif %}</div>
+<ul class="alarms">
+  {%- for a in e.alarms %}
+  <li>{{ a.words }} <span class="st">{% if a.count > 1 %}first <span class="localtime" data-at="{{ a.at }}" title="{{ a.at }}">…</span>, last <span class="localtime" data-at="{{ a.last }}" title="{{ a.last }}">…</span>{% else %}<span class="localtime" data-at="{{ a.at }}" title="{{ a.at }}">…</span>{% endif %}</span></li>
+  {%- endfor %}
+</ul>
+<div class="row gap wrap mfoot">
+  <span class="st">identity: {{ e.mode or 'unknown' }}{% if e.mode == 'observe' %} — recorded and served exactly as before (design §4.8a){% elif e.mode == 'enforce' %} — the request was refused{% elif e.mode == 'off' %} — nothing is classified on this host{% endif %}</span>
+  <span class="grow"></span>
+  {%- if e.sid %}{{ open_btn(e, 'Open') }}{% endif %}
+  <button class="btn sm ghost" data-act="identity_ack" data-id="person" data-who="{{ e.sid }}" data-confirm="Acknowledge these alarms? The list is cleared and the row leaves; the host agent's log keeps every one of them.">Acknowledge</button>
+</div>
+{%- endmacro %}
+
 {% macro row(e, section) -%}
+{%- if e.row %}
+<div class="mailrow staterow" data-msg="{{ e.id }}" data-kind="state" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ e.find }}">
+{%- if e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
+</div>
+{%- else %}
 <div class="mailrow" data-msg="{{ e.id }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '')) | lower }}">
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
@@ -130,4 +215,5 @@
 {%- else %}{{ ask(e, section) }}
 {%- endif %}
 </div>
+{%- endif %}
 {%- endmacro %}

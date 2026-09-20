@@ -1112,3 +1112,23 @@ def test_whoami_and_identity_say_what_the_host_agent_sees(subprocess_agent, caps
     assert "ALARM ao-a: session ao-a claimed ao-b on msg ×3 (t1 … t3)" in out
     assert cli.main(["whoami"]) == 0
     assert capsys.readouterr().out.strip() == "session ao-a (by sid)"
+
+
+def test_status_v_says_which_identity_mode_this_host_is_in_once(subprocess_agent, capsys, tmp_path):
+    """design §4.8a: *`ao status -v` and the Org's teams line say which mode a host is in*, since
+    *observe* is a host that is not yet protected — and beside it whether the detached-process
+    check is on, so a host where it is off is not taken for one where it is on. **One line for the
+    host**, never one per session, and nothing at all without `-v`."""
+    assert cli.main(["shell", "idline", "-d", str(tmp_path)]) == 0
+    sid = capsys.readouterr().out.split()[0]
+    wait_state(sid, "idle")
+    assert cli.main(["status"]) == 0
+    assert "identity" not in capsys.readouterr().out
+    assert cli.main(["status", "-v"]) == 0
+    out = capsys.readouterr().out
+    # the suite's agent runs `off` (conftest, §4.8a *Tests*), which the line must say as plainly
+    # as it would say `observe`
+    lines = [ln for ln in out.splitlines() if "identity" in ln]
+    assert len(lines) == 1 and "identity off" in lines[0] and "detached-process check" in lines[0]
+    assert "not enforcing it yet" in lines[0]
+    assert cli.main(["kill", sid]) == 0

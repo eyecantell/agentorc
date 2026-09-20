@@ -24,6 +24,10 @@
       {# design §4.5a card **unread** chip (§4.10): the record's count, never a body; nothing at
          zero, which is the common case. Opens the Focus Inbox panel. #}
       {% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}
+      {# design §4.8a (TD-077 step 2): a request named this session and did not come from it. A
+         **mark**, not a control — it is never pressable, and what to do about it is a row in the
+         Inbox, where Acknowledge lives. The newest alarm is the hover. #}
+      {% if s.alarm_note %}<span class="badge alarmmark" title="{{ s.alarm_note }} — it is either a bug of ours or a session misbehaving; the Inbox has the list and Acknowledge (design §4.8a)">⚠ identity</span>{% endif %}
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ s.host_note or ('guessed from the screen' if s.scraped else 'reported by the tool') }}"><span class="dot"></span>{{ s.state_label }}</span>
@@ -56,7 +60,10 @@
     </div>{% endif %}
   </div>
   <div class="sc-slot">
-    {% if s.state == 'needs-you' and s.pending and s.pending.kind == 'permission' %}
+    {# Allow / Deny only when the hook gave something to answer (`tool_use_id`): the route 409s without
+       it, and the Inbox's row (`state_kind`) already reads it that way — a permission with none falls to
+       the *answer in the terminal* branch below (review of PR #251) #}
+    {% if s.state == 'needs-you' and s.pending and s.pending.kind == 'permission' and s.pending.tool_use_id %}
       <div class="status needs">{{ s.pending.text }}</div>
       <div class="row gap">
         <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>

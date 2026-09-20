@@ -36,6 +36,7 @@ Read `docs/technical_debt.md` and pick open entries suited to autonomous complet
 - Rebase on latest main before each merge; ledger files are high-churn — pull before editing, keep edits small. Grep for conflict markers before committing any merge.
 - Branches: a branch exists only to carry a PR and is named for the TD (`tdNNN-<slug>`). Never create one as a save-point. GitHub deletes a merged PR's remote head automatically; once `gh pr view <n>` shows MERGED, `git branch -D` your local branch.
 - Work in one continuous turn. If you must end a turn with work remaining, first invoke the `loop` skill (dynamic/self-paced) so you resume automatically.
+- An **identity mismatch** refusal (*this request did not come from the session it names*, design §4.8a) is never to be worked around: do not unset or change `AGENTORC_SESSION`, and do not retry under another name. Report it with `ao msg person "…"` and stop what caused it — it is a bug of ours or something acting as you, and Paul should see which.
 - An auth error (401 / "not logged in") or a usage-limit message means the subscription is capped or the token lapsed. Do not spin: ledger where you are, write your end-of-run summary, and exit.
 - The samscrape workers tdgrind-1/2/3 run concurrently on this machine in a different repo; they share your subscription usage cap but nothing else — ignore them.
 

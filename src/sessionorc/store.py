@@ -16,9 +16,17 @@ from sessionorc import paths
 from sessionorc.models import MailEntry, Session
 
 
-def _atomic_write(path: Path, text: str) -> None:
+def _atomic_write(path: Path, text: str, *, mode: int | None = None) -> None:
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(text, encoding="utf-8")
+    if mode is None:
+        tmp.write_text(text, encoding="utf-8")
+    else:
+        # A file whose contents are evidence is created with its mode, never chmod'ed after: a
+        # world-readable window, however short, is a window (design §4.8a).
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.chmod(tmp, mode)  # an existing tmp keeps its old mode through O_CREAT
     os.replace(tmp, path)
 
 
@@ -70,6 +78,31 @@ class PersonInboxStore:
 
     def save(self, entries: list[MailEntry]) -> None:
         _atomic_write(self.path, json.dumps({"entries": [e.to_dict() for e in entries]}, indent=1))
+
+
+class IdentityAlarmStore:
+    """The host's **own** identity alarms (design §4.8a, TD-077 step 2): the ones about no record —
+    a claim from outside every pane, an unreadable peer — which have nowhere else to live, since a
+    record's alarms ride that record's file. One small `0600` file beside `sessions/`, written
+    whole. A missing or unreadable file is no alarms, never a crash; the agent's log has every one
+    of them either way, so nothing is lost by a file that could not be read.
+
+    `identity_tally` is deliberately *not* here: it counts connections **since the agent started**
+    (§4.8a), and a number that outlived the process would say something else."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = path or paths.identity_alarms_file()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def load(self) -> list[dict[str, Any]]:
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            return [a for a in raw.get("alarms", []) if isinstance(a, dict)]
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return []
+
+    def save(self, alarms: list[dict[str, Any]]) -> None:
+        _atomic_write(self.path, json.dumps({"alarms": alarms}, indent=1), mode=0o600)
 
 
 class EventQueue:

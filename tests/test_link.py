@@ -1402,3 +1402,46 @@ async def test_a_copy_with_a_renamed_grant_is_rewritten_and_said_so_at_either_en
     finally:
         agent.sessions.pop(s.id)
         agent.mode, agent.home = "home", agent.host
+
+
+async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_path, monkeypatch):
+    """§4.8a (TD-077 step 2, review of PR #251): identity alarms are **node-owned** — observed
+    where the socket is — so **Acknowledge** on a node's record is routed to that node, which
+    clears its own list; the home takes the cleared record from the reply, and no later report
+    brings the alarms back. Without an `id` the RPC is the host's own list and never travels. A
+    person at the node may clear only that node's records; a session is refused at both ends."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        acts = Acts(node, monkeypatch)
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        # the node records a forgery aimed at its own session, exactly as its dispatch would
+        node._id_alarm({"channel": f"session {w['id']}", "claimed": "ao-b", "rpc": "msg"}, w["id"])
+        seen = await until(home, address, lambda v: bool((v or {}).get("identity_alarms")))
+        assert [a["claimed"] for a in seen["identity_alarms"]] == ["ao-b"]
+
+        async with LocalClient(sock=home.dir / "agent.sock", caller="ao-someone") as as_session:
+            with pytest.raises(AgentError, match="only by a person"):
+                await as_session.call("identity_ack", id=address)
+        assert node.sessions[w["id"]].identity_alarms  # refused at the node, nothing cleared
+
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            got = await person.call("identity_ack", id=address)
+            assert got["cleared"] is True and acts.taken[-1]["rpc"] == "identity_ack"
+            assert acts.taken[-1]["caller"] is None and acts.taken[-1]["params"]["id"] == w["id"]
+        assert node.sessions[w["id"]].identity_alarms == []  # cleared where the list lives
+        # the home's replica is clear from the reply, and stays clear through the node's next report
+        assert (await at_home(home, address))["identity_alarms"] == []
+        await asyncio.sleep(FAST_TICK * 3)
+        assert (await at_home(home, address))["identity_alarms"] == []
+
+        # a person at the node clears that node's records and no other host's: a home record is
+        # simply no session here, exactly as a `kill` of one is (§4.4a) — and this never travels
+        async with LocalClient() as at_node:
+            with pytest.raises(AgentError, match="no session ao-x-lead@kmaster"):
+                await at_node.call("identity_ack", id="ao-x-lead@kmaster")
+            assert (await at_node.call("identity_ack"))["id"] == "person"  # its own host's list, here
+        # the person's ack and the session's refused one: both crossed, because the node is the
+        # authority on its own list — and nothing else went over the link on this account
+        assert [a["rpc"] for a in acts.taken].count("identity_ack") == 2

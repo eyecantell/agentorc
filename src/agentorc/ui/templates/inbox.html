@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block title %}Inbox · agentorc{% endblock %}
-{# design §4.5 screen 6, §4.5a **Inbox page** (TD-069 step 1): full width, the one place to work
-   from. Mail only in this step — session states (step 2) and due board items (step 3) join these
-   same sections later, each with a row renderer of its own in `inbox_row.html`. #}
+{# design §4.5 screen 6, §4.5a **Inbox page** (TD-069 steps 1 and 2): full width, the one place to
+   work from — the person's mail and the sessions' states in one list. Due board items (step 3)
+   join these same sections later, each with a row renderer of its own in `inbox_row.html`. #}
 {% block body %}
 <div class="page inboxpage">
   <div class="row gap wrap">
     <span class="h1">Inbox</span>
-    <span class="pill s-needs{% if not sections.count %} hidden{% endif %}" id="needspill" title="what is waiting on you: open questions sessions asked you, plus steering you paused, minus anything snoozed. Not the Org's needs-you count, which is session states only."><span class="dot"></span><span id="needsn">{{ sections.count }}</span> needs you</span>
+    <span class="pill s-needs{% if not sections.count %} hidden{% endif %}" id="needspill" title="what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you and steering you paused, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference, and due board items join this one later (TD-069 step 3)."><span class="dot"></span><span id="needsn">{{ sections.count }}</span> needs you</span>
     <span class="grow"></span>
     <input class="input" id="ifilter" placeholder="filter… (team:name)" style="width: 220px;" title="team:name shows one team, team: shows what carries none; anything else matches sender, text and about">
   </div>
@@ -21,7 +21,7 @@
 
   <section class="card pad isec" id="sec-needs">
     <div class="row gap wrap"><span class="h2">Needs you</span><span class="meta" id="n-needs"></span></div>
-    <div class="note">Questions a session cannot go on without, and steering you have paused — a session is held on you. Oldest first. This section <b>is</b> the number in the top bar.</div>
+    <div class="note">Sessions that stopped for you — a permission, a question, a cap, a stall, work that was never pushed, an identity alarm — questions a session cannot go on without, and steering you have paused. What is on the tool's clock first, then oldest first. This section <b>is</b> the number in the top bar; the Org's <i>needs you</i> counts the session states alone.</div>
     <div class="inboxrows" id="rows-needs">{% with rows = sections.needs, section = 'needs' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing is waiting on you.</div>
   </section>
@@ -40,7 +40,7 @@
     <div class="note empty" hidden>Nothing here.</div>
   </details>
 
-  <div class="note">Mail sessions sent you with <code>ao msg person</code>. Reading it marks nothing and rings nothing — a person is not the session. <b>Reply</b> lands in the sender's inbox; <b>Delete</b> on a question declines it and the sender is told; <b>Dismiss</b> removes an entry. Anything with a date on it belongs on the board.</div>
+  <div class="note">A state row is the session's own: its controls are the card's, and a mark that is not a control never looks like one. Mail sessions sent you with <code>ao msg person</code>. Reading it marks nothing and rings nothing — a person is not the session. <b>Reply</b> lands in the sender's inbox; <b>Delete</b> on a question declines it and the sender is told; <b>Dismiss</b> removes an entry. Anything with a date on it belongs on the board.</div>
 </div>
 {% endblock %}
 {% block scripts %}<script>AO.inbox();</script>{% endblock %}

@@ -86,6 +86,10 @@
     if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast("copied", true)); return; }
     const id = b.dataset.id, action = b.dataset.act;
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
+    // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the
+    // card's own controls, so the press goes to the card's own route — and the row, which is the
+    // state and not a copy of it, leaves the moment the state is answered.
+    const staterow = b.closest(".staterow");
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
     const details = b.closest("details"); if (details) details.open = false;
     try {
@@ -122,6 +126,9 @@
         body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
       }
       if (action === "unmail") body = { msg: b.dataset.msg };
+      // design §4.5a **Inbox row: identity alarm** (§4.8a): a record's list, or — with no id — the
+      // host's own. A person's act; the agent refuses it to every session.
+      if (action === "identity_ack") body = { id: b.dataset.who || "" };
       // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
       // is the one that decides what may be done, and its refusal comes back as a toast.
@@ -150,7 +157,11 @@
       if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);
       if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
       if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
-      if (id === "person" && typeof AO.refreshInboxPage === "function") {
+      if (action === "identity_ack") AO.toast("acknowledged — the agent's log keeps every alarm", true);
+      // the state is answered, so the row is gone: it is taken out here rather than waited for, and
+      // the refresh below puts back whatever the record actually says
+      if (staterow) staterow.remove();
+      if ((staterow || id === "person") && typeof AO.refreshInboxPage === "function") {
         // the control that was pressed is about to go with its row, and while it holds the focus
         // the refresh below would politely decline to redraw the section it sits in
         if (document.activeElement === b) b.blur();
@@ -162,7 +173,19 @@
         AO.toast(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
         if (typeof AO.refreshMembership === "function") AO.refreshMembership();
       }
-    } catch (e) { AO.toast(`${action} failed: ${e.message}`); }
+    } catch (e) {
+      // Answered twice — two tabs, or the tool timed out into its own dialog between the poll and
+      // the press — is not a failure to shout about: the state is simply no longer pending, and
+      // the refresh below shows what it is now (design §4.5a **Inbox row: state**).
+      if (staterow && /no pending permission/i.test(e.message)) {
+        AO.toast("already answered — nothing was sent twice", true);
+        staterow.remove();
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
+      AO.toast(`${action} failed: ${e.message}`);
+      if (staterow && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
+    }
   });
 
   // One mail entry, as the Focus Inbox panel shows it (design §4.5a **Focus Inbox**, §4.10):

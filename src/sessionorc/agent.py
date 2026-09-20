@@ -61,7 +61,7 @@ from sessionorc.models import (
     normalize_ref,
     now_iso,
 )
-from sessionorc.store import EventQueue, PersonInboxStore, SessionStore
+from sessionorc.store import EventQueue, IdentityAlarmStore, PersonInboxStore, SessionStore
 from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 
 log = logging.getLogger("agentorc.agent")
@@ -104,7 +104,11 @@ ACT_TIMEOUT = 120.0
 # What the home routes to the node whose name is the record's `host` (design §4.4a "A node reports
 # and executes; the home decides"): the acts that touch a pane or the node's waiters, executed
 # there with no gate of their own. `name_check` is a read, routed with a `host` for a team start.
-NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "create", "name_check"})
+# `identity_ack` is here for the same reason (§4.8a, review of PR #251): a record's identity alarms
+# are **node-owned**, observed where the socket is, so the node clears its own list and the home
+# learns it from the reply's record — a home that cleared its replica would have it back on the
+# next report. Without an `id` the RPC is the home's own list and never leaves this host.
+NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "create", "name_check", "identity_ack"})
 # What the home owns and edits on its own copy (§4.4a "Each field has one owner"), and pushes to
 # the node's replica in the same call so its stopping policies read the same intent. 4b generalises
 # the push to every home-owned field on reconnect.
@@ -199,7 +203,13 @@ class HostAgent:
         self._id_listed_at = 0.0
         self._id_list_lock = asyncio.Lock()
         self._id_detached: str | None = None
-        self.identity_alarms: list[dict[str, Any]] = []
+        # The home's own alarms **persist** (TD-077 step 2): a forgery aimed at no record — a claim
+        # from outside every pane — is evidence, and evidence that dies with the process is a page
+        # that says *no alarms* about the night the agent was restarted. The tally does not: it
+        # says *since the agent started*, and §4.8a means that literally.
+        self.identity_store = IdentityAlarmStore()
+        self.identity_alarms: list[dict[str, Any]] = self.identity_store.load()
+        self._id_host_dirty = False  # counts moved since the last write; the tick writes them
         self.identity_tally: dict[str, int] = defaultdict(int)
         self.tmux = tmux or Tmux()
         self.store = store or SessionStore()
@@ -3587,7 +3597,16 @@ class HostAgent:
         log.warning("identity alarm (%s): %s claimed %r on %s", self.identity_mode, *entry.values())
         s = self.sessions.get(about) if about else None
         if s is None:
+            # The host's own list follows the record's rule (§4.8a): a *new* alarm is written at
+            # once, a repeat moves a count in memory and the next tick writes it, so a loop of
+            # forgeries is not a disk write each.
+            known = len(self.identity_alarms)
             self.identity_alarms = identity.coalesce(self.identity_alarms, entry, at)
+            if len(self.identity_alarms) != known:
+                self.identity_store.save(self.identity_alarms)
+                self._id_host_dirty = False
+            else:
+                self._id_host_dirty = True
             return
         known = len(s.identity_alarms)
         s.identity_alarms = identity.coalesce(s.identity_alarms, entry, at)
@@ -3603,6 +3622,42 @@ class HostAgent:
             self._id_dirty.discard(sid)
             if (s := self.sessions.get(sid)) is not None:
                 self._save(s)
+        if self._id_host_dirty:
+            self._id_host_dirty = False
+            self.identity_store.save(self.identity_alarms)
+
+    async def rpc_identity_ack(self, id: str | None = None, caller: Any = None) -> dict[str, Any]:
+        """**Acknowledge** an identity alarm list (design §4.8a, §4.5a **Inbox row: identity
+        alarm**): clears one record's `identity_alarms`, or — with no `id` — the host's own list,
+        so the row leaves the person's Inbox. *A person has seen this and decided what it was.*
+
+        **A person's only**, refused to every session exactly as `inbox_delete` is, and deliberately
+        **not** in `identity.READS`: a session that could clear the list could erase the evidence of
+        its own forgery, which is the one thing the alarm exists to prevent. Nothing is lost either
+        way — the host agent's log keeps every alarm, one line each (§4.8a).
+
+        **A node's record is acknowledged at that node** (§4.8a): alarms are node-owned, so an `id`
+        naming another host is routed there like any other act (`NODE_ACTS`, §4.4a step 4a), the
+        node clears its own list and the home takes the cleared record from the reply — a home that
+        cleared its replica would have the alarms back on the node's next report. A person at a
+        node may clear only that node's records (`PERSON_NODE_BOUND`); the host's own list is
+        whichever host was asked, and never travels."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot acknowledge an identity alarm: the list is cleared only by a person, "
+                "in the Inbox (design §4.8a)"
+            )
+        if not id or id == PERSON:
+            self.identity_alarms = []
+            self._id_host_dirty = False
+            self.identity_store.save(self.identity_alarms)
+            return {"id": PERSON, "cleared": True, "alarms": []}
+        s = self._get(self._addr(id))
+        s.identity_alarms = []
+        self._id_dirty.discard(s.id)
+        self._save(s)
+        await self._push_changes()
+        return {"id": s.id, "cleared": True, "alarms": []}
 
     async def rpc_identity(self) -> dict[str, Any]:
         """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,

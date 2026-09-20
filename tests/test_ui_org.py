@@ -186,7 +186,8 @@ def test_the_top_bar_inbox_opens_the_page_and_shows_its_count_only_above_zero(mo
     for html in (zero, one):
         assert 'id="personinbox"' in html and 'href="/inbox"' in html
         assert 'id="personbox"' not in html and 'id="personlist"' not in html  # the dialog is gone
-        assert "Not the Org's needs-you count, which is session states only." in html
+        # §4.5a, TD-069 step 2: the two counts say precisely how they differ, not merely that they do
+        assert "the session states the Org counts too" in html and "the states alone" in html
     assert 'class="badge needs hidden" id="personneeds"></span>' in zero
     assert 'class="badge needs" id="personneeds">1</span>' in one
 
@@ -225,3 +226,27 @@ def test_a_live_team_that_needs_a_person_comes_above_the_other_live_teams():
     gone; what it did between cards still happens inside a team, and between teams too."""
     views = [sess("ao-a", "a", team="alpha"), sess("ao-z", "z", team="zeta", state="needs-you"), sess("ao-n", "n")]
     assert [g["team"] for g in team_groups(views)] == ["zeta", "alpha", ""]
+
+
+def test_the_teams_line_says_the_identity_mode_unless_the_host_enforces_it(tmp_path, monkeypatch):
+    """design §4.8a: the Org's teams line says *identity: observe* or *identity: off* — a host that
+    is not enforcing is not yet protected — and says **nothing** under `enforce`, which is the host
+    that is. A note that was always there would stop being read."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import identity_note, templates
+
+    assert "observe" in identity_note({"mode": "observe"}) and "not enforcing" in identity_note({"mode": "observe"})
+    assert identity_note({"mode": "off"}).startswith("identity: off")
+    assert identity_note({"mode": "enforce"}) == "" and identity_note(None) == "" and identity_note({}) == ""
+
+    def page(note):
+        return templates.get_template("org.html").render(
+            sessions=[], groups=None, strip={"teams": [{"name": "t"}], "source": "x", "notes": [], "elsewhere": ""},
+            counts={}, host="kmaster", active="Org", agent_down=False, volatile=False, usage={},
+            person_needs=0, node_banner="", identity_note=note,
+        )  # fmt: skip
+
+    html = page(identity_note({"mode": "observe"}))
+    assert 'id="identitynote"' in html and "identity: observe" in html
+    assert 'id="identitynote"' not in page(identity_note({"mode": "enforce"}))

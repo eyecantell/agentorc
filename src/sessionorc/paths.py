@@ -38,6 +38,12 @@ def person_inbox_file() -> Path:
     return home() / "person_inbox.json"
 
 
+def identity_alarms_file() -> Path:
+    """The host agent's **own** identity alarms (design §4.8a, TD-077 step 2): the ones about no
+    record, which no record's file can hold. Mode `0600`, beside `person_inbox.json`."""
+    return home() / "identity_alarms.json"
+
+
 def socket_path() -> Path:
     return home() / "agent.sock"
 

@@ -65,6 +65,8 @@ class Fleet:
             return {"host": "kmaster", "home": "kmaster", "mode": "home", "home_reachable": True, "links": {}}
         if method == "inbox":  # the Org top bar's person inbox count (design §4.5a)
             return {"id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0}
+        if method == "identity":  # the teams line's identity note (design §4.8a, TD-077 step 2)
+            return {"host": HOST, "mode": "off", "detached_check": False, "tally": {}, "alarms": [], "sessions": {}}
         if method in ("send", "kill", "seen"):
             for s in self.sessions:
                 if s["id"] == params["id"]:

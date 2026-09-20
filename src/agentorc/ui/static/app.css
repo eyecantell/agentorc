@@ -11,6 +11,7 @@
   --limited: #7c3aed; --limited-bg: #ede9fe; --limited-fg: #5b21b6;
   --done: #059669; --done-bg: #d1fae5; --done-fg: #065f46;
   --warn-bg: #fff7ed; --warn-line: #fdba74; --warn-fg: #7c2d12; --scraped: #d9a441;
+  --alarm: #b45309; --alarm-bg: #fef3c7; --alarm-fg: #7c2d12;  /* design §4.8a: an identity alarm's mark */
   --primary: #1c2128; --primary-fg: #fff;
 }
 html[data-theme="dark"] {
@@ -22,6 +23,7 @@ html[data-theme="dark"] {
   --idle-bg: #2a313a; --idle-fg: #c9d1db; --stalled-bg: #4a1414; --stalled-fg: #fecaca;
   --limited-bg: #2e1d5c; --limited-fg: #ddd6fe; --done-bg: #0d3d2c; --done-fg: #a7f3d0;
   --warn-bg: #3a2410; --warn-line: #9a5b1c; --warn-fg: #fdba74;
+  --alarm: #d97706; --alarm-bg: #3f2a0c; --alarm-fg: #fcd34d;
   --primary: #e6e9ee; --primary-fg: #0f1216;
 }
 * { box-sizing: border-box; }
@@ -103,6 +105,15 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
 .inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
 .inboxpage .mfoot, .inboxpage .mhead { row-gap: 4px; }
+/* design §4.5a **Inbox row: state** (TD-069 step 2): a state row wears the card's own pill, which
+   is a span and never a control. The alarms list is text, one line per alarm. */
+.inboxpage .staterow .pill { cursor: default; }
+.inboxpage .alarms { margin: 0; padding-left: 18px; font-size: 12px; color: var(--alarm-fg); }
+.inboxpage .alarms li { margin: 2px 0; }
+.inboxpage .staterow[data-row="alarm"], .inboxpage .staterow[data-row="alarm_host"] { border-left: 2px solid var(--alarm); padding-left: 8px; }
+/* design §4.8a: the card's identity mark — a warning, not the amber needs-you ring, and never
+   pressable: the Inbox row is where anything is done about it (TD-077 step 2). */
+.badge.alarmmark { cursor: default; color: var(--alarm-fg); background: var(--alarm-bg); border-color: var(--alarm); }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
