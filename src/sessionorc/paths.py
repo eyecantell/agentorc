@@ -26,6 +26,11 @@ def attachments_dir() -> Path:
     return home() / "attachments"
 
 
+def launch_dir() -> Path:
+    """Launch scripts for commands too long for tmux's own command line (`Tmux.new_session`)."""
+    return home() / "launch"
+
+
 def remote_dir(host: str) -> Path:
     """Where the home keeps another host's records (design §4.4a "A node's records at the home"):
     apart from its own `sessions/`, one directory per node, so two hosts may hold one id."""
