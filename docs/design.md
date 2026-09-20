@@ -2378,7 +2378,7 @@ now one of three things, and the envelope says which:
   names the board.
 - **Steering — a `steer`.** A preference the session can go on without: *I will do X unless you
   say otherwise*. The envelope carries **`default`** — the one line saying what it will do,
-  **required** (`--default`; a `steer` without one is refused), cleaned and capped as a `doing` line
+  **required** (`--default`; a `steer` without one is refused, and `--default` on any other kind is refused too: a `note`, an `ask` and a `reply` say what they say), cleaned and capped as a `doing` line
   is (§4.8) — and a **bound**: `--bound`, else `ASK_BOUND`. A `reply` before the bound closes it
   (`replied`), exactly as it closes an `ask`. At the bound it **lapses** — `closed_reason:
   lapsed`, never `expired_at`: nothing failed — and the sender does what it said. **A `steer` is
@@ -2386,7 +2386,7 @@ now one of three things, and the envelope says which:
   `ask` does and its first `reply` closes it uncounted; it is never pruned while open; a reply
   after it closed is delivered as a `note`. One rule differs, because the point of a `steer` is
   that the *sender* goes on: **its bound runs whatever becomes of the addressee** — an addressee
-  that exits does not leave it *pending*, it lapses on time. A `steer` may be addressed wherever
+  that exits does not leave it *pending*, and one that is closed or forgotten does not expire it: the sender's copy lapses at its bound, as it would have anyway. A `steer` may be addressed wherever
   an `ask` may — to the person or, along the graph, to one session — which is what lets a
   go-between answer steering before it reaches a person (TD-075). It counts toward the
   person's number only while the person has **paused** it (*Pause*, below; §4.5a **Inbox**).
@@ -2396,7 +2396,7 @@ now one of three things, and the envelope says which:
 (§4.5a) are events on the sender's *outgoing* entry (`asker_gone` tells nobody: there is no one left to tell), and everything that wakes a
 session is keyed on mail *arriving* — so the home **delivers a `note` from `system`** into the
 sender's inbox at that moment, naming the entry: *steer m-… lapsed: go with your default*; *ask
-m-… declined by the person*; *steer m-… — the person says: go with your default*. `system` is a
+m-… declined by the person*; *steer m-… — the person says: go with your default*. (When the sender is the person — a person may `steer` a session — the note lands in the person inbox.) `system` is a
 third sender beside a session id and the person: `ao inbox` marks it `[system]` — a fourth value
 of the mark beside `[controller]`, `[person]` and `[other]` — and it is never an instruction (it
 reports what happened to the session's own message). **The home writes it straight into the
@@ -2406,7 +2406,7 @@ be replied to: `--reply-to` naming one is refused with *a system note reports wh
 your own message; there is nobody to reply to*, and no page offers Reply on one. It wakes as any `note` does, within the wake budget
 (§4.8) — except the three by which a person releases a sender that may be blocked in `ao wait` —
 *declined*, *Go with it* and a **pause** — which wake as a person's `reply` does and refill the
-budget. A **resume**'s note is ordinary: it only says the clock runs again and what is left, so it
+budget. A **resume**'s note is ordinary — *steer m-… resumed by the person: the clock runs again, until <bound>* — it only says the clock runs again and what is left, so it
 wakes within the budget like any `note`. A **lapse** wakes **uncharged** — outside the budget, neither
 spending nor refilling it: it is the home's clock and not another session's message, a session
 can cause at most one per `steer` it sent, and the tallies already bound those — so a spent
@@ -2438,7 +2438,7 @@ is what is left, and the sender is told again; **Reply** and **Go with it** clos
 as they close a running one. A paused `steer` holds its sender's slot in the depths like any open
 one, and an `asker_gone` closes it like any other. Only a `steer` can be paused — an `ask` to
 the person has no clock — and a `steer` addressed to a session cannot be: the pause is the
-person's. **A `steer` has no Snooze**: snooze hides a row while its clock runs, pause stops the
+person's. **Snooze, Pause, Resume and *Go with it* act on the person inbox only**; named on an entry in a session's inbox they answer that the person inbox holds no such entry (whether a person should be able to hold a `steer` put to a go-between is TD-075's to decide). **A `steer` has no Snooze**: snooze hides a row while its clock runs, pause stops the
 clock, and both on one row invite the wrong press.
 
 **Deleting is declining, and nothing vanishes at once.** On an open `ask` or `steer`, the
@@ -2452,7 +2452,7 @@ the old inbox back, with no timer to clear it. The rule the briefs carry: *neede
 on would be wrong, not merely slower or a matter of taste; anything with a sensible default is a
 `steer`; anything already decided and written down is neither — read it. And one line of advice
 from the home, not a gate (the per-sender depth is the gate): when a session sends an `ask` to the
-person while it **already holds three or more open ones** — counted before this send — the reply
+person while it **already holds three or more open `ask`s to the person** — `ask`s only, a `steer` is already the right kind; counted before this send — the reply
 to `ao msg` carries *you have n open asks to the person: is this one needed, or a steer?* beside
 the id, every time that is so.
 
