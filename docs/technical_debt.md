@@ -55,6 +55,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Partly done |
 | TD-083 | A worker that ends its run on purpose, with work still on the ledger, is neither *finished* nor *exited*: no rule of its manager's fires, and the team sits parked until a person restarts it | Medium | Open |
 | TD-084 | On a node, `ao status` always says its home *is unreachable* — it never asks | Low | Open |
+| TD-086 | A promote restarts the host agent, which ends every lead's blocked `ao wait` — and the CLI then tells the session to start a host agent, the one thing it must never do | Medium | Open |
+| TD-087 | The usage chip is empty: the usage endpoint answers 429, the adapter turns every failure into silence, the poll never backs off, and a capped session is not marked `limited` meanwhile | Medium | Open |
 
 ---
 
@@ -920,3 +922,31 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the line says *unreachable* only when the node's agent reports its link down, and otherwise says what the listing is (this host's sessions; the org is at the home), with a test for each.
 
 **Related:** TD-057 (nodes), TD-077 (where it was seen).
+
+
+## TD-086: A promote ends every lead's `ao wait`, and the CLI then tells a session to start a host agent
+
+**Priority:** Medium
+**Added:** 2026-09-20 (the anchor session, from `orchestrator-ao-1`'s board item of the same day, which asked for the entry — a lead creates no work)
+**Status:** Open — not started. Host-agent side: tdgrind-ao-1's lane, after TD-078.
+**Location:** `src/sessionorc/client.py` (`AgentUnavailable("host agent closed the connection")`, raised when a call's reply line is empty), `src/agentorc/cli.py` (the one `fail(..., 3, hint="start it with: agentorc-agent serve")`), `cmd_wait`; `src/agentorc/skill.md` (*exit 3: the host agent is down — stop, do not start one*)
+
+**Why:** A promote restarts `agentorc-agent` (TD-062), and the anchor promoted eight times on 2026-09-20. Each restart closed the socket under every blocked `ao wait`; the lead's round saw `error: host agent closed the connection` and the hint *start it with: agentorc-agent serve* — three times that evening (20:34, 21:01, 21:05 UTC, each within seconds of a promote; the agent was `active` again at once, `NRestarts=0`). Two defects in one line. **The wait is lost**: a lead's wake channel is gone until its next round, by a routine act of the anchor's, and the more the team merges the more often. **The hint is wrong for a session and wrong in fact**: the agent was restarting, not down, and the `ao` skill forbids a session to start one — the CLI tells it to do the one thing its Never list rules out. The briefs' fallback (the `loop` skill) is what kept the cost to the tail of a round.
+
+**Done when** (1) a connection that closes **mid-call** is told apart from an agent that cannot be reached at all: `ao wait` reconnects and re-subscribes for a bounded time (the unit is back in seconds) and returns what it would have — a lead does not see a promote; (2) where a call cannot be retried, the message says *the host agent restarted — run it again*, and the *start it with…* hint is printed only when no agent answers and **never to a session** (`AGENTORC_SESSION` set, or a session channel): a session is told to stop, as its skill says; (3) a test restarts a private agent under a blocked `wait` and sees it return on the next event. Design first if (1) changes what `wait` promises (§4.10 *wake budget*: a reconnect must not count as a wake).
+
+**Related:** TD-062 (why promotes restart the unit), TD-058 (the agent stops in a second with a `wait` blocked — the other half of the same restart), TD-052 (`wait` as an RPC).
+
+
+## TD-087: The usage chip is empty because the usage endpoint rate-limits us, and the adapter says nothing
+
+**Priority:** Medium
+**Added:** 2026-09-20 (the anchor session; the chip never drew on the live page after TD-073's promote)
+**Status:** Open — not started. The adapter and the host agent's poll: tdgrind-ao-1's lane; the chip's words: tdgrind-ao-2's.
+**Location:** `src/agentorc/adapters/claude_code/__init__.py` (`usage`, `usage_for`: every failure is `return None`), `src/sessionorc/agent.py` (the tick's usage poll, `USAGE_EVERY = 60.0`, `_usage` and `_usage_checked` in memory), `src/agentorc/ui/static/app.js` (`fitUsage`)
+
+**Why:** After #279 the top bar showed no usage chip through three promotes. Read 2026-09-20 22:50 UTC with the `grind` profile's own credentials (present, unexpired): the OAuth usage endpoint answers **HTTP 429, `rate_limit_error`**. `usage()` catches every exception and returns `None`, `usage_for` passes it on, and the tick ignores anything that is not a dict — so *rate-limited*, *no credentials*, *no network* and *no profile* are one silence, in the journal and on the page. Three things keep it that way: the poll is **every 60 s per profile with no backoff**, so a 429 is answered with another request a minute later; `_usage` lives in memory, so **each promote forgets the last good reading and polls at once** (eight promotes that day); and anything else polling the same account's endpoint (tdgrind's own poller, the tool) spends the same allowance. The cost is more than a missing chip: `_cap` reads the same dict, so **a session that hits its cap is not marked `limited`** while the endpoint refuses us.
+
+**Done when** (1) the adapter tells the core *why* there is no reading — a small structured result (`ok`, `rate_limited` with `Retry-After` when given, `no_credentials`, `error`), never prose — and the host agent logs a change of reason once; (2) a 429 backs the poll off (honour `Retry-After`, else double up to a ceiling) and a success resets it; (3) the last good reading survives a restart with its `fetched` time, and the chip shows it as stale rather than vanishing (a design line in §4.5a's usage row first: a stale chip is a new state of a mark); (4) `USAGE_EVERY` is reconsidered — five minutes is plenty for a five-hour window; (5) tests for each reason and for the backoff.
+
+**Related:** TD-073 (the windows and the chip), TD-001 (the poll), TD-062 (promotes restart the agent).
