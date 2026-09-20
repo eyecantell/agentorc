@@ -1,0 +1,3 @@
+{# One section's rows. The page renders each section with this template and so does the poll
+   (`inbox_html`), so what a refresh puts back is exactly what the page was rendered with. #}
+{% import "inbox_row.html" as r %}{% for e in rows %}{{ r.row(e, section) }}{% endfor %}

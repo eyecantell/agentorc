@@ -159,9 +159,11 @@ def test_a_lead_whose_own_badge_differs_is_still_found_but_keeps_its_card():
     assert groups["other"]["ids"] == ["o"] and groups["other"]["lead"] is None
 
 
-def test_the_top_bar_person_inbox_shows_its_count_only_above_zero(monkeypatch, tmp_path):
-    """design §4.5a Org top bar **person inbox** (§4.10): the control is always there to open, and
-    its unread count shows at one and not at zero."""
+def test_the_top_bar_inbox_opens_the_page_and_shows_its_count_only_above_zero(monkeypatch, tmp_path):
+    """design §4.5a Org top bar **Inbox** (TD-069 step 1, 2026-09-19): the control is a link to
+    `/inbox` — the dialog it opened until then is retired — and its number, the **Needs you**
+    section, shows at one and not at zero. Its hover text says what it counts and that it is not
+    the Org's needs-you count."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
     from agentorc.ui.app import templates
@@ -177,14 +179,16 @@ def test_the_top_bar_person_inbox_shows_its_count_only_above_zero(monkeypatch, t
             agent_down=False,
             volatile=False,
             usage={},
-            person_unread=n,
+            person_needs=n,
         )
 
     zero, one = render(0), render(1)
     for html in (zero, one):
-        assert 'id="personinbox"' in html and 'id="personbox"' in html and 'id="personlist"' in html
-    assert 'class="badge unread hidden" id="personunread"></span>' in zero
-    assert 'class="badge unread" id="personunread">1</span>' in one
+        assert 'id="personinbox"' in html and 'href="/inbox"' in html
+        assert 'id="personbox"' not in html and 'id="personlist"' not in html  # the dialog is gone
+        assert "Not the Org's needs-you count, which is session states only." in html
+    assert 'class="badge needs hidden" id="personneeds"></span>' in zero
+    assert 'class="badge needs" id="personneeds">1</span>' in one
 
 
 def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph(monkeypatch, tmp_path):

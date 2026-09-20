@@ -899,25 +899,26 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
 
 
 def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
-    """TD-052 step 8, design §4.5a Org top bar **person inbox** (§4.10): the Org page renders the
-    unread count from the `inbox` RPC; the panel's feed lists an entry a session sent with
-    `ao msg person`, with its sender's id and name, as a person's read (no `read_at`); **Reply**
-    lands a `reply` from the person in the sender's inbox and closes its `ask`; delete removes the
-    entry from the person inbox and leaves the sender's copy."""
+    """TD-052 step 8, design §4.5a Org top bar **Inbox** (§4.10): the Org page renders the top
+    bar's number — the **Needs you** count since TD-069 step 1, so one open `ask` to the person
+    makes it 1; the feed lists an entry a session sent with `ao msg person`, with its sender's id
+    and name, as a person's read (no `read_at`); **Reply** lands a `reply` from the person in the
+    sender's inbox and closes its `ask`; delete removes the entry from the person inbox and leaves
+    the sender's copy."""
     import asyncio
 
     from sessionorc.client import LocalClient
 
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "asker"}, follow_redirects=False)
     sender = r.headers["location"].rsplit("/", 1)[-1]
-    assert 'class="badge unread hidden" id="personunread"></span>' in client.get("/").text  # nothing at zero
+    assert 'class="badge needs hidden" id="personneeds"></span>' in client.get("/").text  # nothing at zero
 
     async def as_sender(**kw):
         async with LocalClient(caller=sender) as c:
             return await c.call("msg", to="person", **kw)
 
     ask = asyncio.run(as_sender(text="merge PR 9?", kind="ask", about="TD-052"))["entry"]["id"]
-    assert 'class="badge unread" id="personunread">1</span>' in client.get("/").text
+    assert 'class="badge needs" id="personneeds">1</span>' in client.get("/").text
 
     got = client.get("/api/person/inbox").json()
     [e] = got["entries"]
@@ -951,11 +952,13 @@ def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
     assert client.post("/api/person/nope", json={}).status_code == 404
 
 
-def test_the_inbox_dialog_renders_a_steer_and_its_delete_declines(client, tmp_path):
-    """TD-069 step 0, design §4.10 and §4.5a **Inbox**: the dialog that is built until step 1 lands
-    must not break on the new kinds and fields — it draws a `steer`'s default and when it lapses,
-    an `ask` to the person with no bound, and a `system` note with no Reply; and its Delete on an
-    open question goes through the new **decline** semantics, which the entry itself then says."""
+def test_the_person_inbox_feed_carries_a_steer_and_its_delete_declines(client, tmp_path):
+    """TD-069 step 0, design §4.10 and §4.5a **Inbox**: the fields the new kinds added are on the
+    entries the person-inbox route hands its surfaces — a `steer`'s default and bound, an `ask` to
+    the person with no bound — and the Focus Inbox panel's renderer, which stayed when step 1
+    retired the top bar's dialog, still draws them and offers no Reply on a `system` note. Delete
+    on an open question goes through the **decline** semantics, which the entry itself then says.
+    The Inbox page's own rows are tests/test_ui_inbox.py."""
     import asyncio
     import pathlib
 
@@ -971,7 +974,7 @@ def test_the_inbox_dialog_renders_a_steer_and_its_delete_declines(client, tmp_pa
     steer = asyncio.run(as_sender(text="which branch?", kind="steer", default="off main"))["entry"]
     ask = asyncio.run(as_sender(text="merge PR 9?", kind="ask"))["entry"]["id"]
     got = {e["id"]: e for e in client.get("/api/person/inbox").json()["entries"]}
-    # every field the dialog draws is on the entry the API hands it
+    # every field a surface draws is on the entry the API hands it
     assert got[steer["id"]]["default"] == "off main" and got[steer["id"]]["bound"]
     assert got[steer["id"]]["paused_at"] is None and got[steer["id"]]["snoozed_until"] is None
     assert got[ask]["bound"] is None and got[ask]["closed_reason"] is None

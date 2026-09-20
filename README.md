@@ -11,8 +11,9 @@ see git status per checkout; press configured command buttons; jump to VS Code; 
 unattended workers with run windows and usage caps. Sessions live on the host, so closing the
 laptop changes nothing.
 
-**Status: phase 1 in progress.** The host agent, the Claude Code adapter, the Org and Focus
-pages, New session and the CLI are built and running; phase 2 (a second host over ssh) is not.
+**Status: phase 1 in progress.** The host agent, the Claude Code adapter, the Org, Focus and
+Inbox pages (the Inbox is mail only so far — TD-069), New session and the CLI are built and
+running; phase 2 (a second host over ssh) is not.
 Read [`docs/design.md`](docs/design.md) — §7 has the phase plan, and what is deferred is in
 [`docs/technical_debt.md`](docs/technical_debt.md).
 

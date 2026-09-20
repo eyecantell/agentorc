@@ -18,9 +18,12 @@
   </div>
   <div class="grow"></div>
   <span class="mono dim" id="usagechip" title="subscription usage per profile: the 5-hour window and the weekly window (TD-001)">{% for prof, u in (usage or {}).items() %}<span data-profile="{{ prof }}">{{ prof }} 5h {{ u.five_hour_pct }}% · wk {{ u.weekly_pct }}%</span> {% endfor %}</span>
-  {# design §4.5a Org top bar **person inbox** (§4.10): mail sessions sent with `ao msg person`.
-     The count shows only above zero; opening it reads as a person, which marks nothing and rings nothing. #}
-  <button class="btn light" type="button" id="personinbox" title="mail sessions sent you with ao msg person">✉ Inbox<span class="badge unread{% if not person_unread %} hidden{% endif %}" id="personunread">{{ person_unread or '' }}</span></button>
+  {# design §4.5a Org top bar **Inbox** / **Inbox page** (§4.5 screen 6, §4.10, TD-069 step 1): the
+     nav item for `/inbox`, which replaced the dialog that hung here until 2026-09-19. Its number is
+     that page's **Needs you** section — open questions to you plus `steer`s you have paused, minus
+     anything snoozed — and never unread mail; it shows only above zero. Reading the page marks
+     nothing and rings nothing: a person is not the session. #}
+  <a class="btn light{% if active == 'Inbox' %} on{% endif %}" href="/inbox" id="personinbox" title="what is waiting on you: open questions sessions asked you, plus steering you paused, minus anything snoozed. Not the Org's needs-you count, which is session states only.">✉ Inbox<span class="badge needs{% if not person_needs %} hidden{% endif %}" id="personneeds">{{ person_needs or '' }}</span></a>
   <span class="mono dim" id="hostchip">{{ host }} <span id="hostdot">●</span></span>
   <button class="btn ghost light" id="theme" title="dark / light">◐</button>
   <form method="post" action="/shell" class="inline" id="shellform">
@@ -49,13 +52,8 @@
     </div>
   </form>
 </dialog>
-<dialog id="personbox" class="card pad maildlg inbox">
-  <div class="col gap">{# no form: its Reply and Delete buttons must not submit-close the dialog #}
-    <div class="row gap"><span class="h2">Inbox</span><span class="meta" id="personcount"></span><span class="grow"></span><button class="btn ghost" type="button" id="personclose">Close</button></div>
-    <div id="personlist"><div class="note">Loading…</div></div>
-    <div class="note">Mail sessions sent you with <code>ao msg person</code>. Reading it here marks nothing and rings nothing. Reply goes to the sender's inbox; delete removes it from here only — the sender keeps its copy. Anything with a date on it belongs on the board.</div>
-  </div>
-</dialog>
+{# The `personbox` dialog stood here until 2026-09-19: a fixed-width column at `max-height: 60vh`
+   that sessions wrote paragraphs into. It is retired with the Inbox page (§4.5a, TD-069 step 1). #}
 {% block body %}{% endblock %}
 <script src="/static/app.js"></script>
 {% block scripts %}{% endblock %}

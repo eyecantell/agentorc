@@ -122,6 +122,16 @@
         body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
       }
       if (action === "unmail") body = { msg: b.dataset.msg };
+      // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
+      // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
+      // is the one that decides what may be done, and its refusal comes back as a toast.
+      if (["pause", "resume", "gowithit"].includes(action)) body = { msg: b.dataset.msg };
+      if (action === "unsnooze") { action2 = "snooze"; body = { msg: b.dataset.msg }; }  // no `until` clears it
+      if (action === "snooze") {
+        const until = snoozeUntil(b.dataset.when);
+        if (!until) return;
+        body = { msg: b.dataset.msg, until };
+      }
       if (action === "control-add") {
         const who = prompt("Which session may act on this one? (its id or name from ao status)");
         if (!who) return;
@@ -135,7 +145,12 @@
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
       if (action === "unmail") AO.toast(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
       if (["message", "reply", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
-      if (["reply", "unmail"].includes(action) && id === "person") AO.refreshPersonInbox(true);
+      if (action === "snooze") AO.toast("snoozed — it comes back at that time; the sender is not told", true);
+      if (action === "unsnooze") AO.toast("back in its section", true);
+      if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);
+      if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
+      if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
+      if (id === "person" && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
       if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
       if (action2 === "controllers") {
@@ -145,16 +160,16 @@
     } catch (e) { AO.toast(`${action} failed: ${e.message}`); }
   });
 
-  // One mail entry, as the Focus Inbox panel and the top bar's person inbox both show it (design
-  // §4.5a, §4.10): sender (name, id on hover), kind, `about`, read/unread, age, an `ask`'s state,
-  // Reply and delete. `owner` is the inbox it sits in — a session id, or "person". No Reply on an
-  // entry the person sent: its answer is the session's, which lands in the person inbox.
+  // One mail entry, as the Focus Inbox panel shows it (design §4.5a **Focus Inbox**, §4.10):
+  // sender (name, id on hover), kind, `about`, read/unread, age, an `ask`'s state, Reply and
+  // delete. `owner` is the session whose inbox it sits in — the person inbox has the Inbox page's
+  // rows instead, since 2026-09-19 (TD-069 step 1). No Reply on an entry the person sent: its
+  // answer is the session's, which lands in the person inbox.
   // A `steer` carries the default it will take and lapses at its bound; an `ask` to the person
   // carries no bound at all and never expires; `system` is a sender and is never replied to
   // (design §4.10, 2026-09-19, TD-069 step 0).
   AO.mailEntry = function (e, owner) {
     const ask = e.kind === "ask" || e.kind === "steer" || e.kind === "conflict";
-    const open = ask && !e.closed_reason && !e.closed_by && !e.expired_at;
     let st = "";
     if (ask) {
       st = e.closed_reason === "lapsed" ? "lapsed · the sender went with its default"
@@ -168,16 +183,11 @@
         : e.bound ? `${e.kind === "steer" ? "lapses" : "open · bound"} ${esc(new Date(e.bound).toLocaleString())}`
         : "open · no bound";
     }
-    const person = owner === "person";
     const reply = (e.from === "person" || e.from === "system") ? ""
       : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}">Reply</button>`;
-    const confirmText = person && open
-      ? "Delete this question? That declines it: the sender is told, and nothing else answers it."
-      : person ? "Delete this entry from your inbox? The sender keeps its copy."
-      : "Delete this entry from this session's inbox? The sender keeps its copy.";
+    const confirmText = "Delete this entry from this session's inbox? The sender keeps its copy.";
     return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
       + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
-      + (person && e.from_name && e.from_name !== e.from ? `<span class="st">${esc(e.from)}</span>` : "")
       + `<span class="st kind">${esc(e.kind)}</span>${e.about ? `<span class="st">re ${esc(e.about)}</span>` : ""}`
       + `<span class="grow"></span><span class="st">${e.read_at ? "read" : "unread"}</span>`
       + `<span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
@@ -188,30 +198,28 @@
       + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-confirm="${confirmText}">Delete</button></div></div>`;
   };
 
-  // design §4.5a Org top bar **person inbox** (§4.10). No session record holds it, so nothing on
-  // the pushed stream carries its count: the top bar polls the `inbox` RPC (a person's read, which
-  // marks nothing). The list is fetched only while the panel is open.
-  AO.refreshPersonInbox = async function (list) {
+  // design §4.5a Org top bar **Inbox** (§4.5 screen 6, TD-069 step 1). The control is a link to
+  // `/inbox`, and its number is that page's **Needs you** section — computed server-side in one
+  // place (`inbox_sections`), so the top bar and the page cannot disagree. No session record holds
+  // the person inbox, so nothing on the pushed stream carries it: this polls the same route the
+  // page does, a person's read that marks nothing. (The dialog that hung here until 2026-09-19
+  // relied on that same rule and is retired with the page's arrival.)
+  AO.refreshInboxCount = async function () {
     let got;
     try {
       const r = await fetch("/api/person/inbox");
-      if (!r.ok) return;
+      if (!r.ok) return null;
       got = await r.json();
-    } catch (e) { return; }
-    const n = got.unread || 0, es = got.entries || [];
-    const chip = $("#personunread");
+    } catch (e) { return null; }
+    const chip = $("#personneeds"), n = got.needs || 0;
     if (chip) { chip.textContent = n ? String(n) : ""; chip.classList.toggle("hidden", !n); }
-    if (!list) return;
-    $("#personcount").textContent = es.length ? `${n} unread · ${es.length}` : "";
-    $("#personlist").innerHTML = es.length ? es.slice().reverse().map((e) => AO.mailEntry(e, "person")).join("")
-      : `<div class="note">Nothing here.</div>`;
+    return got;
   };
-  if ($("#personinbox")) {
-    $("#personinbox").addEventListener("click", () => { $("#personbox").showModal(); AO.refreshPersonInbox(true); });
-    $("#personclose").addEventListener("click", () => $("#personbox").close());
-    // only the Org page renders the count server-side: every other page reads it at load
-    if (location.pathname !== "/") AO.refreshPersonInbox(false);
-    setInterval(() => AO.refreshPersonInbox($("#personbox").open), 20000);
+  if ($("#personneeds")) {
+    // the Org page and the Inbox page render the count server-side; every other page reads it at
+    // load. On the Inbox page the poll is the page's own, which refreshes the rows as well.
+    if (location.pathname !== "/" && location.pathname !== "/inbox") AO.refreshInboxCount();
+    setInterval(() => (AO.refreshInboxPage || AO.refreshInboxCount)(), 20000);
   }
 
   $("#theme") && $("#theme").addEventListener("click", () => {
@@ -237,6 +245,15 @@
       if (!el.dataset.deadline) return;
       const left = Math.floor((Date.parse(el.dataset.deadline) - Date.now()) / 1000);
       el.textContent = left > 0 ? `via hook · ${Math.floor(left / 60)}m ${String(left % 60).padStart(2, "0")}s left` : "via hook · falling through to the terminal";
+    });
+    // design §4.5a **Inbox row: `steer`**: the time left, ticking here — the lapse itself is the
+    // home's, and arrives as a changed entry on the next poll, never from this clock.
+    $$(".timeleft[data-deadline]").forEach((el) => {
+      if (!el.dataset.deadline) return;
+      const left = Math.floor((Date.parse(el.dataset.deadline) - Date.now()) / 1000);
+      el.textContent = left > 0
+        ? `${left >= 3600 ? Math.floor(left / 3600) + "h " + Math.floor((left % 3600) / 60) + "m" : Math.floor(left / 60) + "m " + String(left % 60).padStart(2, "0") + "s"} left — then it goes with its default`
+        : "the time is up: the sender goes with its default";
     });
   }, 1000);
 
@@ -412,6 +429,80 @@
       btn.disabled = false;
       syncTeams();  // the button on the page now may not be the one that was pressed
     }
+  }
+
+  // ---- Inbox (design §4.5 screen 6, §4.5a **Inbox page**; TD-069 step 1) ----
+  // The rows are rendered by the server, by the same template the page was rendered with, and a
+  // poll swaps a whole section's markup: nothing here composes markup out of what a session wrote.
+  // What lives in the browser is what belongs to this browser — the filter, the FYI fold — exactly
+  // as the Org's filter and team folds do.
+  const IN_SECS = ["needs", "steering", "fyi", "snoozed"];
+
+  // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
+  // which is what the entry stores; the prompt is in the person's own clock.
+  function snoozeUntil(when) {
+    const iso = (d) => new Date(d.getTime() - d.getMilliseconds()).toISOString().replace(/\.\d+Z$/, "Z");
+    const d = new Date();
+    if (when === "1h") { d.setHours(d.getHours() + 1); return iso(d); }
+    if (when === "tomorrow") { d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); return iso(d); }
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const s = prompt("Snooze until… (YYYY-MM-DDTHH:MM, your own clock)", local);
+    if (!s) return null;
+    const t = new Date(s.trim());
+    if (isNaN(t)) { AO.toast(`${s}: not a time I can read`); return null; }
+    if (t <= new Date()) { AO.toast("that time has passed: a snooze goes forwards"); return null; }
+    return iso(t);
+  }
+
+  AO.inbox = function () {
+    const f = $("#ifilter");
+    f.value = store.get("inboxfilter", "");
+    $("#sec-fyi").open = store.get("inboxfyi", false);  // folded by default, remembered here
+    $("#sec-fyi").addEventListener("toggle", () => store.set("inboxfyi", $("#sec-fyi").open));
+    f.addEventListener("input", () => { store.set("inboxfilter", f.value.trim()); inboxFilter(); });
+    // the row's team badge filters to that team; pressing it again clears the box (as on the Org)
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest(".mailrow .badge.team"); if (!b) return;
+      e.preventDefault();
+      const q = "team:" + b.dataset.team;
+      f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
+      store.set("inboxfilter", f.value); inboxFilter();
+    });
+    AO.refreshInboxPage = refreshInbox;
+    inboxFilter();
+    refreshInbox();
+  };
+
+  async function refreshInbox() {
+    const got = await AO.refreshInboxCount();
+    if (!got || !got.html) return;
+    IN_SECS.forEach((k) => { const el = $("#rows-" + k); if (el) el.innerHTML = got.html[k] || ""; });
+    $("#needsn").textContent = got.needs || 0;
+    $("#needspill").classList.toggle("hidden", !got.needs);
+    const sn = got.snoozed_n || 0;
+    $("#snoozedbox").hidden = !sn;
+    $("#snoozedlabel").textContent = `${sn} snoozed — show`;
+    inboxFilter();
+  }
+
+  // `team:<name>` is an exact match on the row's badge, `team:` alone is what carries none; any
+  // other text matches the sender, the message and its `about` — the fields a person searches by.
+  function inboxFilter() {
+    const box = $("#ifilter"); if (!box) return;
+    const raw = box.value.trim();
+    const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
+    const q = team === null ? raw.toLowerCase() : "";
+    $$(".mailrow").forEach((r) => {
+      const has = (r.dataset.team || "").toLowerCase();
+      r.hidden = team !== null ? has !== team : !!q && !(r.dataset.find || "").includes(q);
+    });
+    IN_SECS.forEach((k) => {
+      const sec = $("#sec-" + k); if (!sec) return;
+      const n = $$(`#rows-${k} .mailrow`).filter((r) => !r.hidden).length;
+      const all = $$(`#rows-${k} .mailrow`).length;
+      $("#n-" + k).textContent = raw && n !== all ? `${n} of ${all}` : all ? `${all}` : "";
+      const empty = $(".note.empty", sec); if (empty) empty.hidden = n > 0;
+    });
   }
 
   AO.org = function () {

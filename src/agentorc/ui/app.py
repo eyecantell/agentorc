@@ -537,6 +537,71 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
     return groups
 
 
+# -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
+
+PERSON_ASK_KINDS = ("ask", "conflict")  # what reads as a question to the person; `steer` has its own rules
+INBOX_SECTIONS = ("needs", "steering", "fyi", "snoozed")
+
+
+def _entry_open(e: dict[str, Any]) -> bool:
+    """Design §4.10 *One way of being closed*, mirrored for the dicts the RPC hands the page: an
+    entry is open exactly when it is an `ask`, `steer` or `conflict` with no `closed_reason` —
+    and, for entries written before 2026-09-19, one with no `closed_by` and no `expired_at`."""
+    if e.get("kind") not in (*PERSON_ASK_KINDS, "steer"):
+        return False
+    if e.get("closed_reason"):
+        return False
+    return not (e.get("closed_by") or e.get("expired_at"))
+
+
+def _iso(raw: Any) -> datetime | None:
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def inbox_sections(entries: Collection[dict[str, Any]], *, now: datetime | None = None) -> dict[str, Any]:
+    """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
+    snoozed. Mail only — session states are TD-069 step 2 and board items step 3, and each joins a
+    section here rather than anywhere else.
+
+    - **Needs you** — open `ask`s to the person (an open `conflict` too: it cannot be addressed to
+      the person, §4.10, but one written before that gate would still be a question nobody else
+      can answer) and **paused** `steer`s; oldest first.
+    - **Steering** — open `steer`s whose clock is running; soonest bound first, and a `steer`
+      that somehow carries no bound last.
+    - **FYI** — everything else: `note`s, `system` notes, replies, and every closed entry until
+      retention prunes it (`MAIL_RETENTION`, 12 h); newest first, because the useful end of a list
+      nobody must act on is the recent end.
+    - **Snoozed** — an entry whose `snoozed_until` is still ahead is in none of the three and in
+      no count (§4.10 *Snooze*); soonest first, so the page can say *n snoozed — show* and a
+      snooze is never a way to lose mail.
+
+    `count` is the **Needs you** section's length, which is the top bar's number (§4.5a): what is
+    waiting on a person, never unread mail. One computation, used by the page and by the poll.
+    An unreadable `snoozed_until` reads as *not snoozed*: mail is never hidden by a bad field."""
+    at = now or datetime.now(UTC)
+    out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
+    for e in entries:
+        snoozed = _iso(e.get("snoozed_until"))
+        if snoozed and snoozed > at:
+            out["snoozed"].append(e)
+        elif _entry_open(e) and (e.get("kind") in PERSON_ASK_KINDS or e.get("paused_at")):
+            out["needs"].append(e)
+        elif _entry_open(e) and e.get("kind") == "steer":
+            out["steering"].append(e)
+        else:
+            out["fyi"].append(e)
+    out["needs"].sort(key=lambda e: str(e.get("at") or ""))
+    out["steering"].sort(key=lambda e: (not e.get("bound"), str(e.get("bound") or "")))
+    out["fyi"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
+    out["snoozed"].sort(key=lambda e: str(e.get("snoozed_until") or ""))
+    return {**out, "count": len(out["needs"])}
+
+
 # -- app -------------------------------------------------------------------------------------------
 
 
@@ -619,14 +684,16 @@ def create_app() -> FastAPI:
         # (design §4.5 unreachable hosts), never a bare 503.
         agent_down = False
         usage: dict[str, Any] = {}
-        person_unread = 0
+        person_needs = 0
         info: dict[str, Any] | None = None
         try:
             sessions = await call("list")
             usage = await call("usage")
             info = await call("host")
             try:
-                person_unread = (await call("inbox"))["unread"]  # the top bar's person inbox count (§4.5a)
+                # the top bar's number: the Inbox page's **Needs you** section, and not unread mail
+                # (§4.5a **Inbox page**, TD-069 step 1) — the same `inbox_sections` the page uses
+                person_needs = inbox_sections((await call("inbox"))["entries"])["count"]
             except HTTPException as e:
                 # a node whose link is down refuses the mailbox (§4.4a): the banner says why, and
                 # the page is still this host's sessions
@@ -653,7 +720,7 @@ def create_app() -> FastAPI:
                 "agent_down": agent_down,
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
-                "person_unread": person_unread,
+                "person_needs": person_needs,
                 "node_banner": node_banner(info),
             },
         )
@@ -1063,25 +1130,100 @@ def create_app() -> FastAPI:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
         return got
 
-    @app.get("/api/person/inbox")
-    async def api_person_inbox():
-        """design §4.5a Org top bar **person inbox** (§4.10 "A session reaches a person through the
-        org's person inbox"): the `inbox` RPC with no caller and no id. A person's read sets nothing
-        and rings nothing. The top bar polls this for its count — the pushed stream carries session
-        records only, and the person inbox belongs to none."""
+    async def person_inbox() -> dict[str, Any]:
+        """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
+        caller and no id — **a person's read, which sets no `read_at`**, because a person is not
+        the session. That is what lets the Inbox page poll it every few seconds without marking
+        anything read and without freeing a depth slot an unanswered question still holds; it is
+        the rule the dialog this page replaces already relied on, so no `peek` was needed. Each
+        sender gets the name it is known by, and `from_open` the id **Open** goes to while that
+        record still exists (§4.5 screen 6: a row opens the session that needs the person)."""
         got = await call("inbox")
         fleet = await call("list")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        at = datetime.now(UTC)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            e["from_open"] = e["from"] if e["from"] in names else ""
+            e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
         return got
+
+    def inbox_html(sections: dict[str, Any]) -> dict[str, str]:
+        """Each section's rows, rendered by the one template the page itself renders them with, so
+        a poll replaces a section without the client composing any markup — the shape the events
+        stream already uses for team headers. Jinja escapes every field, which is what keeps what a
+        session wrote text and nothing else (TD-071 item 8)."""
+        rows = templates.get_template("inbox_rows.html")
+        return {k: rows.render(rows=sections[k], section=k) for k in INBOX_SECTIONS}
+
+    @app.get("/inbox", response_class=HTMLResponse)
+    async def inbox_page(request: Request):
+        """design §4.5 screen 6 / §4.5a **Inbox page** (TD-069 step 1): full width, the person
+        inbox in three sections, and the count that means *what is waiting on a person*. Mail only
+        — session states are step 2 and board items step 3, and each joins a section here."""
+        agent_down = False
+        try:
+            got = await person_inbox()
+        except HTTPException as e:
+            if e.status_code != 503:
+                raise
+            got, agent_down = {"entries": []}, True  # the banner + Retry, never a bare 503
+        sections = inbox_sections(got["entries"])
+        return templates.TemplateResponse(
+            request,
+            "inbox.html",
+            {
+                "sections": sections,
+                "person_needs": sections["count"],
+                "host": host_name(),
+                "active": "Inbox",
+                "agent_down": agent_down,
+                "volatile": hosts.local_host().volatile,
+                "usage": {},
+            },
+        )
+
+    @app.get("/api/person/inbox")
+    async def api_person_inbox():
+        """design §4.5a Org top bar **Inbox** and the **Inbox page** (§4.10): the entries, which
+        section each is in, their rendered rows, and `needs` — the count, computed in the one place
+        (`inbox_sections`) the page renders from, so the top bar's number and the page cannot
+        disagree. Both poll this: the pushed stream carries session records only, and the person
+        inbox belongs to none. The read marks nothing (`person_inbox`, above)."""
+        got = await person_inbox()
+        sections = inbox_sections(got["entries"])
+        got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
+        got["needs"] = sections["count"]
+        got["snoozed_n"] = len(sections["snoozed"])
+        got["html"] = inbox_html(sections)
+        return got
+
+    # design §4.5a **Inbox row** controls (§4.10): each is a person's own act on their own inbox,
+    # so each calls its RPC **caller-less** — a person is not a session, and every one of these is
+    # refused to every session by the agent. The UI adds no rule of its own: a refusal comes back
+    # as the toast every other RPC error on the page does.
+    PERSON_ACTS = {"pause": "inbox_pause", "resume": "inbox_resume", "gowithit": "inbox_go_with_it"}
 
     @app.post("/api/person/{action}")
     async def api_person_action(action: str, request: Request):
         """design §4.5a Org top bar **person inbox** → Reply and delete (§4.10): a person's reply
         lands in the sender's inbox (the agent addresses it to the entry's sender and closes its
-        `ask`); delete removes the entry from the person inbox only — the sender keeps its copy."""
+        `ask`); delete removes the entry from the person inbox only — the sender keeps its copy.
+        From 2026-09-19 (TD-069 step 1) the Inbox page's own controls join it: **Snooze** and
+        **Unsnooze** (`inbox_snooze`, with and without an `until`), **Pause** / **Resume**, and
+        **Go with it**."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        if action in PERSON_ACTS or action == "snooze":
+            ref = str(body.get("msg") or "").strip()
+            if not ref:
+                raise HTTPException(400, f"{action} needs the entry's id")
+            if action == "snooze":
+                # no `until` is the clear — *Unsnooze* on the page's snoozed list (§4.10 *Snooze*)
+                until = str(body.get("until") or "").strip() or None
+                got = await call("inbox_snooze", msg=ref, until=until)
+            else:
+                got = await call(PERSON_ACTS[action], msg=ref)
+            return JSONResponse({"ok": True, **got})
         if action == "reply":
             ref = str(body.get("reply_to") or "").strip()
             if not ref:
