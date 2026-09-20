@@ -880,7 +880,10 @@
       $("#adapter_id").textContent = v.adapter_id || "—";
       $("#last_output").textContent = v.last_output ? fmtAge(v.last_output) + " ago" : "—";
       if (v.git) {
-        $("#gitline").textContent = v.git.branch + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
+        // the one measure first (design §4.2, TD-080: *only on this machine*), then `ahead`, which
+        // is *unmerged* and a different question — the template renders the same three parts
+        const unpushed = v.git.unpushed ? ` · ${v.git.unpushed} unpushed${v.git.pushed_against ? ` vs ${v.git.pushed_against}` : ""}` : "";
+        $("#gitline").textContent = v.git.branch + unpushed + (v.git.ahead ? ` · ${v.git.ahead} ahead` : "") + (v.git.behind ? ` · ${v.git.behind} behind` : "");
         $("#gitfiles").innerHTML = v.git.files.length ? v.git.files.map((f) => `<div>${esc(f)}</div>`).join("") : '<div class="muted">clean</div>';
       }
       renderReports(v);

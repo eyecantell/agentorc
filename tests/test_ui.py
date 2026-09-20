@@ -1198,6 +1198,40 @@ def test_the_node_banner_reads_the_host_rpc():
     assert node_banner(down).startswith("node of kmaster: unreachable since t — ssh failed · offline")
 
 
+def test_the_card_and_the_focus_git_line_read_one_measure_of_pushed(tmp_path, monkeypatch):
+    """TD-080, design §4.2: *pushed* is `git.unpushed` — **only on this machine** — and every place
+    that says it reads that one number. `ahead` stays and still means *ahead of the upstream*,
+    which is *unmerged*: a launch branch tracking `origin/main` and pushed to its own ref is ahead
+    and not unpushed, and the card must not call that stranded work. Three places, as ever: the
+    card's flag, the Focus template's git line, and the `app.js` line that redraws it live."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "exited", "since": "2026-09-19T16:00:00Z", "confidence": "hook", "tail": [],
+        "created": "2026-09-19T15:00:00Z", "pane": False,
+        "git": {"branch": "orc-1", "dirty": 0, "ahead": 308, "behind": 0, "upstream": "origin/main",
+                "unpushed": 0, "pushed_against": "origin/orc-1", "files": []},
+    }  # fmt: skip
+    v = view(base)
+    assert v["flag"] == "", "308 ahead of origin/main is unmerged, not unpushed (TD-080)"
+    assert ("branch pushed", True) in v["ready"]
+    html = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": v["ready"]}, host="h", active="Org")  # noqa: E501
+    assert "308 ahead" in html and "unpushed" not in html.split('id="gitline"')[1].split("</span>")[0]
+
+    only_here = view({**base, "git": {**base["git"], "unpushed": 2}})
+    assert only_here["flag"] == "2 unpushed"
+    assert ("branch pushed (vs origin/orc-1)", False) in only_here["ready"]
+    html = templates.get_template("focus.html").render(
+        s={**only_here, "grants_all": [], "ready": only_here["ready"]}, host="h", active="Org"
+    )
+    assert "2 unpushed vs origin/orc-1" in html
+    # the page redraws that line itself on a delta, so it says the same thing (the chips' lesson)
+    js = (pathlib.Path(templates.env.loader.searchpath[0]).parent / "static" / "app.js").read_text()
+    assert "unpushed" in js and "pushed_against" in js
+
+
 def test_the_card_and_focus_show_the_tools_own_title_beside_the_name(tmp_path, monkeypatch):
     """TD-074 step 3, design §4.5a **title**: the session's name as its tool holds it, shown beside
     agentorc's own name on the card and in the Focus header — always when there is one, since it is

@@ -76,7 +76,7 @@
       </dl>
     </div>
     <div class="card pad" id="gitcard">
-      <div class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></div>
+      <div class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></div>
       <div class="mono small gitfiles" id="gitfiles">{% if s.git %}{% for f in s.git.files %}<div>{{ f }}</div>{% endfor %}{% if not s.git.files %}<div class="muted">clean</div>{% endif %}{% endif %}</div>
     </div>
     <div class="card pad reports hidden" id="reportscard">
