@@ -36,6 +36,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-056 | Reference leases: a worker's claim on a `TD-NNN` or a path is an advisory, timed reservation checked at claim, not a note to siblings | Medium | Partly done |
 | TD-057 | Sessions on different hosts cannot talk: build the home and node split — one home host agent holds the org's graph and mail, other hosts dial it (design §4.4a); a container node (contractmatch's devcontainer) is brought up, provisioned at the home's version and supervised by the home, with the checkout at the same absolute path inside and a per-node link socket — design §4.4a *A container node*, step 3c, 2026-09-17 | Medium | Partly done |
 | TD-058 | `systemctl restart agentorc-agent` hangs for the 90 s stop timeout and ends in SIGKILL: the serve loop waits for every open connection to close | Medium | Partly done — fixed, live check pending |
+| TD-059 | The rename search turned up neighbours building the same thing and nobody has read them: survey `agentboss` and the projects holding the names we wanted, and record what to take, what to skip and where this project differs | Medium | Open |
+| TD-060 | The name `agentorc` is taken: rename the project — `shiftlead` leads, undecided; two packages, seven env vars, a state directory, two systemd units and a per-repo config file carry the name onto machines, so it is a migration and not a text sweep | Medium | Open — awaiting Paul's decision |
 | TD-061 | A worktree session's memory write lands uncommitted in the main checkout, where the anchor's next `git commit -a` sweeps it into an unrelated PR | Medium | Open |
 | TD-062 | A merge that changes an RPC's parameters breaks the `ao` CLI on the live system until the host agent restarts: the install is editable, so the client is new at once and the agent is not | Medium | Partly done |
 | TD-063 | CI-only flakes on the 3.12 runner: the two timing-shaped tests and the record-revive race are fixed; the 26-minute hang of PR #192 is still unattributed | Low | Partly done |
@@ -513,6 +515,47 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 **Done when** `systemctl --user restart agentorc-agent` returns in a few seconds with the UI open and a lead blocked in `ao wait`, and the journal shows a clean stop.
 
 **Related:** TD-024 (archived: the pending-task traceback on SIGTERM, which made the cancel path clean but did not meet this), TD-052 step 3 (the `wait` RPC's long-lived connections), design §4.4, §4.6.
+
+## TD-059: The rename search found neighbours building the same thing — read them
+
+**Priority:** Medium
+**Added:** 2026-09-16 (Paul, during the rename discussion held in samscrape session 746e1973 on kmaster)
+
+**Status:** Open — nothing surveyed yet. Only `tallu-wonder/agentboss`'s README and top-level tree have been read (2026-09-16); every other project below is known by its name and one-line description alone.
+
+**Location:** no code. The output is an ADR under `docs/decisions/` beside the existing `2026-09-12-orchestrator-membership-prior-art.md`, plus whatever TD entries the survey produces.
+
+**Why:** the name `agentorc` turned out to be in use, and checking replacement names against PyPI, npm, crates.io and GitHub kept landing on projects in this exact niche — which is a finding about the field, not only about names. Two unrelated people took `agentboss` for agent-session tooling within three months of each other. None of these has been read for what it *does*, and at least one has solved problems that are open entries in this ledger. The projects, with how each was found:
+
+- **`tallu-wonder/agentboss`** (Go, MIT, created 2026-07-30, pushed 2026-09-10, 0 stars) — *"One screen for every coding-agent session you have running — a persistent tmux-backed desk for Claude Code and Codex."* The closest neighbour: one tmux session per agent session, status from Claude Code hooks, everything needed to revive a session kept on disk. From its README alone it has things this project lacks or has open: **Codex as a second first-class agent** (status from transcript events plus the `notify` hook; the conversation id adopted by folder + start time because Codex reveals it only at turn end), a five-state status vocabulary (`working` / `needs you` / `finished since you looked` / `idle` / `stopped`) — *finished since you looked* is a state this project does not have, and bears on TD-032 and TD-049 — desktop notifications that jump to the session, per-session model / context / estimated cost, context that drops on a compaction record (**the 2026-09-14 board item: a `/compact` leaves a healthy session reading `stalled?`**), colored groups with an Archived shelf, `opt+W` to start a session in a fresh worktree, and fork-the-conversation (`claude --resume --fork-session`). What it does **not** appear to have is anything above the single person at one terminal: no lead/worker/director, no grants or controllers, no mail between sessions, no unattended teams, no multi-host, no browser UI. That gap is this project's claim to exist, and the survey should confirm it from the code rather than from a README's silence.
+- **npm `agentboss`** (`2026hackathon/AgentBoss`, v0.1.4, 2026-06) — *"AI Agent collaboration analytics — become your AI agent's boss, not its babysitter."* Analytics over agent sessions, not control of them. Worth a look for what it measures: this project records progress and findings (TD-028) but reports nothing about them over time.
+- **the project holding `agentorc`**, and **`agentdirector`** — Paul found both taken; neither has been identified in this ledger. Step one of the survey is to name them (registry, URL, what they are), since a project that chose the same name probably chose it for the same reason.
+- Not in scope: `18682402476-svg/AgentBoss` (a Sui-blockchain agent arena), `ntnusky/shiftleader` (a dormant Puppet management dashboard — relevant only as the nearest name to `shiftlead`), the npm `directr` directive processor.
+
+**Fix:** read each in-scope project's code, not its README — the README above is a claim about agentboss, and this entry's bullets restate it unverified. For each, record in one ADR: (a) what it does that this project does not, and whether that is wanted — each wanted item becomes its own TD entry, or a line on an existing one (TD-032, TD-049, the `/compact` stall item); (b) how it solved a problem this project also has, where the mechanism differs — status detection, session revival, the conversation-id handshake, compaction; (c) what this project does that it does not, stated as the sentence the README's first screen should say once the rename lands. Start from design §3, which already surveys ttyd, ccmanager, claude-squad, Vibe Kanban, agent-dashboard, herdr (measured, ADR 2026-09-10) and OpenAI's Agents API — none of the projects above is in it, so this entry adds to that table and does not redo it. Then widen the search past the names already tripped over: search GitHub for the *description* (tmux + Claude Code + sessions, agent orchestration, multi-agent desk), because the names found so far were found by accident and a survey scoped to them proves only that scope. State the search terms and the date in the ADR.
+
+**Done when** the ADR exists, names every project read and the commit each was read at, and each wanted capability has a TD number; and the rename's README positioning has a sentence drawn from (c).
+
+**Related:** TD-060 (the rename itself; [ADR 2026-09-16](decisions/2026-09-16-rename.md)), design §3 (the existing prior-art table), `docs/decisions/2026-09-10-herdr-spike.md`, TD-055 (the glossary rename: `lead` is already the decided word for the coordinating session, which is part of why `shiftlead` fits), TD-032, TD-049, TD-028, `docs/decisions/2026-09-12-orchestrator-membership-prior-art.md` (the earlier prior-art pass, scoped to membership).
+
+---
+
+## TD-060: The name `agentorc` is taken — rename the project
+
+**Priority:** Medium
+**Added:** 2026-09-16 (Paul; discussed in samscrape session 746e1973 on kmaster)
+
+**Status:** Open — **awaiting Paul's decision on the name.** `shiftlead` is the leading candidate (free on PyPI, npm, crates.io and as a GitHub org when checked 2026-09-16; `.dev`/`.org`/`.tech` open per Paul); Paul asked for time to think. Nothing is renamed. **Both names were claimed 2026-09-17 ahead of the decision:** PyPI `shiftlead 0.0.0` (empty placeholder) and the GitHub org `ShiftLead`; the domains are not registered. The candidates, the test they were held to, the measured surface and the six decisions are in [ADR 2026-09-16](decisions/2026-09-16-rename.md). Worktree `agentorc_rename` exists with no commits.
+
+**Location:** the whole repo — 1,110 case-insensitive occurrences of `agentorc` in 93 tracked files and 260 of `sessionorc` in 56 (`origin/main` at `8bd21b9`) — plus what lives outside it: `~/.agentorc/`, seven `AGENTORC_*` environment variables (the six below plus `AGENTORC_BUILD`, added since this was measured), `agentorc-agent.service` / `agentorc-ui.service`, `~/.local/share/agentorc-venv`, `.agentorc.yml` in other repos, the `ao-` session-id prefix, and three synced files in dev-cadence (and so in samscrape and contractmatch).
+
+**Why:** another project holds the name (TD-059 is to identify it). This is the second rename (`sessionherd` → `agentorc`, 2026-09-04, chosen to sit beside `cmdorc`), and it is cheaper now than it will ever be again: one user, nothing published to PyPI, no external adapter known. Every week adds briefs, ADRs and session records that carry the old name.
+
+**Fix:** decide the six questions in the ADR (the name; what happens to `sessionorc`; whether the `ao-` id prefix stays as an opaque historical prefix — recommended; whether `ao` survives as an alias; a compatibility window or a clean cut with a `migrate` command; whether to claim the names before deciding). Then, in order: claim PyPI + the GitHub org; land TD-055 first, since it edits many of the same lines; one PR for packages, entry points, env vars, state dir, units and config file name, with the migration and a test for it; the text sweep, **leaving dated records — ADRs, the ledger archive, memories — as written**; dev-cadence's three synced files and a sync; the repo rename and a README tagline drawn from TD-059. **Land the machine-facing step with no team running and both units stopped:** running sessions hold `AGENTORC_SESSION` in their environment and resolve `agentorc-hook` from the unit's PATH, so a rename under a live team breaks every started session's hooks.
+
+**Done when** the installed distribution, both units, the state directory and the README carry the new name; a session started before the rename is either migrated or documented as needing a restart; `git grep -i agentorc` returns only dated records and the "was `agentorc`" lines; and the three dev-cadence files are synced.
+
+**Related:** TD-059 (the neighbours the name search found; its survey supplies the tagline), TD-055 (the glossary rename — `lead` is already the decided word, which is much of why `shiftlead` fits), design §4.1 (session ids), §4.3 (the two packages).
 
 ## TD-061: A worker's memory write lands uncommitted in the anchor's checkout
 
