@@ -1381,8 +1381,13 @@ class HostAgent:
 
     def _move_mail(self, old: Session, new: Session) -> None:
         # The row the old record was showing ends here, and the trail says *resumed* — which is
-        # what Paul saw vanish: opening a row's session resumed it (design §4.10, TD-079).
-        self._attention_ended(old.id, "resumed", "*")
+        # what Paul saw vanish: opening a row's session resumed it (design §4.10, TD-079). **Only
+        # when there are two ids**: under the same name the ending was marked in `rpc_create`,
+        # before the name was taken, and marking it again here would leave the word on the id the
+        # **live** record now holds — where `*` stands until the record goes, so its next, unrelated
+        # ending would wear *resumed* with nothing resumed (review of PR #282).
+        if old.id != new.id:
+            self._attention_ended(old.id, "resumed", "*")
         now = datetime.now(UTC)
         new.inbox = self._rename([self._copy(e) for e in old.inbox if self._keep(e, now, inbox=True)], old.id, new.id)
         new.outbox = self._rename(

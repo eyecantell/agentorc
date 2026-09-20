@@ -301,4 +301,18 @@ async def test_a_name_taken_back_by_a_resume_says_resumed(agent, hookstub, tmp_p
         assert again == sid
         got = (await person.call("inbox"))["trail"]
         assert [(e["sid"], e["kind"], e["how"]) for e in got] == [(sid, "question", "resumed")]
+        # and the word is spent on that ending alone: the **live** record keeps the id, and its
+        # next row must not wear *resumed* with nothing resumed (review of PR #282)
+        await feeder.call("hook", session=sid, state="needs-you", pending={"kind": "question"})
+        await wait_state(person, sid, "needs-you")
+        await agent.tick()
+        agent._attention[f"{sid}|state"] = ("question", "2026-09-20T00:00:00Z", "and now?")
+        await feeder.call("hook", session=sid, state="idle")
+        await wait_state(person, sid, "idle")
+        await agent.tick()
+        assert [(e["kind"], e["how"], e["text"]) for e in (await person.call("inbox"))["trail"]][0] == (
+            "question",
+            "resolved",
+            "and now?",
+        )
         await person.call("kill", id=sid)
