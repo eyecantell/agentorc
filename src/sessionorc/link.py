@@ -57,6 +57,10 @@ class LinkClosed(Exception):
     """The link ended while a request was outstanding, or before one could be sent."""
 
 
+class FrameTooLarge(LinkError):
+    """A frame this end refused to write because the other end could not have read it."""
+
+
 class Mux:
     """One end of a link. `handler(method, params)` serves the other end's requests; an exception
     it raises is sent back as that request's error, never allowed to end the link."""
@@ -145,8 +149,22 @@ class Mux:
     async def _write(self, frame: dict[str, Any]) -> None:
         if self.closed:
             raise LinkClosed("the link is closed")
+        line = (json.dumps(frame) + "\n").encode()
+        if len(line) > FRAME_LIMIT:
+            # A frame past the limit is one the other end cannot read: its reader raises and the
+            # link ends there, with nothing on this side to say which frame did it. So it is
+            # refused here instead, where the method is still in hand (TD-066). A reply becomes an
+            # error reply — the request is answered, and the link survives; a request or a
+            # notification raises, which every caller of `request` already handles as a LinkError.
+            why = f"{len(line)} bytes, past the {FRAME_LIMIT}-byte frame limit"
+            what = frame.get("method") or f"the reply to {frame.get('re')}"
+            log.error("refusing to write %s: %s", what, why)
+            if "re" in frame and "error" not in frame:
+                await self._write({"re": frame["re"], "error": f"the reply is too large to send: {why}"})
+                return
+            raise FrameTooLarge(f"{what} is too large to send: {why}")
         try:
-            self.writer.write((json.dumps(frame) + "\n").encode())
+            self.writer.write(line)
             await self.writer.drain()
         except (ConnectionError, RuntimeError, OSError) as e:
             self.close(f"write failed: {e}")

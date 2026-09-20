@@ -93,6 +93,24 @@ async def test_a_frame_past_the_limit_ends_the_link_with_a_reason_never_an_excep
     w1.close()
 
 
+async def test_a_frame_too_large_to_send_is_refused_here_not_discovered_there(tmp_path, monkeypatch):
+    """TD-066: a frame past the limit is unreadable at the other end, which ends the link with a
+    reason but cannot say which frame did it. The writing end refuses it instead: a reply becomes an
+    error reply and the link lives; a request raises, which every caller already handles."""
+
+    async def wide(method, params):
+        return {"pad": "a" * 4096}
+
+    async with pair(tmp_path, nothing, wide) as (a, _b, _):
+        monkeypatch.setattr(link, "FRAME_LIMIT", 1024)
+        with pytest.raises(link.LinkError, match="too large to send"):
+            await a.request("wide")  # the reply is refused at the end that built it
+        with pytest.raises(link.FrameTooLarge, match="too large to send"):
+            await a.request("x", pad="a" * 4096)  # and so is an outgoing request
+        monkeypatch.setattr(link, "FRAME_LIMIT", 8 * 1024 * 1024)
+        assert await a.request("wide") == {"pad": "a" * 4096}  # the link survived both
+
+
 def test_backoff_doubles_to_a_ceiling_with_jitter():
     d = link.backoff_delays(1.0, 8.0)
     got = [next(d) for _ in range(6)]
@@ -420,8 +438,8 @@ async def test_a_report_after_the_first_hook_still_lands_and_a_record_that_will_
 class FakeMux:
     closed_why = None
 
-    def __init__(self, during=None, stall=False):
-        self.during, self.stall, self.sent = during, stall, []
+    def __init__(self, during=None, stall=False, refuse=False):
+        self.during, self.stall, self.refuse, self.sent = during, stall, refuse, []
 
     async def request(self, method, timeout=None, **params):
         self.sent.append((method, params))
@@ -432,6 +450,8 @@ class FakeMux:
     async def notify(self, method, **params):
         if self.stall:
             await asyncio.sleep(30)
+        if self.refuse:
+            raise link.FrameTooLarge("too large to send: 9000000 bytes, past the 8388608-byte frame limit")
         self.sent.append((method, params))
 
     def close(self, why="closed"):
@@ -465,6 +485,29 @@ async def test_a_report_that_cannot_be_written_gives_the_link_up_instead_of_stal
     await asyncio.wait_for(agent._report_home(), timeout=3)  # returns: the tick is not held for `LINK_SILENCE`
     assert "could not be written within 0.2 s" in agent._home_mux.closed_why
     agent.sessions.pop("ao-x-a")
+
+
+async def test_a_report_the_node_refuses_to_write_is_not_marked_as_told(agent):
+    """TD-066: a frame past the limit is refused at the writing end, which is a `LinkError` where
+    only `LinkClosed` and a timeout were handled. The records in that batch must not be marked
+    reported over a write that never happened — the whole batch, not just the one that was too
+    large — or the home keeps their old state and nothing ever sends it again."""
+    from sessionorc.models import Session
+
+    agent.mode, agent.home = "node", "kmaster"
+    agent._home_mux, agent._snapshot_sent = FakeMux(refuse=True), True
+    agent.sessions["ao-x-a"] = Session(
+        id="ao-x-a", name="a", kind="agent", adapter="claude-code", dir="/tmp/x", host=agent.host
+    )
+    await agent._report_home()
+    assert "could not be written" in agent._home_mux.closed_why  # started over, as a failed snapshot is
+    assert "ao-x-a" not in agent._reported
+    # the next link carries it, which is the whole point of not having marked it
+    agent._home_mux = FakeMux()
+    await agent._report_home()
+    assert [r["id"] for r in agent._home_mux.sent[0][1]["records"]] == ["ao-x-a"]
+    agent.sessions.pop("ao-x-a")
+    agent._reported.clear()
 
 
 # -- acts across the link (step 4a) ---------------------------------------------------------------------

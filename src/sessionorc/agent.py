@@ -68,6 +68,7 @@ from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 log = logging.getLogger("agentorc.agent")
 
 TICK_SECONDS = float(os.environ.get("AGENTORC_TICK", "2"))
+PUSH_OPEN = b'{"event": "session", "session": '  # a pushed view's envelope, measured not guessed (TD-066)
 TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
@@ -179,6 +180,29 @@ def _peer_pid(writer: asyncio.StreamWriter) -> int | None:
     except OSError:
         return None
     return struct.unpack("3i", raw)[0] or None
+
+
+def _reply_line(req: dict[str, Any], reply: dict[str, Any]) -> bytes:
+    """One reply is one line. A line longer than the limit every client opens its stream with is a
+    line no client can read: the reader raises `Separator is found, but chunk is longer than
+    limit`, the connection is lost, and the agent's log says nothing — on 2026-09-17 a `list` that
+    had grown past asyncio's 64 KiB default took every `ao` on the machine down at once, and a
+    person had to work out why (TD-066). So the agent refuses its own oversize reply rather than
+    writing it: the request is answered, in words, against its own id, and the method that produced
+    it is logged."""
+    line = (json.dumps(reply) + "\n").encode()
+    if len(line) <= link.FRAME_LIMIT:
+        return line
+    method = req.get("method")
+    log.error("reply to %s is %d bytes, past the %d-byte line limit: refused", method, len(line), link.FRAME_LIMIT)
+    refusal = {
+        "id": reply.get("id", req.get("id")),
+        "error": (
+            f"the reply to {method!r} is {len(line)} bytes, past the {link.FRAME_LIMIT}-byte line "
+            "limit — ask for less of it, or raise the limit at both ends"
+        ),
+    }
+    return (json.dumps(refusal) + "\n").encode()
 
 
 class HostAgent:
@@ -331,6 +355,7 @@ class HostAgent:
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
+        self._oversize: set[str] = set()  # ids whose view is past the line limit, logged once each
         self._backed_up = ""  # the local date of the last nightly tarball tried (a home only)
         self._backup_task: asyncio.Task[None] | None = None
 
@@ -2867,16 +2892,14 @@ class HostAgent:
         mux = self._home_mux
         if self.mode != "node" or mux is None or not self._snapshot_sent:
             return
-        now, changed = time.monotonic(), []
+        now, changed, marks = time.monotonic(), [], []
         for s in self.sessions.values():
             urgent, payload = _urgent(s), json.dumps(s.to_dict(), sort_keys=True)
             was = self._reported.get(s.id)
             if was is None or was[0] != urgent or (was[1] != payload and now - was[2] >= REPORT_EVERY):
-                self._reported[s.id] = (urgent, payload, now)
+                marks.append((s.id, (urgent, payload, now)))
                 changed.append(s.to_dict())
         forgotten = [sid for sid in self._reported if sid not in self.sessions]
-        for sid in forgotten:
-            del self._reported[sid]
         # Bounded: this runs inside the tick and inside every RPC that pushes, and a write to a peer
         # that has gone blocks once the pipe is full — for `LINK_SILENCE`, were nothing to stop it.
         try:
@@ -2886,9 +2909,21 @@ class HostAgent:
                 if forgotten:
                     await mux.notify("gone", ids=forgotten)
         except link.LinkClosed:
-            pass
+            return
+        except link.LinkError as e:
+            # a frame this end refused to write, because the home could not have read it (TD-066).
+            # The link is started over, exactly as a failed snapshot above is: nothing is marked
+            # told over a write that did not happen, and the reconnect's snapshot repairs the gap.
+            log.error("a report to %s was not written: %s", self.home, e)
+            mux.close(f"a report could not be written: {e}")
+            return
         except TimeoutError:
             mux.close(f"a report could not be written within {REPORT_WRITE:g} s")  # the reconnect's snapshot repairs it
+            return
+        for sid, mark in marks:  # marked as told only once it went, as the intent push below is
+            self._reported[sid] = mark
+        for sid in forgotten:
+            del self._reported[sid]
 
     async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
         """What the home may ask of this node: a ping; an `act` (step 4a) — an RPC the home has
@@ -3450,6 +3485,10 @@ class HostAgent:
                     await mux.notify("intent", records=[item for _, _, item in out])
             except link.LinkClosed:
                 continue
+            except link.LinkError as e:  # refused here, unreadable there: start the link over (TD-066)
+                log.error("an intent push to %s was not written: %s", host, e)
+                mux.close(f"an intent push could not be written: {e}")
+                continue
             except TimeoutError:
                 mux.close(f"an intent push could not be written within {REPORT_WRITE:g} s")
                 continue
@@ -3826,11 +3865,23 @@ class HostAgent:
             return
         # sort_keys: the payload is the comparison key too (the UI reads fields by name, never order)
         payloads = {v["id"]: json.dumps(v, sort_keys=True) for v in self._views()}
+        # A push is a line like a reply, and one past the limit ends every open subscription at
+        # once — every tab, not just the card that grew (TD-066). One card is dropped from the
+        # stream instead, and named in the log; `last` is left untouched, so the card returns to
+        # the stream the moment it fits again. Logged once per card, not once a tick.
+        room = link.FRAME_LIMIT - len(PUSH_OPEN) - len(b"}\n")  # the envelope `_send` puts around it
+        big = {sid for sid, payload in payloads.items() if len(payload.encode()) > room}
+        for sid in big - self._oversize:
+            log.error("the view of %s is past the %d-byte line limit: not pushed", sid, link.FRAME_LIMIT)
+        for sid in self._oversize & (payloads.keys() - big):
+            log.info("the view of %s fits again: pushing", sid)
+        self._oversize = big  # so a record that has gone leaves the set with its view
+        payloads = {sid: payload for sid, payload in payloads.items() if sid not in big}
         for w, last in list(self._subscribers.items()):
             for sid, payload in payloads.items():
                 if last.get(sid) != payload:
                     last[sid] = payload
-                    await self._send(w, '{"event": "session", "session": ' + payload + "}")
+                    await self._send(w, PUSH_OPEN.decode() + payload + "}")
             for sid in gone:
                 await self._send(w, json.dumps({"event": "gone", "id": sid}))
 
@@ -3876,9 +3927,7 @@ class HostAgent:
                         await self._send(writer, json.dumps({"event": "usage", "profile": prof, "usage": u}))
                     await self._push_changes()
                     continue
-                writer.write(
-                    (json.dumps(await self._dispatch(req, peer=_peer_pid(writer), conn=writer)) + "\n").encode()
-                )
+                writer.write(_reply_line(req, await self._dispatch(req, peer=_peer_pid(writer), conn=writer)))
                 await writer.drain()
         except (ConnectionError, asyncio.IncompleteReadError):
             pass
@@ -3906,7 +3955,7 @@ class HostAgent:
                     line.cancel()
                     with contextlib.suppress(asyncio.CancelledError, ConnectionError):
                         await line
-                    writer.write((json.dumps(task.result()) + "\n").encode())
+                    writer.write(_reply_line(req, task.result()))
                     await writer.drain()
                     return
                 try:
