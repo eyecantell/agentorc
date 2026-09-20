@@ -138,7 +138,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
     and the line that switches to it (`ao focus ao-agentorc-tests-aotest`) as error data rather
     than prose to parse — the CLI prints that as its hint, the form draws a button from it. The New session form learns
     this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
-  - the name is held by an **exited or closed** record → the new session **supersedes** it: it
+  - the name is held by an **exited or closed** record → the new session **supersedes** it (**one exception, designed 2026-09-20 and not built: a holder a person *suspended* over an identity alarm refuses every session's `create` under its name, and only a person lifts it — §4.8a *An alarm's answers***): it
     takes the id, the old record is **replaced in place** by it (so the card becomes the new
     session rather than going and coming back, and a start that fails leaves the old record
     standing), its run log is kept and linked from the new record as *previous run* (a new
@@ -1183,7 +1183,7 @@ Screens:
    number is exactly this section: a pending permission or question, `limited`, `stalled?`, an
    exited session with unpushed work, an open `ask` to the person (a `conflict` never names the person, §4.10 — a worker whose controllers cannot settle one `ask`s the person about it), a `steer` the person has **paused**, a due board item;
    what is on the tool's clock first (a permission's countdown), then oldest first. **Steering** —
-   not counted: open `steer`s whose clock is running (a paused one is under *Needs you*), each with its default and the time left, soonest first; doing
+   not counted: open `steer`s whose clock is running (a paused one is under *Needs you*), each with its default and the time left, soonest first (and, designed 2026-09-20 and not buildable until TD-075: an identity alarm while it is with a techlead — the same shape, something proceeding on a clock that a person may take over — §4.8a *Who answers first*); doing
    nothing is a valid answer and the row says so. **FYI** — not counted, folded by default (the
    browser remembers the fold): `note`s, `system` notes, late replies, and every entry closed by
    any path — lapsed, declined, *go with it*, `asker_gone`, replied — until retention prunes it
@@ -1350,7 +1350,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, 2026-09-19, TD-069). The top bar's **Inbox** opens it (the dialog it opened until then is retired when the page lands) and its number is the **Needs you** section only — a running `steer`, a `note` and anything snoozed are never counted (a **paused** `steer` is: a session is held on the person), so the number means *what is waiting on a person*. **It is not the Org's needs-you count**, which is session states alone: the Inbox's number adds open `ask`s to the person and due board items, so the two may differ, and each says what it counts on hover. The page's mail is polled from the `inbox` RPC as the dialog's was (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the pushed stream the Org uses. Team filter as on the Org (`team:name`, and `team:` alone for entries whose sender carried none), remembered in the browser — **built 2026-09-19, step 1, mail only**: the count is `inbox_sections`' **Needs you** list, one computation the page and the poll both read, and the poll marks nothing read (§4.10). **Step 2 built 2026-09-19**: the state rows below join *Needs you* in that same computation, so the two numbers still cannot disagree — and the hover on both now says *how* the Inbox's number differs from the Org's: the Org counts the session states, the Inbox counts those **and** open `ask`s to the person and paused `steer`s (and, from step 3, due board items). The states ride the page's own poll rather than the pushed stream, which is per record where this page is per person (§4.5 screen 6). Board items are step 3 |
 | Inbox: section heading, the **i** mark | **i** (one per section) | design 2026-09-20, **built 2026-09-20** (TD-082). A section is its name, its count and an **i** mark; the mark holds the paragraph saying what the section is and what it counts (§4.5 screen 6 *Layout*): a tooltip on hover and keyboard focus, and pressed it opens that paragraph in place under the heading (pressed again, it closes); which are open is remembered in the browser. It is a `<button>` — Enter and Space press it — carrying `aria-expanded` and `aria-controls` naming the paragraph, and labelled *About <section>*; the tooltip is the same text as the button's description (`aria-describedby`), so a screen reader hears it without pressing — which needs the paragraph to be in the page always, closed by the `hidden` attribute and never removed (a description may point at a hidden node; it cannot point at a missing one). Touch has no hover: a tap opens it in place, which is why the opened form exists. Fixed text in the source. It replaces the paragraphs that stood above every section and at the foot of the page |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Switch profile… / Wait**; exited with unpushed work: what Ready to close says (§4.2) and which ref it was measured against, **Reopen and push**, **Resume**, **Open** (details) — **built 2026-09-20 (TD-081 step 2)**; *Reopen and push* (2026-09-20, Paul, TD-081) is the banner's one-press **Resume** with one thing added, a first prompt **the page wrote**: *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); it is offered only where Resume would be silent; the session is attended like any one-press Resume, so a `git push` the tool asks about arrives as an Allow / Deny row; and what comes of it returns as an outcome (§4.10 *Outcomes*) — **it is built after `--outcome` (TD-079 step 1), never before**: a page-written prompt does not name a command that does not exist. A state row leaves the list when the state does; none can be snoozed but `stalled?` and unpushed work, which are not on the tool's clock. **Built 2026-09-19 (TD-069 step 2)**, and two things it found: (a) **`limited` carries no Switch profile… / Wait**, because neither is built on the card either — the row says what the cap is doing and offers **Open**, and gains them when the card does; (b) **the Snooze on `stalled?` and unpushed work is built 2026-09-20** (TD-079 steps 1b and 2) on the home-owned store `attention_snooze` writes — keyed on the record **and the row kind**, so a session's permission and its stalled row are two rows and setting one aside is not setting the other aside; no `until` clears it, and the snoozed row is in no section and no count until its time, exactly as a snoozed entry is. The other rows are never offered one: something is waiting on the tool's own clock. A state row is built from the card's own view, so its pill, `title`, `doing` line and badges are the card's; the pill is a `<span>`, and a state mark never looks pressable (TD-071 item 8). **One predicate** (`state_kind`) answers for the rows *and* for the Org's needs-you badge, so every session the Org counts has exactly one row here and the page's *the session states the Org counts too* is true: a `needs-you` record whose `pending` is empty, is not a dict, or names a kind this build does not know is a plain **needs you** row with **Open** and no Allow / Deny — nothing structured came with it, and a control built from what is not there is what §4.2 forbids (review of PR #251) |
-| Inbox row: identity alarm | **Acknowledge**, **Open** | design 2026-09-19, TD-077 step 2 — §4.5a first, so the control exists. One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and **counted**: an alarm is either a bug of ours or a session misbehaving, and a person should know which. The row lists the alarms in words — channel, what was claimed, the rpc, the count, and first–last in the person's own clock, with *(others)* read as *and n more distinct claims* — and says which identity mode the host is in, since *observe* records what *enforce* would refuse. **Acknowledge** clears that list (the record's, or the host's) so the row leaves: a person's own act, the `identity_ack` RPC called caller-less, refused to every session exactly as `inbox_delete` is and deliberately not among §4.8a's never-gated reads — a session that could clear the list could erase the evidence of its own forgery. Nothing is lost by it: the host agent's log keeps every alarm, a line each. **Open** focuses the session while its record is here; on the card the alarm is a **mark** and nothing more. **A node's record is acknowledged at that node**: alarms are node-owned, so an `id` naming another host is routed there like any other act (§4.4a step 4a), the node clears its own list and the home takes the cleared record from the reply — a home that cleared its replica would have the alarms back on the node's next report. The host's own list is whichever host was asked, and never travels. Acknowledging leaves a trail in FYI — *acknowledged by you* — like every row that resolves (§4.10 *The Inbox is a queue*, 2026-09-20) |
+| Inbox row: identity alarm | **Suspend**, **Log TD**, **Open**, **Dismiss** | design 2026-09-19, TD-077 step 2; **the answers redesigned 2026-09-20 on Paul's direction** (*"Acknowledge" seems like a dismiss*, and an alarm is the one row where dismissing is the least useful thing on offer) — §4.8a *An alarm's answers* is the full text; **built so far: the row, with the one control it was first given, labelled Acknowledge**. One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and **counted** (under *Steering*, uncounted, only while a techlead holds it — §4.8a *Who answers first*, not buildable yet): an alarm is either a bug of ours or a session misbehaving, and a person should know which. The row lists the alarms in words — channel, what was claimed, the rpc, the count, and first–last in the person's own clock, with *(others)* read as *and n more distinct claims* — and says which identity mode the host is in, since *observe* records what *enforce* would refuse. **Two of the four are answers, and only an answer ends the row** (§4.10 *The Inbox is a queue*): **Dismiss** — the control first built as *Acknowledge*, renamed; the wire name `identity_ack` stays, since a wire name is not a control — clears that list (the record's, or the host's), and the trail says *dismissed by you*; **Log TD** hands the alarm, in words the home composes from the alarm's own fields, to the session that answers for this one — **the record's first live controller**, read from the control graph and never from a badge — as mail from the person that owes an outcome (an extension of TD-079's debt, §4.8a), clears the list, and the trail says *logged by you → `<controller>`*; it is **offered only where there is such a session**: not on the host's own row and not on a record with no live controller, which a lead's own record is — the row says so, in words, where it is missing. **The other two act on the session and leave the row standing**: **Open** focuses it while its record is here; **Suspend** stops it at once — no wrap-up, a session under suspicion is not asked to tidy — keeps its worktree and conversation, and marks the record *suspended*, which only a person lifts and which refuses every session's `create` under that name, a whole `ao team start` included (§4.8a); it is offered only on a record's row and only while that session is live, and a suspended record's row says so in a flat mark — its only record, since a suspension ends no row and so writes no trail. All four are a person's own acts, called caller-less and refused to every session exactly as `inbox_delete` is (**one exception, not buildable yet and never on a host that carries a person**: a techlead's `identity_ack` and `suspend` for a record it controls, §4.8a *Who answers first*), and none is among §4.8a's never-gated reads — a session that could clear the list could erase the evidence of its own forgery, and one that could suspend could stop its rival. Nothing is lost by any of them: the host agent's log keeps every alarm, a line each. On the card the alarm is a **mark** and nothing more, and so is *suspended*. **A node's record is answered at that node**: alarms are node-owned, so an `id` naming another host is routed there like any other act (§4.4a step 4a), the node clears its own list and the home takes the cleared record from the reply — a home that cleared its replica would have the alarms back on the node's next report. (**Suspend** is the home's act — `suspended` is the home's field — and only its `kill` is routed.) The host's own list is whichever host was asked, and never travels |
 | Inbox row: `ask` | **Reply**, **Delete**, **Snooze** | the whole text, sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms, closes it as `declined` and the asker is told by a `system` note (§4.10); **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of — the snoozed entry is listed behind *n snoozed — show* with **Unsnooze**, which clears it. Suggested answers, when the envelope carries them, are the row below. Built 2026-09-19, step 1 |
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*; up to four, 80 characters each, format characters stripped). **Drawn apart from the row's own controls** — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm — design 2026-09-20, TD-070; built 2026-09-20 (step 2), on the `ask` and `steer` rows, which is where **Reply** is drawn |
 | Inbox row: `steer` | **Reply**, **Go with it**, **Pause / Resume** | the text, **the default it will take, and the time left**; **Reply** says otherwise; **Go with it** closes it now — `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh, told to it by a `system` note that wakes it as a person's reply does — so it need not wait out the bound; doing nothing lets it lapse to the same end. **Pause** stops the clock and tells the sender not to take its default yet; the row moves to *Needs you* and **is counted while paused** — a session is now held on the person; **Resume** gives back the time that was left (§4.10 *Pause*). No Snooze on a `steer`. Not counted unless paused. Built 2026-09-19, step 1 |
@@ -1955,7 +1955,8 @@ shown — a mark on the card, and a row under *Needs you* in the Inbox (§4.5 sc
 is either a bug of ours or a session misbehaving and a person should know which — and it wakes
 nobody and blocks nothing by itself. **Built 2026-09-19 (step 2)**: the card's mark is a `<span>`
 in a token colour of its own, never pressable and never the amber needs-you ring, carrying the
-newest alarm in words on hover; the Inbox row lists them all and offers **Acknowledge** (§4.5a
+newest alarm in words on hover; the Inbox row lists them all and offers **Acknowledge** — to be
+renamed **Dismiss**, *An alarm's answers* below — (§4.5a
 **Inbox row: identity alarm**), which clears that list — a person's own act, the `identity_ack`
 RPC, refused to every session and **not** a never-gated read, since a session that could clear the
 list could erase the evidence of its own forgery; the log keeps every alarm either way. **That refusal is only as strong as the host's mode**: under `observe` or `off` a session that leaves its `caller` out *is* the person to this RPC, as to `inbox_delete` and every other person-only act, so an acknowledged list means what it says only on a host that enforces — one more reason the page says when a host does not, and the log, which no RPC clears, is the record. **The
@@ -1971,6 +1972,103 @@ A process that leaves the agent's cgroup as well as its pane — `systemd-run --
 cron line — is *outside*, and with no `caller` it is the person. A process of another session on
 the same host can read that session's files; identity here is about *requests to the host agent*
 and nothing else.
+
+**An alarm's answers (2026-09-20, Paul's direction; designed, not built).** The row was first
+built with one control, *Acknowledge*, and Paul read it for what it was: *"Acknowledge" seems like
+a dismiss; identity items should have options like "Suspend agent" or "Log TD", and should go
+through the chain of command — techlead if defined, then to me.* An alarm is a bug of ours or a
+session misbehaving, and the first wants filing and the second wants stopping; clearing the list
+is the least useful thing a person can do with either. So the row has four controls (§4.5a
+**Inbox row: identity alarm**), of two kinds, and the difference is the queue's own rule (§4.10
+*The Inbox is a queue*): **a row leaves only by an answer**, and an act on the session is not an
+answer to the alarm.
+
+- **Dismiss** is *Acknowledge* renamed and nothing else: `identity_ack` (the wire name stays —
+  it is in `NODE_ACTS`, and a rename there is a protocol change that buys a person nothing)
+  clears the list, and the trail says *dismissed by you* where it said *acknowledged by you*.
+- **Log TD** files the alarm where work is picked up. The host agent does not write a repo's
+  ledger — it never commits on a session's behalf (§4.10 *A bounded exchange*), and board
+  write-back (§4.4) is unbuilt — so *filing* is handing it to the session that answers for this
+  one. **Which session is read from the control graph, never from a badge** (§9 invariant 9:
+  nothing that acts keys on `team` or `role`, and the host agent does not read `org.yml`): it is
+  **the record's first live controller**, in the order `controllers` holds them — the session that
+  created it (§4.8 *Create adds the creator*), which for a team's member is its lead (§4.9). `identity_log` (a person's only, gated as `identity_ack`
+  is) sends that controller one message from the person, its text composed by the home from the
+  alarm's own fields and the record's — channel, claim, RPC, count, first and last time, the
+  host's mode, the session's `doing` line and last report; **never from anything the session
+  wrote beyond those two capped lines, which are quoted as text** — asking for a ledger entry.
+  **It owes an outcome, and that is new**: TD-079's debt exists today only on a session's own
+  question to the person (`_owing_question` looks in the person inbox for an entry *from the
+  caller*), so a piece of work the *person* hands a session has no debt to settle. The
+  extension is one rule: **an entry from the person that is marked `handed` is a debt on its
+  addressee** (a new stored field, named apart from `MailEntry.owes`, which is a computed
+  property — and which gains this case: *from the person, `handed`, no outcome yet*), settled by that session's `--outcome done|blocked|dropped --for <id>` naming the
+  entry in its own inbox, and refused `ao progress none` like any other — which means
+  **`owed()` is extended too**: it reads a session's outbox today, its own copies of what it
+  asked, and must also count the entries in its **inbox** that `owes` is now true of, since that one number is what `ao progress none`, `mail.owed`
+  and *Ready to close* all read —
+  `identity_log` is its first user, and nothing else sets the mark until a design says so. The
+  list is then cleared and the trail says *logged by you → `<controller>`*. It is offered only
+  where that session exists: a record with a live controller. On a record without one — a
+  session a person started with no controller, a lead's own alarm (a lead has none) — the row
+  says *no session answers for this one* and the person has **Open**, **Dismiss** and, while
+  the session is live, **Suspend**. **The host's own row has Dismiss and nothing else**: it is
+  about no record, so there is no session to open, to stop, or to answer for it. The host
+  agent's log keeps the alarm whatever is pressed.
+- **Suspend** stops the session now and keeps it stopped. `suspend` (a person's only) marks
+  the record `suspended: {at, by, why}` — `why` being the newest alarm in words — and then
+  kills it as `ao kill` does: no wrap-up, because a session under suspicion is not asked to
+  tidy, and nothing is lost by that — the worktree, the conversation and the run log are kept,
+  and whatever is unpushed shows under *Ready to close* as it would after any kill.
+  **`suspended` is the home's field** (§9 invariant 15 — intent, like `controllers`; a `create`
+  is gated at the home, which is where the mark is read), so for a node's record the home sets
+  it and routes only the `kill`; the alarms stay the node's. **What it does not reach**: a
+  person's own create at a node whose link is down (§4.4a) never passes the home's gate — but
+  that is a person, who may lift a suspension anyway; no *session* there can create at all
+  without the home, so the mark holds against everything it is meant to stop. **A suspension is lifted only by a
+  person**: a person's own resume of that conversation, or a person's **Forget** of the record
+  (the log keeps the alarms either way). Until then every road a session has to bring it back
+  is closed: `create` under that name and `create --resume` of that conversation are refused
+  to every session, naming the suspension — **the one exception to §4.1's rule that an exited
+  holder is superseded**, and §4.1 says so — and **`ao team start` refuses the whole start and
+  names the suspended member**, exactly as it does for a live holder (§4.9: *there is never
+  half a team*): the person who suspended it lifts it, forgets it, or takes it out of the team.
+  The alarms stay on the record and the row stays in *Needs you*, now wearing a flat
+  *suspended `<when>` by you* mark and no **Suspend**: the person still owes the alarm an
+  answer, and a suspension is not one — so it writes nothing to the trail, whose entries are
+  endings (§4.10 rule 2); the mark on the row and the card is its record. No new alarm can land
+  on a suspended record: an alarm is raised by a request from under a live pane, and it has
+  none. It is offered only on a record's row, only while the session is live; the host's own
+  row names no session to stop — its `claimed` is the *victim's* name, never the offender's,
+  and the row says so.
+- **Open** is what it was.
+
+**Who answers first — the chain of command (designed with the above; buildable only after
+TD-075's `techlead` and step 4's `person: false`).** Where a team has a techlead, an alarm on
+one of its sessions goes to it before it goes to the person. **Who the techlead is, is a fact of
+the control graph** — a live controller of the record holding the grant TD-075's design gives
+that role — never the `role` or `team` badge (§9 invariant 9); TD-075 owes that grant, and
+until it exists there is no techlead to the host agent. It goes there first — but only where a techlead's word
+on an alarm can be trusted, which is only where this section's wall stands: **the record's host
+enforces, and carries no person** (§4.4a *A node that carries no person*). On a host in
+`observe` a session can pass as the person; on a host with a person, *outside* is a channel a
+detached process can reach; in both, a session that may clear alarms may clear the evidence of
+its own forgery. kmaster carries a person, so **on kmaster every alarm goes to the person, as
+now**. Where the condition holds: the home sends the techlead the alarm as an `ask` from the
+system with a bound (`ALARM_ANSWER`, 15 minutes), and the person's Inbox shows the row under
+*Steering* — *with `<techlead>`, yours at `<time>`* — with all four controls live, since a
+person's act always wins. The techlead answers with one of four structured replies, never
+prose the home would have to read: **dismiss** (a reason is required, and is shown to the
+person as text), **suspend**, **logged** (it keeps the ledger itself, so it names the entry),
+or **pass up**. `identity_ack` and `suspend` admit that one caller for that one record — the
+team's techlead, a record in its team other than itself, on a host that meets the condition —
+and nobody else. The row moves to *Needs you* when the techlead passes it up, when the bound
+passes unanswered, and at once — never offered to the techlead at all — when the alarm is on
+the techlead's own record, on a record with no such controller **or whose techlead is not
+live** (a bound is not spent waiting on a session that cannot answer), or on the host's own list. **Every
+techlead decision is told to the person**: a trail entry in FYI, *dismissed by `<techlead>`:
+`<reason>`* and the like, under the heading the queue already uses for what was answered for
+you; the log keeps the alarm either way.
 
 **Observe before enforce.** A wrong ancestry rule locks every session on the host out of `ao` —
 the outage of 2026-09-17 (one merged RPC change, 31 minutes) with a worse cause. So the host agent
@@ -2114,7 +2212,7 @@ because the badge is a plain string nothing keys on).
 `ao team` runs it; the exceptions are named at the end of this paragraph). `ao team start <name>` resolves the definition, then checks
 *everything before launching anything*: every checkout exists on this host, every role and
 profile resolves, and every session name is free under §4.1's rule — a live holder refuses the
-whole start and names it, so there is never half a team; exited or closed holders are
+whole start and names it, so there is never half a team (and so, once built, does a holder a person suspended over an identity alarm, §4.8a — for the same reason); exited or closed holders are
 superseded as §4.1 says, which makes `ao team start` after a night's exit the restart too. Then
 it creates the lead (its grants, profile and mode — the role's `control`, the host's
 profile and unattended, unless the definition overrides any of them — in a
@@ -2810,7 +2908,7 @@ state alike:
 1. **Nothing leaves without an answer.** Reading, opening, focusing, following a row's link: none
    of them changes a row. A row leaves *Needs you*, *Steering* or FYI only by one of its own
    controls (§4.5a) — Reply, a suggested answer, *Go with it*, Pause, Snooze, Delete, Dismiss,
-   Acknowledge, Allow / Deny — or by **resolving**, below; a question that closes by a road that is
+   Log TD, Allow / Deny (an identity alarm's *Acknowledge* is a Dismiss, and is being renamed one: §4.8a *An alarm's answers*) — or by **resolving**, below; a question that closes by a road that is
    not the person's — `asker_gone`, a session-to-session `expired` — already says so where it lands
    (*One way of being closed*, above), which is the same thing for mail. What retention prunes is a
    *trail*, never an item: an entry that was already answered or already resolved.
@@ -2823,7 +2921,7 @@ state alike:
    of its own (persisted beside the person inbox, the newest 100, each kept for `MAIL_RETENTION`),
    where `how` is what the home can tell — *allowed by you*, *denied by you* (the `decide` RPC from
    a person), *answered in the terminal* (the pending thing cleared with no `decide`), *resumed*,
-   *pushed*, *forgotten*, *the limit reset*, *acknowledged by you* (an identity alarm, §4.8a), and
+   *pushed*, *forgotten*, *the limit reset*, *acknowledged by you* (an identity alarm, §4.8a — *dismissed by you* once the control is renamed, beside *logged by you → `<controller>`*; a suspension ends no row and writes nothing here), and
    plain *resolved* when it cannot tell (for a node's session the home sees the replica change and
    knows its own `decide`s, so *by you* is always known and the rest is as good as the node's
    report). `text` is cleaned and capped as a `doing` line is. FYI lists the trail; **Dismiss**
@@ -3436,7 +3534,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
 
 15. The org's **graph, intent and mail have one writer, the home host agent**; a session's
     **observed state has one writer, its node** (§4.4a, 2026-09-16). `controllers`, grants, team,
-    `unattended`, stop time, reports, inboxes, `sends`, tallies and wake budgets change only at the home, and
+    `unattended`, stop time, reports, inboxes, `sends`, tallies, wake budgets and (designed 2026-09-20, §4.8a) `suspended` change only at the home, and
     every gate reads them there; `state`, pane, exit code, usage and `wrapup_sent_at` change only on
     the node that owns the session's tmux (invariant 1). Merges go by owner, never by last write. A
     request's identity is the channel it arrived on, never a field it carries — between hosts the link and its key (§4.4a), and **on one host the connecting process's pane** (§4.8a, 2026-09-19): *no caller* is a person only from outside every pane, and only on a host that carries one. Inside one OS account that is tamper-evidence, and the design says so; the wall is a node that carries no person. While a node's link is
