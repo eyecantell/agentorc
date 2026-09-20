@@ -693,7 +693,7 @@ def test_the_card_marks_a_record_with_identity_alarms_and_the_mark_is_not_a_cont
 def test_the_inbox_has_a_row_per_record_with_alarms_and_one_for_the_hosts_own_list(tmp_path, monkeypatch):
     """§4.8a: *a row under Needs you*, counted, because it is either a bug of ours or a session
     misbehaving and a person should know which. The row lists the alarms in words, says which mode
-    the host is in, and offers **Acknowledge**; the host's own list is a row of its own, blaming no
+    the host is in, and offers **Dismiss**; the host's own list is a row of its own, blaming no
     record. `(others)` is read as what it stands for, never printed as a row of empty fields."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     from agentorc.ui.app import alarm_view, inbox_sections
@@ -719,6 +719,13 @@ def test_the_inbox_has_a_row_per_record_with_alarms_and_one_for_the_hosts_own_li
     assert "identity: observe" in html
     assert 'data-act="identity_ack" data-id="person" data-who="ao-x"' in html  # the record's list
     assert 'data-act="identity_ack" data-id="person" data-who=""' in html  # the host's own
+    # §4.5a, renamed 2026-09-20 on Paul's direction (*"Acknowledge" seems like a dismiss*): the
+    # control is **Dismiss**, as it is on every other row, and the **wire name stays** — a wire
+    # name is not a control, and `identity_ack` is what the agent's own tests drive
+    assert ">Dismiss</button>" in html and "Acknowledge" not in html
+    # …and the two that §4.5a gives the row but no RPC yet answers are not drawn: a control against
+    # a method that is not there is what §4.2 forbids (they arrive with `suspend` and `log_td`)
+    assert "Suspend" not in html and "Log TD" not in html
     # every instant is handed to the browser to put in the person's own clock, as the snoozed row is
     assert 'class="localtime" data-at="2026-09-19T10:30:00Z"' in html
     assert ">2026-09-19T10:30:00Z<" not in html
@@ -830,8 +837,9 @@ def test_an_exited_session_with_unpushed_work_is_a_row_until_it_is_forgotten(cli
 
 
 @pytest.mark.integration
-def test_acknowledge_is_a_persons_own_route_and_the_agents_rule_decides(client, tmp_path):
-    """§4.5a **Inbox row: identity alarm** → **Acknowledge**: `/api/person/identity_ack` calls the
+def test_dismiss_on_an_alarm_is_a_persons_own_route_and_the_agents_rule_decides(client, tmp_path):
+    """§4.5a **Inbox row: identity alarm** → **Dismiss** (the wire name `identity_ack` is unchanged
+    by the 2026-09-20 rename: a wire name is not a control): `/api/person/identity_ack` calls the
     `identity_ack` RPC caller-less, exactly as every other control on this page calls its own. The
     UI adds no rule of its own — a record this host does not have comes back as the agent's
     refusal, in the toast every other error uses. (That a session is refused the RPC, and that the
