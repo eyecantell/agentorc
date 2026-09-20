@@ -505,8 +505,10 @@ async def test_the_person_inbox_is_ungated_persisted_and_read_without_marking(ag
     any session lands there with no edge to anyone; the inbox is its own file in the store and a
     fresh host agent on the same store reloads it; a person (no caller, no id) reads it and sets
     nothing; a person's reply from it lands in the sender's inbox as a person's, closing the
-    sender's `ask` on every copy; a session answering a person's message answers into the person
-    inbox; and an `ask` to the person expires on its bound like any other."""
+    sender's `ask` on every copy; and a session answering a person's message answers into the
+    person inbox. (Until 2026-09-19 this test ended on *an `ask` to the person expires on its bound
+    like any other*; §4.10 *What a person is asked* is the rule that changed, and
+    `test_an_ask_to_the_person_carries_no_bound_and_never_expires` is where it is now pinned.)"""
     from sessionorc.agent import HostAgent
 
     async with LocalClient() as person:
@@ -542,12 +544,13 @@ async def test_the_person_inbox_is_ungated_persisted_and_read_without_marking(ag
             # a session answering the person's message answers into the person inbox
             back = await lo.call("msg", text="merged", kind="reply", reply_to=reply["entry"]["id"])
             assert back["delivered"] == ["person"]
-            # an ask to the person expires on its bound, read or not
-            short = (await lo.call("msg", to="person", text="quick?", kind="ask", bound=0.2))["entry"]
+            # a steer to the person does carry one, and lapses on it (§4.10, 2026-09-19)
+            short = (await lo.call("msg", to="person", text="which?", kind="steer", default="A", bound=0.2))["entry"]
         await asyncio.sleep(0.4)
         await agent._sweep_mail(datetime.now(UTC))
         held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == short["id"]][0]
-        assert held["expired_at"] and (await person.call("get", id=loner))["mail"]["expired"] == [short["id"]]
+        assert held["closed_reason"] == "lapsed" and not held["expired_at"]
+        assert (await person.call("get", id=loner))["mail"]["open_asks"] == []
         # a session with no edge to `loner` still reaches the person: the person inbox is ungated
         async with LocalClient(caller=other) as o:
             assert (await o.call("msg", to="person", text="me too"))["delivered"] == ["person"]
@@ -572,8 +575,17 @@ async def test_a_person_deletes_from_the_person_inbox_and_no_session_may(agent, 
                     await c.call("inbox_delete", msg=one, **({"id": target} if target else {}))
         with pytest.raises(AgentError, match="person inbox holds no entry"):
             await person.call("inbox_delete", msg="m-nope")
-        assert await person.call("inbox_delete", msg=one) == {"id": "person", "deleted": one, "unread": 1}
-        assert await person.call("inbox_delete", id="person", msg=two) == {"id": "person", "deleted": two, "unread": 0}
+        assert await person.call("inbox_delete", msg=one) == {
+            "id": "person",
+            "deleted": one,
+            "declined": False,
+            "unread": 1,
+        }
+        # `two` is an open `ask`: deleting it declines it rather than stripping it (§4.10, 2026-09-19),
+        # so it stays in the inbox — closed, and read as such
+        assert (await person.call("inbox_delete", id="person", msg=two))["declined"] is True
+        assert [e["closed_reason"] for e in (await person.call("inbox"))["entries"]] == ["declined"]
+        await person.call("inbox_delete", id="person", msg=two)  # a closed entry is then stripped
         assert (await person.call("inbox"))["entries"] == []
         assert HostAgent(tmux=agent.tmux).person_inbox == []  # persisted
         stored = json.loads((paths.sessions_dir() / f"{w}.json").read_text())
@@ -864,3 +876,489 @@ async def test_every_reply_to_a_session_with_unread_mail_carries_the_count(agent
         assert "mail" not in await raw(worker, "ping")
         for sid in (lead, worker):
             await person.call("kill", id=sid)
+
+
+# -- what a person is asked: needed, steering, FYI (design §4.10, 2026-09-19; TD-069 step 0) -----
+
+
+async def test_an_ask_to_the_person_is_asked_alone_carries_no_bound_and_never_expires(agent, tmp_path):
+    """Design §4.10 *What a person is asked* — **Needed**. An `ask` to the person carries no bound
+    and never expires: `--bound` on one is refused and the refusal names `steer`; the person is
+    asked alone, so an `ask` or a `steer` naming the person names nobody else (a `note` may) and a
+    `conflict` never names the person; both refusals say what to do instead. No sweep, however
+    late, closes it."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, other = await mk("w", unattended=True, team="alpha"), await mk("o", unattended=True, team="alpha")
+        async with LocalClient(caller=w) as c:
+            ask = (await c.call("msg", to="person", text="merge PR 9?", kind="ask"))["entry"]
+            assert ask["bound"] is None and ask["closed_reason"] is None
+            with pytest.raises(AgentError, match="never expires") as e:
+                await c.call("msg", to="person", text="merge PR 9?", kind="ask", bound=60)
+            assert "steer" in str(e.value) and "--default" in str(e.value)
+            # the person is asked alone — and the refusal says to send the others a note
+            for kind, extra in (("ask", {}), ("steer", {"default": "merge it"})):
+                with pytest.raises(AgentError, match="asked alone") as e:
+                    await c.call("msg", to=["person", other], text="both", kind=kind, **extra)
+                assert "note to the others" in str(e.value)
+            # a `note` may name both
+            got = await c.call("msg", to=["person", other], text="fyi")
+            assert sorted(got["delivered"]) == sorted(["person", other])
+            # a conflict never names the person: it goes to the controllers, and the ask is the way up
+            with pytest.raises(AgentError, match="a conflict never names the person") as e:
+                await c.call("msg", to=["person", other], text="settle this", kind="conflict", cites=["s-1"])
+            assert "--kind ask" in str(e.value)
+        # nothing on the home's clock closes it, however late the sweep runs
+        await agent._sweep_mail(datetime.now(UTC) + timedelta(days=30))
+        held = [x for x in (await person.call("inbox"))["entries"] if x["id"] == ask["id"]][0]
+        assert held["closed_reason"] is None and held["expired_at"] is None and held["bound"] is None
+        for sid in (w, other):
+            await person.call("kill", id=sid)
+
+
+async def test_a_steer_requires_a_default_cleaned_and_capped_and_lapses_at_its_bound(agent, tmp_path):
+    """Design §4.10 — **Steering**. A `steer` carries `default`, the one line it will go with,
+    required and cleaned and capped as a `doing` line is (§4.8); only a `steer` carries one. At the
+    bound it **lapses**: `closed_reason: lapsed` and `closed_at`, never `expired_at` — nothing
+    failed — and the home tells the sender with a `system` note naming the entry."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w = await mk("w", unattended=True)
+        async with LocalClient(caller=w) as c:
+            with pytest.raises(AgentError, match="a steer says what it will do"):
+                await c.call("msg", to="person", text="which branch?", kind="steer")
+            with pytest.raises(AgentError, match="only a steer carries a default"):
+                await c.call("msg", to="person", text="fyi", default="something")
+            messy = "  branch off main\x07" + "x" * 400 + "\nand also rebase"
+            steer = (await c.call("msg", to="person", text="which?", kind="steer", default=messy, bound=0.2))["entry"]
+            # one line, control bytes stripped, capped — exactly as `ao doing` cleans its line (§4.8)
+            assert steer["default"] == ("  branch off main" + "x" * 400)[: mail.DEFAULT_CAP].strip()
+            assert "\n" not in steer["default"] and "\x07" not in steer["default"] and steer["bound"]
+        await asyncio.sleep(0.3)
+        await agent._sweep_mail(datetime.now(UTC))
+        held = [x for x in (await person.call("inbox"))["entries"] if x["id"] == steer["id"]][0]
+        assert held["closed_reason"] == "lapsed" and held["closed_at"] and held["expired_at"] is None
+        rec = await person.call("get", id=w)
+        assert rec["mail"]["expired"] == [] and rec["mail"]["open_asks"] == []  # nothing failed
+        # the sender hears it, from `system`, naming the entry
+        note = (await person.call("inbox", id=w))["entries"][-1]
+        assert (note["from"], note["kind"], note["from_role"]) == ("system", "note", "system")
+        assert note["text"] == f"steer {steer['id']} lapsed: go with your default"
+        await person.call("kill", id=w)
+
+
+async def test_a_steer_is_an_ask_for_every_other_rule(agent, tmp_path, monkeypatch):
+    """Design §4.10: "**A `steer` is an `ask` for every other rule in this section**" — it counts
+    toward the exchange tallies as an `ask` does, its first `reply` closes it uncounted, it is
+    never pruned while open, and a reply after it closed is delivered as a `note`. The one rule
+    that differs: **its bound runs whatever becomes of the addressee** — an addressee that exits
+    leaves it no `pending`, and it lapses on time."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        lead, w1, w2 = [await mk(n, unattended=True) for n in ("lead", "w1", "w2")]
+        for sid in (w1, w2):
+            await person.call("set_controllers", id=sid, add=[lead])
+        async with LocalClient(caller=lead) as ld, LocalClient(caller=w1) as c1:
+            steer = (await ld.call("msg", to=w1, text="rebase?", kind="steer", default="I will rebase"))["entry"]
+            assert (await person.call("get", id=w1))["mail"]["open_asks"] == [steer["id"]]
+            threads = (await person.call("get", id=lead))["threads"]
+            assert threads[steer["id"]]["count"] == 1  # counted as an `ask` is
+            # never pruned while open, however long it has been read
+            await c1.call("inbox")
+            monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(seconds=0))
+            await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
+            assert [e["id"] for e in (await person.call("inbox", id=w1))["entries"]] == [steer["id"]]
+            # the first reply closes it, uncounted
+            first = await c1.call("msg", text="no, merge", kind="reply", reply_to=steer["id"])
+            assert first["closed"] == steer["id"]
+            assert (await person.call("get", id=lead))["threads"][steer["id"]]["count"] == 1
+            held = [e for e in (await person.call("inbox", id=w1))["entries"] if e["id"] == steer["id"]][0]
+            assert held["closed_reason"] == "replied" and held["closed_by"] == first["entry"]["id"]
+            # a reply after it closed is a `note`: it counts
+            await c1.call("msg", text="…or hold", kind="reply", reply_to=steer["id"])
+            assert (await person.call("get", id=lead))["threads"][steer["id"]]["count"] == 2
+            # an addressee that exits leaves an `ask` pending and a `steer` not: its bound runs on
+            ask2 = (await ld.call("msg", to=w2, text="status?", kind="ask"))["entry"]
+            s2 = (await ld.call("msg", to=w2, text="rebase?", kind="steer", default="rebase", bound=0.2))["entry"]
+        monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(hours=12))  # back to normal: nothing pruned below
+        await person.call("kill", id=w2)
+        await wait_state(person, w2, "exited")
+        await asyncio.sleep(0.3)
+        await agent._sweep_mail(datetime.now(UTC))
+        marks = (await person.call("get", id=lead))["mail"]
+        assert marks["addressee_exited"] == [ask2["id"]] and marks["expired"] == []
+        out = [
+            e for e in json.loads((paths.sessions_dir() / f"{lead}.json").read_text())["outbox"] if e["id"] == s2["id"]
+        ][0]  # noqa: E501
+        assert out["closed_reason"] == "lapsed" and out["pending"] == []
+        for sid in (lead, w1):
+            await person.call("kill", id=sid)
+
+
+async def test_every_close_path_writes_its_reason_and_the_fields_that_came_before_it(agent, tmp_path):
+    """Design §4.10 "**One way of being closed**": `closed_reason` is set whenever an entry closes,
+    by whatever path — `replied`, `declined`, `asker_gone`, `lapsed`, `go_with_it`, `expired` — and
+    the fields that existed before it are kept and still written: `replied` sets `closed_by` and
+    `closed_at`; `expired` sets `expired_at`; the other four set `closed_at` alone. An entry is
+    open exactly when it is an `ask`, `steer` or `conflict` with no `closed_reason`."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        lead, w = await mk("lead", unattended=True), await mk("w", unattended=True)
+        await person.call("set_controllers", id=w, add=[lead])
+        seen: dict[str, dict] = {}
+
+        async def person_entry(mid: str) -> dict:
+            return [e for e in (await person.call("inbox"))["entries"] if e["id"] == mid][0]
+
+        async with LocalClient(caller=w) as c, LocalClient(caller=lead) as ld:
+            # replied
+            a = (await c.call("msg", to="person", text="merge?", kind="ask"))["entry"]
+            rep = await person.call("msg", text="yes", kind="reply", reply_to=a["id"])
+            seen["replied"] = await person_entry(a["id"])
+            assert seen["replied"]["closed_by"] == rep["entry"]["id"] and seen["replied"]["closed_at"]
+            # declined: the person's delete on an open one
+            b = (await c.call("msg", to="person", text="and this?", kind="ask"))["entry"]
+            await person.call("inbox_delete", msg=b["id"])
+            seen["declined"] = await person_entry(b["id"])
+            # go_with_it
+            g = (await c.call("msg", to="person", text="branch?", kind="steer", default="off main"))["entry"]
+            await person.call("inbox_go_with_it", msg=g["id"])
+            seen["go_with_it"] = await person_entry(g["id"])
+            # lapsed
+            lp = (await c.call("msg", to="person", text="fmt?", kind="steer", default="black", bound=0.2))["entry"]
+            # expired: a session-to-session ask whose bound ran out
+            x = (await ld.call("msg", to=w, text="status?", kind="ask", bound=0.2))["entry"]
+            # asker_gone: the asker's record is closed
+            k = (await c.call("msg", to="person", text="and finally?", kind="ask"))["entry"]
+        await asyncio.sleep(0.3)
+        await agent._sweep_mail(datetime.now(UTC))
+        seen["lapsed"] = await person_entry(lp["id"])
+        seen["expired"] = [e for e in (await person.call("inbox", id=w))["entries"] if e["id"] == x["id"]][0]
+        await person.call("close", id=w)
+        seen["asker_gone"] = await person_entry(k["id"])
+        assert {r: seen[r]["closed_reason"] for r in seen} == {r: r for r in seen}
+        # the legacy fields, exactly as the paragraph lists them
+        assert seen["expired"]["expired_at"] and seen["expired"]["closed_at"] is None
+        for r in ("declined", "asker_gone", "lapsed", "go_with_it"):
+            assert seen[r]["closed_at"] and seen[r]["expired_at"] is None and seen[r]["closed_by"] is None
+        # none of them is open any more, and nothing else in the person inbox closed
+        assert (await person.call("get", id=lead))["mail"]["open_asks"] == []
+        await person.call("kill", id=lead)
+
+
+def test_an_entry_written_before_closed_reason_still_reads_as_closed():
+    """Design §4.10: "Entries written before this date have no `closed_reason`; they read as closed
+    when `closed_by` or `expired_at` is set, which is the rule until now." An old persisted inbox
+    must load and read the same way it did."""
+    from sessionorc.models import MailEntry
+
+    old_open = MailEntry.from_dict({"id": "m-1", "from": "ao-a", "to": ["ao-b"], "at": "x", "kind": "ask", "text": "?"})
+    old_replied = MailEntry.from_dict(
+        {"id": "m-2", "from": "ao-a", "to": ["ao-b"], "at": "x", "kind": "ask", "text": "?", "closed_by": "m-9"}
+    )
+    old_expired = MailEntry.from_dict(
+        {"id": "m-3", "from": "ao-a", "to": ["ao-b"], "at": "x", "kind": "ask", "text": "?", "expired_at": "y"}
+    )
+    assert old_open.open and not old_replied.open and not old_expired.open
+    assert old_open.closed_reason is None and old_open.default is None and old_open.paused_at is None
+    # an unknown field on an old record is dropped, as it always was, and the new ones default
+    assert MailEntry.from_dict({**old_open.to_dict(), "who_knows": 1}).id == "m-1"
+
+
+async def test_asker_gone_closes_the_persons_questions_on_close_and_forget_but_not_on_exit(agent, tmp_path):
+    """Design §4.10 — an `ask` to the person cannot expire, so the other half is the **asker's**:
+    closing or forgetting a record closes the open `ask`s and `steer`s it put to the person
+    (`asker_gone`), and an asker that merely **exited** leaves them open, since a resume may still
+    want the answer. Nothing is told: there is no one left to tell."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        a, b, c = [await mk(n, unattended=True) for n in ("a", "b", "c")]
+        asks = {}
+        for sid in (a, b, c):
+            async with LocalClient(caller=sid) as s:
+                asks[sid] = (await s.call("msg", to="person", text=f"from {sid}", kind="ask"))["entry"]["id"]
+                asks[sid + ":steer"] = (await s.call("msg", to="person", text="or?", kind="steer", default="this"))[
+                    "entry"
+                ]["id"]
+
+        async def reason(mid: str):
+            return [e for e in (await person.call("inbox"))["entries"] if e["id"] == mid][0]["closed_reason"]
+
+        # exited: still open
+        await person.call("kill", id=a)
+        await wait_state(person, a, "exited")
+        await agent._sweep_mail(datetime.now(UTC))
+        assert await reason(asks[a]) is None and await reason(asks[a + ":steer"]) is None
+        # closed: both close, and nothing is written to the asker — there is no one left to tell
+        await person.call("close", id=b)
+        assert await reason(asks[b]) == "asker_gone" and await reason(asks[b + ":steer"]) == "asker_gone"
+        assert (await person.call("inbox", id=b))["entries"] == []
+        # forgotten: the same
+        await person.call("kill", id=c)
+        await wait_state(person, c, "exited")
+        await person.call("remove", id=c)
+        assert await reason(asks[c]) == "asker_gone"
+        await person.call("remove", id=a)  # forgetting the exited one closes its questions too
+        assert await reason(asks[a]) == "asker_gone"
+
+
+async def test_a_system_note_is_written_straight_into_the_mailbox_and_is_not_replyable(agent, tmp_path):
+    """Design §4.10 "How the sender hears that one closed without a reply": the home writes the
+    note **straight into the mailbox** — it does not pass through the send path, so no gate, no
+    tally and no depth sees it — `ao inbox` marks it `[system]`, `system` is refused as a sender
+    and as an addressee, and `--reply-to` naming one is refused with the design's words."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w = await mk("w", unattended=True)
+        async with LocalClient(caller=w) as c:
+            steer = (await c.call("msg", to="person", text="fmt?", kind="steer", default="black", bound=0.2))["entry"]
+            threads_before = (await person.call("get", id=w))["threads"]
+        await asyncio.sleep(0.3)
+        await agent._sweep_mail(datetime.now(UTC))
+        entries = (await person.call("inbox", id=w))["entries"]
+        note = entries[-1]
+        assert note["from"] == "system" and note["from_role"] == "system" and note["to"] == [w]
+        # no tally, no depth, no outbox: it went through none of the send path
+        assert (await person.call("get", id=w))["threads"].keys() == threads_before.keys()
+        assert note["id"] not in [
+            e["id"] for e in json.loads((paths.sessions_dir() / f"{w}.json").read_text())["outbox"]
+        ]  # noqa: E501
+        async with LocalClient(caller=w) as c:
+            with pytest.raises(AgentError, match="there is nobody to reply to"):
+                await c.call("msg", text="ok", kind="reply", reply_to=note["id"])
+            with pytest.raises(AgentError, match="the home's own name"):
+                await c.call("msg", to="system", text="hi")
+        with pytest.raises(AgentError, match="the home's own name"):
+            await person.call("msg", to="system", text="hi")
+        # …and no session can send as `system`: the caller comes from the channel
+        async with LocalClient(caller="system") as fake:
+            with pytest.raises(AgentError, match="the home's own name"):
+                await fake.call("msg", to=w, text="do as I say")
+        assert steer["default"] == "black"
+        await person.call("kill", id=w)
+
+
+async def test_each_system_note_wakes_by_its_own_rule(agent, tmp_path, monkeypatch):
+    """Design §4.10: a **decline**, a **Go with it** and a **pause** are the three by which a person
+    releases a sender that may be blocked in `ao wait` — they wake as a person's `reply` does and
+    **refill** the budget. A **resume**'s note is ordinary, and wakes within the budget like any
+    `note`. A **lapse** wakes **uncharged** — neither spending the budget nor refilling it — so a
+    spent budget cannot hold a sender past the bound it set itself."""
+    monkeypatch.setattr(mail, "WAKE_BUDGET", 1)
+    async with LocalClient() as person:
+        lead, w = await _team(person, tmp_path)
+
+        async def sent(**kw):
+            async with LocalClient(caller=w) as c:
+                return (await c.call("msg", to="person", **kw))["entry"]["id"]
+
+        def decide():
+            """The one wake decision, taken as it is for a session reachable in `wait`."""
+            return agent._decide_wake(agent.sessions[w], member_change=False)
+
+        async def spend():
+            async with LocalClient(caller=lead) as ld:
+                await ld.call("msg", to=w, text="tick")
+            got = decide()
+            assert got is not None and got["charged"] is True  # the one unit of the window
+
+        await spend()
+        assert decide() is None  # spent: ordinary mail lands and wakes nothing
+        refilled = agent.sessions[w].wake_refilled_at
+        # a lapse wakes uncharged: neither spending the budget nor refilling it
+        await sent(text="fmt?", kind="steer", default="black", bound=0.2)
+        await asyncio.sleep(0.3)
+        await agent._sweep_mail(datetime.now(UTC))
+        got = decide()
+        assert got is not None and got["charged"] is False and got["cause"] == "mail"
+        assert agent.sessions[w].wake_refilled_at == refilled  # it refilled nothing
+        assert decide() is None  # …and the budget is still spent: one uncharged wake, not a window
+        # a decline wakes as a person's reply does, and refills
+        ask = await sent(text="merge?", kind="ask")
+        await person.call("inbox_delete", msg=ask)
+        assert (refilled := agent.sessions[w].wake_refilled_at) is not None
+        got = decide()
+        assert got is not None and got["charged"] is True
+        assert decide() is None  # the refilled unit is spent again
+        # a pause refills too
+        st = await sent(text="branch?", kind="steer", default="off main", bound=600)
+        await person.call("inbox_pause", msg=st)
+        assert agent.sessions[w].wake_refilled_at > refilled
+        refilled = agent.sessions[w].wake_refilled_at
+        assert decide()["charged"] is True
+        # a resume's note is ordinary: it refills nothing and wakes within the budget, which is spent
+        await person.call("inbox_resume", msg=st)
+        assert agent.sessions[w].wake_refilled_at == refilled and decide() is None
+        # *Go with it* refills, like a decline
+        await person.call("inbox_go_with_it", msg=st)
+        assert agent.sessions[w].wake_refilled_at > refilled
+        assert decide()["charged"] is True
+        for sid in (lead, w):
+            await person.call("kill", id=sid)
+
+
+async def test_the_persons_own_bookkeeping_is_refused_to_every_session_and_persists(agent, tmp_path):
+    """Design §4.10 **Snooze** and **Pause**: `inbox_snooze`, `inbox_pause`, `inbox_resume` and
+    *Go with it* are the person's alone, refused to every session as `inbox_delete` is; a snooze
+    persists with the person inbox, tells the sender nothing, and changes nothing but what a page
+    shows — the entry is still unread, still occupies the depths and, if it was open, stays open. A
+    `steer` has **Pause** instead of Snooze, and only a person-addressed `steer` can be paused."""
+    from sessionorc.agent import HostAgent
+
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, w2 = await mk("w", unattended=True), await mk("w2", unattended=True)
+        await person.call("set_controllers", id=w2, add=[w])
+        async with LocalClient(caller=w) as c:
+            ask = (await c.call("msg", to="person", text="merge?", kind="ask"))["entry"]["id"]
+            steer = (await c.call("msg", to="person", text="fmt?", kind="steer", default="black"))["entry"]["id"]
+            to_session = (await c.call("msg", to=w2, text="fmt?", kind="steer", default="black"))["entry"]["id"]
+            for rpc, kw in (
+                ("inbox_snooze", {"until": "2026-09-20T08:00:00Z"}),
+                ("inbox_pause", {}),
+                ("inbox_resume", {}),
+                ("inbox_go_with_it", {}),
+            ):
+                with pytest.raises(AgentError, match="the person's own bookkeeping"):
+                    await c.call(rpc, msg=steer, **kw)
+        # a snooze is set, persisted, and cleared by the same RPC with no `until`
+        got = await person.call("inbox_snooze", msg=ask, until="2026-09-20T08:00:00Z")
+        assert got == {"id": "person", "msg": ask, "snoozed_until": "2026-09-20T08:00:00Z"}
+        held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == ask][0]
+        assert held["snoozed_until"] == "2026-09-20T08:00:00Z" and held["read_at"] is None
+        assert held["closed_reason"] is None  # a snoozed ask stays open
+        assert [e.snoozed_until for e in HostAgent(tmux=agent.tmux).person_inbox if e.id == ask] == [
+            "2026-09-20T08:00:00Z"
+        ]
+        assert (await person.call("inbox"))["unread"] == 2  # it is still unread, and still counted
+        assert (await person.call("inbox_snooze", msg=ask))["snoozed_until"] is None
+        # a steer has Pause, not Snooze; an ask has no clock to pause
+        with pytest.raises(AgentError, match="it has Pause"):
+            await person.call("inbox_snooze", msg=steer, until="2026-09-20T08:00:00Z")
+        with pytest.raises(AgentError, match="only a steer can be paused"):
+            await person.call("inbox_pause", msg=ask)
+        with pytest.raises(AgentError, match="Go with it answers a steer"):
+            await person.call("inbox_go_with_it", msg=ask)
+        # a `steer` addressed to a session is not in the person inbox at all: the pause is the person's
+        for rpc in ("inbox_pause", "inbox_snooze", "inbox_go_with_it"):
+            with pytest.raises(AgentError, match="the person inbox holds no entry"):
+                await person.call(rpc, msg=to_session)
+        for sid in (w, w2):
+            await person.call("kill", id=sid)
+
+
+async def test_pause_stops_the_clock_and_resume_gives_back_what_was_left(agent, tmp_path):
+    """Design §4.10 **Pause**: `paused_at` stops the bound running and **the sweep skips the entry
+    outright, whatever `bound` reads**; **Resume** moves `bound` later by the time it was held and
+    clears `paused_at` **in one step**, so the sweep never sees a resumed entry with its old bound;
+    and **Reply** or *Go with it* closes a paused `steer` as it closes a running one."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w = await mk("w", unattended=True)
+        async with LocalClient(caller=w) as c:
+            st = (await c.call("msg", to="person", text="fmt?", kind="steer", default="black", bound=0.2))["entry"]
+        await person.call("inbox_pause", msg=st["id"])
+        await asyncio.sleep(1.3)
+        await agent._sweep_mail(datetime.now(UTC))  # long past its bound, and skipped
+
+        async def now_held():
+            return [e for e in (await person.call("inbox"))["entries"] if e["id"] == st["id"]][0]
+
+        paused = await now_held()
+        assert paused["paused_at"] and paused["closed_reason"] is None and paused["bound"] == st["bound"]
+        with pytest.raises(AgentError, match="already paused"):
+            await person.call("inbox_pause", msg=st["id"])
+        # resume gives back what was left: the bound moves later by the time it was held
+        got = await person.call("inbox_resume", msg=st["id"])
+        after = await now_held()
+        assert after["paused_at"] is None and got["bound"] == after["bound"] > st["bound"]
+        with pytest.raises(AgentError, match="is not paused"):
+            await person.call("inbox_resume", msg=st["id"])
+        # a paused steer is closed by Go with it exactly as a running one is
+        async with LocalClient(caller=w) as c:
+            st2 = (await c.call("msg", to="person", text="branch?", kind="steer", default="main", bound=600))["entry"]
+        await person.call("inbox_pause", msg=st2["id"])
+        await person.call("inbox_go_with_it", msg=st2["id"])
+        closed = [e for e in (await person.call("inbox"))["entries"] if e["id"] == st2["id"]][0]
+        assert closed["closed_reason"] == "go_with_it" and closed["paused_at"]
+        await person.call("kill", id=w)
+
+
+async def test_the_person_inbox_depths_count_read_but_unanswered_questions(agent, tmp_path, monkeypatch):
+    """Design §4.10: from 2026-09-19 the two depths count **every entry that is unread or is an
+    open `ask` or `steer`** — one set, each entry once — so reading the page frees no slot an
+    unanswered question still holds, and one worker cannot fill the Inbox with asks that never
+    lapse. The refusal still names the board."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w = await mk("w", unattended=True)
+        monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 3)
+        async with LocalClient(caller=w) as c:
+            await c.call("msg", to="person", text="fyi")  # a note: it frees its slot once read
+            one = (await c.call("msg", to="person", text="a?", kind="ask"))["entry"]["id"]
+            await c.call("msg", to="person", text="b?", kind="steer", default="x")
+        # the person reads the page: nothing is unread, and the two open questions still hold theirs
+        for e in agent.person_inbox:
+            e.read_at = datetime.now(UTC).isoformat()
+        agent.person_store.save(agent.person_inbox)
+        assert (await person.call("inbox"))["unread"] == 0
+        async with LocalClient(caller=w) as c:
+            # under the old rule (unread only) the count would be zero here and this would be the
+            # first of many; it is the third slot, and the fourth question is refused
+            assert (await c.call("msg", to="person", text="c?", kind="ask"))["delivered"] == ["person"]
+            with pytest.raises(AgentError, match=r"user_attention\.md with a Due: date") as err:
+                await c.call("msg", to="person", text="d?", kind="ask")
+            assert "unread or unanswered" in str(err.value)
+            # answering one frees its slot; the read note never held one
+            await person.call("msg", text="yes", kind="reply", reply_to=one)
+            assert (await c.call("msg", to="person", text="d?", kind="ask"))["delivered"] == ["person"]
+        await person.call("kill", id=w)
+
+
+async def test_three_open_asks_earn_one_line_of_advice_beside_the_id(agent, tmp_path):
+    """Design §4.10 "Which to send is the brief's to teach": one line of advice from the home, not
+    a gate — when a session sends an `ask` to the person while it already holds three or more open
+    ones, counted **before** this send, the reply carries it beside the id, **every time** that is
+    so. It is never a refusal: the entry lands either way."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, other = await mk("w", unattended=True), await mk("o", unattended=True)
+        async with LocalClient(caller=w) as c, LocalClient(caller=other) as o:
+            for i in range(3):
+                got = await c.call("msg", to="person", text=f"q{i}?", kind="ask")
+                assert got["advice"] is None  # counted before the send: the third one is still clear
+            fourth = await c.call("msg", to="person", text="q3?", kind="ask")
+            assert fourth["advice"] == "you have 3 open asks to the person: is this one needed, or a steer?"
+            assert fourth["entry"]["id"] and fourth["delivered"] == ["person"]
+            fifth = await c.call("msg", to="person", text="q4?", kind="ask")
+            assert "4 open asks" in fifth["advice"]  # every time that is so, not once
+            # a `steer` and a `note` earn none, and the count is this sender's
+            assert (await c.call("msg", to="person", text="?", kind="steer", default="x"))["advice"] is None
+            assert (await c.call("msg", to="person", text="fyi"))["advice"] is None
+            assert (await o.call("msg", to="person", text="q?", kind="ask"))["advice"] is None
+            # closing one takes it back below the line
+            for mid in [e["id"] for e in (await person.call("inbox"))["entries"] if e["from"] == w][:3]:
+                await person.call("inbox_delete", msg=mid)
+            assert (await c.call("msg", to="person", text="q5?", kind="ask"))["advice"] is None
+        for sid in (w, other):
+            await person.call("kill", id=sid)
+
+
+async def test_an_envelope_carries_its_senders_team(agent, tmp_path):
+    """Design §4.10: "**An envelope carries its sender's `team`**" from this date, stamped by the
+    home at send beside `from` — a join to the sender's record fails exactly when the page most
+    needs it, after that record is gone. A session with no team, and a person, stamp none."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        badged, plain = await mk("t1", unattended=True, team="alpha"), await mk("p", unattended=True)
+        async with LocalClient(caller=badged) as t, LocalClient(caller=plain) as p:
+            assert (await t.call("msg", to="person", text="from a team"))["entry"]["team"] == "alpha"
+            assert (await p.call("msg", to="person", text="from nobody"))["entry"]["team"] is None
+        assert (await person.call("msg", to=plain, text="from the person"))["entry"]["team"] is None
+        # it survives the sender: the stamp is on the envelope, not a join
+        await person.call("kill", id=badged)
+        await wait_state(person, badged, "exited")
+        await person.call("remove", id=badged)
+        left = [e for e in (await person.call("inbox"))["entries"] if e["from"] == badged][0]
+        assert left["team"] == "alpha"
+        await person.call("kill", id=plain)

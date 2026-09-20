@@ -133,7 +133,7 @@
       if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
-      if (action === "unmail") AO.toast("deleted from this inbox", true);
+      if (action === "unmail") AO.toast(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
       if (["message", "reply", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
       if (["reply", "unmail"].includes(action) && id === "person") AO.refreshPersonInbox(true);
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
@@ -149,19 +149,31 @@
   // §4.5a, §4.10): sender (name, id on hover), kind, `about`, read/unread, age, an `ask`'s state,
   // Reply and delete. `owner` is the inbox it sits in — a session id, or "person". No Reply on an
   // entry the person sent: its answer is the session's, which lands in the person inbox.
+  // A `steer` carries the default it will take and lapses at its bound; an `ask` to the person
+  // carries no bound at all and never expires; `system` is a sender and is never replied to
+  // (design §4.10, 2026-09-19, TD-069 step 0).
   AO.mailEntry = function (e, owner) {
-    const ask = e.kind === "ask" || e.kind === "conflict";
+    const ask = e.kind === "ask" || e.kind === "steer" || e.kind === "conflict";
+    const open = ask && !e.closed_reason && !e.closed_by && !e.expired_at;
     let st = "";
     if (ask) {
-      st = e.closed_by ? `answered by ${esc(e.closed_by)}`
+      st = e.closed_reason === "lapsed" ? "lapsed · the sender went with its default"
+        : e.closed_reason === "go_with_it" ? "closed · go with it"
+        : e.closed_reason === "declined" ? "declined"
+        : e.closed_reason === "asker_gone" ? "closed · the asker is gone"
+        : e.closed_by ? `answered by ${esc(e.closed_by)}`
         : e.expired_at ? "expired"
+        : e.paused_at ? "paused · the clock is stopped"
         : (e.pending || []).length ? "addressee exited · pending"
-        : e.bound ? `open · bound ${esc(new Date(e.bound).toLocaleString())}` : "open";
+        : e.bound ? `${e.kind === "steer" ? "lapses" : "open · bound"} ${esc(new Date(e.bound).toLocaleString())}`
+        : "open · no bound";
     }
     const person = owner === "person";
-    const reply = e.from === "person" ? ""
+    const reply = (e.from === "person" || e.from === "system") ? ""
       : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}">Reply</button>`;
-    const confirmText = person ? "Delete this entry from your inbox? The sender keeps its copy."
+    const confirmText = person && open
+      ? "Delete this question? That declines it: the sender is told, and nothing else answers it."
+      : person ? "Delete this entry from your inbox? The sender keeps its copy."
       : "Delete this entry from this session's inbox? The sender keeps its copy.";
     return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
       + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
@@ -171,6 +183,7 @@
       + `<span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
       + (e.reply_to ? `<div class="st">reply to ${esc(e.reply_to)}</div>` : "")
       + `<div class="body">${esc(e.text)}</div>`
+      + (e.default ? `<div class="st">unless you say otherwise: ${esc(e.default)}</div>` : "")
       + `<div class="row gap">${st ? `<span class="st${e.expired_at ? " expired" : ""}">${st}</span>` : ""}<span class="grow"></span>${reply}`
       + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-confirm="${confirmText}">Delete</button></div></div>`;
   };

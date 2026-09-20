@@ -44,13 +44,19 @@ def has_control(capabilities: list[str] | None) -> bool:
 
 
 # Message kinds (design §4.10): a small closed set, so a message's purpose is read off its envelope.
-MailKind = Literal["note", "ask", "reply", "conflict"]
-MAIL_KINDS = ("note", "ask", "reply", "conflict")
-# The two kinds that pose a question and so carry a bound, may be closed by a reply, are left
+MailKind = Literal["note", "ask", "steer", "reply", "conflict"]
+MAIL_KINDS = ("note", "ask", "steer", "reply", "conflict")
+# The kinds that pose a question and so carry a bound, may be closed by a reply, are left
 # pending by an addressee's exit, and are never pruned while open. A `conflict` is an `ask` for
-# every rule in §4.10; only its delivery shape differs.
-ASK_KINDS = ("ask", "conflict")
+# every rule in §4.10, and so is a `steer` (2026-09-19, TD-069): a `steer` differs only in that its
+# bound ends in *lapsed* rather than *expired*, and runs whatever becomes of the addressee.
+ASK_KINDS = ("ask", "steer", "conflict")
 PERSON = "person"  # `from` when a person sent the entry; never a session id
+SYSTEM = "system"  # the third sender (design §4.10): the home saying what became of a session's own message
+# How an entry closed (design §4.10 "One way of being closed"). `expired` is a session-to-session
+# `ask` whose bound ran out or whose addressee was closed or forgotten; `lapsed` is a `steer`
+# reaching its bound, where nothing failed.
+CLOSED_REASONS = ("replied", "declined", "asker_gone", "lapsed", "go_with_it", "expired")
 
 # Who owns which field of a record (design §4.4a, §9 invariant 15): the node observes and enforces
 # on its host, the home holds the graph and intent, and identity is set once at create. Merges go
@@ -206,17 +212,29 @@ class MailEntry:
     closed_by: str | None = None  # the first `reply` that answered an `ask`; closes it uncounted
     closed_at: str | None = None  # when it did: retention for a closed `ask` runs from here
     expired_at: str | None = None  # the bound ran out, or an addressee was closed or forgotten
+    closed_reason: str | None = None  # one of CLOSED_REASONS, written on every close path (§4.10, TD-069)
     pending: list[str] = field(default_factory=list)  # addressees that exited with the `ask` open (may resume)
     cites: list[str] = field(default_factory=list)  # a `conflict`: the `sends` ids it cannot reconcile
+    default: str | None = None  # a `steer`: the one line saying what the sender will do, required on it
+    team: str | None = None  # the sender's `team` at send, stamped by the home (§4.10, 2026-09-19)
+    snoozed_until: str | None = None  # a person-inbox entry the person set aside; the Inbox page only
+    paused_at: str | None = None  # a person-inbox `steer` whose clock the person stopped (§4.10 *Pause*)
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
 
     @property
     def open(self) -> bool:
-        """An `ask` or `conflict` nobody has answered and whose bound has not run out — never
-        pruned, and the one thing a first `reply` closes for free."""
-        return self.kind in ASK_KINDS and not self.closed_by and not self.expired_at
+        """Design §4.10 "One way of being closed": an entry is open exactly when it is an `ask`,
+        `steer` or `conflict` with no `closed_reason` — which is what *never pruned while open*,
+        the person inbox's depths and the FYI list all read. Entries written before 2026-09-19
+        carry no `closed_reason` and read as closed when `closed_by` or `expired_at` is set, which
+        is the rule until then."""
+        if self.kind not in ASK_KINDS:
+            return False
+        if self.closed_reason:
+            return False
+        return not (self.closed_by or self.expired_at)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
