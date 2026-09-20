@@ -34,7 +34,7 @@
          controls this one — the agent decides, this only asks. #}
       <span class="controllers" id="fcontrollers" data-id="{{ s.id }}"
             title="the sessions that may act on this one (design §4.8)">
-        {% if s.under %}under {% for c in s.under %}<button class="chip{% if c.gone %} scraped{% endif %}"
+        {% if s.under %}under {% for c in s.under %}<button class="badge controller{% if c.gone %} scraped{% endif %}"
               data-act="uncontrol" data-id="{{ s.id }}" data-who="{{ c.id }}"
               title="{{ c.id }} — click to remove it as a controller{{ ' (its session is gone)' if c.gone else '' }}">{{ c.name }} ×</button>{% endfor %}
         {% else %}<span class="note">no controller — nobody may act on this session</span>{% endif %}

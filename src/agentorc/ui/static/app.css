@@ -150,6 +150,12 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; font-size: 12px; } .ghead .h2 { font-size: 14px; }
 .ghead .name { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; color: var(--fg); text-decoration: none; }
 .badge.team { cursor: pointer; color: var(--fg); }
+/* the card's *under <controller>* chip and the Focus header's controllers chips (design §4.5a,
+   §4.8): one control drawn in two places, so both are `.badge` like every other chip on the page.
+   A controller whose session is gone is *shown dim, not dropped* (§4.5a), with the dashed scraped
+   outline `.pill.scraped` uses — `.scraped` is only ever a compound rule, so it needs this one. */
+.badge.controller { cursor: pointer; color: var(--fg); text-decoration: none; }
+.badge.controller.scraped { opacity: 0.6; outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* what is left of the Org Teams strip (design §4.5a): one line about the definitions themselves, when there is something to say */
 .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
 .strip .warnish { color: var(--warn-fg); }
