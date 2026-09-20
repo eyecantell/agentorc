@@ -964,6 +964,8 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 
 **Paul, later on 2026-09-20 — two controls, not a prefilled form:** *when a session needs to be resumed, I should have a resume option that requires no input from me, and a "resume with changes" (or similar) that goes to the normal resume screen where name etc. can be changed if desired.* So: **Resume** is one press — same name, directory, adapter, profile, role and team as the record it resumes, no form — and **Resume with changes…** opens the New session form with all of those filled in. The design round settles what the one-press path does when it cannot be silent (the name is held by a *live* record; the directory is gone; the profile no longer exists): it falls through to the form with the reason shown, never a guess.
 
+**Found by the design review, 2026-09-20 — build this first:** a create that takes the old name *and* resumes the old conversation replaces the record under the same id with an **empty** mailbox (`_take_name`), and `_supersede` — the only caller of `_move_mail` — looks for a *different*, `exited` record and finds none. So the fix Paul asked for would have silently dropped the resumed session's mail; §4.10 *a resume under the same name* is the rule, and it has a test before any button exists.
+
 **Done when** resuming from the page needs no typing, the resumed session has its old name, *Resume with changes…* reaches the filled-in form, and the unpushed-work row can be answered from the row.
 
 **Related:** design §4.5a (*Focus (exited / closed)*: the exited banner), TD-079 (outcomes; every row needs an answer it can be given), TD-080 (why this particular row was a false alarm), design §4.10 (*Resume carries mail forward*), §9 invariant 12 (names).
