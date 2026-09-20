@@ -758,7 +758,7 @@ decided here so both ends are written from one text.
   It is wrong for a container that holds only agents, because nothing on a node's socket tells
   the person from a session that leaves its `caller` out (§4.8a), so the reach given to the
   person is given to every session there. A node's entry in the home's `hosts.yml` may therefore
-  say **`person: false`** — `nodes: {grind-box: {person: false}}` — and **a container node's entry must say which**: a person writes
+  say **`person: false`** (an entry with no `person:` key and no `container:` key is `person: true`, which is the behaviour until now) — `nodes: {grind-box: {person: false}}` — and **a container node's entry must say which**: a person writes
   the `nodes:` entry by hand today (`ao host up` brings an entry up, it does not write one), so
   `ao host up` refuses a `container:` entry that says neither `person: false` nor `person: true`,
   naming this section — the choice is made once, in the open, and the safe one is the example in
@@ -1769,7 +1769,10 @@ request — as one of:
 
 - **session X** — the peer belongs to the pane of a record on this host whose pane is live, by
   the first of three signals that answers, each read from `/proc/<pid>/stat`: **ancestry** — the
-  peer pid or an ancestor of it (the `ppid` chain, walked at most 64 steps) is the **pane pid**;
+  peer pid or an ancestor of it (the `ppid` chain, walked at most 64 steps) is the **pane pid**
+  (a parent must have started no later than its child — `stat` field 22 — so a hop whose start
+  time is later than the child's it was read from is a reused pid, and the walk is abandoned as
+  *unknown* rather than trusted);
   the host agent already reads `#{pane_pid}` with the pane list each tick (§4.1), and reads
   `#{pane_tty}` beside it from this date; else **the POSIX session id** — the pane's first process
   is a session leader, so what it started carries its pid as `sid` unless it called `setsid`;
@@ -1781,7 +1784,9 @@ request — as one of:
   shells, its hooks (which send no `caller` at all today), `ao`. **A pane the tick has not listed
   yet** — a session's first hook can arrive before the first tick after `create` — is looked up
   on demand: a connection that matches no known pane triggers one pane list before it is
-  classified, at most once a second.
+  classified, at most once a second — and a connection that arrives while one is in flight, or
+  inside that second, **waits for the next list rather than being judged against the old one**;
+  only a connection that matches nothing once a fresh list has landed is *outside* or *unknown*.
 - **outside** — no ancestor is a pane of ours: a person's terminal, the UI's process, a systemd
   unit, a test harness.
 - **unknown** — the ancestry could not be read (the peer exited before the walk, `/proc` refused),
@@ -1827,16 +1832,16 @@ a person acts from their own terminal or the page. **The UI must not run under a
 connections would be a session's, and every press in the browser would be refused as one; a new
 never-gated read, **`whoami`**, returns the connection's classification and the signal that
 decided it, the UI calls it at startup and shows a banner when the answer is not *outside*, and
-`ao whoami` prints it for a person or a session checking their own channel.
+`ao whoami` prints it for a person or a session checking their own channel. `ao identity` (below) is a never-gated read too: tallies and this host's alarms tell a session nothing it could not learn by trying.
 
-**An identity alarm** is `{at, channel, claimed, rpc}`: kept on the record it is about (the last
+**An identity alarm** is `{at, channel, claimed, rpc}` — identical `{channel, claimed, rpc}` alarms coalesce into one entry carrying a `count` and its first and last time, so a loop cannot push a different alarm out of the list: kept on the record it is about (the last
 20, `identity_alarms`), or in a small list of the home's own when it is about no record. It is
 shown — a mark on the card, and a row under *Needs you* in the Inbox (§4.5 screen 6), because it
 is either a bug of ours or a session misbehaving and a person should know which — and it wakes
 nobody and blocks nothing by itself. The offending request's refusal says only *identity
 mismatch: this request did not come from the session it names (design §4.8a)*.
 
-**What this does not stop, so nobody reads it as more.** `tmux send-keys` and the UI's API, above.
+**What this does not stop, so nobody reads it as more.** `tmux send-keys` and the UI's API, above. **`tmux respawn-pane -k -t ao-Y <cmd>`** is stronger than either: it replaces the very process the tick reads as Y's pane, so the command passes all three signals *as Y* with no help from Y — the tmux server is the person's own, and anything that can talk to it can be any pane. (`new-window` in Y's tmux session is not Y: the record's pane is the lowest window and pane index.) **And one cost `enforce` is accepted to carry:** a legitimate child that detached completely — double-forked *and* `setsid` — and outlives its shell has shed all three signals, so its own later `ao` calls are refused; that is the price of not reading a detached process as the person, it is what `observe` and `ao identity` measure before a host is turned, and it is not to be fixed by loosening the clause.
 A process that leaves the agent's cgroup as well as its pane — `systemd-run --user`, a timer, a
 cron line — is *outside*, and with no `caller` it is the person. A process of another session on
 the same host can read that session's files; identity here is about *requests to the host agent*
@@ -1868,6 +1873,8 @@ calling as itself, as another session, with no caller, detached with `setsid`, a
 process calling as the person and as a session. `off` is not a back door in an installed
 system: it is a line in a `0600` file the person owns, the page and `ao status -v` say so, and a
 session that can edit that file can already do worse (the threat model, above).
+
+**Only `agent.sock` is classified.** A link — a container node's `link.sock`, an ssh link — is identified by its key or its socket binding (§4.4a) and never by this section: its peer is a node's agent, possibly in another pid namespace, and nothing here could read its `/proc`.
 
 **On a node** the same classification runs on the node's own socket before anything is forwarded,
 so the home trusts the link for the *host* (§4.4a) and the node for the *session*. What a node
