@@ -1367,6 +1367,63 @@ async def test_an_envelope_carries_its_senders_team(agent, tmp_path):
 # -- resume, and the two halves of it step 0 got wrong (review of PR #245) -----------------------
 
 
+async def test_a_resume_under_the_same_name_keeps_its_mail(agent, hookstub, tmp_path):
+    """Design §4.10 *Resume carries mail forward*, on the path the page is about to make the
+    ordinary one (TD-081): resuming a session **under its own name**. §4.1's name rule replaces the
+    exited record **in place, at the same id** (`_take_name`), so `_supersede`'s search for a
+    *different* exited record finds nothing — and the mail would be silently dropped by the very
+    path that exists to carry it. There is one record and one id here: nothing is closed, nothing
+    forwards, and the entries, the tallies and `sends` are simply still there."""
+    async with LocalClient() as person:
+        for d in ("l", "w"):
+            (tmp_path / d).mkdir()
+        lead = (await person.call("create", name="lead", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
+            "id"
+        ]
+        await person.call("hook", session=w, adapter_id="conv-81", state="idle")
+        await person.call("set_controllers", id=w, add=[lead])
+        await person.call("set_grants", id=lead, add=["control"])
+        async with LocalClient(caller=lead) as ld, LocalClient(caller=w) as worker:
+            await ld.call("send", id=w, text="echo hi")
+            ask = (await ld.call("msg", to=w, text="branch?", kind="ask"))["entry"]
+            await worker.call("inbox")  # read it, then crash before answering
+            await worker.call("msg", to="person", text="which repo?", kind="ask")
+        await person.call("kill", id=w)
+        await wait_state(person, w, "exited")
+        await agent._sweep_mail(datetime.now(UTC))
+        assert (await person.call("get", id=lead))["mail"]["addressee_exited"] == [ask["id"]]
+        # the name is taken back, which is what *Resume* will do with no typing at all
+        again = (
+            await person.call(
+                "create",
+                name="w",
+                dir=str(tmp_path / "w"),
+                adapter=hookstub.name,
+                unattended=True,
+                resume="conv-81",
+                controllers=[lead],
+            )
+        )["id"]
+        assert again == w  # the same name, so the same id: the record was replaced in place
+        rec = await person.call("get", id=w)
+        assert rec["state"] != "closed" and rec["superseded_by"] is None  # it *is* the successor
+        assert [e["text"] for e in rec["sends"]] == ["echo hi"]
+        kept = (await person.call("inbox", id=w))["entries"]
+        assert [(e["id"], e["read_at"] is not None, e["to"]) for e in kept] == [(ask["id"], True, [w])]
+        assert rec["threads"][f"pair:{lead}"]["count"] == 1  # the tally moved, not recounted
+        lead_rec = await person.call("get", id=lead)
+        assert lead_rec["threads"][f"pair:{w}"]["count"] == 1
+        assert lead_rec["mail"]["addressee_exited"] == []  # the addressee is back: the ask is open again
+        # and the question it left the person is still the resumed session's to answer
+        asked = [e for e in (await person.call("inbox"))["entries"] if e["from"] == w]
+        assert [(e["text"], e["closed_at"]) for e in asked] == [("which repo?", None)]
+        async with LocalClient(caller=w) as worker:
+            assert (await worker.call("msg", text="main", kind="reply", reply_to=ask["id"]))["closed"] == ask["id"]
+        for sid in (lead, w):
+            await person.call("kill", id=sid)
+
+
 async def test_a_resumed_askers_questions_to_the_person_are_not_closed_as_asker_gone(agent, hookstub, tmp_path):
     """Design §4.10 "Ids follow the move" against *What a person is asked*: an `ask` to the person
     never expires, so it outlives the record that sent it, and `asker_gone` is the only thing that
