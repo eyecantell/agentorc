@@ -2407,7 +2407,10 @@ your own message; there is nobody to reply to*, and no page offers Reply on one.
 (§4.8) — except the three by which a person releases a sender that may be blocked in `ao wait` —
 *declined*, *Go with it* and a **pause** — which wake as a person's `reply` does and refill the
 budget. A **resume**'s note is ordinary: it only says the clock runs again and what is left, so it
-wakes within the budget like any `note`. So a sender blocked in `ao wait` on its own `steer`
+wakes within the budget like any `note`. A **lapse** wakes **uncharged** — outside the budget, neither
+spending nor refilling it: it is the home's clock and not another session's message, a session
+can cause at most one per `steer` it sent, and the tallies already bound those — so a spent
+budget cannot hold a sender past the bound it set itself. So a sender blocked in `ao wait` on its own `steer`
 is released at the bound, which is the whole use of the kind; one that carried on working meets
 the line at its next `ao inbox`.
 
