@@ -924,7 +924,8 @@ def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
     assert got["unread"] == 1 and (e["id"], e["from"], e["from_name"], e["kind"], e["about"]) == (
         ask, sender, "asker", "ask", "TD-052"
     )  # fmt: skip
-    assert e["read_at"] is None and e["bound"] and e["closed_by"] is None
+    # an `ask` to the person carries no bound and never expires (§4.10, 2026-09-19, TD-069 step 0)
+    assert e["read_at"] is None and e["bound"] is None and e["closed_by"] is None
     assert client.get("/api/person/inbox").json()["entries"][0]["read_at"] is None  # a person's read sets nothing
 
     # **Reply**: into the sender's inbox, from the person, closing the ask
@@ -938,10 +939,54 @@ def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
 
     # delete: from the person inbox only
     assert client.post("/api/person/unmail", json={}).status_code == 400
-    assert client.post("/api/person/unmail", json={"msg": ask}).json() == {"ok": True, "unread": 0}
+    # the ask was closed by the Reply above, so deleting it strips it; an *open* one would be
+    # declined and kept instead (§4.10 *Deleting is declining*, TD-069 step 0 — pinned in test_mail)
+    assert client.post("/api/person/unmail", json={"msg": ask}).json() == {
+        "ok": True,
+        "unread": 0,
+        "declined": False,
+    }
     assert client.get("/api/person/inbox").json()["entries"] == []
     assert client.post("/api/person/unmail", json={"msg": ask}).status_code == 400  # already gone
     assert client.post("/api/person/nope", json={}).status_code == 404
+
+
+def test_the_inbox_dialog_renders_a_steer_and_its_delete_declines(client, tmp_path):
+    """TD-069 step 0, design §4.10 and §4.5a **Inbox**: the dialog that is built until step 1 lands
+    must not break on the new kinds and fields — it draws a `steer`'s default and when it lapses,
+    an `ask` to the person with no bound, and a `system` note with no Reply; and its Delete on an
+    open question goes through the new **decline** semantics, which the entry itself then says."""
+    import asyncio
+    import pathlib
+
+    from sessionorc.client import LocalClient
+
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "steerer"}, follow_redirects=False)
+    sender = r.headers["location"].rsplit("/", 1)[-1]
+
+    async def as_sender(**kw):
+        async with LocalClient(caller=sender) as c:
+            return await c.call("msg", to="person", **kw)
+
+    steer = asyncio.run(as_sender(text="which branch?", kind="steer", default="off main"))["entry"]
+    ask = asyncio.run(as_sender(text="merge PR 9?", kind="ask"))["entry"]["id"]
+    got = {e["id"]: e for e in client.get("/api/person/inbox").json()["entries"]}
+    # every field the dialog draws is on the entry the API hands it
+    assert got[steer["id"]]["default"] == "off main" and got[steer["id"]]["bound"]
+    assert got[steer["id"]]["paused_at"] is None and got[steer["id"]]["snoozed_until"] is None
+    assert got[ask]["bound"] is None and got[ask]["closed_reason"] is None
+
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert 'e.kind === "steer"' in js and "e.default" in js  # the default and the lapse line
+    assert 'e.closed_reason === "lapsed"' in js and 'e.from === "system"' in js  # no Reply on a system note
+
+    # Delete on an open ask declines it: the entry stays, closed, and the sender is told
+    assert client.post("/api/person/unmail", json={"msg": ask}).json()["declined"] is True
+    held = {e["id"]: e for e in client.get("/api/person/inbox").json()["entries"]}
+    assert held[ask]["closed_reason"] == "declined" and held[ask]["closed_at"]
+    [told] = client.get(f"/api/sessions/{sender}/inbox").json()["entries"]
+    assert told["from"] == "system" and told["text"] == f"ask {ask} declined by the person"
+    client.post(f"/api/sessions/{sender}/kill")
 
 
 def test_a_declaration_of_no_work_is_a_chip_on_the_card_and_the_focus_header(tmp_path, monkeypatch):

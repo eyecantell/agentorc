@@ -615,7 +615,7 @@ Since step 5 the table is what a node answers **while its link is down**; with i
 | reads — `list`, `get`, `tail`, `explain`, `occupancy`, `name_check`, `recent_dirs`, `usage`, `adapters`, `ping`, `wait` | served: this host's sessions only | served; a `wait` sees only this host's records and no mail |
 | node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served. On another session, and any `create`: **refused** — except `seen`, `decide` and `hook`, which the gate has never covered (§4.8) and which are the node's own socket |
 | home-owned edits — `set_controllers`, `set_grants`, `set_stop`, `set_mode` | **refused**: they wait for the link | refused |
-| the mailbox — `msg`, `inbox`, `inbox_delete` | **refused**: the mailbox is at the home | refused |
+| the mailbox — `msg`, `inbox`, `inbox_delete`, and the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (§4.10, TD-069) | **refused**: the mailbox is at the home | refused |
 | reports — `progress`, `finding`, `doing` | — | **refused** |
 
 Two of those rows are decisions the rule did not make. **Reports are refused, not kept locally.**
@@ -653,7 +653,7 @@ see.
 **Mail across hosts (2026-09-18, TD-057 step 5).** How the paragraphs above are built.
 
 - **A node forwards; the home answers.** What the node's table refuses — `msg`, `inbox`,
-  `inbox_delete`, `progress`, `finding`, the home-owned edits, a session's `create` and its acts
+  `inbox_delete` and the person's own bookkeeping beside it, `progress`, `finding`, the home-owned edits, a session's `create` and its acts
   on another session — and every `wait` go to the home as `forward {rpc, params, caller, token}`
   while the link is up, and are refused as unreachable while it is down. The home runs the call
   through its own dispatch **as that node's session**: the caller is `id@node` — identity from the
@@ -1421,7 +1421,7 @@ definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every ch
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills; `--close` also closes each member that settled clean and pushed, §4.9a);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
-its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC built 2026-09-16 by step 3): `ao msg <to>… "…"` `[--kind note|ask|steer|reply|conflict] [--default <line>] [--bound <seconds>] [--about <ref>] [--reply-to <id>]` (`steer`, `--default` and the rule that an `ask` to the person takes no `--bound` are design 2026-09-19, TD-069 step 0 — not yet built) addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — is a thin call to the host agent's `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC built 2026-09-16 by step 3): `ao msg <to>… "…"` `[--kind note|ask|steer|reply|conflict] [--default <line>] [--bound <seconds>] [--about <ref>] [--reply-to <id>]` (`steer`, `--default` and the rule that an `ask` to the person takes no `--bound` are design 2026-09-19, built 2026-09-19 by TD-069 step 0, which also added the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume` and `inbox_go_with_it`) addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — is a thin call to the host agent's `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -2364,7 +2364,9 @@ now one of three things, and the envelope says which:
   silence is not); **`asker_gone`** (the asker's record was **closed or forgotten** — new with this
   rule: until now only an *addressee's* going closed an entry, and an `ask` that cannot expire
   needs the other half, or a forgotten worker's questions stand forever; an asker that merely
-  *exited* leaves it open, since a resume may still want the answer); or the refusal below. The
+  *exited* leaves it open, since a resume may still want the answer, and **a record closed because
+  a resume superseded it is not a gone asker either** — the conversation continues under the new
+  id, which the rewrite above moved its questions to); or the refusal below. The
   asker does not wait on it: it takes other work, or declares itself out of work (§4.9a), and a
   reply that lands after it exited waits in its inbox and moves with a resume, as all mail does.
   **It is still mail, and mail is not durable** (§9 invariant 13): a question whose answer must
@@ -2378,7 +2380,7 @@ now one of three things, and the envelope says which:
   names the board.
 - **Steering — a `steer`.** A preference the session can go on without: *I will do X unless you
   say otherwise*. The envelope carries **`default`** — the one line saying what it will do,
-  **required** (`--default`; a `steer` without one is refused), cleaned and capped as a `doing` line
+  **required** (`--default`; a `steer` without one is refused, and `--default` on any other kind is refused too: a `note`, an `ask` and a `reply` say what they say), cleaned and capped as a `doing` line
   is (§4.8) — and a **bound**: `--bound`, else `ASK_BOUND`. A `reply` before the bound closes it
   (`replied`), exactly as it closes an `ask`. At the bound it **lapses** — `closed_reason:
   lapsed`, never `expired_at`: nothing failed — and the sender does what it said. **A `steer` is
@@ -2386,7 +2388,7 @@ now one of three things, and the envelope says which:
   `ask` does and its first `reply` closes it uncounted; it is never pruned while open; a reply
   after it closed is delivered as a `note`. One rule differs, because the point of a `steer` is
   that the *sender* goes on: **its bound runs whatever becomes of the addressee** — an addressee
-  that exits does not leave it *pending*, it lapses on time. A `steer` may be addressed wherever
+  that exits does not leave it *pending*, and one that is closed or forgotten does not expire it: the sender's copy lapses at its bound, as it would have anyway. A `steer` may be addressed wherever
   an `ask` may — to the person or, along the graph, to one session — which is what lets a
   go-between answer steering before it reaches a person (TD-075). It counts toward the
   person's number only while the person has **paused** it (*Pause*, below; §4.5a **Inbox**).
@@ -2396,7 +2398,7 @@ now one of three things, and the envelope says which:
 (§4.5a) are events on the sender's *outgoing* entry (`asker_gone` tells nobody: there is no one left to tell), and everything that wakes a
 session is keyed on mail *arriving* — so the home **delivers a `note` from `system`** into the
 sender's inbox at that moment, naming the entry: *steer m-… lapsed: go with your default*; *ask
-m-… declined by the person*; *steer m-… — the person says: go with your default*. `system` is a
+m-… declined by the person*; *steer m-… — the person says: go with your default*. (When the sender is the person — a person may `steer` a session — the note lands in the person inbox.) `system` is a
 third sender beside a session id and the person: `ao inbox` marks it `[system]` — a fourth value
 of the mark beside `[controller]`, `[person]` and `[other]` — and it is never an instruction (it
 reports what happened to the session's own message). **The home writes it straight into the
@@ -2406,7 +2408,7 @@ be replied to: `--reply-to` naming one is refused with *a system note reports wh
 your own message; there is nobody to reply to*, and no page offers Reply on one. It wakes as any `note` does, within the wake budget
 (§4.8) — except the three by which a person releases a sender that may be blocked in `ao wait` —
 *declined*, *Go with it* and a **pause** — which wake as a person's `reply` does and refill the
-budget. A **resume**'s note is ordinary: it only says the clock runs again and what is left, so it
+budget. A **resume**'s note is ordinary — *steer m-… resumed by the person: the clock runs again, until <bound>* — it only says the clock runs again and what is left, so it
 wakes within the budget like any `note`. A **lapse** wakes **uncharged** — outside the budget, neither
 spending nor refilling it: it is the home's clock and not another session's message, a session
 can cause at most one per `steer` it sent, and the tallies already bound those — so a spent
@@ -2438,7 +2440,7 @@ is what is left, and the sender is told again; **Reply** and **Go with it** clos
 as they close a running one. A paused `steer` holds its sender's slot in the depths like any open
 one, and an `asker_gone` closes it like any other. Only a `steer` can be paused — an `ask` to
 the person has no clock — and a `steer` addressed to a session cannot be: the pause is the
-person's. **A `steer` has no Snooze**: snooze hides a row while its clock runs, pause stops the
+person's. **Snooze, Pause, Resume and *Go with it* act on the person inbox only**; named on an entry in a session's inbox they answer that the person inbox holds no such entry (whether a person should be able to hold a `steer` put to a go-between is TD-075's to decide). **A `steer` has no Snooze**: snooze hides a row while its clock runs, pause stops the
 clock, and both on one row invite the wrong press.
 
 **Deleting is declining, and nothing vanishes at once.** On an open `ask` or `steer`, the
@@ -2452,7 +2454,7 @@ the old inbox back, with no timer to clear it. The rule the briefs carry: *neede
 on would be wrong, not merely slower or a matter of taste; anything with a sensible default is a
 `steer`; anything already decided and written down is neither — read it. And one line of advice
 from the home, not a gate (the per-sender depth is the gate): when a session sends an `ask` to the
-person while it **already holds three or more open ones** — counted before this send — the reply
+person while it **already holds three or more open `ask`s to the person** — `ask`s only, a `steer` is already the right kind; counted before this send — the reply
 to `ao msg` carries *you have n open asks to the person: is this one needed, or a steer?* beside
 the id, every time that is so.
 
@@ -2656,7 +2658,13 @@ Outside those stages an entry leaves only with its record or by a person's hand:
   record's pair tallies and pending `ask` addressees that name it — one host agent holds every
   record in the org — the home, §4.4a — so the rewrite is local. (Resume stays on one host: a
   tool's conversation lives in that host's files, and a resume across hosts is not supported.)
-  Entries already delivered keep `from` as it was; instead, **a message addressed to a closed
+  **And in `from`, on the copies the conversation itself owns** (2026-09-19, review of TD-069 step
+  0): the moved `outbox`, and the **person inbox**'s copies of what the old id asked. An `ask` to
+  the person does not expire, so it outlives the record that sent it, and its `from` is what the
+  per-sender depth, the advice line, the delivery of a `system` note about it and the person's
+  Reply all read; left naming the old id, a question the resumed session is still waiting on would
+  be closed `asker_gone` when the superseded record is dropped a day later. Entries already
+  delivered into **another session's** inbox keep `from` as it was; instead, **a message addressed to a closed
   record that a live one superseded is forwarded to the successor**, and the sender's reply says
   so. Without it, a lead's Reply to a worker that crashed and was resumed would be refused, the
   worker being closed.
