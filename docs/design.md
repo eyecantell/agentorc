@@ -750,6 +750,28 @@ decided here so both ends are written from one text.
   authorised node* and closed. An agent that is itself a node refuses every link: there is one
   home. A second link for a host that already has one **replaces** it (the node reconnected before
   the home noticed the first had died), and the old one is closed.
+- **A node that carries no person (2026-09-19, TD-077; decided by Paul as the condition for
+  TD-075's trial).** Until this date a request arriving over a link with no `caller` was the
+  person, everywhere: *a person may still message anyone*, and the person inbox is the person's
+  from any node — designed, reviewed (#217, #219) and tested
+  (`test_a_persons_forwarded_act_reaches_only_the_nodes_own_records`), and right for a laptop.
+  It is wrong for a container that holds only agents, because nothing on a node's socket tells
+  the person from a session that leaves its `caller` out (§4.8a), so the reach given to the
+  person is given to every session there. A node's entry in the home's `hosts.yml` may therefore
+  say **`person: false`** — `nodes: {grind-box: {person: false}}` — and a container node that
+  `ao host up` makes is written that way by default (a person who wants a shell in one attaches
+  through the home). For such a node **the home refuses every caller-less request from its
+  link**, the never-gated reads of that node's own records aside, with *no person is at
+  <host>: this node carries agents only (design §4.4a)*, and records an identity alarm (§4.8a)
+  about no record. The flag is the **home's** and is read from the home's file: a node cannot
+  grant itself a person. The node's own agent applies the same refusal on its own socket, as a
+  first line, when its `hosts.yml` says `local: {person: false}`; the home's check is the one
+  that counts. **One node per trust level**: sessions inside one node are one account to each
+  other, exactly as on the home (§4.8a), so a less-trusted model is kept out of a more-trusted
+  one's node, and **the home, where the person and the high-trust sessions are, runs no
+  untrusted session at all**. What such a node can still reach is its link and nothing else: the
+  home's `agent.sock` is never mounted in (*A container node*, below), nor its tmux server, nor
+  the UI's port — which is what makes this the wall §4.8a is not.
 - **Where to dial.** On a node, `hosts.yml`'s `link:` — `{ssh: <target>}`, defaulting to the
   `home:` name as an ssh alias; `{command: [...]}`, which is run as given and is how the tests
   dial without an sshd (and how any other transport would); or `{socket: <path>}`, a container
@@ -1549,7 +1571,7 @@ acting RPC. One exists today:
   checks the gate before the method runs, against the record as it is then, so a grant or a
   revoke takes effect on the session's next call (landed 2026-09-10, TD-028 step 1). This is a
   guard against a confused worker, not a security boundary — the socket is
-  local and the id is an environment variable — and it closes the gap where any worker could
+  local and the id is an environment variable (**§4.8a, 2026-09-19, takes the id from the channel instead, and says what that does and does not defend**) — and it closes the gap where any worker could
   kill its neighbour. It says *may act on others*, not *on which others*: that is what the
   membership rule below narrows (landed 2026-09-13, TD-036 step 1). And neither grant nor
   membership reaches an interactive session: that is §9 invariant 5, a gate since 2026-09-13
@@ -1710,6 +1732,97 @@ a §6 policy. Rules that prove mechanical (wrap up at the stop time, retry a sta
 into the tick; those that needed judgement (stuck or thinking? interrupt now?) stay in the
 brief. The grant is what makes this safe to try: the lead's power is a field the person
 can see on the Focus header and revoke, not a promise in its prompt.
+
+### 4.8a Who is calling: identity on one host (2026-09-19, TD-077; decided by Paul)
+
+**What the gates were, and what they are not.** §4.8 says it plainly of the control gate — *a guard
+against a confused worker, not a security boundary: the socket is local and the id is an
+environment variable* — and until this date that was true of every gate, §4.10's marks included.
+The CLI copies `AGENTORC_SESSION` into the envelope's `caller`; the socket (mode `0600`) takes raw
+JSON from any process of the person's user, which every session on the host is; and **an absent
+`caller` is the person**. So a session could send as another session, and as the person, by
+changing or unsetting one variable — and the hook RPC trusts its `session` parameter the same way.
+Between hosts the rule has always been the other one (§4.4a: *a request's identity comes from the
+channel it arrived on, never from a field*). This section brings that rule to one host, and says
+where it stops.
+
+**The threat model, stated once.** Every session on a host runs as the person's own user. A
+*determined* rogue therefore needs no forged envelope: it can type into any pane with `tmux
+send-keys` — which a session reads as its person speaking, and which is how `ao send` itself
+works — and it can POST to the UI, which binds `127.0.0.1` and authenticates nothing (§4.5,
+*never a bare public port*). **Inside one account an identity check is tamper-evidence, not a
+wall.** What it buys is that the accidental and the casual are stopped — an agent talked into
+`env -u AGENTORC_SESSION ao msg …` by something it read — and that the record stops lying: a
+forgery is refused where it can be told, and *shown* where it is tried. **The wall is an OS
+boundary** (§4.4a *A node that carries no person*): a less-trusted model runs in an agents-only
+container node, from which the home's socket, its tmux server and the UI are all out of reach.
+Putting a cheaper, less-trusted model beside a high-trust one (TD-075) waits on that wall, not on
+this section.
+
+**The channel.** On every connection to its own socket the host agent reads the peer's
+credentials (`SO_PEERCRED`: pid, uid) once, at accept, and classifies the connection — not the
+request — as one of:
+
+- **session X** — the peer pid, or an ancestor of it (the `ppid` chain in `/proc`, walked at most
+  64 steps), is the **pane pid** of a record on this host whose pane is live; the host agent
+  already reads `#{pane_pid}` with the pane list each tick (§4.1). Everything a session runs is
+  under its pane: the tool, its shells, its hooks, `ao`.
+- **outside** — no ancestor is a pane of ours: a person's terminal, the UI's process, a systemd
+  unit, a test harness.
+- **unknown** — the ancestry could not be read (the peer exited before the walk, `/proc` refused),
+  **or** the chain reached no pane *but the peer is in the tmux server's own cgroup* while the
+  person's processes are not — which is the installed case (`KillMode=process` keeps the tmux
+  server, and so every pane, inside `agentorc-agent.service`, §4.4; a person's terminal and the UI
+  are in other cgroups). That second clause is what catches a session's process that detached
+  from its pane — a double fork, `tmux run-shell` — and would otherwise read as *outside*. It
+  applies only when the tmux server's cgroup is the agent's own service cgroup; under `pdm run
+  agentorc-agent serve` in a person's shell everything shares one cgroup and the clause is off.
+
+The classification is cached per `(pid, process start time)` for the connection's life; a pid
+that is reused is a different start time.
+
+**The rule: the channel decides, and a claim that disagrees is never innocent.**
+
+| channel | `caller` sent | the request runs as | and |
+|---|---|---|---|
+| session X | X, or none | **session X** | an absent `caller` under a pane is a script that forgot the variable, not a person — the person does not live under a pane |
+| session X | Y | **refused** | an **identity alarm** on X's record |
+| outside | none | **the person** | as today |
+| outside | X | **refused** | an alarm addressed to the person, naming the claim and blaming no record — a session cannot be framed by someone else's claim |
+| unknown | anything | **refused**, reads aside | an alarm addressed to the person |
+
+Reads that are never gated (`status`, `tail`, `explain`, `ping`, …; §4.4a's first table row) are
+served on every channel and raise no alarm: they tell a caller nothing the socket's mode did not
+already grant. The **`hook` RPC** is bound the same way: its `session` parameter must be the
+channel's session, or it is refused with an alarm — a hook runs under its tool, under its pane.
+`ao … --id <other>` is unchanged: that is a parameter the gates already judge, not an identity.
+
+**An identity alarm** is `{at, channel, claimed, rpc}`: kept on the record it is about (the last
+20, `identity_alarms`), or in a small list of the home's own when it is about no record. It is
+shown — a mark on the card, and a row under *Needs you* in the Inbox (§4.5 screen 6), because it
+is either a bug of ours or a session misbehaving and a person should know which — and it wakes
+nobody and blocks nothing by itself. The offending request's refusal says only *identity
+mismatch: this request did not come from the session it names (design §4.8a)*.
+
+**What this does not stop, so nobody reads it as more.** `tmux send-keys` and the UI's API, above.
+A process that leaves the agent's cgroup as well as its pane — `systemd-run --user`, a timer, a
+cron line — is *outside*, and with no `caller` it is the person. A process of another session on
+the same host can read that session's files; identity here is about *requests to the host agent*
+and nothing else.
+
+**Observe before enforce.** A wrong ancestry rule locks every session on the host out of `ao` —
+the outage of 2026-09-17 (one merged RPC change, 31 minutes) with a worse cause. So the host agent
+carries **`identity: observe | enforce`** (`hosts.yml`, this host's block; default `observe` for
+the release that introduces it): in `observe` it classifies, records alarms and serves every
+request exactly as before; `enforce` applies the table. The anchor turns a host to `enforce`
+after a day of `observe` there with no alarm that was not a real forgery — sessions, hooks, the
+UI, the systemd units, a person's terminal, VS Code's terminal, the SessionStart hook and a
+node's forwarded calls having all been seen. `ao status -v` and the Org's teams line say which
+mode a host is in, since *observe* is a host that is not yet protected.
+
+**On a node** the same classification runs on the node's own socket before anything is forwarded,
+so the home trusts the link for the *host* (§4.4a) and the node for the *session*. What a node
+may say in the person's name is §4.4a's.
 
 ### 4.9 Org, Team, Project: the definitions above a session (2026-09-13)
 
