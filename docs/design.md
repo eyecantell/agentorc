@@ -1119,7 +1119,7 @@ Screens:
    what is on the tool's clock first (a permission's countdown), then oldest first. **Steering** —
    not counted: open `steer`s, each with its default and the time left, soonest first; doing
    nothing is a valid answer and the row says so. **FYI** — not counted, folded by default: `note`s,
-   late replies, and what lapsed or was declined in the last day. One row per thing with the
+   late replies, and what lapsed or was declined within the retention window. One row per thing with the
    controls of its kind in place (§4.5a), its session's name, team and `doing` line, and **Open**
    to Focus on the session that needs the person. **A team filter** narrows all three sections — a
    state and a message carry their session's `team` badge; a board item carries its repo, which
@@ -1232,11 +1232,11 @@ noted). If a control is not in this table it does not exist.
 | card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, which is the common case. A person's own session shows it too when the graph reaches it (§4.10); mail meant for the person goes to the top bar's **person inbox**, not here — design 2026-09-14, TD-052; built 2026-09-16, PR #165 |
 | Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (host agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a send, and the sender reads it when it next looks (§4.10) — design 2026-09-14, TD-052; built 2026-09-16, PR #165 (no Reply on an entry the person sent: a person does not answer themselves — the session's answer to it lands in the top bar's person inbox, where the person replies) |
 | card `more ▾`, Focus header | **Message** | opens a composer that sends a `note` or `ask` from the person into this session's inbox (host agent RPC, ungated for a person; `from` is the person). Mail, not a send: it lands, may wake the session within its budget as any person's act does, and refills that budget (§4.10). Beside **Send**, which types into the pane and is the act of control — design 2026-09-16 (fourth Fable review), TD-052; built 2026-09-16, PR #165, as one dialog shared with Reply, an `ask` taking the default bound |
-| Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, 2026-09-19, TD-069). The top bar's **Inbox** opens it (the dialog it opened until then is retired when the page lands) and its number is the **Needs you** section only — a `steer`, a `note` and anything snoozed are never counted, so the number means *what is waiting on a person*. Team filter as on the Org (`team:name`), remembered in the browser |
+| Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, 2026-09-19, TD-069). The top bar's **Inbox** opens it (the dialog it opened until then is retired when the page lands) and its number is the **Needs you** section only — a `steer`, a `note` and anything snoozed are never counted, so the number means *what is waiting on a person*. **It is not the Org's needs-you count**, which is session states alone: the Inbox's number adds open `ask`s to the person and due board items, so the two may differ, and each says what it counts on hover. The page's mail is polled from the `inbox` RPC as the dialog's was (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the pushed stream the Org uses. Team filter as on the Org (`team:name`), remembered in the browser |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Switch profile… / Wait**; exited with unpushed work: what Ready to close says (§4.2), **Open** (details). A state row leaves the list when the state does; none can be snoozed but `stalled?` and unpushed work, which are not on the tool's clock |
-| Inbox row: `ask` / `conflict` | **Reply**, **Delete**, **Snooze** | the whole text, sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms and tells the asker *declined by the person*; **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of. Suggested answers beside Reply are TD-070 |
-| Inbox row: `steer` | **Reply**, **Go with it** | the text, **the default it will take, and the time left**; **Reply** says otherwise; **Go with it** closes it now with the default (the sender is told, and need not wait out the bound); doing nothing lets it lapse to the same end. Never counted |
-| Inbox row: `note` and the rest of FYI | **Dismiss** | the text; Dismiss deletes. Lapsed `steer`s, declined `ask`s and late replies are listed a day and then go |
+| Inbox row: `ask` / `conflict` | **Reply**, **Delete**, **Snooze** | the whole text, sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms, closes it as `declined` and the asker is told by a `system` note (§4.10); **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of. Suggested answers beside Reply are TD-070 |
+| Inbox row: `steer` | **Reply**, **Go with it** | the text, **the default it will take, and the time left**; **Reply** says otherwise; **Go with it** closes it now — `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh, told to it by a `system` note that wakes it as a person's reply does — so it need not wait out the bound; doing nothing lets it lapse to the same end. **Snooze** as on an `ask`; it still lapses on time. Never counted |
+| Inbox row: `note` and the rest of FYI | **Dismiss** | the text; Dismiss deletes. Lapsed `steer`s, declined `ask`s and late replies are listed for the retention window (`MAIL_RETENTION`, 12 h) and then pruned, as every closed entry is |
 | Org top bar | **Inbox** | the org's person inbox (§4.10), labelled **Inbox** on the page — *person inbox* is the design's word for whose it is, and on a page only a person reads it says nothing (2026-09-18): unread count, click to open; each entry with its sender session, kind, time and `about`, with **Reply** into the sender's inbox and delete. **From 2026-09-19 the design is the Inbox page (rows above): the top bar's control opens `/inbox` and counts only what needs a person; the dialog described here is what is built until TD-069 step 1 lands.** Sessions reach it with `ao msg person`, ungated. Rings nothing; the count is polled from the `inbox` RPC, since the pushed stream carries session records and the person inbox belongs to none — design 2026-09-16 (Fable review), TD-052; built 2026-09-16, PR #168 |
 | Org top bar | **usage** chip | display only: per profile that reports usage, `<profile> 5h n% · wk n%` — the account's 5-hour and weekly windows from the adapter's `usage()` (§4.3, TD-001), red at a cap, reset times on hover; a profile whose adapter reports none is not shown. The labels were added 2026-09-18: two bare percentages said nothing. The two windows are Claude Code's, and they are named in the core's usage gate and in this chip — a second tool's windows will not fit them (TD-073) |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `control` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands — landed 2026-09-13, TD-036 step 3; the prefill 2026-09-13, TD-036 step 4 / TD-040 step a |
@@ -1421,7 +1421,7 @@ definition from `~/.agentorc/org.yml` or the repo's `.agentorc.yml` — every ch
 `controllers: [lead]` in a worktree of its home repo; `ao team stop <name>` wraps members up before the lead (`--now` kills; `--close` also closes each member that settled clean and pushed, §4.9a);
 `ao team status <name>` prints the lead's Members view; `ao team list` the definitions, their source and whether each is live;
 `ao new --project <name>` gives a hand-started session the project's reach block. A nested `{team: …}` member is refused with
-its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC built 2026-09-16 by step 3): `ao msg <to>… "…"` `[--kind note|ask|reply|conflict] [--about <ref>] [--reply-to <id>]` addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — is a thin call to the host agent's `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
+its name until the nested case is built. Mail between sessions (§4.10; design 2026-09-14, TD-052 — `ao msg`, `ao inbox` and the person inbox built 2026-09-16, the `wait` RPC built 2026-09-16 by step 3): `ao msg <to>… "…"` `[--kind note|ask|steer|reply|conflict] [--default <line>] [--bound <seconds>] [--about <ref>] [--reply-to <id>]` (`steer`, `--default` and the rule that an `ask` to the person takes no `--bound` are design 2026-09-19, TD-069 step 0 — not yet built) addresses a message to a session's inbox rather than typing into its pane, and is refused unless the graph permits it — the caller's controllers, its members, or a session sharing its team or a controlled target — and `ao msg person "…"` addresses the org's person inbox, ungated (design 2026-09-16); `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because it is its own; and `ao wait` — which already blocks on a member's state change (§4.8 "Waking a lead", landed 2026-09-14) — is a thin call to the host agent's `wait` RPC, so the host agent knows who is blocked and decides mail wakes (§4.10, 2026-09-16), and gains new mail as a second thing it returns on, so one wait covers both. The CLI reads the calling session from `AGENTORC_SESSION`, the variable the
 hook already uses (§4.2), and sends it as the request envelope's `caller` with every RPC
 (landed 2026-09-10, TD-028 step 1): that is how a report lands on the right record and how the
 agent tells a worker acting on another session from a person typing in a terminal (§4.8).
@@ -2344,53 +2344,92 @@ It also dissolves a question the session-addressed form could not answer — *wh
 five open sessions should the worker write to?* — and it buys the person nothing they must act on:
 an unread message changes no state. It is read when the person looks.
 
-**What a person is asked: needed, steering, FYI (2026-09-19, decided by Paul; TD-069).** Until this
-date an `ask` to the person carried the same bound as any other — 24 hours by default — and expired
-read or not, so the person was shown a countdown and the asker then moved on. Paul: *either user
-input is legitimately needed or it isn't.* The two cases want opposite rules, and one kind with a
-timer blurred them. What a session sends a person is now one of three things, and the envelope
-says which:
+**What a person is asked: needed, steering, FYI (2026-09-19, decided by Paul; TD-069; Sonnet design
+review the same day).** Until this date an `ask` to the person carried the same bound as any
+other — 24 hours by default — and expired read or not, so the person was shown a countdown and
+the asker then moved on. Paul: *either user input is legitimately needed or it isn't.* The two
+cases want opposite rules, and one kind with a timer blurred them. What a session sends a person is
+now one of three things, and the envelope says which:
 
 - **Needed — an `ask` to the person.** The session cannot, or must not, go on with *this* without
   the answer. It carries **no bound and never expires**: `--bound` on an `ask` to the person is
-  refused, and the refusal names `steer`. It stays open until the person replies, or deletes it
-  (the asker's next `ao inbox` and its card say *declined by the person* — a deletion is an answer,
-  and silence is not), or the asker's record is closed or forgotten, as for any `ask` (*lifecycle*,
-  below). The asker does not wait on it: it takes other work, or declares itself out of work
-  (§4.9a), and a reply that lands after it exited waits in its inbox and moves with a resume, as
-  all mail does. **It is still mail, and mail is not durable** (§9 invariant 13): a question whose
-  answer must outlive the record is a board line with a `Due:` date, as before — *needed* changes
-  how long the question stands, not where a durable one lives. The person inbox's two depths
-  still refuse (§4.10 *bounds*), and the refusal still names the board; an open `ask` counts
-  toward its sender's depth until it is closed, which is what stops one worker filling the
-  Inbox with questions that never lapse.
+  refused, and the refusal names `steer`. **The person is asked alone**: an `ask` or a `steer` that
+  names the person names nobody else (a `note` may), and **a `conflict` never names the person** —
+  it is put to controllers, and a worker whose controllers cannot settle it `ask`s the person about
+  it; both refusals say so. That keeps `bound` one field on the entry: `None` exactly when the
+  addressee is the person and the kind is `ask`. The `ask` stays open until one of four things
+  closes it, each a `closed_reason` on the entry beside `closed_at`: **`replied`** (the person's
+  `reply`, as for any `ask`); **`declined`** (the person deleted it — a deletion is an answer, and
+  silence is not); **`asker_gone`** (the asker's record was **closed or forgotten** — new with this
+  rule: until now only an *addressee's* going closed an entry, and an `ask` that cannot expire
+  needs the other half, or a forgotten worker's questions stand forever; an asker that merely
+  *exited* leaves it open, since a resume may still want the answer); or the refusal below. The
+  asker does not wait on it: it takes other work, or declares itself out of work (§4.9a), and a
+  reply that lands after it exited waits in its inbox and moves with a resume, as all mail does.
+  **It is still mail, and mail is not durable** (§9 invariant 13): a question whose answer must
+  outlive the record is a board line with a `Due:` date, as before — *needed* changes how long the
+  question stands, not where a durable one lives.
+  **What bounds it, now that time does not:** the person inbox's two depths (*bounds*, above)
+  count, from this date, **unread entries plus open `ask`s and `steer`s, read or not** — 200 in all,
+  20 from one sender — so reading the page does not free a slot that an unanswered question still
+  holds, and one worker cannot fill the Inbox with questions that never lapse. The refusal still
+  names the board.
 - **Steering — a `steer`.** A preference the session can go on without: *I will do X unless you
-  say otherwise*. The envelope carries **`default`** — the one line saying what it will do, required,
-  cleaned and capped as a `doing` line is (§4.8) — and a **bound**, required in effect: the
-  `ASK_BOUND` default applies when none is given, and a sender that wants an answer within the
-  hour says so. A `reply` before the bound closes it, exactly as it closes an `ask`. At the bound
-  it **lapses**: the record says *lapsed*, never *expired* — nothing failed — the sender's next
-  `ao inbox` tells it so in one line (*steer m-… lapsed: go with your default*), and it does what
-  it said. A reply that arrives after the lapse is delivered as a `note`, as a late reply to a
-  closed `ask` is: the sender may still act on it, and nothing promises that it will. A `steer`
-  may be addressed wherever an `ask` may — to the person or, along the graph, to a controller —
-  which is what lets a lead answer steering before it reaches a person (TD-075, not yet decided).
-  It is **never** a `conflict`, and it never counts toward the person's number (§4.5a **Inbox**).
+  say otherwise*. The envelope carries **`default`** — the one line saying what it will do,
+  **required** (`--default`; a `steer` without one is refused), cleaned and capped as a `doing` line
+  is (§4.8) — and a **bound**: `--bound`, else `ASK_BOUND`. A `reply` before the bound closes it
+  (`replied`), exactly as it closes an `ask`. At the bound it **lapses** — `closed_reason:
+  lapsed`, never `expired_at`: nothing failed — and the sender does what it said. **A `steer` is
+  an `ask` for every other rule in this section**: it counts toward the exchange tallies as an
+  `ask` does and its first `reply` closes it uncounted; it is never pruned while open; a reply
+  after it closed is delivered as a `note`. One rule differs, because the point of a `steer` is
+  that the *sender* goes on: **its bound runs whatever becomes of the addressee** — an addressee
+  that exits does not leave it *pending*, it lapses on time. A `steer` may be addressed wherever
+  an `ask` may — to the person or, along the graph, to one session — which is what lets a
+  go-between answer steering before it reaches a person (TD-075). It never counts toward the
+  person's number (§4.5a **Inbox**).
 - **FYI — a `note` to the person.** Unchanged, and never counted.
+
+**How the sender hears that one closed without a reply.** A lapse, a decline, *Go with it*
+(§4.5a) and `asker_gone` are events on the sender's *outgoing* entry, and everything that wakes a
+session is keyed on mail *arriving* — so the home **delivers a `note` from `system`** into the
+sender's inbox at that moment, naming the entry: *steer m-… lapsed: go with your default*; *ask
+m-… declined by the person*; *steer m-… — the person says: go with your default*. `system` is a
+third sender beside a session id and the person: `ao inbox` marks it `[system]`, it is never an
+instruction (it reports what happened to the session's own message), it counts toward no tally
+and no depth, and it cannot be replied to. It wakes as any `note` does, within the wake budget
+(§4.8) — except the two that are a person's act, *declined* and *Go with it*, which wake as a
+person's `reply` does and refill the budget. So a sender blocked in `ao wait` on its own `steer`
+is released at the bound, which is the whole use of the kind; one that carried on working meets
+the line at its next `ao inbox`.
+
+**Deleting is declining, and nothing vanishes at once.** On an open `ask` or `steer`, the
+Inbox's **Delete** closes the person's copy (`declined`) rather than stripping it; like every
+closed entry it stays for the retention window (`MAIL_RETENTION`, 12 h — the FYI section lists it
+for exactly that long) and is then pruned. **Dismiss**, on a `note` or on anything already
+closed, removes the entry outright, as `inbox_delete` does today. Both are the person's alone.
 
 **Which to send is the brief's to teach** — a worker that marks every preference *needed* brings
 the old inbox back, with no timer to clear it. The rule the briefs carry: *needed* only when going
 on would be wrong, not merely slower or a matter of taste; anything with a sensible default is a
-`steer`; anything already decided and written down is neither — read it. `ao msg person --kind
-ask` from a session whose open `ask`s to the person already number **three** is answered with that
-reminder beside the id (it is delivered; the line is advice, not a gate — the per-sender depth is
-the gate).
+`steer`; anything already decided and written down is neither — read it. And one line of advice
+from the home, not a gate (the per-sender depth is the gate): when a session sends an `ask` to the
+person while it **already holds three or more open ones** — counted before this send — the reply
+to `ao msg` carries *you have n open asks to the person: is this one needed, or a steer?* beside
+the id, every time that is so.
 
-**Snooze** (TD-069). A person-inbox entry may carry **`snoozed_until`**: set by a person from the
-Inbox, never by a session, it takes the entry out of the list and the count until that time and
-changes nothing else — a snoozed `steer` still lapses at its bound, which is the point of having
-said a default; a snoozed `ask` stays open. The sender is not told: a snooze is the person's own
-bookkeeping, as editing a `Due:` date is.
+**Snooze** (TD-069). A person-inbox entry may carry **`snoozed_until`**, set and cleared by the
+`inbox_snooze` RPC, which **every session is refused**, as `inbox_delete` is — a snooze is the
+person's own bookkeeping, as editing a `Due:` date is, and the sender is not told. It persists
+with the person inbox. It affects **the Inbox page only** — the entry leaves the *Needs you* or
+*Steering* section and the page's count until that time, or until the person clears it — and
+nothing else: it is still unread if it was, it still occupies the depths above, a snoozed `steer`
+still lapses at its bound (the point of having said a default), a snoozed `ask` stays open.
+
+**An envelope carries its sender's `team`** from this date, stamped by the home at send beside
+`from` — the Inbox filters by team, and a join to the sender's record fails exactly when the page
+most needs it, after that record is gone. An entry from a session with no team, or sent before
+this date, shows under *No team*.
 
 **A message may still reach an interactive session; an act of control still may not.** Where the
 graph reaches a person's session on its own terms — a session the person drives by hand that
@@ -2505,7 +2544,7 @@ same: the records of a night's team.
   "both participants" did not cover):
   - the tally is kept **per thread root, on every record that holds an entry of that thread**, so
     forgetting one side resets nobody else's;
-  - it counts `ask`, `note` and `conflict` entries; **the first `reply` to an open `ask` is never
+  - it counts `ask`, `steer`, `note` and `conflict` entries (a `note` from `system` counts nowhere); **the first `reply` to an open `ask` or `steer` is never
     refused and never counted** — it closes a question and cannot extend one, and refusing the
     answer would strand the very `ask` the bound exists to resolve. That first reply **closes** the
     `ask` (recorded on the entry, which is what the Inbox row's *the reply that answered it*
@@ -2554,7 +2593,7 @@ through three stages:
    body; neither does the doorbell or the per-command line, which name a count; neither does a person opening the Inbox panel, because a person is not the session.
 3. **Pruned.** A read entry is kept for a retention window, so a thread stays legible — to the
    session, to its other controllers (who hold their own copies), and to the person in the Inbox
-   panel — and then removed. **An open `ask` or `conflict` is never pruned** (fourth review,
+   panel — and then removed. **An open `ask`, `steer` or `conflict` is never pruned** (fourth review,
    2026-09-16): its bound and the retention window are independent, a `reply` must name an entry
    in the replier's own inbox, so a read `ask` pruned before its bound ran out could never be
    answered — the one entry the bound exists to resolve, stranded by housekeeping. It becomes
@@ -2565,7 +2604,7 @@ through three stages:
 
 Outside those stages an entry leaves only with its record or by a person's hand:
 
-- **A person deletes it** in the Inbox panel (§4.5a): that session's copy only, through the `inbox_delete` RPC, which every session is refused — its own inbox included (TD-052 step 8).
+- **A person deletes it** in the Inbox panel (§4.5a): that session's copy only, through the `inbox_delete` RPC, which every session is refused — its own inbox included (TD-052 step 8). In the **person inbox**, deleting an *open* `ask` or `steer` declines it instead of stripping it (*Deleting is declining*, above).
 - **Forget removes the record** and its inbox with it; a **closed** record is dropped a day after
   it closed (`CLOSED_KEEP`), and its inbox with it.
 - **Resume carries mail forward.** Resuming a conversation creates a new record and closes the
@@ -2584,7 +2623,7 @@ Outside those stages an entry leaves only with its record or by a person's hand:
   record that a live one superseded is forwarded to the successor**, and the sender's reply says
   so. Without it, a lead's Reply to a worker that crashed and was resumed would be refused, the
   worker being closed.
-- **A recipient that exits** leaves the `ask`s addressed to it **pending**, not expired: at exit
+- **A recipient that exits** leaves the `ask`s addressed to it **pending**, not expired (a `steer` is the exception — its bound runs on and it lapses on time, *What a person is asked*, above): at exit
   the host agent cannot know whether a person will press Resume an hour later. The askers' `ao`
   replies say *addressee exited*. The `ask` expires when the record is **closed or forgotten**, or
   when its own bound runs out, whichever comes first — and a resume before either carries it
