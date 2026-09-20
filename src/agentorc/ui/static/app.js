@@ -335,7 +335,10 @@
     const chip = $("#usagechip"); if (!chip) return;
     let el = chip.querySelector(`[data-profile="${CSS.escape(ev.profile)}"]`);
     const windows = (ev.usage && ev.usage.windows) || [];
-    if (!windows.length) { if (el) el.remove(); fitUsage(); return; }
+    // The chip and the space after it were added together, so they go together: a profile that
+    // comes and goes all day would otherwise leave a text node behind each time, and those widths
+    // are what `fitUsage` measures against (review of PR #279).
+    if (!windows.length) { if (el) { const sep = el.nextSibling; if (sep && sep.nodeType === 3) sep.remove(); el.remove(); } fitUsage(); return; }
     if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.insertBefore(el, $("#usagemore")); chip.insertBefore(document.createTextNode(" "), $("#usagemore")); }
     const sorted = windows.slice().sort((a, b) => (b.pct || 0) - (a.pct || 0)), worst = sorted[0];
     el.dataset.pct = worst.pct;
