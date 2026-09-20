@@ -246,6 +246,7 @@ class HostAgent:
         # the work was pushed — the row used to vanish with no trace, which is what *it disappeared
         # when I read it* was. The home records the ending instead.
         self.attention_store = AttentionStore()
+        self._ticker: asyncio.Task | None = None  # the tick loop, once `serve` is running
         self.trail, self.attention_snoozed = self.attention_store.load()
         # `<sid>|state` / `<sid>|alarm` → (the row kind it is showing, when that row began, what it
         # said). Empty on load **on purpose**: the first tick after a restart reads every live row
@@ -395,7 +396,10 @@ class HostAgent:
         os.chmod(sock, 0o600)
         log.info("listening on %s", sock)
         link_servers = await self._bind_links() if self.mode == "home" else []
-        ticker = asyncio.create_task(self._tick_loop())
+        # Kept on the agent as well as locally: a test that must own the clock cancels it rather
+        # than racing it with a sleep, which is the shape TD-078 and TD-088 keep catching. The
+        # `finally` below cancels it either way — cancelling a cancelled task is a no-op.
+        ticker = self._ticker = asyncio.create_task(self._tick_loop())
         dialer = asyncio.create_task(self._dial_home()) if self.mode == "node" else None
         try:
             async with server:
