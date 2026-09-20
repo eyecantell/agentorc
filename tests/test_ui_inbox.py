@@ -1413,3 +1413,133 @@ def test_a_person_act_refreshes_the_page_once():
     js = (UI / "static" / "app.js").read_text()
     assert '(staterow || id === "person") && typeof AO.refreshInboxPage === "function"' in js
     assert '["dismiss", "attention_snooze"].includes(action) && typeof AO.refreshInboxPage' not in js
+
+# -- TD-081 step 2: Resume, Resume with changes…, Reopen and push ---------------------------------
+
+
+@pytest.mark.unit
+def test_a_one_press_resume_carries_the_record_and_never_its_unattended_flag(tmp_path, monkeypatch):
+    """§4.5a **Focus (exited / closed)** → **Resume**: the record's own `name` above all — that is
+    what makes the name check answer `supersede`, so the resumed session takes the bare name *and*
+    the record's id, is replaced in place, and keeps its mail (§4.10, built by step 1).
+
+    **Never `unattended`.** The session a press starts is attended, whatever the record was: an
+    unattended session answers its own permission prompts, and a press with no form is no place to
+    grant that. Nor `run_until`, `wrapup_prompt` or the old `prompt`."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import resume_create
+
+    rec = {
+        "id": "ao-w1", "name": "tdgrind-ao-2", "dir": str(tmp_path), "adapter": "claude-code",
+        "profile": "grind", "role": "grinder", "team": "ao-grind", "project": "agentorc",
+        "lane": ["TD-073"], "controllers": ["ao-lead"], "adapter_id": "u-1", "state": "exited",
+        "unattended": True, "run_until": "2026-09-20T06:00:00Z", "wrapup_prompt": "wrap up",
+        "prompt": "the old brief", "capabilities": ["control"],
+    }  # fmt: skip
+    got = resume_create(rec)
+    assert got["name"] == "tdgrind-ao-2" and got["resume"] == "u-1"
+    assert got["team"] == "ao-grind" and got["project"] == "agentorc" and got["controllers"] == ["ao-lead"]
+    assert got["lane"] == ["TD-073"] and got["dir"] == str(tmp_path)
+    assert got["unattended"] is False  # the whole point of the rule
+    assert "run_until" not in got and "wrapup_prompt" not in got and "prompt" not in got
+    # the grants come from the role preset, not off the old record: nothing copied, nothing dropped
+    assert got.get("capabilities") != ["control"] or rec["role"] == "grinder"
+    # *Reopen and push* is the same create with a first prompt **the page wrote**
+    from agentorc.ui.app import REOPEN_AND_PUSH
+
+    assert resume_create(rec, prompt=REOPEN_AND_PUSH)["prompt"] == REOPEN_AND_PUSH
+    assert "push" in REOPEN_AND_PUSH.lower() and "--outcome" in REOPEN_AND_PUSH
+
+
+@pytest.mark.unit
+def test_when_a_resume_cannot_be_silent_it_is_the_filled_in_form_and_not_a_guess(tmp_path):
+    """§4.5a: *when it cannot be silent it is not a guess*. What the record itself settles is
+    answered before anything is created; everything else is the agent's own refusal, and either
+    way the answer is the same — the filled-in form, with the reason on it."""
+    from agentorc.ui.app import resume_blocked, resume_form_url
+
+    live = {"state": "working", "name": "w", "dir": "/tmp", "adapter_id": "u-1"}
+    assert "still running" in resume_blocked(live)
+    shell = {"state": "exited", "name": "w", "dir": "/tmp", "adapter_id": ""}
+    assert "no tool session id" in resume_blocked(shell)
+    nameless = {"state": "exited", "name": "", "dir": "/tmp", "adapter_id": "u-1"}
+    assert "no name or no directory" in resume_blocked(nameless)
+    ok = {"state": "closed", "name": "w", "dir": "/tmp", "adapter_id": "u-1"}
+    assert resume_blocked(ok) == ""  # a `closed` record resumes too (§4.5a)
+    url = resume_form_url({**ok, "role": "grinder", "lane": ["TD-1"], "unattended": True}, "the directory is gone")
+    assert url.startswith("/new?") and "name=w" in url and "resume=u-1" in url and "role=grinder" in url
+    assert "lane=TD-1" in url and "unattended=on" in url and "why=the+directory+is+gone" in url
+
+
+@pytest.mark.unit
+def test_the_form_says_which_control_was_pressed_and_fills_in_what_it_knew(tmp_path, monkeypatch):
+    """**Resume with changes…** is the same create as a form; a press that could not be silent
+    lands on the same page with its reason, so a person is never left wondering which of the two
+    controls they pressed or what stopped it."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import templates
+
+    def page(prefill):
+        return templates.get_template("new.html").render(
+            host="kmaster", active="Org", profiles={}, default_profile="default", recent=[],
+            adapters=["claude-code"], control_holders=[{"id": "ao-lead", "name": "lead"}], grants_all=[],
+            grant_notes={}, roles=[{"name": "plain", "source": "built-in", "lane": [], "controllers": [],
+                                    "grants": []},
+                                   {"name": "grinder", "source": "built-in", "lane": [], "controllers": [],
+                                    "grants": []}],
+            default_controllers=[], projects=[], prefill=prefill,
+        )  # fmt: skip
+
+    filled = page({"dir": "/repo", "adapter": "claude-code", "resume": "u-1", "project": "", "name": "w1",
+                   "profile": "", "role": "grinder", "team": "", "lane": "TD-1", "controllers": ["ao-lead"],
+                   "unattended": True, "why": "the directory is gone"})  # fmt: skip
+    assert 'name="name" value="w1"' in filled and 'value="u-1"' in filled and 'name="lane" value="TD-1"' in filled
+    assert 'value="grinder" selected' in filled and 'name="unattended" checked' in filled
+    assert 'value="ao-lead" data-name="lead" checked' in filled
+    assert 'id="resumewhy"' in filled and "the directory is gone" in filled
+    # and an ordinary New session is untouched: no banner, nothing prefilled, `plain` selected
+    plain = page({"dir": "", "adapter": "claude-code", "resume": "", "project": "", "name": "", "profile": "",
+                  "role": "", "team": "", "lane": "", "controllers": [], "unattended": False, "why": ""})  # fmt: skip
+    assert 'id="resumewhy"' not in plain and 'name="name" value=""' in plain
+    assert 'value="plain" selected' in plain and 'name="unattended" checked' not in plain
+
+
+@pytest.mark.unit
+def test_the_unpushed_row_can_be_answered_from_the_row():
+    """§4.5a **Inbox row: state** (TD-081): *exited with unpushed work* offered only **Details**,
+    which is not an answer to it. It now offers **Reopen and push** — the one-press Resume with a
+    first prompt the **page** wrote, never anything a session said — and **Resume** beside it."""
+    row = {"row": "unpushed", "id": "ao-w1:unpushed", "sid": "ao-w1", "name": "w1",
+           "text": "3 unpushed vs origin/w1", "state_label": "exited", "state_class": "exited",
+           "at": "2026-09-19T11:00:00Z"}  # fmt: skip
+    html = rows("needs", [row])
+    assert 'data-act="reopen-push" data-id="ao-w1"' in html and 'data-act="resume" data-id="ao-w1"' in html
+    assert "data-confirm=" in html and "under its own name" in html
+    assert "Details" in html  # what was there stays
+    js = (UI / "static" / "app.js").read_text()
+    assert 'act(id, "resume", { push: action === "reopen-push" })' in js
+    assert 'data-act="resume-form"' in js  # the Focus banner's second control
+    assert "Resume this conversation" not in js  # the link that carried no name is gone
+
+
+@pytest.mark.integration
+def test_a_one_press_resume_takes_the_name_back_and_the_old_record_keeps_its_place(client, tmp_path):
+    """The whole of TD-081: on 2026-09-20 resuming `orchestrator-ao-1` meant typing a name, and
+    what was typed became a second record beside the one being resumed. One press now, and the
+    record is replaced in place — same id, same name (§4.10 *a resume under the same name*)."""
+    r = client.post("/new", data={"name": "w1", "dir": str(tmp_path), "adapter": "shell"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    # a shell holds no tool session id, so the press is the form, with its reason — never a guess
+    client.post(f"/api/sessions/{sid}/kill")
+    got = client.post(f"/api/sessions/{sid}/resume", json={}).json()
+    assert got["ok"] is False and "no tool session id" in got["why"] and got["form"].startswith("/new?")
+    assert "name=w1" in got["form"]
+    # and **Resume with changes…** is the same form, asked for, with nothing created
+    form = client.post(f"/api/sessions/{sid}/resume", json={"form": True}).json()
+    assert form["ok"] is True and "id" not in form and "name=w1" in form["form"]
+    # nothing was created by either press. Counted in this test's own directory, never over the
+    # whole fleet: the module's other tests leave records behind and a bare count would pass or
+    # fail on the order they ran in.
+    here = [x for x in client.get("/api/sessions").json() if x["dir"] == str(tmp_path)]
+    assert [x["id"] for x in here] == [sid]

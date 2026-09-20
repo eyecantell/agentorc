@@ -15,7 +15,7 @@ from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -1068,6 +1068,97 @@ def inbox_sections(
 # -- app -------------------------------------------------------------------------------------------
 
 
+# design §4.5a **Focus (exited / closed)** → **Resume** (TD-081 step 2; the plumbing is step 1,
+# PR #282). What a one-press resume carries, and what it deliberately does not.
+RESUME_CARRIES = ("name", "dir", "adapter", "profile", "role", "team", "project", "lane", "controllers")
+# The first prompt **Reopen and push** writes (§4.5a *Inbox row: state*, TD-081). Fixed text, in
+# the source: it is the page's sentence, never anything a session said (§4.2), and what comes of it
+# returns as an outcome (§4.10 *Outcomes*).
+REOPEN_AND_PUSH = (
+    "Push your branch and open or update its PR, then report the outcome with "
+    '`ao msg person --outcome done|blocked|dropped "<one line>" --for <the question this answers>` '
+    "— or, if nothing is owed, say so on docs/user_attention.md."
+)
+
+
+def resume_create(rec: dict[str, Any], *, prompt: str = "") -> dict[str, Any]:
+    """The `create` a one-press **Resume** makes from an exited record (design §4.5a).
+
+    It carries the record's own `name` — which is the whole point: the name check answers
+    `supersede`, the new session takes the bare name *and* the record's id, the old record is
+    replaced in place and its mail stays with it (§4.10 *a resume under the same name*, built by
+    TD-081 step 1). And it carries `dir`, `adapter`, `profile`, `role`, `team`, `project`, `lane`
+    and `controllers`, so a live team finds its member where it was.
+
+    **Never `unattended`.** The session a press starts is *attended*, whatever the record was: an
+    unattended session answers its own permission prompts, and a press with no form is no place to
+    grant that — least of all to a member whose manager has gone and whose `run_until` has passed.
+    Also not carried: `run_until` and `wrapup_prompt` (a deadline that has passed is not one),
+    the old `prompt`, and `capabilities` — the grants come from the record's **role**, through the
+    same preset path the form takes, so nothing is copied and nothing is dropped."""
+    lane = rec.get("lane")
+    got: dict[str, Any] = {
+        "name": str(rec.get("name") or ""),
+        "dir": str(rec.get("dir") or ""),
+        "adapter": str(rec.get("adapter") or "claude-code"),
+        "profile": str(rec.get("profile") or ""),
+        "role": str(rec.get("role") or ""),
+        "team": str(rec.get("team") or ""),
+        "project": str(rec.get("project") or ""),
+        "lane": [str(x) for x in lane] if isinstance(lane, list) else [],
+        "controllers": [str(c) for c in (rec.get("controllers") or [])],
+        "resume": str(rec.get("adapter_id") or ""),
+        "unattended": False,
+    }
+    if prompt:
+        got["prompt"] = prompt
+    # The **grants** and the **ledger** come from the directory's repo through the record's role,
+    # exactly as they do when the form's Role picker is used — not copied off the old record, so a
+    # grant a preset has since dropped is dropped here too, and one it has gained is gained. A
+    # directory or a role that no longer resolves is not decided here: the create refuses it and
+    # the press lands on the form with the agent's own words (`resume_blocked`'s docstring).
+    with contextlib.suppress(KeyError, ValueError, OSError):
+        cfg = repoconfig.discover(got["dir"] or os.getcwd())
+        got["ledger"] = cfg.ledger
+        if got["role"]:
+            preset = repoconfig.resolve_role(cfg, got["role"])
+            got["capabilities"] = [g for g in preset.grants if g in GRANTS]
+            got["lane"] = got["lane"] or list(preset.lane)
+            got["profile"] = got["profile"] or preset.profile or ""
+    return got
+
+
+def resume_blocked(rec: dict[str, Any]) -> str:
+    """Why a one-press **Resume** cannot be silent on this record, or "" — *when it cannot be
+    silent it is not a guess* (§4.5a): the press lands on the filled-in form with the reason on it.
+
+    Only what is knowable from the record is decided here. Everything else — a directory that is
+    gone, a profile or role that no longer exists, a host that is not connected, a name a live
+    record has taken since — is the agent's own refusal, which the caller turns into the same
+    fall-through in the agent's own words, so no rule of ours can drift from the one that runs."""
+    if str(rec.get("state") or "") not in ("exited", "closed"):
+        return "this session is still running — there is nothing to resume"
+    if not str(rec.get("adapter_id") or ""):
+        return "this record holds no tool session id, so there is no conversation to resume"
+    if not str(rec.get("name") or "") or not str(rec.get("dir") or ""):
+        return "this record has no name or no directory to take back"
+    return ""
+
+
+def resume_form_url(rec: dict[str, Any], why: str = "") -> str:
+    """**Resume with changes…**: New session with every field of `resume_create` filled in, which
+    is also where a press that cannot be silent lands, with its reason (§4.5a)."""
+    got = resume_create(rec)
+    q = {k: v for k, v in got.items() if k not in ("lane", "controllers", "unattended") and v}
+    q["lane"] = ", ".join(got["lane"])
+    q["controllers"] = ",".join(got["controllers"])
+    # *Unattended* as the record had it — on the form, where it is next to its stop time
+    q["unattended"] = "on" if rec.get("unattended") else ""
+    if why:
+        q["why"] = why
+    return "/new?" + urlencode({k: v for k, v in q.items() if v})
+
+
 def _int_param(raw: str | None, default: int, lo: int, hi: int) -> int:
     try:
         v = int(float(raw)) if raw not in (None, "") else default
@@ -1232,7 +1323,23 @@ def create_app() -> FastAPI:
 
     @app.get("/new", response_class=HTMLResponse)
     async def new_form(
-        request: Request, dir: str = "", adapter: str = "claude-code", resume: str = "", project: str = ""
+        request: Request,
+        dir: str = "",
+        adapter: str = "claude-code",
+        resume: str = "",
+        project: str = "",
+        # design §4.5a **Resume with changes…** (TD-081 step 2): the same fields a one-press
+        # Resume carries, filled into the form instead of used. `why` is set when a press that
+        # should have been silent landed here, and the form says so rather than leaving a person
+        # to wonder which of the two controls they pressed.
+        name: str = "",
+        profile: str = "",
+        role: str = "",
+        team: str = "",
+        lane: str = "",
+        controllers: str = "",
+        unattended: str = "",
+        why: str = "",
     ):
         profs, default = profiles_mod.load()
         # registered repos (design §5: the dev-cadence registry, `repos_registry` in hosts.yml) first,
@@ -1276,7 +1383,20 @@ def create_app() -> FastAPI:
                 # list without another round trip. "No project" is the default and is what every
                 # session was before.
                 "projects": projects_view(),
-                "prefill": {"dir": dir, "adapter": adapter, "resume": resume, "project": project},
+                "prefill": {
+                    "dir": dir,
+                    "adapter": adapter,
+                    "resume": resume,
+                    "project": project,
+                    "name": name,
+                    "profile": profile,
+                    "role": role,
+                    "team": team,
+                    "lane": lane,
+                    "controllers": [c for c in controllers.split(",") if c.strip()],
+                    "unattended": unattended == "on",
+                    "why": why,
+                },
             },
         )
 
@@ -1371,6 +1491,38 @@ def create_app() -> FastAPI:
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
     # -- actions (every control in design §4.5a that exists in phase 1) --------------------------
+
+    @app.post("/api/sessions/{sid}/resume")
+    async def resume_session(sid: str, request: Request):
+        """design §4.5a **Focus (exited / closed)** → **Resume**, and **Inbox row: state** →
+        **Reopen and push** (TD-081 step 2): *a resume option that requires no input from me*.
+
+        One press, no form: a `create` carrying the record's own name, so the name check answers
+        `supersede` and the resumed session takes the bare name and the record's id in place, with
+        its mail (§4.10, built by step 1). It is a person's act from the page — **caller-less**, no
+        attenuation (§4.8 create rule) — and the session it starts is **attended**, whatever the
+        record was.
+
+        **When it cannot be silent it is not a guess.** What the record itself settles is answered
+        here; everything else is the agent's own refusal, and either way the answer is the same:
+        the filled-in form, with the reason on it, for the person to finish by hand. The client
+        follows `form`; nothing is created behind their back and nothing is guessed at."""
+        body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        rec = await call("get", id=sid)
+        # **Resume with changes…** asks for the form outright and creates nothing (§4.5a).
+        if body.get("form"):
+            return JSONResponse({"ok": True, "form": resume_form_url(rec)})
+        if why := resume_blocked(rec):
+            return JSONResponse({"ok": False, "form": resume_form_url(rec, why), "why": why})
+        # *Reopen and push* is the same press with a first prompt **the page wrote** — fixed text
+        # in the source, never anything a session said (§4.2, TD-071 item 8).
+        prompt = REOPEN_AND_PUSH if body.get("push") else ""
+        try:
+            new = await call("create", **resume_create(rec, prompt=prompt))
+        except HTTPException as e:
+            why = str(e.detail).strip('"') or "the host agent refused the resume"
+            return JSONResponse({"ok": False, "form": resume_form_url(rec, why), "why": why})
+        return JSONResponse({"ok": True, "id": new["id"]})
 
     @app.post("/api/sessions/{sid}/{action}")
     async def action(sid: str, action: str, request: Request):

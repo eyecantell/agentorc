@@ -3,6 +3,10 @@
 {% block body %}
 <div class="page narrow">
   <div class="h1">New session</div>
+  {# design §4.5a **Resume** (TD-081 step 2): *when it cannot be silent it is not a guess* — a
+     one-press Resume that could not run lands here, filled in, with the reason on it, so a person
+     knows which control they pressed and what stopped it. Fixed text plus the reason as given. #}
+  {% if prefill.why %}<div class="warn" id="resumewhy">⚠ Resume could not be one press: {{ prefill.why }} — the form is filled in from that session; change what needs changing and Start.</div>{% endif %}
   <form method="post" action="/new" class="col gap">
     <div class="grid2">
       <div class="field"><label>Host</label><span class="input">{{ host }}</span></div>
@@ -27,18 +31,18 @@
         <select class="input" name="adapter">{% for a in adapters %}<option value="{{ a }}"{% if a == prefill.adapter %} selected{% endif %}>{{ a }}</option>{% endfor %}</select>
         <span class="note">claude-code: state from hooks · shell: guessed from the screen</span>
       </div>
-      <div class="field"><label>Name</label><input class="input mono" name="name" placeholder="td-302" required>
+      <div class="field"><label>Name</label><input class="input mono" name="name" value="{{ prefill.name }}" placeholder="td-302" required>
         <span class="note" id="namecheck"></span></div>
       <div class="field"><label>Profile</label>
         {# an empty pick lets the role's `profile` apply (design §4.9 precedence), else the host's default #}
-        <select class="input" name="profile"><option value="" selected>the role's, else {{ default_profile }} (default)</option>{% for k, p in profiles.items() %}<option value="{{ k }}">{{ p.label }}</option>{% endfor %}</select>
+        <select class="input" name="profile"><option value=""{% if not prefill.profile %} selected{% endif %}>the role's, else {{ default_profile }} (default)</option>{% for k, p in profiles.items() %}<option value="{{ k }}"{% if k == prefill.profile %} selected{% endif %}>{{ p.label }}</option>{% endfor %}</select>
         <span class="note">tool · account · model, from ~/.agentorc/profiles.yml</span>
       </div>
       {# design §4.5a New session **Role** preset + **Lane** field (§4.8): a preset fills the brief
          from its template, the lane's default, its grants and its profile; the list is the built-ins
          plus what the directory's repo defines, refreshed from /api/roles as the directory changes. #}
       <div class="field"><label>Role</label>
-        <select class="input" name="role" id="role">{% for r in roles %}<option value="{{ r.name }}"{% if r.name == 'plain' %} selected{% endif %} data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}">{{ r.name }} [{{ r.source }}]{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}</option>{% endfor %}</select>
+        <select class="input" name="role" id="role">{% for r in roles %}<option value="{{ r.name }}"{% if r.name == (prefill.role or 'plain') %} selected{% endif %} data-lane="{{ r.lane|join(', ') }}" data-controllers="{{ r.controllers|join(',') }}" data-grants="{{ r.grants|join(',') }}">{{ r.name }} [{{ r.source }}]{% if r.grants %} · grants {{ r.grants|join(', ') }}{% endif %}</option>{% endfor %}</select>
         <span class="note" id="rolenote">a preset fills the brief, lane, grants and profile it names; each can be edited before Start</span>
       </div>
       {# design §4.5a New session **Grants** checkboxes (§4.8): the capabilities the session starts
@@ -54,7 +58,7 @@
         <div class="note">None is the default and is what every session has: a session with no grant can act on nothing but itself.</div>
       </div>
       <div class="field"><label>Lane</label>
-        <input class="input mono" name="lane" placeholder="TD-027, TD-019 · or free-pick">
+        <input class="input mono" name="lane" value="{{ prefill.lane }}" placeholder="TD-027, TD-019 · or free-pick">
         <span class="note">the references this session is handed, in order; empty: the role's default</span>
       </div>
       <div class="field"><label>Resume (optional)</label><input class="input mono" name="resume" value="{{ prefill.resume }}" placeholder="the tool's session id"></div>
@@ -74,7 +78,7 @@
       <input class="input mono" name="until" placeholder="06:00 · +8h · an ISO time">
       <span class="note">when an <b>unattended</b> session stops: at it the agent asks it to wrap up and stops it once it settles, ten minutes at the outside. Empty: nothing stops it.</span>
     </div>
-    <label class="radio gap"><input type="checkbox" name="unattended"><div><div>Unattended</div><div class="note">off: interactive — never paused, sent to, or killed by a policy. on: policies apply (phase 3).</div></div></label>
+    <label class="radio gap"><input type="checkbox" name="unattended"{% if prefill.unattended %} checked{% endif %}><div><div>Unattended</div><div class="note">off: interactive — never paused, sent to, or killed by a policy. on: policies apply (phase 3).</div></div></label>
     {# design §4.5a New session **Controllers** picker (§4.8, TD-036): which sessions may act on
        this one once it starts. The candidates are the sessions holding `control` — nothing
        else could act on it anyway — and none is selected by default: an empty list means nobody
@@ -83,7 +87,7 @@
       <label>Controllers</label>
       {% if control_holders %}
         <div class="row gap wrap">
-          {% for o in control_holders %}<label class="radio"><input type="checkbox" name="controller" value="{{ o.id }}" data-name="{{ o.name }}"{% if o.name in default_controllers or o.id in default_controllers %} checked{% endif %}>
+          {% for o in control_holders %}<label class="radio"><input type="checkbox" name="controller" value="{{ o.id }}" data-name="{{ o.name }}"{% if o.id in prefill.controllers or o.name in prefill.controllers or ((not prefill.controllers) and (o.name in default_controllers or o.id in default_controllers)) %} checked{% endif %}>
             <div><div>{{ o.name }}</div><div class="note mono">{{ o.id }}</div></div></label>{% endfor %}
         </div>
         <div class="note">The sessions that may act on this one (send, wrap up, kill, close). None selected: nobody may — you can add one later from the session's Focus or with <code>ao control</code>. Ticked in advance: the repo's or the role's <code>controllers:</code> from <code>.agentorc.yml</code>.</div>
