@@ -20,7 +20,7 @@ from agentorc import repoconfig, teamrun, teams
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
 from sessionorc.adapters import short_model
-from sessionorc.client import AgentError, AgentUnavailable, LocalClient
+from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.models import GRANT_ALIASES, GRANTS, STATE_RANK, report_line, stop_note
 from sessionorc.tmux import attach_argv
@@ -104,8 +104,13 @@ def cmd_wait(args: argparse.Namespace) -> int:
     caller = os.environ.get("AGENTORC_SESSION") or None
 
     async def go() -> Any:
-        async with LocalClient(caller=caller) as c:
-            return await c.call("wait", timeout=args.timeout, scope=args.scope)
+        # Through a restart (TD-086 item 1): a promote takes the socket out from under a blocked
+        # wait, and the unit is back in seconds. The wait is remade rather than lost, with the
+        # time that is left, so a lead does not see a promote. The transport owns that, not this.
+        got, remakes = await clientmod.wait_rpc(caller=caller, timeout=args.timeout, scope=args.scope)
+        if remakes and not args.json:
+            print(f"[agentorc] the host agent restarted while waiting — the wait was remade ({remakes}×)")
+        return got
 
     try:
         got = asyncio.run(go())

@@ -11,9 +11,9 @@ from datetime import timedelta
 import pytest
 from conftest import kill_private_server, private_socket_name, wait_for, wait_state
 
-from sessionorc import paths
+from sessionorc import client, paths
 from sessionorc.agent import HostAgent
-from sessionorc.client import AgentError, LocalClient
+from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.models import Pending, Session
 from sessionorc.store import SessionStore
 from sessionorc.tmux import Tmux
@@ -251,3 +251,50 @@ def test_prune_runs_keeps_live_logs(tmp_path, monkeypatch):
         assert not fresh.exists() and live_log.exists()
     finally:
         kill_private_server(tmux)
+
+
+async def test_a_wait_rides_out_a_restart_and_returns_the_change(tmp_path, monkeypatch):
+    """TD-086 item 1: a promote restarts `agentorc-agent` under every blocked `ao wait`, and the
+    wait died with the socket — a lead lost its wake channel by a routine act of the anchor's,
+    three times in one evening. `client.wait_rpc` remakes the connection instead, with the time
+    that is left, so the wait keeps its promise: it returns on the first thing in scope.
+
+    Nothing is missed across the gap. The cursor is the agent's, written on every way out of
+    `rpc_wait` holding only what that wait compared and found **unchanged** — so a change that
+    lands while nobody is connected is still ahead of it, and the remade wait returns it at once.
+    Here the change lands **while the agent is down**, which is the case that matters."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
+    tmux = Tmux(socket_name=private_socket_name())
+    try:
+        _, task = await start(tmux)
+        async with LocalClient() as person:
+            lead = (await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash"]))["id"]
+            w = (await person.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash"]))["id"]
+            await person.call("set_controllers", id=w, add=[lead])
+            await person.call("wait", timeout=0.1, caller=lead)  # a first wait records the cursor
+
+        waiting = asyncio.create_task(client.wait_rpc(caller=lead, timeout=30.0))
+        await asyncio.sleep(0.4)  # it is blocked at the agent
+        await stop(task)  # the promote
+        # what changes while nothing is listening — and a real change, not a hand-written one:
+        # the agent stopping leaves tmux alone, so a record edited in the store would simply
+        # reconcile back on the restart
+        tmux.kill_session(w)
+        _, task = await start(tmux)
+
+        got, remakes = await asyncio.wait_for(waiting, 20)
+        assert remakes >= 1, "the wait was not remade — nothing rode out the restart"
+        assert [c["id"] for c in got["changed"]] == [w]  # and it returned the change it never saw
+        await stop(task)
+    finally:
+        kill_private_server(tmux)
+
+
+async def test_a_wait_against_no_agent_at_all_is_still_an_error(tmp_path, monkeypatch):
+    """The other half of TD-086 item 1: a connection that closes **mid-call** is told apart from
+    an agent that cannot be reached at all. Nothing answers here, so nothing is retried — the
+    caller is told at once, as before, rather than waiting out a grace for an agent that is down."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    with pytest.raises(AgentUnavailable, match="not reachable"):
+        await client.wait_rpc(caller="ao-nobody", timeout=30.0)

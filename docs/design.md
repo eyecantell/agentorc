@@ -1718,7 +1718,22 @@ lead controls.** The prior-art survey behind the rules below is
   controls that target. Control is handed on, never seized.
 **Waking a lead** (TD-049, from Paul 2026-09-14). Everything a lead knows, it learns by asking, so it is up to a round stale on every event that matters — a worker marking `done` waits a round for its cadence check, a worker that exited waits a round for its restart — and a quiet team pays for a poll that finds nothing, on the same usage budget as the work. The substrate for the alternative already exists and no session used it: `subscribe` (§4.6) is a stream of record deltas, which is what the Org page consumes.
 
-`ao wait [--timeout N]` is a blocking command over that stream (built in the CLI 2026-09-14; since TD-052 step 3 a thin call to the host agent's `wait` RPC, which compares its own complete records against the same cursor, so the host agent can decide mail wakes — §4.10): a lead's round **ends** with it instead of sleeping. An event returns in about a second, a quiet window returns at the timeout, and **that timeout is the fallback poll** — one mechanism, not two that can disagree. Four things make it trustworthy rather than merely quick:
+`ao wait [--timeout N]` is a blocking command over that stream (built in the CLI 2026-09-14; since TD-052 step 3 a thin call to the host agent's `wait` RPC, which compares its own complete records against the same cursor, so the host agent can decide mail wakes — §4.10): a lead's round **ends** with it instead of sleeping. An event returns in about a second, a quiet window returns at the timeout, and **that timeout is the fallback poll** — one mechanism, not two that can disagree. **A restart of the host agent does not end a wait** (2026-09-20, TD-086): a promote takes the
+socket out from under every blocked wait, and the unit is back in seconds — so the call is
+**remade**, on a new connection, with the time that is left of the caller's own timeout, and what
+`wait` promises is unchanged. Nothing is missed across the gap: the cursor is written on every way
+out of `rpc_wait` and holds only what that wait *compared and found unchanged*, so a change that
+arrived while nobody was connected is still ahead of it — and a `SIGKILL`, which runs no `finally`,
+leaves it where the last wait that *returned* left it, which is the same answer from the other
+side. The one thing no reconnect recovers is a reply **composed and not delivered**, the agent
+dying between returning a result (which advances the cursor) and the bytes reaching the socket:
+a window one local write wide, inherent to a request and a reply with no ack, and named rather
+than claimed away. **A reconnect is not a wake** — it decides
+nothing; the next wait takes the decision the last one would have, against the same `mail_decided`
+watermark. And a drop is told apart from an agent that is not there: the **first** connection is
+never retried, so an agent that is down is still an error at once, and a connection that was made
+and then lost is remade only within a grace, because past some point a restart is an outage.
+Four things make it trustworthy rather than merely quick:
 
 - **Scope is the authority rule.** By default a lead waits on exactly the sessions it may act on — those whose `controllers` name it — so the wake and the authority cannot drift apart. A person at a terminal has no caller and sees everything, which is what `ao status` gives them anyway.
 - **The vocabulary is short, and the exclusions are the point.** A wake is a change to a session's `state`, its `exit_code`, the pending thing it is asking (the question, never the permission's countdown), what it has claimed or marked `done` and with which PR, what it has filed, who controls it, or its declaration that it is out of work (§4.9a). Explicitly **not** `last_output`, `tail`, `since`, `seen_at` or `git`: those move on almost every tick of a healthy session, and a lead woken continuously is worth less than the poll it replaces.

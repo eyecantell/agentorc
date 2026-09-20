@@ -111,6 +111,72 @@ class LocalClient:
             yield json.loads(line)
 
 
+# How long a `wait` keeps trying to reconnect after the socket goes under it (design §4.8
+# *Waking a lead*, TD-086). A promote restarts `agentorc-agent` and the unit is back in seconds
+# (TD-062); eight promotes in one evening cost a lead its wake channel three times. Long enough
+# for a restart under load, short enough that a real outage is still an error a person sees.
+RECONNECT_GRACE = 30.0
+RECONNECT_STEP = 0.25  # between attempts, so a restart that takes a moment is not a busy loop
+
+
+async def wait_rpc(
+    *,
+    caller: str | None,
+    timeout: float,
+    scope: str | None = None,
+    sock: Path | None = None,
+    grace: float = RECONNECT_GRACE,
+) -> tuple[Any, int]:
+    """The `wait` RPC, **carried across a host-agent restart** (TD-086 item 1). Returns
+    `(what wait returned, how many times the connection had to be remade)`.
+
+    A promote restarts the unit under every blocked wait, and the wait's own connection dies with
+    it: a lead's wake channel then stays gone until its next round, by a routine act of the
+    anchor's. Here a drop is not the end of the wait — the call is reissued, on a new connection,
+    with **the time that is left of the caller's own timeout**, so what `wait` promises is
+    unchanged: it returns on the first thing in scope, or at the timeout, and never later.
+
+    **Nothing is missed across the gap.** The cursor is the agent's, per caller, written on every
+    way out of `rpc_wait` and holding only what that wait *compared and found unchanged* — a
+    change that arrived while nobody was connected is still ahead of it, so the reissued wait
+    returns it at once. A `SIGKILL`, which runs no `finally`, leaves the cursor where the last
+    wait that **returned** left it, which is the same answer from the other side. And **a
+    reconnect is not a wake**: it decides nothing itself; the next wait takes the same decision
+    the last one would have, against the same `mail_decided` watermark (§4.10 *the wake budget*).
+    The one thing a reconnect cannot recover is a reply that was **composed and not delivered** —
+    the agent died between returning a result, which advances the cursor, and the bytes reaching
+    the socket. That window is a write to a local socket wide and is inherent to a request and a
+    reply without an ack; it is named here rather than papered over (review of PR #303).
+
+    **A drop is told apart from an agent that is not there.** The first connection is not retried:
+    if nothing answers the socket, that is an agent which is down and the caller is told so, as
+    before. Only a connection that was *made and then lost* is remade, and only within `grace` —
+    past that the same refusal is raised, because at some point a restart is an outage.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + max(float(timeout), 0.0)
+    remakes = 0
+    connected = False
+    lost_at: float | None = None  # when the socket went, so the grace is time and not attempts
+    while True:
+        left = deadline - loop.time()
+        if left <= 0:
+            return {"changed": [], "mail": [], "wake": None}, remakes
+        try:
+            async with LocalClient(sock=sock, caller=caller) as c:
+                connected, lost_at = True, None  # back: a later drop gets a grace of its own
+                return await c.call("wait", timeout=left, scope=scope), remakes
+        except AgentUnavailable:
+            if not connected:
+                raise  # nothing ever answered: an agent that is down, not one that restarted
+            now = loop.time()
+            lost_at = now if lost_at is None else lost_at
+            if now - lost_at > grace:
+                raise  # at some point a restart is an outage, and a person should be told
+            remakes += 1
+            await asyncio.sleep(min(RECONNECT_STEP, max(deadline - loop.time(), 0.0)))
+
+
 def call_sync(method: str, *, caller: str | None = None, **params: Any) -> Any:
     async def _go() -> Any:
         async with LocalClient(caller=caller) as c:
