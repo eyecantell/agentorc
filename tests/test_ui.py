@@ -1128,3 +1128,106 @@ def test_the_node_banner_reads_the_host_rpc():
     assert up.startswith("node of kmaster: linked")
     down = {"mode": "node", "home": "kmaster", "home_reachable": False, "link": {"since": "t", "why": "ssh failed"}}
     assert node_banner(down).startswith("node of kmaster: unreachable since t — ssh failed · offline")
+
+
+def test_the_card_and_focus_show_the_tools_own_title_beside_the_name(tmp_path, monkeypatch):
+    """TD-074 step 3, design §4.5a **title**: the session's name as its tool holds it, shown beside
+    agentorc's own name on the card and in the Focus header — always when there is one, since it is
+    a name and not a status. Display only: no control sets it, and the text is escaped. The Org
+    filter matches a card's text, so it matches this too."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "idle", "since": "2026-09-19T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],
+        "created": "2026-09-19T15:00:00Z",
+    }  # fmt: skip
+    card, focus = templates.get_template("card.html"), templates.get_template("focus.html")
+    assert view(base)["title"] == ""  # no title: nothing drawn, and no empty chip
+    assert "tool-title" not in card.render(s=view(base))
+
+    titled = view({**base, "title": "Error Checker"})
+    assert titled["title"] == "Error Checker"
+    html = card.render(s=titled)
+    assert "Error Checker" in html and "tool-title" in html
+    assert 'data-act="title' not in html and 'data-act="rename' not in html  # agentorc has no rename
+    # the whole of it is on hover, so the card may clip it; the Focus header carries it too
+    assert "title=\"the session's name as its tool holds it" in html
+    assert "Error Checker" in focus.render(s={**titled, "grants_all": [], "ready": []}, host="h", active="Org")
+    # it is a model's text: escaped, never markup
+    marked = card.render(s=view({**base, "title": "<b>x</b> & y"}))
+    assert "&lt;b&gt;x&lt;/b&gt; &amp; y" in marked
+    # a malformed field costs the card its title and nothing else
+    for junk in (7, ["nope"], None):
+        assert view({**base, "title": junk})["title"] == ""
+
+
+def test_the_filter_matches_the_tools_own_title(tmp_path, monkeypatch):
+    """TD-074 step 3, design §4.5a **title**: *the filter box matches it*. The Org filter matches a
+    card's own text (`applyFilter`), so the title is matched by being rendered in it — this pins
+    both halves: the filter still reads the card's text, and the title is part of that text."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert "c.textContent.toLowerCase().includes(q)" in js
+    html = templates.get_template("card.html").render(
+        s=view(
+            {
+                "id": "ao-x-8",
+                "name": "w",
+                "kind": "agent",
+                "adapter": "claude-code",
+                "dir": str(tmp_path),
+                "state": "idle",
+                "since": "2026-09-19T16:00:00Z",
+                "title": "Error Checker",
+            }
+        )  # fmt: skip
+    )
+    assert re.search(r">\s*Error Checker\s*<", html)  # text of the card, not an attribute alone
+
+
+def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_path, monkeypatch):
+    """TD-074 step 4, design §4.8 *Role presets*: the preset's icon inside the role badge — one of
+    the eight the UI ships, small, monochrome and `currentColor`, with the badge's word beside it.
+    It is resolved from the role's *name* at render time, through `repoconfig` (nothing in the core
+    keys on a role, §9 invariant 9); a role with no icon, or a name this build does not know, draws
+    nothing rather than an error."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    import asyncio
+
+    from agentorc.repoconfig import ICONS
+    from agentorc.ui import app as uiapp
+    from agentorc.ui.icons import ICON_PATHS, role_svg
+
+    assert sorted(ICON_PATHS) == sorted(ICONS)  # every name the config accepts has a picture
+    assert 'stroke="currentColor"' in role_svg("flag") and 'aria-hidden="true"' in role_svg("flag")
+    assert "M5 21V4M5 4h11l-2 4 2 4H5" in role_svg("flag")  # the flag, as the design gives it
+    assert 'fill="none"' in role_svg("flag")  # stroked, never filled: it is not something to press
+    assert role_svg(None) == "" and role_svg("rocket") == ""  # never an error on the page
+
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {icon: terminal}\n")
+
+    def rec(sid, role=None, repo=None):
+        r = {"id": sid, "name": sid, "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+             "state": "idle", "since": "2026-09-19T16:00:00Z"}  # fmt: skip
+        if role:
+            r["role"] = role
+        if repo:
+            r["repo"] = repo
+        return r
+
+    records = [rec("ao-l", "lead"), rec("ao-g", "grinder", str(tmp_path)), rec("ao-p", "plain"), rec("ao-n")]
+    uiapp._icon_cache.clear()
+    icons = asyncio.run(uiapp.role_icons(records))
+    card = uiapp.templates.get_template("card.html")
+    lead, grinder, plain, none = (card.render(s=uiapp.view(r, records, icons=icons)) for r in records)
+    assert ICON_PATHS["flag"] in lead and ">lead</span>" in lead  # the picture, and the word beside it
+    # the repo's own `roles:` wins, exactly as it does for every other key
+    assert ICON_PATHS["terminal"] in grinder and ICON_PATHS["wrench"] not in grinder
+    # `plain` carries no icon, and a session with no role carries no badge at all
+    assert "ricon" not in plain and "ricon" not in none
+    # a caller that resolved no icons still renders the badge's word, and nothing breaks
+    assert "ricon" not in card.render(s=uiapp.view(records[0], records))

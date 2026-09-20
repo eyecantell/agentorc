@@ -6,7 +6,7 @@ worktrees: .claude/worktrees
 anchor: main-checkout-single
 unattended: {workers: 3, ...}         # kept as a block; the loader only knows it is present
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
-  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}
+  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}
   lead: {grants: [control], controllers: []}
 controllers: [orchestrator-ao-1]      # who may act on a session started here; omitted = nobody
 ledger: docs/technical_debt.md
@@ -42,17 +42,22 @@ DEFAULT_WORKTREES = ".claude/worktrees"
 DEFAULT_ANCHOR = "main-checkout-single"
 DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
-ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers")
+ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon")
+# A role's icon (design §4.8 *Role presets*, 2026-09-19, TD-074): one name from the fixed set the UI
+# ships, never markup from a config file. Drawn small and monochrome inside the role badge — a
+# label's picture and nothing more. An unknown name is refused when the file is read, as an unknown
+# grant is; a role with no icon draws nothing.
+ICONS = ("flag", "wrench", "search", "eye", "book", "shield", "terminal", "person")
 LANE_PLACEHOLDER = "{lane}"
 
 # The built-in presets (design §4.8's table): each a brief template shipped with the package
 # (`agentorc/briefs/<role>.md`, `{lane}` filled at launch), a default lane shape, and its grants.
 # None names a profile: profile names are the person's (§4.2a, §4.9).
 PRESETS: dict[str, dict[str, Any]] = {
-    "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": []},
-    "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": []},
-    "lead": {"brief": "lead.md", "lane": [], "grants": ["control"]},
-    "plain": {"brief": None, "lane": [], "grants": []},
+    "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": [], "icon": "wrench"},
+    "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": [], "icon": "search"},
+    "lead": {"brief": "lead.md", "lane": [], "grants": ["control"], "icon": "flag"},
+    "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
 # Renamed roles, old → new (TD-055, docs/glossary.md): the old name still resolves for one release,
@@ -120,6 +125,7 @@ class Role:
     lane: list[str] = field(default_factory=list)
     grants: list[str] = field(default_factory=list)
     profile: str | None = None
+    icon: str | None = None  # one name from `ICONS` (§4.8), or None: the badge draws no picture
     controllers: list[str] = field(default_factory=list)
     controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
     # deliberately, and the repo's default is not fallen back to (review of PR #116)
@@ -161,6 +167,7 @@ class Role:
             "lane": list(self.lane),
             "grants": list(self.grants),
             "profile": self.profile,
+            "icon": self.icon,
             "controllers": list(self.controllers),
             "source": self.source,
         }
@@ -290,7 +297,7 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise ValueError(f"{here} must be a mapping (brief, lane, grants, profile, controllers)")
+        raise ValueError(f"{here} must be a mapping ({', '.join(ROLE_KEYS)})")
     out: dict[str, Any] = {}
     for k, v in raw.items():
         k = str(k)
@@ -300,6 +307,15 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             if v is not None and (not isinstance(v, str) or not v.strip()):
                 raise ValueError(f"{here}.{k} must be a string")
             out[k] = v.strip() if isinstance(v, str) else None
+        elif k == "icon":
+            # One name from the set the UI ships (§4.8): checked when the file is read, exactly as a
+            # grant is, so a typo is a line naming the key and never a blank badge on the page.
+            if v is not None and (not isinstance(v, str) or not v.strip()):
+                raise ValueError(f"{here}.icon must be a string")
+            name = v.strip() if isinstance(v, str) else None
+            if name is not None and name not in ICONS:
+                raise ValueError(f"{here}.icon: unknown icon {name!r} (known: {', '.join(ICONS)})")
+            out[k] = name
         elif k == "grants":
             grants = _str_list(v, f"{here}.grants")
             for old in dict.fromkeys(g for g in grants if g in GRANT_ALIASES):
@@ -342,6 +358,8 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
             role.grants = list(block["grants"])
         if "profile" in block:
             role.profile = block["profile"]
+        if "icon" in block:
+            role.icon = block["icon"]
         if "controllers" in block:
             role.controllers, role.controllers_set = list(block["controllers"]), True
     return role

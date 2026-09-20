@@ -128,6 +128,13 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
    pane output, so a long line wraps instead of being clipped mid-word; no colour of its own — the
    state tile stays the one coloured thing on a card. */
 .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: var(--strong); }
+/* design §4.5a **title** (§4.3 `title()`, TD-074): the tool's own name for the session, beside
+   agentorc's. Secondary — agentorc's name leads — and clipped on a card (`.meta` ellipsises), with
+   the whole of it on hover. */
+.tool-title { max-width: 16em; flex: 0 1 auto; }
+/* design §4.8 *Role presets*: the role badge's picture — `currentColor`, no fill, so it takes the
+   badge's muted ink and never reads as something to press. */
+.badge .ricon { vertical-align: -2px; margin-right: 3px; }
 .term { background: var(--term); color: var(--termfg); font-family: "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; padding: 10px 12px; border-radius: 4px; white-space: pre; overflow: hidden; }
 .term.tail { font-size: 11px; line-height: 1.55; padding: 6px 9px; color: var(--tail); min-height: 54px; }
 details.more { position: relative; } details.more summary { list-style: none; } details.more summary::-webkit-details-marker { display: none; }

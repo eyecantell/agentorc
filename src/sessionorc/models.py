@@ -64,6 +64,7 @@ NODE_OWNED = frozenset(
         "confidence",
         "pane",
         "tail",
+        "title",
         "last_output",
         "exit_code",
         "git",
@@ -387,6 +388,13 @@ class Session:
     unattended: bool = False
     created: str = field(default_factory=now_iso)
     tail: list[str] = field(default_factory=list)
+    # The session's name as its tool holds it (design §4.5a **title**, §4.3 `title()`, TD-074):
+    # observed from the pane on the host where the pane lives, exactly as `tail` is — the tool
+    # writes its terminal title, tmux holds it as `#{pane_title}`, and the session's adapter says
+    # what of it is a name. Display only: agentorc has no rename of its own, so nothing here ever
+    # writes it. None when the adapter has no opinion or there is no name to show; it changes
+    # rarely and no wake fires on it (it is out of `wake_digest`).
+    title: str | None = None
     exit_code: int | None = None
     # A tmux pane (live or dead) still backs this record. False after `kill`/`close` (the session is
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).

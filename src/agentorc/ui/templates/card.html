@@ -7,9 +7,17 @@
   <div class="sc-body">
     <div class="row">
       <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>
+      {# design §4.5a card **title** (§4.3 `title()`, TD-074): the session's name as its tool holds
+         it, beside agentorc's own name for it. Display only — it is set in the tool, never here —
+         so it carries no control; secondary and truncated, with the whole of it on hover. The Org
+         filter matches the card's text, so it matches this too. #}
+      {% if s.title %}<span class="meta tool-title" title="the session's name as its tool holds it (design §4.5a) — set in the tool, not in agentorc: {{ s.title }}">{{ s.title }}</span>{% endif %}
       <button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
               title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>
-      {% if s.role %}<span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ s.role }}</span>{% endif %}
+      {# design §4.8 *Role presets* (TD-074): the preset's icon inside the badge — a label's picture,
+         small and monochrome, so the state pill stays the one coloured thing. A role with no icon,
+         or one this build does not know, draws its word alone. #}
+      {% if s.role %}<span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ role_svg(s.role_icon) }}{{ s.role }}</span>{% endif %}
       {# design §4.5a card **team** badge (§4.9): the team the session was started under; a badge,
          nothing keys on it (§9 invariant 9). Click filters the grid to that team, client-side. #}
       {% if s.team %}<button class="badge team" data-team="{{ s.team }}" title="team {{ s.team }} — click: show only this team">{{ s.team }}</button>{% endif %}

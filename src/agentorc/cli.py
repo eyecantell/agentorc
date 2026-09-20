@@ -176,6 +176,10 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      members: {', '.join(members)}")
             if note := stop_note(s):
                 print(f"{'':<{w}}      {note}")
+            # design §4.5a **title** (§4.3 `title()`, TD-074): the session's name as its tool holds
+            # it — set in the tool and never here, shown wherever agentorc shows its own name.
+            if title := str(s.get("title") or "").strip():
+                print(f"{'':<{w}}      title:  {title}")
             if model := short_model(s.get("adapter") or "", s.get("model")):
                 print(f"{'':<{w}}      model:  {model}")
             if line := report_line(s):

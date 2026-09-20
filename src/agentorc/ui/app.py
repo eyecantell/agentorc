@@ -33,11 +33,15 @@ from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
 from sessionorc.models import GRANTS, STATE_RANK, canonical_grants, has_control, report_head, report_line, stop_note
 
+from .icons import role_svg
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 
 HERE = Path(__file__).parent
 log = logging.getLogger("uvicorn.error")  # the logger uvicorn already shows on the console
 templates = Jinja2Templates(directory=str(HERE / "templates"))
+# The role badge's picture (design §4.8 *Role presets*, TD-074): the markup lives in one place and
+# the template asks for it by name, so no config file ever carries an SVG.
+templates.env.globals["role_svg"] = role_svg
 
 # The New session form's `controller` field when nothing is ticked: an empty list means nobody may
 # act on the session, which is design §4.8's explicit default. Module-level so the signature keeps
@@ -234,7 +238,43 @@ def stop_fields(until: str, unattended: bool) -> dict[str, str]:
         raise HTTPException(400, str(e)) from None
 
 
-def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_known: bool = True) -> dict[str, Any]:
+ICON_TTL = 5.0  # seconds a resolved role icon is kept, the `DEFS_TTL` idiom (design §4.5a)
+# (repo, role) → (read at, icon name). Module-level, so every open page and every delta shares one
+# read: resolving an icon is a `.agentorc.yml` per repo, which must never ride the render path.
+_icon_cache: dict[tuple[str, str], tuple[float, str]] = {}
+
+
+def _icon_for(repo: str, role: str) -> str:
+    """The role's icon in that repo (design §4.8): the repo's own `roles:` over the org's over the
+    built-in, resolved by `repoconfig` — the core never keys on a role, and the UI is free to
+    (§9 invariant 9). A repo with no file, an unreadable one, a role nothing defines: no icon,
+    never an error on the page."""
+    try:
+        cfg = repoconfig.load(repo) if repo else repoconfig.RepoConfig()
+        return repoconfig.resolve_role(cfg, role, org_here()[0].roles).icon or ""
+    except (KeyError, ValueError, OSError):
+        return ""
+
+
+async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, str], str]:
+    """The icon per (repo, role) the fleet carries, off the loop and cached for `ICON_TTL` seconds —
+    a role redefined by hand shows on the next load, or within that, exactly as a team definition
+    does. Passed into `view`, so the record itself never carries an icon."""
+    now = time.monotonic()
+    want = {(str(s.get("repo") or ""), str(s.get("role") or "")) for s in sessions if s.get("role")}
+    if stale := [k for k in want if now - _icon_cache.get(k, (0.0, ""))[0] > ICON_TTL]:
+        got = await asyncio.to_thread(lambda: {k: _icon_for(*k) for k in stale})
+        _icon_cache.update({k: (now, v) for k, v in got.items()})
+    return {k: _icon_cache[k][1] for k in want if k in _icon_cache}
+
+
+def view(
+    s: dict[str, Any],
+    fleet: list[dict[str, Any]] | None = None,
+    *,
+    fleet_known: bool = True,
+    icons: dict[tuple[str, str], str] | None = None,
+) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
     a lead — which sessions it controls. Without it both come back empty, which is what a
@@ -335,6 +375,16 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
     doing = doing if isinstance(doing, dict) else {}
     text = str(doing.get("text") or "").strip() if isinstance(doing.get("text"), str) else ""
     d["doing"] = {"text": text, "age": _age(doing.get("at"), now)} if text else None
+    # design §4.5a card / Focus header **title** (§4.3 `title()`, TD-074): the session's name as its
+    # tool holds it, observed from the pane and cleaned there. Display only and always shown when
+    # there is one — it is a name, not a status, so it is not a fallback for the `doing` line. Empty
+    # for every adapter that gives none, which is what draws nothing.
+    tool_title = s.get("title")
+    d["title"] = tool_title.strip() if isinstance(tool_title, str) else ""
+    # The role's icon (design §4.8 *Role presets*): resolved here from the role's *name* — nothing in
+    # the core keys on a role (§9 invariant 9) and no icon is stored on the record. Without a map
+    # (a caller that did not resolve one) the badge draws its word alone, as it always has.
+    d["role_icon"] = (icons or {}).get((str(s.get("repo") or ""), str(s.get("role") or "")), "")
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
@@ -578,7 +628,8 @@ def create_app() -> FastAPI:
             if e.status_code != 503:
                 raise
             sessions, agent_down = [], True
-        vs = sorted((view(s, sessions) for s in sessions), key=lambda v: (v["rank"], v["name"]))
+        icons = await role_icons(sessions)
+        vs = sorted((view(s, sessions, icons=icons) for s in sessions), key=lambda v: (v["rank"], v["name"]))
         counts = {k: sum(1 for v in vs if v["state"] == k) for k in ("needs-you", "limited", "stalled?")}
         strip = teams_view(sessions)
         return templates.TemplateResponse(
@@ -613,7 +664,13 @@ def create_app() -> FastAPI:
         except HTTPException:  # the record we already have still renders; membership just empties
             fleet, known = [s], False  # …and Ready to close says it does not know, rather than pass
         return templates.TemplateResponse(
-            request, "focus.html", {"s": view(s, fleet, fleet_known=known), "host": host_name(), "active": "Org"}
+            request,
+            "focus.html",
+            {
+                "s": view(s, fleet, fleet_known=known, icons=await role_icons([s])),
+                "host": host_name(),
+                "active": "Org",
+            },
         )
 
     @app.get("/new", response_class=HTMLResponse)
@@ -1034,7 +1091,8 @@ def create_app() -> FastAPI:
     @app.get("/api/sessions")
     async def api_sessions():
         sessions = await call("list")
-        return [view(s, sessions) for s in sessions]
+        icons = await role_icons(sessions)
+        return [view(s, sessions, icons=icons) for s in sessions]
 
     # -- live state ------------------------------------------------------------------------------
 
@@ -1061,7 +1119,7 @@ def create_app() -> FastAPI:
                 if ev.get("event") == "session":
                     s = ev["session"]
                     known[s["id"]] = s
-                    v = view(s, list(known.values()))
+                    v = view(s, list(known.values()), icons=await role_icons([s]))
                     # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
                     # `controllers` change on one record can move a card, change a lead, or turn
                     # grouping on or off for the whole page, and only the server sees the fleet.
@@ -1091,7 +1149,7 @@ def create_app() -> FastAPI:
                         # session that is gone until the page is reloaded (review 2026-09-13).
                         for other in list(known.values()):
                             if went in (other.get("controllers") or []):
-                                ov = view(other, list(known.values()))
+                                ov = view(other, list(known.values()), icons=await role_icons([other]))
                                 await ws.send_text(
                                     json.dumps(
                                         {
