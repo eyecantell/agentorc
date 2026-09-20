@@ -38,6 +38,10 @@ CSS = """
   .btn.ghost:hover { background: #eef0f3; }
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
+  /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
+  .status.doing { white-space: normal; overflow-wrap: anywhere; }
+  /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
+  .badge .ricon { vertical-align: -2px; margin-right: 3px; }
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
   svg { width: 14px; height: 14px; }
@@ -45,7 +49,9 @@ CSS = """
   .card { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
   .sc { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; position: relative; }
   .sc-body { display: flex; flex-direction: column; gap: 8px; }
-  .sc-slot { height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
+  /* `min-height`, as the page has it (app.css): a fixed height clipped the doing line's second
+     row and stacked the stalled note on top of it (TD-074 step 6) */
+  .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
   .sc-foot { display: flex; gap: 6px; align-items: center; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
   .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -119,6 +125,24 @@ ICON = {
     "term": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>',
     "git": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="1.6"></circle><circle cx="4" cy="12" r="1.6"></circle><circle cx="12" cy="6" r="1.6"></circle><path d="M4 5.6v4.8M12 7.6c0 2.4-8 1.2-8 3"></path></svg>',
 }
+
+# design §4.8 *Role presets* (TD-074): the role badge's picture. The `d` of each path is copied
+# from `src/agentorc/ui/icons.py`, which is where the page's eight live — a mockup that drew its
+# own would be showing something the page does not. Monochrome and unfilled, so the state pill
+# stays the one coloured thing on a card.
+ROLE_ICON = {
+    "lead": "M5 21V4M5 4h11l-2 4 2 4H5",
+    "grinder": "M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z",
+    "hunter": "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM16 16l5 5",
+}
+
+def role_icon(role):
+    d = ROLE_ICON.get(role)
+    if not d:
+        return ""  # a role with no icon draws its word alone, as the page does
+    return (f'<svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" '
+            f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            f'<path d="{d}"></path></svg>')
 
 BAR = {'needs': '#f59e0b', 'limited': '#7c3aed', 'stalled': '#dc2626', 'working': '#2563eb', 'idle': '#9ca3af', 'exited': '#9ca3af', 'done': '#059669', 'unreachable': '#9ca3af'}
 RANK = {"needs": 0, "limited": 1, "stalled": 2, "working": 3, "idle": 4, "exited": 5, "done": 6}
@@ -216,12 +240,20 @@ def due_strip(compact=False):
 # What §4.9 added to a session and §4.8 to its record: the team badge, the controllers edge, and the
 # two report channels. Keyed by session name; a session with no entry is on no team, under nobody,
 # and reporting nothing — which is every session a person starts for themselves.
+# `doing` is what the session **says** it is doing (§4.8, TD-074) with the age the card prints
+# beside it, and `title` is the name its **tool** holds — Claude Code's own, often the person's
+# (*Error Checker*), shown beside agentorc's name and never a control. Both are display only.
 EXTRA = {
-    "orc-1":     {"team": "samscrape-grind", "role": "orchestrator", "report": "last tick 20:10 · 2 wrapped up", "grants": "orchestrate"},
-    "tdgrind-1": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-301 → #811 · 1/3 done", "findings": "2 filed"},
-    "tdgrind-2": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-296 → #437 · 2/2 done", "derived": True},
-    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed"},
+    "orc-1":     {"team": "samscrape-grind", "role": "lead", "report": "last round 20:10 · 2 wrapped up", "grants": "control",
+                  "doing": ("round 41: reading four members, two claims to re-check", "2m")},
+    "tdgrind-1": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-301 → #811 · 1/3 done", "findings": "2 filed",
+                  "doing": ("TD-301: pushing the branch for review", "14s"), "title": "DIU fetcher"},
+    "tdgrind-2": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-296 → #437 · 2/2 done", "derived": True,
+                  "doing": ("TD-296: waiting on CI for #437", "39m")},
+    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed",
+                  "doing": ("TD-290: reading the summariser before choosing a fix", "9m")},
     "main":      {"findings": "1 filed"},
+    "errors-alerts": {"title": "Error Checker"},
 }
 
 # §4.9 team definitions, as the Teams strip reads them: every team in ~/.agentorc/org.yml and in the
@@ -242,6 +274,23 @@ def report_line(name):
     right = f'<span class="meta">{e["findings"]}</span>' if e.get("findings") else ""
     return f'<div style="display: flex; align-items: center; gap: 8px;">{left}<span style="flex-grow: 1;"></span>{right}</div>'
 
+def doing_of(name):
+    return EXTRA.get(name, {}).get("doing")
+
+def doing_slot(name):
+    """design §4.5a card **doing** line: the session's own words, with the age beneath them, so a
+    line nobody refreshed reads as stale. Text a model wrote — shown, never a control."""
+    text, age = EXTRA[name]["doing"]
+    return (f'<div class="status doing" title="what this session says it is doing (design §4.8): its own words">{text}</div>'
+            f'<div><span class="meta">says · {age} ago</span></div>')
+
+def tool_title(name):
+    """design §4.5a card **title** (§4.3 `title()`): the session's name as its tool holds it,
+    beside agentorc's own. It is set in the tool — agentorc keeps no second name — so it carries
+    no control, and it is always shown, never a fallback for the doing line (Paul, 2026-09-19)."""
+    t = EXTRA.get(name, {}).get("title")
+    return f'<span class="meta" title="the session\'s name as its tool holds it — set in the tool, not in agentorc">{t}</span>' if t else ""
+
 def team_badges(name):
     """the card's **team** badge (§4.9) and its **under `<controller>`** chip (§4.8)."""
     e = EXTRA.get(name, {})
@@ -249,7 +298,8 @@ def team_badges(name):
     if e.get("team"):
         out += f'<span class="badge" title="click: filter the grid to this team">{e["team"]}</span>'
     if e.get("role"):
-        out += f'<span class="badge">{e["role"]}</span>'
+        out += (f'<span class="badge" title="the role preset it was started under (design §4.8): '
+                f'a label, nothing keys on it">{role_icon(e["role"])}{e["role"]}</span>')
     return out
 
 def under_row(name):
@@ -283,6 +333,11 @@ def team_desktop():
             slot = f'<div class="status" style="border-color: #f59e0b; color: #7c3d00;">{pending}</div><div style="display: flex; gap: 6px;"><span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta" style="align-self: center;">via hook · 9m 12s left</span></div>'
         elif state == "limited":
             slot = f'<div class="status lim">{pending}</div><div style="display: flex; gap: 6px;"><span class="btn sm">Switch profile…</span><span class="btn sm ghost">Wait</span></div>'
+        elif state in ("working", "stalled") and doing_of(name):
+            # design §4.5a card **doing** line (§4.8, TD-074): what the session says it is doing
+            # comes *before* the tail — for a TUI the tail is the tool's chrome, never the work.
+            note = f'<div class="status needs">{pending}</div>' if state == "stalled" and pending else ""
+            slot = note + doing_slot(name)
         elif state in ("working", "stalled"):
             tail = pending if pending else "⏺ Edit(scripts/recover_stuck_notices.py)\n▌"
             slot = f'<div class="term tail">{tail}</div>'
@@ -294,16 +349,21 @@ def team_desktop():
             slot = f'<div class="status {"bad" if pending.startswith("not done") else ""}">{pending}</div>'
         elif pending.startswith("ready"):
             slot = f'<div class="status ok">{pending}</div><div style="display: flex; gap: 6px;"><span class="btn sm">Close session</span></div>'
+        elif doing_of(name):
+            # the same line for an idle session: its last word stands until it says another (§4.8)
+            slot = doing_slot(name)
         elif tool == "shell":
             slot = f'<div class="status">last: $ wg show wg0 · at prompt</div>'
         else:
+            # a session that has said nothing keeps the tail, which is what every card showed
+            # before 2026-09-19 — for `shell` and command runs the tail *is* the work
             slot = f'<div class="status">last: ⏺ Edit(scripts/recover_stuck_notices.py)</div>'
         border = "#f59e0b" if state == "needs" else "#dfe3e8"
         place = f"{host} / {repo}" if repo else f"{host} / {where}"
         return f'''<div class="card sc{" off" if state == "unreachable" else ""}" style="border-color: {border};">
   <div class="sbar" style="background: {BAR[state]};"></div>
   <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">{name}</span>{tag_html}{team_badges(name)}<span style="flex-grow: 1;"></span>{pill(state, scraped=(conf == "scraped"))}</div>
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">{name}</span>{tool_title(name)}{tag_html}{team_badges(name)}<span style="flex-grow: 1;"></span>{pill(state, scraped=(conf == "scraped"))}</div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">{place}</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">{age}</span></div>
     <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">{where}</span><span style="flex-grow: 1;"></span>{flag_html}</div>
     <div class="meta">{tool}</div>
@@ -430,7 +490,8 @@ def focus():
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
       {pill("needs")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
-      <span class="badge">samscrape-grind</span><span class="badge">grinder</span>
+      <span class="meta" title="the session\'s name as its tool holds it — set in the tool, not in agentorc">DIU fetcher</span>
+      <span class="badge">samscrape-grind</span><span class="badge">{role_icon("grinder")}grinder</span>
       <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: none</span>
       <span class="badge" title="the sessions that may act on this one; + adds one">under orc-1 ×  +</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
@@ -519,16 +580,16 @@ def focus_orchestrator():
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / orc-1</span>
       {pill("idle")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
-      <span class="badge">samscrape-grind</span><span class="badge">orchestrator</span>
-      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: orchestrate ×</span>
+      <span class="badge">samscrape-grind</span><span class="badge">{role_icon("lead")}lead</span>
+      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: control ×</span>
       <span class="badge" title="the sessions that may act on this one; + adds one">no controller  +</span>
       <span style="flex-grow: 1;"></span>
-      <span class="btn">{{ICON["term"]}}Open shell here</span><span class="btn">{{ICON["code"]}}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{{ICON["kill"]}}Kill</span>
+      <span class="btn">{ICON["term"]}Open shell here</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{ICON["kill"]}Kill</span>
     </div>
-    <div class="term" style="height: 520px;">{{term}}</div>
+    <div class="term" style="height: 520px;">{term}</div>
     <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
       <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
-      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">{{ICON["clip"]}}Attach</span><span style="flex-grow: 1;"></span><span class="btn primary">{{ICON["send"]}}Send</span></div>
+      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">{ICON["clip"]}Attach</span><span style="flex-grow: 1;"></span><span class="btn primary">{ICON["send"]}Send</span></div>
     </div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
@@ -548,7 +609,7 @@ def focus_orchestrator():
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-404</span><span class="badge">filed · medium</span><span class="meta">tdgrind-2 stood down</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
       </div>
     </div>
-    <div class="note">A lead's own channels read like anyone's: what it claimed, what it filed. Its members are the panel above, derived from their <span class="mono">controllers</span> on each tick and never cached (§4.8). Nothing keys on the <span class="mono">orchestrator</span> role — the panel is there because the session holds the <span class="mono">orchestrate</span> grant (§9 invariant 9).</div>
+    <div class="note">A lead's own channels read like anyone's: what it claimed, what it filed. Its members are the panel above, derived from their <span class="mono">controllers</span> on each tick and never cached (§4.8). Nothing keys on the <span class="mono">lead</span> role — the panel is there because the session holds the <span class="mono">control</span> grant (§9 invariant 9).</div>
   </div>
 </div>
 </div>
@@ -589,9 +650,9 @@ def new_session():
       <div class="radio on" style="gap: 8px;"><span class="rb"></span><div><div>orc-1</div><div class="note mono">ao-samscrape-orc-1</div></div></div>
       <div class="radio" style="gap: 8px;"><span class="rb"></span><div><div>orchestrator-ao-1</div><div class="note mono">ao-agentorc-orchestrator-ao-1</div></div></div>
     </div>
-    <span class="note">The sessions that may act on this one (send, wrap up, kill, close) — the ones holding <span class="mono">orchestrate</span>, since nothing else could. None ticked: nobody may, which is the default; add one later from Focus or with <span class="mono">ao control</span>. Ticked in advance: the role's or the repo's <span class="mono">controllers:</span>.</span>
+    <span class="note">The sessions that may act on this one (send, wrap up, kill, close) — the ones holding <span class="mono">control</span>, since nothing else could. None ticked: nobody may, which is the default; add one later from Focus or with <span class="mono">ao control</span>. Ticked in advance: the role's or the repo's <span class="mono">controllers:</span>.</span>
   </div>
-  <div class="warn">{{ICON["warn"]}}<span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
+  <div class="warn">{ICON["warn"]}<span>One agent session per directory. The main checkout already hosts <b>main</b>, so a second agent session there is refused, not warned about. Shells and command runs are exempt.</span></div>
   <div style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 6px;"><span class="btn">Cancel</span><span class="btn primary">Start session</span></div>
 </div>
 </div>
