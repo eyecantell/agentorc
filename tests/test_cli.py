@@ -6,8 +6,10 @@ import datetime
 import json
 import os
 import pathlib
+import re
 import subprocess
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 
@@ -222,16 +224,28 @@ def test_send_wait(subprocess_agent, tmp_path, capsys):
     call_sync("hook", session=sid, state="idle")
     wait_state(sid, "idle")
 
-    def turn():
-        time.sleep(0.3)
-        call_sync("hook", session=sid, state="working")
-        time.sleep(0.3)
-        call_sync("hook", session=sid, state="idle")
+    # Turns until the send returns, rather than one turn on a timer (TD-063). `rpc_send` captures
+    # the revision it waits for *after* `_submit` — a paste, a settle and a composer check — so on a
+    # slow runner a single working→idle pair posted 0.3 s and 0.6 s in can both land before that
+    # read: the record is idle, its revision is already past, nothing else ever moves it, and the
+    # stall window expires. CI saw exactly that (`showed no activity within 4.69821 s`). Whichever
+    # cycle lands after the read satisfies both waits, at any load, and the loop ends on idle so the
+    # settled state the command prints is unchanged.
+    done = threading.Event()
+
+    def turns():
+        while not done.is_set():
+            call_sync("hook", session=sid, state="working")
+            call_sync("hook", session=sid, state="idle")
+            done.wait(0.05)
 
     with ThreadPoolExecutor(max_workers=1) as pool:
-        fut = pool.submit(turn)
-        assert cli.main(["send", sid, "--wait", "--timeout", "5", "go"]) == 0
-        fut.result(timeout=5)
+        fut = pool.submit(turns)
+        try:
+            assert cli.main(["send", sid, "--wait", "--timeout", "5", "go"]) == 0
+        finally:
+            done.set()
+        fut.result(timeout=5)  # `rpc_hook` applies the event inline, so the last idle is on the record
     assert capsys.readouterr().out.strip() == f"{sid}: idle"
     assert cli.main(["send", sid, "--wait", "--timeout", "1", "nothing happens"]) == 1
     assert "prompt-stalled" in capsys.readouterr().err
@@ -319,7 +333,7 @@ def test_skill_prints_the_rules(capsys):
         # the membership half of the gate (TD-036 step 2): both refusals, and who may hand control
         # on — a session that already controls the target, not only a person (review 2026-09-13)
         "not in its controllers",
-        "needs the orchestrate grant",
+        "needs the control grant",
         "or one of its current controllers",
         "ao control",
         # the mail rules (design §4.10, TD-052 step 2), the instructions rule above the rest
@@ -328,6 +342,7 @@ def test_skill_prints_the_rules(capsys):
         "answer an `ask`",
         "never broadcast",
         "ao msg person",
+        "ao progress none",  # TD-053 step 1: declared before exiting, or the exit reads as a crash
     ):
         assert must in out.lower() or must in out, must
     assert out.count("\n") <= 120
@@ -351,17 +366,17 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     call_sync("set_mode", id=b, unattended=True)  # a worker; an interactive b is §9 invariant 5's case
     monkeypatch.setenv("AGENTORC_SESSION", a)  # now `ao` runs inside session a
     assert cli.main(["kill", b]) == 1
-    assert "needs the orchestrate grant" in capsys.readouterr().err
-    assert cli.main(["--json", "grant", a, "orchestrate"]) == 1  # no self-grant
-    assert "needs the orchestrate grant" in out()["error"]
+    assert "needs the control grant" in capsys.readouterr().err
+    assert cli.main(["--json", "grant", a, "control"]) == 1  # no self-grant
+    assert "needs the control grant" in out()["error"]
     assert cli.main(["--json", "status"]) == 0  # reads pass
     assert {s["id"] for s in out()} >= {a, b}
     assert cli.main(["send", a, "echo", "self-ok"]) == 0  # self passes
     monkeypatch.delenv("AGENTORC_SESSION")  # a person at a terminal
-    assert cli.main(["grant", a, "orchestrate"]) == 0
-    assert capsys.readouterr().out.strip() == f"{a}: grants orchestrate"
+    assert cli.main(["grant", a, "control"]) == 0
+    assert capsys.readouterr().out.strip() == f"{a}: grants control"
     assert cli.main(["status", "-v"]) == 0
-    assert "grants: orchestrate" in capsys.readouterr().out
+    assert "grants: control" in capsys.readouterr().out
     monkeypatch.setenv("AGENTORC_SESSION", a)
     # The grant alone is no longer enough (TD-036): a is not in b's controllers, and an empty list
     # means nobody may act. `ao control` lands in step 2; here the RPC stands in for it.
@@ -371,18 +386,18 @@ def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeyp
     assert cli.main(["--json", "kill", b]) == 0
     assert out()["state"] == "exited"
     monkeypatch.delenv("AGENTORC_SESSION")
-    assert cli.main(["--json", "revoke", a, "orchestrate"]) == 0
+    assert cli.main(["--json", "revoke", a, "control"]) == 0
     assert out()["capabilities"] == []
-    assert cli.main(["--json", "new", "gc", "-a", "shell", "-d", str(tmp_path), "--grant", "orchestrate"]) == 0
+    assert cli.main(["--json", "new", "gc", "-a", "shell", "-d", str(tmp_path), "--grant", "control"]) == 0
     c = out()
-    assert c["capabilities"] == ["orchestrate"]
+    assert c["capabilities"] == ["control"]
     for sid in (a, c["id"]):
         call_sync("kill", id=sid)
 
 
 def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypatch):
-    """TD-036 step 2: `ao control <orc> add|remove <session>…` edits membership from the
-    orchestrator's side, `ao new --controller` sets it at create, `ao status -v` prints both
+    """TD-036 step 2: `ao control <controller> add|remove <session>…` edits membership from the
+    lead's side, `ao new --controller` sets it at create, `ao status -v` prints both
     directions, and `ao new` says so when a session starts with nobody able to act on it."""
 
     def out():
@@ -399,13 +414,13 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     w1 = next(s_["id"] for s_ in w1 if s_["name"] == "w1")
     wait_state(orc, "idle")
     wait_state(w1, "idle")
-    call_sync("set_grants", id=orc, add=["orchestrate"])
+    call_sync("set_grants", id=orc, add=["control"])
 
     # a bare name works on both sides (design §4.1), and the output says who is over the session
     assert cli.main(["control", "orc", "add", "w1"]) == 0
     assert capsys.readouterr().out.strip() == f"{w1}: under {orc}"
     assert call_sync("get", id=w1)["controllers"] == [orc]
-    # …so the orchestrator can now act on it — once it is a worker. Interactive, it is a person's
+    # …so the lead can now act on it — once it is a worker. Interactive, it is a person's
     # session and out of reach whatever the list says (§9 invariant 5, TD-041); `ao mode` is how
     # a person hands it over, and the CLI shows the refusal as it came
     monkeypatch.setenv("AGENTORC_SESSION", orc)
@@ -432,7 +447,7 @@ def test_control_and_new_controller(subprocess_agent, tmp_path, capsys, monkeypa
     assert [s_["id"] for s_ in res["sessions"]] == [w1]
     # one entry per attempt, not per name: the same bad name twice is two answers
     assert [r["session"] for r in res["refused"]] == ["nosuchsession", "nosuchsession"]
-    # an orchestrator may not be made to control itself — refused by the agent, not by the CLI
+    # a lead may not be made to control itself — refused by the agent, not by the CLI
     assert cli.main(["control", "orc", "add", "orc"]) == 1
     assert "cannot be its own controller" in capsys.readouterr().err
 
@@ -539,7 +554,7 @@ def test_progress_and_finding_report_on_the_calling_session(subprocess_agent, tm
     # `shell` has no opinion on how a model name shortens, so it prints as observed (TD-031)
     assert "model:  claude-opus-5" in shown
     monkeypatch.delenv("AGENTORC_SESSION")
-    assert cli.main(["--json", "finding", "#67", "--id", sid]) == 0  # a person, or an orchestrator, for a worker
+    assert cli.main(["--json", "finding", "#67", "--id", sid]) == 0  # a person, or a lead, for a worker
     assert [f["ref"] for f in out()["findings"]] == ["TD-029", "#67"]
     call_sync("kill", id=sid)
 
@@ -879,7 +894,7 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert out.startswith(cli.INBOX_HEADER)
     assert "from person" in out.splitlines()[1]  # the last send into this pane was the person's
     assert "[person] person" in out and f"[controller] {lead}" in out and "rebase first" in out
-    assert "open, bound" in out and "about TD-001" in out
+    assert "open, 23h left" in out and "about TD-001" in out  # the bound, as the time left (TD-069 step 0)
     # the read above marked both: `--unread` now shows nothing, and `--json` is the RPC result
     assert cli.main(["inbox", "--unread"]) == 0
     assert "0 shown, 0 unread" in capsys.readouterr().out
@@ -898,6 +913,33 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert f"reply → {peer}" in capsys.readouterr().out
     for sid in (lead, worker, peer):
         call_sync("kill", id=sid)
+
+
+def test_msg_steer_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-069 step 0 (design §4.10 *What a person is asked*): `ao msg --kind steer --default` sends
+    the line the session will go with; `ao msg person --kind ask --bound` is refused and the
+    refusal names `steer`; `ao inbox` prints a steer's default and how long is left, `[system]`
+    beside a note from the home, and `lapsed` once the bound has passed."""
+    sid = call_sync("create", name="steerer", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["msg", "person", "which branch?", "--kind", "steer", "--default", "off main"]) == 0
+    out = capsys.readouterr().out
+    assert "steer → person" in out and "bound" in out and "unless told otherwise: off main" in out
+    # a steer with no default, and an ask to the person with a bound, are both refused
+    assert cli.main(["msg", "person", "which?", "--kind", "steer"]) == 1
+    assert "a steer says what it will do" in capsys.readouterr().err
+    assert cli.main(["msg", "person", "merge?", "--kind", "ask", "--bound", "60"]) == 1
+    err = capsys.readouterr().err
+    assert "never expires" in err and "steer" in err
+    # …and the unbounded ask says so where it is read
+    assert cli.main(["msg", "person", "merge?", "--kind", "ask"]) == 0
+    capsys.readouterr()
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert "steer" in out and "default: off main" in out and "left" in out
+    assert "open, no bound — it never expires" in out
+    call_sync("kill", id=sid)
 
 
 def test_every_ao_reply_ends_with_the_unread_line_while_the_caller_has_mail(subprocess_agent, tmp_path, capsys):
@@ -965,3 +1007,128 @@ def test_ao_wait_against_an_agent_without_the_wait_rpc_says_so_and_exits(monkeyp
     assert cli.main(["wait", "--timeout", "1"]) == 1
     err = capsys.readouterr().err
     assert "predates the wait RPC" in err and err.count("\n") == 1
+
+
+def test_progress_none_declares_out_of_work(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-053 step 1 (design §4.9a): `ao progress none --why` takes no reference, needs its reason,
+    and shows in `ao status -v` and `--json`."""
+    assert cli.main(["--json", "shell", "oow", "-d", str(tmp_path)]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["progress", "none", "TD-001", "--why", "x"]) == 2
+    assert "takes no reference" in capsys.readouterr().err
+    assert cli.main(["progress", "claim", "TD-900", "--force"]) == 0  # TD-056: --force reaches the RPC
+    capsys.readouterr()
+    assert cli.main(["progress", "claim"]) == 2
+    assert "needs a reference" in capsys.readouterr().err
+    assert cli.main(["progress", "none"]) != 0
+    assert "needs --why" in capsys.readouterr().err
+    assert cli.main(["progress", "none", "--why", "no open entry I may pick"]) == 0
+    assert capsys.readouterr().out.strip() == f"{sid}: out of work — no open entry I may pick"
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["status", "-v"]) == 0
+    assert re.search(r"out of work \S+: no open entry I may pick", capsys.readouterr().out)
+    assert cli.main(["--json", "status"]) == 0
+    assert next(x for x in json.loads(capsys.readouterr().out) if x["id"] == sid)["out_of_work"]["why"]
+    call_sync("kill", id=sid)
+
+
+def test_doing_says_one_line_and_status_shows_it_with_its_age(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-074 step 1 (design §4.8 `doing`): `ao doing "<line>"` lands on this session's own record,
+    the last line replaces the one before, `--clear` empties it, and `ao status -v` prints it with
+    its age. A person with no session of their own is told, not guessed at."""
+    assert cli.main(["--json", "shell", "doer", "-d", str(tmp_path)]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["doing"]) == 2
+    assert "needs a line" in capsys.readouterr().err
+    assert cli.main(["doing", "--clear", "reading the ledger"]) == 2
+    assert "takes no line" in capsys.readouterr().err
+    assert cli.main(["doing", "reading the ledger for the next entry"]) == 0
+    assert capsys.readouterr().out.strip() == f"{sid}: doing — reading the ledger for the next entry"
+    assert cli.main(["doing", "opening", "the", "PR"]) == 0  # a line typed unquoted is still one line
+    assert capsys.readouterr().out.strip() == f"{sid}: doing — opening the PR"
+    assert cli.main(["status", "-v"]) == 0
+    assert re.search(r"doing \S+ ago: opening the PR", capsys.readouterr().out)
+    assert cli.main(["--json", "status"]) == 0
+    assert next(x for x in json.loads(capsys.readouterr().out) if x["id"] == sid)["doing"]["text"] == "opening the PR"
+    assert cli.main(["doing", "--clear"]) == 0
+    assert capsys.readouterr().out.strip() == f"{sid}: doing cleared"
+    assert call_sync("get", id=sid)["doing"] is None
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["doing", "nothing of mine to say"]) == 2
+    assert "no session" in capsys.readouterr().err
+    call_sync("kill", id=sid)
+
+
+def test_progress_sends_force_only_when_asked(monkeypatch, capsys):
+    """A host agent older than TD-056 refuses an unknown `force` keyword, and the CLI is routinely
+    newer than the running agent until its restart: a plain claim must not send it (2026-09-17).
+    The command now says *unset* by passing `None` and the client drops it from the envelope
+    (TD-062 fix (a), tests/test_rpc_skew.py) — one rule for every command instead of one dance
+    per new parameter."""
+    sent = []
+
+    def fake(method, **params):
+        sent.append(params)
+        return {"id": "ao-x", "progress": [], "lane": []}
+
+    monkeypatch.setattr(cli, "call_sync", fake)
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-x")
+    assert cli.main(["progress", "claim", "TD-900"]) == 0
+    assert cli.main(["progress", "claim", "TD-900", "--force"]) == 0
+    assert sent[0]["force"] is None and sent[1]["force"] is True
+
+
+def test_whoami_and_identity_say_what_the_host_agent_sees(subprocess_agent, capsys, monkeypatch):
+    """Design §4.8a: `ao whoami` is the connection's classification, `ao identity` the host's mode,
+    tally and alarms. The suite's agent runs identity `off` (conftest), and both say so plainly;
+    the alarm lines are checked against a canned reply, since `off` raises none."""
+    assert cli.main(["whoami"]) == 0
+    assert "identity is off on this host" in capsys.readouterr().out
+    assert cli.main(["identity"]) == 0
+    out = capsys.readouterr().out
+    assert "identity off" in out and "no connection classified yet" in out and "no identity alarms" in out
+
+    alarm = {"channel": "session ao-a", "claimed": "ao-b", "rpc": "msg", "count": 3, "at": "t1", "last": "t3"}
+    bare = {"channel": "outside", "claimed": "", "rpc": "hook", "count": 1, "at": "t0", "last": "t0"}
+    canned = {
+        "identity": {
+            "host": "kmaster",
+            "mode": "observe",
+            "detached_check": True,
+            "tally": {"outside": 880, "session:ancestry": 4102, "session:sid": 37},
+            "alarms": [bare],
+            "sessions": {"ao-a": [alarm]},
+        },
+        "whoami": {"channel": "session", "session": "ao-a", "signal": "sid"},
+    }
+    monkeypatch.setattr(cli, "call_sync", lambda method, **_: canned[method])
+    assert cli.main(["identity"]) == 0
+    out = capsys.readouterr().out
+    assert "kmaster: identity observe · detached-process check on" in out
+    assert "session:ancestry 4,102" in out and "session:sid 37" in out
+    assert "ALARM (no record): outside claimed no caller on hook ×1 (t0)" in out
+    assert "ALARM ao-a: session ao-a claimed ao-b on msg ×3 (t1 … t3)" in out
+    assert cli.main(["whoami"]) == 0
+    assert capsys.readouterr().out.strip() == "session ao-a (by sid)"
+
+
+def test_status_v_says_which_identity_mode_this_host_is_in_once(subprocess_agent, capsys, tmp_path):
+    """design §4.8a: *`ao status -v` and the Org's teams line say which mode a host is in*, since
+    *observe* is a host that is not yet protected — and beside it whether the detached-process
+    check is on, so a host where it is off is not taken for one where it is on. **One line for the
+    host**, never one per session, and nothing at all without `-v`."""
+    assert cli.main(["shell", "idline", "-d", str(tmp_path)]) == 0
+    sid = capsys.readouterr().out.split()[0]
+    wait_state(sid, "idle")
+    assert cli.main(["status"]) == 0
+    assert "identity" not in capsys.readouterr().out
+    assert cli.main(["status", "-v"]) == 0
+    out = capsys.readouterr().out
+    # the suite's agent runs `off` (conftest, §4.8a *Tests*), which the line must say as plainly
+    # as it would say `observe`
+    lines = [ln for ln in out.splitlines() if "identity" in ln]
+    assert len(lines) == 1 and "identity off" in lines[0] and "detached-process check" in lines[0]
+    assert "not enforcing it yet" in lines[0]
+    assert cli.main(["kill", sid]) == 0

@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
+from typing import Any
 
 PREFIX = "ao-"
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
@@ -72,3 +73,40 @@ def qualify(address: str, *, local: str) -> str:
     if host is None or host == local:
         return sid
     return f"{sid}@{host}"
+
+
+# The keys under which a reply or a request carries session addresses (design §4.4a "Every address
+# crosses in the reader's form", TD-057 step 5): what is rewritten when a call crosses the link.
+# `text` and message ids are never touched; `add`/`remove` hold addresses only on `set_controllers`.
+ADDRESS_KEYS = frozenset(
+    {"id", "from", "to", "about", "controllers", "copies", "copies_failed", "delivered", "wake_budget_spent", "holder"}
+)
+ADDRESS_MAPS = frozenset({"forwarded"})  # id → id
+
+
+def is_address(value: Any) -> bool:
+    return isinstance(value, str) and value.startswith(PREFIX)
+
+
+def readdress(obj: Any, fn: Callable[[str], str], *, keys: frozenset[str] = ADDRESS_KEYS) -> Any:
+    """`obj` with every session address under an address key rewritten by `fn` — recursively
+    through dicts and lists, so a reply's entries and a wait's records are covered — and nothing
+    else touched. A string that is not an id (`person`, a name) is left alone."""
+    if isinstance(obj, list):
+        return [readdress(x, fn, keys=keys) for x in obj]
+    if not isinstance(obj, dict):
+        return obj
+    out: dict[str, Any] = {}
+    for k, v in obj.items():
+        if k in keys:
+            if is_address(v):
+                out[k] = fn(v)
+            elif isinstance(v, list):
+                out[k] = [fn(x) if is_address(x) else x for x in v]
+            else:
+                out[k] = readdress(v, fn, keys=keys)
+        elif k in ADDRESS_MAPS and isinstance(v, dict):
+            out[k] = {(fn(a) if is_address(a) else a): (fn(b) if is_address(b) else b) for a, b in v.items()}
+        else:
+            out[k] = readdress(v, fn, keys=keys)
+    return out

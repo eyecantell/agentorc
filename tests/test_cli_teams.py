@@ -26,7 +26,7 @@ def org_doc(root: Path, *, two_repos: bool = False) -> dict:
         "teams": {
             "ao-grind": {
                 "projects": ["ao"],
-                "lead": {"role": "orchestrator", "name": "orc-ao", "home": "agentorc"},
+                "lead": {"role": "lead", "name": "orc-ao", "home": "agentorc"},
                 "members": [
                     {"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick", "home": "agentorc"},
                     {"role": "hunter", "name": "hunt", "lane": "ui", "home": "agentorc"},
@@ -64,6 +64,16 @@ def world(tmp_path, monkeypatch):
             return state["sessions"]
         if method == "name_check":
             return state["verdicts"].get(params["name"], {"name": params["name"], "verdict": "free"})
+        if method == "host_dir":
+            if isinstance(state.get("elsewhere"), Exception):
+                raise state["elsewhere"]
+            return {"host": params["host"], "dir": params["dir"], "exists": params["dir"] in state.get("elsewhere", ())}
+        if method == "host_files":
+            files = state.get("files")
+            if isinstance(files, Exception):
+                raise files
+            there = (files or {}).get(params["dir"], {})
+            return {"host": params["host"], "dir": params["dir"], "files": {p: there.get(p) for p in params["paths"]}}
         if method == "create":
             rec = {
                 "id": f"ao-{Path(params['dir']).name}-{params['name']}",
@@ -79,10 +89,12 @@ def world(tmp_path, monkeypatch):
             }
             state["sessions"].append(rec)
             return rec
-        if method in ("send", "kill"):
+        if method in ("send", "kill", "close"):
+            if (why := state.get("refuse", {}).get(params["id"])) is not None:
+                raise cli.AgentError(why)
             for s in state["sessions"]:
                 if s["id"] == params["id"]:
-                    s["state"] = "closed" if method == "kill" else "idle"
+                    s["state"] = "idle" if method == "send" else "closed"
             return None
         raise AssertionError(method)
 
@@ -176,7 +188,7 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "grind-1", "grind-2", "hunt"]
     lead, grind1, hunt = made[0], made[1], made[3]
-    assert lead["controllers"] == [] and lead["capabilities"] == ["orchestrate"] and lead["role"] == "orchestrator"
+    assert lead["controllers"] == [] and lead["capabilities"] == ["control"] and lead["role"] == "lead"
     lead_id = "ao-agentorc-orc-ao"
     assert all(p["controllers"] == [lead_id] for p in made[1:])
     # a worktree per session in its home repo (§4.9 "Home and reach"), and both badges
@@ -186,8 +198,27 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert "## Lane: free-pick" in grind1["prompt"] and "## Area: ui" in hunt["prompt"]
     assert "## Project:" not in grind1["prompt"]  # one repo: no reach to describe
     out = capsys.readouterr().out
-    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  lead orchestrator")
+    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  lead lead")
     assert "member grinder" in out
+
+
+def test_a_definition_still_naming_role_orchestrator_starts_a_lead(world, capsys, monkeypatch):
+    """TD-055 step 2: an `org.yml` written before the rename — `lead: {role: orchestrator}` and a
+    `roles: orchestrator:` overlay, the live shape — starts the lead with the lead brief, grants and
+    the overlay's profile, records `role: lead`, and says once that the name changed."""
+    from agentorc import repoconfig
+
+    monkeypatch.setattr(repoconfig, "_warned", set())
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["lead"]["role"] = "orchestrator"
+    doc["roles"]["orchestrator"] = {"profile": "org-grind"}
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    lead = creates(state)[0]
+    assert lead["role"] == "lead" and lead["capabilities"] == ["control"] and lead["profile"] == "org-grind"
+    assert "You are a **lead**" in lead["prompt"]
+    assert capsys.readouterr().err.count("role `orchestrator` is now `lead`") == 1
 
 
 def test_an_interactive_member_is_started_but_said_to_be_out_of_its_leads_reach(world, capsys):
@@ -242,7 +273,95 @@ def test_a_repo_on_another_host_is_a_note_not_a_failure(world):
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 0
     prompt = creates(state)[1]["prompt"]
-    assert "- ao-api: not checked out on kmaster (declared on devenv) — out of reach until phase 2" in prompt
+    assert "- ao-api: not checked out on kmaster (declared on devenv) — out of reach" in prompt
+
+
+# ── a team on another host (design §4.4a "Teams across hosts", TD-057 step 4a) ────────────────
+
+
+def on_devenv(tmp_path):
+    """The team's `host:` is `devenv`, and the repo is checked out there at the same path it has
+    here — a container node's shape, where the roles and briefs are read."""
+    doc = org_doc(tmp_path)
+    doc["projects"]["ao"]["repos"]["agentorc"]["devenv"] = str(tmp_path / "agentorc")
+    doc["teams"]["ao-grind"]["host"] = "devenv"
+    write_org(tmp_path, doc)
+    return str(tmp_path / "agentorc")
+
+
+def test_a_team_with_a_host_is_checked_there_and_created_there(world, capsys):
+    tmp_path, state = world
+    checkout = on_devenv(tmp_path)
+    state["elsewhere"] = {checkout}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    calls = state["calls"]
+    assert [p for m, p in calls if m == "host_dir"] == [{"host": "devenv", "dir": checkout}]  # once per checkout
+    assert all(p["host"] == "devenv" for m, p in calls if m == "name_check")
+    assert all(p["host"] == "devenv" and p["dir"] == checkout for p in creates(state))
+    order = [m for m, _ in calls]
+    assert order[0] == "host_dir" and order.index("create") > order.index("name_check")
+
+
+def test_a_team_whose_host_is_unreachable_is_refused_whole(world, capsys):
+    tmp_path, state = world
+    on_devenv(tmp_path)
+    state["elsewhere"] = cli.AgentError("runs on devenv: unreachable since t — ssh failed; refused, not queued")
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "was not started — devenv: runs on devenv: unreachable" in capsys.readouterr().err and not creates(state)
+    state["elsewhere"] = set()  # reachable, and the checkout is not there
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "does not exist on devenv" in capsys.readouterr().err and not creates(state)
+
+
+def test_a_machine_nodes_roles_and_briefs_are_read_on_that_node(world, capsys):
+    """TD-057 step 4b.3: a checkout that is not a directory here — a machine node's — has its
+    `.agentorc.yml` and its briefs read on that node (`host_files`), by the same loader; the start
+    stays all-or-nothing when that read fails, and a brief outside the checkout is never asked for."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["projects"]["ao"]["repos"]["agentorc"]["devenv"] = "/workspaces/agentorc"  # a laptop's path, not here
+    doc["teams"]["ao-grind"]["host"] = "devenv"
+    write_org(tmp_path, doc)
+    there = "/workspaces/agentorc"
+    state["elsewhere"] = {there}
+    repo_cfg = yaml.safe_dump({"roles": {"grinder": {"brief": "docs/grind.md", "profile": "repo-grind"}}})
+    state["files"] = {there: {".agentorc.yml": repo_cfg, "docs/grind.md": "grind on the node: {lane}"}}
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    asked = [p for m, p in state["calls"] if m == "host_files"]
+    assert asked and all(p["host"] == "devenv" and p["dir"] == there for p in asked)
+    assert {x for p in asked for x in p["paths"]} == {".agentorc.yml", "docs/grind.md"}
+    made = {p["name"]: p for p in creates(state)}
+    assert "grind on the node: free-pick" in made["grind-1"]["prompt"] and made["grind-1"]["profile"] == "repo-grind"
+    assert all(p["host"] == "devenv" and p["dir"] == there for p in made.values())
+    # the node cannot be read: nothing is started
+    state["sessions"], state["calls"] = [], []
+    state["files"] = cli.AgentError("runs on devenv: unreachable since t — ssh failed; refused, not queued")
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "devenv: runs on devenv: unreachable" in capsys.readouterr().err and not creates(state)
+    # a brief the repo keeps outside its checkout is refused here, never asked of the node
+    state["files"] = {there: {".agentorc.yml": yaml.safe_dump({"roles": {"grinder": {"brief": "/etc/passwd"}}})}}
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "outside the checkout" in capsys.readouterr().err and not creates(state)
+    assert "/etc/passwd" not in str([p for m, p in state["calls"] if m == "host_files"])
+    del doc["projects"]["ao"]["repos"]["agentorc"]["devenv"]  # declared nowhere on that host
+    write_org(tmp_path, doc)
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "has no checkout on devenv (declared on kmaster)" in capsys.readouterr().err
+
+
+def test_stop_degrades_per_member_when_one_is_refused(world, capsys):
+    """The 3b leftover: a member whose host is unreachable is named with the reason, and the rest
+    are still wrapped up — the stop never aborts on the first refusal."""
+    tmp_path, state = world
+    started(state)
+    state["refuse"] = {"ao-agentorc-grind-2": "runs on devenv: unreachable since t — ssh failed; refused, not queued"}
+    capsys.readouterr()
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0"]) == 0
+    sent = [p["id"] for m, p in state["calls"] if m == "send"]  # every member was tried, the lead last
+    assert sent == ["ao-agentorc-grind-1", "ao-agentorc-grind-2", "ao-agentorc-hunt", "ao-agentorc-orc-ao"]
+    out = capsys.readouterr().out
+    assert "ao-agentorc-grind-2  member: refused: runs on devenv: unreachable" in out
+    assert out.count("wrap-up sent") == 3 and "still working" not in out  # the refused one is not waited on
 
 
 def test_a_members_brief_override_replaces_the_roles_template(world):
@@ -296,6 +415,92 @@ def test_stop_wraps_the_members_up_before_the_lead_and_now_kills(world, capsys):
     assert not [m for m, _ in state["calls"] if m == "send"]
 
 
+def test_a_lead_stopping_its_own_team_is_the_wind_down_and_is_never_typed_at(world, capsys, monkeypatch):
+    """Design §4.9a, TD-053 step 3: the same sequence under a different trigger. The lead's own
+    command never sends to the lead or kills it, and `--close` closes what settled with nothing to
+    lose — a member holding unpushed work is left open and named."""
+    tmp_path, state = world
+    started(state)
+    capsys.readouterr()
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")
+    by_id = {s["id"]: s for s in state["sessions"]}
+    pushed = {"dirty": 0, "ahead": 0, "upstream": "origin/x"}
+    by_id["ao-agentorc-grind-1"]["git"] = pushed
+    by_id["ao-agentorc-hunt"]["git"] = pushed
+    by_id["ao-agentorc-grind-2"]["git"] = {"dirty": 0, "ahead": 2, "upstream": "origin/x"}
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "send"] == [
+        "ao-agentorc-grind-1", "ao-agentorc-grind-2", "ao-agentorc-hunt",
+    ]  # fmt: skip
+    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1", "ao-agentorc-hunt"]
+    out = capsys.readouterr().out
+    assert "lead: is you" in out and "ao close ao-agentorc-orc-ao" in out
+    assert "left open: 2 unpushed" in out
+    assert "still working" not in out  # the lead's own line is not a member that missed the window
+    assert by_id["ao-agentorc-orc-ao"]["state"] == "working"  # untouched by its own command
+    # `--now` from the lead kills the members and still spares the caller
+    state["calls"].clear()
+    by_id["ao-agentorc-grind-2"]["state"] = "working"
+    assert cli.main(["team", "stop", "ao-grind", "--now"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "kill"] == ["ao-agentorc-grind-2"]
+
+
+def test_a_finished_member_gets_no_wrap_up_prompt_and_is_closed(world, capsys, monkeypatch):
+    """§4.9a *Finished means declared, not gone*: out of work and settled — nothing to wrap up."""
+    tmp_path, state = world
+    started(state)
+    by_id = {s["id"]: s for s in state["sessions"]}
+    by_id["ao-agentorc-grind-1"].update(
+        state="idle",
+        out_of_work={"at": "2026-09-17T06:00:00Z", "why": "ledger empty"},
+        git={"dirty": 0, "ahead": 0, "upstream": "origin/x"},
+    )
+    by_id["ao-agentorc-grind-2"]["out_of_work"] = {"at": "2026-09-17T06:00:00Z", "why": "x"}  # declared, still working
+    monkeypatch.setenv("AGENTORC_SESSION", "ao-agentorc-orc-ao")
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "send"] == ["ao-agentorc-grind-2", "ao-agentorc-hunt"]
+    assert "ao-agentorc-grind-1" in [p["id"] for m, p in state["calls"] if m == "close"]
+    assert "finished (out of work), nothing sent, closed" in capsys.readouterr().out
+
+
+def test_close_needs_proof_of_pushed_not_an_absent_count(world, capsys, tmp_path_factory):
+    """Review of PR #192: `ahead: 0` with no upstream is what a never-pushed branch looks like, and
+    a record with no `git` yet is unknown, not clean. With no upstream the commit is looked for on
+    the remote branches — a merged worker on a detached `origin/main` is pushed."""
+    import subprocess
+
+    tmp_path, state = world
+    started(state)
+    by_id = {s["id"]: s for s in state["sessions"]}
+    repo = tmp_path_factory.mktemp("wt")
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "merged"], check=True)
+    subprocess.run([*git, "update-ref", "refs/remotes/origin/main", "HEAD"], check=True)
+    no_upstream = {"dirty": 0, "ahead": 0, "upstream": None}
+    by_id["ao-agentorc-grind-1"].update(dir=str(repo), git=no_upstream)  # detached on what origin has
+    by_id["ao-agentorc-hunt"].pop("git", None)  # unknown
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1"]
+    out = capsys.readouterr().out
+    assert out.count("left open: git state unknown") == 2  # grind-2 and hunt
+    # the same checkout with a commit origin has never seen
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", "never pushed"], check=True)
+    by_id["ao-agentorc-grind-1"]["state"] = "idle"
+    state["calls"].clear()
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0", "--close"]) == 0
+    assert not [m for m, _ in state["calls"] if m == "close"]
+    assert "no upstream, and its commit is on no remote branch" in capsys.readouterr().out
+
+
+def test_a_persons_stop_without_close_closes_nothing(world, capsys):
+    tmp_path, state = world
+    started(state)
+    assert cli.main(["team", "stop", "ao-grind", "--timeout", "0"]) == 0
+    assert not [m for m, _ in state["calls"] if m == "close"]
+    assert "still working" not in capsys.readouterr().out  # every member settled; the lead's `?` is not a miss
+
+
 def test_stop_with_no_live_session_says_so(world, capsys):
     tmp_path, state = world
     assert cli.main(["team", "stop", "ao-grind"]) == 1
@@ -334,6 +539,17 @@ def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, ca
     rows = {r["name"]: r for r in json.loads(capsys.readouterr().out)["teams"]}
     assert rows["ao-grind"]["live"] == 4 and rows["ao-grind"]["members"] == 3
     assert rows["repo-team"]["live"] == 0
+    # *stopped* and *wound down* are different facts about a team (§4.9a, TD-053 step 6), and the
+    # CLI says which from the same rows the Org strip reads, or the two would disagree about one
+    # definition. Every session that carried the badge declared, and each was then stopped.
+    for s in state["sessions"]:
+        if s.get("team") == "ao-grind":
+            s["state"], s["out_of_work"] = "closed", {"at": "2026-09-17T20:00:00Z", "why": "nothing open"}
+    capsys.readouterr()
+    assert cli.main(["team", "list"]) == 0
+    out = capsys.readouterr().out
+    assert "ao-grind" in out and "wound down" in out
+    assert "repo-team" in out and "stopped" in out  # one that never ran is not wound down
 
 
 # ── the profile precedence chain, and `ao new --project` ──────────────────────────────────────
@@ -493,3 +709,44 @@ def test_a_partial_start_still_says_the_brief_names_one_run(world, capsys, monke
     err = capsys.readouterr().err
     assert "already started" in err
     assert "TD-042" in err and "a clock time" in err
+
+
+def test_on_a_node_the_org_lives_on_the_home_and_status_says_offline(world, capsys):
+    """Design §4.4a, TD-057 step 2: `org.yml` lives on the home, so a node reads no local copy; and
+    what `ao status` shows there is this host's sessions only, labelled — on stderr, so `--json`
+    stays the records."""
+    tmp_path, state = world
+    (tmp_path / "home" / "hosts.yml").write_text("home: elsewhere\n")  # this host is `kmaster` (the fixture)
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    err = capsys.readouterr().err
+    assert "the org lives on elsewhere (home)" in err and not creates(state)
+    assert cli.main(["status", "--json"]) == 0
+    out = capsys.readouterr()
+    assert out.out.strip() == "[]" and "offline" in out.err and "node of elsewhere" in out.err
+
+
+# ── ao focus on a container node's session (design §4.4a "Reach", TD-057 3c.5) ───────────────
+
+
+def test_focus_on_a_container_nodes_session_runs_docker_exec_and_a_machine_nodes_is_refused(world, capsys, monkeypatch):
+    tmp_path, state = world
+    records = {
+        "ao-repo-w@cm": {
+            "id": "ao-repo-w@cm",
+            "state": "working",
+            "host": "cm",
+            "host_link": {"up": True, "reach": {"container": "abc123def456", "user": "developer"}},
+        },
+        "ao-repo-l@laptop": {"id": "ao-repo-l@laptop", "state": "working", "host": "laptop", "host_link": {"up": True}},
+    }
+    monkeypatch.setattr(cli, "call_sync", lambda method, **p: records[p["id"]] if method == "get" else None)
+    assert cli.main(["--json", "focus", "ao-repo-w@cm"]) == 0
+    argv = json.loads(capsys.readouterr().out)["attach"]
+    assert argv[:6] == ["docker", "exec", "-u", "developer", "-it", "abc123def456"] and argv[6:9] == [
+        "tmux",
+        "attach",
+        "-t",
+    ]
+    assert argv[9] == "=ao-repo-w:"
+    assert cli.main(["focus", "ao-repo-l@laptop"]) == 1
+    assert "runs on laptop: no terminal reaches it from here" in capsys.readouterr().err

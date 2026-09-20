@@ -44,6 +44,14 @@ class Adapter(Protocol):
     #   explain(tail) -> screen.Match | None               the screen-rule verdict with its evidence
     #                                                      (hook-fed adapters: applied as `scraped` only
     #                                                      when no fresher hook state exists; TD-015)
+    #   title(pane_title: str) -> str | None              the session's name as the tool holds it, read from
+    #                                                      the terminal title the tool set (tmux `#{pane_title}`,
+    #                                                      carried on `PaneInfo.title`) with the tool's own
+    #                                                      decoration removed; None when what is there is not a
+    #                                                      name — the tool's default, a shell's `user@host: path`.
+    #                                                      Display only: agentorc has no rename of its own
+    #                                                      (design §4.3, §4.5a **title**, TD-074). An adapter
+    #                                                      without it gives no title, which is the `shell` case
     #   external_sessions() -> list[ExternalSession]      live sessions of the tool started elsewhere
     #   model_in_use(session_id: str, cwd: Path, profile: str) -> str | None
     #                                                      the model the session is running now, if the tool

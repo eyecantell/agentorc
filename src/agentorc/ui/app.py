@@ -10,6 +10,8 @@ import contextlib
 import json
 import logging
 import os
+import time
+from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -24,17 +26,22 @@ from agentorc import org as orgmod
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig, teamrun, teams
 from agentorc.cli import stop_time as clistop
-from sessionorc import hosts, naming, paths
+from sessionorc import hosts, identity, naming, paths
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_head, report_line, stop_note
+from sessionorc.containers import attach_argv_in
+from sessionorc.models import GRANTS, STATE_RANK, canonical_grants, has_control, report_head, report_line, stop_note
 
+from .icons import role_svg
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 
 HERE = Path(__file__).parent
 log = logging.getLogger("uvicorn.error")  # the logger uvicorn already shows on the console
 templates = Jinja2Templates(directory=str(HERE / "templates"))
+# The role badge's picture (design §4.8 *Role presets*, TD-074): the markup lives in one place and
+# the template asks for it by name, so no config file ever carries an SVG.
+templates.env.globals["role_svg"] = role_svg
 
 # The New session form's `controller` field when nothing is ticked: an empty list means nobody may
 # act on the session, which is design §4.8's explicit default. Module-level so the signature keeps
@@ -48,7 +55,7 @@ NO_GRANTS: list[str] = []
 UNDESCRIBED_GRANT = "⚠ this grant has no description — see design §4.8"
 
 GRANT_NOTES: dict[str, str] = {
-    "orchestrate": (
+    "control": (
         "lets this session act on other sessions — send to them, wrap them up, kill them — "
         "for the sessions that name it a controller (§4.8)"
     ),
@@ -96,12 +103,55 @@ def rpc(method: str, **params: Any) -> Any:
     return _call_sync(method, **params)
 
 
+def node_org_note() -> str:
+    """What a node's page and toasts say about the org (design §4.4a): it lives on the home, and a
+    node does not read it from there — decided, not pending (TD-057 step 4b.3)."""
+    return (
+        f"the org lives on {hosts.home_name()} (home): start and stop teams there — "
+        f"{hosts.local_host().name} is a node, and its page shows this host's sessions only"
+    )
+
+
+def node_banner(info: dict[str, Any] | None) -> str:
+    """The Org page's line on a node (design §4.4a "When a host cannot reach home"): whether its
+    link to the home is up, from the `host` RPC, and when it is not, what that means here."""
+    if not info or info.get("mode") != "node":
+        return ""
+    home, link = info.get("home") or "the home", info.get("link") or {}
+    if info.get("home_reachable"):
+        return f"node of {home}: linked — the org's teams, mail and other hosts are on {home}"
+    return (
+        f"node of {home}: unreachable since {link.get('since') or '?'} — {link.get('why') or 'no link'} · "
+        f"offline: this host's sessions only; mail, reports and home-owned edits wait for the link"
+    )
+
+
+def identity_note(info: dict[str, Any] | None) -> str:
+    """The Org's teams line on who is calling (design §4.8a: *`ao status -v` and the Org's teams
+    line say which mode a host is in, since `observe` is a host that is not yet protected*). It
+    says **identity: observe** as loudly as it says **identity: off**, and says nothing at all
+    under `enforce`, which is the host that is protected — a note that was always there would stop
+    being read."""
+    mode = str((info or {}).get("mode") or "")
+    if mode not in ("off", "observe"):
+        return ""
+    if mode == "off":
+        return "identity: off — a caller is whatever it says it is here; nothing is classified (design §4.8a)"
+    return (
+        "identity: observe — a forged caller is recorded and shown, and still served: "
+        "this host is not enforcing it yet (design §4.8a)"
+    )
+
+
 def org_here() -> tuple[orgmod.Org, list[str]]:
     """The definitions the Org page acts on (design §4.9): `~/.agentorc/org.yml`, plus the `teams:`
     of every repo in this host's registry — the page is not *in* a directory the way `ao team` is,
     so "a repo's own teams" means every repo the host knows about. The org file wins a name
     collision. Read on every use and cached nowhere; a malformed file is a note beside the strip,
-    never a 500 — the rest of the page is still the fleet."""
+    never a 500 — the rest of the page is still the fleet. On a node the org is not here (design
+    §4.4a: `org.yml` lives on the home), which is a note too."""
+    if hosts.is_node():
+        return orgmod.Org(path=orgmod.org_file()), [node_org_note()]
     try:
         org = orgmod.load()
     except ValueError as e:
@@ -128,11 +178,24 @@ def projects_view() -> list[dict[str, Any]]:
     ]
 
 
+def _aged(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """design §4.5a **wound down** note (§4.9a, TD-053 step 6): a team's card says *wound down <t>*
+    rather than a bare *stopped* when every session that carried the badge declared it was out of
+    work. The instant comes from the records; the age is rendered here, like every other."""
+    now = datetime.now(UTC)
+    for r in rows:
+        r["wound_down_age"] = _age(r.get("wound_down"), now)
+    return rows
+
+
 def teams_view(sessions: list[dict[str, Any]]) -> dict[str, Any]:
     """The **Teams** strip's contents (design §4.5a): every definition with its source, projects,
     member count and live count — `teamrun.rows`, the very rows `ao team list` prints."""
     org, notes = org_here()
-    return {"teams": teamrun.rows(org, sessions), "source": str(org.path or ""), "notes": notes}
+    rows = _aged(teamrun.rows(org, sessions))
+    # on a node the one note is where the org is, not a definition that failed to read
+    elsewhere = notes[0] if hosts.is_node() and notes else ""
+    return {"teams": rows, "source": str(org.path or ""), "notes": [] if elsewhere else notes, "elsewhere": elsewhere}
 
 
 def vscode_url(directory: str) -> str:
@@ -153,7 +216,14 @@ def vscode_url(directory: str) -> str:
 
 
 def _age(iso: str | None, now: datetime) -> str:
-    if not iso:
+    """An instant off a record as *2h 5m*, or "" for anything this cannot read.
+
+    Anything: `view` runs for every session on the grid, so a raise here takes down the page rather
+    than the one card — the failure PR #131's review caught for a `run_until` of *half six*. A
+    record's timestamps are written by the agent and are well-formed, but a state file that a
+    different build, a bug or a hand repair left holding a number or a dict must cost its card a
+    line and nothing more, so the shape is checked rather than trusted (review of PR #203)."""
+    if not isinstance(iso, str) or not iso:
         return ""
     try:
         dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
@@ -185,10 +255,106 @@ def stop_fields(until: str, unattended: bool) -> dict[str, str]:
         raise HTTPException(400, str(e)) from None
 
 
-def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+ICON_TTL = 5.0  # seconds a resolved role icon is kept, the `DEFS_TTL` idiom (design §4.5a)
+# (repo, role) → (read at, icon name). Module-level, so every open page and every delta shares one
+# read: resolving an icon is a `.agentorc.yml` per repo, which must never ride the render path.
+_icon_cache: dict[tuple[str, str], tuple[float, str]] = {}
+
+
+def _icon_for(repo: str, role: str, org_roles: Any) -> str:
+    """The role's icon in that repo (design §4.8): the repo's own `roles:` over the org's over the
+    built-in, resolved by `repoconfig` — the core never keys on a role, and the UI is free to
+    (§9 invariant 9). A repo with no file, an unreadable one, a role nothing defines: no icon,
+    never an error on the page."""
+    try:
+        cfg = repoconfig.load(repo) if repo else repoconfig.RepoConfig()
+        return repoconfig.resolve_role(cfg, role, org_roles).icon or ""
+    except (KeyError, ValueError, OSError):
+        return ""
+
+
+async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, str], str]:
+    """The icon per (repo, role) the fleet carries, off the loop and cached for `ICON_TTL` seconds —
+    a role redefined by hand shows on the next load, or within that, exactly as a team definition
+    does. Passed into `view`, so the record itself never carries an icon."""
+    now = time.monotonic()
+    want = {(str(s.get("repo") or ""), str(s.get("role") or "")) for s in sessions if s.get("role")}
+    if stale := [k for k in want if now - _icon_cache.get(k, (0.0, ""))[0] > ICON_TTL]:
+
+        def resolve() -> dict[tuple[str, str], str]:
+            try:
+                org_roles = org_here()[0].roles  # read once per batch, not once per pair (review of PR #240)
+            except (ValueError, OSError):
+                org_roles = None
+            return {k: _icon_for(*k, org_roles) for k in stale}
+
+        got = await asyncio.to_thread(resolve)
+        _icon_cache.update({k: (now, v) for k, v in got.items()})
+    return {k: _icon_cache[k][1] for k in want if k in _icon_cache}
+
+
+# -- identity alarms (design §4.8a, TD-077 step 2) -------------------------------------------------
+
+
+def _count(raw: Any) -> int:
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return 1
+
+
+def alarm_words(a: dict[str, Any]) -> str:
+    """One alarm in words (design §4.8a: `{channel, claimed, rpc, count, at, last}`). The `(others)`
+    entry stands for every distinct alarm past the list's room and names no rpc, so it is said as
+    what it is rather than printed as a row with empty fields."""
+    n = _count(a.get("count"))
+    claimed = str(a.get("claimed") or "")
+    if claimed == identity.OTHERS:
+        return f"and {n} more distinct claim{'' if n == 1 else 's'}"
+    channel = str(a.get("channel") or "an unknown channel")
+    rpc = str(a.get("rpc") or "a request")
+    who = f"claimed to be {claimed}" if claimed else "sent no caller"
+    return f"{channel} {who} on {rpc}{'' if n == 1 else f' ×{n}'}"
+
+
+def alarm_view(raw: Any) -> list[dict[str, Any]]:
+    """A record's (or the host's) `identity_alarms` as the page shows them: the words, and the
+    first and last time for the browser to put in the person's own clock. **Tolerant by design** —
+    a record written by another build, or repaired by hand, must cost its card a mark and not the
+    grid (the `_age` rule, review of PR #203), so anything that is not a dict is dropped and every
+    field is read as text."""
+    if not isinstance(raw, list):
+        return []
+    out = []
+    for a in raw:
+        if not isinstance(a, dict):
+            continue
+        at = a.get("at") if isinstance(a.get("at"), str) else ""
+        last = a.get("last") if isinstance(a.get("last"), str) else ""
+        out.append({"words": alarm_words(a), "at": at, "last": last or at, "count": _count(a.get("count"))})
+    return out
+
+
+def alarm_note(alarms: list[dict[str, Any]]) -> str:
+    """The card mark's hover: the newest alarm in words, and how many there are in all. Empty when
+    there are none, which is what draws no mark."""
+    if not alarms:
+        return ""
+    newest = max(alarms, key=lambda a: (a["last"], a["at"]))
+    rest = f" · {len(alarms)} alarms in all" if len(alarms) > 1 else ""
+    return f"identity alarm: {newest['words']}{rest}"
+
+
+def view(
+    s: dict[str, Any],
+    fleet: list[dict[str, Any]] | None = None,
+    *,
+    fleet_known: bool = True,
+    icons: dict[tuple[str, str], str] | None = None,
+) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
-    an orchestrator — which sessions it controls. Without it both come back empty, which is what a
+    a lead — which sessions it controls. Without it both come back empty, which is what a
     caller that has only one record should show."""
     now = datetime.now(UTC)
     d = dict(s)
@@ -209,8 +375,19 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         d["rank"] = STATE_RANK["idle"] - 0.5
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
-    d["host"] = host_name()
-    d["vscode"] = vscode_url(s["dir"]) if s.get("dir") else ""
+    # Another host's record, as the home shows it (design §4.4a): its own host on the card, and a
+    # VS Code link only when a container node's reach names one — the ssh URL below is built from
+    # *this* host's alias, which would open the wrong machine.
+    d["host"] = s.get("host") or host_name()
+    here = d["host"] == host_name()
+    # An unreachable host's reason, and what the home is doing about a container node (§4.4a
+    # "The home supervises it"): the overlay's line, on the state pill's title and as the flag.
+    hl = s.get("host_link") or {}
+    sup = hl.get("supervisor") or {}
+    d["host_note"] = sup.get("doing") or (hl.get("why", "") if state == "unreachable" else "")
+    # A container node's record reaches VS Code by attaching to that container (§4.4a "Reach"),
+    # from what the home derived when the node dialed in; any other host's record has no link.
+    d["vscode"] = vscode_url(s["dir"]) if s.get("dir") and here else (hl.get("reach") or {}).get("vscode", "")
     d["place"] = f"{d['host']} / {Path(s['repo']).name}" if s.get("repo") else f"{d['host']} / {s.get('dir', '')}"
     git = s.get("git") or {}
     where = s.get("dir", "")
@@ -226,9 +403,7 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         flags.append(f"{git['ahead']} unpushed")
     d["flag"] = " · ".join(flags) if state in ("idle", "exited", "stalled?", "needs-you") and flags else ""
     prof = s.get("profile") or ""
-    if s.get("external"):
-        d["profile_line"] = f"{s.get('adapter')} · started outside agentorc (read-only)"
-    elif s.get("adapter") == "shell":
+    if s.get("adapter") == "shell":
         d["profile_line"] = "shell"
     else:
         # tool · account · model (design §4.2a). The third part is the model actually in use when
@@ -245,9 +420,13 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         elif declared:
             line += f" · {declared} (profile)"
         d["profile_line"] = line
-    pend = s.get("pending") or {}
+    # A record whose `pending` is not a dict — another build, a hand repair — costs its card its
+    # pending line and nothing more, the rule `doing` and `out_of_work` already follow: every
+    # reader below (the card, the Focus header, `state_kind`) gets one shape (review of PR #251).
+    pend = s.get("pending")
+    pend = pend if isinstance(pend, dict) else {}
+    d["pending"] = pend
     d["deadline"] = pend.get("deadline") or ""
-    d["ready"] = ready_to_close(s)
     # The report channels (design §4.8, §4.5a card **report line**, TD-028 step 4). One line, shown
     # only when a channel is non-empty: `report_line` is the same text `ao status -v` prints — one
     # formatter, so the card and the CLI cannot drift — and the findings count rides beside it. The
@@ -258,6 +437,42 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
     d["report"] = report_line(s)
     d["report_derived"] = bool(head and head.get("source", "declared") != "declared")
     d["findings_line"] = f"{len(findings)} filed" if findings else ""
+    # design §4.5a card / Focus header **out of work** chip (§4.9a, TD-053 step 6). Not a state —
+    # the session still reads `idle` or `exited` — and shown for any session that declared it, since
+    # a hand-started worker may run out too. The words are fixed and the `why` is the hover, because
+    # the reason is a paragraph naming every entry the session looked at: a card cannot hold it, and
+    # a card that tried would push the report line off. Dropped the moment the session claims again,
+    # which is the record's own rule (§4.9a: a session that claims has work again).
+    oow = s.get("out_of_work")
+    oow = oow if isinstance(oow, dict) else {}  # one malformed record must not empty the grid
+    d["out_of_work"] = (
+        {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
+    )
+    # design §4.8a (TD-077 step 2): the identity alarms kept on this record — requests that named
+    # this session from somewhere it does not live. A **mark**, never a control: it says *a person
+    # should look*, and what to do about it is a row in the Inbox. Shaped like the chips above, so
+    # one malformed entry costs that card its mark and not the grid.
+    d["alarms"] = alarm_view(s.get("identity_alarms"))
+    d["alarm_note"] = alarm_note(d["alarms"])
+    # design §4.5a card **doing** line (§4.8, TD-074): what the session says it is doing, always with
+    # its age — *says · 11m ago* — so a stale line reads as stale. Text a model wrote: shown, never
+    # acted on, and escaped like everything else. `None` for a session that has said nothing, which
+    # is what makes the slot fall back to the tail; shaped like the chip above, so one malformed
+    # record costs that card its line and not the grid.
+    doing = s.get("doing")
+    doing = doing if isinstance(doing, dict) else {}
+    text = str(doing.get("text") or "").strip() if isinstance(doing.get("text"), str) else ""
+    d["doing"] = {"text": text, "age": _age(doing.get("at"), now)} if text else None
+    # design §4.5a card / Focus header **title** (§4.3 `title()`, TD-074): the session's name as its
+    # tool holds it, observed from the pane and cleaned there. Display only and always shown when
+    # there is one — it is a name, not a status, so it is not a fallback for the `doing` line. Empty
+    # for every adapter that gives none, which is what draws nothing.
+    tool_title = s.get("title")
+    d["title"] = tool_title.strip() if isinstance(tool_title, str) else ""
+    # The role's icon (design §4.8 *Role presets*): resolved here from the role's *name* — nothing in
+    # the core keys on a role (§9 invariant 9) and no icon is stored on the record. Without a map
+    # (a caller that did not resolve one) the badge draws its word alone, as it always has.
+    d["role_icon"] = (icons or {}).get((str(s.get("repo") or ""), str(s.get("role") or "")), "")
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
@@ -286,50 +501,67 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None) -> dict[s
         for o in (fleet or [])
         if s.get("id") in (o.get("controllers") or [])
     ]
-    d["is_orchestrator"] = "orchestrate" in (s.get("capabilities") or [])
+    d["holds_control"] = has_control(s.get("capabilities"))
+    # `fleet_known=False`: the caller asked for the fleet and did not get it. An empty members list
+    # then means *unknown*, and Ready to close must not read it as *none* (review of PR #195).
+    d["ready"] = ready_to_close(s, d["members"] if fleet_known else None)
     return d
 
 
-def ready_to_close(s: dict[str, Any]) -> list[tuple[str, bool]]:
-    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents.
-    A registry-only card has nothing to close: no checks, so no Close button (TD-010 a)."""
-    if s.get("external"):
-        return []
+def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ()) -> list[tuple[str, bool]]:
+    """Phase 1 subset of the checklist (design §4.2): tree clean, branch pushed, no subagents — and,
+    for a session other sessions list as a controller, no live member. That last one comes from the
+    control graph, not from a role: it covers a lead, a director over leads, and a session attached
+    by hand with `ao control`, and a session that controls nothing never sees it. A lead idle
+    between rounds with its log pushed used to read *ready to close ✓* over three working members,
+    one click from orphaning them (seen 2026-09-17)."""
     git = s.get("git") or {}
     checks = []
     if s.get("dir") and git:
         checks.append(("tree clean", git.get("dirty", 0) == 0))
         checks.append(("branch pushed", git.get("ahead", 0) == 0 and bool(git.get("upstream"))))
     checks.append(("no subagents running", (s.get("subagents") or 0) == 0))
+    if members is None:
+        checks.append(("members unknown — the host agent did not list the sessions; reload", False))
+    elif members:
+        up = [m["name"] for m in members if m.get("state") not in DEAD]
+        label = f"no live members ({', '.join(up)} — stop the team first)" if up else "no live members"
+        checks.append((label, not up))
     return checks
 
 
+DEFS_TTL = 5.0  # seconds the events stream keeps the team definitions it read (design §4.5a)
 NO_TEAM = ""  # the group key for sessions carrying no `team` badge; rendered as *No team*, last
 DEAD = ("exited", "closed")
 
 
-def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
+def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = ()) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
-    derived from the views on every render and every delta, never stored. `None` when no *live*
-    session carries a badge — the page then renders the flat grid, with no header anywhere.
+    derived from the views on every render and every delta, never stored. `rows` is the definitions
+    (`teamrun.rows`). `None` when no session carries a badge and nothing is defined — the page then
+    renders the flat grid, with no header anywhere. A team with nothing live keeps its group
+    (2026-09-18): dead cards under a team's name are still that team's, and a definition no session
+    carries is a group with no members, because its card is where Start lives.
 
     The badge decides the group; `controllers` decides the lead: the one member holding
-    `orchestrate` that other members of the same group list as a controller. A group without one
+    `control` that other members of the same group list as a controller. A group without one
     has no lead card and its header says so. Within a group the lead comes first, then the rest in
     urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
-    per group in Pinned mode. Sessions with no badge form the *No team* group at the end.
+    per group in Pinned mode. Down the page: the teams with something live, the sessions with no
+    badge as *No team*, then the teams with nothing live.
 
     A lead carrying a different badge from its members — which `ao team start` never produces, but a
     hand-typed `ao new --team` can — is still found, by looking across the whole fleet rather than
     only inside the group (review of PR #117). Its card stays where its own badge puts it; the
     header names it and says so, because moving the card would contradict the badge."""
-    if not any(v.get("team") and v.get("state") not in DEAD for v in views):
-        return None
-    by_team: dict[str, list[dict[str, Any]]] = {}
+    defs = {str(r["name"]): r for r in rows}
+    by_team: dict[str, list[dict[str, Any]]] = {name: [] for name in defs}
     for v in views:
         by_team.setdefault(str(v.get("team") or NO_TEAM), []).append(v)
+    if not any(t != NO_TEAM for t in by_team):
+        return None
     groups: list[dict[str, Any]] = []
-    for team in sorted(by_team, key=lambda t: (t == NO_TEAM, t)):
+    for team in sorted(by_team):
         members = sorted(by_team[team], key=lambda v: (v["rank"], v["name"]))
         lead, lead_elsewhere = None, False
         if team != NO_TEAM:
@@ -337,7 +569,7 @@ def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
             # The fleet, not just this group: a lead whose own badge differs is still this group's
             # lead, and saying "led by you" over a group that plainly has one would be a lie.
             leads = sorted(
-                (v for v in views if "orchestrate" in (v.get("capabilities") or []) and v["id"] in named),
+                (v for v in views if has_control(v.get("capabilities")) and v["id"] in named),
                 key=lambda v: (str(v.get("team") or "") != team, v["rank"], v["name"]),  # our own badge first
             )
             if leads:
@@ -348,22 +580,275 @@ def team_groups(views: list[dict[str, Any]]) -> list[dict[str, Any]] | None:
                 else:
                     lead_elsewhere = True
         projects = sorted({str(m.get("project")) for m in members if m.get("project")})
+        row = defs.get(team) or {}
         groups.append(
             {
                 "team": team,
                 "label": team or "No team",
-                "lead": {k: lead[k] for k in ("id", "name", "state", "state_class", "state_label", "scraped")}
+                # `doing` rides with the lead (design §4.5a **team groups**, TD-074): the team card's
+                # header shows its lead's line, which is the lead reporting on the team without
+                # being asked to narrate each member.
+                "lead": {
+                    k: lead.get(k) for k in ("id", "name", "state", "state_class", "state_label", "scraped", "doing")
+                }
                 if lead
                 else None,
                 "lead_elsewhere": lead_elsewhere,  # its card sits under its own badge, not here
                 "members": members,
                 "ids": [m["id"] for m in members],
-                "projects": projects,
+                "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "live": sum(1 for m in members if m.get("state") not in DEAD),
+                # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
+                "defined": team in defs,
+                "source": row.get("source"),
+                "def_lead": row.get("lead"),  # the definition's word, for a card with no sessions yet
+                "def_members": row.get("members"),
+                # *nothing running* and *nothing left to run* are different facts (§4.9a)
+                "wound_down": row.get("wound_down"),
+                "wound_down_age": row.get("wound_down_age"),
             }
         )
+    # what is running is read first; *No team* is never "stopped" — nothing there starts as one
+    # …and among the live teams, one with a session that needs a person comes first (2026-09-18)
+    groups.sort(
+        key=lambda g: (2 if g["team"] and not g["live"] else 1 if not g["team"] else 0, not g["needs"], g["team"])
+    )
     return groups
+
+
+# -- the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**, §4.10; TD-069 step 1) -------------
+
+PERSON_ASK_KINDS = ("ask", "conflict")  # what reads as a question to the person; `steer` has its own rules
+INBOX_SECTIONS = ("needs", "steering", "fyi", "snoozed")
+
+
+def _entry_open(e: dict[str, Any]) -> bool:
+    """Design §4.10 *One way of being closed*, mirrored for the dicts the RPC hands the page: an
+    entry is open exactly when it is an `ask`, `steer` or `conflict` with no `closed_reason` —
+    and, for entries written before 2026-09-19, one with no `closed_by` and no `expired_at`."""
+    if e.get("kind") not in (*PERSON_ASK_KINDS, "steer"):
+        return False
+    if e.get("closed_reason"):
+        return False
+    return not (e.get("closed_by") or e.get("expired_at"))
+
+
+def _iso(raw: Any) -> datetime | None:
+    if not isinstance(raw, str) or not raw:
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _find_text(*parts: Any) -> str:
+    """What the page's free-text filter matches on, lowercased once here rather than in the
+    browser: the same `data-find` the mail rows carry."""
+    return " ".join(str(p).strip() for p in parts if str(p or "").strip()).lower()
+
+
+# design §4.5a **Inbox row: state**: the row kinds that are a *needs you* session, and so exactly
+# what the Org's needs-you count counts. Kept beside `state_kind` because the two are one rule.
+NEEDS_YOU_ROWS = ("permission", "question", "needs")
+
+
+def state_kind(v: dict[str, Any]) -> str:
+    """Which state row this session is, or "" for one that needs nobody (design §4.5a **Inbox row:
+    state**). **The one predicate the Inbox and the Org's needs-you count both read**, so every
+    session the Org counts as `needs-you` has exactly one row on the Inbox and the page's hover
+    text — *the session states the Org counts too* — is true (review of PR #251).
+
+    A `needs-you` record whose `pending` is empty, is not a dict, or names a kind this build does
+    not know is still a session stopped for a person: it becomes a plain **needs** row with
+    **Open** and no Allow / Deny, because nothing structured came with it and a control built from
+    what is not there is the thing §4.2 and TD-071 item 8 forbid."""
+    state = v.get("state")
+    pend = v.get("pending")
+    pend = pend if isinstance(pend, dict) else {}
+    if state == "needs-you":
+        if pend.get("kind") == "permission" and pend.get("tool_use_id"):
+            return "permission"
+        return "question" if pend.get("text") or pend.get("kind") else "needs"
+    if state == "stalled?":
+        return "stalled"
+    if state == "limited":
+        return "limited"
+    if state == "exited" and v.get("flag") and [name for name, ok in (v.get("ready") or []) if not ok]:
+        # "exited with unpushed work" (§4.5a, TD-069): what Ready to close says, in its own words —
+        # the row goes when the work is pushed or the session is forgotten.
+        return "unpushed"
+    return ""
+
+
+def state_rows(
+    views: Collection[dict[str, Any]],
+    *,
+    host_alarms: Collection[dict[str, Any]] = (),
+    host: str = "",
+    identity_mode: str = "",
+) -> list[dict[str, Any]]:
+    """Design §4.5 screen 6 / §4.5a **Inbox row: state** (TD-069 step 2): a session's state as a
+    row of the Inbox, one per thing that needs a person. Built from the card views the Org is
+    rendered from — the same `view()`, so a row's pill, `doing` line, `title`, team and role are
+    the card's own and cannot drift from it — and never from anything parsed off a screen
+    (TD-071 item 8).
+
+    The kinds, in §4.5a's words: a pending **permission** (what is asked, the time left, Allow /
+    Deny through the hook channel); a pending **question** and **stalled?** (the text or the host's
+    note, **Open**); **limited** (the reset time); an **exited** session with unpushed work (what
+    Ready to close says, **Open**). To them TD-077 step 2 adds the **identity alarm** rows: one per
+    record that has alarms, and one for the host's own list — *it is either a bug of ours or a
+    session misbehaving and a person should know which* (§4.8a).
+
+    A row has no `snoozed_until` and no Snooze: a state lives on the record, and there is nowhere
+    to keep a person's *not now* (the gap is written up in TD-069 step 2's entry). It leaves the
+    list the moment the state does, which is the next poll."""
+    rows: list[dict[str, Any]] = []
+
+    def base(v: dict[str, Any], row: str, text: str, *, extra: str = "") -> dict[str, Any]:
+        doing = v.get("doing") or {}
+        return {
+            "row": row,
+            "id": f"{v['id']}:{row}",  # the row's own key on the page; a record may raise two
+            "sid": v["id"],
+            "name": v.get("name") or v["id"],
+            "team": v.get("team") or "",
+            "role": v.get("role") or "",
+            "role_icon": v.get("role_icon") or "",
+            "title": v.get("title") or "",
+            "doing": v.get("doing"),
+            "state": v.get("state") or "",
+            "state_class": v.get("state_class") or "",
+            "state_label": v.get("state_label") or "",
+            "scraped": bool(v.get("scraped")),
+            "host": v.get("host") or "",
+            "text": text,
+            "deadline": v.get("deadline") or "" if row == "permission" else "",
+            "at": v.get("since") or "",
+            "age": v.get("age") or "",
+            "find": _find_text(v.get("name"), v.get("title"), doing.get("text"), text, extra),
+        }
+
+    for v in sorted(views, key=lambda v: (str(v.get("since") or ""), str(v.get("id") or ""))):
+        pend = v.get("pending")
+        pend = pend if isinstance(pend, dict) else {}
+        text = str(pend.get("text") or "")
+        kind = state_kind(v)
+        if kind == "permission":
+            rows.append(base(v, kind, text))
+        elif kind == "question":
+            rows.append(base(v, kind, f"{pend.get('kind')}: {text}" if pend.get("kind") else text))
+        elif kind == "needs":
+            rows.append(base(v, kind, "it is waiting on a person, and nothing came with it saying what for"))
+        elif kind == "stalled":
+            rows.append(base(v, kind, text or v.get("host_note") or "no output for a while, and no note"))
+        elif kind == "limited":
+            rows.append(base(v, kind, text or "the profile is at its cap"))
+        elif kind == "unpushed":
+            unmet = [name for name, ok in (v.get("ready") or []) if not ok]
+            rows.append(base(v, kind, f"{v['flag']} — {', '.join(unmet)}", extra=v.get("where") or ""))
+        if alarms := v.get("alarms"):
+            row = base(v, "alarm", alarm_note(alarms))
+            # an alarm row is as old as its newest alarm, not as its session: what the order is
+            # about is when the thing that needs a person happened
+            rows.append(
+                {
+                    **row,
+                    "at": max((a["last"] or a["at"]) for a in alarms) or row["at"],
+                    "age": "",
+                    "alarms": alarms,
+                    "mode": identity_mode,
+                    "find": _find_text(row["find"], *(a["words"] for a in alarms)),
+                }
+            )
+    if host_alarms:
+        rows.append(
+            {
+                "row": "alarm_host",
+                "id": "host:alarm",
+                "sid": "",
+                "name": host or host_name(),
+                "team": "",
+                "role": "",
+                "role_icon": "",
+                "title": "",
+                "doing": None,
+                "state": "",
+                "state_class": "",
+                "state_label": "",
+                "scraped": False,
+                "host": host,
+                "text": alarm_note(list(host_alarms)),
+                "deadline": "",
+                "at": max((a["last"] or a["at"]) for a in host_alarms),
+                "age": "",
+                "find": _find_text(host, "identity alarm", *(a["words"] for a in host_alarms)),
+                "alarms": list(host_alarms),
+                "mode": identity_mode,
+            }
+        )
+    return rows
+
+
+def _needs_key(item: dict[str, Any]) -> tuple[int, str]:
+    """The **Needs you** order (design §4.5 screen 6): *what is on the tool's clock first (a
+    permission's countdown), then oldest first* — across states and mail together, which is why one
+    key reads both."""
+    if item.get("row") == "permission" and item.get("deadline"):
+        return (0, str(item["deadline"]))
+    return (1, str(item.get("at") or ""))
+
+
+def inbox_sections(
+    entries: Collection[dict[str, Any]],
+    *,
+    now: datetime | None = None,
+    states: Collection[dict[str, Any]] = (),
+) -> dict[str, Any]:
+    """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
+    snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
+    into **Needs you** here rather than anywhere else. Board items are step 3 and join the same way.
+
+    - **Needs you** — the state rows, open `ask`s to the person (an open `conflict` too: it cannot be addressed to
+      the person, §4.10, but one written before that gate would still be a question nobody else
+      can answer) and **paused** `steer`s; oldest first.
+    - **Steering** — open `steer`s whose clock is running; soonest bound first, and a `steer`
+      that somehow carries no bound last.
+    - **FYI** — everything else: `note`s, `system` notes, replies, and every closed entry until
+      retention prunes it (`MAIL_RETENTION`, 12 h); newest first, because the useful end of a list
+      nobody must act on is the recent end.
+    - **Snoozed** — an entry whose `snoozed_until` is still ahead is in none of the three and in
+      no count (§4.10 *Snooze*); soonest first, so the page can say *n snoozed — show* and a
+      snooze is never a way to lose mail.
+
+    `count` is the **Needs you** section's length, which is the top bar's number (§4.5a): what is
+    waiting on a person, never unread mail. One computation, used by the page and by the poll.
+    An unreadable `snoozed_until` reads as *not snoozed*: mail is never hidden by a bad field.
+
+    A **state row carries no snooze**: §4.5a allows one on `stalled?` and unpushed work, but a
+    state lives on its record and no field of ours holds a person's *not now* — so the rows are
+    built without Snooze and the gap is TD-069 step 2's to close (a home-owned
+    `attention_snoozed_until`, set by a person-only RPC, is the proposal)."""
+    at = now or datetime.now(UTC)
+    out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
+    out["needs"].extend(states)
+    for e in entries:
+        snoozed = _iso(e.get("snoozed_until"))
+        if snoozed and snoozed > at:
+            out["snoozed"].append(e)
+        elif _entry_open(e) and (e.get("kind") in PERSON_ASK_KINDS or e.get("paused_at")):
+            out["needs"].append(e)
+        elif _entry_open(e) and e.get("kind") == "steer":
+            out["steering"].append(e)
+        else:
+            out["fyi"].append(e)
+    out["needs"].sort(key=_needs_key)
+    out["steering"].sort(key=lambda e: (not e.get("bound"), str(e.get("bound") or "")))
+    out["fyi"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
+    out["snoozed"].sort(key=lambda e: str(e.get("snoozed_until") or ""))
+    return {**out, "count": len(out["needs"])}
 
 
 # -- app -------------------------------------------------------------------------------------------
@@ -409,13 +894,25 @@ def create_app() -> FastAPI:
     def render_card(v: dict[str, Any]) -> str:
         return templates.get_template("card.html").render(s=v)
 
-    def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
+    defs_cache: dict[str, Any] = {"at": 0.0, "org": None}
+
+    async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The definitions' rows for a delta's headers. The page reads the files on every load;
+        the events stream re-renders every header on every delta, so it reads them at most once in
+        `DEFS_TTL` seconds — a definition edited by hand shows on the next load, or within that."""
+        now = time.monotonic()
+        if defs_cache["org"] is None or now - defs_cache["at"] > DEFS_TTL:
+            # off the loop: every open page shares it, and the read is a file per registered repo
+            defs_cache.update(at=now, org=(await asyncio.to_thread(org_here))[0])
+        return _aged(teamrun.rows(defs_cache["org"], sessions))
+
+    async def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
         """The team groups as the events stream ships them (design §4.5a **team groups**): per group
         its key, the member ids in order, and the header rendered by the same template the page
         uses — so the client moves cards between groups and swaps headers without composing any
         markup of its own. `None` means "flat grid", exactly as the page renders it."""
         fleet = list(known.values())
-        groups = team_groups([view(s, fleet) for s in fleet])
+        groups = team_groups([view(s, fleet) for s in fleet], await team_rows(fleet))
         if groups is None:
             return None
         head = templates.get_template("group_head.html")
@@ -423,6 +920,7 @@ def create_app() -> FastAPI:
             {
                 "team": g["team"],
                 "lead": (g["lead"] or {}).get("id", ""),
+                "live": g["live"],
                 "ids": g["ids"],
                 "html": head.render(g=g),
             }
@@ -435,24 +933,51 @@ def create_app() -> FastAPI:
         # (design §4.5 unreachable hosts), never a bare 503.
         agent_down = False
         usage: dict[str, Any] = {}
-        person_unread = 0
+        person_needs = 0
+        info: dict[str, Any] | None = None
+        entries: list[dict[str, Any]] = []
         try:
             sessions = await call("list")
             usage = await call("usage")
-            person_unread = (await call("inbox"))["unread"]  # the top bar's person inbox count (§4.5a)
+            info = await call("host")
+            try:
+                # the top bar's number: the Inbox page's **Needs you** section, and not unread mail
+                # (§4.5a **Inbox page**, TD-069 steps 1–2) — mail *and* the session states, from the
+                # same `inbox_sections` the page uses, so the two numbers cannot drift apart
+                entries = (await call("inbox"))["entries"]
+            except HTTPException as e:
+                # a node whose link is down refuses the mailbox (§4.4a): the banner says why, and
+                # the page is still this host's sessions
+                if e.status_code == 503 or (info or {}).get("mode") != "node":
+                    raise
         except HTTPException as e:
             if e.status_code != 503:
                 raise
             sessions, agent_down = [], True
-        vs = sorted((view(s, sessions) for s in sessions), key=lambda v: (v["rank"], v["name"]))
-        counts = {k: sum(1 for v in vs if v["state"] == k) for k in ("needs-you", "limited", "stalled?")}
+        icons = await role_icons(sessions)
+        vs = sorted((view(s, sessions, icons=icons) for s in sessions), key=lambda v: (v["rank"], v["name"]))
+        # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
+        # record the Org counts and the Inbox did not list was the two pages disagreeing in public
+        counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
+        counts.update({k: sum(1 for v in vs if v["state"] == k) for k in ("limited", "stalled?")})
         strip = teams_view(sessions)
+        id_info = {} if agent_down else await identity_info()
+        if entries or vs:
+            person_needs = inbox_sections(
+                entries,
+                states=state_rows(
+                    vs,
+                    host_alarms=alarm_view(id_info.get("alarms")),
+                    host=str(id_info.get("host") or host_name()),
+                    identity_mode=str(id_info.get("mode") or ""),
+                ),
+            )["count"]
         return templates.TemplateResponse(
             request,
             "org.html",
             {
                 "sessions": vs,
-                "groups": team_groups(vs),
+                "groups": team_groups(vs, strip["teams"]),
                 "strip": strip,
                 "counts": counts,
                 "host": host_name(),
@@ -460,7 +985,9 @@ def create_app() -> FastAPI:
                 "agent_down": agent_down,
                 "volatile": hosts.local_host().volatile,
                 "usage": usage,
-                "person_unread": person_unread,
+                "person_needs": person_needs,
+                "node_banner": node_banner(info),
+                "identity_note": identity_note(id_info),
             },
         )
 
@@ -472,12 +999,19 @@ def create_app() -> FastAPI:
             if e.status_code == 503:
                 return RedirectResponse("/", status_code=303)  # the Org shows the down banner
             raise
+        known = True
         try:
             fleet = await call("list")
         except HTTPException:  # the record we already have still renders; membership just empties
-            fleet = [s]
+            fleet, known = [s], False  # …and Ready to close says it does not know, rather than pass
         return templates.TemplateResponse(
-            request, "focus.html", {"s": view(s, fleet), "host": host_name(), "active": "Org"}
+            request,
+            "focus.html",
+            {
+                "s": view(s, fleet, fleet_known=known, icons=await role_icons([s])),
+                "host": host_name(),
+                "active": "Org",
+            },
         )
 
     @app.get("/new", response_class=HTMLResponse)
@@ -491,11 +1025,11 @@ def create_app() -> FastAPI:
         recent = repos + [d for d in await call("recent_dirs") if d not in repos]
         adapters = await call("adapters")
         # design §4.5a New session **Controllers** picker (§4.8): the candidates are the sessions
-        # holding `orchestrate` — nothing else could act on the new session anyway.
-        orchestrators = [
+        # holding `control` — nothing else could act on the new session anyway.
+        control_holders = [
             {"id": o["id"], "name": o.get("name") or o["id"]}
             for o in await call("list")
-            if "orchestrate" in (o.get("capabilities") or []) and o.get("state") not in ("closed", "exited")
+            if has_control(o.get("capabilities")) and o.get("state") not in ("closed", "exited")
         ]
         # design §4.5a New session **Role** preset: the built-ins, plus what the prefilled directory's
         # repo redefines; `/api/roles` refreshes the list as the directory is typed (TD-040 step a).
@@ -510,7 +1044,7 @@ def create_app() -> FastAPI:
                 "default_profile": default,
                 "recent": recent,
                 "adapters": adapters,
-                "orchestrators": orchestrators,
+                "control_holders": control_holders,
                 # design §4.5a New session **Grants** checkboxes: the grants a record may hold
                 # (`sessionorc.models.GRANTS`, the same list `ao new --grant` offers), each with
                 # the one-line warning the row asks for.
@@ -605,7 +1139,7 @@ def create_app() -> FastAPI:
             # The Grants checkboxes were ticked from the preset when the page loaded and as the
             # Role changed (design §4.5a), so what is ticked is what was meant — including an
             # untick, which is a person deciding this session does not get the grant.
-            capabilities=[g for g in grant if g in GRANTS],
+            capabilities=[g for g in canonical_grants(grant) if g in GRANTS],
             lane=refs or (list(preset.lane) if preset else []),
             role=preset.name if preset else "",
             ledger=ledger,
@@ -800,6 +1334,8 @@ def create_app() -> FastAPI:
 
     @app.post("/api/teams/{name}/start")
     async def api_team_start(name: str):
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())  # the strip's note, as the toast (§4.4a)
         org, _notes = org_here()
         try:
             _plan, result = await asyncio.to_thread(teamrun.start, rpc, org, name, host_name())
@@ -812,6 +1348,8 @@ def create_app() -> FastAPI:
     async def api_team_stop(name: str, request: Request):
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
         now = bool(body.get("now"))
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
         org, _notes = org_here()
         try:
             st = await asyncio.to_thread(teamrun.stop_members, rpc, org, name, now=now)
@@ -858,25 +1396,153 @@ def create_app() -> FastAPI:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
         return got
 
-    @app.get("/api/person/inbox")
-    async def api_person_inbox():
-        """design §4.5a Org top bar **person inbox** (§4.10 "A session reaches a person through the
-        org's person inbox"): the `inbox` RPC with no caller and no id. A person's read sets nothing
-        and rings nothing. The top bar polls this for its count — the pushed stream carries session
-        records only, and the person inbox belongs to none."""
-        got = await call("inbox")
+    identity_cache: dict[str, Any] = {"at": 0.0, "info": None}
+
+    async def identity_info() -> dict[str, Any]:
+        """This host's identity mode (design §4.8a), for the Org's one-line note. The `identity`
+        RPC is a never-gated read, and it is read at most once every `DEFS_TTL` seconds — the same
+        idiom as the team definitions, so a page under a delta storm never asks per render. An
+        agent that is down or too old to answer leaves the note off rather than the page."""
+        now = time.monotonic()
+        if identity_cache["info"] is None or now - identity_cache["at"] > DEFS_TTL:
+            try:
+                identity_cache.update(at=now, info=await call("identity"))
+            except HTTPException:
+                identity_cache.update(at=now, info={})
+        return identity_cache["info"] or {}
+
+    async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
+        fleet the request already read. Every host the home knows, exactly as the Org shows them —
+        the same records and the same `view()` — plus this host's own identity alarms (§4.8a).
+
+        Rendered server-side on the page's load *and* on its poll: a state that changed between
+        polls is corrected by the next one, and nothing here has to ride the pushed stream to be
+        no more than a few seconds behind the Org."""
+        icons = await role_icons(fleet)
+        views = [view(s, fleet, icons=icons) for s in fleet]
+        info = await identity_info()
+        return state_rows(
+            views,
+            host_alarms=alarm_view(info.get("alarms")),
+            host=str(info.get("host") or host_name()),
+            identity_mode=str(info.get("mode") or ""),
+        )
+
+    async def person_view() -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """The mail and the state rows of one Inbox request — over **one** `list`. Both halves need
+        the fleet (the mail for its senders' names, the states for the records themselves), and
+        this runs on every page load and every poll: two fleet lists on that path would be two for
+        no reason (review of PR #251)."""
         fleet = await call("list")
+        return await person_inbox(fleet), await person_states(fleet)
+
+    async def person_inbox(fleet: list[dict[str, Any]]) -> dict[str, Any]:
+        """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
+        caller and no id — **a person's read, which sets no `read_at`**, because a person is not
+        the session. That is what lets the Inbox page poll it every few seconds without marking
+        anything read and without freeing a depth slot an unanswered question still holds; it is
+        the rule the dialog this page replaces already relied on, so no `peek` was needed. Each
+        sender gets the name it is known by, and `from_open` the id **Open** goes to while that
+        record still exists (§4.5 screen 6: a row opens the session that needs the person)."""
+        got = await call("inbox")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        at = datetime.now(UTC)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            e["from_open"] = e["from"] if e["from"] in names else ""
+            e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
         return got
+
+    def inbox_html(sections: dict[str, Any]) -> dict[str, str]:
+        """Each section's rows, rendered by the one template the page itself renders them with, so
+        a poll replaces a section without the client composing any markup — the shape the events
+        stream already uses for team headers. Jinja escapes every field, which is what keeps what a
+        session wrote text and nothing else (TD-071 item 8)."""
+        rows = templates.get_template("inbox_rows.html")
+        return {k: rows.render(rows=sections[k], section=k) for k in INBOX_SECTIONS}
+
+    @app.get("/inbox", response_class=HTMLResponse)
+    async def inbox_page(request: Request):
+        """design §4.5 screen 6 / §4.5a **Inbox page** (TD-069 steps 1 and 2): full width, the
+        person inbox and the sessions' states in three sections, and the count that means *what is
+        waiting on a person*. Board items are step 3 and join the same sections here."""
+        agent_down = False
+        try:
+            got, states = await person_view()
+        except HTTPException as e:
+            if e.status_code != 503:
+                raise
+            got, states, agent_down = {"entries": []}, [], True  # the banner + Retry, never a bare 503
+        sections = inbox_sections(got["entries"], states=states)
+        return templates.TemplateResponse(
+            request,
+            "inbox.html",
+            {
+                "sections": sections,
+                "person_needs": sections["count"],
+                "host": host_name(),
+                "active": "Inbox",
+                "agent_down": agent_down,
+                "volatile": hosts.local_host().volatile,
+                "usage": {},
+            },
+        )
+
+    @app.get("/api/person/inbox")
+    async def api_person_inbox():
+        """design §4.5a Org top bar **Inbox** and the **Inbox page** (§4.10): the entries, which
+        section each is in, their rendered rows, and `needs` — the count, computed in the one place
+        (`inbox_sections`) the page renders from, so the top bar's number and the page cannot
+        disagree. Both poll this: the pushed stream carries session records only, and the person
+        inbox belongs to none. The read marks nothing (`person_inbox`, above).
+
+        From TD-069 step 2 the **state rows** ride this poll too, rendered from a fresh `list`
+        (`person_states`): the Org's pushed stream is per-record and this page is per-person, so
+        the simplest correct thing is one snapshot per poll — a row whose state changed in between
+        is corrected by the next one, and a permission answered here leaves at once because the
+        press refreshes."""
+        got, states = await person_view()
+        sections = inbox_sections(got["entries"], states=states)
+        got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
+        got["needs"] = sections["count"]
+        got["snoozed_n"] = len(sections["snoozed"])
+        got["html"] = inbox_html(sections)
+        return got
+
+    # design §4.5a **Inbox row** controls (§4.10): each is a person's own act on their own inbox,
+    # so each calls its RPC **caller-less** — a person is not a session, and every one of these is
+    # refused to every session by the agent. The UI adds no rule of its own: a refusal comes back
+    # as the toast every other RPC error on the page does.
+    PERSON_ACTS = {"pause": "inbox_pause", "resume": "inbox_resume", "gowithit": "inbox_go_with_it"}
 
     @app.post("/api/person/{action}")
     async def api_person_action(action: str, request: Request):
         """design §4.5a Org top bar **person inbox** → Reply and delete (§4.10): a person's reply
         lands in the sender's inbox (the agent addresses it to the entry's sender and closes its
-        `ask`); delete removes the entry from the person inbox only — the sender keeps its copy."""
+        `ask`); delete removes the entry from the person inbox only — the sender keeps its copy.
+        From 2026-09-19 (TD-069 step 1) the Inbox page's own controls join it: **Snooze** and
+        **Unsnooze** (`inbox_snooze`, with and without an `until`), **Pause** / **Resume**, and
+        **Go with it**."""
         body = await request.json() if request.headers.get("content-type", "").startswith("application/json") else {}
+        if action in PERSON_ACTS or action == "snooze":
+            ref = str(body.get("msg") or "").strip()
+            if not ref:
+                raise HTTPException(400, f"{action} needs the entry's id")
+            if action == "snooze":
+                # no `until` is the clear — *Unsnooze* on the page's snoozed list (§4.10 *Snooze*)
+                until = str(body.get("until") or "").strip() or None
+                got = await call("inbox_snooze", msg=ref, until=until)
+            else:
+                got = await call(PERSON_ACTS[action], msg=ref)
+            return JSONResponse({"ok": True, **got})
+        if action == "identity_ack":
+            # design §4.5a **Inbox row: identity alarm** (§4.8a, TD-077 step 2): a person has seen
+            # the alarms and decided what they were, so the list is cleared and the row leaves.
+            # Caller-less like every other control here — the agent refuses it to every session,
+            # and the log keeps every alarm, so acknowledging loses nothing.
+            got = await call("identity_ack", id=str(body.get("id") or "").strip() or None)
+            return JSONResponse({"ok": True, **got})
         if action == "reply":
             ref = str(body.get("reply_to") or "").strip()
             if not ref:
@@ -888,77 +1554,99 @@ def create_app() -> FastAPI:
             if not ref:
                 raise HTTPException(400, "delete needs the entry's id")
             got = await call("inbox_delete", msg=ref)
-            return JSONResponse({"ok": True, "unread": got["unread"]})
+            # design §4.10 *Deleting is declining*: on an open `ask` or `steer` the entry is not
+            # stripped — it closes as `declined`, the asker is told, and it stays for retention.
+            return JSONResponse({"ok": True, "unread": got["unread"], "declined": bool(got.get("declined"))})
         raise HTTPException(404, f"no action {action}")
 
     @app.get("/api/sessions")
     async def api_sessions():
         sessions = await call("list")
-        return [view(s, sessions) for s in sessions]
+        icons = await role_icons(sessions)
+        return [view(s, sessions, icons=icons) for s in sessions]
 
     # -- live state ------------------------------------------------------------------------------
 
     @app.websocket("/events")
     async def events(ws: WebSocket):
         await ws.accept()
+
+        async def gone() -> None:
+            # The page never sends on this socket, so the next message is its disconnect. Without
+            # this watch the handler noticed a closed tab only when the next event's send failed —
+            # and uvicorn's shutdown waits on the handler, which is the UI's 40 s stop (TD-058).
+            while (await ws.receive()).get("type") != "websocket.disconnect":
+                pass
+
+        async def stream(c: LocalClient) -> None:
+            # A delta carries one record, but membership is read across records (design §4.8):
+            # a card's *under* chip names its controllers, which live on other records. So the
+            # loop keeps the fleet it has already been told about — seeded once, then updated
+            # by the very deltas it is rendering — rather than re-listing per event.
+            known: dict[str, dict[str, Any]] = {}
+            with contextlib.suppress(Exception):
+                known = {o["id"]: o for o in await call("list")}
+            async for ev in c.subscribe():
+                if ev.get("event") == "session":
+                    s = ev["session"]
+                    known[s["id"]] = s
+                    v = view(s, list(known.values()), icons=await role_icons([s]))
+                    # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
+                    # `controllers` change on one record can move a card, change a lead, or turn
+                    # grouping on or off for the whole page, and only the server sees the fleet.
+                    await ws.send_text(
+                        json.dumps(
+                            {
+                                "event": "session",
+                                "id": s["id"],
+                                "state": s["state"],
+                                "rank": v["rank"],  # the view's: unseen idle sorts above idle
+                                "html": render_card(v),
+                                "session": v,
+                                "groups": await group_heads(known),
+                            }
+                        )
+                    )
+                elif ev.get("event") in ("gone", "usage"):
+                    if ev.get("event") == "gone":
+                        # only a `gone` names a session; a `usage` event carries a profile, and
+                        # popping on it would one day evict a live session by coincidence
+                        went = str(ev.get("id") or "")
+                        known.pop(went, None)
+                        await ws.send_text(json.dumps({**ev, "groups": await group_heads(known)}))
+                        # A card's *under* chip names another record, so the session that went
+                        # is not the only card now out of date: every card listing it as a
+                        # controller has to be redrawn, or it keeps naming and linking to a
+                        # session that is gone until the page is reloaded (review 2026-09-13).
+                        for other in list(known.values()):
+                            if went in (other.get("controllers") or []):
+                                ov = view(other, list(known.values()), icons=await role_icons([other]))
+                                await ws.send_text(
+                                    json.dumps(
+                                        {
+                                            "event": "session",
+                                            "id": other["id"],
+                                            "state": other["state"],
+                                            "rank": ov["rank"],
+                                            "html": render_card(ov),
+                                            "session": ov,
+                                        }
+                                    )
+                                )
+                        continue
+                    await ws.send_text(json.dumps(ev))
+
         try:
             async with LocalClient() as c:
-                # A delta carries one record, but membership is read across records (design §4.8):
-                # a card's *under* chip names its controllers, which live on other records. So the
-                # loop keeps the fleet it has already been told about — seeded once, then updated
-                # by the very deltas it is rendering — rather than re-listing per event.
-                known: dict[str, dict[str, Any]] = {}
-                with contextlib.suppress(Exception):
-                    known = {o["id"]: o for o in await call("list")}
-                async for ev in c.subscribe():
-                    if ev.get("event") == "session":
-                        s = ev["session"]
-                        known[s["id"]] = s
-                        v = view(s, list(known.values()))
-                        # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
-                        # `controllers` change on one record can move a card, change a lead, or turn
-                        # grouping on or off for the whole page, and only the server sees the fleet.
-                        await ws.send_text(
-                            json.dumps(
-                                {
-                                    "event": "session",
-                                    "id": s["id"],
-                                    "state": s["state"],
-                                    "rank": v["rank"],  # the view's: unseen idle sorts above idle
-                                    "html": render_card(v),
-                                    "session": v,
-                                    "groups": group_heads(known),
-                                }
-                            )
-                        )
-                    elif ev.get("event") in ("gone", "usage"):
-                        if ev.get("event") == "gone":
-                            # only a `gone` names a session; a `usage` event carries a profile, and
-                            # popping on it would one day evict a live session by coincidence
-                            went = str(ev.get("id") or "")
-                            known.pop(went, None)
-                            await ws.send_text(json.dumps({**ev, "groups": group_heads(known)}))
-                            # A card's *under* chip names another record, so the session that went
-                            # is not the only card now out of date: every card listing it as a
-                            # controller has to be redrawn, or it keeps naming and linking to a
-                            # session that is gone until the page is reloaded (review 2026-09-13).
-                            for other in list(known.values()):
-                                if went in (other.get("controllers") or []):
-                                    ov = view(other, list(known.values()))
-                                    await ws.send_text(
-                                        json.dumps(
-                                            {
-                                                "event": "session",
-                                                "id": other["id"],
-                                                "state": other["state"],
-                                                "rank": ov["rank"],
-                                                "html": render_card(ov),
-                                                "session": ov,
-                                            }
-                                        )
-                                    )
-                            continue
-                        await ws.send_text(json.dumps(ev))
+                tasks = {asyncio.ensure_future(stream(c)), asyncio.ensure_future(gone())}
+                try:
+                    done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    for t in tasks:
+                        t.cancel()
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                for t in done:
+                    t.result()  # the stream's own failure is handled below, as it always was
         except (WebSocketDisconnect, AgentUnavailable, ConnectionError):
             pass
         except Exception:  # noqa: BLE001
@@ -984,13 +1672,32 @@ def create_app() -> FastAPI:
             await ws.send_bytes(f"\r\n[agentorc] {e.detail}\r\n".encode())
             await ws.close(code=4404)  # final: the client must not retry
             return
+        sid = sid.removesuffix(f"@{host_name()}")  # a self-addressed id is this host's tmux session
+        sock = os.environ.get("AGENTORC_TMUX_SOCKET")
+        inside: list[str] = []  # the `docker exec` prefix every tmux command takes for a container node's session
+        argv = attach_argv(sid, socket_name=sock)
+        if s.get("host") and s["host"] != host_name():
+            # Another host's session (design §4.4a "Reach"): a container node on this machine is
+            # reached by `docker exec` into it, from what the home derived when it dialed in; a
+            # machine node's pane has nothing here that reaches it yet.
+            reach = (s.get("host_link") or {}).get("reach") or {}
+            if not reach.get("container"):
+                await ws.send_bytes(
+                    f"\r\n[agentorc] runs on {s['host']}: no terminal reaches it from here "
+                    "(a container node's reach comes with its link; a machine node's waits for the terminal "
+                    "over the link, TD-057 *Later*).\r\n".encode()
+                )
+                await ws.close(code=4404)
+                return
+            sid, sock = naming.split_address(sid)[0], None  # the bare id, on the user's default server inside
+            argv = attach_argv_in(reach["container"], reach.get("user") or "root", sid)
+            inside = argv[: argv.index("tmux")]
         if s.get("state") == "closed" or not s.get("pane", True):  # no pane to attach (TD-023)
             await ws.send_bytes(b"\r\n[agentorc] this session's pane is gone (see the banner).\r\n")
             await ws.close(code=4404)
             return
-        sock = os.environ.get("AGENTORC_TMUX_SOCKET")
         try:
-            pty = PtySession(attach_argv(sid, socket_name=sock), cols=cols, rows=rows)
+            pty = PtySession(argv, cols=cols, rows=rows)
         except Exception as e:  # noqa: BLE001 — no silent failure path (design §4.5)
             await ws.send_bytes(f"\r\n[agentorc] could not attach a terminal: {type(e).__name__}: {e}\r\n".encode())
             await ws.close()
@@ -1021,7 +1728,7 @@ def create_app() -> FastAPI:
             # A tmux command against the session, not keys into the pane: there is no escape
             # sequence that enters copy mode (TD-022). Bad directions are the client's bug; ignore.
             try:
-                argv = scroll_argv(sid, direction, socket_name=sock)
+                argv = [*[a for a in inside if a != "-it"], *scroll_argv(sid, direction, socket_name=sock)]
             except ValueError:
                 return
             devnull = asyncio.subprocess.DEVNULL

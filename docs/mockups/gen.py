@@ -225,7 +225,7 @@ def report_line(name):
     return f'<div style="display: flex; align-items: center; gap: 8px;">{left}<span style="flex-grow: 1;"></span>{right}</div>'
 
 def team_badges(name):
-    """the card's **team** badge (§4.9) and its **under `<orc>`** chip (§4.8)."""
+    """the card's **team** badge (§4.9) and its **under `<controller>`** chip (§4.8)."""
     e = EXTRA.get(name, {})
     out = ""
     if e.get("team"):
@@ -242,15 +242,17 @@ def under_row(name):
 
 def teams_strip():
     rows = ""
+    # 2026-09-16: a live team is not listed here — its group's card carries Stop / Stop now.
     for team, source, lead, live, repo in TEAMS:
-        state = f'<span class="pill s-working">{live} live</span>' if live else '<span class="pill s-idle">not running</span>'
-        acts = ('<span class="btn sm">Stop</span><span class="btn sm danger">Stop now</span>' if live
-                else '<span class="btn sm primary">Start</span>')
+        if live:
+            continue
+        state = '<span class="pill s-idle">not running</span>'
+        acts = '<span class="btn sm primary">Start</span>'
         rows += (f'<div class="due"><span style="font-weight: 600; font-size: 12.5px; width: 150px;">{team}</span>{state}'
                  f'<span class="meta">lead {lead} · {repo} · {source}</span>'
                  f'<span style="flex-grow: 1;"></span>{acts}</div>')
     return f'''<div class="card" style="display: flex; flex-direction: column;">
-    <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Teams</span><span class="muted">3 defined · 1 running · from ~/.agentorc/org.yml and the repos</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
+    <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Teams</span><span class="muted">3 defined · 2 not running · from ~/.agentorc/org.yml and the repos</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
     {rows}
   </div>'''
 
@@ -303,11 +305,20 @@ def team_desktop():
     # is grouped — a header per team with its lead, projects and needs-you count, the lead's card
     # first and its members after; everything else under *No team*, last. Derived on each tick from
     # the badge and the `controllers` edges, never stored.
-    def group_header(title, sub, needs=0):
+    # 2026-09-16: a team is one card holding its sessions' cards, its Stop / Stop now on the header;
+    # *No team* stays a plain section.
+    GRID = "display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"
+
+    def group(title, sub, cards_html, needs=0, team=False):
         flag = pill("needs", f"{needs} needs you") if needs else ""
-        return (f'<div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; margin-top: 4px;">'
+        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm">Stop</span><span class="btn sm danger">Stop now</span>'
+                if team else "")
+        box = "border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;" if team else ""
+        return (f'<div style="display: flex; flex-direction: column; gap: 12px; {box}">'
+                f'<div style="display: flex; align-items: center; gap: 10px;">'
                 f'<span style="font-weight: 600; font-size: 13.5px;">{title}</span>'
-                f'<span class="meta">{sub}</span>{flag}</div>')
+                f'<span class="meta">{sub}</span>{flag}{acts}</div>'
+                f'<div style="{GRID}">{cards_html}</div></div>')
 
     grid = ""
     for team, source, lead, live, repo in TEAMS:
@@ -317,11 +328,10 @@ def team_desktop():
         members.sort(key=lambda t: (t[2][0] != lead, rank(t[0], t[2][2])))
         needs = sum(1 for t in members if t[2][2] == "needs")
         lead_state = next((t[2][2] for t in members if t[2][0] == lead), "exited")
-        grid += group_header(team, f"lead {lead} ({lead_state}) · project {repo} · {len(members)} sessions", needs)
-        grid += "".join(card(h, r, x) for h, r, x in members)
+        grid += group(team, f"lead {lead} ({lead_state}) · project {repo} · {len(members)} sessions · {source}",
+                      "".join(card(h, r, x) for h, r, x in members), needs, team=True)
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
-    grid += group_header("No team", f"{len(rest)} sessions started on their own")
-    grid += "".join(card(h, r, x) for h, r, x in rest)
+    grid += group("No team", f"{len(rest)} sessions started on their own", "".join(card(h, r, x) for h, r, x in rest))
     cards = grid
     return head("Org") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
@@ -338,8 +348,8 @@ def team_desktop():
   {due_strip()}
   {teams_strip()}
   <div class="warn" style="background: #f3f4f6; border-color: #cbd0d6; color: #374151; align-items: center;">{ICON["warn"]}<span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
-  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;">{cards}</div>
-  <div class="note"><b>Teams</b> lists every team defined in <span class="mono">~/.agentorc/org.yml</span> and in the repos' <span class="mono">.agentorc.yml</span>: <b>Start</b> runs the same sequence as <span class="mono">ao team start</span> (every check before any session is created), <b>Stop</b> wraps the members up and then the lead, <b>Stop now</b> kills. The grid groups by the <b>team</b> badge whenever a live session carries one — lead first, members after, everything else under <i>No team</i> — and each card shows who may act on it (<b>under</b>) and what it has reported. <b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed; an unreachable host sorts with idle when it is volatile, after stalled? when it is not. <b>Pinned</b> keeps every card where you dragged it and highlights the ones that need you instead. A dashed outline on a state pill means the state was guessed from the screen (shells, tools without hooks). Allow / Deny answer the permission through the tool's hook, so the dialog never reaches the terminal unless the hook times out. Command runs (kind: command) are on the Commands tab and hidden here by default.</div>
+  <div style="display: flex; flex-direction: column; gap: 22px;">{cards}</div>
+  <div class="note"><b>Teams</b> lists every team defined in <span class="mono">~/.agentorc/org.yml</span> and in the repos' <span class="mono">.agentorc.yml</span>: <b>Start</b> runs the same sequence as <span class="mono">ao team start</span> (every check before any session is created), a running team is not listed — its card below carries <b>Stop</b> (wraps the members up, then the lead) and <b>Stop now</b> (kills). The grid groups by the <b>team</b> badge whenever a live session carries one — lead first, members after, everything else under <i>No team</i> — and each card shows who may act on it (<b>under</b>) and what it has reported. <b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed; an unreachable host sorts with idle when it is volatile, after stalled? when it is not. <b>Pinned</b> keeps every card where you dragged it and highlights the ones that need you instead. A dashed outline on a state pill means the state was guessed from the screen (shells, tools without hooks). Allow / Deny answer the permission through the tool's hook, so the dialog never reaches the terminal unless the hook times out. Command runs (kind: command) are on the Commands tab and hidden here by default.</div>
 </div>
 </div>
 ''' + TAIL

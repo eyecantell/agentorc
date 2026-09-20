@@ -6,8 +6,8 @@ worktrees: .claude/worktrees
 anchor: main-checkout-single
 unattended: {workers: 3, ...}         # kept as a block; the loader only knows it is present
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
-  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}
-  orchestrator: {grants: [orchestrate], controllers: []}
+  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}
+  lead: {grants: [control], controllers: []}
 controllers: [orchestrator-ao-1]      # who may act on a session started here; omitted = nobody
 ledger: docs/technical_debt.md
 teams: {...}                          # §4.9; passed through for the team step
@@ -25,6 +25,8 @@ repo's own `roles:`, each overriding per key.
 
 from __future__ import annotations
 
+import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
@@ -32,7 +34,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc.models import GRANTS
+from sessionorc.models import GRANT_ALIASES, GRANTS
 
 FILE = ".agentorc.yml"
 DEFAULT_ADAPTER = "claude-code"
@@ -40,19 +42,78 @@ DEFAULT_WORKTREES = ".claude/worktrees"
 DEFAULT_ANCHOR = "main-checkout-single"
 DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
-ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers")
+ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon")
+# A role's icon (design §4.8 *Role presets*, 2026-09-19, TD-074): one name from the fixed set the UI
+# ships, never markup from a config file. Drawn small and monochrome inside the role badge — a
+# label's picture and nothing more. An unknown name is refused when the file is read, as an unknown
+# grant is; a role with no icon draws nothing.
+ICONS = ("flag", "wrench", "search", "eye", "book", "shield", "terminal", "person")
 LANE_PLACEHOLDER = "{lane}"
 
 # The built-in presets (design §4.8's table): each a brief template shipped with the package
 # (`agentorc/briefs/<role>.md`, `{lane}` filled at launch), a default lane shape, and its grants.
 # None names a profile: profile names are the person's (§4.2a, §4.9).
 PRESETS: dict[str, dict[str, Any]] = {
-    "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": []},
-    "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": []},
-    "orchestrator": {"brief": "orchestrator.md", "lane": [], "grants": ["orchestrate"]},
-    "plain": {"brief": None, "lane": [], "grants": []},
+    "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": [], "icon": "wrench"},
+    "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": [], "icon": "search"},
+    "lead": {"brief": "lead.md", "lane": [], "grants": ["control"], "icon": "flag"},
+    "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
+# Renamed roles, old → new (TD-055, docs/glossary.md): the old name still resolves for one release,
+# wherever a role is named — `--role`, a team definition, an `org.yml` or `.agentorc.yml` `roles:`
+# key — and says so once per process, naming the new word.
+ROLE_ALIASES: dict[str, str] = {"orchestrator": "lead"}
+_warned: set[str] = set()
+
+
+def canonical_role(name: str) -> str:
+    """The role's current name; an old one is accepted with a deprecation line on stderr."""
+    new = ROLE_ALIASES.get(name)
+    if new is None:
+        return name
+    _deprecated(name, new)
+    return new
+
+
+def _deprecated(old: str, new: str) -> None:
+    if old not in _warned:
+        _warned.add(old)
+        print(
+            f"role `{old}` is now `{new}` (TD-055); `{old}` is still accepted for one release — rename it",
+            file=sys.stderr,
+        )
+
+
+def deprecated_grant(old: str, where: str) -> None:
+    if f"grant:{old}" not in _warned:
+        _warned.add(f"grant:{old}")
+        print(
+            f"{where}: grant `{old}` is now `{GRANT_ALIASES[old]}` (TD-055); `{old}` is still accepted for one release",
+            file=sys.stderr,
+        )
+
+
+def _aliased(blocks: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """A `roles:` mapping with old keys folded into their new names. When a layer spells both, the
+    new key's values win per key: it is the one the person wrote since the rename."""
+    if not any(old in blocks for old in ROLE_ALIASES):
+        return blocks
+    out = {k: v for k, v in blocks.items() if k not in ROLE_ALIASES}
+    for old, new in ROLE_ALIASES.items():
+        if old in blocks:
+            _deprecated(old, new)
+            out[new] = {**(blocks[old] or {}), **(blocks.get(new) or {})}
+    return out
+
+
+# Reads one file by its absolute path and returns its text, or None when there is no such file;
+# raises `OSError` when it exists and cannot be read. `_read_here` is this host's disk.
+Reader = Callable[[Path], "str | None"]
+
+
+def _read_here(path: Path) -> str | None:
+    return path.read_text(encoding="utf-8") if path.is_file() else None
 
 
 @dataclass
@@ -64,6 +125,7 @@ class Role:
     lane: list[str] = field(default_factory=list)
     grants: list[str] = field(default_factory=list)
     profile: str | None = None
+    icon: str | None = None  # one name from `ICONS` (§4.8), or None: the badge draws no picture
     controllers: list[str] = field(default_factory=list)
     controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
     # deliberately, and the repo's default is not fallen back to (review of PR #116)
@@ -76,9 +138,12 @@ class Role:
         """`built-in`, `repo`, `built-in + repo` …: for `ao roles` and the form's note."""
         return " + ".join(self.sources) or "built-in"
 
-    def brief_text(self, lane: list[str] | None = None) -> str | None:
+    def brief_text(self, lane: list[str] | None = None, *, read: Reader | None = None) -> str | None:
         """The opening prompt this role gives a session: its template with `{lane}` filled from
-        `lane` (default the role's own). None for a role without a brief (`plain`)."""
+        `lane` (default the role's own). None for a role without a brief (`plain`). `read` reads a
+        repo's brief file — this host's disk by default, or another host's checkout across the link
+        (design §4.4a "Teams across hosts", TD-057 step 4b.3); a built-in template is always the
+        package's own."""
         if not self.brief:
             return None
         if self.brief_source == "built-in":
@@ -88,9 +153,11 @@ class Role:
             if not path.is_absolute():
                 path = (self.root or Path.cwd()) / path
             try:
-                text = path.read_text(encoding="utf-8")
+                text = (read or _read_here)(path)
             except OSError as e:
                 raise ValueError(f"role {self.name!r}: brief {path} cannot be read ({e.strerror or e})") from None
+            if text is None:
+                raise ValueError(f"role {self.name!r}: brief {path} cannot be read (no such file)")
         return text.replace(LANE_PLACEHOLDER, ", ".join(lane if lane is not None else self.lane) or "(none given)")
 
     def to_dict(self) -> dict[str, Any]:
@@ -100,6 +167,7 @@ class Role:
             "lane": list(self.lane),
             "grants": list(self.grants),
             "profile": self.profile,
+            "icon": self.icon,
             "controllers": list(self.controllers),
             "source": self.source,
         }
@@ -121,16 +189,25 @@ class RepoConfig:
     teams: dict[str, Any] = field(default_factory=dict)  # §4.9; read by the team step, passed through here
 
 
-def load(repo_root: Path | str) -> RepoConfig:
-    """`<repo>/.agentorc.yml`, or the defaults when there is none."""
+def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
+    """`<repo>/.agentorc.yml`, or the defaults when there is none. `read` is how the file is read:
+    this host's disk by default, another host's checkout across the link for a team started there
+    (TD-057 step 4b.3) — one loader for both, `load_text`."""
+    root = Path(repo_root).expanduser()
+    return load_text((read or _read_here)(root / FILE), root)
+
+
+def load_text(text: str | None, repo_root: Path | str) -> RepoConfig:
+    """A repo's config from the text of its `.agentorc.yml` (None: the file is not there — the
+    defaults), wherever that text was read."""
     root = Path(repo_root).expanduser()
     path = root / FILE
     cfg = RepoConfig(root=root)
-    if not path.is_file():
+    if text is None:
         return cfg
     cfg.path = path
     try:
-        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = yaml.safe_load(text)
     except yaml.YAMLError as e:
         raise ValueError(f"{path}: not valid YAML ({e})") from None
     if data is None:
@@ -220,7 +297,7 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
     if raw is None:
         return {}
     if not isinstance(raw, dict):
-        raise ValueError(f"{here} must be a mapping (brief, lane, grants, profile, controllers)")
+        raise ValueError(f"{here} must be a mapping ({', '.join(ROLE_KEYS)})")
     out: dict[str, Any] = {}
     for k, v in raw.items():
         k = str(k)
@@ -230,8 +307,20 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             if v is not None and (not isinstance(v, str) or not v.strip()):
                 raise ValueError(f"{here}.{k} must be a string")
             out[k] = v.strip() if isinstance(v, str) else None
+        elif k == "icon":
+            # One name from the set the UI ships (§4.8): checked when the file is read, exactly as a
+            # grant is, so a typo is a line naming the key and never a blank badge on the page.
+            if v is not None and (not isinstance(v, str) or not v.strip()):
+                raise ValueError(f"{here}.icon must be a string")
+            name = v.strip() if isinstance(v, str) else None
+            if name is not None and name not in ICONS:
+                raise ValueError(f"{here}.icon: unknown icon {name!r} (known: {', '.join(ICONS)})")
+            out[k] = name
         elif k == "grants":
             grants = _str_list(v, f"{here}.grants")
+            for old in dict.fromkeys(g for g in grants if g in GRANT_ALIASES):
+                deprecated_grant(old, f"{here}.grants")
+            grants = list(dict.fromkeys(GRANT_ALIASES.get(g, g) for g in grants))
             if bad := [g for g in grants if g not in GRANTS]:
                 raise ValueError(f"{here}.grants: unknown grant {bad[0]!r} (known: {', '.join(GRANTS)})")
             out[k] = grants
@@ -242,16 +331,18 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
 
 def role_names(cfg: RepoConfig, roles_overlay: dict[str, dict[str, Any]] | None = None) -> list[str]:
     """Every role that resolves here: the built-ins first, then what the layers add, each once."""
-    return list(dict.fromkeys([*PRESETS, *(roles_overlay or {}), *cfg.roles]))
+    return list(dict.fromkeys([*PRESETS, *_aliased(roles_overlay or {}), *_aliased(cfg.roles)]))
 
 
 def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, Any]] | None = None) -> Role:
     """Built-in < `roles_overlay` (the org layer, a later step) < the repo's `roles:`, per key.
-    An unknown name is a `KeyError` naming it and what would have resolved."""
+    An unknown name is a `KeyError` naming it and what would have resolved. A renamed role's old
+    name resolves to the new one (`ROLE_ALIASES`), and the returned `Role` carries the new name."""
+    name = canonical_role(name)
     layers = [
         ("built-in", PRESETS.get(name)),
-        ("org", (roles_overlay or {}).get(name)),
-        ("repo", cfg.roles.get(name)),
+        ("org", _aliased(roles_overlay or {}).get(name)),
+        ("repo", _aliased(cfg.roles).get(name)),
     ]
     spoke = [(src, block) for src, block in layers if block is not None]
     if not spoke:
@@ -267,6 +358,8 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
             role.grants = list(block["grants"])
         if "profile" in block:
             role.profile = block["profile"]
+        if "icon" in block:
+            role.icon = block["icon"]
         if "controllers" in block:
             role.controllers, role.controllers_set = list(block["controllers"]), True
     return role

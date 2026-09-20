@@ -175,8 +175,23 @@ def test_mail_survives_the_store_roundtrip_and_stays_out_of_the_view():
     v = s.view()
     assert "inbox" not in v and "outbox" not in v
     assert (
-        v["unread"] == 1 and v["host"] == "h1" and v["threads"] == {"m-1": {"count": 1, "bound_hit": False, "at": []}}
+        v["unread"] == 1
+        and v["host"] == "h1"
+        and "threads" not in v
+        and "wakes" not in v  # bookkeeping rides only a `get` (TD-066)
+        and s.view(bookkeeping=True)["threads"] == {"m-1": {"count": 1, "bound_hit": False, "at": []}}
     )
     assert v["mail"]["open_asks"] == ["m-1"] and v["sends"][0]["id"] == "s-1"
     ask.closed_by = "m-3"
     assert not ask.open and s.mail_marks()["open_asks"] == []
+
+
+def test_has_control_reads_either_name():
+    """TD-055 step 3: a client newer than the running host agent still sees `orchestrate` records."""
+    from sessionorc.models import canonical_grants, has_control
+
+    assert has_control(["orchestrate"]) and has_control(["control"]) and not has_control([]) and not has_control(None)
+    assert canonical_grants(["orchestrate", "control"]) == ["control"]
+    assert Session.from_dict(
+        {"id": "x", "name": "x", "kind": "interactive", "adapter": "shell", "dir": "/", "capabilities": ["orchestrate"]}
+    ).capabilities == ["control"]

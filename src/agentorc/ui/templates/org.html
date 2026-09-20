@@ -13,39 +13,25 @@
     <span class="grow"></span>
     <input class="input" id="filter" placeholder="filter… (team:name)" style="width: 200px;">
     <label class="btn ghost"><input type="checkbox" id="showcmd"> show command runs</label>
-    <span class="seg">
-      <button class="btn on" data-sort="urgent">Urgent first</button>
-      <button class="btn" data-sort="pinned">Pinned</button>
-    </span>
   </div>
   <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>
-  {# design §4.5a Org **Teams** strip (§4.9 "Starting and stopping"): every definition in
-     `~/.agentorc/org.yml` and in a registered repo's own `teams:`, with its source, projects,
-     member count and live count, and Start / Stop / Stop now. Collapsed to a count when nothing is
-     defined. Live counts are recomputed from the cards on every tick — a team is live when a
-     session carrying its badge is, and there is no team record to ask. #}
+  {# design §4.4a: a node's page says whose org it is part of and whether its link is up #}
+  {% if node_banner %}<div class="warn" id="nodebanner">⚠ <b>{{ host }}</b>: {{ node_banner }}</div>{% endif %}
+  {# design §4.5a: what is left of the **Teams** strip (retired 2026-09-18 — Start is on the team's
+     card): one line, only when there is something to say about the definitions themselves. #}
+  {% if strip.elsewhere or strip.notes or not strip.teams or identity_note %}
   <div class="strip" id="teams" data-source="{{ strip.source }}">
-    {% if strip.teams %}
-    <span class="meta">Teams</span>
-    {% for t in strip.teams %}
-    <span class="team-row" data-team="{{ t.name }}" data-live="{{ t.live }}">
-      <b>{{ t.name }}</b>
-      <span class="meta" title="{{ t.source or 'no file' }}">{{ (t.source or '').split('/')|last }}</span>
-      {% if t.projects %}<span class="meta">{{ t.projects | join(', ') }}</span>{% endif %}
-      <span class="meta">lead {{ t.lead }} · {{ t.members }} member{{ '' if t.members == 1 else 's' }}</span>
-      <span class="meta live">{% if t.live %}{{ t.live }} live{% else %}stopped{% endif %}</span>
-      <button class="btn sm start" data-team-act="start" data-team="{{ t.name }}"{% if t.live %} hidden{% endif %} title="the same sequence as `ao team start`: every check before any session is created">Start</button>
-      <button class="btn sm stop" data-team-act="stop" data-team="{{ t.name }}"{% if not t.live %} hidden{% endif %} title="wrap up the members, then the lead (`ao team stop`)">Stop</button>
-      <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ t.name }}"{% if not t.live %} hidden{% endif %} title="kill every session carrying this badge (`ao team stop --now`)">Stop now</button>
-    </span>
-    {% endfor %}
-    {% else %}
-    <span class="meta">Teams: none defined{% if strip.source %} in {{ strip.source }}{% endif %} — a team is <code>teams:</code> there, or in a repo's <code>.agentorc.yml</code></span>
-    {% endif %}
+    {% if strip.elsewhere %}<span class="meta">Teams: {{ strip.elsewhere }}</span>
+    {% elif not strip.teams %}<span class="meta">Teams: none defined{% if strip.source %} in {{ strip.source }}{% endif %} — a team is <code>teams:</code> there, or in a repo's <code>.agentorc.yml</code></span>{% endif %}
     {% for n in strip.notes %}<span class="meta warnish" title="{{ n }}">⚠ a definition could not be read</span>{% endfor %}
+    {# design §4.8a: which mode this host is in, said here and by `ao status -v` — and said only
+       when it is not `enforce`, because a host that is not enforcing is not yet protected. #}
+    {% if identity_note %}<span class="meta warnish" id="identitynote" title="who is calling: the channel decides, and a claim that disagrees is refused and shown (design §4.8a)">{{ identity_note }}</span>{% endif %}
   </div>
-  {# design §4.5a Org **team groups** (§4.9): a section per team when any live session carries a
-     badge, each a header plus its own grid; otherwise the one flat grid, no header anywhere. Both
+  {% endif %}
+  {# design §4.5a Org **team groups** (§4.9): a section per team when any session carries a badge
+     or any team is defined, each a header plus its own grid; otherwise the one flat grid, no header
+     anywhere. `data-live` is what the fold keys on: only a team with nothing live folds. Both
      shapes are the same element tree (`.tgroup` > `.grid`), so the client's layout code has one
      path: the flat page is a single unnamed group with its header omitted. #}
   <div id="groups"{% if groups is none %} class="flat"{% endif %}>
@@ -54,14 +40,14 @@
       {% for s in sessions %}{% include "card.html" %}{% endfor %}
     </div></section>
     {% else %}{% for g in groups %}
-    <section class="tgroup" data-team="{{ g.team }}" data-lead="{{ g.lead.id if g.lead else '' }}">
+    <section class="tgroup" data-team="{{ g.team }}" data-lead="{{ g.lead.id if g.lead else '' }}" data-live="{{ g.live }}">
       <div class="row gap wrap ghead">{% include "group_head.html" %}</div>
       <div class="grid">{% for s in g.members %}{% include "card.html" %}{% endfor %}</div>
     </section>
     {% endfor %}{% endif %}
   </div>
   <div class="note" id="empty" {% if sessions %}hidden{% endif %}>No sessions on {{ host }}. Start one with <b>New session</b> or <b>Shell</b>.</div>
-  <div class="note"><b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed. <b>Pinned</b> keeps every card where you dragged it, per team. A dashed pill means the state was guessed from the screen. A <b>team</b> badge on a card filters the page to that team; clear the filter box to see everyone again.</div>
+  <div class="note">Inside a team: the lead, then whatever needs you first. A dashed pill means the state was guessed from the screen. A <b>team</b> badge on a card filters the page to that team; clear the filter box to see everyone again.</div>
 </div>
 {% endblock %}
 {% block scripts %}<script>AO.org();</script>{% endblock %}

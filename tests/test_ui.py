@@ -49,7 +49,7 @@ def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
     # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
-    assert 'name="role"' in r.text and "orchestrator [built-in] · grants orchestrate" in r.text
+    assert 'name="role"' in r.text and "lead [built-in] · grants control" in r.text
     (tmp_path / ".agentorc.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
     r = client.get(f"/new?dir={tmp_path}")
     assert "reviewer [repo]" in r.text and 'data-default="orc"' in r.text
@@ -331,25 +331,6 @@ def test_unseen_idle_until_focused(client, tmp_path):
     client.post(f"/api/sessions/{sid}/kill")
 
 
-def test_registry_only_card_renders_read_only(tmp_path, monkeypatch):
-    """TD-010 (a): a card built from the tool's registry (no tmux) offers Details and nothing that
-    acts — no mode toggle, no ⋯ menu — and says where it came from."""
-    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
-    from agentorc.ui.app import templates, view
-
-    s = {
-        "id": "ext-u-1", "name": "editor", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
-        "state": "working", "since": "2026-09-10T16:00:00Z", "confidence": "scraped", "external": True,
-        "pane": False, "adapter_id": "u-1", "tail": [],
-    }  # fmt: skip
-    html = templates.get_template("card.html").render(s=view(s))
-    assert "▣ Details" in html and "▣ Focus" not in html
-    assert ">registry<" in html and 'data-act="mode"' not in html and 'data-act="kill"' not in html
-    assert "started outside agentorc" in html
-    html = templates.get_template("card.html").render(s=view({**s, "state": "idle"}))
-    assert 'data-act="close"' not in html and "ready to close" not in html  # nothing to close either
-
-
 def test_the_terminal_palette_is_complete_and_dark(tmp_path):
     """TD-038 (b), design goal 12 and §4.6: the pane carries VS Code's Dark Modern terminal palette,
     so the same Claude Code output is the same colour in Focus as in the editor's terminal beside
@@ -546,7 +527,7 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     sid = r.headers["location"].rsplit("/", 1)[-1]
     page = client.get(f"/focus/{sid}").text
     assert 'id="reportscard"' in page and 'id="progresslist"' in page and 'id="findinglist"' in page
-    assert 'id="fgrants"' in page and 'data-grants="orchestrate"' in page
+    assert 'id="fgrants"' in page and 'data-grants="control"' in page
     # Drop is the person letting a claim go: it lands as a *declaration*, so the tick cannot undo it
     assert client.post(f"/api/sessions/{sid}/nonsense", json={}).status_code == 404
     assert client.post(f"/api/sessions/{sid}/drop", json={}).status_code == 400  # a drop needs a reference
@@ -557,17 +538,15 @@ def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     ]
     assert s["report"] == "TD-027 · 0/1 done" and s["report_derived"] is False
     # the grants chip: one click grants, the next revokes, and the record is what answers
-    assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["orchestrate"]}).json()["capabilities"] == [
-        "orchestrate"
-    ]
-    assert client.post(f"/api/sessions/{sid}/grants", json={"remove": ["orchestrate"]}).json()["capabilities"] == []
+    assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["control"]}).json()["capabilities"] == ["control"]
+    assert client.post(f"/api/sessions/{sid}/grants", json={"remove": ["control"]}).json()["capabilities"] == []
     assert client.post(f"/api/sessions/{sid}/grants", json={"add": ["sudo"]}).status_code == 400  # unknown grant
     client.post(f"/api/sessions/{sid}/kill")
 
 
 def test_the_membership_controls(client, tmp_path):
-    """TD-036 step 3, design §4.5a: the card's **under `<orc>`** chip, the Focus **controllers**
-    chip, the orchestrator's **Members** list, and the New session **Controllers** picker. Both
+    """TD-036 step 3, design §4.5a: the card's **under `<controller>`** chip, the Focus **controllers**
+    chip, the lead's **Members** list, and the New session **Controllers** picker. Both
     directions are derived from the fleet on render, never stored, so the assertions go through
     the real pages rather than a hand-built view."""
     from agentorc.ui.app import templates, view
@@ -576,7 +555,7 @@ def test_the_membership_controls(client, tmp_path):
         "id": "ao-w", "name": "w", "kind": "agent", "adapter": "shell", "dir": str(tmp_path),
         "state": "working", "since": "2026-09-12T10:00:00Z", "confidence": "hook", "tail": [],
     }  # fmt: skip
-    orc = {**base, "id": "ao-orc", "name": "orc", "capabilities": ["orchestrate"]}
+    orc = {**base, "id": "ao-orc", "name": "orc", "capabilities": ["control"]}
     card = templates.get_template("card.html")
     # no controllers: no chip at all — a person's own session has none, and that is the common case
     assert "under" not in card.render(s=view(base, [base]))
@@ -596,7 +575,7 @@ def test_the_membership_controls(client, tmp_path):
 
     page = client.get(f"/focus/{worker}").text
     assert 'id="fcontrollers"' in page and "no controller — nobody may act on this session" in page
-    assert 'id="members"' not in page  # not an orchestrator: no member list
+    assert 'id="members"' not in page  # not a lead: no member list
 
     # the chip adds one, and the agent is what actually decides
     assert client.post(f"/api/sessions/{worker}/controllers", json={"add": [orc_id]}).json() == {
@@ -609,7 +588,7 @@ def test_the_membership_controls(client, tmp_path):
     assert ">morc ×<" in page
 
     # the Members list appears once the session holds the grant, and lists what names it
-    client.post(f"/api/sessions/{orc_id}/grants", json={"add": ["orchestrate"]})
+    client.post(f"/api/sessions/{orc_id}/grants", json={"add": ["control"]})
     page = client.get(f"/focus/{orc_id}").text
     assert 'id="members"' in page and f'href="/focus/{worker}"' in page and ">mw<" in page
     # the card of the worker now says who is over it
@@ -632,7 +611,7 @@ def test_the_membership_controls(client, tmp_path):
     # the body is validated: a bare string would otherwise become one controller per character
     for bad in ({"add": "ao-x"}, {"add": [None]}, {"add": [""]}):
         assert client.post(f"/api/sessions/{worker}/controllers", json=bad).status_code == 400
-    assert client.post(f"/api/sessions/{worker}/grants", json={"add": "orchestrate"}).status_code == 400
+    assert client.post(f"/api/sessions/{worker}/grants", json={"add": "control"}).status_code == 400
 
     # the picker's tick reaches the created session (the form round trip, not just its rendering)
     r = client.post(
@@ -670,7 +649,7 @@ def test_the_membership_controls(client, tmp_path):
 def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_what_is_ticked(client, tmp_path):
     """Design §4.5a New session **Grants** checkboxes (TD-028 step 5).
 
-    A preset's grants used to apply unseen: picking `orchestrator` in the form started a session
+    A preset's grants used to apply unseen: picking `lead` in the form started a session
     that could send to, wrap up and kill other sessions, and nothing on the page said so. That is
     the one power in the system a person should never acquire without seeing it — and the reverse
     matters as much: a tick the person removed has to be honoured, not overridden by the preset.
@@ -684,7 +663,7 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
         assert f'name="grant" value="{g}"' in r.text
         assert GRANT_NOTES[g] in r.text  # §4.5a: "a one-line warning of what the grant allows"
     # the role options carry their grants, which is what ticks the boxes as the Role changes
-    assert 'data-grants="orchestrate"' in r.text and 'data-grants=""' in r.text
+    assert 'data-grants="control"' in r.text and 'data-grants=""' in r.text
 
     # ticked: the session gets it
     r = client.post(
@@ -693,23 +672,23 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
             "name": "g1",
             "dir": str(tmp_path),
             "adapter": "hookstub",
-            "role": "orchestrator",
-            "grant": "orchestrate",
+            "role": "lead",
+            "grant": "control",
         },
         follow_redirects=False,
     )
     assert r.status_code == 303
     sid = r.headers["location"].rsplit("/", 1)[-1]
     got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
-    assert "orchestrate" in (got.get("capabilities") or [])
+    assert "control" in (got.get("capabilities") or [])
 
-    # unticked on an `orchestrator` preset: the person's decision stands over the preset's grants.
+    # unticked on a `lead` preset: the person's decision stands over the preset's grants.
     # A second directory, since one agent session per directory is refused (§9 invariant 2).
     other = tmp_path / "other"
     other.mkdir()
     r = client.post(
         "/new",
-        data={"name": "g2", "dir": str(other), "adapter": "hookstub", "role": "orchestrator"},
+        data={"name": "g2", "dir": str(other), "adapter": "hookstub", "role": "lead"},
         follow_redirects=False,
     )
     assert r.status_code == 303
@@ -920,32 +899,34 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
 
 
 def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
-    """TD-052 step 8, design §4.5a Org top bar **person inbox** (§4.10): the Org page renders the
-    unread count from the `inbox` RPC; the panel's feed lists an entry a session sent with
-    `ao msg person`, with its sender's id and name, as a person's read (no `read_at`); **Reply**
-    lands a `reply` from the person in the sender's inbox and closes its `ask`; delete removes the
-    entry from the person inbox and leaves the sender's copy."""
+    """TD-052 step 8, design §4.5a Org top bar **Inbox** (§4.10): the Org page renders the top
+    bar's number — the **Needs you** count since TD-069 step 1, so one open `ask` to the person
+    makes it 1; the feed lists an entry a session sent with `ao msg person`, with its sender's id
+    and name, as a person's read (no `read_at`); **Reply** lands a `reply` from the person in the
+    sender's inbox and closes its `ask`; delete removes the entry from the person inbox and leaves
+    the sender's copy."""
     import asyncio
 
     from sessionorc.client import LocalClient
 
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "asker"}, follow_redirects=False)
     sender = r.headers["location"].rsplit("/", 1)[-1]
-    assert 'class="badge unread hidden" id="personunread"></span>' in client.get("/").text  # nothing at zero
+    assert 'class="badge needs hidden" id="personneeds"></span>' in client.get("/").text  # nothing at zero
 
     async def as_sender(**kw):
         async with LocalClient(caller=sender) as c:
             return await c.call("msg", to="person", **kw)
 
     ask = asyncio.run(as_sender(text="merge PR 9?", kind="ask", about="TD-052"))["entry"]["id"]
-    assert 'class="badge unread" id="personunread">1</span>' in client.get("/").text
+    assert 'class="badge needs" id="personneeds">1</span>' in client.get("/").text
 
     got = client.get("/api/person/inbox").json()
     [e] = got["entries"]
     assert got["unread"] == 1 and (e["id"], e["from"], e["from_name"], e["kind"], e["about"]) == (
         ask, sender, "asker", "ask", "TD-052"
     )  # fmt: skip
-    assert e["read_at"] is None and e["bound"] and e["closed_by"] is None
+    # an `ask` to the person carries no bound and never expires (§4.10, 2026-09-19, TD-069 step 0)
+    assert e["read_at"] is None and e["bound"] is None and e["closed_by"] is None
     assert client.get("/api/person/inbox").json()["entries"][0]["read_at"] is None  # a person's read sets nothing
 
     # **Reply**: into the sender's inbox, from the person, closing the ask
@@ -959,7 +940,360 @@ def test_the_top_bar_person_inbox_lists_replies_and_deletes(client, tmp_path):
 
     # delete: from the person inbox only
     assert client.post("/api/person/unmail", json={}).status_code == 400
-    assert client.post("/api/person/unmail", json={"msg": ask}).json() == {"ok": True, "unread": 0}
+    # the ask was closed by the Reply above, so deleting it strips it; an *open* one would be
+    # declined and kept instead (§4.10 *Deleting is declining*, TD-069 step 0 — pinned in test_mail)
+    assert client.post("/api/person/unmail", json={"msg": ask}).json() == {
+        "ok": True,
+        "unread": 0,
+        "declined": False,
+    }
     assert client.get("/api/person/inbox").json()["entries"] == []
     assert client.post("/api/person/unmail", json={"msg": ask}).status_code == 400  # already gone
     assert client.post("/api/person/nope", json={}).status_code == 404
+
+
+def test_the_person_inbox_feed_carries_a_steer_and_its_delete_declines(client, tmp_path):
+    """TD-069 step 0, design §4.10 and §4.5a **Inbox**: the fields the new kinds added are on the
+    entries the person-inbox route hands its surfaces — a `steer`'s default and bound, an `ask` to
+    the person with no bound — and the Focus Inbox panel's renderer, which stayed when step 1
+    retired the top bar's dialog, still draws them and offers no Reply on a `system` note. Delete
+    on an open question goes through the **decline** semantics, which the entry itself then says.
+    The Inbox page's own rows are tests/test_ui_inbox.py."""
+    import asyncio
+    import pathlib
+
+    from sessionorc.client import LocalClient
+
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "steerer"}, follow_redirects=False)
+    sender = r.headers["location"].rsplit("/", 1)[-1]
+
+    async def as_sender(**kw):
+        async with LocalClient(caller=sender) as c:
+            return await c.call("msg", to="person", **kw)
+
+    steer = asyncio.run(as_sender(text="which branch?", kind="steer", default="off main"))["entry"]
+    ask = asyncio.run(as_sender(text="merge PR 9?", kind="ask"))["entry"]["id"]
+    got = {e["id"]: e for e in client.get("/api/person/inbox").json()["entries"]}
+    # every field a surface draws is on the entry the API hands it
+    assert got[steer["id"]]["default"] == "off main" and got[steer["id"]]["bound"]
+    assert got[steer["id"]]["paused_at"] is None and got[steer["id"]]["snoozed_until"] is None
+    assert got[ask]["bound"] is None and got[ask]["closed_reason"] is None
+
+    js = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js").read_text()
+    assert 'e.kind === "steer"' in js and "e.default" in js  # the default and the lapse line
+    assert 'e.closed_reason === "lapsed"' in js and 'e.from === "system"' in js  # no Reply on a system note
+
+    # Delete on an open ask declines it: the entry stays, closed, and the sender is told
+    assert client.post("/api/person/unmail", json={"msg": ask}).json()["declined"] is True
+    held = {e["id"]: e for e in client.get("/api/person/inbox").json()["entries"]}
+    assert held[ask]["closed_reason"] == "declined" and held[ask]["closed_at"]
+    [told] = client.get(f"/api/sessions/{sender}/inbox").json()["entries"]
+    assert told["from"] == "system" and told["text"] == f"ask {ask} declined by the person"
+    client.post(f"/api/sessions/{sender}/kill")
+
+
+def test_a_declaration_of_no_work_is_a_chip_on_the_card_and_the_focus_header(tmp_path, monkeypatch):
+    """design §4.5a **out of work** chip (§4.9a, TD-053 step 6): a session that declared it found
+    nothing left says so where a person looks, with the reason on hover. It is not a state — the
+    record still reads `idle` — and it is drawn for any session that declared, since a hand-started
+    worker may run out too. A card with neither report channel still draws the row for it."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-2", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "idle", "since": "2026-09-17T16:00:00Z", "confidence": "hook", "pane": True, "tail": [],
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    assert "out of work" not in card.render(s=view(base))
+    assert view(base)["out_of_work"] is None
+
+    # no apostrophe: Jinja escapes one, and a test that reads the raw HTML would be asserting the
+    # escaping rather than the hover
+    why = "every open entry is parked on a person or belongs to another team"
+    at = (datetime.now(UTC) - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
+    done = {**base, "out_of_work": {"at": at, "why": why}}
+    html = card.render(s=view(done))
+    assert "out of work 2h" in html and why in html  # the words, and the reason on hover
+    assert view(done)["out_of_work"]["age"].startswith("2h")
+    # the chip does not pretend to be a state: the card still reads `idle` (§4.2's unseen-idle rule)
+    assert 'data-state="idle"' in html and "out-of-work" not in html
+    # a declaration with no reason is still a declaration — the hover says so rather than being empty
+    bare = card.render(s=view({**base, "out_of_work": {"at": at, "why": ""}}))
+    assert "out of work" in bare and "no reason recorded" in bare
+    # and a record whose declaration has no instant is not one (the agent refuses to write it)
+    assert view({**base, "out_of_work": {"why": why}})["out_of_work"] is None
+
+    # A malformed declaration costs that card its chip and nothing else. `view` runs for every
+    # session on the grid, so a raise here would take down the page rather than the one card — the
+    # failure PR #131's review caught for a `run_until` of *half six*, and the same guard is owed to
+    # a field a different build or a hand repair could leave in any shape (review of PR #203).
+    for junk in ("out of work", ["nope"], 7, {"at": 12345}, {"at": "half six"}, {"at": {"nested": 1}}):
+        d = view({**base, "out_of_work": junk})
+        assert d["out_of_work"] is None or d["out_of_work"]["age"] == ""
+        assert "out of work" not in card.render(s=d) or d["out_of_work"] is not None
+
+
+def test_the_focus_header_carries_the_out_of_work_chip_from_the_record(client, tmp_path):
+    """The other half of §4.5a's row (§4.9a, TD-053 step 6), on the live page: the declaration the
+    session itself wrote is what the header reads — `ao progress none --why` is refused from anyone
+    but the session (invariant 14), so this goes through the agent rather than a hand-built record."""
+    from sessionorc.client import call_sync
+
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "oow"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    assert "out of work" not in client.get(f"/focus/{sid}").text
+
+    why = "nothing open that this brief does not exclude"
+    call_sync("progress", id=sid, status="none", why=why, caller=sid)
+    page = client.get(f"/focus/{sid}").text
+    assert "out of work" in page and why in page
+    assert "out of work" in client.get("/").text  # and the card on the Org page
+
+    # a claim means it has work again — the record clears the declaration, and so does the header
+    call_sync("progress", id=sid, ref="TD-053", status="claimed", caller=sid)
+    assert "out of work" not in client.get(f"/focus/{sid}").text
+    call_sync("kill", id=sid)
+
+
+def test_the_card_shows_what_the_session_says_it_is_doing_before_the_tail(tmp_path, monkeypatch):
+    """design §4.5a card **doing** line (§4.8, TD-074): the slot shows what needs a person first,
+    then the `doing` line with its age, then the tail. A session that has said nothing keeps exactly
+    the tail it showed before 2026-09-19, which is what a `shell` — whose tail *is* the work — always
+    does. The text is a model's: escaped, shown, and never a control."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-3", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "working", "since": "2026-09-19T16:00:00Z", "confidence": "hook", "pane": True,
+        "tail": ["▸▸ bypass permissions on (shift+tab…"],
+    }  # fmt: skip
+    card = templates.get_template("card.html")
+    # said nothing: the tail, exactly as before
+    assert view(base)["doing"] is None
+    assert "bypass permissions on" in card.render(s=view(base))
+
+    at = (datetime.now(UTC) - timedelta(minutes=11)).isoformat().replace("+00:00", "Z")
+    text = "rebasing the branch onto main and re-running the suite"
+    said = view({**base, "doing": {"text": text, "at": at}})
+    assert said["doing"] == {"text": text, "age": "11m"}
+    html = card.render(s=said)
+    assert text in html and "says · 11m ago" in html
+    assert "bypass permissions on" not in html  # the tool's chrome gives way to the session's word
+    # and the same line for an idle session, in place of *last: …* (one that is not ready to close:
+    # that checklist and its Close button are what an idle card shows when it has earned them)
+    idle = card.render(s=view({**base, "state": "idle", "subagents": 1, "doing": {"text": text, "at": at}}))
+    assert text in idle and "last:" not in idle
+    # it is shown, never acted on: no button, and the text is escaped (Jinja autoescape)
+    marked = card.render(s=view({**base, "doing": {"text": "<b>claim</b> & go", "at": at}}))
+    assert "&lt;b&gt;claim&lt;/b&gt; &amp; go" in marked and 'data-act="doing' not in marked
+    # a malformed field costs that card its line and nothing else — `view` runs for every card
+    for junk in ("doing", ["nope"], 7, {"at": at}, {"text": "", "at": at}, {"text": 7, "at": at}):
+        d = view({**base, "doing": junk})
+        assert d["doing"] is None
+        assert "bypass permissions on" in card.render(s=d)
+    # an instant it cannot read is still a line: the age is empty, the words stand
+    noage = view({**base, "doing": {"text": text, "at": "half six"}})
+    assert noage["doing"] == {"text": text, "age": ""}
+    assert text in card.render(s=noage)
+
+
+def test_a_teams_header_shows_its_leads_doing_line(tmp_path, monkeypatch):
+    """design §4.5a **team groups** (§4.8, TD-074): the team card's header carries the lead's line,
+    with its age — the lead reporting on the team without narrating each member."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import team_groups, templates, view
+
+    at = (datetime.now(UTC) - timedelta(minutes=11)).isoformat().replace("+00:00", "Z")
+    records = [
+        {"id": "ao-orc", "name": "orc", "state": "idle", "dir": str(tmp_path), "kind": "agent",
+         "team": "ao-grind", "capabilities": ["control"], "doing": {"text": "round 3: reviewing PR 236", "at": at}},
+        {"id": "ao-g1", "name": "g1", "state": "working", "dir": str(tmp_path), "kind": "agent",
+         "team": "ao-grind", "controllers": ["ao-orc"], "tail": ["…"]},
+    ]  # fmt: skip
+    (g,) = team_groups([view(r, records) for r in records])
+    assert g["lead"]["doing"]["text"] == "round 3: reviewing PR 236"
+    head = templates.get_template("group_head.html").render(g=g)
+    assert "round 3: reviewing PR 236" in head and "says · 11m ago" in head
+    # a lead that has said nothing adds no line
+    (quiet,) = team_groups([view({**rec, "doing": None}, records) for rec in records])
+    assert quiet["lead"]["doing"] is None
+    assert "says" not in templates.get_template("group_head.html").render(g=quiet)
+
+
+def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_dialog(tmp_path, monkeypatch):
+    """§4.4a "Permission prompts follow the same line" (TD-057 step 4b.1): with the host's link down
+    the waiter is out of reach, so the card offers no Allow / Deny — whose `decide` would be refused —
+    and says where the prompt can still be answered."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    s = {
+        "id": "ao-x-w@laptop", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/x",
+        "host": "laptop", "state": "unreachable", "last_state": "needs-you", "since": "2026-09-18T10:00:00Z",
+        "confidence": "hook", "pane": True, "tail": [], "host_link": {"up": False, "why": "the lid closed"},
+        "pending": {"kind": "permission", "text": "Bash: git push", "tool_use_id": "tu", "host_unreachable": True},
+    }  # fmt: skip
+    html = templates.get_template("card.html").render(s=view(s))
+    assert "permission: Bash: git push — host unreachable" in html and "answer it at laptop" in html
+    assert 'data-act="allow"' not in html
+
+
+async def test_a_nodes_org_page_says_its_link_and_where_the_org_is(agent):
+    """TD-057 step 4b.3 (*Left for step 4*): the Org page on a node reads the `host` RPC and says
+    whether its link to the home is up — here it has never dialed, so *offline* — and still
+    renders this host's sessions although the node refuses the mailbox; the Teams strip names where
+    the org is, and a Start or Stop pressed there answers with that note rather than *no team*."""
+    import asyncio
+
+    from sessionorc import paths
+
+    (paths.home() / "hosts.yml").write_text("home: elsewhere\n")
+    agent.mode, agent.home = "node", "elsewhere"
+    try:
+        from agentorc.ui.app import create_app
+
+        def browse():
+            with TestClient(create_app()) as c:
+                return c.get("/"), c.post("/api/teams/ao-grind/start"), c.post("/api/teams/ao-grind/stop")
+
+        page, start, stop = await asyncio.to_thread(browse)
+        assert page.status_code == 200, page.text
+        assert "node of elsewhere: unreachable since" in page.text and "offline: this host" in page.text
+        assert "the org lives on elsewhere (home)" in page.text and "a definition could not be read" not in page.text
+        for r in (start, stop):
+            assert r.status_code == 409 and "the org lives on elsewhere (home)" in r.json()["detail"]
+    finally:
+        agent.mode, agent.home = "home", agent.host
+
+
+def test_the_node_banner_reads_the_host_rpc():
+    from agentorc.ui.app import node_banner
+
+    assert node_banner({"mode": "home"}) == "" and node_banner(None) == ""
+    up = node_banner({"mode": "node", "home": "kmaster", "home_reachable": True, "link": {"up": True}})
+    assert up.startswith("node of kmaster: linked")
+    down = {"mode": "node", "home": "kmaster", "home_reachable": False, "link": {"since": "t", "why": "ssh failed"}}
+    assert node_banner(down).startswith("node of kmaster: unreachable since t — ssh failed · offline")
+
+
+def test_the_card_and_focus_show_the_tools_own_title_beside_the_name(tmp_path, monkeypatch):
+    """TD-074 step 3, design §4.5a **title**: the session's name as its tool holds it, shown beside
+    agentorc's own name on the card and in the Focus header — always when there is one, since it is
+    a name and not a status. Display only: no control sets it, and the text is escaped. The Org
+    filter matches a card's text, so it matches this too."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    base = {
+        "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+        "state": "idle", "since": "2026-09-19T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],
+        "created": "2026-09-19T15:00:00Z",
+    }  # fmt: skip
+    card, focus = templates.get_template("card.html"), templates.get_template("focus.html")
+    assert view(base)["title"] == ""  # no title: nothing drawn, and no empty chip
+    assert "tool-title" not in card.render(s=view(base))
+
+    titled = view({**base, "title": "Error Checker"})
+    assert titled["title"] == "Error Checker"
+    html = card.render(s=titled)
+    assert "Error Checker" in html and "tool-title" in html
+    assert 'data-act="title' not in html and 'data-act="rename' not in html  # agentorc has no rename
+    # the whole of it is on hover, so the card may clip it; the Focus header carries it too
+    assert "title=\"the session's name as its tool holds it" in html
+    assert "Error Checker" in focus.render(s={**titled, "grants_all": [], "ready": []}, host="h", active="Org")
+    # it is a model's text: escaped, never markup
+    marked = card.render(s=view({**base, "title": "<b>x</b> & y"}))
+    assert "&lt;b&gt;x&lt;/b&gt; &amp; y" in marked
+    # a malformed field costs the card its title and nothing else
+    for junk in (7, ["nope"], None):
+        assert view({**base, "title": junk})["title"] == ""
+
+
+def test_the_filter_matches_the_tools_own_title(tmp_path, monkeypatch):
+    """TD-074 step 3, design §4.5a **title**: *the filter box matches it*. The Org filter matches a
+    card's own text (`applyFilter`), so the title is matched by being rendered in it — this pins
+    both halves: the filter still reads the card's text, and the title is part of that text."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert "c.textContent.toLowerCase().includes(q)" in js
+    html = templates.get_template("card.html").render(
+        s=view(
+            {
+                "id": "ao-x-8",
+                "name": "w",
+                "kind": "agent",
+                "adapter": "claude-code",
+                "dir": str(tmp_path),
+                "state": "idle",
+                "since": "2026-09-19T16:00:00Z",
+                "title": "Error Checker",
+            }
+        )  # fmt: skip
+    )
+    assert re.search(r">\s*Error Checker\s*<", html)  # text of the card, not an attribute alone
+
+
+def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_path, monkeypatch):
+    """TD-074 step 4, design §4.8 *Role presets*: the preset's icon inside the role badge — one of
+    the eight the UI ships, small, monochrome and `currentColor`, with the badge's word beside it.
+    It is resolved from the role's *name* at render time, through `repoconfig` (nothing in the core
+    keys on a role, §9 invariant 9); a role with no icon, or a name this build does not know, draws
+    nothing rather than an error."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    import asyncio
+
+    from agentorc.repoconfig import ICONS
+    from agentorc.ui import app as uiapp
+    from agentorc.ui.icons import ICON_PATHS, role_svg
+
+    assert sorted(ICON_PATHS) == sorted(ICONS)  # every name the config accepts has a picture
+    assert 'stroke="currentColor"' in role_svg("flag") and 'aria-hidden="true"' in role_svg("flag")
+    assert "M5 21V4M5 4h11l-2 4 2 4H5" in role_svg("flag")  # the flag, as the design gives it
+    assert 'fill="none"' in role_svg("flag")  # stroked, never filled: it is not something to press
+    assert role_svg(None) == "" and role_svg("rocket") == ""  # never an error on the page
+
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {icon: terminal}\n")
+
+    def rec(sid, role=None, repo=None):
+        r = {"id": sid, "name": sid, "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+             "state": "idle", "since": "2026-09-19T16:00:00Z"}  # fmt: skip
+        if role:
+            r["role"] = role
+        if repo:
+            r["repo"] = repo
+        return r
+
+    records = [rec("ao-l", "lead"), rec("ao-g", "grinder", str(tmp_path)), rec("ao-p", "plain"), rec("ao-n")]
+    uiapp._icon_cache.clear()
+    icons = asyncio.run(uiapp.role_icons(records))
+    card = uiapp.templates.get_template("card.html")
+    lead, grinder, plain, none = (card.render(s=uiapp.view(r, records, icons=icons)) for r in records)
+    assert ICON_PATHS["flag"] in lead and ">lead</span>" in lead  # the picture, and the word beside it
+    # the repo's own `roles:` wins, exactly as it does for every other key
+    assert ICON_PATHS["terminal"] in grinder and ICON_PATHS["wrench"] not in grinder
+    # `plain` carries no icon, and a session with no role carries no badge at all
+    assert "ricon" not in plain and "ricon" not in none
+    # a caller that resolved no icons still renders the badge's word, and nothing breaks
+    assert "ricon" not in card.render(s=uiapp.view(records[0], records))
+
+
+def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_path, monkeypatch):
+    """Review of PR #251: the Allow / Deny route 409s without a `tool_use_id`, and the Inbox's row
+    already read such a permission as something to answer in the terminal — the card now agrees,
+    instead of offering two buttons that cannot work."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    s = {
+        "id": "ao-x-w", "name": "w", "kind": "interactive", "adapter": "claude-code", "dir": "/x",
+        "state": "needs-you", "since": "2026-09-18T10:00:00Z", "confidence": "hook", "pane": True, "tail": [],
+        "pending": {"kind": "permission", "text": "Bash: git push"},
+    }  # fmt: skip
+    html = templates.get_template("card.html").render(s=view(s))
+    assert 'data-act="allow"' not in html and "answer in the terminal (Focus)" in html
+    with_id = {**s, "pending": {**s["pending"], "tool_use_id": "tu"}}
+    assert 'data-act="allow"' in templates.get_template("card.html").render(s=view(with_id))

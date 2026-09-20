@@ -6,7 +6,7 @@ A session is a tmux session, with or without a repo, with or without an agent (d
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
@@ -23,18 +23,40 @@ SOURCES = ("declared", "derived", "scraped")
 ProgressStatus = Literal["claimed", "done", "dropped"]
 PROGRESS_STATUSES = ("claimed", "done", "dropped")
 
-# Grants a session record can hold in `capabilities` (design §4.8). `orchestrate`: the session may
-# act on other sessions through the agent (§9 invariant 11).
-GRANTS = ("orchestrate",)
+# Grants a session record can hold in `capabilities` (design §4.8). `control`: the session may
+# act on other sessions through the host agent (§9 invariant 11).
+GRANTS = ("control",)
+# Renamed grants, old → new (TD-055, docs/glossary.md). For one release the old name is read
+# wherever a grant is named — a stored record (normalised on load, so its next save writes the new
+# name), a request, a role's `grants:` — and never written.
+GRANT_ALIASES: dict[str, str] = {"orchestrate": "control"}
+
+
+def canonical_grants(names: list[str]) -> list[str]:
+    """`names` with renamed grants under their current names, each once, in the order given."""
+    return list(dict.fromkeys(GRANT_ALIASES.get(n, n) for n in names))
+
+
+def has_control(capabilities: list[str] | None) -> bool:
+    """Whether a record's grants include `control`, under either name — a client can be newer than
+    the host agent whose records it reads until that agent restarts (TD-062)."""
+    return "control" in canonical_grants(list(capabilities or []))
+
 
 # Message kinds (design §4.10): a small closed set, so a message's purpose is read off its envelope.
-MailKind = Literal["note", "ask", "reply", "conflict"]
-MAIL_KINDS = ("note", "ask", "reply", "conflict")
-# The two kinds that pose a question and so carry a bound, may be closed by a reply, are left
+MailKind = Literal["note", "ask", "steer", "reply", "conflict"]
+MAIL_KINDS = ("note", "ask", "steer", "reply", "conflict")
+# The kinds that pose a question and so carry a bound, may be closed by a reply, are left
 # pending by an addressee's exit, and are never pruned while open. A `conflict` is an `ask` for
-# every rule in §4.10; only its delivery shape differs.
-ASK_KINDS = ("ask", "conflict")
+# every rule in §4.10, and so is a `steer` (2026-09-19, TD-069): a `steer` differs only in that its
+# bound ends in *lapsed* rather than *expired*, and runs whatever becomes of the addressee.
+ASK_KINDS = ("ask", "steer", "conflict")
 PERSON = "person"  # `from` when a person sent the entry; never a session id
+SYSTEM = "system"  # the third sender (design §4.10): the home saying what became of a session's own message
+# How an entry closed (design §4.10 "One way of being closed"). `expired` is a session-to-session
+# `ask` whose bound ran out or whose addressee was closed or forgotten; `lapsed` is a `steer`
+# reaching its bound, where nothing failed.
+CLOSED_REASONS = ("replied", "declined", "asker_gone", "lapsed", "go_with_it", "expired")
 
 # Who owns which field of a record (design §4.4a, §9 invariant 15): the node observes and enforces
 # on its host, the home holds the graph and intent, and identity is set once at create. Merges go
@@ -42,12 +64,14 @@ PERSON = "person"  # `from` when a person sent the entry; never a session id
 # every field of `Session` is in one and only one of the three.
 NODE_OWNED = frozenset(
     {
+        "identity_alarms",
         "state",
         "since",
         "pending",
         "confidence",
         "pane",
         "tail",
+        "title",
         "last_output",
         "exit_code",
         "git",
@@ -57,7 +81,6 @@ NODE_OWNED = frozenset(
         "run_log",
         "previous_run",
         "closed_at",
-        "external",
     }
 )
 HOME_OWNED = frozenset(
@@ -73,6 +96,8 @@ HOME_OWNED = frozenset(
         "wrapup_prompt",
         "progress",
         "findings",
+        "out_of_work",
+        "doing",
         "ledger",
         "seen_at",
         "inbox",
@@ -188,17 +213,34 @@ class MailEntry:
     closed_by: str | None = None  # the first `reply` that answered an `ask`; closes it uncounted
     closed_at: str | None = None  # when it did: retention for a closed `ask` runs from here
     expired_at: str | None = None  # the bound ran out, or an addressee was closed or forgotten
+    closed_reason: str | None = None  # one of CLOSED_REASONS, written on every close path (§4.10, TD-069)
     pending: list[str] = field(default_factory=list)  # addressees that exited with the `ask` open (may resume)
     cites: list[str] = field(default_factory=list)  # a `conflict`: the `sends` ids it cannot reconcile
+    default: str | None = None  # a `steer`: the one line saying what the sender will do, required on it
+    team: str | None = None  # the sender's `team` at send, stamped by the home (§4.10, 2026-09-19)
+    snoozed_until: str | None = None  # a person-inbox entry the person set aside; the Inbox page only
+    paused_at: str | None = None  # a person-inbox `steer` whose clock the person stopped (§4.10 *Pause*)
+    # A `system` note whose wake is **uncharged** (§4.10: a lapse is the home's clock, not another
+    # session's message). It is on the entry rather than in a set beside the records so that it
+    # survives what the entry survives: a resume moves it with the note, and a host-agent restart
+    # reloads it — the wake is decided when the session is next reachable, which may be after both.
+    uncharged: bool = False
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
 
     @property
     def open(self) -> bool:
-        """An `ask` or `conflict` nobody has answered and whose bound has not run out — never
-        pruned, and the one thing a first `reply` closes for free."""
-        return self.kind in ASK_KINDS and not self.closed_by and not self.expired_at
+        """Design §4.10 "One way of being closed": an entry is open exactly when it is an `ask`,
+        `steer` or `conflict` with no `closed_reason` — which is what *never pruned while open*,
+        the person inbox's depths and the FYI list all read. Entries written before 2026-09-19
+        carry no `closed_reason` and read as closed when `closed_by` or `expired_at` is set, which
+        is the rule until then."""
+        if self.kind not in ASK_KINDS:
+            return False
+        if self.closed_reason:
+            return False
+        return not (self.closed_by or self.expired_at)
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -294,6 +336,8 @@ def wake_digest(session: dict[str, Any]) -> str:
     parts.append("progress=" + repr(prog))
     parts.append("findings=" + repr([(x.get("ref"), x.get("priority")) for x in session.get("findings") or []]))
     parts.append("controllers=" + repr(sorted(session.get("controllers") or [])))
+    ow = session.get("out_of_work") or {}
+    parts.append(f"out_of_work={(ow.get('at'), ow.get('why'))!r}")  # an ending, not a crash (§4.9a)
     return "\n".join(parts)
 
 
@@ -368,13 +412,21 @@ class Session:
     unattended: bool = False
     created: str = field(default_factory=now_iso)
     tail: list[str] = field(default_factory=list)
+    # The session's name as its tool holds it (design §4.5a **title**, §4.3 `title()`, TD-074):
+    # observed from the pane on the host where the pane lives, exactly as `tail` is — the tool
+    # writes its terminal title, tmux holds it as `#{pane_title}`, and the session's adapter says
+    # what of it is a name. Display only: agentorc has no rename of its own, so nothing here ever
+    # writes it. None when the adapter has no opinion or there is no name to show; it changes
+    # rarely and no wake fires on it (it is out of `wake_digest`).
+    title: str | None = None
+    # design §4.8a: requests on this host's socket whose claim disagreed with their channel —
+    # `{channel, claimed, rpc, count, at, last}`, coalesced, the newest `identity.ALARMS_KEEP`. Observed
+    # where the socket is, so the node's to write, like `tail`.
+    identity_alarms: list[dict[str, Any]] = field(default_factory=list)
     exit_code: int | None = None
     # A tmux pane (live or dead) still backs this record. False after `kill`/`close` (the session is
     # destroyed) or when the tick finds no pane; a natural exit keeps its dead pane (TD-023).
     pane: bool = True
-    # Started outside agentorc and known only from the tool's live registry (TD-010 a): a read-only
-    # card — no tmux pane, no controls, never stored; it leaves when the process does.
-    external: bool = False
     subagents: int = 0  # live subagents (SubagentStart − SubagentStop); Ready to close needs zero
     last_output: str | None = None  # ISO time the run log last grew (liveness cross-check)
     run_log: str | None = None
@@ -386,7 +438,7 @@ class Session:
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)
     capabilities: list[str] = field(default_factory=list)  # grants, from GRANTS (design §4.8)
     # Membership (design §4.8, TD-036): the session ids that may act on *this* session. The list
-    # lives on the target, not on the orchestrator, so the gate is one lookup and nothing has to be
+    # lives on the target, not on the lead, so the gate is one lookup and nothing has to be
     # kept in step; empty — the default — means nobody may act on it. A grant says a session may
     # act on others at all; this says on which. Several controllers are allowed and none is
     # privileged.
@@ -405,6 +457,17 @@ class Session:
     lane: list[str] = field(default_factory=list)
     progress: list[ProgressEntry] = field(default_factory=list)
     findings: list[FindingEntry] = field(default_factory=list)
+    # `{at, why}` once the session has declared it searched and found nothing it may pick
+    # (`ao progress none --why`, design §4.9a): beside `progress`, never an entry in it. Only the
+    # session itself writes it and nothing derives it (§9 invariant 14); a later declared claim
+    # clears it, since the session has work again.
+    out_of_work: dict[str, str] | None = None
+    # `{text, at}`: the session's own word for what it is doing now (`ao doing`, design §4.8, the
+    # third report channel, 2026-09-19). A value, not a log — the last line replaces the one before,
+    # as `out_of_work` does — and only the session itself writes it (§9 invariant 14). Never
+    # derived, nothing keys on it, no wake fires on it (so it is out of `wake_digest`), and an exit
+    # leaves it in place, as the last thing the session said.
+    doing: dict[str, str] | None = None
     # The preset the session was started under (design §4.8): a badge, and nothing keys on it
     # (§9 invariant 9). Empty for a session started without one.
     role: str = ""
@@ -462,14 +525,20 @@ class Session:
         d["sends"] = [e.to_dict() for e in self.sends]
         return d
 
-    def view(self) -> dict[str, Any]:
+    def view(self, *, bookkeeping: bool = False) -> dict[str, Any]:
         """The record as `list`, `get` and the `subscribe` deltas hand it out: message bodies never
         ride the push that reaches the Org page on every change (design §4.10 "A bounded body") —
-        those carry counts, and a body is fetched by `inbox`. `threads` (the `bound_hit` marks a
-        card shows) and `sends` (what `ao status` prints) stay."""
+        those carry counts, and a body is fetched by `inbox`. `sends` (what `ao status` prints)
+        stays. `threads` and `wakes` are the host agent's bookkeeping — their one visible part,
+        `bound_hit`, is in `mail` — and ride only a `get` of one record (`bookkeeping=True`): they
+        left `list`, the stream and `wait` when a `list` of six records outgrew what a client could
+        read (TD-066)."""
         d = self.to_dict()
         d.pop("inbox")
         d.pop("outbox")
+        if not bookkeeping:
+            d.pop("threads")
+            d.pop("wakes")
         d["unread"] = self.unread()
         d["mail"] = self.mail_marks()
         return d
@@ -513,6 +582,9 @@ class Session:
         known = {f for f in cls.__dataclass_fields__}
         obj = cls(**{k: v for k, v in d.items() if k in known})
         obj.pending = Pending.from_dict(pending) if pending else None
+        if renamed := [g for g in obj.capabilities if g in GRANT_ALIASES]:
+            obj.capabilities = canonical_grants(obj.capabilities)
+            obj.renamed_grants = renamed  # not a field: tells the loader to save and say so (TD-055)
         obj.progress = [ProgressEntry.from_dict(p) for p in progress]
         obj.findings = [FindingEntry.from_dict(f) for f in findings]
         obj.inbox = [MailEntry.from_dict(e) for e in inbox]
@@ -550,7 +622,7 @@ class Session:
         the upsert has no delete branch, and invariant 10 means a derived entry is replaced only
         when the session *declares* the same reference. So a `tdNNN-*` branch created and abandoned
         before its PR existed — what a grinder does the moment it finds a neighbour already holds
-        that TD — left a `claimed` entry forever, and the idle-with-open-work nudge (§4.8, §6) fires
+        that TD — left a `claimed` entry forever, and the idle-with-open-work send (§4.8, §6) fires
         on exactly that (TD-045). Who is retireable is decided by `sessionorc.reports.derive`, which
         is the half that can see whether the branch ever grew a PR.
 
@@ -579,3 +651,64 @@ def _upsert(entries: list[Any], entry: Any) -> bool:
         return True
     entries.append(entry)
     return True
+
+
+# -- the replica's merge, in both directions (design §4.4a, TD-057 step 2) --------------------------
+
+
+class NotTheSameSession(ValueError):
+    """A copy that disagrees with the record on an identity field describes another session."""
+
+
+# Home-owned, and yet written on a node while it is offline: a person's `send` or `keys` there is
+# recorded in `sends` and refills the wake budget, and their look sets `seen_at` (review of PR
+# #198). An overlay would erase them on reconnect and say nothing. Each only ever grows — an
+# append-only list keyed by id, and two timestamps that only move forward — so both directions
+# **merge** these three instead: nothing a merge of monotonic fields can resurrect or lose.
+GROWS = frozenset({"sends", "seen_at", "wake_refilled_at"})
+SENDS_KEPT = 20  # the bound `sessionorc.mail.SENDS_KEEP` holds the list to; models cannot import mail
+
+
+# What makes two copies the same session. The rest of `IDENTITY` is set or changed on the session's
+# own host after it exists — `adapter_id` by the first hook, `name` by a rename, `profile`, `repo`,
+# `worktree`, `created` — so it travels with the node's report and is never grounds for refusing one
+# (review of PR #202: a record reported before its first hook would have frozen at the home).
+SAME_SESSION = frozenset({"id", "host", "kind", "adapter", "dir"})
+
+
+def _overlay(record: Session, copy: Mapping[str, Any], owned: frozenset[str]) -> Session:
+    for f in sorted(SAME_SESSION):
+        if f in copy and copy[f] != getattr(record, f):
+            raise NotTheSameSession(f"{record.id}: `{f}` is {getattr(record, f)!r} here and {copy[f]!r} in the copy")
+    taken = (owned | GROWS) & copy.keys()
+    parsed = Session.from_dict({**record.to_dict(), **{k: copy[k] for k in taken}})
+    for f in taken - GROWS:
+        setattr(record, f, getattr(parsed, f))
+    if "capabilities" in taken and (renamed := getattr(parsed, "renamed_grants", None)):
+        # the copy carried a renamed grant: normalised above, and the marker kept, so the caller
+        # saves and says so as the loader does (TD-055; review of TD-057 step 2, fixed in 4b.3)
+        record.renamed_grants = renamed
+    if "sends" in taken:
+        by_id = {e.id: e for e in (*parsed.sends, *record.sends)}  # on one id the record's own entry stands
+        record.sends = sorted(by_id.values(), key=lambda e: (e.at, e.id))[-SENDS_KEPT:]
+    for f in ("seen_at", "wake_refilled_at"):
+        if f in taken:
+            setattr(record, f, max(filter(None, (getattr(record, f), getattr(parsed, f))), default=None))
+    return record
+
+
+def apply_home(record: Session, home_copy: Mapping[str, Any]) -> Session:
+    """A node's replica takes the home's copy: exactly the home-owned fields are overlaid — the
+    graph and intent — and nothing the node observes is touched. Merges go by owner, never by last
+    write (§4.4a): the link was down, the node wrapped a worker up and it exited, and meanwhile a
+    person at the home extended its `run_until`; the node's `exited` stands, and so does the new
+    `run_until`. `home_copy` is a record as `to_dict()` writes it; fields it omits are left alone.
+    The three fields in `GROWS` are merged, in this direction and the other."""
+    return _overlay(record, home_copy, HOME_OWNED)
+
+
+def apply_node(record: Session, report: Mapping[str, Any]) -> Session:
+    """The home's record takes a node's report: exactly the node-owned fields — what the node
+    observes and enforces on its host, and the identity fields that are set there after the session
+    exists. The mirror of `apply_home`."""
+    return _overlay(record, report, NODE_OWNED | (IDENTITY - SAME_SESSION))

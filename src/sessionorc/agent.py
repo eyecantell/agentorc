@@ -20,36 +20,48 @@ import os
 import re
 import secrets
 import signal
+import socket
+import stat
+import struct
 import sys
+import tarfile
 import time
 from collections import OrderedDict, defaultdict
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, hosts, mail, naming, paths, reports, waits
-from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info
+from sessionorc import adapters, containers, hosts, identity, link, mail, modes, naming, paths, reports, waits
+from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktree_path
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
     ASK_KINDS,
     GRANTS,
+    HOME_OWNED,
     MAIL_KINDS,
     PERSON,
     PROGRESS_STATUSES,
     SOURCES,
+    SYSTEM,
     FindingEntry,
     MailEntry,
+    NotTheSameSession,
     Pending,
     ProgressEntry,
     SendEntry,
     Session,
     State,
     Tally,
+    apply_home,
+    apply_node,
+    canonical_grants,
+    has_control,
     normalize_ref,
     now_iso,
 )
-from sessionorc.store import EventQueue, PersonInboxStore, SessionStore
+from sessionorc.store import EventQueue, IdentityAlarmStore, PersonInboxStore, SessionStore
 from sessionorc.tmux import DuplicateSession, PaneInfo, Tmux
 
 log = logging.getLogger("agentorc.agent")
@@ -58,6 +70,11 @@ TICK_SECONDS = float(os.environ.get("AGENTORC_TICK", "2"))
 TAIL_LINES = 15  # cards show the last 3; the screen rules (TD-015) need the dialog above the options
 CLOSED_KEEP = timedelta(days=1)
 STALL_AFTER = timedelta(minutes=20)
+# How long a declared claim holds its reference against another live session's claim (design §4.8
+# "A claim is a lease", TD-056). Renewed by claiming again; released sooner by done/dropped or the
+# holder's record ending. Long enough for one medium TD without a renewal, short enough that a
+# stood-down worker does not hold a reference into the next day.
+LEASE_TTL = timedelta(hours=12)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
 # Derived report entries per session (design §4.8, TD-028 step 3): a `gh` call and a little git, so
 # a slow cadence. Nothing waits on it and a failure derives nothing (`sessionorc.reports`).
@@ -69,6 +86,7 @@ SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken
 PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)
 SUBMIT_SECONDS = 1.5  # `send`: how long the composer gets to empty after Enter, per try (TD-027)
 COMPOSER_LINES = 12  # raw rows an adapter's `composer` reads (the composer sits above a status line or two)
+TITLE_CAP = 80  # characters of the tool's own title kept (design §4.5a **title**, TD-074): a name, not a line
 SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends
 # `ACTING_RPCS` lives in `sessionorc.mail` beside the gates, and is re-exported here for the
 # callers that always read it from the agent.
@@ -79,8 +97,47 @@ PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
 # killed anyway, because the whole point is that nobody is watching.
 WRAPUP_GRACE = timedelta(minutes=10)
-# a tool registry's status → our state (Claude Code: busy | idle | shell, the last a `!` command running)
-EXTERNAL_STATES = {"busy": "working", "idle": "idle", "shell": "working"}
+REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
+# An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
+# itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
+ACT_TIMEOUT = 120.0
+# What the home routes to the node whose name is the record's `host` (design §4.4a "A node reports
+# and executes; the home decides"): the acts that touch a pane or the node's waiters, executed
+# there with no gate of their own. `name_check` is a read, routed with a `host` for a team start.
+# `identity_ack` is here for the same reason (§4.8a, review of PR #251): a record's identity alarms
+# are **node-owned**, observed where the socket is, so the node clears its own list and the home
+# learns it from the reply's record — a home that cleared its replica would have it back on the
+# next report. Without an `id` the RPC is the home's own list and never leaves this host.
+NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "create", "name_check", "identity_ack"})
+# What the home owns and edits on its own copy (§4.4a "Each field has one owner"), and pushes to
+# the node's replica in the same call so its stopping policies read the same intent. 4b generalises
+# the push to every home-owned field on reconnect.
+HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"})
+# What the home reads from the node whose name is the record's `host` (§4.4a, step 4b.1): a pane's
+# screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
+# their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
+# read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
+NODE_READS = frozenset({"tail", "explain"})
+# What the home pushes a node about each of its records (§4.4a "The home pushes each node its
+# records' policy fields as they change", step 4b.2): the home-owned fields, less the mailbox — the
+# inbox, outbox, threads, wakes and `mail_decided` stay the home's, and no message body ever reaches
+# a node — less `sends`, which every pane's own node writes first (a send runs there) and the merge
+# unions, and less `superseded_by`, which the node writes itself when a resume there supersedes a
+# record and the home does not hear (a node's report carries node-owned fields only).
+INTENT_FIELDS = HOME_OWNED - frozenset(
+    {"inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "superseded_by"}
+)
+# A checkout's files read across the link for a team start (§4.4a "Teams across hosts", step
+# 4b.3): its repo config and the briefs its roles name. A read across a trust boundary, so bounded:
+# at most this many files per call, each at most this many bytes, and only inside the checkout.
+FILES_MAX = 16
+FILE_CAP = 256 * 1024
+# The home's nightly tarball of its store (§4.4a "When the home is lost", step 4b.3): what goes in,
+# relative to AGENTORC_HOME — the org's records and the files that say what the org is — and how
+# many days are kept. Nothing else: never a node's `env`, a token, a run log or a socket.
+BACKUP_KEEP = 7
+BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml")
+REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
 USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
@@ -110,17 +167,108 @@ class _Wait:
         self.poke = asyncio.Event()
 
 
+def _peer_pid(writer: asyncio.StreamWriter) -> int | None:
+    """The pid at the other end of a unix socket (`SO_PEERCRED`: pid, uid, gid), or None when the
+    transport cannot say — an in-memory stream, a platform without it."""
+    sock = writer.get_extra_info("socket")
+    if sock is None or not hasattr(socket, "SO_PEERCRED"):
+        return None
+    try:
+        raw = sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+    except OSError:
+        return None
+    return struct.unpack("3i", raw)[0] or None
+
+
 class HostAgent:
     def __init__(
-        self, *, tmux: Tmux | None = None, store: SessionStore | None = None, events: EventQueue | None = None
+        self,
+        *,
+        tmux: Tmux | None = None,
+        store: SessionStore | None = None,
+        events: EventQueue | None = None,
+        identity_mode: str | None = None,
+        proc: identity.ProcReader | None = None,
     ):
         paths.ensure_layout()
+        # Who is calling (design §4.8a, TD-077): `off | observe | enforce` from `local: {identity: …}`,
+        # the panes the last list saw, the home's own alarms (about no record), and a tally of
+        # connections by class and deciding signal since start — what `ao identity` prints, and what
+        # turning a host from `observe` to `enforce` is decided on.
+        self.identity_mode = identity.mode_of(identity_mode or hosts.local_host().identity)
+        self.proc: identity.ProcReader = proc or identity.LinuxProc()
+        self._id_panes: list[identity.Pane] = []
+        self._id_conns: dict[Any, identity.Channel] = {}  # a connection's classification, for its life
+        self._id_dirty: set[str] = set()  # records whose alarm counts moved since their last write
+        self._id_listed_at = 0.0
+        self._id_list_lock = asyncio.Lock()
+        self._id_detached: str | None = None
+        # The home's own alarms **persist** (TD-077 step 2): a forgery aimed at no record — a claim
+        # from outside every pane — is evidence, and evidence that dies with the process is a page
+        # that says *no alarms* about the night the agent was restarted. The tally does not: it
+        # says *since the agent started*, and §4.8a means that literally.
+        self.identity_store = IdentityAlarmStore()
+        self.identity_alarms: list[dict[str, Any]] = self.identity_store.load()
+        self._id_host_dirty = False  # counts moved since the last write; the tick writes them
+        self.identity_tally: dict[str, int] = defaultdict(int)
         self.tmux = tmux or Tmux()
         self.store = store or SessionStore()
         self.events = events or EventQueue()
         # This host's name (design §4.4a): what `host` on every record holds, and what an address
         # is qualified against — `ao-x@<this host>` is stored bare (`naming.qualify`).
         self.host = hosts.local_host().name
+        # Home or node (design §4.4a, TD-057 step 2). With no `home:` in hosts.yml, or one naming
+        # this host, this agent is the home and nothing below differs from phase 1. A node keeps
+        # everything that touches its machine and its own host's records on disk — the replica.
+        self.home = hosts.home_name()
+        self.mode = "node" if self.home != self.host else "home"
+        # The link (§4.4a "The link's protocol", TD-057 step 3a). At the home: one entry per node
+        # that has ever connected — `{up, since, why}` — and the live `Mux` while it is up. At a
+        # node: the same shape for its one link to the home.
+        self.links: dict[str, dict[str, Any]] = {}
+        self._link_muxes: dict[str, link.Mux] = {}
+        # The container supervisor (§4.4a "The home supervises it", step 3c.3): per container node,
+        # what the tick is doing about a down link — `{doing, since, attempts, next}` — and the one
+        # action in flight. `container_runner` is the seam the suite replaces.
+        self.supervision: dict[str, dict[str, Any]] = {}
+        self._supervising: dict[str, tuple[asyncio.Task[None], containers.Runner]] = {}
+        self.container_runner: Callable[[], containers.Runner] = lambda: containers.Runner(log=log.info)
+        self.home_link: dict[str, Any] = {"up": False, "since": now_iso(), "why": "not dialed yet"}
+        self._home_mux: link.Mux | None = None
+        # A node's calls in flight here, by the node's token (step 5): a `wait` the node cancels
+        self._forwarded_calls: dict[str, asyncio.Task[Any]] = {}
+        # Other hosts' records, at the home (§4.4a "A node's records at the home", step 3b): held
+        # apart from `self.sessions` — host → id → record — so nothing that reads this host's panes
+        # ever meets one. Loaded from `remote/<host>/`, so a restarted home still shows them,
+        # unreachable, until their node dials in.
+        self.remote: dict[str, dict[str, Session]] = {}
+        self._remote_stores: dict[str, SessionStore] = {}
+        if self.mode == "home" and paths.home().joinpath("remote").is_dir():
+            for d in sorted(paths.home().joinpath("remote").iterdir()):
+                if d.is_dir():
+                    self.remote[d.name] = self._remote_store(d.name).load_all()
+        # What the home last pushed each linked node about each of its records (`intent`, step
+        # 4b.2): host → id → payload. Present from that link's snapshot until the link goes, so a
+        # new link is pushed everything once and then what changes.
+        self._intent_sent: dict[str, dict[str, str]] = {}
+        # A node's side of the same: what it last told the home about each record, and when.
+        self._reported: dict[str, tuple[str, str, float]] = {}
+        # A node's hint of each record's mail, as the home last pushed it: `(unread, budget spent)`.
+        # Never an inbox — the mailbox is the home's — only what a reply's mail line needs.
+        self._mail_hints: dict[str, tuple[int, bool]] = {}
+        self._snapshot_sent = False
+        self._bg: set[asyncio.Task[None]] = set()  # fire-and-forget tasks, held so they are not collected
+        if self.mode == "node":
+            log.warning(
+                "node of %s: this host's sessions only while the link is down — mail, reports, home-owned edits "
+                "and sessions' acts on others are then refused, and forwarded to the home while it is up. "
+                "This host calls itself %s: if this machine IS %s, set `local: {name: %s}` in hosts.yml — without "
+                "it the name is the machine's hostname, and a home that does not recognise its own name is a node.",
+                self.home,
+                self.host,
+                self.home,
+                self.home,
+            )
         self.sessions: dict[str, Session] = self.store.load_all()
         # The org's person inbox (design §4.10): held here, on no session record, in its own file.
         self.person_store = PersonInboxStore()
@@ -134,6 +282,9 @@ class HostAgent:
             if not s.host:  # a record written before TD-057 step 1: it ran here, so it is this host's
                 s.host = self.host
                 self.store.save(s)
+            if renamed := getattr(s, "renamed_grants", None):  # TD-055: read for one release, written new
+                log.warning("%s: grant %s is now `control` (TD-055); the record is rewritten", s.id, ", ".join(renamed))
+                self.store.save(s)
         # (sender, client nonce) → the verdict its first send got (design §4.4a "Delivery and
         # time"): a retry after a reconnect never lands twice and is not an identical repeat —
         # it returns the original verdict. Bounded, oldest out, in memory only.
@@ -144,11 +295,18 @@ class HostAgent:
         self._subscribers: dict[asyncio.StreamWriter, dict[str, str]] = {}
         self._gone: list[str] = []  # forgotten ids not yet announced (`_forget` → `_push_changes`)
         self._waits: set[_Wait] = set()  # every `wait` blocked right now, each on its own connection
+        # every open client connection: a stop closes them, or `Server.wait_closed()` waits on the
+        # UI's subscription and each blocked `wait` forever (TD-058)
+        self._conns: set[asyncio.StreamWriter] = set()
         # (session id, tool_use_id) → the hook's pending decision
         self._waiters: dict[tuple[str, str], asyncio.Future[dict[str, Any]]] = {}
         self._git_checked: dict[str, datetime] = {}
         self._derived_at: dict[str, datetime] = {}
         self._model_checked: dict[str, datetime] = {}
+        # When a `kill` or a `close` destroyed a pane, so a tick holding a pane list taken before
+        # it does not observe a session that is already gone (TD-063). Dropped as soon as a
+        # snapshot newer than the kill arrives, so it holds at most one tick's worth of ids.
+        self._killed_at: dict[str, datetime] = {}
         self._derive_task: asyncio.Task[None] | None = None
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
@@ -172,9 +330,8 @@ class HostAgent:
         # (TD-020, TD-021). `None` for the creation time: the pane was already gone at remove.
         self._removed: dict[str, tuple[int | None, float]] = {}
         self._pruned_at = datetime.min.replace(tzinfo=UTC)  # first tick sweeps
-        # Read-only cards for sessions the adapters see outside agentorc (TD-010 a): rebuilt every
-        # tick from `adapters.external_sessions()`, never stored, keyed `ext-<tool id>`.
-        self._external: dict[str, Session] = {}
+        self._backed_up = ""  # the local date of the last nightly tarball tried (a home only)
+        self._backup_task: asyncio.Task[None] | None = None
 
     # -- lifecycle ------------------------------------------------------------------------------
 
@@ -184,17 +341,73 @@ class HostAgent:
         with contextlib.suppress(FileNotFoundError):
             sock.unlink()
         self.tmux.ensure_server()
-        server = await asyncio.start_unix_server(self._handle_conn, path=str(sock))
+        # `limit`: a link's frame is one line, and a node's snapshot outgrows asyncio's 64 KiB default
+        server = await asyncio.start_unix_server(self._handle_conn, path=str(sock), limit=link.FRAME_LIMIT)
         os.chmod(sock, 0o600)
         log.info("listening on %s", sock)
+        link_servers = await self._bind_links() if self.mode == "home" else []
         ticker = asyncio.create_task(self._tick_loop())
+        dialer = asyncio.create_task(self._dial_home()) if self.mode == "node" else None
         try:
             async with server:
-                await server.serve_forever()
+                # `start_unix_server` is already serving. Not `serve_forever()`: cancelled, it awaits
+                # `wait_closed()` itself, which since Python 3.12 waits for every client connection
+                # to end — and a subscriber or a blocked `wait` never does on its own, so a stop hung
+                # until systemd's SIGKILL. Close them first, then let `async with` wait: a `wait`
+                # sees the close, is cancelled and writes its cursor on the way out (TD-058).
+                try:
+                    await asyncio.get_running_loop().create_future()
+                finally:
+                    server.close()
+                    for _, srv in link_servers:
+                        srv.close()
+                    for w in list(self._conns):
+                        w.close()
         finally:
             ticker.cancel()
+            if dialer is not None:
+                dialer.cancel()
+            for m in list(self._link_muxes.values()):
+                m.close("the home is stopping")
+            for name in list(self._supervising):
+                self._stop_supervising(name)  # a build in flight is killed, not left to finish alone
             with contextlib.suppress(FileNotFoundError):
                 sock.unlink()
+            for lsock, _ in link_servers:
+                with contextlib.suppress(FileNotFoundError):
+                    lsock.unlink()
+
+    async def _bind_links(self) -> list[tuple[Path, asyncio.AbstractServer]]:
+        """The home's per-node link sockets (design §4.4a "A container node", TD-057 step 3c): one
+        listener per `nodes:` entry at `links/<name>/link.sock`, speaking only the link protocol. A
+        connection on it *is* that node — the name is the home's configuration, never the node's
+        argv — so it enters `_serve_link` as sshd's forced command would, with no bridge between.
+        Read once, here: a new node is a restart. The directory is `0700` and the socket `0600`,
+        and a container node is handed the directory, which outlives the socket file (re-bound on
+        every start of the home)."""
+        out: list[tuple[Path, asyncio.AbstractServer]] = []
+        for name in hosts.nodes():
+            lsock = paths.link_socket(name)
+            lsock.parent.mkdir(parents=True, exist_ok=True)
+            os.chmod(lsock.parent, 0o700)
+            with contextlib.suppress(FileNotFoundError):
+                lsock.unlink()
+
+            async def take(reader: asyncio.StreamReader, writer: asyncio.StreamWriter, name: str = name) -> None:
+                self._conns.add(writer)
+                try:
+                    await self._serve_link({"host": name}, reader, writer)
+                except (ConnectionError, asyncio.IncompleteReadError):
+                    pass
+                finally:
+                    self._conns.discard(writer)
+                    writer.close()
+
+            srv = await asyncio.start_unix_server(take, path=str(lsock), limit=link.FRAME_LIMIT)
+            os.chmod(lsock, 0o600)
+            log.info("link socket for %s at %s", name, lsock)
+            out.append((lsock, srv))
+        return out
 
     async def _tick_loop(self) -> None:
         while True:
@@ -215,6 +428,8 @@ class HostAgent:
     async def tick(self) -> None:
         snapshot_at = datetime.now(UTC)
         panes = await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX)
+        self._id_note_panes(panes)
+        self._id_flush()
         tails = await asyncio.to_thread(lambda: {sid: self.tmux.capture_tail(sid, TAIL_LINES) for sid in panes})
         self._reconcile(panes, tails, snapshot_at)
         await self._refresh_git(snapshot_at)
@@ -229,6 +444,12 @@ class HostAgent:
             # work goes to the thread
             live = {s.run_log for s in self.sessions.values() if s.run_log and s.state not in ("exited", "closed")}
             await asyncio.to_thread(self._prune_runs, snapshot_at, live)
+        if self.mode == "home":
+            self._supervise_containers()
+            day = datetime.now().astimezone().date().isoformat()
+            if day != self._backed_up and (self._backup_task is None or self._backup_task.done()):
+                self._backed_up = day  # tried once a day: a failure is a log line and tomorrow's retry
+                self._backup_task = asyncio.create_task(self._backup(day))
         if self._usage_task is None or self._usage_task.done():
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
@@ -284,6 +505,16 @@ class HostAgent:
             if settled or now - _parse(s.wrapup_sent_at) >= WRAPUP_GRACE:
                 log.info("%s stopped after its wrap-up (%s)", s.id, "settled" if settled else "grace ran out")
                 await self.rpc_kill(s.id)
+
+    async def _backup(self, day: str) -> None:
+        """The nightly tarball (§4.4a "When the home is lost"): off the loop, and never an error
+        anyone but the log hears of."""
+        try:
+            made = await asyncio.to_thread(backup_store, day)
+            if made:
+                log.info("backed up the store to %s", made)
+        except Exception:  # noqa: BLE001 — a detached task: log, and try again tomorrow
+            log.exception("the nightly backup of the store failed")
 
     def _prune_runs(self, now: datetime, live: set[str]) -> None:
         """Run-log retention (design §4.6): a log older than `runs_keep_days` goes unless it is in
@@ -353,11 +584,15 @@ class HostAgent:
         came from and then *retired* if that branch never grew a PR (TD-045): nothing else could
         ever remove one — the re-check above works by PR number, the upsert has no delete branch,
         and invariant 10 only replaces a derived entry when the session declares the same reference
-        — and a permanent false `claimed` is exactly what the idle-with-open-work nudge fires on."""
+        — and a permanent false `claimed` is exactly what the idle-with-open-work send fires on."""
+        if self.mode == "node" and not self.home_reachable():
+            # `progress` and `findings` are the home's (§4.4a, step 4b.2): a claim written to the
+            # replica is overwritten on reconnect and was never checked against the siblings' leases.
+            return
         holders = reports.holds_directory(self.sessions.values())
         due: list[tuple[Session, str | None, list[tuple[str, int]], list[tuple[str, str | None]]]] = []
         for s in self.sessions.values():
-            if not s.dir or s.external or s.state == "closed":
+            if not s.dir or s.state == "closed":
                 continue
             if now - self._derived_at.get(s.id, datetime.min.replace(tzinfo=UTC)) <= DERIVE_EVERY:
                 continue
@@ -394,6 +629,10 @@ class HostAgent:
                 log.warning("deriving reports for %s failed: %s", s.id, result)
                 continue
             progress, findings, retire = result
+            if self.mode == "node":
+                # sent to the home as the derived reports they are; the home's push brings them back
+                await self._send_derived(live, progress, findings, retire)
+                continue
             # Lists, not generators: these upserts are the write, and `any()` over a generator
             # would stop at the first change and silently drop every later entry (review 2026-09-11).
             applied = [live.report_progress(e) for e in progress] + [live.report_finding(e) for e in findings]
@@ -408,7 +647,7 @@ class HostAgent:
         thread, on its own cadence. An adapter that cannot tell leaves the field alone."""
         due = []
         for s in self.sessions.values():
-            if not (s.adapter_id and s.dir) or s.external or s.state == "closed":
+            if not (s.adapter_id and s.dir) or s.state == "closed":
                 continue
             if now - self._model_checked.get(s.id, datetime.min.replace(tzinfo=UTC)) <= MODEL_EVERY:
                 continue
@@ -489,7 +728,19 @@ class HostAgent:
                 if s.closed_at and _parse(s.closed_at) + CLOSED_KEEP < now:
                     self._forget(sid)
                 continue
+            killed = self._killed_at.get(sid)
+            if killed is not None and killed < snapshot_at:
+                del self._killed_at[sid]  # this snapshot is newer than the kill: the guard is spent
+                killed = None
             pane = panes.get(sid)
+            if pane is not None and killed is not None:
+                # The pane list was taken before the kill that ended this record, so it still lists
+                # a tmux session that is gone. Observing it would set `pane` back to True and read a
+                # state off the last screen — an `exited` record flipped back to `idle`, which then
+                # refuses its own `remove` ("kill it first"). The window is the two `to_thread` hops
+                # between the snapshot and here, and an RPC runs on the loop inside them (TD-063,
+                # seen on a 3.12 CI runner 2026-09-17).
+                continue
             if pane is None:
                 # A session created after the pane snapshot was taken is not judged by it.
                 if _parse(s.created) + CREATE_GRACE < snapshot_at and (s.state != "exited" or s.pane):
@@ -513,53 +764,6 @@ class HostAgent:
                 s.created = datetime.fromtimestamp(pane.created, UTC).isoformat().replace("+00:00", "Z")
                 self.sessions[name] = s
                 self._observe(s, pane, tails.get(name, []), now)
-        self._reconcile_external()
-
-    def _reconcile_external(self) -> None:
-        """Read-only cards for live sessions the adapters see that agentorc did not start (a
-        `claude` in a VS Code terminal: no tmux at all; TD-010 a, design §4.1). State comes from
-        the tool's registry status, so it is `scraped`. Skipped: a tool id one of our records
-        already carries, and any session in a directory where one of our agent sessions is live
-        (that is our own pane before its first hook reported the id; invariant 2 says there is
-        only one). A card leaves when its process does."""
-        try:
-            exts = adapters.external_sessions()
-        except Exception:  # noqa: BLE001
-            log.exception("external sessions")
-            return
-        ours = {s.adapter_id for s in self.sessions.values() if s.adapter_id}
-        taken = {
-            Path(s.dir).resolve()
-            for s in self.sessions.values()
-            if s.dir and s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
-        }
-        seen: set[str] = set()
-        for ext in exts:
-            if (ext.tool_id and ext.tool_id in ours) or (ext.cwd and Path(ext.cwd).resolve() in taken):
-                continue
-            sid = base = "ext-" + naming.slug(ext.tool_id or ext.name, max_len=48)
-            n = 2
-            while sid in seen:  # two entries with no tool id and one name: never hide the second
-                sid = f"{base}-{n}"
-                n += 1
-            seen.add(sid)
-            s = self._external.get(sid)
-            if s is None:
-                s = Session(
-                    id=sid, name=ext.name, kind="interactive", adapter=ext.adapter, dir=ext.cwd, adapter_id=ext.tool_id
-                )
-                s.external, s.pane = True, False
-                self._external[sid] = s
-            s.name, s.dir = ext.name, ext.cwd
-            st = EXTERNAL_STATES.get(ext.status or "", "working")
-            if st != s.state:
-                s.set_state(st, confidence="scraped")
-        for sid in list(self._external):
-            if sid not in seen:
-                del self._external[sid]
-                for last in self._subscribers.values():  # as `_forget` does: announce `gone` exactly once
-                    last.pop(sid, None)
-                self._gone.append(sid)
 
     def _is_removed_pane(self, name: str, pane: PaneInfo) -> bool:
         """Is this the pane a recent `remove` killed (as a stale snapshot would still list it)? A
@@ -577,6 +781,7 @@ class HostAgent:
     def _observe(self, s: Session, pane: PaneInfo, tail: list[str], now: datetime) -> None:
         adapter = adapters.get(s.adapter)
         s.tail = [_clean(t) for t in tail]
+        s.title = _pane_title(adapter, pane.title)
         s.pane = True
         if s.run_log:
             with contextlib.suppress(OSError):
@@ -642,7 +847,15 @@ class HostAgent:
     def _scrub(self, sid: str) -> None:
         """No cadence or hook key outlives the session it was about — whether the record is
         forgotten or replaced in place by a new session of the same name (§4.1)."""
-        for side in (self._git_checked, self._derived_at, self._model_checked, self._pre_limited, self._last_hook):
+        for side in (
+            self._git_checked,
+            self._derived_at,
+            self._model_checked,
+            self._pre_limited,
+            self._last_hook,
+            self._killed_at,
+            self._mail_hints,
+        ):
             side.pop(sid, None)
 
     def _forget(self, sid: str) -> None:
@@ -651,9 +864,11 @@ class HostAgent:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
         # Its open `ask`s expire with it (design §4.10 lifecycle): the record and its inbox go, and
         # every other holder of those asks — the askers — is told so. Done while it is still in the
-        # map so `_mark` reaches it, harmlessly, along with the rest.
-        for e in [e for e in gone.inbox if e.open]:
-            self._mark(e.id, expired_at=now_iso())
+        # map so `_mark` reaches it, harmlessly, along with the rest. A `steer` is the exception:
+        # its bound runs whatever becomes of the addressee, so the sender's copy lapses on time.
+        for e in [e for e in gone.inbox if e.open and e.kind != "steer"]:
+            self._close_entry(e.id, "expired", now_iso())
+        self._asker_gone(gone, self._address(gone))
         self.sessions.pop(sid, None)
         self.store.delete(sid)
         # Scrub the id from every subscriber's map and queue the one `gone`: whichever
@@ -663,13 +878,32 @@ class HostAgent:
         self._scrub(sid)
         self._gone.append(sid)
 
+    def _asker_gone(self, s: Session, *ids: str) -> None:
+        """Design §4.10 *What a person is asked*: an `ask` to the person cannot expire, so the
+        other half of its lifecycle is the **asker's** — closing or forgetting a record closes the
+        open `ask`s and `steer`s it put to the person, `closed_reason: asker_gone`, or a forgotten
+        worker's questions would stand forever. An asker that merely **exited** leaves them open: a
+        resume may still want the answer. Nothing is told — there is no one left to tell.
+
+        **A record a resume superseded is not a gone asker** (review of PR #245): the conversation
+        continues under the new id, `_move_mail` moved its questions' `from` there with it, and this
+        record is closed only as the bookkeeping of that move — forgetting it a day later must not
+        close a question the resumed session is still waiting on. The id rewrite is what makes this
+        so; this is the second line, for a superseded record whose person-inbox copy was pruned and
+        written again, or a rewrite a future path misses."""
+        if s.superseded_by:
+            return
+        at = now_iso()
+        for e in [e for e in self.person_inbox if e.from_ in (s.id, *ids) and e.open]:
+            self._close_entry(e.id, "asker_gone", at)
+
     # -- RPC methods -----------------------------------------------------------------------------
 
     async def rpc_list(self) -> list[dict[str, Any]]:
-        return [s.view() for s in (*self.sessions.values(), *self._external.values())]
+        return self._views()
 
     async def rpc_get(self, id: str) -> dict[str, Any]:
-        return self._get(id, external=True).view()
+        return self._view(self._find(id), bookkeeping=True)  # one record: its tallies and wakes ride along
 
     async def rpc_create(
         self,
@@ -694,8 +928,13 @@ class HostAgent:
         project: str = "",
         run_until: str | None = None,
         wrapup_prompt: str | None = None,
+        host: str | None = None,
         caller: str | None = None,
     ) -> dict[str, Any]:
+        if host and host != self.host:
+            # Routed before the method runs (`_act_host`) when this is the home; a node asked for
+            # another host's create got here through the link, and the link is one host's.
+            raise RpcError(f"{host} is not this host ({self.host}): a create lands on the host it names")
         directory = Path(dir).expanduser().resolve()
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
@@ -807,9 +1046,13 @@ class HostAgent:
                 await self._supersede(resume, sid)
         return s.view()
 
-    async def rpc_name_check(self, dir: str, name: str, repo: str | None = None) -> dict[str, Any]:
+    async def rpc_name_check(
+        self, dir: str, name: str, repo: str | None = None, host: str | None = None
+    ) -> dict[str, Any]:
         """What §4.1's name rule would do to this name, without doing it: the New session form's
         check as you type, and the note `ao new` prints (design §4.5a, TD-030 step 4)."""
+        if host and host != self.host:
+            raise RpcError(f"{host} is not this host ({self.host}): a name is checked on the host it would run on")
         verdict, _ = await self._name_verdict(Path(dir).expanduser(), repo, name)
         return verdict
 
@@ -940,6 +1183,18 @@ class HostAgent:
         # not decided (and charged) a second time, and a spent budget is not reset by a resume
         new.mail_decided, new.wakes, new.wake_refilled_at = old.mail_decided, list(old.wakes), old.wake_refilled_at
         old.inbox, old.outbox, old.threads, old.sends = [], [], {}, []
+        # **The person inbox's copies follow the move too** (§4.10 "Ids follow the move"; review of
+        # PR #245). An `ask` to the person does not expire, so a question the old id put there can
+        # outlive the record that sent it — and its `from` is load-bearing in four places: the
+        # per-sender depth, the advice line, where a `system` note about it is delivered, and where
+        # the person's Reply is addressed. Left naming the old id, the question would be closed
+        # `asker_gone` when the superseded record is forgotten a day later, although the
+        # conversation it belongs to is still running.
+        moved = [e for e in self.person_inbox if e.from_ == old.id]
+        for e in moved:
+            e.from_ = new.id
+        if moved:
+            self.person_store.save(self.person_inbox)
         for r in self.sessions.values():
             if r.id in (old.id, new.id):
                 continue
@@ -956,10 +1211,16 @@ class HostAgent:
 
     @staticmethod
     def _rename(entries: list[MailEntry], old: str, new: str) -> list[MailEntry]:
+        """The old id rewritten to the new one in entries the resume carries. `from_` too, on the
+        copies this record owns — its **outbox**, where `from_` is this conversation and the home
+        reads it to deliver a `system` note about the entry (review of PR #245). A delivered copy
+        in someone else's inbox is never passed here and keeps `from` as it was (§4.10)."""
         for e in entries:
             e.to = [new if x == old else x for x in e.to]
             e.copies = [new if x == old else x for x in e.copies]
             e.pending = [x for x in e.pending if x != old]
+            if e.from_ == old:
+                e.from_ = new
         return entries
 
     def occupants(self, directory: Path) -> list[str]:
@@ -967,15 +1228,32 @@ class HostAgent:
         agent sessions, plus live sessions the adapters can see that agentorc did not start
         (a VS Code terminal running `claude` in the checkout, say). Shells never count."""
         directory = Path(directory).resolve()
-        ours = {s.adapter_id for s in self.sessions.values() if s.adapter_id}
-        out = [
-            f"{s.id} ({s.state})"
-            for s in self.sessions.values()
-            if s.kind == "interactive"
-            and s.adapter != "shell"
-            and s.state not in ("exited", "closed")
-            and Path(s.dir).resolve() == directory
-        ]
+        # Runs in a thread while the loop goes on writing these maps in place: iterate copies, taken
+        # in one step, never the live dicts (review of PR #215).
+        mine = list(self.sessions.values())
+        ours = {s.adapter_id for s in mine if s.adapter_id}
+
+        def holds(s: Session) -> bool:
+            return (
+                s.kind == "interactive"
+                and s.adapter != "shell"
+                and s.state not in ("exited", "closed")
+                and Path(s.dir).resolve() == directory
+            )
+
+        out = [f"{s.id} ({s.state})" for s in mine if holds(s)]
+        # A container node on this machine has the checkout mounted at the same path (design §4.4a
+        # "A container node", 3c.4): a record of its over this directory holds the slot too — read
+        # from what the node reports, derived from the `container:` entry, never configured — while
+        # its link is up. Down, the container is a blip away from dialing back (its records are
+        # then repaired by the snapshot) or stopped, and a stopped container's sessions are dead:
+        # neither may hold this checkout against a create here. A machine node's `/home/x/repo`
+        # is another directory, and is not read.
+        if self.mode == "home" and self.remote:
+            for host in containers.container_nodes():
+                if not (self.links.get(host) or {}).get("up"):
+                    continue
+                out += [f"{s.id}@{host} ({s.state})" for s in list(self.remote.get(host, {}).values()) if holds(s)]
         for ext in adapters.external_sessions():
             if ext.tool_id and ext.tool_id in ours:
                 continue  # that is one of ours, seen through the tool's registry
@@ -1016,6 +1294,7 @@ class HostAgent:
         await asyncio.to_thread(self.tmux.kill_session, id)
         s.set_state("exited", confidence="scraped")
         s.pane = False  # unlike a natural exit, a kill destroys the pane (TD-023)
+        self._killed_at[id] = datetime.now(UTC)  # a tick's older pane list must not revive it (TD-063)
         self.store.save(s)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
@@ -1026,7 +1305,13 @@ class HostAgent:
         s.set_state("closed", confidence="scraped")
         s.pane = False
         s.closed_at = now_iso()
+        # A `kill` then a `close` before an intervening tick would otherwise strand a `_killed_at`
+        # stamp for `CLOSED_KEEP`: the reconcile skips a closed record before it reaches the guard,
+        # so nothing else would ever clear it. Harmless — a closed record is never observed either
+        # way — but it would make the guard's one-tick bound untrue (review of PR #199).
+        self._killed_at.pop(id, None)
         self.store.save(s)
+        self._asker_gone(s, self._address(s))  # its open questions to the person close with it (§4.10)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
 
@@ -1235,17 +1520,16 @@ class HostAgent:
     async def rpc_seen(self, id: str) -> dict[str, Any]:
         """A person looked at this session (Focus opened, a card control used). The UI reads
         `since > seen_at` on an `idle` record as "finished while you were away" (design §4.2)."""
-        s = self._get(id, external=True)
+        s = self._find(id)  # a person may look at another host's session: `seen_at` is the home's
         s.seen_at = now_iso()
-        if not s.external:
-            self.store.save(s)
+        self._save(s)
         await self._push_changes()
         return s.view()
 
     async def rpc_set_mode(self, id: str, unattended: bool) -> dict[str, Any]:
-        s = self._get(id)
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
         s.unattended = bool(unattended)
-        self.store.save(s)
+        self._save(s)
         return s.view()
 
     async def rpc_set_stop(
@@ -1258,7 +1542,7 @@ class HostAgent:
         time is where this started, so clearing one is a decision worth being able to make out loud
         rather than by restarting the session.
         """
-        s = self._get(id)
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
         when = _stop_time(run_until)  # a malformed time is an error before anything else is judged
         if when and not s.unattended:
             raise RpcError(f"{id} is interactive: a stop time is a policy, and policies leave it alone (§4.2)")
@@ -1274,7 +1558,7 @@ class HostAgent:
         s.run_until = when
         if wrapup_prompt is not None:
             s.wrapup_prompt = str(wrapup_prompt).strip() or None
-        self.store.save(s)
+        self._save(s)
         await self._push_changes()
         return s.view()
 
@@ -1283,26 +1567,28 @@ class HostAgent:
     ) -> dict[str, Any]:
         """`ao grant` / `ao revoke`, the Focus grants chip (design §4.8): edit `capabilities`. Takes
         effect on the target's next call — the gate reads the record, not a cached copy."""
-        s = self._get(id)
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
         adding, removing = _grants(add or []), _grants(remove or [])
         s.capabilities = [g for g in GRANTS if (g in s.capabilities or g in adding) and g not in removing]
-        self.store.save(s)
+        self._save(s)
         await self._push_changes()
         return s.view()
 
     async def rpc_set_controllers(
         self, id: str, add: list[str] | None = None, remove: list[str] | None = None
     ) -> dict[str, Any]:
-        """`ao control <orc> add|remove <session>`, the Focus controllers chip (design §4.8,
+        """`ao control <controller> add|remove <session>`, the Focus controllers chip (design §4.8,
         TD-036): edit which sessions may act on this one. Gated on the *target* like `set_grants`,
         so a person always may and a session only if it already controls it — control is handed
         on, never seized; and never at all from a session onto an interactive target (§9
         invariant 5, TD-041 — `_gate` refuses it before this method runs), while a person may hand
         their own session to a controller deliberately. Takes effect on the next call the
         controller makes: the gate reads the record, not a cached copy."""
-        s = self._get(id)
-        adding = [self._addr(c) for c in _controllers(add or [])]
-        removing = [self._addr(c) for c in _controllers(remove or [])]
+        s = self._find(id)  # the home's own copy of another host's record too (4a)
+        # Stored as the record's own host addresses them (§4.4a, step 4a): bare for that host's
+        # sessions, `id@host` for the rest — another host's record keeps its node's form here too.
+        adding = [self._to_host(c, s.host) for c in _controllers(add or [])]
+        removing = [self._to_host(c, s.host) for c in _controllers(remove or [])]
         if s.id in adding:
             raise RpcError(f"{s.id} cannot be its own controller: it could then drop the ones watching it")
         # One call naming an id in both `add` and `remove` drops it: remove wins, as it already
@@ -1310,34 +1596,120 @@ class HostAgent:
         # that disagree on the ambiguous call is how one of them eventually surprises someone, and
         # of the two answers the safe one is the one that takes authority away (review 2026-09-13).
         s.controllers = _controllers([c for c in s.controllers + adding if c not in removing])
-        self.store.save(s)
+        self._save(s)
         await self._push_changes()
         return s.view()
 
     async def rpc_progress(
         self,
         id: str,
-        ref: str,
+        ref: str = "",
         status: str = "claimed",
         pr: int | None = None,
         why: str | None = None,
         source: str = "declared",
+        force: bool = False,
+        caller: Any = None,
     ) -> dict[str, Any]:
         """`ao progress claim|done|drop <ref>` (design §4.8): what this session set out to resolve
         and how it went. A report channel is **ungated** — any session may write any record's, the
-        Org renders whichever are non-empty — and one reference is one entry, upserted in place."""
-        s = self._get(id)
+        Org renders whichever are non-empty — and one reference is one entry, upserted in place.
+
+        `status="none"` is `ao progress none --why` (design §4.9a): no reference and no entry, but
+        `out_of_work: {at, why}` on the record. It is the one write on this channel that is not
+        open to everyone — only the session itself may make it, declared, with a reason (§9
+        invariant 14).
+
+        A declared claim is a **lease** (§4.8, TD-056): refused while another live record holds an
+        unexpired declared claim on the same reference, naming the holder; `force` claims anyway and
+        the reply carries `lease_overridden`."""
+        s = self._find(id)  # a node's session reports here (step 5): the field is the home's
+        if status == "none":
+            if ref or pr is not None:
+                raise RpcError('progress none takes no reference and no PR, only why="<the search that came up empty>"')
+            return await self._out_of_work(s, why, source, caller)
         if status not in PROGRESS_STATUSES:
-            raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}")
+            raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none")
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
-        return await self._report(s, s.report_progress(entry), entry)
+        holder = self._lease_holder(s, entry) if status == "claimed" and entry.source == "declared" else None
+        if holder is not None and not force:
+            raise RpcError(
+                f"{entry.ref} is claimed by {holder['session']} since {holder['at']} (a lease, design §4.8): pick "
+                "another reference, or claim it anyway with --force",
+                holder=holder,
+            )
+        applied = s.report_progress(entry)
+        if applied and status == "claimed" and entry.source == "declared":
+            s.out_of_work = None  # a session that claims something has work again
+        out = await self._report(s, applied, entry)
+        if holder is not None and applied:
+            out["lease_overridden"] = holder
+        return out
+
+    def _lease_holder(self, s: Session, entry: ProgressEntry) -> dict[str, str] | None:
+        """The other live record holding an unexpired declared claim on `entry.ref`, if any. Read and
+        acted on in one loop step, so two claims a moment apart get one grant and one refusal."""
+        now = datetime.now(UTC)
+        for o in self._graph().values():
+            if o.id == s.id or o.state in ("exited", "closed"):
+                continue
+            for e in o.progress:
+                if e.ref == entry.ref and e.status == "claimed" and e.source == "declared":
+                    with contextlib.suppress(ValueError):
+                        if now - _parse(e.at) < LEASE_TTL:
+                            return {"session": o.id, "at": e.at}
+        return None
+
+    async def _out_of_work(self, s: Session, why: str | None, source: str, caller: Any) -> dict[str, Any]:
+        if _source(source) != "declared":
+            raise RpcError("out of work is declared, never derived (design §9 invariant 14)")
+        if mail.is_person(caller) or str(caller) != s.id:
+            raise RpcError(
+                f"only {s.id} may declare itself out of work: it is the session's own word that it searched "
+                "(design §9 invariant 14)"
+            )
+        if not (why or "").strip():
+            raise RpcError(
+                'ao progress none needs --why "<the search that came up empty>": a declaration without its '
+                "reason is refused (design §4.9a)"
+            )
+        s.out_of_work = {"at": now_iso(), "why": why.strip()}
+        return await self._report(s, True, None)
+
+    async def rpc_doing(self, id: str, text: str = "", clear: bool = False, caller: Any = None) -> dict[str, Any]:
+        """`ao doing "<line>"` (design §4.8, the third report channel, TD-074): one line, the
+        session's own word for what it is doing now. `doing: {text, at}` on the record — a value
+        beside the entry lists, as `out_of_work` is, so the last line replaces the one before and
+        `--clear` empties it.
+
+        Ungated like the other channels, and, like `out_of_work`, only the session itself may write
+        it (§9 invariant 14): it is *the session says*, and a lead describing a member would be
+        second-hand. One line (a newline ends it), control bytes stripped as a tail's are, capped at
+        200 characters; a line that cleans to nothing is refused. Nothing derives it, nothing keys
+        on it and no wake fires on it — it is shown, never acted on, and an exit leaves it in
+        place."""
+        s = self._find(id)  # a node's session reports here (step 5): the field is the home's
+        if mail.is_person(caller) or str(caller) != s.id:
+            raise RpcError(
+                f"only {s.id} may say what it is doing: it is the session's own word (design §9 invariant 14)"
+            )
+        if clear:
+            s.doing = None
+        else:
+            line = _clean(str(text or "").split("\n", 1)[0]).strip()
+            if not line:
+                raise RpcError('ao doing needs a line: `ao doing "<what you are doing now>"`, or --clear (design §4.8)')
+            s.doing = {"text": line, "at": now_iso()}
+        self._save(s)
+        await self._push_changes()
+        return s.view()
 
     async def rpc_finding(
         self, id: str, ref: str, priority: str | None = None, source: str = "declared"
     ) -> dict[str, Any]:
         """`ao finding <ref> [--priority …]` (design §4.8): a reference this session filed on the
         side. Ungated like `progress`, and upserted by reference the same way."""
-        s = self._get(id)
+        s = self._find(id)  # a node's session reports here (step 5): the field is the home's
         entry = FindingEntry(ref=_ref(ref), priority=priority, source=_source(source))
         return await self._report(s, s.report_finding(entry), entry)
 
@@ -1346,7 +1718,7 @@ class HostAgent:
         `derived` or `scraped` entry over a `declared` one) is not an error — the caller gets the
         record as it stands, with `refused` naming the entry that did not land."""
         if applied:
-            self.store.save(s)
+            self._save(s)
             await self._push_changes()
         out = s.view()
         if not applied:
@@ -1364,6 +1736,7 @@ class HostAgent:
         reply_to: str | None = None,
         bound: float | None = None,
         cites: list[str] | None = None,
+        default: str | None = None,
         nonce: str | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
@@ -1373,9 +1746,10 @@ class HostAgent:
         cap on the addressees the sender named, all or nothing across them, a copy to the other
         controllers of the session it is `about` (exempt from both), the exchange bound per thread
         and per pair, the mailbox depth, the body cap, and an `ask`'s wall-clock bound. `bound` is
-        the `ask`'s, in seconds, else `mail.ASK_BOUND`. A retry carrying the same `nonce` returns
-        the first send's verdict. The reply names what landed, what was copied, and what was
-        forwarded to a resumed successor."""
+        the `ask`'s, in seconds, else `mail.ASK_BOUND` — and an `ask` to the person carries none at
+        all (§4.10 *What a person is asked*, 2026-09-19): `default` is a `steer`'s, required on it.
+        A retry carrying the same `nonce` returns the first send's verdict. The reply names what
+        landed, what was copied, and what was forwarded to a resumed successor."""
         sender = PERSON if mail.is_person(caller) else str(caller)
         key = (sender, str(nonce)) if nonce else None
         if key and key in self._nonces:
@@ -1384,7 +1758,7 @@ class HostAgent:
                 raise error
             return dict(result or {})
         try:
-            result = await self._msg(sender, text, to, kind, about, reply_to, bound, cites)
+            result = await self._msg(sender, text, to, kind, about, reply_to, bound, cites, default)
         except RpcError as e:
             if key:
                 self._remember_nonce(key, (None, e))
@@ -1408,10 +1782,13 @@ class HostAgent:
         reply_to: str | None,
         bound: float | None,
         cites: list[str] | None,
+        default: str | None = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
-        the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land)."""
-        records = self.sessions
+        the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
+        The records are the org's one graph (§4.4a, step 5): an addressee on another host is its
+        record here, its inbox the home's copy — landed whether or not its link is up, and said so."""
+        records = self._graph()
         if kind not in MAIL_KINDS:
             raise RpcError(f"unknown message kind {kind!r}; kinds are: {', '.join(MAIL_KINDS)}")
         text = str(text or "").strip()
@@ -1421,6 +1798,10 @@ class HostAgent:
             raise RpcError(
                 f"message body over {mail.TEXT_CAP} bytes: cite a `sends` id or a reference instead (design §4.10)"
             )
+        if sender == SYSTEM:
+            raise RpcError(
+                f"{SYSTEM!r} is the home's own name on a note about your message: no session sends as it (design §4.10)"
+            )
         me = records.get(sender) if sender != PERSON else None
         if sender != PERSON and me is None:
             raise RpcError(f"{sender} cannot send mail: this host agent has no record of it (design §4.10)")
@@ -1428,6 +1809,19 @@ class HostAgent:
         named = list(dict.fromkeys(named))
         if PERSON in named and sender == PERSON:
             raise RpcError("the person inbox is how a session reaches a person; a person's own note is a board line")
+        if SYSTEM in named:
+            raise RpcError(
+                f"{SYSTEM!r} is the home's own name on a note about your message: it addresses nobody (design §4.10)"
+            )
+        # -- a `steer` carries the one line it will go with, cleaned and capped as a `doing` line --
+        line = _clean(str(default or "").split("\n", 1)[0]).strip()[: mail.DEFAULT_CAP]
+        if kind == "steer" and not line:
+            raise RpcError(
+                'a steer says what it will do unless told otherwise: --default "<the line you will go with>" '
+                "(design §4.10)"
+            )
+        if kind != "steer" and line:
+            raise RpcError(f"only a steer carries a default: {kind} says what it says (design §4.10)")
         # -- a reply belongs to its root's thread, and answers an entry the replier holds ----------
         replied: MailEntry | None = None
         copies: list[str] = []
@@ -1441,6 +1835,11 @@ class HostAgent:
                     f"copied (design §4.10)"
                 )
             replied = held[0]
+            if replied.from_ == SYSTEM:
+                raise RpcError(
+                    "a system note reports what happened to your own message; there is nobody to reply to "
+                    "(design §4.10)"
+                )
             if not named:
                 if replied.from_ == PERSON and sender == PERSON:
                     raise RpcError(f"{reply_to} is a person's own message: name the addressee")
@@ -1456,6 +1855,24 @@ class HostAgent:
             raise RpcError(
                 f"{len(named)} addressees is more than the cap of {mail.RECIPIENT_CAP} (design §4.10: no broadcast)"
             )
+        # -- what a person is asked (design §4.10, 2026-09-19): alone, unbounded, never a conflict --
+        if PERSON in named:
+            if kind == "conflict":
+                raise RpcError(
+                    "a conflict never names the person: it is put to your controllers, and if they cannot "
+                    "settle it, ask the person about it with --kind ask (design §4.10)"
+                )
+            if kind in ("ask", "steer") and len(named) > 1:
+                raise RpcError(
+                    f"the person is asked alone: a {kind} naming the person names nobody else — send it to the "
+                    f"person on its own, and a note to the others (design §4.10)"
+                )
+            if kind == "ask" and bound is not None:
+                raise RpcError(
+                    "an ask to the person carries no bound and never expires: send a steer with --default "
+                    "<the line you will go with> --bound <seconds> if you can go on without an answer "
+                    "(design §4.10)"
+                )
         # -- forwarding: a closed record a live one superseded hands its mail on -------------------
         forwarded: dict[str, str] = {}
         resolved: list[str] = []
@@ -1475,7 +1892,7 @@ class HostAgent:
         for sid in named:
             if sid not in records and sid != PERSON:
                 raise RpcError(f"no session {sid}")
-            if (reason := mail.message_gate(records, sender, sid)) is not None:
+            if (reason := mail.message_gate(records, sender, sid, controllers=self._ctl)) is not None:
                 raise RpcError(reason)
         cited: list[str] = []
         if kind == "conflict":
@@ -1490,18 +1907,25 @@ class HostAgent:
                 )
         # -- copies: a controller's mail `about` its member reaches the member's other controllers --
         subject = records.get(self._addr(about)) if about and not reply_to and me is not None else None
-        if subject is not None and sender in subject.controllers:
-            copies = [c for c in subject.controllers if c not in (sender, *named)]
+        if subject is not None and sender in self._ctl(subject):
+            copies = [c for c in self._ctl(subject) if c not in (sender, *named)]
         copies = [c for c in copies if c in records]
         # -- what this message counts as ------------------------------------------------------------
         closes = replied is not None and kind == "reply" and replied.open
         counts = sender != PERSON and not closes  # a person's message is never counted; a first reply is free
         root = replied.root if replied is not None else ""
         now = datetime.now(UTC)
-        if counts and mail.THREAD_BOUND is not None:
+        if counts and (mail.THREAD_BOUND is not None or mail.PAIR_BOUND is not None):
             self._check_bounds(sender, named, root, now)
+        advice = None
         if PERSON in named:
             self._check_person_depth(sender)
+            if kind == "ask":
+                # One line of advice from the home, not a gate — the per-sender depth is the gate
+                # (design §4.10 "Which to send is the brief's to teach"): counted before this send.
+                held = sum(1 for e in self.person_inbox if e.from_ == sender and e.kind == "ask" and e.open)
+                if held >= mail.OPEN_ASK_ADVICE:
+                    advice = f"you have {held} open asks to the person: is this one needed, or a steer?"
         if mail.MAILBOX_DEPTH is not None:
             for sid in named:
                 if sid != PERSON and records[sid].unread() >= mail.MAILBOX_DEPTH:
@@ -1517,7 +1941,11 @@ class HostAgent:
             id=mid, from_=sender, to=list(named), at=at, kind=kind, text=text, about=about, reply_to=reply_to, root=root
         )
         entry.cites = cited
-        if kind in ASK_KINDS:
+        entry.default = line or None
+        entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
+        if kind in ASK_KINDS and not (kind == "ask" and PERSON in named):
+            # `bound` is None exactly when the addressee is the person and the kind is `ask`: that
+            # one never expires, and the person inbox's depths are what bound it instead (§4.10).
             span = timedelta(seconds=float(bound)) if bound is not None else mail.ASK_BOUND
             entry.bound = (now + span).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         landed: list[str] = []
@@ -1551,7 +1979,7 @@ class HostAgent:
                         t.at.append(at)
                         t.count = len(t.at)  # the window's count, kept as a field so pruning cannot reset it
         if closes and replied is not None:
-            self._mark(replied.id, closed_by=mid, closed_at=at)
+            self._mark(replied.id, closed_by=mid, closed_at=at, closed_reason="replied")
         if sender == PERSON and reply_to:
             # A person's message into a thread resets it (design §4.10): tally and `bound_hit`
             # cleared on every record holding it, so the sessions may reply to the ruling.
@@ -1565,7 +1993,7 @@ class HostAgent:
                 if sid != PERSON:
                     self._refill(records[sid])
         for r in touched:
-            self.store.save(r)
+            self._save(r)
         await self._push_changes()
         now = datetime.now(UTC)
         return {
@@ -1573,12 +2001,23 @@ class HostAgent:
             "wake_budget_spent": [
                 sid for sid in (*named, *landed) if sid != PERSON and mail.wake_budget_spent(records[sid], now)
             ],
+            # landed at the home while its host's link is down (§4.4a "When the recipient's host is
+            # unreachable"): nothing waits anywhere but the mailbox, and the sender is told
+            "unreachable": [
+                sid
+                for sid in (*named, *landed)
+                if sid != PERSON
+                and records[sid].host != self.host
+                and not (self.links.get(records[sid].host) or {}).get("up")
+            ],
             "entry": entry.to_dict(),
             "delivered": list(named),
             "copies": landed,
             "copies_failed": failed,
             "forwarded": forwarded,
             "closed": replied.id if closes and replied is not None else None,
+            # advice, not a refusal: the id comes back either way (design §4.10)
+            "advice": advice,
         }
 
     @staticmethod
@@ -1606,11 +2045,12 @@ class HostAgent:
         """A send is refused when the sender's tally, or any named addressee's, is at the bound —
         never a copy recipient's — and `bound_hit` is written on every record holding the thread
         so the other side learns the exchange stopped (design §4.10 "A bounded exchange")."""
-        limit = mail.THREAD_BOUND
-        assert limit is not None
-        records = self.sessions
+        records = self._graph()
         me = records[sender]
         if root:
+            limit = mail.THREAD_BOUND
+            if limit is None:
+                return
             at_bound = [
                 sid
                 for sid in (sender, *named)
@@ -1620,11 +2060,14 @@ class HostAgent:
                 for r in records.values():
                     if root in r.threads:
                         r.threads[root].bound_hit = True
-                        self.store.save(r)
+                        self._save(r)
                 raise RpcError(
                     f"thread {root} is at its bound of {limit} entries ({', '.join(at_bound)}): the send is "
                     f"refused — write the user_attention.md line yourself, with the thread attached (design §4.10)"
                 )
+            return
+        limit = mail.PAIR_BOUND
+        if limit is None:
             return
         for sid in named:
             if sid == PERSON:
@@ -1632,8 +2075,8 @@ class HostAgent:
             mine, theirs = self._pair(me, sid, now), self._pair(records[sid], sender, now)
             if mine.count >= limit or theirs.count >= limit:
                 mine.bound_hit = theirs.bound_hit = True
-                self.store.save(me)
-                self.store.save(records[sid])
+                self._save(me)
+                self._save(records[sid])
                 raise RpcError(
                     f"{sender} and {sid} have exchanged {limit} messages replying to nothing inside "
                     f"{mail.PAIR_WINDOW}: the send is refused — write the user_attention.md line yourself "
@@ -1644,20 +2087,24 @@ class HostAgent:
         """Where a person's `--reply-to` looks: the person inbox first (a session's message to the
         person), then every session's copies (a person answering from a session's Inbox panel)."""
         return [e for e in self.person_inbox if e.id == msg_id] + [
-            e for r in self.sessions.values() for e in r.holds(msg_id)
+            e for r in self._graph().values() for e in r.holds(msg_id)
         ]
 
     def _check_person_depth(self, sender: str) -> None:
         """The person inbox's depth and per-sender depth (design §4.10): it fills exactly when the
-        person has been away, so the refusal is a redirect to the channel with a `Due:` date."""
-        unread = [e for e in self.person_inbox if not e.read_at]
+        person has been away, so the refusal is a redirect to the channel with a `Due:` date.
+
+        From 2026-09-19 (TD-069) they count **every entry that is unread or is an open `ask` or
+        `steer`** — one set, each entry once — so reading the page frees no slot an unanswered
+        question still holds, and one worker cannot fill the Inbox with asks that never lapse."""
+        counted = [e for e in self.person_inbox if not e.read_at or e.open]
         full = None
-        if mail.PERSON_INBOX_DEPTH is not None and len(unread) >= mail.PERSON_INBOX_DEPTH:
-            full = f"the person inbox holds {mail.PERSON_INBOX_DEPTH} unread entries"
+        if mail.PERSON_INBOX_DEPTH is not None and len(counted) >= mail.PERSON_INBOX_DEPTH:
+            full = f"the person inbox holds {mail.PERSON_INBOX_DEPTH} entries unread or unanswered"
         elif mail.PERSON_SENDER_DEPTH is not None and (
-            sum(1 for e in unread if e.from_ == sender) >= mail.PERSON_SENDER_DEPTH
+            sum(1 for e in counted if e.from_ == sender) >= mail.PERSON_SENDER_DEPTH
         ):
-            full = f"the person inbox holds {mail.PERSON_SENDER_DEPTH} unread entries from {sender}"
+            full = f"the person inbox holds {mail.PERSON_SENDER_DEPTH} entries unread or unanswered from {sender}"
         if full:
             raise RpcError(
                 f"{full}: the person is away — write the line on user_attention.md with a Due: date, "
@@ -1667,7 +2114,7 @@ class HostAgent:
     def _mark(self, msg_id: str, **fields: Any) -> None:
         """Write the same fact on every copy of one message, so both cards show it: the home is
         the one writer (design §4.4a). `pending=<id>` appends to the list; anything else is set."""
-        for r in self.sessions.values():
+        for r in self._graph().values():
             copies = r.holds(msg_id)
             if not copies:
                 continue
@@ -1678,7 +2125,7 @@ class HostAgent:
                             e.pending.append(v)
                     else:
                         setattr(e, k, v)
-            self.store.save(r)
+            self._save(r)
         mine = [e for e in self.person_inbox if e.id == msg_id]
         for e in mine:
             for k, v in fields.items():
@@ -1689,6 +2136,62 @@ class HostAgent:
                     setattr(e, k, v)
         if mine:
             self.person_store.save(self.person_inbox)
+
+    def _close_entry(self, msg_id: str, reason: str, at: str) -> None:
+        """Design §4.10 "One way of being closed": `closed_reason` is set whenever an entry closes,
+        by whatever path, and the fields that existed before it are kept and still written —
+        `expired` sets `expired_at` as today, and `lapsed`, `declined`, `go_with_it` and
+        `asker_gone` set `closed_at` alone. (`replied` is the send path's, which writes `closed_by`
+        and `closed_at` with the reply that answered.)"""
+        if reason == "expired":
+            self._mark(msg_id, expired_at=at, closed_reason=reason)
+        else:
+            self._mark(msg_id, closed_at=at, closed_reason=reason)
+
+    def _system_note(self, to: str, text: str, *, wake: str = "note") -> None:
+        """A `note` from `system` written **straight into the sender's mailbox** (design §4.10 "How
+        the sender hears that one closed without a reply"): it does not pass through the send path,
+        so no gate, no tally and no depth sees it, and no session can send as `system`. It reports
+        what happened to the reader's own message and is never an instruction; `--reply-to` naming
+        one is refused.
+
+        `wake` is which of the section's three rules applies:
+
+        - `person` — a decline, a *Go with it* or a **pause**, the three by which a person releases
+          a sender that may be blocked in `ao wait`: they wake as a person's `reply` does and
+          **refill** the budget;
+        - `note` — a **resume**, ordinary: it wakes within the budget like any `note`;
+        - `uncharged` — a **lapse**: outside the budget, neither spending nor refilling it, so a
+          spent budget cannot hold a sender past the bound it set itself. It is carried on the note
+          (`MailEntry.uncharged`) rather than beside the records, so it survives the two things
+          that happen between a lapse and the wake it earns: a **resume**, which moves the note to
+          the new record, and a host-agent **restart**, which reloads it (review of PR #245).
+
+        A sender that has since been resumed is followed to its successor, as mail addressed to a
+        superseded record is (§4.10 lifecycle): the note is about the conversation, not the id."""
+        entry = MailEntry(id="m-" + secrets.token_hex(6), from_=SYSTEM, to=[to], at=now_iso(), kind="note", text=text)
+        entry.uncharged = wake == "uncharged"
+        if to == PERSON:
+            self.person_inbox.append(entry)
+            self.person_store.save(self.person_inbox)
+            return
+        records = self._graph()
+        sid, seen = to, {to}
+        while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
+            sid = r.superseded_by
+            if sid in seen:
+                break
+            seen.add(sid)
+        r = records.get(sid)
+        if r is None:
+            return  # the sender's record is gone: there is nobody left to tell
+        entry.to = [sid]
+        r.inbox.append(entry)
+        if wake == "person":
+            self._refill(r)  # saves the record and pokes the waits
+        else:
+            self._save(r)
+            self._poke_waits()
 
     async def rpc_inbox(self, id: str | None = None, unread: bool = False, caller: Any = None) -> dict[str, Any]:
         """`ao inbox [--unread]` (design §4.10): a session reads its own inbox and nobody else's;
@@ -1703,30 +2206,38 @@ class HostAgent:
                 return {
                     "id": PERSON,
                     "entries": [
-                        {**e.to_dict(), "from_role": mail.from_role(self.sessions, PERSON, e.from_)} for e in held
+                        {
+                            **e.to_dict(),
+                            "from_role": mail.from_role(self._graph(), PERSON, e.from_, controllers=self._ctl),
+                        }
+                        for e in held
                     ],
                     "threads": {},
                     "sends": [],
                     "unread": sum(1 for e in self.person_inbox if not e.read_at),
                 }
-            s = self._get(self._addr(id))
+            s = self._find(self._addr(id))  # another host's too: the mailbox is the home's (step 5)
             mark = False
         else:
             me = self._addr(caller)
             if id and self._addr(id) != me:
                 raise RpcError(f"{me} cannot read {id}'s inbox: nobody reads another session's inbox (design §4.10)")
-            s = self._get(me)
+            s = self._find(me)
             mark = True
         entries = [e for e in s.inbox if not (unread and e.read_at)]
         if mark and any(not e.read_at for e in entries):
             at = now_iso()
             for e in entries:
                 e.read_at = e.read_at or at
-            self.store.save(s)
+            self._save(s)
             await self._push_changes()
+        who = self._address(s)
         return {
-            "id": s.id,
-            "entries": [{**e.to_dict(), "from_role": mail.from_role(self.sessions, s.id, e.from_)} for e in entries],
+            "id": who,
+            "entries": [
+                {**e.to_dict(), "from_role": mail.from_role(self._graph(), who, e.from_, controllers=self._ctl)}
+                for e in entries
+            ],
             "threads": {k: t.to_dict() for k, t in s.threads.items()},
             "sends": [e.to_dict() for e in s.sends[-3:]],
             "unread": s.unread(),
@@ -1739,58 +2250,179 @@ class HostAgent:
         session, itself included: a session's inbox is read-only to it through the RPCs, and an
         entry leaves outside its lifecycle only with its record or by a person's hand. Naming no
         session (or `person`) deletes from the org's person inbox — the top bar's delete — and the
-        sender's copy stays there too."""
+        sender's copy stays there too.
+
+        **Deleting is declining, and nothing vanishes at once** (design §4.10, 2026-09-19): in the
+        person inbox, deleting an *open* `ask` or `steer` closes it `declined` — a deletion is an
+        answer, and silence is not — and the entry stays for the retention window like any closed
+        one; the asker is told by a `system` note that wakes it as a person's reply does. A `note`,
+        or anything already closed, is removed outright, as it always was."""
         if not mail.is_person(caller):
             raise RpcError(
                 f"{caller} cannot delete mail: an entry is deleted only by a person, in the Inbox panel (design §4.10)"
             )
         if not id or id == PERSON:
-            kept = [e for e in self.person_inbox if e.id != msg]
-            if len(kept) == len(self.person_inbox):
+            held = [e for e in self.person_inbox if e.id == msg]
+            if not held:
                 raise RpcError(f"the person inbox holds no entry {msg}")
+            if held[0].open:
+                e = held[0]
+                self._close_entry(msg, "declined", now_iso())
+                self._system_note(e.from_, f"{e.kind} {msg} declined by the person", wake="person")
+                await self._push_changes()
+                return {
+                    "id": PERSON,
+                    "deleted": msg,
+                    "declined": True,
+                    "unread": sum(1 for x in self.person_inbox if not x.read_at),
+                }
+            kept = [e for e in self.person_inbox if e.id != msg]
             self.person_inbox = kept
             self.person_store.save(kept)
-            return {"id": PERSON, "deleted": msg, "unread": sum(1 for e in kept if not e.read_at)}
-        s = self._get(self._addr(id))
+            return {"id": PERSON, "deleted": msg, "declined": False, "unread": sum(1 for e in kept if not e.read_at)}
+        s = self._find(self._addr(id))
         kept = [e for e in s.inbox if e.id != msg]
         if len(kept) == len(s.inbox):
             raise RpcError(f"{s.id}'s inbox holds no entry {msg}")
         s.inbox = kept
-        self.store.save(s)
+        _prune_tallies(s)  # a delete is the other way an entry leaves (review of PR #214)
+        self._save(s)
         await self._push_changes()
-        return {"id": s.id, "deleted": msg, "unread": s.unread()}
+        return {"id": self._address(s), "deleted": msg, "unread": s.unread()}
+
+    # -- the person's own bookkeeping on their inbox (design §4.10, TD-069 step 0) ----------------
+    # Each is refused to every session exactly as `inbox_delete` is, and each acts on the org's
+    # person inbox: a snooze, a pause and a *Go with it* are the person's, and no session has them.
+
+    def _person_entry(self, msg: str, caller: Any, what: str) -> MailEntry:
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot {what} mail: it is the person's own bookkeeping on their inbox (design §4.10)"
+            )
+        held = [e for e in self.person_inbox if e.id == msg]
+        if not held:
+            raise RpcError(f"the person inbox holds no entry {msg}")
+        return held[0]
+
+    async def rpc_inbox_snooze(self, msg: str, until: str | None = None, caller: Any = None) -> dict[str, Any]:
+        """**Snooze** (design §4.10, TD-069): `snoozed_until` on a person-inbox entry, set by this
+        RPC and cleared by it with no `until`. A snooze is the person's own bookkeeping, as editing
+        a `Due:` date is, and the sender is not told. It persists with the person inbox and affects
+        **the Inbox page only** — the entry leaves its section and the page's count until that time
+        — and nothing else: it is still unread if it was, it still occupies the depths, and a
+        snoozed `ask` stays open. A `steer` has **Pause** instead, so it is refused one: snooze
+        hides a row while its clock runs, pause stops the clock, and both on one row invite the
+        wrong press."""
+        e = self._person_entry(msg, caller, "snooze")
+        if e.kind == "steer":
+            raise RpcError(f"{msg} is a steer: it has Pause, which stops its clock, and no Snooze (design §4.10)")
+        self._mark(msg, snoozed_until=str(until) if until else None)
+        return {"id": PERSON, "msg": msg, "snoozed_until": e.snoozed_until}
+
+    async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer
+        this; do not go on without me*. `paused_at` stops the bound running (the sweep skips the
+        entry outright, whatever `bound` reads), the sender is told by a `system` note that wakes it
+        as a person's reply does, so it turns to other work instead of waiting out a clock that has
+        stopped, and the entry is counted while paused: a preference has become something a session
+        is held on. Only a `steer` can be paused — an `ask` to the person has no clock — and a
+        `steer` addressed to a session cannot be: the pause is the person's."""
+        e = self._person_entry(msg, caller, "pause")
+        if e.kind != "steer":
+            raise RpcError(f"only a steer can be paused: {msg} is a {e.kind}, and has no clock to stop (design §4.10)")
+        if not e.open:
+            raise RpcError(f"{msg} is closed ({e.closed_reason}): there is no clock left to stop (design §4.10)")
+        if e.paused_at:
+            raise RpcError(f"{msg} is already paused")
+        self._mark(msg, paused_at=now_iso())
+        self._system_note(e.from_, f"steer {msg} paused by the person: do not take your default yet", wake="person")
+        await self._push_changes()
+        return {"id": PERSON, "msg": msg, "paused_at": e.paused_at, "bound": e.bound}
+
+    async def rpc_inbox_resume(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """**Resume** (design §4.10, TD-069): moves `bound` later by the time it was held and then
+        clears `paused_at`, **in one step**, so the sweep never sees a resumed entry with its old
+        bound — what was left is what is left — and the sender is told again. That note is an
+        ordinary one: it only says the clock runs again and what is left, so it wakes within the
+        wake budget like any `note`."""
+        e = self._person_entry(msg, caller, "resume")
+        if not e.paused_at:
+            raise RpcError(f"{msg} is not paused")
+        held = datetime.now(UTC) - _parse(e.paused_at)
+        bound = (_parse(e.bound) + held).replace(microsecond=0).isoformat().replace("+00:00", "Z") if e.bound else None
+        self._mark(msg, bound=bound, paused_at=None)
+        self._system_note(e.from_, f"steer {msg} resumed by the person: the clock runs again, until {bound}")
+        await self._push_changes()
+        return {"id": PERSON, "msg": msg, "paused_at": None, "bound": bound}
+
+    async def rpc_inbox_go_with_it(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """**Go with it** (design §4.5a **Inbox**, §4.10): closes a `steer` now —
+        `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh — so the
+        sender need not wait out the bound; doing nothing would let it lapse to the same end. The
+        sender is told by a `system` note that wakes it as a person's reply does. It closes a
+        paused `steer` as it closes a running one."""
+        e = self._person_entry(msg, caller, "answer")
+        if e.kind != "steer":
+            raise RpcError(f"Go with it answers a steer, which carries the default: {msg} is a {e.kind} (§4.10)")
+        if not e.open:
+            raise RpcError(f"{msg} is already closed ({e.closed_reason})")
+        self._close_entry(msg, "go_with_it", now_iso())
+        self._system_note(e.from_, f"steer {msg} — the person says: go with your default", wake="person")
+        await self._push_changes()
+        return {"id": PERSON, "msg": msg, "closed_reason": "go_with_it"}
 
     async def _sweep_mail(self, now: datetime) -> None:
-        """Once a tick: an `ask` past its bound expires on every copy; an addressee that exited
-        leaves the `ask`s addressed to it pending, a closed one expires them (design §4.10
-        lifecycle); read entries past retention are pruned, open asks exempt."""
+        """Once a tick: an `ask` past its bound expires on every copy and a `steer` past its bound
+        **lapses**; an addressee that exited leaves the `ask`s addressed to it pending, a closed one
+        expires them (design §4.10 lifecycle); read entries past retention are pruned, open asks
+        exempt. Two things a `steer` does differently (§4.10 *What a person is asked*): its bound
+        runs whatever becomes of the addressee — an exit leaves it no `pending` and a close expires
+        nothing, it lapses on time — and while the person has **paused** it the sweep skips it
+        outright, whatever `bound` reads. An `ask` to the person carries no bound at all, so nothing
+        here ever reaches it."""
         stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
-        for r in list(self.sessions.values()):
+        for r in list(self._graph().values()):
             for e in list(r.inbox):
-                if not e.open:
+                if not e.open or e.paused_at:
                     continue
-                if (e.bound and _parse(e.bound) <= now) or r.state == "closed":
-                    self._mark(e.id, expired_at=stamp)
+                if e.bound and _parse(e.bound) <= now:
+                    self._lapse_or_expire(e, stamp)
+                elif e.kind == "steer":
+                    continue  # the sender goes on: nothing the addressee does closes it early
+                elif r.state == "closed":
+                    self._close_entry(e.id, "expired", stamp)
                 elif r.state == "exited" and r.id not in e.pending:
                     self._mark(e.id, pending=r.id)
             for e in list(r.outbox):
-                if e.open and e.bound and _parse(e.bound) <= now:
-                    self._mark(e.id, expired_at=stamp)
-        for e in list(self.person_inbox):  # an `ask` to the person expires on its bound like any other
-            if e.open and e.bound and _parse(e.bound) <= now:
-                self._mark(e.id, expired_at=stamp)
+                if e.open and not e.paused_at and e.bound and _parse(e.bound) <= now:
+                    self._lapse_or_expire(e, stamp)
+        for e in list(self.person_inbox):  # a `steer` to the person lapses on its bound; an `ask` has none
+            if e.open and not e.paused_at and e.bound and _parse(e.bound) <= now:
+                self._lapse_or_expire(e, stamp)
         if mail.MAIL_RETENTION is None:
             return
         kept = [e for e in self.person_inbox if self._keep(e, now, inbox=True)]
         if len(kept) != len(self.person_inbox):
             self.person_inbox = kept
             self.person_store.save(kept)
-        for r in self.sessions.values():
+        for r in self._graph().values():
             inbox = [e for e in r.inbox if self._keep(e, now, inbox=True)]
             outbox = [e for e in r.outbox if self._keep(e, now, inbox=False)]
             if len(inbox) != len(r.inbox) or len(outbox) != len(r.outbox):
                 r.inbox, r.outbox = inbox, outbox
-                self.store.save(r)
+                _prune_tallies(r)
+                self._save(r)
+
+    def _lapse_or_expire(self, e: MailEntry, stamp: str) -> None:
+        """A bound that ran out (design §4.10): a `steer` **lapses** — `closed_reason: lapsed`,
+        never `expired_at`, because nothing failed — and the sender is told by a `system` note that
+        wakes it **uncharged**, so a spent budget cannot hold it past the bound it set itself. An
+        `ask` or a `conflict` expires, as it always has."""
+        if e.kind == "steer":
+            self._close_entry(e.id, "lapsed", stamp)
+            self._system_note(e.from_, f"steer {e.id} lapsed: go with your default", wake="uncharged")
+        else:
+            self._close_entry(e.id, "expired", stamp)
 
     @staticmethod
     def _keep(e: MailEntry, now: datetime, *, inbox: bool) -> bool:
@@ -1806,7 +2438,9 @@ class HostAgent:
 
     # -- waking (design §4.8 "Waking a lead", §4.10 "The host agent decides each wake") ----------
 
-    async def rpc_wait(self, timeout: float = 600.0, scope: str = "controlled", caller: Any = None) -> dict[str, Any]:
+    async def rpc_wait(
+        self, timeout: float = 600.0, scope: str = "controlled", only_host: str | None = None, caller: Any = None
+    ) -> dict[str, Any]:
         """`ao wait [--timeout N] [--scope controlled|all]` (TD-049, moved here by TD-052 step 3):
         block until something in the caller's scope changes, new mail wakes it, or the timeout
         passes — and **that timeout is the fallback poll**.
@@ -1834,9 +2468,11 @@ class HostAgent:
         try:
             while True:
                 me.poke.clear()
-                views = [x.view() for x in self.sessions.values()]
+                views = self._views()
+                if only_host:  # a person over a link watches that node's records only (§4.4a)
+                    views = [v for v in views if v.get("host") == only_host]
                 changed, cursor = waits.wake_changes(before, waits.wait_scope(views, who, scope))
-                s = self.sessions.get(who) if who is not None else None
+                s = self._graph().get(who) if who is not None else None  # a node's session waits here too (step 5)
                 wake = self._decide_wake(s, member_change=bool(changed)) if s is not None else None
                 if changed or (wake is not None and wake["cause"] == "mail"):
                     covered = wake["entries"] if wake is not None else []
@@ -1862,7 +2498,7 @@ class HostAgent:
         return {
             "id": e.id,
             "from": e.from_,
-            "from_role": mail.from_role(self.sessions, s.id, e.from_),
+            "from_role": mail.from_role(self._graph(), self._address(s), e.from_, controllers=self._ctl),
             "kind": e.kind,
             "about": e.about,
             "at": e.at,
@@ -1884,6 +2520,11 @@ class HostAgent:
         - none, or `s` is a person's session (never woken by mail) → None, nothing recorded;
         - a member's change is waking it anyway → a **free** wake: recorded `charged: False`,
           watermark advanced over all of it;
+        - one of the undecided entries is a note the home marked `uncharged` — a `steer` of its own
+          **lapsed** → a free wake, free in the same sense and for the same reason it is not a
+          refill: it is the home's clock, not another session's message (design §4.10), so a spent
+          budget cannot hold a sender past its own bound. The mark is on the note, so it survives a
+          resume and a restart between the lapse and the moment the session is next reachable;
         - the budget holds → one unit spent however many entries it covers, `charged: True`,
           watermark advanced;
         - the budget is spent → None: the mail has landed, nothing wakes, **the watermark stays**,
@@ -1896,27 +2537,28 @@ class HostAgent:
         if not fresh:
             return None
         now = datetime.now(UTC)
-        if not member_change and mail.wake_budget_spent(s, now):
+        free = member_change or any(e.uncharged for e in fresh)
+        if not free and mail.wake_budget_spent(s, now):
             return None
         decision = {
             "at": now.isoformat(timespec="microseconds"),
             "cause": "member" if member_change else "mail",
-            "charged": not member_change,
+            "charged": not free,
             "covered": len(fresh),
         }
         s.wakes = (s.wakes + [decision])[-mail.WAKES_KEEP :]
         s.mail_decided = {"id": fresh[-1].id, "at": fresh[-1].at}
-        self.store.save(s)
+        self._save(s)
         return {**decision, "entries": fresh}
 
     def _refill(self, s: Session | None) -> None:
         """A person's act toward `s` restores its wake budget in full (design §4.10 "Time and a
         person restore it"): a send or keys with no caller, a person's message, a decided
         permission. Never a session's traffic, never a person looking (`seen`, a panel read)."""
-        if s is None or s.external:
+        if s is None:
             return
         s.wake_refilled_at = datetime.now(UTC).isoformat(timespec="microseconds")
-        self.store.save(s)
+        self._save(s)
         self._poke_waits()
 
     async def rpc_hook(self, session: str, **event: Any) -> dict[str, Any] | None:
@@ -1986,6 +2628,1056 @@ class HostAgent:
     async def rpc_ping(self) -> str:
         return "pong"
 
+    async def rpc_host(self) -> dict[str, Any]:
+        """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
+        whether the home can be reached — which a client on a node needs before it labels what it
+        shows *offline*."""
+        out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
+        if self.mode == "home":
+            out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
+        else:
+            out["link"] = dict(self.home_link)
+        return out
+
+    # -- the container supervisor (design §4.4a "The home supervises it", TD-057 step 3c.3) -----
+
+    def _supervise_containers(self) -> None:
+        """For each container node whose link is down and whose turn has come: observe, decide,
+        act — in a task, so a build never holds the tick — and say on the overlay what is being
+        done. A node whose link is up is left alone and its record cleared."""
+        now = time.monotonic()
+        for name, n in containers.container_nodes().items():
+            state = self.links.get(name)
+            if state and state["up"] and "build" in state:
+                # Asked again on every tick, not only at `hello`: a link that outlives a new wheel
+                # at the home (today a promote restarts the home and so drops it — nothing promises
+                # that) must not leave the node behind for good (review of PR #225).
+                self._note_build(name, str(state["build"]))
+            if state and state["up"] and not state.get("stale"):
+                if self.supervision.pop(name, None) is not None:
+                    self._note_link(name)
+                continue
+            if name not in self.supervision:
+                # A linked node that is merely behind waits one grace before anything is done about
+                # it: a promote writes the new wheel about a second before it restarts this agent,
+                # and the process about to be stopped must not start an install it cannot finish
+                # (seen live at the promote of PR #227: a `docker exec pip` left running by the stop,
+                # no outcome logged, and the new process installing again 30 s later). A node whose
+                # link is down is looked at at once, as before.
+                linked = bool(state and state["up"])
+                first = now + containers.SUPERVISE_GRACE if linked else 0.0
+                self.supervision[name] = {"doing": "", "since": now_iso(), "attempts": 0, "next": first, "error": ""}
+            sup = self.supervision[name]
+            if not (state and state["up"]) and sup["attempts"] == 0 and not sup["doing"]:
+                # the link dropped while that grace was still running — the container may really be
+                # gone: looked at at once, as a down link always is. A record that has already
+                # acted keeps its own backoff (review of PR #228).
+                sup["next"] = 0.0
+            if name in self._supervising and not self._supervising[name][0].done():
+                continue
+            if now < sup["next"]:
+                continue
+            r = self.container_runner()
+            task = asyncio.create_task(self._supervise_one(n, sup, r))
+            self._supervising[name] = (task, r)
+            task.add_done_callback(lambda t, name=name: self._supervising.pop(name, None))
+
+    def _stop_supervising(self, name: str) -> None:
+        """Cancel the node's action in flight, process and all, and forget its record."""
+        entry = self._supervising.pop(name, None)
+        if entry is not None:
+            task, r = entry
+            r.cancel()
+            task.cancel()
+        self.supervision.pop(name, None)
+
+    async def _supervise_one(self, n: containers.ContainerNode, sup: dict[str, Any], r: containers.Runner) -> None:
+        try:
+            cstate, alive, user = await asyncio.to_thread(containers.observe, n, r)
+        except Exception as e:  # noqa: BLE001 — docker itself failing is a reason on the card, not a crash
+            self._supervised(n.name, sup, f"cannot observe the container: {e}", failed=True)
+            return
+        state = self.links.get(n.name) or {}
+        why = state.get("why", "")
+        stale = bool(state.get("up") and state.get("stale"))  # linked, and behind this home's build
+        action, doing = containers.decide(cstate, alive, str(why), volatile=n.volatile, stale=stale)
+        if action == "wait":
+            # nothing to mend — the agent is dialing, or the person stopped a volatile container:
+            # give it the grace, then look again
+            sup["next"] = time.monotonic() + containers.SUPERVISE_GRACE
+            if sup["doing"] != doing:
+                sup["doing"], sup["since"], sup["error"], sup["attempts"] = doing, now_iso(), "", 0
+                self._note_link(n.name)
+            return
+        sup["doing"], sup["since"], sup["error"] = doing, now_iso(), ""
+        self._note_link(n.name)
+        log.info("supervisor %s: %s", n.name, doing)
+        try:
+            await asyncio.to_thread(containers.act, n, r, action, user)
+        except Exception as e:  # noqa: BLE001
+            self._supervised(n.name, sup, f"{doing}: failed — {e}", failed=True)
+            return
+        self._supervised(n.name, sup, f"{doing}: done, waiting for it to dial in", failed=False)
+
+    def _supervised(self, name: str, sup: dict[str, Any], doing: str, *, failed: bool) -> None:
+        # the first failure waits SUPERVISE_FIRST, then doubling to SUPERVISE_MAX; a success resets
+        delay = min(containers.SUPERVISE_FIRST * (2 ** sup["attempts"]), containers.SUPERVISE_MAX)
+        sup["attempts"] = sup["attempts"] + 1 if failed else 0
+        sup["next"] = time.monotonic() + (delay if failed else containers.SUPERVISE_GRACE)
+        sup["doing"], sup["since"], sup["error"] = doing, now_iso(), doing if failed else ""
+        (log.warning if failed else log.info)("supervisor %s: %s", name, doing)
+        self._note_link(name)
+
+    def _note_link(self, name: str) -> None:
+        """The overlay changed for that host's cards: push it."""
+        task = asyncio.ensure_future(self._push_changes())
+        self._bg.add(task)
+        task.add_done_callback(self._bg.discard)
+
+    async def rpc_forget_host(self, host: str, caller: Any = None) -> dict[str, Any]:
+        """`ao host forget` (design §4.4a "A container node"): the host's records at the home are
+        closed as a closed session is kept — never deleted, their run logs are the node's volume —
+        and its link, if up, is dropped. A person's act: a session may not forget a host."""
+        if not mail.is_person(caller):
+            raise RpcError(f"{caller} cannot forget host {host}: a person's act, from a terminal or the UI")
+        if self.mode != "home":
+            raise RpcError(f"{self.host} is a node of {self.home}: hosts are forgotten at the home")
+        if host == self.host:
+            raise RpcError(f"{host} is this home: it cannot forget itself")
+        closed = 0
+        for s in self.remote.get(host, {}).values():
+            if s.state != "closed":
+                s.set_state("closed", confidence="scraped")
+                self._save(s)
+                closed += 1
+        mux = self._link_muxes.pop(host, None)
+        if mux is not None:
+            mux.close("the host was forgotten")
+        self.links.pop(host, None)
+        self._stop_supervising(host)  # `ao host forget` removed the `nodes:` entry: nothing to mend
+        await self._push_changes()
+        return {"host": host, "closed": closed, "kept": len(self.remote.get(host, {}))}
+
+    def home_reachable(self) -> bool:
+        """The home is always in reach of itself; a node reaches it while its link is up (§4.4a)."""
+        return self.mode == "home" or bool(self.home_link["up"])
+
+    # -- the link (design §4.4a "The link's protocol", TD-057 step 3a) ---------------------------
+
+    async def _dial_home(self) -> None:
+        """A node's dialer: keeps one link to the home up, forever, with backoff."""
+
+        def on_state(up: bool, why: str, mux: link.Mux | None) -> None:
+            if up != self.home_link["up"] or why != self.home_link["why"]:
+                (log.info if up else log.warning)("link to %s: %s", self.home, why)
+            self.home_link = {"up": up, "since": now_iso(), "why": why}
+            self._home_mux = mux
+            self._snapshot_sent = False
+            if up:
+                task = asyncio.ensure_future(self._send_snapshot(mux))
+                self._bg.add(task)
+                task.add_done_callback(self._bg.discard)
+
+        await link.dial(
+            hosts.link_socket() or hosts.link_command(),
+            host=self.host,
+            handler=self._from_home,
+            on_state=on_state,
+            first=link.BACKOFF_FIRST,
+            top=link.BACKOFF_MAX,
+        )
+
+    async def _send_snapshot(self, mux: link.Mux | None) -> None:
+        """First thing on a new link (§4.4a): every record of this host, whole. Reports start only
+        once it is acknowledged, so the home never applies a change to a record it has not got."""
+        if mux is None:
+            return
+        # What is marked as told is exactly what was sent: a record created while the request is out
+        # is not in it, and must go in the first report rather than be taken as known.
+        sending = {s.id: (_urgent(s), s.to_dict()) for s in self.sessions.values()}
+        try:
+            await mux.request("snapshot", timeout=link.LINK_SILENCE, records=[d for _, d in sending.values()])
+        except (link.LinkClosed, link.LinkError, TimeoutError) as e:
+            log.warning("snapshot to %s failed: %s", self.home, e)
+            mux.close(f"snapshot failed: {e}")  # start over: a link whose snapshot did not land reports into a void
+            return
+        now = time.monotonic()
+        self._reported = {sid: (urgent, json.dumps(d, sort_keys=True), now) for sid, (urgent, d) in sending.items()}
+        self._snapshot_sent = True
+
+    async def _report_home(self) -> None:
+        """What changed since the home was last told (§4.4a "Snapshot, then reports"): at once when
+        `state`, `pending`, `exit_code` or `pane` moved, else at most every `REPORT_EVERY` per
+        record; and the ids this node has forgotten."""
+        mux = self._home_mux
+        if self.mode != "node" or mux is None or not self._snapshot_sent:
+            return
+        now, changed = time.monotonic(), []
+        for s in self.sessions.values():
+            urgent, payload = _urgent(s), json.dumps(s.to_dict(), sort_keys=True)
+            was = self._reported.get(s.id)
+            if was is None or was[0] != urgent or (was[1] != payload and now - was[2] >= REPORT_EVERY):
+                self._reported[s.id] = (urgent, payload, now)
+                changed.append(s.to_dict())
+        forgotten = [sid for sid in self._reported if sid not in self.sessions]
+        for sid in forgotten:
+            del self._reported[sid]
+        # Bounded: this runs inside the tick and inside every RPC that pushes, and a write to a peer
+        # that has gone blocks once the pipe is full — for `LINK_SILENCE`, were nothing to stop it.
+        try:
+            async with asyncio.timeout(REPORT_WRITE):
+                if changed:
+                    await mux.notify("report", records=changed)
+                if forgotten:
+                    await mux.notify("gone", ids=forgotten)
+        except link.LinkClosed:
+            pass
+        except TimeoutError:
+            mux.close(f"a report could not be written within {REPORT_WRITE:g} s")  # the reconnect's snapshot repairs it
+
+    async def _from_home(self, method: str, params: dict[str, Any]) -> Any:
+        """What the home may ask of this node: a ping; an `act` (step 4a) — an RPC the home has
+        already gated, run here through the same handler a local caller reaches, with no gate of
+        its own; and `stat`, whether a directory exists here (a team start's checkout check)."""
+        if method == "ping":
+            return "pong"
+        if method == "act":
+            return await self._act(params)
+        if method == "read":
+            return await self._read(params)
+        if method == "intent":
+            await self._take_intent(params.get("records") or [])
+            return None
+        if method == "files":
+            try:
+                return await asyncio.wait_for(
+                    asyncio.to_thread(read_checkout, params.get("dir"), params.get("paths")), ACT_TIMEOUT
+                )
+            except ValueError as e:
+                raise link.LinkError(str(e)) from None
+        if method == "stat":
+            d = Path(str(params.get("dir") or "")).expanduser()
+            return {"dir": str(d), "exists": await asyncio.to_thread(d.is_dir)}
+        raise link.LinkError(f"unknown link method {method!r}")
+
+    async def _act(self, params: dict[str, Any]) -> dict[str, Any]:
+        """An act the home routed here (design §4.4a "A node reports and executes; the home
+        decides"): `{rpc, params, caller}`, every address in it already written from this host's
+        point of view. The home is the gate and this node the executor, so neither `_gate` nor
+        the offline table runs — the request came over the link, which is the home. Refused by
+        name when the record is another host's (*not my host*). The reply carries the RPC's
+        result and the record as it now stands, so the home applies the outcome before it answers
+        the caller rather than a report later."""
+        rpc = str(params.get("rpc") or "")
+        if rpc not in NODE_ACTS and rpc not in HOME_EDITS:
+            raise link.LinkError(f"{rpc!r} is not an act a node executes")
+        p = dict(params.get("params") or {})
+        caller = params.get("caller")
+        rid = str(p["id"]) if p.get("id") is not None else None
+        if rid is not None:
+            bare, where = naming.split_address(rid)
+            if where and where != self.host:
+                raise link.LinkError(f"{rid} is not on {self.host}: not my host")
+            p["id"] = rid = bare
+        if rpc in ("create", "name_check"):
+            asked = p.pop("host", None)
+            if asked and asked != self.host:
+                raise link.LinkError(f"a {rpc} for {asked} is not {self.host}'s: not my host")
+        method = getattr(self, f"rpc_{rpc}")
+        if ignored := _drop_unknown(method, p):
+            log.warning("act %s from the home: ignored unknown params %s", rpc, ", ".join(ignored))
+        if "caller" in inspect.signature(method).parameters:
+            p["caller"] = caller
+        try:
+            result = await method(**p)
+        except RpcError as e:
+            raise link.LinkError(str(e)) from None
+        except TypeError as e:
+            raise link.LinkError(f"bad params: {e}") from None
+        sid = rid if rid is not None else (result.get("id") if isinstance(result, dict) else None)
+        record = self.sessions.get(str(sid)) if sid else None
+        return {
+            "result": result,
+            "record": record.to_dict() if record is not None else None,
+            "gone": bool(sid) and record is None and rpc == "remove",
+        }
+
+    async def _take_intent(self, records: list[Any]) -> None:
+        """The home's intent for this node's records (§4.4a, step 4b.2): `apply_home` over exactly
+        `INTENT_FIELDS` — whatever else a push carries is not taken — so the stopping policies read
+        what the home holds; the unread count kept apart as a hint for the mail line, never an
+        inbox. A record of another host, or one this node does not hold, is not this node's."""
+        changed = False
+        for raw in records:
+            if not isinstance(raw, dict) or raw.get("host") != self.host:
+                log.warning("intent from %s: dropped a record that is not %s's", self.home, self.host)
+                continue
+            s = self.sessions.get(str(raw.get("id") or ""))
+            if s is None:
+                continue
+            with contextlib.suppress(TypeError, ValueError):
+                self._mail_hints[s.id] = (int(raw.get("unread") or 0), bool(raw.get("wake_budget_spent")))
+            fields = {k: raw[k] for k in INTENT_FIELDS if k in raw}
+            before, stop_before = s.to_dict(), s.run_until
+            try:
+                apply_home(s, {**fields, "id": s.id, "host": s.host})
+            except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
+                log.warning("intent from %s: could not take %s: %s", self.home, s.id, e)
+                continue
+            if s.run_until != stop_before:
+                s.wrapup_sent_at = None  # a new stop time is a new run, as `set_stop` has it
+            if _renamed_grants(s, f"the intent from {self.home}") or s.to_dict() != before:
+                self.store.save(s)
+                changed = True
+        if changed:
+            await self._push_changes()
+
+    async def _send_derived(self, s: Session, progress: list[Any], findings: list[Any], retire: list[str]) -> None:
+        """A node's tick derived these for `s` (§4.4a, step 4b.2): sent to the home — whose fields
+        they are — as `derived`, and applied there exactly as a home's own tick applies them. Not
+        queued: a link that is gone, or a home that refuses, is a log line, and the next derive
+        (`DERIVE_EVERY`) says it again."""
+        mux = self._home_mux
+        if mux is None or not (progress or findings or retire):
+            return
+        try:
+            await mux.request(
+                "derived",
+                timeout=REPORT_WRITE,
+                id=s.id,
+                progress=[e.to_dict() for e in progress],
+                findings=[e.to_dict() for e in findings],
+                retire=list(retire),
+            )
+        except (link.LinkError, link.LinkClosed, TimeoutError) as e:
+            log.warning("derived reports for %s did not reach %s: %s", s.id, self.home, e)
+
+    async def _read(self, params: dict[str, Any]) -> Any:
+        """A read the home routed here (§4.4a, step 4b.1): `{rpc, params}`, `rpc` one of
+        `NODE_READS` and nothing else — ungated, as on one host, so no caller rides along. Refused
+        by name when the record is another host's (*not my host*). The reply is the RPC's own."""
+        rpc = str(params.get("rpc") or "")
+        if rpc not in NODE_READS:
+            raise link.LinkError(f"{rpc!r} is not a read a node serves the home")
+        p = dict(params.get("params") or {})
+        bare, where = naming.split_address(str(p.get("id") or ""))
+        if where and where != self.host:
+            raise link.LinkError(f"{p.get('id')} is not on {self.host}: not my host")
+        p["id"] = bare
+        method = getattr(self, f"rpc_{rpc}")
+        if ignored := _drop_unknown(method, p):
+            log.warning("read %s from the home: ignored unknown params %s", rpc, ", ".join(ignored))
+        try:
+            return await method(**p)
+        except RpcError as e:
+            raise link.LinkError(str(e)) from None
+        except TypeError as e:
+            raise link.LinkError(f"bad params: {e}") from None
+
+    # -- a node's calls the home answers (design §4.4a "Mail across hosts", TD-057 step 5) --------
+
+    def _from_home_form(self, address: str) -> str:
+        """An address in the home's form, read at this node: the home's own sessions bare there are
+        `id@home` here, and `id@<this node>` is bare."""
+        sid, h = naming.split_address(address)
+        return naming.qualify(f"{sid}@{h or self.home}", local=self.host)
+
+    async def _forward(self, rid: Any, name: str, params: dict[str, Any], caller: Any) -> dict[str, Any]:
+        """A node hands a call it cannot serve to the home over the link — `forward {rpc, params,
+        caller, token}` — and answers with the home's verdict, every address in it rewritten into
+        this host's form. A cancelled call (a `wait` whose client went away) is cancelled at the
+        home too, by its token, so no ghost wait is charged a wake there. Never queued: a link
+        that drops while the call is out is that call's error."""
+        mux = self._home_mux
+        if mux is None:
+            raise RpcError(f"{self.home} (home) is unreachable from {self.host}; refused, not queued (design §4.4a)")
+        token = secrets.token_hex(8)
+        # A `wait` is bounded by its own timeout at the home; everything else within ACT_TIMEOUT —
+        # pings keep a link up past a dispatch that hangs (review of PR #217)
+        timeout = None if name == "wait" else ACT_TIMEOUT
+        try:
+            reply = await mux.request("forward", timeout=timeout, rpc=name, params=params, caller=caller, token=token)
+        except asyncio.CancelledError:
+            with contextlib.suppress(Exception):
+                await mux.notify("cancel", token=token)
+            raise
+        except link.LinkError as e:
+            return {"id": rid, "error": f"{self.home}: {e}"}
+        except link.LinkClosed:
+            return {"id": rid, "error": f"the link to {self.home} dropped while {name} was out: its verdict is unknown"}
+        except TimeoutError:
+            with contextlib.suppress(Exception):
+                await mux.notify("cancel", token=token)
+            return {
+                "id": rid,
+                "error": f"{self.home} did not answer {name} within {timeout:g} s: its verdict is unknown",
+            }
+        reply = reply if isinstance(reply, dict) else {}
+        out = naming.readdress({k: v for k, v in reply.items() if k != "id"}, self._from_home_form)
+        return {"id": rid, **out}
+
+    async def _forwarded(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
+        """The home's end: a node's call run here as that node's session — the caller is
+        `id@host`, every address in the params read from that host's point of view, a `create`
+        landing on that host unless it says otherwise — through the same dispatch a local caller
+        gets, gate and routing included. The reply is the dispatch's, addresses in the home's
+        form; the node rewrites them. Registered by token until it returns so the node can
+        cancel it."""
+        rpc = str(params.get("rpc") or "")
+        if rpc in modes.HOME_ONLY:
+            # a checkout's files are read by a caller at the home, for a team start there (4b.3);
+            # a node — a person or a session on it — never reads another host's files through here
+            return {"id": 0, "error": f"host_files is not served to a call from {host}: ask at the home (design §4.4a)"}
+        p = naming.readdress(dict(params.get("params") or {}), lambda a: self._from_host(a, host))
+        if rpc == "set_controllers":
+            for key in ("add", "remove"):
+                if p.get(key):
+                    p[key] = [self._from_host(x, host) for x in p[key]]
+        if rpc == "create":
+            p.setdefault("host", host)
+        if params.get("caller") is None:
+            # A person at a node acts only on that node's records (§4.4a): `id@<this home>` collapsed
+            # to a home record above, and the person gate would then have passed it (security read of
+            # PR #217). The target's host, read after the rewrite, has to be the link's own. A call
+            # that names no session — the person inbox, a `wait` — names nothing to bound; the wait
+            # is scoped to the node's host instead. A `create` for another host is refused at the
+            # node before it gets here; the check is kept as a second line.
+            if rpc == "wait":
+                p["only_host"] = host
+            where: str | None = None
+            if rpc == "create":
+                where = str(p.get("host") or host)
+            elif rpc in modes.PERSON_NODE_BOUND and p.get("id") and p["id"] != PERSON:
+                where = naming.split_address(str(p["id"]))[1] or self.host
+            if where is not None and where != host:
+                return {
+                    "id": 0,
+                    "error": (
+                        f"a person at {host} may {rpc} only {host}'s sessions: {p.get('id') or p.get('host')} "
+                        f"is on {where} (design §4.4a)"
+                    ),
+                }
+        req = {"id": 0, "method": rpc, "params": p, "caller": params.get("caller")}
+        task = asyncio.ensure_future(self._dispatch(req, link_host=host))
+        token = str(params.get("token") or "")
+        if token:
+            self._forwarded_calls[token] = task
+        try:
+            return await task
+        finally:
+            if token:
+                self._forwarded_calls.pop(token, None)
+            if not task.done():
+                task.cancel()
+
+    def _cancel_forwarded(self, token: str) -> None:
+        task = self._forwarded_calls.pop(str(token), None)
+        if task is not None and not task.done():
+            task.cancel()
+
+    # -- acts across the link, at the home (design §4.4a, TD-057 step 4a) -----------------------
+
+    def _act_host(self, method: str, params: dict[str, Any]) -> str | None:
+        """The host an act is for when it is not this one: the address in `id`, or `create`'s
+        (and `name_check`'s) `host`. None means *here*, and the method runs as it always has."""
+        if method not in NODE_ACTS and method not in HOME_EDITS and method not in NODE_READS:
+            return None
+        if method in ("create", "name_check"):
+            h = str(params.get("host") or "")
+        else:
+            _rid, h = naming.split_address(str(params.get("id") or ""))
+        return h if h and h != self.host else None
+
+    def _from_host(self, address: Any, host: str) -> str:
+        """An address as `host`'s node stores it, read from here: its bare ids are `id@host`, and
+        an `id@<this home>` is bare."""
+        sid, h = naming.split_address(str(address))
+        return naming.qualify(f"{sid}@{h or host}", local=self.host)
+
+    def _to_host(self, address: Any, host: str) -> str:
+        """The inverse: an address as this home stores it, written for `host`'s node."""
+        sid, h = naming.split_address(str(address))
+        return naming.qualify(f"{sid}@{h or self.host}", local=host)
+
+    def _graph(self) -> dict[str, Session]:
+        """One graph for the gates and the mailbox (§4.4a "The gate reads one graph", steps 4a and
+        5): this host's records under their ids and every other host's under `id@host` — the
+        records themselves, so what the mailbox writes lands on the record `_save` knows the host
+        of. A remote record's `controllers` are stored as its node writes them; `_ctl` reads them
+        from here, and every gate takes it. `self.sessions` itself is never widened — the tick,
+        the anchor rule and the pane reads stay this host's."""
+        g: dict[str, Session] = dict(self.sessions)
+        for host, recs in self.remote.items():
+            for rid, r in recs.items():
+                g[f"{rid}@{host}"] = r
+        return g
+
+    def _ctl(self, s: Session) -> list[str]:
+        """A record's `controllers` as this host addresses them (§4.4a "Every address crosses in
+        the reader's form"): its own as stored, another host's re-addressed."""
+        return s.controllers if s.host == self.host else [self._from_host(x, s.host) for x in s.controllers]
+
+    def _address(self, s: Session) -> str:
+        return s.id if s.host == self.host else f"{s.id}@{s.host}"
+
+    def _node_mux(self, host: str) -> link.Mux:
+        """The live link to `host`, or the refusal in words: *unreachable since <when> — <why>*,
+        never queued (§4.4a "When the recipient's host is unreachable")."""
+        if self.mode != "home":
+            raise RpcError(f"{self.host} is a node of {self.home}: it acts on its own sessions only, ask the home")
+        mux = self._link_muxes.get(host)
+        if mux is not None:
+            return mux
+        state = self.links.get(host)
+        if state is None and host not in hosts.nodes() and host not in self.remote:
+            raise RpcError(f"unknown host {host}: not under `nodes:` in {self.host}'s hosts.yml")
+        since = (state or {}).get("since") or "the home started"
+        why = (state or {}).get("why") or "not connected since the home started"
+        raise RpcError(f"runs on {host}: unreachable since {since} — {why}; refused, not queued (design §4.4a)")
+
+    async def rpc_host_dir(self, host: str, dir: str) -> dict[str, Any]:
+        """Whether `dir` exists on `host` (design §4.4a "Teams across hosts"): `ao team start`'s
+        *every checkout exists on the record's host*, asked of that host's node. A read."""
+        if host == self.host:
+            return {"host": host, "dir": dir, "exists": await asyncio.to_thread(Path(dir).expanduser().is_dir)}
+        mux = self._node_mux(host)
+        try:
+            seen = await mux.request("stat", timeout=ACT_TIMEOUT, dir=dir)
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except (link.LinkClosed, TimeoutError) as e:
+            raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
+        return {"host": host, **(seen if isinstance(seen, dict) else {"dir": dir, "exists": False})}
+
+    async def rpc_host_files(
+        self, host: str, dir: str, paths: list[str] | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """The text of files in a checkout on `host` (design §4.4a "Teams across hosts", step
+        4b.3): a team start's repo config and briefs, read where the checkout is — `paths` relative
+        to `dir`, confined to it, bounded (`read_checkout`). A read, like `host_dir`, and yet more
+        than an existence check: a person's, or a session's holding `control` — one that could
+        start that team anyway. Never for a call forwarded from a node (`_forwarded` refuses it):
+        a laptop does not read another host's files through the home."""
+        if not mail.is_person(caller):
+            me = self._graph().get(self._addr(caller))
+            if me is None or not has_control(me.capabilities):
+                raise RpcError(f"{caller} cannot read files on {host}: needs the control grant (design §4.4a)")
+        if host == self.host:
+            try:
+                got = await asyncio.wait_for(asyncio.to_thread(read_checkout, dir, paths), ACT_TIMEOUT)
+            except ValueError as e:
+                raise RpcError(str(e)) from None
+            except TimeoutError:
+                raise RpcError(f"reading {dir} did not finish within {ACT_TIMEOUT:g} s") from None
+            return {"host": host, **got}
+        mux = self._node_mux(host)
+        try:
+            got = await mux.request("files", timeout=ACT_TIMEOUT, dir=dir, paths=list(paths or []))
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except (link.LinkClosed, TimeoutError) as e:
+            raise RpcError(f"{host} did not answer: {e or 'the link dropped'}") from None
+        return {"host": host, **(got if isinstance(got, dict) else {"dir": dir, "files": {}})}
+
+    async def _check_occupancy_for(self, host: str, params: dict[str, Any]) -> None:
+        """The anchor rule (§9 invariant 2) for a create routed to a container node on this
+        machine (3c.4): the checkout is one directory here and there, and the node cannot see this
+        host's sessions, so the home checks its own records — and the other container nodes' —
+        before the create crosses. The node then checks its own as it always has. A machine node
+        is not checked: its path is another directory."""
+        if host not in containers.container_nodes():
+            return
+        if params.get("kind", "interactive") != "interactive" or params.get("adapter", "shell") == "shell":
+            return
+        directory = Path(str(params.get("dir") or "")).expanduser().resolve()
+        if params.get("worktree"):
+            # the same place `create` puts it — one resolution, the main checkout's, shared with it
+            repo = Path(str(params.get("repo") or directory)).expanduser().resolve()
+            try:
+                directory = await asyncio.to_thread(worktree_path, repo, str(params["worktree"]))
+            except WorktreeError:
+                return  # the node's own create refuses it in its own words
+        if not directory.is_dir():
+            return  # the node's own create says whether it exists there
+        for who in await asyncio.to_thread(self.occupants, directory):
+            raise RpcError(f"{directory} already has agent session {who}; anchor rule (use a worktree)")
+
+    async def _route_read(self, method: str, params: dict[str, Any], host: str) -> Any:
+        """A read of another host's pane (§4.4a, step 4b.1): served by that host's node through the
+        `read` link method, ungated, and refused as unreachable — never queued — while the link is
+        down. The reply is the node's, untouched but for its addresses."""
+        rid, _h = naming.split_address(str(params.get("id") or ""))
+        if rid not in self.remote.get(host, {}):
+            raise RpcError(f"no session {rid}@{host}")
+        mux = self._node_mux(host)
+        try:
+            reply = await mux.request("read", timeout=ACT_TIMEOUT, rpc=method, params={**params, "id": rid})
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except (link.LinkClosed, TimeoutError) as e:
+            raise RpcError(f"{host} did not answer {method}: {e or 'the link dropped'}") from None
+        return naming.readdress(reply, lambda a: self._from_host(a, host))
+
+    async def _route_act(self, method: str, params: dict[str, Any], caller: Any, host: str) -> Any:
+        """An act on another host's record, gated here already: executed by that host's node and
+        its verdict returned (§4.4a). Refused in words — never queued — while the link is down.
+        A home-owned edit is applied to this home's copy after the node took it, so the two agree
+        and the caller's reply is the home's view."""
+        rid, _h = naming.split_address(str(params.get("id") or ""))
+        if method not in ("create", "name_check") and rid not in self.remote.get(host, {}):
+            raise RpcError(f"no session {rid}@{host}")
+        if method == "create":
+            await self._check_occupancy_for(host, params)
+        mux = self._node_mux(host)
+        sent = dict(params)
+        if rid:
+            sent["id"] = rid
+        for key in ("controllers", "add", "remove") if method in ("create", "set_controllers") else ():
+            if sent.get(key):
+                sent[key] = [self._to_host(x, host) for x in sent[key]]
+        who = None if mail.is_person(caller) else self._to_host(caller, host)
+        timeout: float | None = ACT_TIMEOUT
+        if method == "send" and sent.get("wait"):
+            timeout = None if sent.get("timeout") is None else float(sent["timeout"]) + ACT_TIMEOUT
+        try:
+            reply = await mux.request("act", timeout=timeout, rpc=method, params=sent, caller=who)
+        except link.LinkError as e:
+            raise RpcError(f"{host}: {e}") from None
+        except link.LinkClosed:
+            raise RpcError(
+                f"the link to {host} dropped while {method} was out: its verdict is unknown — read the record"
+            ) from None
+        except TimeoutError:
+            raise RpcError(f"{host} did not answer {method} within {timeout:g} s: its verdict is unknown") from None
+        reply = reply if isinstance(reply, dict) else {}
+        if reply.get("record"):
+            self._take_records(host, [reply["record"]], whole=False)
+        elif reply.get("gone") and rid:
+            self._forget_remote(host, rid)
+        result = reply.get("result")
+        if method in HOME_EDITS:
+            # the home's own copy carries the edit, and its view — addressed — is what the caller gets
+            await getattr(self, f"rpc_{method}")(**params)
+            result = self._view(self.remote[host][rid])
+        elif method == "name_check" and isinstance(result, dict):
+            for key in ("id", "holder"):  # the node's bare ids, addressed for the caller (review of PR #213)
+                if isinstance(result.get(key), str) and result[key].startswith(naming.PREFIX):
+                    result[key] = f"{result[key]}@{host}"
+        elif isinstance(result, dict) and result.get("host") == host and result.get("id"):
+            # the node answered with its view of the record: the caller gets this home's, addressed
+            held = self.remote.get(host, {}).get(str(result["id"]))
+            result = self._view(held) if held is not None else {**result, "id": f"{result['id']}@{host}"}
+        await self._push_changes()
+        return result
+
+    async def _serve_link(self, info: Any, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        """One node's link, for as long as it lasts. The host name is the one sshd's forced command
+        announced — it came from `authorized_keys`, never from the node — and everything the link
+        may do is decided against that name."""
+        host = str((info or {}).get("host") or "").strip() if isinstance(info, dict) else ""
+        said_hello = False
+
+        async def from_node(method: str, params: dict[str, Any]) -> Any:
+            nonlocal said_hello
+            if method == "hello":
+                refusal = self._link_refusal(host, params)
+                if refusal:
+                    asyncio.get_running_loop().call_later(0.2, mux.close, refusal)  # after the reply is written
+                    if host in hosts.nodes() and "protocol" in refusal:
+                        # an authorised node on an older build: the supervisor re-provisions a container
+                        self.links[host] = {"up": False, "since": now_iso(), "why": f"refused: {refusal}"}
+                    raise link.LinkError(refusal)
+                old = self._link_muxes.get(host)
+                if old is not None and old is not mux:
+                    old.close("replaced by a newer link from the same host")
+                self._link_muxes[host] = mux
+                self._intent_sent.pop(host, None)  # nothing is pushed to a link before its snapshot
+                self.links[host] = {"up": True, "since": now_iso(), "why": "linked"}
+                self._note_build(host, str(params.get("build") or ""))
+                said_hello = True
+                log.info("link from %s: up", host)
+                if host in containers.container_nodes():
+                    task = asyncio.ensure_future(self._note_reach(host))  # one docker look, off the link
+                    self._bg.add(task)
+                    task.add_done_callback(self._bg.discard)
+                await self._push_changes()  # the overlay lifts on its cards
+                return {"protocol": link.PROTOCOL, "home": self.host, "host": host}
+            if not said_hello:
+                raise link.LinkError("say hello first")
+            if method == "ping":
+                return "pong"
+            if method in ("snapshot", "report"):
+                taken = self._take_records(host, params.get("records") or [], whole=method == "snapshot")
+                if method == "snapshot":
+                    self._intent_sent[host] = {}  # the intent goes out whole once, then as it changes
+                await self._push_changes()
+                return {"taken": taken}
+            if method == "gone":
+                for rid in params.get("ids") or []:
+                    self._forget_remote(host, str(rid))
+                await self._push_changes()
+                return None
+            if method == "derived":
+                return await self._take_derived(host, params)
+            if method == "forward":
+                return await self._forwarded(host, params)
+            if method == "cancel":
+                self._cancel_forwarded(str(params.get("token") or ""))
+                return None
+            raise link.LinkError(f"unknown link method {method!r}")
+
+        mux = link.Mux(reader, writer, from_node)
+        why = "the link's reader failed"
+        try:
+            why = await mux.run()
+        finally:  # however it ended: a link the home still calls up after it has gone is the worst answer
+            if self._link_muxes.get(host) is mux:
+                del self._link_muxes[host]
+                self._intent_sent.pop(host, None)
+                self.links[host] = {"up": False, "since": now_iso(), "why": why}
+                log.warning("link from %s: down — %s", host, why)
+                with contextlib.suppress(Exception):
+                    await self._push_changes()  # its cards go `unreachable` now, not at the next tick
+
+    async def _take_derived(self, host: str, params: dict[str, Any]) -> dict[str, Any]:
+        """A node's tick derived reports for one of its records (§4.4a, step 4b.2): applied as this
+        home's own tick applies its own — upserted under §9 invariant 10, the branch claims named
+        retired — and only for a record of the link's host. A derived report is never `declared`:
+        one that says it is is refused whole."""
+        rid = str(params.get("id") or "")
+        s = self.remote.get(host, {}).get(rid)
+        if s is None:
+            raise link.LinkError(f"{rid}@{host}: no such record here")
+        try:
+            progress = [ProgressEntry.from_dict(e) for e in params.get("progress") or []]
+            findings = [FindingEntry.from_dict(e) for e in params.get("findings") or []]
+        except (TypeError, ValueError, AttributeError) as e:
+            raise link.LinkError(f"bad derived report: {e}") from None
+        if any(e.source == "declared" for e in (*progress, *findings)):
+            raise link.LinkError("a derived report is never declared: a session declares through its own `ao`")
+        applied = [s.report_progress(e) for e in progress] + [s.report_finding(e) for e in findings]
+        changed = any(applied) | s.retire_branch_claims(str(r) for r in params.get("retire") or [])
+        if changed:
+            self._save(s)
+            await self._push_changes()
+        return {"changed": changed}
+
+    async def _push_intent(self) -> None:
+        """What changed in the home-owned fields, or the unread count, of a linked node's records
+        since that node was last told (§4.4a, step 4b.2) — everything, once, after its snapshot.
+        `controllers` go as stored: another host's record keeps them in its node's form here
+        (step 4a). A notification, bounded like a report: a push that cannot be written gives the
+        link up, and the next link's snapshot pushes everything again. Never queued."""
+        for host, sent in list(self._intent_sent.items()):
+            mux = self._link_muxes.get(host)
+            if mux is None:
+                continue
+            recs = self.remote.get(host, {})
+            out = []
+            for rid, r in recs.items():
+                d = r.to_dict()
+                item = {
+                    "id": rid,
+                    "host": host,
+                    **{k: d[k] for k in sorted(INTENT_FIELDS) if k in d},
+                    "unread": r.unread(),
+                    "wake_budget_spent": r.wake_budget_spent(),
+                }
+                payload = json.dumps(item, sort_keys=True)
+                if sent.get(rid) != payload:
+                    out.append((rid, payload, item))
+            for rid in [x for x in sent if x not in recs]:
+                del sent[rid]
+            if not out:
+                continue
+            try:
+                async with asyncio.timeout(REPORT_WRITE):
+                    await mux.notify("intent", records=[item for _, _, item in out])
+            except link.LinkClosed:
+                continue
+            except TimeoutError:
+                mux.close(f"an intent push could not be written within {REPORT_WRITE:g} s")
+                continue
+            for rid, payload, _ in out:  # marked as told only once it went
+                sent[rid] = payload
+
+    def _note_build(self, host: str, build: str) -> None:
+        """What the node says it runs, kept on its link state — and, for a container node, whether
+        it is behind what this home would provision now (§4.4a "The home supervises it": *at its
+        own version*). A promote changes no protocol number, so a node can stay linked many builds
+        behind, answering *unknown link method* to everything newer; the supervisor re-provisions
+        one marked `stale`. A machine node's build is recorded and nothing more: the home does
+        not install there."""
+        state = self.links.get(host)
+        if state is None:
+            return
+        state["build"] = build
+        if host in containers.container_nodes():
+            ours = containers.home_build()
+            if ours and build != ours:
+                if "stale" not in state:
+                    log.warning(
+                        "link from %s: the node runs build %s, this home's is %s", host, build or "unknown", ours
+                    )
+                state["stale"] = f"the node runs build {build or 'unknown'}, this home's is {ours}"
+            else:
+                state.pop("stale", None)
+
+    async def _note_reach(self, host: str) -> None:
+        """How a container node's sessions are reached (§4.4a "Reach", 3c.5): looked up (three
+        docker calls) once when it dials in and kept on its link state, so every card of its carries `host_link.reach` —
+        the Focus terminal and `ao focus` run `docker exec … tmux attach` from it, and the card's
+        VS Code link attaches to that container. A failed look is a log line and no reach."""
+        n = containers.container_nodes().get(host)
+        state = self.links.get(host)
+        if n is None or state is None or not state.get("up"):
+            return
+        try:
+            seen = await asyncio.to_thread(containers.observe_reach, n, self.container_runner())
+        except Exception as e:  # noqa: BLE001 — docker failing is a log line, never a dead link
+            log.warning("link from %s: could not derive its reach: %s", host, e)
+            return
+        if seen and self.links.get(host) is state:
+            state["reach"] = seen
+            await self._push_changes()
+
+    def _take_records(self, host: str, records: list[Any], *, whole: bool) -> int:
+        """A node's snapshot or report (§4.4a): only records whose `host` is the name this link's
+        key is bound to; a known one takes the node-owned fields, an unknown one is adopted whole;
+        and a snapshot is the truth about which sessions that host has."""
+        mine = self.remote.setdefault(host, {})
+        seen: set[str] = set()
+        for raw in records:
+            if not isinstance(raw, dict) or not raw.get("id"):
+                continue
+            if raw.get("host") != host:
+                log.warning("link from %s: dropped a report about %s@%s", host, raw.get("id"), raw.get("host"))
+                continue
+            rid = str(raw["id"])
+            seen.add(rid)  # listed, whether or not it could be taken: a snapshot forgets only what it omits
+            try:
+                if rid in mine:
+                    try:
+                        apply_node(mine[rid], raw)
+                    except NotTheSameSession:
+                        if mine[rid].state != "closed":
+                            raise  # a live record that disagrees on identity is another session: refused
+                        # §4.4a, §9 invariant 12: a closed record of this id is superseded by the
+                        # node's new one — replaced in place, as a new session of a name replaces a
+                        # finished one on one host (`_take_name`); its run log stays on its node.
+                        log.info("link from %s: %s supersedes the closed record of the same id", host, rid)
+                        mine[rid] = Session.from_dict(raw)
+                else:
+                    mine[rid] = Session.from_dict(raw)  # adopted, the replica's home-owned fields and all
+            except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
+                log.warning("link from %s: could not take %s: %s", host, rid, e)
+                continue
+            _renamed_grants(mine[rid], f"the link from {host}")  # saved just below
+            self._remote_store(host).save(mine[rid])
+        if whole:
+            for rid in [r for r in mine if r not in seen]:
+                self._forget_remote(host, rid)
+        return len(seen)
+
+    def _forget_remote(self, host: str, rid: str) -> None:
+        if self.remote.get(host, {}).pop(rid, None) is None:
+            return
+        self._remote_store(host).delete(rid)
+        address = f"{rid}@{host}"
+        for last in self._subscribers.values():
+            last.pop(address, None)
+        self._gone.append(address)
+
+    def _link_refusal(self, host: str, hello: dict[str, Any]) -> str | None:
+        """Why this home does not take a link from `host`, or None (§4.4a "Who may connect")."""
+        if self.mode != "home":
+            return f"{self.host} is a node of {self.home}, not a home: there is one home, and a node takes no links"
+        if not host:
+            return "the link named no host (`agentorc-agent link --host <name>` in authorized_keys)"
+        if host == self.host:
+            return f"{host} is this home's own name: a node's key must be bound to the node's name"
+        if host not in hosts.nodes():
+            return f"{host} is not an authorised node: add it under `nodes:` in {self.host}'s hosts.yml"
+        claimed = str(hello.get("host") or "")
+        if claimed and claimed != host:
+            return (
+                f"this link is bound to {host}, and the node calls itself {claimed}: the name the home binds "
+                "(the `--host` in authorized_keys, or the `nodes:` entry whose socket this is) and the node's "
+                "`local: {name: …}` must agree"
+            )
+        if hello.get("protocol") != link.PROTOCOL:
+            return f"link protocol {hello.get('protocol')!r} here is {link.PROTOCOL}: promote both ends to one build"
+        return None
+
+    # -- who is calling (design §4.8a, TD-077) -----------------------------------------------------
+
+    def _id_note_panes(self, panes: dict[str, PaneInfo]) -> None:
+        """The live panes of this host's records, as the classification reads them. On the loop,
+        from a pane list a thread already took."""
+        self._id_panes = [
+            identity.Pane(sid, p.pane_pid, identity.tty_nr_of(p.tty) if p.tty else 0)
+            for sid, p in panes.items()
+            if not p.dead and sid in self.sessions
+        ]
+        self._id_listed_at = time.monotonic()
+
+    async def _id_channel(self, peer: int) -> identity.Channel:
+        """Classify one connection's peer. A peer that matches no pane we know may belong to one the
+        tick has not listed yet — a session's first hook can beat the first tick after `create` —
+        so it waits for a fresh list (one at a time, at most one a second) before it is judged
+        *outside* or *unknown*; never against the old one."""
+        if self._id_detached is None:
+            tmux_pid = await asyncio.to_thread(self.tmux.server_pid)
+            if tmux_pid:  # no server yet: asked again on the next connection
+                check = identity.detached_check(self.proc, agent_pid=os.getpid(), tmux_pid=tmux_pid)
+                self._id_detached = check or ""
+        detached = self._id_detached or None
+        ch = identity.classify(peer, self._id_panes, self.proc, detached=detached)
+        listed = {p.session for p in self._id_panes}
+        unlisted = any(
+            sid not in listed and r.pane and (r.host or self.host) == self.host and r.state not in ("exited", "closed")
+            for sid, r in self.sessions.items()
+        )
+        if ch.kind == "session" or not unlisted:
+            # Every live record's pane is known, so a peer that matched none is under none: the
+            # person's terminal and the UI — nearly every such connection — never wait for a list.
+            return ch
+        asked = time.monotonic()
+        async with self._id_list_lock:
+            if self._id_listed_at <= asked:  # nobody listed while this one waited for the lock
+                wait = 1.0 - (time.monotonic() - self._id_listed_at)
+                if self._id_listed_at and wait > 0:
+                    await asyncio.sleep(wait)
+                self._id_note_panes(await asyncio.to_thread(self.tmux.main_panes, naming.PREFIX))
+        return identity.classify(peer, self._id_panes, self.proc, detached=detached)
+
+    async def _identify(self, req: dict[str, Any], peer: int, conn: Any = None) -> dict[str, Any] | None:
+        """The one step at the head of dispatch (§4.8a *Where it lives*): judge the envelope's
+        `caller` against the channel, record an alarm when they disagree, and — under `enforce` —
+        replace the claim with the verdict or refuse. Under `observe` nothing a caller sees
+        changes. Returns the refusal to send, or None to go on."""
+        rpc = str(req.get("method") or "")
+        # The connection is classified once, at its first request, and keeps that for its life: the
+        # peer pid is the one that connected, and asking `/proc` about it again later could be asking
+        # about whoever holds that pid *now* — a process that connects, hands the socket to a child
+        # and exits must not become whatever reuses its pid.
+        ch = self._id_conns.get(conn) if conn is not None else None
+        if ch is None:
+            ch = await self._id_channel(peer)
+            self.identity_tally[f"{ch.kind}:{ch.signal}" if ch.signal else ch.kind] += 1
+            if conn is not None:
+                self._id_conns[conn] = ch
+        if rpc == "whoami":
+            return {"id": req.get("id"), "result": {"channel": ch.kind, "session": ch.session, "signal": ch.signal}}
+        claimed = req.get("caller")
+        named = None if mail.is_person(claimed) else self._addr(claimed)
+        params = req.get("params")
+        hooked = params.get("session") if rpc == "hook" and isinstance(params, dict) else None
+        verdict = identity.judge(ch, named, rpc, hook_session=self._addr(hooked) if hooked else None)
+        if verdict.alarm is not None:
+            self._id_alarm(verdict.alarm, verdict.about)
+        if self.identity_mode != "enforce":
+            return None
+        if verdict.refusal is not None:
+            return {"id": req.get("id"), "error": verdict.refusal}
+        if rpc not in identity.READS:
+            if verdict.caller is None:
+                req.pop("caller", None)
+            else:
+                req["caller"] = verdict.caller
+        elif ch.kind == "session":
+            # A read is served whatever it claims, but from under a pane it runs as that pane's
+            # session all the same — no refusal and no alarm, only no borrowed name (the unread-mail
+            # line on a reply is the caller's, for one).
+            req["caller"] = ch.session
+        return None
+
+    def _id_alarm(self, entry: dict[str, Any], about: str | None) -> None:
+        at = now_iso()
+        log.warning("identity alarm (%s): %s claimed %r on %s", self.identity_mode, *entry.values())
+        s = self.sessions.get(about) if about else None
+        if s is None:
+            # The host's own list follows the record's rule (§4.8a): a *new* alarm is written at
+            # once, a repeat moves a count in memory and the next tick writes it, so a loop of
+            # forgeries is not a disk write each.
+            known = len(self.identity_alarms)
+            self.identity_alarms = identity.coalesce(self.identity_alarms, entry, at)
+            if len(self.identity_alarms) != known:
+                self.identity_store.save(self.identity_alarms)
+                self._id_host_dirty = False
+            else:
+                self._id_host_dirty = True
+            return
+        known = len(s.identity_alarms)
+        s.identity_alarms = identity.coalesce(s.identity_alarms, entry, at)
+        # A new alarm is written at once; a repeat only bumps a count, and a loop of forged requests
+        # must not become a disk write each — the tick writes what is left (`_id_flush`).
+        if len(s.identity_alarms) != known:
+            self._save(s)
+        else:
+            self._id_dirty.add(s.id)
+
+    def _id_flush(self) -> None:
+        for sid in list(self._id_dirty):
+            self._id_dirty.discard(sid)
+            if (s := self.sessions.get(sid)) is not None:
+                self._save(s)
+        if self._id_host_dirty:
+            self._id_host_dirty = False
+            self.identity_store.save(self.identity_alarms)
+
+    async def rpc_identity_ack(self, id: str | None = None, caller: Any = None) -> dict[str, Any]:
+        """**Acknowledge** an identity alarm list (design §4.8a, §4.5a **Inbox row: identity
+        alarm**): clears one record's `identity_alarms`, or — with no `id` — the host's own list,
+        so the row leaves the person's Inbox. *A person has seen this and decided what it was.*
+
+        **A person's only**, refused to every session exactly as `inbox_delete` is, and deliberately
+        **not** in `identity.READS`: a session that could clear the list could erase the evidence of
+        its own forgery, which is the one thing the alarm exists to prevent. Nothing is lost either
+        way — the host agent's log keeps every alarm, one line each (§4.8a).
+
+        **A node's record is acknowledged at that node** (§4.8a): alarms are node-owned, so an `id`
+        naming another host is routed there like any other act (`NODE_ACTS`, §4.4a step 4a), the
+        node clears its own list and the home takes the cleared record from the reply — a home that
+        cleared its replica would have the alarms back on the node's next report. A person at a
+        node may clear only that node's records (`PERSON_NODE_BOUND`); the host's own list is
+        whichever host was asked, and never travels."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot acknowledge an identity alarm: the list is cleared only by a person, "
+                "in the Inbox (design §4.8a)"
+            )
+        if not id or id == PERSON:
+            self.identity_alarms = []
+            self._id_host_dirty = False
+            self.identity_store.save(self.identity_alarms)
+            return {"id": PERSON, "cleared": True, "alarms": []}
+        s = self._get(self._addr(id))
+        s.identity_alarms = []
+        self._id_dirty.discard(s.id)
+        self._save(s)
+        await self._push_changes()
+        return {"id": s.id, "cleared": True, "alarms": []}
+
+    async def rpc_identity(self) -> dict[str, Any]:
+        """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,
+        the tally of connections by class and deciding signal since the agent started, and the
+        alarms — the host's own and each record's. A never-gated read: it tells a session nothing
+        it could not learn by trying."""
+        return {
+            "host": self.host,
+            "mode": self.identity_mode,
+            "detached_check": bool(self._id_detached),
+            "tally": dict(sorted(self.identity_tally.items())),
+            "alarms": list(self.identity_alarms),
+            "sessions": {sid: list(s.identity_alarms) for sid, s in self.sessions.items() if s.identity_alarms},
+        }
+
+    async def rpc_whoami(self) -> dict[str, Any]:
+        """Answered at the head of dispatch, where the channel is known; reached here only when
+        identity is `off` or the call was made in-process."""
+        return {"channel": None, "session": None, "signal": None}
+
     # -- helpers ---------------------------------------------------------------------------------
 
     def _gate(self, caller: Any, method: str, params: dict[str, Any]) -> None:
@@ -1993,7 +3685,7 @@ class HostAgent:
         function over a record map, so a node can forward and the home can answer (§4.4a)."""
         if method == "create" and params.get("capabilities"):
             _grants(params["capabilities"])  # an unknown grant name is refused before the gate reads it
-        reason = mail.act_gate(self.sessions, caller, method, params)
+        reason = mail.act_gate(self._graph(), caller, method, params, controllers=self._ctl)
         if reason:
             raise RpcError(reason)
 
@@ -2002,17 +3694,62 @@ class HostAgent:
         this host is stored bare, another host's as `id@host`."""
         return naming.qualify(str(address), local=self.host)
 
-    def _get(self, sid: str, *, external: bool = False) -> Session:
-        """A record by id. A registry-only card (`external`) is returned only to callers that
-        can act on it read-only; anything else gets a line saying why not."""
-        if sid in self._external:
-            if external:
-                return self._external[sid]
-            raise RpcError(f"{sid} was started outside agentorc (a read-only card from the tool's registry)")
+    def _get(self, sid: str) -> Session:
         try:
             return self.sessions[sid]
         except KeyError:
+            rid, host = naming.split_address(sid)
+            if host and rid in self.remote.get(host, {}):
+                raise RpcError(f"{sid} runs on {host}: this call does not cross the link") from None
             raise RpcError(f"no session {sid}") from None
+
+    def _find(self, sid: str) -> Session:
+        """A record by id or by address — this host's, or another host's as the home holds it. For
+        reads and for what the home owns; `_get` is for everything that touches a pane."""
+        rid, host = naming.split_address(sid)
+        if host and host != self.host:
+            try:
+                return self.remote[host][rid]
+            except KeyError:
+                raise RpcError(f"no session {sid}") from None
+        return self._get(rid)
+
+    def _save(self, s: Session) -> None:
+        (self.store if s.host == self.host else self._remote_store(s.host)).save(s)
+
+    def _remote_store(self, host: str) -> SessionStore:
+        if host not in self._remote_stores:
+            self._remote_stores[host] = SessionStore(paths.remote_dir(host))
+        return self._remote_stores[host]
+
+    # -- one org, to a client (design §4.4a "A node's records at the home") -----------------------
+
+    def _view(self, s: Session, *, bookkeeping: bool = False) -> dict[str, Any]:
+        """The view a client gets. This host's record is `s.view()`. Another host's carries its
+        address as `id`, and while that host's link is down reads `unreachable` — an overlay on the
+        view, never a state on the record."""
+        v = s.view(bookkeeping=bookkeeping)
+        if s.host == self.host:
+            return v
+        v["id"] = f"{s.id}@{s.host}"
+        v["controllers"] = self._ctl(s)  # as this home addresses them
+        state = self.links.get(s.host) or {"up": False, "since": None, "why": "not connected since the home started"}
+        v["host_link"] = dict(state)
+        if (sup := self.supervision.get(s.host)) and sup.get("doing"):
+            v["host_link"]["supervisor"] = {k: sup[k] for k in ("doing", "since", "attempts")}
+        if not state["up"]:
+            v["last_state"], v["state"] = v["state"], "unreachable"
+            if v.get("pending"):
+                # §4.4a "Permission prompts follow the same line": the hook still blocks on its node
+                # and nothing answered here can reach it, so the card says so and sends the person
+                # to the tool's own dialog at that host. An overlay too — the record keeps its pending.
+                v["pending"] = {**v["pending"], "host_unreachable": True}
+        return v
+
+    def _views(self) -> list[dict[str, Any]]:
+        return [
+            self._view(s) for s in (*self.sessions.values(), *(r for h in self.remote.values() for r in h.values()))
+        ]
 
     def _remember_dir(self, directory: Path) -> None:
         p = paths.recent_dirs_file()
@@ -2026,13 +3763,14 @@ class HostAgent:
         """Send each subscriber what changed since *it* was last told. One payload per session is
         serialised once; the per-subscriber comparison is a string compare."""
         self._poke_waits()
+        await self._report_home()  # a node tells its home, whether or not a browser is watching
+        if self._intent_sent:
+            await self._push_intent()  # and the home tells each node what it holds of its records
         gone, self._gone = self._gone, []
         if not self._subscribers:
             return
         # sort_keys: the payload is the comparison key too (the UI reads fields by name, never order)
-        payloads = {
-            sid: json.dumps(s.view(), sort_keys=True) for sid, s in (*self.sessions.items(), *self._external.items())
-        }
+        payloads = {v["id"]: json.dumps(v, sort_keys=True) for v in self._views()}
         for w, last in list(self._subscribers.items()):
             for sid, payload in payloads.items():
                 if last.get(sid) != payload:
@@ -2056,6 +3794,7 @@ class HostAgent:
     # -- connection handling ---------------------------------------------------------------------
 
     async def _handle_conn(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        self._conns.add(writer)
         try:
             while line := await reader.readline():
                 try:
@@ -2063,6 +3802,11 @@ class HostAgent:
                 except ValueError:
                     writer.write(b'{"error": "bad json"}\n')
                     continue
+                if "link" in req and "method" not in req:
+                    # sshd's forced command, announcing the host its key is bound to (§4.4a): from
+                    # here on this connection is a link, not a client.
+                    await self._serve_link(req["link"], reader, writer)
+                    return
                 if req.get("method") == "wait":
                     if writer in self._subscribers:
                         writer.write(b'{"error": "a wait runs on its own connection, never a subscribed one"}\n')
@@ -2077,11 +3821,15 @@ class HostAgent:
                         await self._send(writer, json.dumps({"event": "usage", "profile": prof, "usage": u}))
                     await self._push_changes()
                     continue
-                writer.write((json.dumps(await self._dispatch(req)) + "\n").encode())
+                writer.write(
+                    (json.dumps(await self._dispatch(req, peer=_peer_pid(writer), conn=writer)) + "\n").encode()
+                )
                 await writer.drain()
         except (ConnectionError, asyncio.IncompleteReadError):
             pass
         finally:
+            self._conns.discard(writer)
+            self._id_conns.pop(writer, None)
             self._subscribers.pop(writer, None)
             writer.close()
 
@@ -2092,7 +3840,7 @@ class HostAgent:
         for the close. The moment the client goes away — a Ctrl-C, a cancelled turn — the wait is
         cancelled, so no ghost wait is left to be charged a wake and hand the mail to nobody.
         Requests are serial per connection; one sent mid-wait is answered with an error."""
-        task = asyncio.ensure_future(self._dispatch(req))
+        task = asyncio.ensure_future(self._dispatch(req, peer=_peer_pid(writer), conn=writer))
         try:
             while True:
                 line = asyncio.ensure_future(reader.readline())
@@ -2124,33 +3872,95 @@ class HostAgent:
                 with contextlib.suppress(asyncio.CancelledError, Exception):
                     await task
 
-    async def _dispatch(self, req: dict[str, Any]) -> dict[str, Any]:
-        resp = await self._dispatch_inner(req)
+    async def _dispatch(
+        self, req: dict[str, Any], *, link_host: str | None = None, peer: int | None = None, conn: Any = None
+    ) -> dict[str, Any]:
+        """`link_host`: the request came over that node's link (step 5), so its caller is that
+        host's session — `id@host` here — and never this socket's. `peer`: the pid at the other end
+        of this host's own socket, from its credentials — what design §4.8a judges the envelope's
+        `caller` against; None for a link (identified by its key, never classified) and for a call
+        made in-process. `conn`: the connection, which is what is classified — once, for its life."""
+        if peer is not None and link_host is None and self.identity_mode != "off":
+            try:
+                refused = await self._identify(req, peer, conn)
+            except Exception:  # noqa: BLE001 — a bug in the check must never take the socket down with it
+                # `observe` promises that nothing a caller sees changes, so the request is served as
+                # before. Under `enforce` a check that can be made to fail would be a way round it, so
+                # everything but a read is refused — and a person recovers with `identity: observe`
+                # in hosts.yml, which needs no RPC.
+                log.exception("identity check failed on %s (%s)", req.get("method"), self.identity_mode)
+                refused = None
+                if self.identity_mode == "enforce" and str(req.get("method") or "") not in identity.READS:
+                    refused = {"id": req.get("id"), "error": identity.CHECK_FAILED}
+            if refused is not None:
+                return refused
+        resp = await self._dispatch_inner(req, link_host=link_host)
+        via_home = resp.pop("_via_home", False)
         caller = req.get("caller")
-        if not mail.is_person(caller):
+        if not mail.is_person(caller) and self.mode == "node" and not via_home and "mail" not in resp:
+            # A read this node served alone (§4.4a, step 4b.2): the inbox is at the home, and the
+            # count it last pushed is what the line says — a hint, as fresh as the link.
+            unread, spent = self._mail_hints.get(naming.split_address(str(caller))[0], (0, False))
+            if unread:
+                resp["mail"] = {"unread": unread, "wake_budget_spent": spent}
+        if not mail.is_person(caller) and self.mode == "home":
             # The line on every `ao` reply (design §4.10): the response to a session with unread
             # mail says so — result or refusal alike — read after the method ran, so an `ao inbox`
             # that just read everything carries no line. It types nothing and starts nothing.
-            s = self.sessions.get(self._addr(naming.split_address(str(caller))[0]))
+            s = self._graph().get(self._caller_address(caller, link_host))
             if s is not None and (n := s.unread()):
                 resp["mail"] = {"unread": n, "wake_budget_spent": s.wake_budget_spent()}
         return resp
 
-    async def _dispatch_inner(self, req: dict[str, Any]) -> dict[str, Any]:
+    def _caller_address(self, caller: Any, link_host: str | None) -> str:
+        """A request's identity comes from the channel it arrived on, never from a field it
+        carries (design §4.4a): this socket is this host's, so any `@host` a client wrote is
+        dropped and the caller is this host's bare id; a node's link is that node's, so the
+        caller is `id@node` here."""
+        bare = naming.split_address(str(caller))[0]
+        return naming.qualify(f"{bare}@{link_host}", local=self.host) if link_host else bare
+
+    async def _dispatch_inner(self, req: dict[str, Any], *, link_host: str | None = None) -> dict[str, Any]:
         rid = req.get("id")
         name = req.get("method")
         method = getattr(self, f"rpc_{name}", None)
         if method is None:
             return {"id": rid, "error": f"unknown method {name!r}"}
-        params = req.get("params") or {}
+        if not isinstance(req.get("params") or {}, dict):
+            # raw JSON from any local process: `"params": 5` used to raise outside the handler's
+            # `try` and drop the connection without a reply (red-team of PR #248)
+            return {"id": rid, "error": "params must be an object"}
+        params = dict(req.get("params") or {})
+        if ignored := _drop_unknown(method, params):
+            # logged with the method, because the reply cannot tell a client newer than this agent
+            # from a caller bug of the same age, and the second is worth finding in a log
+            log.warning("rpc %s: ignored unknown params %s", name, ", ".join(ignored))
         caller = req.get("caller")
         if not mail.is_person(caller):
-            # A request's identity comes from the channel it arrived on, never from a field it
-            # carries (design §4.4a): this socket is this host's, so any `@host` a client wrote
-            # is dropped and the caller is this host's bare id.
-            caller = naming.split_address(str(caller))[0]
+            caller = self._caller_address(caller, link_host)
         try:
+            if self.mode == "node":
+                # A node (design §4.4a, the call-by-call table): decided before the gate, because
+                # the gate's graph is at the home. What the table refuses — the mailbox, reports,
+                # home-owned edits, a session's acts on others — is forwarded to the home while
+                # the link is up (step 5) and refused as unreachable while it is down; never
+                # served from the replica. A `wait` goes to the home too: that is where the mail
+                # and the other hosts' members are.
+                refusal = modes.offline_refusal(str(name), caller, params, host=self.host, home=self.home)
+                if refusal or name == "wait":
+                    if not self.home_reachable():
+                        raise RpcError(
+                            refusal
+                            or f"a wait sees the org at the home: {self.home} (home) is unreachable from {self.host}"
+                        )
+                    return {**await self._forward(rid, str(name), params, caller), "_via_home": True}
             self._gate(caller, str(name), params)
+            if (target := self._act_host(str(name), params)) is not None:
+                # Another host's record (design §4.4a, step 4a): gated above over the one graph,
+                # executed by that host's node, its verdict returned — or refused as unreachable.
+                if name in NODE_READS:
+                    return {"id": rid, "result": await self._route_read(str(name), params, target)}
+                return {"id": rid, "result": await self._route_act(str(name), params, caller, target)}
             if "caller" in inspect.signature(method).parameters:
                 # The methods that need to know who called (`create` seeds the new record's
                 # controllers with its creator; `send` and `keys` record who typed; `msg` and
@@ -2158,14 +3968,122 @@ class HostAgent:
                 # after the gate: a client that put its own `caller` in `params` does not get to
                 # choose who it is.
                 params["caller"] = caller
-            return {"id": rid, "result": await method(**params)}
+            resp: dict[str, Any] = {"id": rid, "result": await method(**params)}
         except RpcError as e:
-            return {"id": rid, "error": str(e), **({"error_data": e.data} if e.data else {})}
+            resp = {"id": rid, "error": str(e), **({"error_data": e.data} if e.data else {})}
         except TypeError as e:
-            return {"id": rid, "error": f"bad params: {e}"}
+            resp = {"id": rid, "error": f"bad params: {e}"}
         except Exception as e:  # noqa: BLE001
             log.exception("rpc %s failed", req.get("method"))
-            return {"id": rid, "error": f"{type(e).__name__}: {e}"}
+            resp = {"id": rid, "error": f"{type(e).__name__}: {e}"}
+        if ignored:
+            resp["ignored"] = ignored
+        return resp
+
+
+def backup_store(day: str) -> Path | None:
+    """`backups/store-<day>.tar.gz` of `BACKUP_MEMBERS` under AGENTORC_HOME (design §4.4a "When
+    the home is lost", TD-057 step 4b.3), mode `0600`, written under a temporary name and renamed
+    so a half-written tarball never counts as one; the newest `BACKUP_KEEP` kept. Regular files
+    only — a socket, a symlink or anything else found among them is not followed. None when
+    today's already exists. Blocking: run it in a thread."""
+    out_dir = paths.backups_dir()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    os.chmod(out_dir, 0o700)
+    target = out_dir / f"store-{day}.tar.gz"
+    if target.exists():
+        return None
+    home = paths.home()
+    tmp = out_dir / f".store-{day}.tar.gz.part"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as fh, tarfile.open(fileobj=fh, mode="w:gz") as tar:
+            for member in BACKUP_MEMBERS:
+                top = home / member
+                for f in sorted([top] if top.is_file() else top.rglob("*") if top.is_dir() else []):
+                    if f.is_file() and not f.is_symlink():
+                        tar.add(f, arcname=str(f.relative_to(home)), recursive=False)
+        os.chmod(tmp, 0o600)
+        tmp.rename(target)
+    finally:
+        tmp.unlink(missing_ok=True)
+    for old in sorted(out_dir.glob("store-*.tar.gz"))[:-BACKUP_KEEP]:
+        old.unlink(missing_ok=True)
+    return target
+
+
+def read_checkout(directory: Any, rel_paths: Any) -> dict[str, Any]:
+    """Files inside one checkout, by their paths relative to it (design §4.4a "Teams across
+    hosts", step 4b.3): `{dir, files: {path: text, or None when there is no such file}}`. A file
+    read across a trust boundary, so everything is refused rather than guessed: a directory that
+    is not one, an absolute path or one that climbs out, a path — symlinks followed — that
+    resolves outside the checkout, anything but a regular file, a file over `FILE_CAP` bytes, and
+    more than `FILES_MAX` paths. Blocking: run it in a thread."""
+    if not directory or not str(directory).strip():
+        raise ValueError("no checkout named")
+    try:
+        root = Path(str(directory)).expanduser().resolve(strict=True)
+    except OSError:
+        raise ValueError(f"{directory} does not exist here") from None
+    if not root.is_dir():
+        raise ValueError(f"{directory} is not a directory")
+    if not (root / ".git").exists():
+        # a team's checkout is a repo (a worktree's `.git` is a file): a directory that is not one
+        # — a home directory, `~/.ssh` — is not read, whoever asks (review of PR #224)
+        raise ValueError(f"{directory} is not a git checkout")
+    wanted = [str(p) for p in (rel_paths or [])]
+    if len(wanted) > FILES_MAX:
+        raise ValueError(f"{len(wanted)} files asked for: at most {FILES_MAX} in one call")
+    out: dict[str, str | None] = {}
+    for rel in wanted:
+        if not rel.strip() or Path(rel).is_absolute():
+            raise ValueError(f"{rel!r}: a path relative to the checkout, please")
+        full = (root / rel).resolve()  # symlinks followed, then checked: a link out is refused like `..`
+        if not full.is_relative_to(root):
+            raise ValueError(f"{rel}: outside the checkout {root}")
+        if not full.exists():
+            out[rel] = None
+            continue
+        out[rel] = _read_capped(full, rel)
+    return {"dir": str(root), "files": out}
+
+
+def _read_capped(full: Path, rel: str) -> str:
+    """One file, judged and read through one descriptor (review of PR #224): opened without
+    blocking and without following a final symlink swapped in since the check, then `fstat` says
+    whether it is a regular file, and no more than `FILE_CAP` + 1 bytes are ever read — so a file
+    replaced by a FIFO, or grown, between the check and the read is refused rather than trusted."""
+    try:
+        fd = os.open(full, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+    except OSError as e:
+        raise ValueError(f"{rel}: cannot be read ({e.strerror or e})") from None
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        os.close(fd)
+        raise ValueError(f"{rel}: not a regular file")
+    with os.fdopen(fd, "rb") as fh:
+        data = fh.read(FILE_CAP + 1)
+    if len(data) > FILE_CAP:
+        raise ValueError(f"{rel}: over {FILE_CAP} bytes, which is not a repo config or a brief")
+    return data.decode("utf-8", errors="replace")
+
+
+def _drop_unknown(method: Any, params: dict[str, Any]) -> list[str]:
+    """Design §4.4, TD-062 fix (b): remove the parameters `method` does not take and name them,
+    so a client newer than this host agent degrades instead of failing.
+
+    The other half of the skew rule — a client never sends a parameter it has not set (§4.4,
+    `LocalClient.call`) — means a dropped parameter is always one the caller *did* set, i.e. a
+    feature this agent predates. The call still runs, without it, and the reply says which ones
+    went: `ao` prints that line, so the skew is visible rather than silent. A method that takes
+    `**kwargs` (`rpc_hook`) accepts everything and nothing is dropped.
+    """
+    sig = inspect.signature(method).parameters
+    if any(p.kind is inspect.Parameter.VAR_KEYWORD for p in sig.values()):
+        return []
+    dropped = sorted(k for k in params if k not in sig)
+    for k in dropped:
+        del params[k]
+    return dropped
 
 
 _OSC = re.compile(r"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")  # title sets etc.
@@ -2173,10 +4091,38 @@ _CSI = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 _ESC_OTHER = re.compile(r"\x1b[ -/]*[0-~]")  # remaining ESC sequences (charset, keypad, …)
 
 
+def _prune_tallies(r: Session) -> None:
+    """A thread's tally lives as long as the record holds an entry of it (§4.10): pruned with its
+    last entry — by retention or by a person's delete — or it would grow by one key per message
+    forever (TD-066). A reply must name an entry the replier holds, so a pruned thread cannot come
+    back. Pair tallies are windowed by `_pair` and stay."""
+    held = {e.root for e in (*r.inbox, *r.outbox)}
+    for key in [k for k in r.threads if not k.startswith("pair:") and k not in held]:
+        del r.threads[key]
+
+
+def _renamed_grants(s: Session, where: str) -> bool:
+    """A copy that arrived with a renamed grant's old name (TD-055) was normalised as it was read;
+    say so, as the loader does, and tell the caller to save it. True when there was one."""
+    renamed = getattr(s, "renamed_grants", None)
+    if not renamed:
+        return False
+    log.warning(
+        "%s: grant %s is now `control` (TD-055), from %s; the record is rewritten", s.id, ", ".join(renamed), where
+    )
+    del s.renamed_grants
+    return True
+
+
+def _urgent(s: Session) -> str:
+    """What a node reports at once when it moves (§4.4a): the rest waits for `REPORT_EVERY`."""
+    return json.dumps([s.state, s.exit_code, s.pane, s.pending.to_dict() if s.pending else None])
+
+
 def _controllers(ids: list[Any]) -> list[str]:
     """Session ids for a `controllers` list (design §4.8): stripped, deduped, order kept. Ids are
     not checked against live records on purpose — a controller that has exited keeps its entry
-    (§4.8: an exited orchestrator's workers are surfaced, not silently released), and a list may
+    (§4.8: an exited lead's workers are surfaced, not silently released), and a list may
     be set before the session it names is created."""
     out: list[str] = []
     for raw in ids:
@@ -2224,7 +4170,9 @@ def _source(source: str) -> str:
 
 
 def _grants(names: list[str]) -> list[str]:
-    """Validate a list of grant names against `GRANTS`, in canonical order."""
+    """Validate a list of grant names against `GRANTS`, in canonical order. A renamed grant's old
+    name is accepted as the new one for a release (`GRANT_ALIASES`, TD-055)."""
+    names = canonical_grants(list(names))
     bad = [n for n in names if n not in GRANTS]
     if bad:
         raise RpcError(f"unknown grant {', '.join(map(str, bad))}; grants are: {', '.join(GRANTS)}")
@@ -2234,6 +4182,22 @@ def _grants(names: list[str]) -> list[str]:
 async def _falsy(coro: Any) -> bool:
     """`not await coro`: a composer that reads empty ("") or unreadable (None) counts as emptied."""
     return not await coro
+
+
+def _pane_title(adapter: Any, pane_title: str) -> str | None:
+    """The session's name as its tool holds it (design §4.5a **title**, TD-074): the pane's terminal
+    title handed to the session's adapter, which alone knows what of it is a name (§4.3 `title()`).
+    An adapter without the method — `shell`, a command run — gives none, and so does a broken one:
+    a title is a display, and no tick is lost over one. Cleaned as a tail is, and shorter."""
+    reader = getattr(adapter, "title", None)
+    if reader is None:
+        return None
+    try:
+        name = reader(pane_title or "")
+    except Exception:  # noqa: BLE001 — one adapter's title never costs the tick
+        log.exception("adapter %s: title() failed", getattr(adapter, "name", adapter))
+        return None
+    return (_clean(str(name)).strip()[:TITLE_CAP] or None) if name else None
 
 
 def _clean(text: str) -> str:
@@ -2315,6 +4279,11 @@ def main(argv: list[str] | None = None) -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("serve", help="run the host agent (foreground)")
     sub.add_parser("rpc", help="stdin/stdout JSON-lines bridge to the local socket (used over ssh)")
+    lk = sub.add_parser(
+        "link",
+        help="a node's link into this home: the forced command of the node's key in authorized_keys (design §4.4a)",
+    )
+    lk.add_argument("--host", default="", help="the node's host name — set in authorized_keys, never by the node")
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     if args.cmd == "serve":
@@ -2324,6 +4293,8 @@ def main(argv: list[str] | None = None) -> int:
         from sessionorc.client import bridge_stdio
 
         return asyncio.run(bridge_stdio())
+    if args.cmd == "link":
+        return asyncio.run(link.bridge(args.host))
     return 2
 
 

@@ -16,8 +16,9 @@ from pathlib import Path
 HISTORY_LIMIT = 50000
 _FMT = (
     "#{session_name}\t#{session_created}\t#{pane_current_command}\t#{pane_pid}\t#{pane_dead}\t#{pane_dead_status}"
-    "\t#{window_index}\t#{pane_index}"
+    "\t#{window_index}\t#{pane_index}\t#{pane_tty}\t#{pane_title}"
 )
+_FIELDS = 10  # fields in `_FMT`; the title is last, so a tab inside it cannot shift the ones before
 MIN_VERSION = (3, 2)  # `new-session -e` and `paste-buffer -p`
 _PASTE_SEQ = itertools.count()  # with the pid, makes each paste buffer name unique on a shared server (TD-043)
 
@@ -58,6 +59,13 @@ class PaneInfo:
     dead_status: int | None
     window: int = 0
     pane: int = 0
+    # The terminal title the program in the pane set (`#{pane_title}`), raw and unread here: a tool
+    # writes its own name into it and only that tool's adapter knows how to read it (design §4.3
+    # `title()`, §4.5a **title**, TD-074). Read with the pane list, never a second tmux call.
+    title: str = ""
+    # The pane's pty (`#{pane_tty}`): the controlling terminal of what runs in it, the third signal of
+    # design §4.8a's classification. Read with the pane list, like the title.
+    tty: str = ""
 
 
 class Tmux:
@@ -147,10 +155,12 @@ class Tmux:
         if cp.returncode != 0:
             return out  # no server
         for line in cp.stdout.splitlines():
-            parts = line.split("\t")
-            if len(parts) != 8 or not parts[0].startswith(prefix):
+            # The title is the last field and may itself hold a tab, so the split is bounded: the
+            # fields before it keep their places and whatever is left is the title.
+            parts = line.split("\t", _FIELDS - 1)
+            if len(parts) != _FIELDS or not parts[0].startswith(prefix):
                 continue
-            name, created, cmd, pid, dead, dead_status, win, pane = parts
+            name, created, cmd, pid, dead, dead_status, win, pane, tty, title = parts
             out.append(
                 PaneInfo(
                     session=name,
@@ -161,9 +171,18 @@ class Tmux:
                     dead_status=int(dead_status) if dead == "1" and dead_status.lstrip("-").isdigit() else None,
                     window=int(win or 0),
                     pane=int(pane or 0),
+                    title=title,
+                    tty=tty,
                 )
             )
         return out
+
+    def server_pid(self) -> int | None:
+        """The tmux server's pid, or None with no server: what design §4.8a's detached-process check
+        compares cgroups against."""
+        cp = self.run("display-message", "-p", "#{pid}", check=False)
+        out = cp.stdout.strip()
+        return int(out) if cp.returncode == 0 and out.isdigit() else None
 
     def main_panes(self, prefix: str = "ao-") -> dict[str, PaneInfo]:
         """One pane per session — the lowest window/pane index, deterministically."""

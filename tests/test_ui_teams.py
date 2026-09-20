@@ -8,6 +8,7 @@ back as the agent's own message, and that the page renders what §4.5a's row des
 
 from __future__ import annotations
 
+import pathlib
 import time
 from pathlib import Path
 
@@ -43,6 +44,8 @@ class Fleet:
             return ["claude-code", "shell"]
         if method == "name_check":
             return self.verdicts.get(params["name"], {"name": params["name"], "verdict": "free"})
+        if method == "get":
+            return next(s for s in self.sessions if s["id"] == params["id"])
         if method == "create":
             rec = {
                 "id": f"ao-{params['name']}",
@@ -58,8 +61,12 @@ class Fleet:
             }
             self.sessions.append(rec)
             return rec
+        if method == "host":  # the Org page's node line (design §4.4a): this fake is a home
+            return {"host": "kmaster", "home": "kmaster", "mode": "home", "home_reachable": True, "links": {}}
         if method == "inbox":  # the Org top bar's person inbox count (design §4.5a)
             return {"id": "person", "entries": [], "threads": {}, "sends": [], "unread": 0}
+        if method == "identity":  # the teams line's identity note (design §4.8a, TD-077 step 2)
+            return {"host": HOST, "mode": "off", "detached_check": False, "tally": {}, "alarms": [], "sessions": {}}
         if method in ("send", "kill", "seen"):
             for s in self.sessions:
                 if s["id"] == params["id"]:
@@ -88,7 +95,7 @@ def org_doc(root: Path) -> dict:
         "teams": {
             "ao-grind": {
                 "projects": ["ao"],
-                "lead": {"role": "orchestrator", "name": "orc-ao"},
+                "lead": {"role": "lead", "name": "orc-ao"},
                 "members": [{"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick"}],
             }
         },
@@ -157,6 +164,41 @@ def test_the_strip_lists_every_definition_with_its_source_projects_members_and_l
     assert live["teams"][0]["live"] == 1
 
 
+def test_a_team_whose_sessions_all_declared_reads_wound_down_not_stopped(world):
+    """design §4.5a **Teams** strip *wound down* note (§4.9a, TD-053 step 6): *nothing running* and
+    *nothing left to run* are different facts about a team, and only the second is an answer — a
+    team stopped by a person, a clock or a crash looks identical otherwise. All-or-nothing on
+    purpose: one member's exhaustion is not the team's (§4.9a)."""
+    tmp_path, fleet = world
+    at, later = "2026-09-17T20:00:00Z", "2026-09-17T21:30:00Z"
+
+    def done(name, when, state="closed"):
+        """A member that declared and was then stopped — `ao team stop --close` (§4.9a step 3) is
+        what makes the team's sessions dead, and the declaration stays on each record."""
+        return {**badged(name, "ao-grind", state=state), "out_of_work": {"at": when, "why": "nothing open"}}
+
+    # nothing has ever carried the badge: never run, not wound down
+    assert uiapp.teams_view([])["teams"][0]["wound_down"] is None
+    # one declared, one did not: the team stopped for some other reason and says so
+    half = uiapp.teams_view([done("orc-ao", at), badged("grind-1", "ao-grind", state="exited")])
+    assert half["teams"][0]["wound_down"] is None
+    # every one of them declared: the strip says when, from the latest instant
+    all_done = uiapp.teams_view([done("orc-ao", at), done("grind-1", later)])
+    row = all_done["teams"][0]
+    assert row["live"] == 0 and row["wound_down"] == later and row["wound_down_age"]
+    assert uiapp.teams_view([done("orc-ao", at), done("grind-1", later, state="exited")])["teams"][0]["wound_down"]
+    # a declaration in any other shape is not one — the strip is on the same page as every card,
+    # so a raise here would empty the grid rather than one row (review of PR #203)
+    junk = [{**badged("orc-ao", "ao-grind", state="closed"), "out_of_work": j} for j in ("x", ["y"], 7)]
+    assert all(uiapp.teams_view([s])["teams"][0]["wound_down"] is None for s in junk)
+    # ... and a team still running is described by what it is doing, never by a stale declaration:
+    # a worker that declared but has not been stopped still sits `idle` at its prompt (§4.9a step 3
+    # is what closes it), and until then the team is live and its group card, not the strip, is the
+    # surface — the strip row is hidden for a live definition
+    running = uiapp.teams_view([done("orc-ao", at), done("grind-1", later, state="idle")])
+    assert running["teams"][0]["live"] == 1 and running["teams"][0]["wound_down"] is None
+
+
 def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
     tmp_path, fleet = world
     (tmp_path / "agentorc" / ".agentorc.yml").write_text(
@@ -194,14 +236,64 @@ def test_a_malformed_definition_is_a_note_not_a_500(world):
     assert [r["name"] for r in v["teams"]] == ["ao-grind"] and "ao-api" in v["notes"][0]
 
 
-def test_the_page_renders_a_row_per_team_and_collapses_to_a_line_when_none_is_defined(world, client):
+def test_a_stopped_team_is_a_card_with_start_and_none_defined_is_a_line(world, client):
     tmp_path, fleet = world
     html = client.get("/").text
-    assert 'data-team-act="start"' in html and 'data-team-act="stopnow"' in html
-    assert 'class="team-row" data-team="ao-grind"' in html and "lead orc-ao · 2 members" in html
+    # Nothing is live: the definition is a card with Start, no sessions in it, and no Stop.
+    assert 'data-team-act="start"' in html and 'data-team-act="stop' not in html
+    assert '<section class="tgroup" data-team="ao-grind"' in html and "lead orc-ao · 2 members" in html
+    assert "team-row" not in html  # the strip's rows are retired (design §4.5a, 2026-09-18)
     (tmp_path / "home" / "org.yml").unlink()
     html = client.get("/").text
     assert "Teams: none defined" in html and "data-team-act" not in html
+
+
+def test_a_stopped_teams_card_reads_wound_down_where_it_would_have_read_stopped(world, client):
+    """The rendered half of the same row: the words a person actually sees. A wound-down team is
+    startable like any other — `ao team start` is the restart (§4.9) — so **Start** stays, its
+    sessions' cards sit on the team's card, and the header offers the fold."""
+    _tmp, fleet = world
+    assert ">stopped<" in client.get("/").text
+
+    at = "2026-09-17T20:00:00Z"
+    fleet.sessions = [
+        {**badged(n, "ao-grind", state="closed"), "tail": [], "out_of_work": {"at": at, "why": "nothing open"}}
+        for n in ("orc-ao", "grind-1")
+    ]
+    html = client.get("/").text
+    assert "wound down" in html and ">stopped<" not in html
+    head = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
+    assert 'data-live="0"' in head[:200]  # what the fold and the quieter card key on
+    head, grid = head.split('<div class="grid">', 1)
+    assert 'data-fold="ao-grind" data-n="2"' in head and "2 sessions" in head
+    assert 'data-team-act="start"' in head and 'data-team-act="stop' not in head
+    assert "declared it was out of work" in head  # the hover says why the word is different
+    assert "orc-ao" in grid  # the dead cards are the team's
+
+
+def test_a_live_teams_card_carries_stop_and_stop_now_and_never_folds(world, client):
+    """Design §4.5a **team groups** (2026-09-16): the control sits on the thing it stops."""
+    _tmp, fleet = world
+    fleet.sessions = [{**badged("orc-ao", "ao-grind"), "tail": []}, {**badged("adhoc-1", "adhoc"), "tail": []}]
+    html = client.get("/").text
+    head = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
+    head = head[: head.index('<div class="grid">')]
+    assert 'data-team-act="stop" data-team="ao-grind" title' in head
+    assert ">Wind down</button>" in head and ">Stop</button>" not in head  # the label says how it differs from Stop now
+    assert 'data-team-act="stopnow" data-team="ao-grind" title' in head
+    assert 'data-team-act="start"' not in head and "data-fold" not in head
+    # A badge with no definition has nothing `ao team start|stop` could read: no control at all.
+    adhoc = html[html.index('<section class="tgroup" data-team="adhoc"') :]
+    adhoc = adhoc[: adhoc.index('<div class="grid">')]
+    assert "data-team-act" not in adhoc
+
+
+def test_the_state_pill_has_a_glyph_for_every_state_the_view_can_name():
+    """Design §4.5a **state icon**: the glyph is CSS keyed on the pill's state class, so a state
+    class with no rule is a pill with no icon — pinned here, since there is no JS/CSS harness."""
+    css = (pathlib.Path(uiapp.__file__).parent / "static" / "app.css").read_text()
+    for cls in ("needs", "limited", "stalled", "working", "idle", "exited", "done", "unreachable"):
+        assert f".pill.s-{cls}::before" in css, cls
 
 
 # ── Start: the shared planner, every check before any create ──────────────────────────────────
@@ -381,3 +473,54 @@ def test_two_stop_presses_do_not_start_two_lead_stops(world, client, monkeypatch
     assert first["lead"] == "orc-ao"
     assert second["lead"] is None and "already stopping" in second["text"]
     assert started == ["orc-ao"]  # one task, not two
+
+
+def test_the_terminal_of_another_hosts_session_is_refused_by_name(world, client):
+    """TD-057 step 4a (the 3b leftover): `/term/<id@host>` says what is not built rather than
+    leaving it to tmux's miss."""
+    _tmp, fleet = world
+    fleet.sessions.append({"id": "ao-w@laptop", "name": "w", "state": "working", "host": "laptop", "pane": True})
+    with client.websocket_connect("/term/ao-w@laptop") as ws:
+        got = ws.receive_bytes()
+    assert b"runs on laptop: no terminal reaches it from here" in got
+
+
+def test_a_container_nodes_session_is_reached_by_docker_exec_and_vs_code_attaches_to_it(world, client, monkeypatch):
+    """3c.5: the home put `host_link.reach` on the record when the node dialed in; the Focus
+    terminal runs `docker exec … tmux attach` from it and the card's VS Code link attaches to
+    that container."""
+    tmp_path, fleet = world
+    reach = {
+        "container": "abc123def456",
+        "user": "developer",
+        "vscode": "vscode://vscode-remote/attached-container+7b7d/home/x/repo?windowId=_blank",
+    }
+    fleet.sessions.append(
+        {
+            "id": "ao-repo-w@cm",
+            "name": "w",
+            "state": "working",
+            "host": "cm",
+            "pane": True,
+            "dir": "/home/x/repo",
+            "kind": "interactive",
+            "adapter": "claude-code",
+            "tail": [],
+            "host_link": {"up": True, "since": "t", "why": "linked", "reach": reach},
+        }
+    )
+    seen = {}
+
+    class NoPty:
+        def __init__(self, argv, *, cols, rows):
+            seen["argv"] = argv
+            raise RuntimeError("no pty in this test")
+
+    monkeypatch.setattr(uiapp, "PtySession", NoPty)
+    with client.websocket_connect("/term/ao-repo-w@cm") as ws:
+        got = ws.receive_bytes()
+    assert b"could not attach a terminal: RuntimeError: no pty in this test" in got
+    assert seen["argv"][:6] == ["docker", "exec", "-u", "developer", "-it", "abc123def456"]
+    assert seen["argv"][6:10] == ["tmux", "attach", "-t", "=ao-repo-w:"]  # the bare id inside the container
+    page = client.get("/").text
+    assert 'href="vscode://vscode-remote/attached-container+7b7d/home/x/repo?windowId=_blank"' in page

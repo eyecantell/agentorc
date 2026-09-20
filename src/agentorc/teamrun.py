@@ -13,6 +13,7 @@ a terminal or a page — the callers do that from the returned records.
 
 from __future__ import annotations
 
+import subprocess
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -57,10 +58,14 @@ class Stopping:
     now: bool
     acted: list[dict[str, Any]] = field(default_factory=list)
     lead: dict[str, Any] | None = None  # the record, until `stop_lead` acts on it
+    # The lead ran the stop itself — the wind-down of §4.9a. It cannot be typed at mid-command, and
+    # killing it would kill the command: it is told what is left, and ends itself.
+    lead_is_caller: bool = False
 
     @property
     def member_ids(self) -> list[str]:
-        return [e["id"] for e in self.acted if e["role"] == "member"]
+        """The members the stop reached: a refused one (its host unreachable, §4.4a) is not waited on."""
+        return [e["id"] for e in self.acted if e["role"] == "member" and not e.get("refused")]
 
 
 def badged(name: str, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -95,26 +100,68 @@ def org_with_repo_teams(org: orgmod.Org, roots: list[Path | str]) -> tuple[orgmo
     return org, notes
 
 
+def wound_down(sessions: list[dict[str, Any]]) -> str | None:
+    """When a team's sessions all declared they were out of work, the latest of those instants
+    (design §4.9a, §4.5a **Teams** strip, TD-053 step 6) — else None.
+
+    *Nothing running* and *nothing left to run* are different facts about a team, and only the
+    second is an answer: a team stopped by a person, by a clock or by a crash looks identical on the
+    strip otherwise. The rule is deliberately all-or-nothing and reads the records rather than
+    counting ledger rows, exactly as §4.9a asks: one member's exhaustion is not the team's, and a
+    single session that never declared means the team stopped for some other reason. A team with no
+    session carrying its badge has never run, or has been forgotten, and is neither.
+    """
+    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions]
+    if not seen or not all(d.get("at") for d in seen):
+        return None
+    # `str` before `max`: two declarations of different types would otherwise be a TypeError, and
+    # the strip is on the same page as every card (review of PR #203)
+    return max(str(d["at"]) for d in seen)
+
+
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
-    the name, the file it came from, its projects, how many sessions it starts, and how many
-    carrying its badge are live. There is no team record — a team that is stopped is only its
-    definition, so `live` is counted across the fleet on every call."""
+    the name, the file it came from, its projects, how many sessions it starts, how many carrying
+    its badge are live, and — when none are and every one of them said why — when it wound down.
+    There is no team record — a team that is stopped is only its definition, so both are counted
+    across the fleet on every call."""
     up = live(sessions)
-    return [
-        {
-            "name": t.name,
-            "source": str(t.source) if t.source else None,
-            "projects": list(t.projects),
-            "lead": t.lead.name if t.lead.role != orgmod.PERSON else "person",
-            "members": sum(len(m.names()) for m in t.members if m.team is None),
-            "live": len(badged(t.name, up)),
-        }
-        for t in org.teams.values()
-    ]
+    rows_out = []
+    for t in org.teams.values():
+        mine = badged(t.name, sessions)
+        n_live = len(badged(t.name, up))
+        rows_out.append(
+            {
+                "name": t.name,
+                "source": str(t.source) if t.source else None,
+                "projects": list(t.projects),
+                "lead": t.lead.name if t.lead.role != orgmod.PERSON else "person",
+                "members": sum(len(m.names()) for m in t.members if m.team is None),
+                "live": n_live,
+                # only when nothing is live: a team still running is described by what it is doing
+                "wound_down": None if n_live else wound_down(mine),
+            }
+        )
+    return rows_out
 
 
 # ── start ─────────────────────────────────────────────────────────────────────────────────────
+
+
+def files_via(call: Call) -> teams.Files:
+    """How a plan reads a checkout on another host that is not a directory here (a machine node):
+    the home's `host_files`, confined to the checkout on that host (§4.4a, TD-057 step 4b.3). Any
+    refusal — the host unreachable, a path outside the checkout — is the plan's `OSError`, so the
+    start stops before anything is created."""
+
+    def files(host: str, directory: str, paths: list[str]) -> dict[str, str | None]:
+        try:
+            got = call("host_files", host=host, dir=directory, paths=paths)
+        except Exception as e:  # noqa: BLE001 — whatever the transport raised, nothing was started
+            raise OSError(f"{host}: {e}") from e
+        return dict((got or {}).get("files") or {})
+
+    return files
 
 
 def start(
@@ -126,14 +173,25 @@ def start(
 
     Raises `TeamError` (or `NamesHeld`) before anything is created, and `PartialStart` if a create
     fails after the checks passed. Returns the plan and the result the callers render."""
-    plan = teams.plan(org, name, host, profile=profile)
+    plan = teams.plan(org, name, host, profile=profile, files=files_via(call))
     if not plan.launches:
         raise teams.TeamError(f"team {name} starts nothing: a person leads it and it has no members")
+    on = {"host": plan.host} if plan.host else {}
+    if plan.host:
+        # Design §4.4a "Teams across hosts": *every checkout exists on the record's host*, asked of
+        # that host's node through the home — and the whole team refused while it is unreachable.
+        for d in dict.fromkeys(str(x.dir) for x in plan.launches):
+            try:
+                seen = call("host_dir", host=plan.host, dir=d)
+            except Exception as e:  # noqa: BLE001 — whatever the transport raised, the answer is the same
+                raise teams.TeamError(f"team {name} was not started — {plan.host}: {e}") from e
+            if not seen.get("exists"):
+                raise teams.TeamError(f"team {name} was not started — {d} does not exist on {plan.host}")
     # §4.1's rule, asked of the agent rather than reimplemented here (`name_check`, the same verdict
     # `create` and the New session form use), for every session before any of them exists.
     held = [
         v
-        for v in (call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir)) for x in plan.launches)
+        for v in (call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on) for x in plan.launches)
         if v.get("verdict") == "live"
     ]
     if held:
@@ -146,8 +204,8 @@ def start(
             created.append(rec)
             lead_id = str(rec["id"])
         for m in plan.members:
-            # A person runs a team start, so no attenuation applies (§4.8 create rule); an
-            # orchestrator running it is subject to it as for any create, in the agent.
+            # A person runs a team start, so no attenuation applies (§4.8 create rule); a
+            # lead running it is subject to it as for any create, in the host agent.
             created.append(call("create", **m.create_params([lead_id] if lead_id else [])))
     except Exception as e:
         raise PartialStart(name, created, plan, e) from e
@@ -169,52 +227,129 @@ def start(
 # ── stop ──────────────────────────────────────────────────────────────────────────────────────
 
 
-def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False) -> Stopping:
+def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, caller: str | None = None) -> Stopping:
     """The first half of `ao team stop` (design §4.9): the wrap-up prompt — the one the card's
     **Wrap up** sends — to every member, or a kill with `--now`. The lead is stopped by `stop_lead`
     once the members have settled, which is what makes the order the design's one.
 
     Split in two so a caller that must not block (the Org page) can send this half and let the rest
-    run behind it, while `ao team` runs both in a row."""
+    run behind it, while `ao team` runs both in a row.
+
+    `caller` is the session running the command, if one is (`AGENTORC_SESSION`). When it is the
+    team's own lead this is the wind-down (design §4.9a): the same sequence under a different
+    trigger, except that the lead is never typed at or killed by its own command."""
     up = live(badged(name, call("list")))
     if not up:
         raise teams.TeamError(f"no live session carries the team {name} badge — nothing to stop")
     lead, members = split(name, up, org)
-    st = Stopping(team=name, now=now, lead=lead)
+    st = Stopping(team=name, now=now, lead=lead, lead_is_caller=bool(caller and lead and lead["id"] == caller))
     for s in members:
+        if not now and s.get("out_of_work") and s["state"] in SETTLED:
+            # Finished (§4.9a): it declared, and it is not mid-turn. There is nothing to wrap up, and
+            # a prompt would only start a turn that `--close` could then land in the middle of.
+            st.acted.append(
+                {**_entry(s, "member"), "action": "finished (out of work), nothing sent", "state": s["state"]}
+            )
+            continue
         st.acted.append(_stop_one(call, s, "member", now=now))
     if now and lead is not None:  # a kill has nothing to wait for: the lead goes with them
-        st.acted.append(_stop_one(call, lead, "lead", now=True))
+        st.acted.append(_own_end(lead) if st.lead_is_caller else _stop_one(call, lead, "lead", now=True))
         st.lead = None
     return st
 
 
-def stop_lead(call: Call, st: Stopping, *, timeout: float = STOP_TIMEOUT) -> Stopping:
+def stop_lead(call: Call, st: Stopping, *, timeout: float = STOP_TIMEOUT, close: bool = False) -> Stopping:
     """The second half: wait for each member to go idle, exited or closed — or for the wrap-up
-    window to pass — and then stop the lead. A no-op when `--now` already killed everything."""
+    window to pass — and then stop the lead. A no-op when `--now` already killed everything.
+
+    `close` also closes each member that settled with nothing to lose (design §4.9a, 2026-09-17: a
+    wrapped-up Claude Code session sits `idle` rather than leaving, and `ao team start` refuses
+    while it does). A member still working, or holding uncommitted or unpushed work, is left open
+    and named: a stop never strands work to look finished."""
     if st.now and st.lead is None:
         return st
     states = wait_settled(call, st.member_ids, timeout)
     for entry in st.acted:
         entry["state"] = states.get(entry["id"], entry.get("state") or "?")
+    if close and not st.now:
+        records = {s["id"]: s for s in call("list")}
+        for entry in st.acted:
+            if entry["role"] == "member":
+                _close_settled(call, entry, records.get(entry["id"]))
     if st.lead is not None:
-        st.acted.append(_stop_one(call, st.lead, "lead", now=st.now))
+        st.acted.append(_own_end(st.lead) if st.lead_is_caller else _stop_one(call, st.lead, "lead", now=st.now))
         st.lead = None
     return st
 
 
-def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[str, Any]:
-    if now:
-        call("kill", id=s["id"])
-    else:
-        call("send", id=s["id"], text=teams.WRAPUP_PROMPT)
+def _close_settled(call: Call, entry: dict[str, Any], record: dict[str, Any] | None) -> None:
+    if record is None or record["state"] == "closed":
+        return
+    if record["state"] not in SETTLED:
+        entry["left_open"] = f"still {record['state']}"
+        return
+    unsafe = _unsafe_to_close(record)
+    if unsafe:
+        entry["left_open"] = unsafe
+        return
+    call("close", id=entry["id"])
+    entry["action"] += ", closed"
+    entry["state"] = "closed"
+
+
+def _unsafe_to_close(record: dict[str, Any]) -> str | None:
+    """Why this member's checkout is not *clean and pushed*, or None when it is. Unknown is unsafe:
+    a record with no `git` yet is left open, as Ready to close leaves it unchecked. `ahead: 0`
+    proves nothing without an upstream — a branch never pushed has no `branch.ab` line at all
+    (review of PR #192) — so with none, the commit itself is looked for on the remote-tracking
+    branches: a worker that merged and sits on a detached `origin/main` is pushed; one that
+    committed to a fresh branch and never pushed is not."""
+    git = record.get("git")
+    if not git:
+        return "git state unknown"
+    if git.get("dirty"):
+        return f"{git['dirty']} uncommitted"
+    if git.get("upstream"):
+        return f"{git['ahead']} unpushed" if git.get("ahead") else None
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(record.get("dir") or ""), "branch", "-r", "--contains", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return "no upstream, and the remote branches could not be read"
+    if cp.returncode != 0 or not cp.stdout.strip():
+        return "no upstream, and its commit is on no remote branch"
+    return None
+
+
+def _own_end(lead: dict[str, Any]) -> dict[str, Any]:
+    """The lead's entry when the lead is the one running the stop: nothing is sent to it."""
     return {
-        "id": s["id"],
-        "name": s.get("name") or s["id"],
-        "role": role,
-        "action": "killed" if now else "wrap-up sent",
-        "state": "killed" if now else "?",
+        **_entry(lead, "lead"),
+        "action": f"is you — finish your last acts, then `ao close {lead['id']}`",
+        "state": lead.get("state") or "?",
     }
+
+
+def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[str, Any]:
+    """One member's or the lead's stop. A refusal — its host unreachable (§4.4a), a pending prompt
+    — is this entry's outcome, not the stop's: the rest of the team is still wrapped up, and the
+    refused one is named with the reason (TD-057 step 4a, the 3b leftover)."""
+    try:
+        if now:
+            call("kill", id=s["id"])
+        else:
+            call("send", id=s["id"], text=teams.WRAPUP_PROMPT)
+    except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
+        return {**_entry(s, role), "action": f"refused: {e}", "state": s.get("state") or "?", "refused": True}
+    return {**_entry(s, role), "action": "killed" if now else "wrap-up sent", "state": "killed" if now else "?"}
+
+
+def _entry(s: dict[str, Any], role: str) -> dict[str, Any]:
+    return {"id": s["id"], "name": s.get("name") or s["id"], "role": role}
 
 
 def wait_settled(call: Call, ids: list[str], timeout: float) -> dict[str, str]:

@@ -7,6 +7,11 @@
     <div class="row gap" id="fhead">
       <a class="muted" href="/">← Org</a>
       <span class="mono title">{{ s.place }} / {{ s.name }}</span>
+      {# design §4.5a Focus header **title** (§4.3 `title()`, TD-074): the session's name as its tool
+         holds it, beside agentorc's own name for it. Display only — it is set in the tool, and
+         agentorc has no rename of its own — so it carries no control. #}
+      {% if s.title %}<span class="meta tool-title"
+            title="the session's name as its tool holds it (design §4.5a) — set in the tool, not in agentorc">{{ s.title }}</span>{% endif %}
       <span id="fstate"></span>
       {# design §6 / §4.5a (TD-026): when this session stops, and the control that edits it. Drawn
          only for an unattended session, because a stop time is a policy and policies leave an
@@ -14,6 +19,14 @@
          control that is always refused is worse than not offering it. #}
       {% if s.unattended %}<button class="badge{% if not s.stop_note %} off{% endif %}" id="fstop" data-act="stop" data-id="{{ s.id }}" data-until="{{ s.run_until or '' }}"
               title="when the agent asks this session to wrap up and then stops it — click to change it, empty to clear">{{ s.stop_note or "no stop time" }}</button>{% endif %}
+      {# design §4.5a Focus header **out of work** chip (§4.9a, TD-053 step 6): the words, the
+         reason on hover. Not a state — the session still reads `idle` or `exited`. #}
+      {% if s.out_of_work %}<span class="badge oow"
+            title="{{ s.out_of_work.why or 'no reason recorded' }}">out of work{% if s.out_of_work.age %} {{ s.out_of_work.age }}{% endif %}</span>{% endif %}
+      {# design §4.8 `doing` (TD-074): what the session says it is doing, beside the other things it
+         said about itself, always with its age. Its own words: shown, never acted on. #}
+      {% if s.doing %}<span class="meta doing"
+            title="what this session says it is doing (design §4.8): its own words">{{ s.doing.text }} · says{% if s.doing.age %} · {{ s.doing.age }} ago{% endif %}</span>{% endif %}
       {# design §4.5a Focus header **grants** chip (§4.8): click a grant to revoke it, a dim one to grant it #}
       <span class="grants" id="fgrants" data-id="{{ s.id }}" data-grants="{{ s.grants_all | join(',') }}"></span>
       {# design §4.5a Focus header **controllers** chip (§4.8, TD-036): who may act on this
@@ -80,11 +93,11 @@
       <div id="inboxlist"></div>
       <div class="note">Mail addressed to this session. Opening it here marks nothing read — only the session's own <code>ao inbox</code> does. Reply goes to the sender's inbox; delete removes this session's copy only.</div>
     </div>
-    {# design §4.5a Focus (orchestrator) **Members** list (§4.8, TD-036): every session whose
-       `controllers` name this one — the orchestrator's central view. Derived from the records on
-       each render, never stored. Shown for a session holding `orchestrate`, even with no members
-       yet, because "none" is the answer a person opening an orchestrator most needs to see. #}
-    {% if s.is_orchestrator %}<div class="card pad" id="members">
+    {# design §4.5a Focus (lead) **Members** list (§4.8, TD-036): every session whose
+       `controllers` name this one — the lead's central view. Derived from the records on
+       each render, never stored. Shown for a session holding `control`, even with no members
+       yet, because "none" is the answer a person opening a lead most needs to see. #}
+    {% if s.holds_control %}<div class="card pad" id="members">
       <div class="h2">Members</div>
       {% for m in s.members %}<div class="row gap">
         <a class="name" href="/focus/{{ m.id }}">{{ m.name }}</a>

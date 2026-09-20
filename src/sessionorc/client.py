@@ -12,6 +12,11 @@ from typing import Any
 
 from sessionorc import paths
 
+# One reply is one line, and asyncio's default line limit is 64 KiB. A `list` of six records after a
+# day of two teams' mail crossed it on 2026-09-17 and every `ao` on the machine failed with
+# `Separator is found, but chunk is longer than limit` (TD-066). The same limit the link uses.
+LINE_LIMIT = 8 * 1024 * 1024
+
 
 class AgentError(Exception):
     """An error the agent returned. `data` is whatever it sent alongside the message — the id of
@@ -32,6 +37,15 @@ class AgentUnavailable(AgentError):
 # from the last of them, after its own output.
 last_mail: dict[str, Any] | None = None
 
+# Every parameter name the running host agent did not take, across every call this process has made
+# since it last reset this (design §4.4, TD-062): dropped by the agent rather than refused. Non-empty
+# means the agent is older than this client and a CLI prints one line from it. **Accumulated**, not
+# last-call-wins like `last_mail`: a command that makes several calls — `ao team start` (a
+# `name_check` and a `create` per member), `ao control … add <many>` — would otherwise have the
+# warning from its first call cleared by its last, which is exactly where an operator most needs it.
+# Deduped, so a long-lived client (the UI) is bounded by the number of distinct parameter names.
+last_ignored: list[str] = []
+
 
 class LocalClient:
     """One connection, sequential requests. Cheap enough to open per CLI call."""
@@ -47,7 +61,7 @@ class LocalClient:
 
     async def __aenter__(self) -> LocalClient:
         try:
-            self._reader, self._writer = await asyncio.open_unix_connection(str(self.sock))
+            self._reader, self._writer = await asyncio.open_unix_connection(str(self.sock), limit=LINE_LIMIT)
         except (ConnectionError, FileNotFoundError, OSError) as e:
             raise AgentUnavailable(f"host agent not reachable at {self.sock}: {e}") from e
         return self
@@ -59,9 +73,19 @@ class LocalClient:
                 await self._writer.wait_closed()
 
     async def call(self, method: str, **params: Any) -> Any:
+        """One request, one reply.
+
+        **A parameter that is not set is not sent** (design §4.4, TD-062 fix (a)): every optional
+        RPC parameter defaults to `None` on the agent side and means the same thing absent, so a
+        `None` here is dropped from the envelope. That is what keeps a client newer than the
+        running host agent working — a call that does not use a new parameter never mentions it,
+        and so cannot be refused as an unexpected keyword. It is a rule of this one choke point on
+        purpose: no command can forget it, and none may hand-roll the filtering instead.
+        """
         assert self._reader and self._writer
         self._n += 1
-        req: dict[str, Any] = {"id": self._n, "method": method, "params": params}
+        sent = {k: v for k, v in params.items() if v is not None}
+        req: dict[str, Any] = {"id": self._n, "method": method, "params": sent}
         if self.caller:
             req["caller"] = self.caller
         self._writer.write((json.dumps(req) + "\n").encode())
@@ -70,8 +94,11 @@ class LocalClient:
         if not line:
             raise AgentUnavailable("host agent closed the connection")
         resp = json.loads(line)
-        global last_mail
+        global last_mail, last_ignored
         last_mail = resp.get("mail") if isinstance(resp, dict) else None
+        for name in (resp.get("ignored") or []) if isinstance(resp, dict) else []:
+            if name not in last_ignored:
+                last_ignored.append(name)
         if "error" in resp:
             raise AgentError(resp["error"], resp.get("error_data"))
         return resp.get("result")
@@ -95,13 +122,13 @@ def call_sync(method: str, *, caller: str | None = None, **params: Any) -> Any:
 async def bridge_stdio() -> int:
     """Pump stdin → socket → stdout, line for line. `ssh host agentorc-agent rpc` is this."""
     try:
-        reader, writer = await asyncio.open_unix_connection(str(paths.socket_path()))
+        reader, writer = await asyncio.open_unix_connection(str(paths.socket_path()), limit=LINE_LIMIT)
     except (ConnectionError, FileNotFoundError, OSError) as e:
         sys.stdout.write(json.dumps({"error": f"agent down: {e}"}) + "\n")
         sys.stdout.flush()
         return 1
     loop = asyncio.get_running_loop()
-    stdin = asyncio.StreamReader()
+    stdin = asyncio.StreamReader(limit=LINE_LIMIT)
     await loop.connect_read_pipe(lambda: asyncio.StreamReaderProtocol(stdin), sys.stdin)
 
     async def up() -> None:

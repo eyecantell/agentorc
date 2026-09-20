@@ -80,6 +80,22 @@ def test_concurrent_pastes_do_not_share_one_buffer(tmux, tmp_path):
     assert tmux.run("list-buffers", check=False).stdout.strip() == ""
 
 
+def test_pane_title_rides_with_the_pane_list(tmux):
+    """TD-074 step 3: the terminal title the program in the pane set (`#{pane_title}`) comes back
+    with the pane list the tick already reads — no second tmux call per session. It is the last
+    field of the format, and the split is bounded, so whatever is in it keeps the fields before it
+    in their places (tmux itself drops the control bytes a title might carry)."""
+    tmux.new_session("ao-t-title", "/", ["bash", "--norc", "--noprofile"], {})
+    assert wait_for(lambda: {p.session: p for p in tmux.list_panes()}.get("ao-t-title") is not None)
+    # a program sets it with the usual OSC 2 escape; tmux holds it on the pane
+    tmux.send_literal("ao-t-title", r"printf '\033]2;\342\234\263 Error Checker\007'")
+    tmux.send_enter("ao-t-title")
+    assert wait_for(lambda: {p.session: p for p in tmux.list_panes()}["ao-t-title"].title.endswith("Checker"))
+    info = {p.session: p for p in tmux.list_panes()}["ao-t-title"]
+    assert info.title == "✳ Error Checker"
+    assert info.current_command == "bash" and not info.dead and info.window == 0
+
+
 def test_exit_status_readable(tmux):
     tmux.new_session("ao-t-c", "/", ["sh", "-c", "exit 3"], {})
     assert wait_for(lambda: any(p.dead and p.session == "ao-t-c" for p in tmux.list_panes()))

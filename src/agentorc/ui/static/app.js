@@ -81,12 +81,15 @@
   };
 
   document.addEventListener("click", async (ev) => {
-    const b = ev.target.closest("[data-act], [data-copy], [data-sort]");
+    const b = ev.target.closest("[data-act], [data-copy]");
     if (!b) return;
     if (b.dataset.copy) { navigator.clipboard.writeText(b.dataset.copy).then(() => AO.toast("copied", true)); return; }
-    if (b.dataset.sort) { setSort(b.dataset.sort); return; }
     const id = b.dataset.id, action = b.dataset.act;
     let action2 = null;  // the endpoint's name when it differs from the button's (controllers chip)
+    // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the
+    // card's own controls, so the press goes to the card's own route — and the row, which is the
+    // state and not a copy of it, leaves the moment the state is answered.
+    const staterow = b.closest(".staterow");
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
     const details = b.closest("details"); if (details) details.open = false;
     try {
@@ -123,6 +126,19 @@
         body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
       }
       if (action === "unmail") body = { msg: b.dataset.msg };
+      // design §4.5a **Inbox row: identity alarm** (§4.8a): a record's list, or — with no id — the
+      // host's own. A person's act; the agent refuses it to every session.
+      if (action === "identity_ack") body = { id: b.dataset.who || "" };
+      // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
+      // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
+      // is the one that decides what may be done, and its refusal comes back as a toast.
+      if (["pause", "resume", "gowithit"].includes(action)) body = { msg: b.dataset.msg };
+      if (action === "unsnooze") { action2 = "snooze"; body = { msg: b.dataset.msg }; }  // no `until` clears it
+      if (action === "snooze") {
+        const until = snoozeUntil(b.dataset.when);
+        if (!until) return;
+        body = { msg: b.dataset.msg, until };
+      }
       if (action === "control-add") {
         const who = prompt("Which session may act on this one? (its id or name from ao status)");
         if (!who) return;
@@ -134,72 +150,104 @@
       if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
-      if (action === "unmail") AO.toast("deleted from this inbox", true);
+      if (action === "unmail") AO.toast(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
       if (["message", "reply", "unmail"].includes(action) && typeof AO.refreshInbox === "function") AO.refreshInbox();
-      if (["reply", "unmail"].includes(action) && id === "person") AO.refreshPersonInbox(true);
+      if (action === "snooze") AO.toast("snoozed — it comes back at that time; the sender is not told", true);
+      if (action === "unsnooze") AO.toast("back in its section", true);
+      if (action === "pause") AO.toast("paused — the sender is told not to take its default yet", true);
+      if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
+      if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
+      if (action === "identity_ack") AO.toast("acknowledged — the agent's log keeps every alarm", true);
+      // the state is answered, so the row is gone: it is taken out here rather than waited for, and
+      // the refresh below puts back whatever the record actually says
+      if (staterow) staterow.remove();
+      if ((staterow || id === "person") && typeof AO.refreshInboxPage === "function") {
+        // the control that was pressed is about to go with its row, and while it holds the focus
+        // the refresh below would politely decline to redraw the section it sits in
+        if (document.activeElement === b) b.blur();
+        AO.refreshInboxPage();
+      }
       if (action === "grants") AO.toast(`grants: ${(res.capabilities || []).join(", ") || "none"}`, true);
       if (action === "stop") AO.toast(res.stop_note || "no stop time: nothing will stop this session", true);
       if (action2 === "controllers") {
         AO.toast(`under: ${(res.controllers || []).join(", ") || "nobody"}`, true);
         if (typeof AO.refreshMembership === "function") AO.refreshMembership();
       }
-    } catch (e) { AO.toast(`${action} failed: ${e.message}`); }
+    } catch (e) {
+      // Answered twice — two tabs, or the tool timed out into its own dialog between the poll and
+      // the press — is not a failure to shout about: the state is simply no longer pending, and
+      // the refresh below shows what it is now (design §4.5a **Inbox row: state**).
+      if (staterow && /no pending permission/i.test(e.message)) {
+        AO.toast("already answered — nothing was sent twice", true);
+        staterow.remove();
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
+      AO.toast(`${action} failed: ${e.message}`);
+      if (staterow && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
+    }
   });
 
-  // One mail entry, as the Focus Inbox panel and the top bar's person inbox both show it (design
-  // §4.5a, §4.10): sender (name, id on hover), kind, `about`, read/unread, age, an `ask`'s state,
-  // Reply and delete. `owner` is the inbox it sits in — a session id, or "person". No Reply on an
-  // entry the person sent: its answer is the session's, which lands in the person inbox.
+  // One mail entry, as the Focus Inbox panel shows it (design §4.5a **Focus Inbox**, §4.10):
+  // sender (name, id on hover), kind, `about`, read/unread, age, an `ask`'s state, Reply and
+  // delete. `owner` is the session whose inbox it sits in — the person inbox has the Inbox page's
+  // rows instead, since 2026-09-19 (TD-069 step 1). No Reply on an entry the person sent: its
+  // answer is the session's, which lands in the person inbox.
+  // A `steer` carries the default it will take and lapses at its bound; an `ask` to the person
+  // carries no bound at all and never expires; `system` is a sender and is never replied to
+  // (design §4.10, 2026-09-19, TD-069 step 0).
   AO.mailEntry = function (e, owner) {
-    const ask = e.kind === "ask" || e.kind === "conflict";
+    const ask = e.kind === "ask" || e.kind === "steer" || e.kind === "conflict";
     let st = "";
     if (ask) {
-      st = e.closed_by ? `answered by ${esc(e.closed_by)}`
+      st = e.closed_reason === "lapsed" ? "lapsed · the sender went with its default"
+        : e.closed_reason === "go_with_it" ? "closed · go with it"
+        : e.closed_reason === "declined" ? "declined"
+        : e.closed_reason === "asker_gone" ? "closed · the asker is gone"
+        : e.closed_by ? `answered by ${esc(e.closed_by)}`
         : e.expired_at ? "expired"
+        : e.paused_at ? "paused · the clock is stopped"
         : (e.pending || []).length ? "addressee exited · pending"
-        : e.bound ? `open · bound ${esc(new Date(e.bound).toLocaleString())}` : "open";
+        : e.bound ? `${e.kind === "steer" ? "lapses" : "open · bound"} ${esc(new Date(e.bound).toLocaleString())}`
+        : "open · no bound";
     }
-    const person = owner === "person";
-    const reply = e.from === "person" ? ""
+    const reply = (e.from === "person" || e.from === "system") ? ""
       : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}">Reply</button>`;
-    const confirmText = person ? "Delete this entry from the person inbox? The sender keeps its copy."
-      : "Delete this entry from this session's inbox? The sender keeps its copy.";
+    const confirmText = "Delete this entry from this session's inbox? The sender keeps its copy.";
     return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
       + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
-      + (person && e.from_name && e.from_name !== e.from ? `<span class="st">${esc(e.from)}</span>` : "")
       + `<span class="st kind">${esc(e.kind)}</span>${e.about ? `<span class="st">re ${esc(e.about)}</span>` : ""}`
       + `<span class="grow"></span><span class="st">${e.read_at ? "read" : "unread"}</span>`
       + `<span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
       + (e.reply_to ? `<div class="st">reply to ${esc(e.reply_to)}</div>` : "")
       + `<div class="body">${esc(e.text)}</div>`
+      + (e.default ? `<div class="st">unless you say otherwise: ${esc(e.default)}</div>` : "")
       + `<div class="row gap">${st ? `<span class="st${e.expired_at ? " expired" : ""}">${st}</span>` : ""}<span class="grow"></span>${reply}`
       + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-confirm="${confirmText}">Delete</button></div></div>`;
   };
 
-  // design §4.5a Org top bar **person inbox** (§4.10). No session record holds it, so nothing on
-  // the pushed stream carries its count: the top bar polls the `inbox` RPC (a person's read, which
-  // marks nothing). The list is fetched only while the panel is open.
-  AO.refreshPersonInbox = async function (list) {
+  // design §4.5a Org top bar **Inbox** (§4.5 screen 6, TD-069 step 1). The control is a link to
+  // `/inbox`, and its number is that page's **Needs you** section — computed server-side in one
+  // place (`inbox_sections`), so the top bar and the page cannot disagree. No session record holds
+  // the person inbox, so nothing on the pushed stream carries it: this polls the same route the
+  // page does, a person's read that marks nothing. (The dialog that hung here until 2026-09-19
+  // relied on that same rule and is retired with the page's arrival.)
+  AO.refreshInboxCount = async function () {
     let got;
     try {
       const r = await fetch("/api/person/inbox");
-      if (!r.ok) return;
+      if (!r.ok) return null;
       got = await r.json();
-    } catch (e) { return; }
-    const n = got.unread || 0, es = got.entries || [];
-    const chip = $("#personunread");
+    } catch (e) { return null; }
+    const chip = $("#personneeds"), n = got.needs || 0;
     if (chip) { chip.textContent = n ? String(n) : ""; chip.classList.toggle("hidden", !n); }
-    if (!list) return;
-    $("#personcount").textContent = es.length ? `${n} unread · ${es.length}` : "";
-    $("#personlist").innerHTML = es.length ? es.slice().reverse().map((e) => AO.mailEntry(e, "person")).join("")
-      : `<div class="note">Nothing here.</div>`;
+    return got;
   };
-  if ($("#personinbox")) {
-    $("#personinbox").addEventListener("click", () => { $("#personbox").showModal(); AO.refreshPersonInbox(true); });
-    $("#personclose").addEventListener("click", () => $("#personbox").close());
-    // only the Org page renders the count server-side: every other page reads it at load
-    if (location.pathname !== "/") AO.refreshPersonInbox(false);
-    setInterval(() => AO.refreshPersonInbox($("#personbox").open), 20000);
+  if ($("#personneeds")) {
+    // the Org page and the Inbox page render the count server-side; every other page reads it at
+    // load. On the Inbox page the poll is the page's own, which refreshes the rows as well.
+    if (location.pathname !== "/" && location.pathname !== "/inbox") AO.refreshInboxCount();
+    setInterval(() => (AO.refreshInboxPage || AO.refreshInboxCount)(), 20000);
   }
 
   $("#theme") && $("#theme").addEventListener("click", () => {
@@ -226,7 +274,30 @@
       const left = Math.floor((Date.parse(el.dataset.deadline) - Date.now()) / 1000);
       el.textContent = left > 0 ? `via hook · ${Math.floor(left / 60)}m ${String(left % 60).padStart(2, "0")}s left` : "via hook · falling through to the terminal";
     });
+    // design §4.5a **Inbox row: `steer`**: the time left, ticking here — the lapse itself is the
+    // home's, and arrives as a changed entry on the next poll, never from this clock.
+    $$(".timeleft[data-deadline]").forEach((el) => {
+      if (!el.dataset.deadline) return;
+      const left = Math.floor((Date.parse(el.dataset.deadline) - Date.now()) / 1000);
+      el.textContent = left > 0
+        ? `${left >= 3600 ? Math.floor(left / 3600) + "h " + Math.floor((left % 3600) / 60) + "m" : Math.floor(left / 60) + "m " + String(left % 60).padStart(2, "0") + "s"} left — then it goes with its default`
+        : "the time is up: the sender goes with its default";
+    });
+    showLocalTimes();
   }, 1000);
+
+  // A stored instant (UTC) shown in the browser's own clock: a person who snoozed until *tomorrow
+  // 08:00* must read back tomorrow 08:00, not the UTC instant behind it — which stays on the
+  // element's title. It does not change once written, so each element is written once; the callers
+  // are the tick above and whatever has just put new rows on the page.
+  function showLocalTimes() {
+    $$(".localtime[data-at]").forEach((el) => {
+      if (el.dataset.shown === "1") return;
+      const d = new Date(Date.parse(el.dataset.at || ""));
+      el.textContent = isNaN(d) ? el.dataset.at || "" : d.toLocaleString();
+      el.dataset.shown = "1";
+    });
+  }
 
   // ---- events websocket with backoff; a reconnect reloads the snapshot once ----
   function connectEvents(onEvent) {
@@ -242,13 +313,13 @@
     }
     open();
   }
-  // ---- usage chip: one span per profile, "5-hour% · weekly%", red at a cap (TD-001) ----
+  // ---- usage chip: one span per profile, "5h n% · wk n%", red at a cap (TD-001) ----
   function onUsage(ev) {
     const chip = $("#usagechip"); if (!chip || !ev.usage) return;
     let el = chip.querySelector(`[data-profile="${CSS.escape(ev.profile)}"]`);
     if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.appendChild(el); chip.appendChild(document.createTextNode(" ")); }
     const u = ev.usage, capped = u.five_hour_pct >= 100 || u.weekly_pct >= 100;
-    el.textContent = `${ev.profile} ${u.five_hour_pct}%·${u.weekly_pct}%`;
+    el.textContent = `${ev.profile} 5h ${u.five_hour_pct}% · wk ${u.weekly_pct}%`;  // the numbers say what they are (2026-09-18)
     el.classList.toggle("cap", capped);
     el.title = `5-hour ${u.five_hour_pct}% (resets ${u.five_hour_resets || "?"}) · weekly ${u.weekly_pct}% (resets ${u.weekly_resets || "?"})`;
   }
@@ -259,27 +330,17 @@
 
   // ---- Org (design §4.5 screen 1) ----
   // The page is one or more `.tgroup` sections, each an optional header plus its own `.grid`: one
-  // per team when any live session carries a `team` badge (design §4.5a **team groups**, §4.9),
-  // and one unnamed, headerless group when none does. Every rule below is per group — Urgent first
-  // sorts inside a section (the lead's card first), Pinned order is stored per team.
-  let sortMode = store.get("sort", "urgent");
+  // per team when any session carries a `team` badge or any team is defined (design §4.5a **team
+  // groups**, §4.9), and one unnamed, headerless group otherwise. One order, no control (design
+  // §4.5, 2026-09-18): inside a group the lead's card, then urgency, then name.
   const sections = () => $$("#groups .tgroup");
-  const pinKey = (team) => (team ? "pinned:" + team : "pinned");  // the flat page keeps the old key
-  function setSort(m) { sortMode = m; store.set("sort", m); $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === m)); layout(); }
   function layout() {
     const box = $("#groups"); if (!box) return;
     sections().forEach((sec) => {
       const grid = $(".grid", sec), lead = sec.dataset.lead || "";
       const cards = $$(".sc", grid);
-      if (sortMode === "urgent") {
-        cards.sort((a, b) => (b.dataset.id === lead) - (a.dataset.id === lead) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
-          .forEach((c) => grid.appendChild(c));
-      } else {
-        const order = store.get(pinKey(sec.dataset.team), []);
-        cards.sort((a, b) => { const ia = order.indexOf(a.dataset.id), ib = order.indexOf(b.dataset.id); return (ia < 0 ? 1e9 : ia) - (ib < 0 ? 1e9 : ib); }).forEach((c) => grid.appendChild(c));
-        store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
-      }
-      cards.forEach((c) => c.classList.toggle("highlight", sortMode === "pinned" && c.dataset.state === "needs-you"));
+      cards.sort((a, b) => (b.dataset.id === lead) - (a.dataset.id === lead) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
+        .forEach((c) => grid.appendChild(c));
     });
     applyFilter();
     const shown = $$("#groups .sc").filter((c) => !c.hidden);
@@ -288,7 +349,7 @@
     const counts = {}; shown.forEach((c) => (counts[c.dataset.state] = (counts[c.dataset.state] || 0) + 1));
     $("#badges").innerHTML = [["needs-you", "needs", "needs you"], ["limited", "limited", "limited"], ["stalled?", "stalled", "stalled"]]
       .filter(([k]) => counts[k]).map(([k, cls, l]) => `<span class="pill s-${cls}"><span class="dot"></span>${counts[k]} ${l}</span>`).join("");
-    syncStrip();
+    syncTeams();
   }
   function applyFilter() {
     const raw = ($("#filter") ? $("#filter").value : "").trim(), cmd = $("#showcmd") && $("#showcmd").checked;
@@ -302,7 +363,12 @@
       c.hidden = hideKind || miss;
     });
     // A group with nothing left to show goes away with its header; the empty page says so once.
-    sections().forEach((sec) => (sec.hidden = !$$(".sc", sec).some((c) => !c.hidden)));
+    // A team's card stays while no filter is set, sessions or none: it is where Start lives.
+    const filtering = !!raw;
+    sections().forEach((sec) => {
+      sec.hidden = !$$(".sc", sec).some((c) => !c.hidden) && (filtering || !sec.dataset.team);
+      sec.classList.toggle("filtering", filtering);  // a filter shows what it matched, folded or not
+    });
   }
   // The server derives the groups on every render and every delta (only it sees the whole fleet),
   // so a badge or `controllers` change moves cards between groups here without a page reload.
@@ -320,6 +386,7 @@
         sec.innerHTML = '<div class="grid"></div>';
       }
       sec.dataset.lead = g.lead || "";
+      sec.dataset.live = g.live || 0;
       let head = $(".ghead", sec);
       if (g.html) {
         if (!head) { head = document.createElement("div"); head.className = "row gap wrap ghead"; sec.prepend(head); }
@@ -332,29 +399,28 @@
     });
     sections().forEach((sec) => {
       if (keep.includes(sec)) return;
-      const home = $(".grid", keep[0]);  // a card the server did not list keeps its place on the page
+      // A card the server did not list keeps its place on the page — somewhere it can be seen: the
+      // first group may now be a stopped team, folded (review of PR #226), so *No team* or a live
+      // team is preferred.
+      const dest = keep.find((k) => !k.dataset.team) || keep.find((k) => +k.dataset.live) || keep[0];
+      const home = $(".grid", dest);
       $$(".sc", sec).forEach((c) => home.appendChild(c));
       sec.remove();
     });
   }
-  // ---- the Teams strip (design §4.5a Org **Teams** strip, §4.9) ----
-  // Live counts come from the cards, never a second request: a team is live when a session carrying
-  // its badge is (there is no team record to ask), and the cards are the fleet already, delta by
-  // delta. So a start or a stop shows up in the strip the moment its sessions do.
-  function syncStrip() {
-    const strip = $("#teams"); if (!strip) return;
-    const live = {};
-    $$("#groups .sc").forEach((c) => {
-      const t = c.dataset.team;
-      if (t && c.dataset.state !== "exited" && c.dataset.state !== "closed") live[t] = (live[t] || 0) + 1;
+  // ---- a team's card: the fold, and a request in flight (design §4.5a **team groups**) ----
+  // A team with nothing live folds its cards away: they have exited and are waiting for Forget, and
+  // a page of them buries what is running. The choice is kept per team; a live team never folds.
+  const foldKey = (team) => "fold:" + team;
+  function syncTeams() {
+    sections().forEach((sec) => {
+      const team = sec.dataset.team, b = $(".ghead .fold", sec);
+      const folded = !!team && !+sec.dataset.live && !!b && store.get(foldKey(team), true);
+      sec.classList.toggle("folded", folded);
+      if (b) b.textContent = `${b.dataset.n} session${b.dataset.n === "1" ? "" : "s"} — ${folded ? "show" : "hide"}`;
     });
-    $$(".team-row", strip).forEach((row) => {
-      const n = live[row.dataset.team] || 0;
-      row.dataset.live = n;
-      $(".live", row).textContent = n ? `${n} live` : "stopped";
-      $(".start", row).hidden = n > 0;          // Start on a stopped team, Stop on a live one
-      $$(".stop", row).forEach((b) => (b.hidden = n === 0));
-    });
+    // a header re-rendered for a delta must not re-arm a request in flight
+    $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
   }
   // A stop returns before its lead does (design §4.9: the members settle first, which is minutes).
   // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
@@ -371,7 +437,13 @@
     }
     AO.toast(`${name}: ${lead} is still stopping — see the agent log`);
   }
+  // The button is not the guard: a stop moves its members' states at once, each delta re-renders
+  // the header, and the fresh Stop would be pressable while the first request is still out — a
+  // second wrap-up prompt to every member (review of PR #183). The team's name is the guard.
+  const pendingTeams = new Set();
   async function teamAct(name, what, btn) {
+    if (pendingTeams.has(name)) return;
+    pendingTeams.add(name);
     const stop = what !== "start";
     const url = `/api/teams/${encodeURIComponent(name)}/${stop ? "stop" : "start"}`;
     btn.disabled = true;
@@ -395,12 +467,102 @@
     } catch (e) {
       AO.toast(`${name}: ${e.message}`);
     } finally {
+      pendingTeams.delete(name);
       btn.disabled = false;
+      syncTeams();  // the button on the page now may not be the one that was pressed
     }
   }
 
+  // ---- Inbox (design §4.5 screen 6, §4.5a **Inbox page**; TD-069 step 1) ----
+  // The rows are rendered by the server, by the same template the page was rendered with, and a
+  // poll swaps a whole section's markup: nothing here composes markup out of what a session wrote.
+  // What lives in the browser is what belongs to this browser — the filter, the FYI fold — exactly
+  // as the Org's filter and team folds do.
+  const IN_SECS = ["needs", "steering", "fyi", "snoozed"];
+
+  // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
+  // which is what the entry stores; the prompt is in the person's own clock.
+  function snoozeUntil(when) {
+    const iso = (d) => new Date(d.getTime() - d.getMilliseconds()).toISOString().replace(/\.\d+Z$/, "Z");
+    const d = new Date();
+    if (when === "1h") { d.setHours(d.getHours() + 1); return iso(d); }
+    if (when === "tomorrow") { d.setDate(d.getDate() + 1); d.setHours(8, 0, 0, 0); return iso(d); }
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    const s = prompt("Snooze until… (YYYY-MM-DDTHH:MM, your own clock)", local);
+    if (!s) return null;
+    const t = new Date(s.trim());
+    if (isNaN(t)) { AO.toast(`${s}: not a time I can read`); return null; }
+    if (t <= new Date()) { AO.toast("that time has passed: a snooze goes forwards"); return null; }
+    return iso(t);
+  }
+
+  AO.inbox = function () {
+    const f = $("#ifilter");
+    f.value = store.get("inboxfilter", "");
+    $("#sec-fyi").open = store.get("inboxfyi", false);  // folded by default, remembered here
+    $("#sec-fyi").addEventListener("toggle", () => store.set("inboxfyi", $("#sec-fyi").open));
+    f.addEventListener("input", () => { store.set("inboxfilter", f.value.trim()); inboxFilter(); });
+    // the row's team badge filters to that team; pressing it again clears the box (as on the Org)
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest(".mailrow .badge.team"); if (!b) return;
+      e.preventDefault();
+      const q = "team:" + b.dataset.team;
+      f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
+      store.set("inboxfilter", f.value); inboxFilter();
+    });
+    AO.refreshInboxPage = refreshInbox;
+    inboxFilter();
+    refreshInbox();
+  };
+
+  // Whether the poll may replace this section's rows now. It may not while the person is inside
+  // them: an open Snooze menu would close under the press, and a swap would take the focus of
+  // someone tabbing through a row's controls. Neither is worth a few seconds' freshness — the next
+  // poll does it, and the count above never waits. Kept pure (element in, boolean out) so the rule
+  // is one readable line rather than conditions spread through the swap.
+  AO.maySwapSection = function (el, focused) {
+    if (!el) return false;
+    if (el.querySelector("details[open]")) return false;  // a menu the person has opened
+    return !(focused && focused !== document.body && el.contains(focused));
+  };
+
+  async function refreshInbox() {
+    const got = await AO.refreshInboxCount();
+    if (!got || !got.html) return;
+    IN_SECS.forEach((k) => {
+      const el = $("#rows-" + k);
+      if (AO.maySwapSection(el, document.activeElement)) el.innerHTML = got.html[k] || "";
+    });
+    showLocalTimes();
+    $("#needsn").textContent = got.needs || 0;
+    $("#needspill").classList.toggle("hidden", !got.needs);
+    const sn = got.snoozed_n || 0;
+    $("#snoozedbox").hidden = !sn;
+    $("#snoozedlabel").textContent = `${sn} snoozed — show`;
+    inboxFilter();
+  }
+
+  // `team:<name>` is an exact match on the row's badge, `team:` alone is what carries none; any
+  // other text matches the sender, the message and its `about` — the fields a person searches by.
+  function inboxFilter() {
+    const box = $("#ifilter"); if (!box) return;
+    const raw = box.value.trim();
+    const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
+    const q = team === null ? raw.toLowerCase() : "";
+    $$(".mailrow").forEach((r) => {
+      const has = (r.dataset.team || "").toLowerCase();
+      r.hidden = team !== null ? has !== team : !!q && !(r.dataset.find || "").includes(q);
+    });
+    IN_SECS.forEach((k) => {
+      const sec = $("#sec-" + k); if (!sec) return;
+      const n = $$(`#rows-${k} .mailrow`).filter((r) => !r.hidden).length;
+      const all = $$(`#rows-${k} .mailrow`).length;
+      $("#n-" + k).textContent = raw && n !== all ? `${n} of ${all}` : all ? `${all}` : "";
+      const empty = $(".note.empty", sec); if (empty) empty.hidden = n > 0;
+    });
+  }
+
   AO.org = function () {
-    $$("[data-sort]").forEach((b) => b.classList.toggle("on", b.dataset.sort === sortMode));
     $("#filter").addEventListener("input", layout);
     $("#showcmd").addEventListener("change", layout);
     $("#retry").addEventListener("click", () => location.reload());
@@ -413,34 +575,23 @@
       f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
       layout();
     });
-    // drag to pin: HTML5 drag on cards, order saved by id per group. A card never crosses into
-    // another team's grid — the badge decides the group, not where you dropped it.
-    box.addEventListener("dragstart", (e) => { const c = e.target.closest(".sc"); if (c) { e.dataTransfer.setData("text/plain", c.dataset.id); c.classList.add("dragging"); } });
-    box.addEventListener("dragover", (e) => { if (sortMode === "pinned") e.preventDefault(); });
-    box.addEventListener("drop", (e) => {
-      if (sortMode !== "pinned") return; e.preventDefault();
-      const id = e.dataTransfer.getData("text/plain"), from = $(`#card-${CSS.escape(id)}`), to = e.target.closest(".sc");
-      if (!from || !to || from === to || from.parentElement !== to.parentElement) return;
-      const grid = to.parentElement, sec = grid.closest(".tgroup");
-      grid.insertBefore(from, to);
-      store.set(pinKey(sec.dataset.team), $$(".sc", grid).map((c) => c.dataset.id));
-    });
-    $$("#groups .sc").forEach((c) => (c.draggable = true));
-    const strip = $("#teams");
-    if (strip) strip.addEventListener("click", (e) => {
+    // Start, Wind down and Stop now are all on the team's card, and so is its fold.
+    box.addEventListener("click", (e) => {
       const b = e.target.closest("[data-team-act]");
-      if (b) teamAct(b.dataset.team, b.dataset.teamAct, b);
+      if (b) return teamAct(b.dataset.team, b.dataset.teamAct, b);
+      const f = e.target.closest("[data-fold]");
+      if (f) { store.set(foldKey(f.dataset.fold), !store.get(foldKey(f.dataset.fold), true)); syncTeams(); }
     });
     layout();
     connectEvents((ev) => {
       if (ev.event === "session") {
         const old = $(`#card-${CSS.escape(ev.id)}`);
         const tpl = document.createElement("template"); tpl.innerHTML = ev.html.trim();
-        const fresh = tpl.content.firstElementChild; fresh.draggable = true;
+        const fresh = tpl.content.firstElementChild;
         if (old) old.replaceWith(fresh);
         else {
           const grid = $(".tgroup .grid");  // syncGroups below moves it into its own group
-          if (sortMode === "pinned") grid.prepend(fresh); else grid.appendChild(fresh);
+          grid.appendChild(fresh);
         }
         if (ev.groups !== undefined) syncGroups(ev.groups);
         layout();
@@ -664,7 +815,10 @@
       } else if (v.state === "needs-you" && p) {
         head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>`;
         compose.disabled = true; $("#composehint").textContent = "answer in the terminal above";
-      } else if (v.external) { compose.disabled = true; $("#composehint").textContent = "started outside agentorc: a read-only card (no terminal, no controls)";
+      } else if (v.state === "unreachable" && p && p.host_unreachable) {
+        // design §4.4a: the hook still blocks on its node, and an answer from here cannot reach it
+        head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)} — host unreachable: answer it at ${esc(v.host)}, in the tool's own dialog</span>`;
+        compose.disabled = true; $("#composehint").textContent = "the host agent cannot be reached: nothing can be sent until it is back";
       } else if (v.state === "exited" || v.state === "closed" || v.state === "unreachable") {
         // There is no turn to start or steer: the pane is dead or out of reach. The composer used
         // to sit enabled here and say nothing, which was merely useless; saying "starts a new

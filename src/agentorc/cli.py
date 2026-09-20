@@ -22,7 +22,7 @@ from sessionorc import hosts, naming
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note
+from sessionorc.models import GRANT_ALIASES, GRANTS, STATE_RANK, report_line, stop_note
 from sessionorc.tmux import attach_argv
 
 
@@ -137,11 +137,41 @@ def cmd_wait(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def _identity_line() -> None:
+    """The host's identity mode, once (design §4.8a: *`ao status -v` and the Org's teams line say
+    which mode a host is in*, since `observe` is a host that is not yet protected). One line for
+    the host, never one per session, and beside it whether the detached-process check is on — a
+    host where it is off is not to be taken for one where it is on. An agent too old to answer
+    `identity`, or one that is down, simply says nothing: this is a note on a listing, not the
+    listing."""
+    try:
+        r = call_sync("identity")
+    except (AgentError, AgentUnavailable, OSError):
+        return
+    if not isinstance(r, dict) or not r.get("mode"):
+        return
+    check = "on" if r.get("detached_check") else "off"
+    alarms = len(r.get("alarms") or []) + sum(len(v or []) for v in (r.get("sessions") or {}).values())
+    note = "" if r["mode"] == "enforce" else " — this host is not enforcing it yet (design §4.8a)"
+    tail = f" · {alarms} identity alarm{'' if alarms == 1 else 's'} (`ao identity`)" if alarms else ""
+    print(f"{r.get('host') or ''}: identity {r['mode']} · detached-process check {check}{note}{tail}")
+
+
 def cmd_status(args: argparse.Namespace) -> int:
     sessions = call_sync("list")
+    if hosts.is_node():
+        # design §4.4a: on a node out of reach of its home, this host's sessions only, labelled.
+        # stderr, so `--json` stays the records and nothing else.
+        print(
+            f"offline — {hosts.local_host().name} is a node of {hosts.home_name()}, which is unreachable: "
+            "this host's sessions only; no mail, no org",
+            file=sys.stderr,
+        )
     if args.json:
         print(json.dumps(sessions, indent=1))
         return 0
+    if args.verbose:
+        _identity_line()
     if not sessions:
         print("no sessions")
         return 0
@@ -160,7 +190,7 @@ def cmd_status(args: argparse.Namespace) -> int:
             if s.get("project"):
                 print(f"{'':<{w}}      project: {s['project']}")
             # Both directions of membership (design §4.8): what may act on this session, and — for
-            # an orchestrator — what it may act on. The second is derived from the records here,
+            # a lead — what it may act on. The second is derived from the records here,
             # never stored, which is the same rule the Focus member list follows.
             if s.get("controllers"):
                 print(f"{'':<{w}}      under:  {', '.join(s['controllers'])}")
@@ -168,12 +198,22 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      members: {', '.join(members)}")
             if note := stop_note(s):
                 print(f"{'':<{w}}      {note}")
+            # design §4.5a **title** (§4.3 `title()`, TD-074): the session's name as its tool holds
+            # it — set in the tool and never here, shown wherever agentorc shows its own name.
+            if title := str(s.get("title") or "").strip():
+                print(f"{'':<{w}}      title:  {title}")
             if model := short_model(s.get("adapter") or "", s.get("model")):
                 print(f"{'':<{w}}      model:  {model}")
             if line := report_line(s):
                 print(f"{'':<{w}}      report: {line}")
             if s.get("findings"):
                 print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
+            if ow := s.get("out_of_work"):
+                print(f"{'':<{w}}      out of work {_age(ow['at'])}: {ow['why']}")
+            # design §4.8 `doing` (TD-074): what the session says it is doing, always with its age —
+            # which is what makes a stale line read as stale
+            if (doing := s.get("doing")) and doing.get("text"):
+                print(f"{'':<{w}}      doing {_age(str(doing.get('at') or ''))} ago: {doing['text']}")
             # Mail (design §4.10): the unread count and the marks — never a body, which `ao inbox`
             # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
             if unread := s.get("unread"):
@@ -194,6 +234,20 @@ def _attach(args: argparse.Namespace, sid: str, result: Any | None = None) -> in
     tick behind; `cmd_focus` refuses a known-gone pane before getting here) gets a clear line
     rather than tmux's. Under `--json` nothing is run: the argv is printed for the caller."""
     argv = attach_argv(sid, socket_name=os.environ.get("AGENTORC_TMUX_SOCKET"))
+    if result and result.get("host") and result["host"] != hosts.local_host().name:
+        # Another host's session (design §4.4a "Reach"): a container node on this machine is reached
+        # by `docker exec` into it, from what the home derived when it dialed in.
+        reach = (result.get("host_link") or {}).get("reach") or {}
+        if not reach.get("container"):
+            return fail(
+                args,
+                f"{sid} runs on {result['host']}: no terminal reaches it from here (a container node's reach "
+                f"comes with its link; a machine node's waits for the terminal over the link, TD-057 *Later*)",
+                1,
+            )
+        from sessionorc import containers  # as `cmd_host` does: docker's module, loaded only when a node is in play
+
+        argv = containers.attach_argv_in(reach["container"], reach.get("user") or "root", naming.split_address(sid)[0])
     if args.json:
         print(json.dumps({**(result or {"id": sid}), "attach": argv}, indent=1))
         return 0
@@ -278,7 +332,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "profile": args.profile or role.profile or "",
         "prompt": prompt,
-        "capabilities": list(dict.fromkeys([*role.grants, *(args.grant or [])])),
+        "capabilities": list(dict.fromkeys([*role.grants, *grant_names(args.grant or [])])),
         "controllers": ids,
         "lane": lane,
         "role": role.name,
@@ -350,12 +404,13 @@ def cmd_new(args: argparse.Namespace) -> int:
         team=getattr(args, "team", None) or "",  # badges (design §4.9): plain strings, unvalidated
         project=getattr(args, "project", None) or "",
         **_stop(args),
+        **({"host": args.host} if getattr(args, "host", None) else {}),  # sent only when set (§4.4 skew rule)
     )
     if not s.get("controllers") and not args.json:
         # Design §4.8: an empty list is the explicit default, not an error — but an unattended
         # worker nobody may act on is rarely what was meant, so `ao new` says so once, here,
-        # rather than leaving it to be discovered when a nudge is refused.
-        print(f"{s['id']} starts with no controller: nobody may act on it (ao control <orc> add {s['name']})")
+        # rather than leaving it to be discovered when a send is refused.
+        print(f"{s['id']} starts with no controller: nobody may act on it (ao control <controller> add {s['name']})")
     if s.get("previous_run") and not args.json:
         # the same note the New session form shows before Start (design §4.1, TD-030)
         print(f"replaces the earlier {s['name']} — run log kept: {s['previous_run']}")
@@ -413,7 +468,16 @@ def cmd_roles(args: argparse.Namespace) -> int:
 
 def _org_here(directory: pathlib.Path) -> orgmod.Org:
     """`~/.agentorc/org.yml`, plus a repo's own `teams:` when the command is run inside one — the
-    org file wins a name collision (design §4.9). Read on every use and cached nowhere."""
+    org file wins a name collision (design §4.9). Read on every use and cached nowhere.
+
+    On a node the org is not here (design §4.4a: `org.yml` lives on the home), and a local file
+    that disagreed with the home's would start a team the home knows nothing about."""
+    if hosts.is_node():
+        raise ValueError(
+            f"the org lives on {hosts.home_name()} (home): run `ao team` there — "
+            f"{hosts.local_host().name} is a node, and a node does not read the org from the home "
+            "(design §4.4a: decided, not built)"
+        )
     o = orgmod.load()
     cfg = repoconfig.discover(directory)
     if cfg.teams and cfg.root:
@@ -479,17 +543,28 @@ def cmd_team_stop(args: argparse.Namespace) -> int:
     directory = pathlib.Path(args.dir or os.getcwd())
     try:
         org = _org_here(directory)
-        st = teamrun.stop_members(call_sync, org, args.name, now=args.now)
+        # A lead stopping its own team is the wind-down of §4.9a: same sequence, never typed at.
+        st = teamrun.stop_members(call_sync, org, args.name, now=args.now, caller=os.environ.get("AGENTORC_SESSION"))
     except (teams.TeamError, ValueError) as e:
         return fail(args, str(e), 1)
-    acted = teamrun.stop_lead(call_sync, st, timeout=args.timeout).acted
+    acted = teamrun.stop_lead(call_sync, st, timeout=args.timeout, close=args.close).acted
     result = {"team": args.name, "now": bool(args.now), "sessions": acted}
 
     def prose() -> None:
         for e in acted:
             state = f"  ({e['state']})" if e.get("state") and e["state"] != "?" else ""
             print(f"{e['id']}  {e['role']}: {e['action']}{state}")
-        waiting = [e["id"] for e in acted if e.get("state") not in (*teamrun.SETTLED, "killed", None)]
+            if e.get("left_open"):
+                print(f"    left open: {e['left_open']}")
+        # Members only: the window is theirs. The lead's wrap-up is sent after it and nothing waits
+        # on it, so its `?` used to be printed as *still working* on every stop (seen 2026-09-17).
+        waiting = [
+            e["id"]
+            for e in acted
+            if e["role"] == "member"
+            and not e.get("refused")
+            and e.get("state") not in (*teamrun.SETTLED, "killed", None)
+        ]
         if waiting:
             print(f"still working when the {args.timeout:g}s window passed: {', '.join(waiting)}")
 
@@ -506,9 +581,11 @@ def cmd_team_status(args: argparse.Namespace) -> int:
         org = _org_here(directory)
         # the names the definition would start; a definition that cannot start (a checkout gone,
         # say) is not an error here — status reads what is running, and says what is not
-        expected = [x.name for x in teams.plan(org, args.name, hosts.local_host().name).launches]
-    except (teams.TeamError, ValueError):
-        pass
+        plan = teams.plan(org, args.name, hosts.local_host().name, files=teamrun.files_via(call_sync))
+        expected = [x.name for x in plan.launches]
+    except (teams.TeamError, ValueError) as e:
+        if hosts.is_node():  # the one reason worth saying: the definition is not missing, it is elsewhere
+            print(str(e), file=sys.stderr)
     found = teamrun.badged(args.name, call_sync("list"))
     lead, members = teamrun.split(args.name, found, org)
     rows = [
@@ -550,9 +627,12 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             return
         w = max(len(r["name"]) for r in rows)
         for r in rows:
-            live = f"{r['live']} live" if r["live"] else "stopped"
+            # *stopped* and *wound down* are different facts about a team (§4.9a, TD-053 step 6),
+            # and the strip says which — so this does too, from the same rows, or the page and the
+            # CLI would disagree about the same definition.
+            live = f"{r['live']} live" if r["live"] else ("wound down" if r["wound_down"] else "stopped")
             print(
-                f"{r['name']:<{w}}  {live:<8}  lead: {r['lead']}  members: {r['members']}  "
+                f"{r['name']:<{w}}  {live:<10}  lead: {r['lead']}  members: {r['members']}  "
                 f"projects: {', '.join(r['projects'])}  [{r['source']}]"
             )
 
@@ -655,10 +735,22 @@ def cmd_mode(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: {'unattended' if s['unattended'] else 'interactive'}"))
 
 
+def grant_names(names: list[str]) -> list[str]:
+    """Grants as typed, with a renamed one under its current name and one stderr line saying so
+    (TD-055: `orchestrate` is `control`, accepted for one release)."""
+    for old in dict.fromkeys(n for n in names if n in GRANT_ALIASES):
+        print(
+            f"grant `{old}` is now `{GRANT_ALIASES[old]}` (TD-055); `{old}` is still accepted for one release",
+            file=sys.stderr,
+        )
+    return list(dict.fromkeys(GRANT_ALIASES.get(n, n) for n in names))
+
+
 def cmd_grants(args: argparse.Namespace) -> int:
-    """`ao grant <id> orchestrate` / `ao revoke <id> orchestrate` (design §4.8): edit the record's
-    `capabilities`; the agent applies it on the session's next call."""
-    edit = {"add": args.grants} if args.cmd == "grant" else {"remove": args.grants}
+    """`ao grant <id> control` / `ao revoke <id> control` (design §4.8): edit the record's
+    `capabilities`; the host agent applies it on the session's next call."""
+    grants = grant_names(args.grants)
+    edit = {"add": grants} if args.cmd == "grant" else {"remove": grants}
     s = call_sync("set_grants", id=args.id, **edit)
     return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
 
@@ -673,11 +765,11 @@ def cmd_until(args: argparse.Namespace) -> int:
 
 
 def cmd_control(args: argparse.Namespace) -> int:
-    """`ao control <orc> add|remove <session>…` (design §4.8, TD-036): edit membership from the
-    orchestrator's side, which is how a person thinks about it — *this orc controls these
+    """`ao control <controller> add|remove <session>…` (design §4.8, TD-036): edit membership from
+    the controller's side, which is how a person thinks about it — *this lead controls these
     sessions* — while the list itself lives on each target. One `set_controllers` call per target,
     so a refusal names the session it refused and the rest still stand."""
-    orc = resolve(args.orc)
+    orc = resolve(args.controller)
     edit = "add" if args.action == "add" else "remove"
     done, refused = [], []
     for ident in args.sessions:
@@ -719,13 +811,86 @@ def _own_session(args: argparse.Namespace) -> str | None:
 
 def cmd_progress(args: argparse.Namespace) -> int:
     """`ao progress claim|done|drop <ref>` (design §4.8): declare a lane item claimed before the
-    first edit and its result before moving on. Ungated, and lands on this session's own record."""
+    first edit and its result before moving on. Ungated, and lands on this session's own record.
+    `ao progress none --why "…"` (§4.9a) takes no reference: this session searched and found
+    nothing it may pick, which tells its lead an exit is an ending rather than a crash."""
     sid = _own_session(args)
     if sid is None:
         return 2
+    if args.action == "none":
+        if args.ref or args.pr:
+            return fail(args, 'ao progress none takes no reference and no --pr, only --why "<the search>"', 2)
+        s = call_sync("progress", id=sid, status="none", why=args.why)
+        return emit(args, s, lambda: print(f"{s['id']}: out of work — {s['out_of_work']['why']}"))
+    if not args.ref:
+        return fail(args, f"ao progress {args.action} needs a reference", 2)
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
-    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why)
+    # `force` only when asked (TD-062 fix (a)): unset is `None`, which the client leaves out of the
+    # envelope, so a host agent older than TD-056 still answers every call that does not force
+    s = call_sync("progress", id=sid, ref=args.ref, status=status, pr=args.pr, why=args.why, force=args.force or None)
+    if (held := s.get("lease_overridden")) and not args.json:
+        print(f"{s['id']}: claimed over {held['session']}'s lease (since {held['at']})", file=sys.stderr)
     return emit(args, s, lambda: print(f"{s['id']}: {report_line(s) or args.ref}"))
+
+
+def cmd_doing(args: argparse.Namespace) -> int:
+    """`ao doing "<line>"` (design §4.8, TD-074): one line, this session's own word for what it is
+    doing now — said when it claims and whenever what it is doing changes; a lead says its round.
+    The last line replaces the one before, and `--clear` empties it. It lands on this session's own
+    record and no other: the host agent refuses it from anyone but the session (§9 invariant 14),
+    so there is no `--id` to aim it elsewhere."""
+    sid = _own_session(args)
+    if sid is None:
+        return 2
+    if args.clear:
+        if args.words:
+            return fail(args, "ao doing --clear takes no line", 2)
+        s = call_sync("doing", id=sid, clear=True)
+        return emit(args, s, lambda: print(f"{s['id']}: doing cleared"))
+    if not args.words:
+        return fail(args, 'ao doing needs a line: ao doing "<what you are doing now>", or --clear', 2)
+    s = call_sync("doing", id=sid, text=" ".join(args.words))
+    return emit(args, s, lambda: print(f"{s['id']}: doing — {s['doing']['text']}"))
+
+
+def cmd_whoami(args: argparse.Namespace) -> int:
+    """`ao whoami` (design §4.8a): what the host agent takes this process to be — a session (and by
+    which signal: ancestry, session id or terminal), *outside* every pane, or *unknown* — read from
+    the connection, never from `AGENTORC_SESSION`. For a person or a session checking its own channel."""
+    w = call_sync("whoami")
+
+    def human() -> None:
+        if w.get("channel") is None:
+            print("identity is off on this host: nothing is classified (design §4.8a)")
+        elif w["channel"] == "session":
+            print(f"session {w['session']} (by {w['signal']})")
+        else:
+            print(w["channel"] + (f" ({w['signal']})" if w.get("signal") else ""))
+
+    return emit(args, w, human)
+
+
+def cmd_identity(args: argparse.Namespace) -> int:
+    """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,
+    connections by class and deciding signal since the host agent started, and the identity alarms —
+    what a host is turned from `observe` to `enforce` on."""
+    r = call_sync("identity")
+
+    def human() -> None:
+        check = "on" if r["detached_check"] else "off"
+        print(f"{r['host']}: identity {r['mode']} · detached-process check {check}")
+        tally = " · ".join(f"{k} {v:,}" for k, v in r["tally"].items()) or "no connection classified yet"
+        print(f"  since start: {tally}")
+        rows = [("(no record)", a) for a in r["alarms"]]
+        rows += [(sid, a) for sid, alarms in r["sessions"].items() for a in alarms]
+        if not rows:
+            print("  no identity alarms")
+        for about, a in rows:
+            claimed = a["claimed"] or "no caller"
+            times = a["at"] if a["count"] == 1 else f"{a['at']} … {a['last']}"
+            print(f"  ALARM {about}: {a['channel']} claimed {claimed} on {a['rpc']} ×{a['count']} ({times})")
+
+    return emit(args, r, human)
 
 
 def cmd_finding(args: argparse.Namespace) -> int:
@@ -762,36 +927,75 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "reply_to": args.reply_to,
         "bound": args.bound,
         "cites": _refs(args.cites) if args.cites else None,
+        "default": args.default,
     }
-    got = call_sync("msg", **{k: v for k, v in params.items() if v is not None})
+    got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
 
     def prose() -> None:
         e = got["entry"]
         print(
             f"{e['id']} {e['kind']} → {', '.join(got['delivered'])}"
-            + (f"  (ask bound {e['bound']})" if e.get("bound") else "")
+            + (f"  (bound {e['bound']})" if e.get("bound") else "")
         )
+        if e.get("default"):
+            print(f"unless told otherwise: {e['default']}")
+        if got.get("advice"):  # one line from the home, not a refusal (design §4.10)
+            print(got["advice"])
         if got.get("closed"):
             print(f"closed {got['closed']}")
         if got.get("copies"):
             print(f"copied to {', '.join(got['copies'])}")
         if got.get("copies_failed"):
             print(f"copies failed (dropped): {', '.join(got['copies_failed'])}")
+        if got.get("unreachable"):  # design §4.4a: landed at the home, read when the host's link returns
+            print(f"landed — host unreachable: {', '.join(got['unreachable'])}")
         for asked, now in (got.get("forwarded") or {}).items():
             print(f"forwarded: {asked} was resumed as {now}")
 
     return emit(args, got, prose)
 
 
+def _left(iso: str) -> str:
+    """How long a bound still has to run, in `_age`'s units; `overdue` once it has passed (the
+    sweep closes it on the host agent's next tick)."""
+    try:
+        dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+    except ValueError:
+        return "?"
+    secs = int((dt - datetime.now(UTC)).total_seconds())
+    if secs <= 0:
+        return "overdue"
+    if secs < 60:
+        return f"{secs}s"
+    if secs < 3600:
+        return f"{secs // 60}m"
+    if secs < 86400:
+        return f"{secs // 3600}h"
+    return f"{secs // 86400}d"
+
+
 def _inbox_status(e: dict[str, Any]) -> str:
+    """What an entry's line says about where it stands (design §4.10 "One way of being closed"):
+    its `closed_reason` when it has one — `lapsed` for a `steer` whose bound passed, where nothing
+    failed — else how long is left on its bound, or that the person has paused its clock. An `ask`
+    to the person carries no bound at all, and says so."""
     parts = ["read" if e.get("read_at") else "unread"]
-    if e.get("kind") in ("ask", "conflict"):
-        if e.get("closed_by"):
-            parts.append(f"closed by {e['closed_by']}")
+    if e.get("kind") in ("ask", "steer", "conflict"):
+        when = e.get("closed_at") or e.get("expired_at") or ""
+        if e.get("closed_reason") == "replied" or e.get("closed_by"):
+            parts.append(f"closed by {e.get('closed_by') or 'a reply'}")
+        elif e.get("closed_reason"):
+            parts.append(f"{e['closed_reason']} {when}".strip())
         elif e.get("expired_at"):
             parts.append(f"expired {e['expired_at']}")
+        elif e.get("paused_at"):
+            parts.append(f"open, paused by the person {_age(e['paused_at'])} ago")
         elif e.get("bound"):
-            parts.append(f"open, bound {e['bound']}")
+            parts.append(f"open, {_left(e['bound'])} left")
+        else:
+            parts.append("open, no bound — it never expires")
+    if e.get("snoozed_until"):
+        parts.append(f"snoozed until {e['snoozed_until']}")
     return ", ".join(parts)
 
 
@@ -819,6 +1023,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
             print(f"\n{head} · {_inbox_status(e)}")
             for line in str(e["text"]).splitlines() or [""]:
                 print(f"  {line}")
+            if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
+                print(f"  default: {e['default']}")
 
     return emit(args, got, prose)
 
@@ -853,6 +1059,69 @@ def cmd_service(args: argparse.Namespace) -> int:
         return emit(args, {"ok": True}, lambda: print("units disabled and removed (tmux sessions untouched)"))
     status = service.status()
     return emit(args, {"status": status}, lambda: print(status))
+
+
+def cmd_host(args: argparse.Namespace) -> int:
+    """`ao host up|rebuild|forget|status <name>` (design §4.4a "A container node", TD-057 step 3c):
+    the home brings a container node up from the repo's devcontainer definition, installs the
+    agent in it at its own version and starts it; `status` reads the container and the link;
+    `forget` is the removal path a runtime needs that a machine did not."""
+    from sessionorc import containers
+
+    try:
+        if args.action in ("up", "rebuild"):
+            out = containers.host_up(args.name, rebuild=args.action == "rebuild")
+            return emit(
+                args,
+                out,
+                lambda: print(
+                    f"{out['node']}: container {out['container'][:12]} as {out['user']}, {out['wheel']} installed; "
+                    + ("agent started" if out["started"] else f"agent already running (pid {out['pid']})")
+                    + " — `ao status` shows its card once it dials in"
+                ),
+            )
+        if args.action == "forget":
+            out = containers.host_forget(args.name, purge=args.purge)
+            try:
+                out["records"] = call_sync("forget_host", host=args.name)
+            except (AgentError, AgentUnavailable) as e:
+                out["records"] = {"error": str(e)}
+            return emit(
+                args,
+                out,
+                lambda: print(
+                    f"{out['node']}: container {'removed' if out['container'] else 'none'}, link directory removed, "
+                    f"`nodes:` entry {'removed' if out['entry_removed'] else 'not found'}, "
+                    f"volume {'kept' if out['volume_kept'] else 'purged'}; records at the home: {out['records']}"
+                ),
+            )
+        out = containers.host_status(args.name)
+        try:
+            links = call_sync("host").get("links") or {}
+            out["link"] = links.get(args.name) or {"up": False, "why": "never linked"}
+        except (AgentError, AgentUnavailable) as e:
+            out["link"] = {"up": False, "why": f"host agent: {e}"}
+
+        def prose() -> None:
+            print(f"{out['node']}: devcontainer {out['devcontainer']}")
+            print(f"  container: {(out['container'] or 'none')[:12]} {out['state'] or ''}".rstrip())
+            print(f"  agent pid: {out['pid'] if out['pid'] else 'none'}")
+            b = out.get("build") or {}
+            behind = ""
+            if not b.get("home"):
+                behind = "  — this home has no wheel to compare it with (the promote writes one)"
+            elif b.get("running") != b.get("home"):
+                behind = f"  — behind the home's {b['home']}"
+            print(f"  build: {b.get('running') or 'unknown'}{behind}")
+            link = out["link"]
+            print(f"  link: {'up' if link.get('up') else 'down'} — {link.get('why', '')}")
+            for k, v in (out.get("reach") or {}).items():
+                if k in ("terminal", "vscode"):  # the rest is shown above, or is theirs
+                    print(f"  {k}: {v}")
+
+        return emit(args, out, prose)
+    except containers.ContainerError as e:
+        return fail(args, str(e), 2)
 
 
 def fail(args: argparse.Namespace, message: str, code: int, prose: str | None = None, **extra: Any) -> int:
@@ -929,8 +1198,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--grant",
         action="append",
-        choices=GRANTS,
-        help="a grant the session starts with (design §4.8); `orchestrate` lets it act on other sessions",
+        choices=[*GRANTS, *GRANT_ALIASES],
+        help="a grant the session starts with (design §4.8); `control` lets it act on other sessions",
     )
     p.add_argument(
         "--controller",
@@ -961,6 +1230,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="the project it is started under (design §4.9): the badge, and the Project block in front of the brief "
         "naming each of the project's repos on this host when there is more than one",
     )
+    p.add_argument(
+        "--host",
+        help="the host it lands on (design §4.4a): a `nodes:` entry of this home; the create is gated here and run "
+        "there, and the reply is addressed <id>@<host>. Default: this host",
+    )
     p.add_argument("--attach", action="store_true", help="then attach this terminal to it (tmux attach)")
     p.set_defaults(fn=cmd_new)
 
@@ -986,6 +1260,11 @@ def build_parser() -> argparse.ArgumentParser:
     q.add_argument("name")
     q.add_argument("--now", action="store_true", help="kill each session instead of sending the wrap-up prompt")
     q.add_argument("--timeout", type=float, default=300.0, help="seconds to wait for the members (default: 300)")
+    q.add_argument(
+        "--close",
+        action="store_true",
+        help="also close each member that settled clean and pushed, so `ao team start` can run again",
+    )
     q.set_defaults(fn=cmd_team_stop)
 
     q = add_team("status", help="each member of a live team with its state, lane and report line")
@@ -1068,27 +1347,37 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_until)
 
     for name, help_ in (
-        ("grant", "give a session a grant: `orchestrate` lets it act on other sessions (design §4.8)"),
+        ("grant", "give a session a grant: `control` lets it act on other sessions (design §4.8)"),
         ("revoke", "take a grant away from a session"),
     ):
         p = add(name, help=help_)
         p.add_argument("id")
-        p.add_argument("grants", nargs="+", choices=GRANTS, metavar="grant")
+        p.add_argument("grants", nargs="+", choices=[*GRANTS, *GRANT_ALIASES], metavar="grant")
         p.set_defaults(fn=cmd_grants)
 
-    p = add("control", help="say which sessions an orchestrator may act on (design §4.8)")
-    p.add_argument("orc", help="the orchestrating session (id or name)")
+    p = add("control", help="say which sessions a controller (a lead) may act on (design §4.8)")
+    p.add_argument("controller", help="the controlling session, usually a lead (id or name)")
     p.add_argument("action", choices=["add", "remove"])
     p.add_argument("sessions", nargs="+", metavar="session", help="the sessions it controls (id or name)")
     p.set_defaults(fn=cmd_control)
 
-    p = add("progress", help="declare a reference claimed, done, or dropped (design §4.8)")
-    p.add_argument("action", choices=["claim", "done", "drop"])
-    p.add_argument("ref", help="a ledger id (TD-027), a PR number, or an attention-board line")
+    p = add("progress", help="declare a reference claimed, done, or dropped, or yourself out of work (design §4.8)")
+    p.add_argument("action", choices=["claim", "done", "drop", "none"])
+    p.add_argument("ref", nargs="?", help="a ledger id (TD-027), a PR number, or an attention-board line")
     p.add_argument("--pr", help="the PR the work is on")
-    p.add_argument("--why", help="why it was dropped")
+    p.add_argument("--why", help="why it was dropped; with `none`, the search that came up empty (required)")
+    p.add_argument("--force", action="store_true", help="claim a reference another live session holds (design §4.8)")
     p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
     p.set_defaults(fn=cmd_progress)
+
+    p = add("whoami", help="what the host agent takes this process to be, from its connection (design §4.8a)")
+    p.set_defaults(fn=cmd_whoami)
+    p = add("identity", help="this host's identity mode, the connections it has classified, and its alarms (§4.8a)")
+    p.set_defaults(fn=cmd_identity)
+    p = add("doing", help="say in one line what this session is doing now (design §4.8)")
+    p.add_argument("words", nargs="*", metavar="line", help="one line; the last one replaces the one before")
+    p.add_argument("--clear", action="store_true", help="empty the line: this session is saying nothing")
+    p.set_defaults(fn=cmd_doing)
 
     p = add("finding", help="declare a reference this session filed on the side (design §4.8)")
     p.add_argument("ref")
@@ -1098,10 +1387,19 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("msg", help="put a message in a session's inbox, or the person inbox (design §4.10)")
     p.add_argument("words", nargs="+", metavar='to… "text"', help="addressees (ids, names, or person), then the text")
-    p.add_argument("--kind", choices=["note", "ask", "reply", "conflict"], help="default: note (reply with --reply-to)")
+    p.add_argument(
+        "--kind",
+        choices=["note", "ask", "steer", "reply", "conflict"],
+        help="default: note (reply with --reply-to)",
+    )
     p.add_argument("--about", help="the reference it concerns: a session id, a TD-NNN, a PR")
     p.add_argument("--reply-to", dest="reply_to", help="the entry this answers (the addressee defaults to its sender)")
-    p.add_argument("--bound", type=float, help="an ask's bound in seconds (default: the host agent's)")
+    p.add_argument("--default", help="a steer: the one line you will go with unless told otherwise (required on it)")
+    p.add_argument(
+        "--bound",
+        type=float,
+        help="a steer's or an ask's bound in seconds (default: the host agent's; an ask to the person takes none)",
+    )
     p.add_argument("--cites", help="a conflict: the `sends` ids it cannot reconcile, comma-separated")
     p.set_defaults(fn=cmd_msg)
 
@@ -1113,6 +1411,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--bind", default="127.0.0.1")
     p.add_argument("--port", type=int, default=8765)
     p.set_defaults(fn=cmd_ui)
+
+    p = add("host", help="a container node: bring it up, rebuild it, forget it, or read its state (design §4.4a)")
+    p.add_argument("action", choices=["up", "rebuild", "forget", "status"])
+    p.add_argument("name", help="the `nodes:` entry in hosts.yml with a `container:` block")
+    p.add_argument("--purge", action="store_true", help="forget: also delete the node's volume (its run logs)")
+    p.set_defaults(fn=cmd_host)
 
     p = add("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
     p.add_argument("action", choices=["install", "uninstall", "status"])
@@ -1136,9 +1440,11 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     clientmod.last_mail = None
+    clientmod.last_ignored = []
     try:
         return _run(args)
     finally:
+        skew_line(args)
         unread_line(args)
 
 
@@ -1152,6 +1458,24 @@ def _run(args: argparse.Namespace) -> int:
     except AgentError as e:
         # the holder's id and state under --json (TD-030); `fail`'s own keywords are not overridable
         return fail(args, str(e), 1, **{k: v for k, v in e.data.items() if k not in ("prose", "code", "message")})
+
+
+def skew_line(args: argparse.Namespace) -> None:
+    """TD-062 (b): the running host agent did not know a parameter this command sent, and said so
+    rather than refusing the call. The command worked — without that parameter — so this is a note,
+    never an error. Skew is the usual cause and promoting the live install is the usual answer
+    (CLAUDE.md, "The live copy is promoted, not edited"), but a caller bug against an agent of the
+    same age looks identical from here, so the line says what happened before it says why. The
+    agent logs the same thing with the method name, which is what tells the two apart. Accumulated
+    across every call the command made, and always on stderr: a `--json` caller parses stdout."""
+    if not (dropped := clientmod.last_ignored):
+        return
+    sys.stdout.flush()
+    print(
+        f"[agentorc] the host agent does not know {', '.join(dropped)}: it ran the call without "
+        "them. If this `ao` is newer than the running agent, promote the live install.",
+        file=sys.stderr,
+    )
 
 
 def unread_line(args: argparse.Namespace) -> None:

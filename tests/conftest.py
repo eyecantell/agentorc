@@ -10,7 +10,7 @@ Two agents are on offer:
   pumps that fixture's loop.
 
 Both use a private tmux server (`-L ao-test-<uuid>`), a temp `AGENTORC_HOME` and a temp
-`CLAUDE_CONFIG_DIR` (the default profile's registry; registry-only cards would otherwise show this
+`CLAUDE_CONFIG_DIR` (the default profile's registry; the occupancy check would otherwise see this
 machine's live Claude sessions, TD-010 a), never the
 user's. `subprocess_agent` sets the env in the test process too: the UI under `TestClient` runs
 here and reads `paths.socket_path()` and `AGENTORC_TMUX_SOCKET` from `os.environ` at call time.
@@ -42,6 +42,19 @@ from sessionorc.agent import HostAgent
 from sessionorc.tmux import Tmux
 
 HERE = Path(__file__).parent
+
+
+@pytest.fixture(autouse=True)
+def _identity_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Design §4.8a *Tests*: the suite drives the socket from the pytest process — under no pane —
+    and passes `caller=<id>` to stand for a session, which is exactly what the rule table calls a
+    forgery. So an agent built here with no mode of its own runs `off`; the classification is
+    tested directly (tests/test_identity.py), and `enforce` against real panes there too."""
+    from sessionorc import identity
+
+    monkeypatch.setattr(identity, "DEFAULT_MODE", "off")
+
+
 CHILD = HERE / "_agent_child.py"
 FAST_TICK = 0.3
 
@@ -125,6 +138,26 @@ def _sweep_stale_test_servers():
 
 
 @pytest.fixture(scope="session", autouse=True)
+def _never_docker():
+    """Docker is not in `pdm run test` (TD-057 3c.2): a host agent's container supervisor that
+    reaches `containers.Runner` here gets a refusal, never the machine's docker. A test that wants
+    the seam builds its own fake on the original class."""
+    from sessionorc import containers
+
+    class NoDocker(containers.Runner):
+        def run(self, cmd, *, check=True, stream=False):
+            raise containers.ContainerError("docker is not in pdm run test: give the agent a fake container_runner")
+
+        def devcontainer(self):
+            raise containers.ContainerError("docker is not in pdm run test: give the agent a fake container_runner")
+
+    original = containers.Runner
+    containers.Runner = NoDocker
+    yield
+    containers.Runner = original
+
+
+@pytest.fixture(scope="session", autouse=True)
 def _never_this_machines_home(tmp_path_factory):
     """No test reads this machine's `~/.agentorc` or `~/.claude` (TD-044).
 
@@ -204,6 +237,43 @@ async def wait_state(client, sid: str, state: str, timeout: float = 6.0) -> dict
         await asyncio.sleep(0.1)
         s = await client.call("get", id=sid)
     raise AssertionError(f"{sid} never reached {state}: {s['state']} {s.get('tail')} {pane_line(sid)}")
+
+
+async def derived(agent, check, timeout: float = 10.0):
+    """Drive derivations until `check()` holds, and return what it returned (TD-063).
+
+    `tick()` starts a derivation only when `self._derive_task` is None or done, and the `agent`
+    fixture runs a live tick loop at `FAST_TICK`. So a background tick can already own an in-flight
+    derive whose snapshot predates whatever the test just changed — a `git checkout`, a `gh` stub —
+    and the test's own `tick()` then starts nothing at all: `await agent._derive_task` awaits that
+    stale derive, which legitimately still reports the old answer. Seen on CI 2026-09-17 as
+    `test_the_tick_retires_a_branch_claim_the_session_abandoned` asserting `progress == []` one
+    derive too early. Waiting on the condition instead of on one task is what makes it deterministic:
+    a stale derive costs a retry rather than a failure, and nothing here waits on a duration.
+
+    `check` is called after each round and may be a coroutine function.
+    """
+    end = time.monotonic() + timeout
+    while True:
+        if (t := agent._derive_task) is not None and not t.done():
+            # A derive this helper did not start: whatever it raises belongs to the round that
+            # started it, not to this one, and the round below is the one under test.
+            with contextlib.suppress(Exception):
+                await t  # let a tick's in-flight derive finish before asking for a fresh one
+        agent._git_checked.clear()  # the branch read has its own cadence; the derive follows it
+        agent._derived_at.clear()
+        await agent.tick()
+        if (t := agent._derive_task) is not None:
+            await t  # not suppressed: this is the derive the round asked for, and its traceback is
+            # worth more than the generic timeout below (review of PR #199)
+        got = check()
+        if asyncio.iscoroutine(got):
+            got = await got
+        if got:
+            return got
+        if time.monotonic() > end:
+            raise AssertionError(f"the derive never satisfied {getattr(check, '__doc__', None) or check}")
+        await asyncio.sleep(0.05)
 
 
 # -- the in-process agent -----------------------------------------------------------------------

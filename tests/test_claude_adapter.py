@@ -402,3 +402,23 @@ def test_composer_reads_painted_text_only():
     assert ad.composer(["\x1b[39m❯\xa0\x1b[38;5;153m/exit\x1b[39m", status]) == "/exit"
     assert ad.composer(["Do you trust the files in this folder?", "  Yes, proceed", "  No, exit"]) is None
     assert ad.composer([]) is None
+
+
+def test_title_is_the_tools_own_name_for_the_session_or_nothing():
+    """TD-074 step 3, design §4.3 `title()` / §4.5a **title**: the terminal title the tool set, with
+    its own decoration off. What is left is a name — often the person's own, given with the tool's
+    rename — unless there is nothing left, it is the tool's default, or it is a shell's
+    `user@host: dir` on a pane the tool never titled. Display only: agentorc never sets it."""
+    ad = ClaudeCodeAdapter()
+    assert ad.title("✳ Error Checker") == "Error Checker"  # seen on a live pane 2026-09-19
+    assert ad.title("  ✻  TD-074 steps 3 and 4  ") == "TD-074 steps 3 and 4"
+    assert ad.title("⣷ Error Checker") == "Error Checker"  # a spinner frame is a glyph too
+    assert ad.title("Error Checker") == "Error Checker"  # undecorated, and still a name
+    # one mark and only before a space: a name a person chose may open with a character of its own
+    assert ad.title("* priority fix") == "* priority fix" and ad.title("•bullet") == "•bullet"
+    # not a name: nothing there, the tool's own default, a shell's
+    assert ad.title("") is None and ad.title("   ") is None and ad.title("✳") is None
+    assert ad.title("Claude Code") is None and ad.title("✳ claude") is None
+    assert ad.title("kmaster@dev: ~/agentorc") is None
+    # a name that merely contains an @ is still a name
+    assert ad.title("mail @ the inbox") == "mail @ the inbox"

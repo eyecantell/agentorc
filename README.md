@@ -11,8 +11,9 @@ see git status per checkout; press configured command buttons; jump to VS Code; 
 unattended workers with run windows and usage caps. Sessions live on the host, so closing the
 laptop changes nothing.
 
-**Status: phase 1 in progress.** The host agent, the Claude Code adapter, the Org and Focus
-pages, New session and the CLI are built and running; phase 2 (a second host over ssh) is not.
+**Status: phase 1 in progress.** The host agent, the Claude Code adapter, the Org, Focus and
+Inbox pages (mail and the sessions' states; due board items are still to come — TD-069), New session and the CLI are built and
+running; phase 2 (a second host over ssh) is not.
 Read [`docs/design.md`](docs/design.md) — §7 has the phase plan, and what is deferred is in
 [`docs/technical_debt.md`](docs/technical_debt.md).
 
@@ -102,15 +103,41 @@ file the machine's hostname is used, which is rarely what VS Code can resolve. T
 takes `volatile: true` (a laptop: an unreachable agent is asleep, not an alert), `repos_registry`
 (default `~/.config/dev-cadence/repos.txt`; its repos head the New session directory list) and
 `runs_keep_days` (default 30; run logs of exited/closed sessions older than that are deleted on
-the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`.
+the agent's tick, `0` keeps all) — the full shape is in `sessionorc/hosts.py`. A top-level `home: <host>` makes this
+host agent a *node* of that home (design §4.4a); leave it out on a single machine.
+
+**Linking a second machine to the home** (TD-057 step 3a — the link comes up and stays up; nothing is
+forwarded over it yet, so a node still serves only its own host's sessions):
+
+```bash
+# on the node (say `laptop`): a key used for nothing else
+ssh-keygen -t ed25519 -N '' -f ~/.ssh/agentorc-link
+# on the home (kmaster), one line in ~/.ssh/authorized_keys — the name after --host is the node's
+# name as far as the home is concerned, and it is set HERE, never by the node:
+command="agentorc-agent link --host laptop",restrict ssh-ed25519 AAAA… laptop-link
+# on the home, ~/.agentorc/hosts.yml:      nodes: [laptop]
+# on the node, ~/.agentorc/hosts.yml:      home: kmaster
+#                                          local: {name: laptop}
+#                                          link: {ssh: kmaster-link}   # an alias in ~/.ssh/config using that key
+```
+
+`ao`'s `host` RPC (`agentorc-agent rpc` → `{"method": "host"}`) shows the link's state at both ends,
+with the reason when it is down: *ssh failed*, *agent down on the home*, or *refused: …*.
 
 ## CLI
 
 The package installs `agentorc` and an `ao` alias. Reading: `ao status [-v]`, `ao tail`,
 `ao explain`. Acting on a session: `ao new`, `ao shell`, `ao send`, `ao keys`, `ao allow` /
 `ao deny`, `ao mode`, `ao kill`, `ao close`, `ao forget`. Capabilities and reports (design §4.8):
-`ao grant` / `ao revoke`, `ao progress claim|done|drop`, `ao finding`. Serving: `ao ui`,
-`ao service`. `ao new
+`ao grant` / `ao revoke`, `ao progress claim|done|drop`, `ao finding`, `ao doing "<one line>"` (what
+this session is doing now — its card shows it with its age; `--clear` empties it). Who is calling
+(design §4.8a): `ao whoami` (what the host agent takes this process to be, from its connection),
+`ao identity` (this host's mode — `local: {identity: off | observe | enforce}` in `hosts.yml`,
+`observe` by default — its tally of connections, and its identity alarms, which the Inbox also lists with
+**Acknowledge**; `ao status -v` prints the mode and whether the detached-process check is on). Serving: `ao ui`,
+`ao service`. A container node (design §4.4a): `ao host up|rebuild|forget|status <name>`; `ao new
+--host <name>` starts a session on it, every act on the `<id>@<name>` it prints is gated here
+and run there, and `ao focus <id>@<name>` attaches through `docker exec`. `ao new
 --attach` (or `ao shell --attach`) starts the session and attaches your terminal to it — type it
 where you would have typed `claude`, and the session is a first-class card; `ao focus <id>`
 attaches to an existing one. Every

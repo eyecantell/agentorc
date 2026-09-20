@@ -6,7 +6,7 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import FAST_TICK, wait_state
+from conftest import FAST_TICK, derived, wait_for, wait_state
 
 from sessionorc import adapters, naming, paths, reports
 from sessionorc.agent import WRAPUP_GRACE
@@ -377,60 +377,20 @@ async def test_send_wait_three_outcomes(agent, hookstub, tmp_path, monkeypatch):
         agent.tmux.kill_session(s["id"])
 
 
-async def test_registry_only_sessions_get_read_only_cards(agent, hookstub, tmp_path):
-    """TD-010 (a): a live session the adapter sees outside agentorc (no tmux) is a read-only card:
-    state scraped from the registry status, no pane, no controls; it leaves with its process.
-    One of our own sessions, or a session in a directory one of ours holds, is not doubled."""
+async def test_a_session_started_outside_agentorc_gets_no_card(agent, hookstub, tmp_path):
+    """Design §4.1 (2026-09-17): a live session the adapter sees outside agentorc is not shown —
+    the Org is what agentorc started or adopted, and a person's own session is theirs. The registry
+    is still read where the anchor rule needs it (`occupancy`, tested above)."""
     from sessionorc.adapters import ExternalSession
 
-    ext_dir = tmp_path / "vscode"
-    ext_dir.mkdir()
     hookstub.external = [
-        ExternalSession(adapter="hookstub", cwd=str(ext_dir), name="editor", tool_id="u-1", status="busy")
+        ExternalSession(adapter="hookstub", cwd=str(tmp_path / "vscode"), name="editor", tool_id="u-1", status="busy")
     ]
     async with LocalClient() as c:
-        for _ in range(30):  # the next tick builds the card
-            if any(x["id"] == "ext-u-1" for x in await c.call("list")):
-                break
-            await asyncio.sleep(0.1)
-        card = await wait_state(c, "ext-u-1", "working")
-        assert card["external"] is True and card["pane"] is False and card["confidence"] == "scraped"
-        assert card["adapter_id"] == "u-1" and card["dir"] == str(ext_dir) and card["name"] == "editor"
-        assert "ext-u-1" in [x["id"] for x in await c.call("list")]
-        hookstub.external[0] = ExternalSession(
-            adapter="hookstub", cwd=str(ext_dir), name="editor", tool_id="u-1", status="idle"
-        )
-        await wait_state(c, "ext-u-1", "idle")
-        assert (await c.call("seen", id="ext-u-1"))["seen_at"]  # a person may look at it
-        for act in ("kill", "close", "remove", "set_mode"):
-            with pytest.raises(AgentError, match="outside agentorc"):
-                await c.call(act, id="ext-u-1", **({"unattended": True} if act == "set_mode" else {}))
-        with pytest.raises(AgentError, match="outside agentorc"):
-            await c.call("send", id="ext-u-1", text="hi")
-        # our own session in another directory, seen through the registry under its tool id: one card
-        own = await c.call("create", name="own", dir=str(tmp_path), adapter="hookstub")
-        await c.call("hook", session=own["id"], state="idle", adapter_id="u-own")
-        hookstub.external.append(
-            ExternalSession(adapter="hookstub", cwd=str(tmp_path), name="own", tool_id="u-own", status="busy")
-        )
-        # and a registry entry with an unknown id in a directory one of ours holds: our pane before its first hook
-        hookstub.external.append(
-            ExternalSession(adapter="hookstub", cwd=str(tmp_path), name="early", tool_id="u-early", status="busy")
-        )
-        await asyncio.sleep(FAST_TICK * 3)
-        ids = [x["id"] for x in await c.call("list")]
-        assert "ext-u-1" in ids and "ext-u-own" not in ids and "ext-u-early" not in ids
-        # the process ends: the card goes
-        hookstub.external.clear()
-        for _ in range(30):
-            if "ext-u-1" not in [x["id"] for x in await c.call("list")]:
-                break
-            await asyncio.sleep(0.1)
-        else:
-            raise AssertionError("registry-only card outlived its entry")
+        await asyncio.sleep(4 * FAST_TICK)  # several ticks: a card would have appeared by now
+        assert await c.call("list") == []
         with pytest.raises(AgentError, match="no session"):
             await c.call("get", id="ext-u-1")
-        await c.call("kill", id=own["id"])
 
 
 async def test_send_confirms_the_submit(agent, composerstubs, tmp_path, monkeypatch):
@@ -473,7 +433,7 @@ async def test_send_confirms_the_submit(agent, composerstubs, tmp_path, monkeypa
 
 
 async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
-    """Design §4.8, §9 invariant 11: a session acting on another session needs `orchestrate`;
+    """Design §4.8, §9 invariant 11: a session acting on another session needs `control`;
     self, no caller, and every read pass; `set_grants` is a person's (or a granted session's)."""
     async with LocalClient() as person:
         a = (await person.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
@@ -495,10 +455,10 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
                 ("set_mode", {"id": b, "unattended": True}),
                 ("remove", {"id": b}),
                 ("create", {"name": "c", "dir": str(tmp_path), "adapter": "shell"}),
-                ("set_grants", {"id": a, "add": ["orchestrate"]}),  # no self-grant
-                ("set_grants", {"id": b, "add": ["orchestrate"]}),
+                ("set_grants", {"id": a, "add": ["control"]}),  # no self-grant
+                ("set_grants", {"id": b, "add": ["control"]}),
             ):
-                with pytest.raises(AgentError, match="needs the orchestrate grant"):
+                with pytest.raises(AgentError, match="needs the control grant"):
                     await worker.call(method, **params)
             assert (await person.call("get", id=b))["state"] != "closed"
             # session → self: allowed
@@ -511,13 +471,13 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             assert (await worker.call("explain", id=b, lines=3))["id"] == b
             # unknown caller: a session this agent never started holds no grant
             async with LocalClient(caller="ao-stranger") as stranger:
-                with pytest.raises(AgentError, match="needs the orchestrate grant"):
+                with pytest.raises(AgentError, match="needs the control grant"):
                     await stranger.call("kill", id=b)
             # a person grants; the next call the session makes sees it
             with pytest.raises(AgentError, match="unknown grant"):
                 await person.call("set_grants", id=a, add=["root"])
-            granted = await person.call("set_grants", id=a, add=["orchestrate"])
-            assert granted["capabilities"] == ["orchestrate"]
+            granted = await person.call("set_grants", id=a, add=["control"])
+            assert granted["capabilities"] == ["control"]
             # …and the grant alone is still not enough (TD-036): the second half of the gate is
             # membership, and b's list is empty, which means nobody may act on it.
             with pytest.raises(AgentError, match="not in its controllers — nobody may act on it"):
@@ -534,8 +494,8 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             killed = await worker.call("kill", id=b)
             assert killed["state"] == "exited"
             # revoked: refused again on the very next call, and the grant half is reported first
-            assert (await person.call("set_grants", id=a, remove=["orchestrate"]))["capabilities"] == []
-            with pytest.raises(AgentError, match="needs the orchestrate grant"):
+            assert (await person.call("set_grants", id=a, remove=["control"]))["capabilities"] == []
+            with pytest.raises(AgentError, match="needs the control grant"):
                 await worker.call("kill", id=c["id"])
         # `capabilities` at create, and it survives the store round trip
         d = await person.call(
@@ -544,10 +504,10 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
             dir=str(tmp_path),
             adapter="shell",
             argv=["bash", "--norc"],
-            capabilities=["orchestrate"],
+            capabilities=["control"],
         )
-        assert d["capabilities"] == ["orchestrate"]
-        assert json.loads((paths.sessions_dir() / f"{d['id']}.json").read_text())["capabilities"] == ["orchestrate"]
+        assert d["capabilities"] == ["control"]
+        assert json.loads((paths.sessions_dir() / f"{d['id']}.json").read_text())["capabilities"] == ["control"]
         with pytest.raises(AgentError, match="unknown grant"):
             await person.call("create", name="e", dir=str(tmp_path), adapter="shell", capabilities=["sudo"])
         for sid in (a, c["id"], d["id"]):
@@ -555,7 +515,7 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
 
 
 async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
-    """Design §4.8, §9 invariant 11, TD-036 step 1: an acting RPC needs the `orchestrate` grant
+    """Design §4.8, §9 invariant 11, TD-036 step 1: an acting RPC needs the `control` grant
     *and* the caller in the target's `controllers`. Empty (the default) means nobody may act;
     several controllers are allowed and none is privileged; a session may not edit its own list;
     create adds the creator and may not hand out a grant it does not hold; a person is unaffected
@@ -568,7 +528,7 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
         ui, backend, shared = [(await mk(n))["id"] for n in ("ui", "backend", "shared")]
         await person.call("set_mode", id=shared, unattended=True)  # a worker: §9 invariant 5 is tested apart
         for orc in (ui, backend):
-            await person.call("set_grants", id=orc, add=["orchestrate"])
+            await person.call("set_grants", id=orc, add=["control"])
         # the empty default: granted, but a member of nothing
         assert (await person.call("get", id=shared))["controllers"] == []
         async with LocalClient(caller=ui) as ui_orc, LocalClient(caller=backend) as backend_orc:
@@ -590,7 +550,7 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
             # session that controls nothing here may not add itself
             await backend_orc.call("set_controllers", id=shared, add=[ui])
             rogue = (await mk("rogue"))["id"]
-            await person.call("set_grants", id=rogue, add=["orchestrate"])
+            await person.call("set_grants", id=rogue, add=["control"])
             async with LocalClient(caller=rogue) as rogue_orc:
                 with pytest.raises(AgentError, match="not in its controllers"):
                     await rogue_orc.call("set_controllers", id=shared, add=[rogue])
@@ -598,7 +558,7 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
         # a session may not edit its own controllers, even holding the grant: it could drop the
         # controller watching it, which is the one thing membership exists to prevent
         async with LocalClient(caller=shared) as itself:
-            await person.call("set_grants", id=shared, add=["orchestrate"])
+            await person.call("set_grants", id=shared, add=["control"])
             with pytest.raises(AgentError, match="not in its controllers"):
                 await itself.call("set_controllers", id=shared, remove=[ui, backend])
             with pytest.raises(AgentError, match="cannot be its own controller"):
@@ -617,14 +577,14 @@ async def test_controllers_are_the_gate_s_second_half(agent, tmp_path):
                 dir=str(tmp_path),
                 adapter="shell",
                 argv=["bash", "--norc"],
-                capabilities=["orchestrate"],
+                capabilities=["control"],
                 controllers=[backend],
             )
-            assert grandchild_ok["capabilities"] == ["orchestrate"]  # ui holds it, so it may pass it on
+            assert grandchild_ok["capabilities"] == ["control"]  # ui holds it, so it may pass it on
             assert grandchild_ok["controllers"] == [ui, backend]  # creator first, then what was asked for
         async with LocalClient(caller=shared) as ungranted:
-            await person.call("set_grants", id=shared, remove=["orchestrate"])
-            with pytest.raises(AgentError, match="needs the orchestrate grant"):
+            await person.call("set_grants", id=shared, remove=["control"])
+            with pytest.raises(AgentError, match="needs the control grant"):
                 await ungranted.call("create", name="nope", dir=str(tmp_path), adapter="shell")
         # a person's create has no caller, so the new record starts with only what was asked for
         lone = await person.call("create", name="lone", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
@@ -654,13 +614,13 @@ async def test_a_present_caller_is_a_session_however_odd_its_type(agent, tmp_pat
 
         for odd in (0, "", [], {}, False):
             resp = await raw({"id": 1, "method": "kill", "params": {"id": vid}, "caller": odd})
-            assert "needs the orchestrate grant" in resp.get("error", ""), odd
+            assert "needs the control grant" in resp.get("error", ""), odd
         assert (await person.call("get", id=vid))["state"] != "exited"
         # absent: a person, and allowed exactly as before
         assert (await raw({"id": 2, "method": "set_mode", "params": {"id": vid, "unattended": True}}))["result"]
         # a granted non-member still cannot reach it through an odd caller either
         orc = (await person.call("create", name="o", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
-        await person.call("set_grants", id=orc, add=["orchestrate"])
+        await person.call("set_grants", id=orc, add=["control"])
         async with LocalClient(caller=orc) as orc_client:
             with pytest.raises(AgentError, match="not in its controllers"):
                 await orc_client.call("kill", id=vid)
@@ -685,7 +645,7 @@ async def test_interactive_sessions_are_out_of_every_controller_s_reach(agent, t
             return person.call("create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], **kw)
 
         orc = (await mk("orc"))["id"]
-        await person.call("set_grants", id=orc, add=["orchestrate"])
+        await person.call("set_grants", id=orc, add=["control"])
         anchor = (await mk("anchor"))["id"]  # the person's own session: interactive by default
         worker = (await mk("worker", unattended=True))["id"]
         run = (await mk("run", kind="command"))["id"]
@@ -754,10 +714,8 @@ async def test_set_controllers_remove_wins_over_add(agent, tmp_path):
         got = await person.call("set_controllers", id=sid, add=["ao-three"], remove=["ao-three", "ao-one"])
         assert got["controllers"] == ["ao-two"]
         # and the same call shape on grants still agrees
-        await person.call("set_grants", id=sid, add=["orchestrate"])
-        assert (await person.call("set_grants", id=sid, add=["orchestrate"], remove=["orchestrate"]))[
-            "capabilities"
-        ] == []
+        await person.call("set_grants", id=sid, add=["control"])
+        assert (await person.call("set_grants", id=sid, add=["control"], remove=["control"]))["capabilities"] == []
         await person.call("kill", id=sid)
 
 
@@ -833,6 +791,154 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
         assert [f["ref"] for f in on_disk["findings"]] == ["TD-029", "#59"]
         assert (await person.call("get", id=sid))["lane"] == ["TD-027", "TD-019"]
         await person.call("kill", id=sid)
+
+
+async def test_a_claim_is_a_lease_on_its_reference(agent, tmp_path):
+    """TD-056, design §4.8: a declared claim on a reference another live record holds is refused
+    naming the holder; two claims in one moment get one grant; `force` overrides and says whose;
+    done, the holder exiting, or the TTL releases it; derived claims neither hold nor are checked."""
+    async with LocalClient() as person:
+        ids = []
+        for name in ("wa", "wb"):
+            (tmp_path / name).mkdir()
+            r = await person.call(
+                "create", name=name, dir=str(tmp_path / name), adapter="shell", argv=["bash", "--norc"]
+            )
+            ids.append(r["id"])
+        a, b = ids
+        async with LocalClient(caller=a) as ca, LocalClient(caller=b) as cb:
+            got = await asyncio.gather(
+                ca.call("progress", id=a, ref="td-56"), cb.call("progress", id=b, ref="TD-056"), return_exceptions=True
+            )
+            errors = [g for g in got if isinstance(g, Exception)]
+            assert len(errors) == 1 and "is claimed by" in str(errors[0])  # one grant, one refusal
+            holder, other = (a, b) if not isinstance(got[0], Exception) else (b, a)
+            oc = cb if other == b else ca
+            with pytest.raises(AgentError, match=f"TD-056 is claimed by {holder} since .*--force"):
+                await oc.call("progress", id=other, ref="TD-056")
+            # the holder re-claims (a renewal), and other references are free
+            assert (await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056"))["progress"]
+            assert (await oc.call("progress", id=other, ref="TD-057"))["progress"][0]["ref"] == "TD-057"
+            # a derived claim is neither refused nor a lease
+            assert (await person.call("progress", id=other, ref="TD-056", source="derived"))["progress"]
+            # force overrides, and says whose lease it was
+            forced = await oc.call("progress", id=other, ref="TD-056", force=True)
+            assert forced["lease_overridden"]["session"] == holder
+            await oc.call("progress", id=other, ref="TD-056", status="dropped", why="theirs")
+            # done releases
+            await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056", status="done", pr=1)
+            assert "lease_overridden" not in await oc.call("progress", id=other, ref="TD-056")
+            # the TTL releases: other's claim is now the lease, and an expired one holds nothing
+            with pytest.raises(AgentError, match=f"claimed by {other}"):
+                await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056")
+            next(e for e in agent.sessions[other].progress if e.ref == "TD-056").at = "2020-01-01T00:00:00Z"
+            assert await (ca if holder == a else cb).call("progress", id=holder, ref="TD-056")
+        # the holder's record ending releases it
+        async with LocalClient(caller=other) as oc:
+            with pytest.raises(AgentError, match=f"claimed by {holder}"):
+                await oc.call("progress", id=other, ref="TD-056")
+        await person.call("kill", id=holder)
+        await wait_state(person, holder, "exited")
+        async with LocalClient(caller=other) as oc:
+            assert await oc.call("progress", id=other, ref="TD-056")
+        await person.call("kill", id=other)
+
+
+async def test_out_of_work_is_the_sessions_own_declared_word(agent, tmp_path):
+    """TD-053 step 1, design §4.9a and §9 invariant 14: `progress` with `status="none"` sets
+    `out_of_work: {at, why}` beside the entries, never among them; only the session itself may
+    write it, declared and with a reason; it survives a reload, and a later claim clears it."""
+    from sessionorc.models import wake_digest
+
+    async with LocalClient() as person:
+        s = await person.call("create", name="free", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        sid = s["id"]
+        assert s["out_of_work"] is None
+        before = wake_digest(s)
+        # a person, and any other session, cannot say it for this one: it is the session's own search
+        with pytest.raises(AgentError, match="only .* may declare itself out of work"):
+            await person.call("progress", id=sid, status="none", why="looked")
+        async with LocalClient(caller="ao-stranger") as stranger:
+            with pytest.raises(AgentError, match="only .* may declare itself out of work"):
+                await stranger.call("progress", id=sid, status="none", why="looked")
+        async with LocalClient(caller=sid) as me:
+            with pytest.raises(AgentError, match="needs --why"):
+                await me.call("progress", id=sid, status="none", why="  ")
+            with pytest.raises(AgentError, match="takes no reference and no PR"):
+                await me.call("progress", id=sid, ref="TD-1", status="none", why="looked")
+            with pytest.raises(AgentError, match="never derived"):
+                await me.call("progress", id=sid, status="none", why="looked", source="derived")
+            with pytest.raises(AgentError, match="statuses are: claimed, done, dropped, none"):
+                await me.call("progress", id=sid, ref="TD-1", status="finished")
+            s = await me.call("progress", id=sid, status="none", why="ledger: every open entry excluded or claimed")
+        assert s["out_of_work"] == {"at": s["out_of_work"]["at"], "why": "ledger: every open entry excluded or claimed"}
+        assert s["progress"] == []  # no entry: the upsert-by-reference list is untouched
+        assert wake_digest(s) != before  # a lead waiting on this worker hears it (§4.9a: an ending, not a crash)
+        # persisted, and reloaded with the record
+        on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+        assert on_disk["out_of_work"]["why"].startswith("ledger:")
+        from sessionorc.store import SessionStore
+
+        assert SessionStore(paths.sessions_dir()).load(sid).out_of_work == s["out_of_work"]
+        # a derived claim does not clear it — only the session's own word that it has work again does
+        s = await person.call("progress", id=sid, ref="TD-900", source="derived")
+        assert s["out_of_work"] is not None
+        async with LocalClient(caller=sid) as me:
+            s = await me.call("progress", id=sid, ref="TD-901")
+        assert s["out_of_work"] is None
+        await person.call("kill", id=sid)
+
+
+async def test_doing_is_one_line_the_session_says_about_itself(agent, tmp_path):
+    """TD-074 steps 1–2, design §4.8 `doing`: `doing: {text, at}` on the record, a value and not a
+    log — the last line replaces the one before and `--clear` empties it. One line, control bytes
+    stripped, capped at 200; empty after cleaning is refused. Only the session itself may write it
+    (§9 invariant 14), nothing derives it, no wake fires on it, and an exit leaves it in place."""
+    from sessionorc.models import wake_digest
+    from sessionorc.store import SessionStore
+
+    async with LocalClient() as person:
+        s = await person.call("create", name="doer", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        sid = s["id"]
+        assert s["doing"] is None
+        before = wake_digest(s)
+        # a person, and any other session, cannot say it for this one
+        with pytest.raises(AgentError, match="only .* may say what it is doing"):
+            await person.call("doing", id=sid, text="reading the ledger")
+        async with LocalClient(caller="ao-stranger") as stranger:
+            with pytest.raises(AgentError, match="only .* may say what it is doing"):
+                await stranger.call("doing", id=sid, text="reading the ledger")
+        async with LocalClient(caller=sid) as me:
+            with pytest.raises(AgentError, match="needs a line"):
+                await me.call("doing", id=sid, text="   ")
+            with pytest.raises(AgentError, match="needs a line"):
+                await me.call("doing", id=sid, text="\x1b[31m\x07")  # nothing left once it is cleaned
+            s = await me.call("doing", id=sid, text="reading the ledger for the next entry")
+            assert s["doing"]["text"] == "reading the ledger for the next entry" and s["doing"]["at"]
+            # no wake fires on it: a lead waiting on this worker is not woken by a status line
+            assert wake_digest(s) == before
+            # persisted, and reloaded with the record
+            on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+            assert on_disk["doing"]["text"].startswith("reading the ledger")
+            assert SessionStore(paths.sessions_dir()).load(sid).doing == s["doing"]
+            # the last value only — a replacement, never an entry beside the one before
+            first_at = s["doing"]["at"]
+            s = await me.call("doing", id=sid, text="opening the PR")
+            assert s["doing"]["text"] == "opening the PR" and isinstance(s["doing"], dict)
+            assert s["doing"]["at"] >= first_at
+            # one line, control bytes stripped, capped at 200
+            s = await me.call("doing", id=sid, text="first \x1b[31mline\x07\nsecond line")
+            assert s["doing"]["text"] == "first line"
+            s = await me.call("doing", id=sid, text="x" * 500)
+            assert s["doing"]["text"] == "x" * 200
+            # cleared on the session's own word, and nothing else changes
+            s = await me.call("doing", id=sid, clear=True)
+            assert s["doing"] is None
+            s = await me.call("doing", id=sid, text="waiting on the review")
+        # an exit leaves it in place: it is the last thing the session said
+        await person.call("kill", id=sid)
+        await wait_state(person, sid, "exited")
+        assert (await person.call("get", id=sid))["doing"]["text"] == "waiting on the review"
 
 
 async def test_a_session_past_its_stop_time_is_wrapped_up_then_killed(agent, tmp_path):
@@ -938,29 +1044,36 @@ async def test_the_tick_retires_a_branch_claim_the_session_abandoned(agent, tmp_
     monkeypatch.setattr(reports, "_prs_for_head", lambda directory, branch, **kw: [])
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
-        await agent.tick()
-        await agent._derive_task
-        s = await person.call("get", id=sid)
-        assert [(p["ref"], p["status"], p["pr"], p["branch"]) for p in s["progress"]] == [
-            ("TD-077", "claimed", None, "td077-cap")
-        ]
+
+        async def claimed():
+            """the branch it is on is derived as a claim"""
+            got = await person.call("get", id=sid)
+            return [(p["ref"], p["status"], p["pr"], p["branch"]) for p in got["progress"]] == [
+                ("TD-077", "claimed", None, "td077-cap")
+            ]
+
+        await derived(agent, claimed)
         # the session gives the branch up for a neighbour and moves to its own
         subprocess.run(["git", "-C", str(repo), "checkout", "-q", "main"], check=True)
-        agent._git_checked.clear()  # the branch read has its own cadence; the derive follows it
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        assert (await person.call("get", id=sid))["progress"] == []
+
+        async def retired():
+            """the branch claim is gone from the record"""
+            return (await person.call("get", id=sid))["progress"] == []
+
+        await derived(agent, retired)
         assert json.loads((paths.sessions_dir() / f"{sid}.json").read_text())["progress"] == []  # and it is saved
         # a declaration of the same shape is untouched by any number of ticks (§9 invariant 10)
         async with LocalClient(caller=sid) as worker:
             await worker.call("progress", id=sid, ref="TD-077")
-        agent._git_checked.clear()
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        s = await person.call("get", id=sid)
-        assert [(p["ref"], p["status"], p["source"]) for p in s["progress"]] == [("TD-077", "claimed", "declared")]
+
+        async def declared():
+            """the declaration is still the record's, whatever the derive did"""
+            got = await person.call("get", id=sid)
+            return [(p["ref"], p["status"], p["source"]) for p in got["progress"]] == [
+                ("TD-077", "claimed", "declared")
+            ]
+
+        await derived(agent, declared)
         await person.call("kill", id=sid)
 
 
@@ -980,20 +1093,18 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
     )
     async with LocalClient() as person:
         sid = (await person.call("create", name="w", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
-        await agent.tick()
-        await agent._derive_task  # detached so a slow `gh` never holds up the tick
-        s = await person.call("get", id=sid)
-        assert [(p["ref"], p["status"], p["pr"], p["source"]) for p in s["progress"]] == [
-            ("TD-077", "claimed", 77, "derived")
-        ]
+
+        async def progress_is(want):
+            got = (await person.call("get", id=sid))["progress"]
+            return [tuple(p[k] for k in want[0]) for p in got] == want[1]
+
+        # detached so a slow `gh` never holds up the tick, so the wait is on the entry, not the task
+        keys = ("ref", "status", "pr", "source")
+        await derived(agent, lambda: progress_is((keys, [("TD-077", "claimed", 77, "derived")])))
         # the session declares the same reference done: the declaration replaces the derived entry
         await person.call("progress", id=sid, ref="TD-077", status="done", pr=77)
         # ... and the next derivation cannot put it back to claimed (§9 invariant 10)
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        s = await person.call("get", id=sid)
-        assert [(p["ref"], p["status"], p["source"]) for p in s["progress"]] == [("TD-077", "done", "declared")]
+        await derived(agent, lambda: progress_is((("ref", "status", "source"), [("TD-077", "done", "declared")])))
         # every entry of a multi-entry derivation is applied and saved: these upserts are the write,
         # so an `any()` over a generator would have stopped at the first one (review 2026-09-11)
         ledgers: list[str] = []  # the record's `ledger` (§5) reaches the derivation; unset → the default
@@ -1009,13 +1120,15 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
                 )
             ),
         )
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
-        assert [p["ref"] for p in on_disk["progress"]] == ["TD-077", "TD-080", "TD-081"]
-        assert [f["ref"] for f in on_disk["findings"]] == ["TD-082", "TD-083"]
-        assert ledgers == [reports.LEDGER_DEFAULT]
+
+        def on_disk():
+            """all four stubbed entries are applied and saved"""
+            rec = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+            return rec if [p["ref"] for p in rec["progress"]] == ["TD-077", "TD-080", "TD-081"] else None
+
+        rec = await derived(agent, on_disk)
+        assert [f["ref"] for f in rec["findings"]] == ["TD-082", "TD-083"]
+        assert set(ledgers) == {reports.LEDGER_DEFAULT}  # a retried round still asks for the default
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
         assert sid not in agent._derived_at  # no key outlives the record
@@ -1025,9 +1138,8 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
                                    role="grinder", ledger="docs/debt.md"))  # fmt: skip
         assert other["role"] == "grinder" and other["ledger"] == "docs/debt.md"
         ledgers.clear()
-        await agent.tick()
-        await agent._derive_task
-        assert ledgers == ["docs/debt.md"]
+        await derived(agent, lambda: ledgers)
+        assert set(ledgers) == {"docs/debt.md"}
         await person.call("kill", id=other["id"])
         await person.call("remove", id=other["id"])
 
@@ -1227,25 +1339,52 @@ async def test_derived_entries_go_to_the_record_that_holds_the_directory(agent, 
         await person.call("kill", id=old)
         await wait_state(person, old, "exited")
         new = (await person.call("create", name="run-2", dir=str(repo), adapter="shell", argv=["bash", "--norc"]))["id"]
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        live = await person.call("get", id=new)
-        assert [(p["ref"], p["status"], p["pr"], p["source"]) for p in live["progress"]] == [
-            ("TD-077", "claimed", 77, "derived")
-        ]
+
+        async def credited():
+            """the live record holds the branch's claim"""
+            got = (await person.call("get", id=new))["progress"]
+            rows = [(p["ref"], p["status"], p["pr"], p["source"]) for p in got]
+            return rows == [("TD-077", "claimed", 77, "derived")]
+
+        await derived(agent, credited)
         # the exited record gains nothing from a branch it never saw
         assert [p["ref"] for p in (await person.call("get", id=old))["progress"]] == ["TD-070"]
         # ... but its own PR merging still reaches it, which is why skipping exited records is wrong
         prs[1] = {"number": 70, "state": "MERGED", "mergedAt": "now", "headRefName": "td070-earlier"}
-        agent._derived_at.clear()
-        await agent.tick()
-        await agent._derive_task
-        gone = await person.call("get", id=old)
-        assert [(p["ref"], p["status"], p["pr"]) for p in gone["progress"]] == [("TD-070", "done", 70)]
+
+        async def finished():
+            """the exited record's own PR merging still reaches it"""
+            got = (await person.call("get", id=old))["progress"]
+            return [(p["ref"], p["status"], p["pr"]) for p in got] == [("TD-070", "done", 70)]
+
+        await derived(agent, finished)
         await person.call("kill", id=new)
         for sid in (old, new):
             await person.call("remove", id=sid)
+
+
+async def test_a_pane_list_taken_before_a_kill_does_not_revive_the_record(agent, tmp_path):
+    """TD-063: `tick()` reads the pane list in one thread and the tails in another before it
+    reconciles, and an RPC runs on the loop inside that window. A `kill` there left the tick holding
+    a list that still named the session, `_observe` set `pane` back to True and read a state off the
+    last screen, and the `exited` record came back as `idle` — which then refused its own `remove`
+    with *kill it first*. That is the 3.12 CI failure of 2026-09-17, reproduced here by handing
+    `_reconcile` exactly the snapshot the in-flight tick would have had."""
+    async with LocalClient() as person:
+        made = await person.call("create", name="revive", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        sid = made["id"]
+        await wait_state(person, sid, "idle")
+        snapshot_at = datetime.now(UTC)
+        panes = await asyncio.to_thread(agent.tmux.main_panes, naming.PREFIX)
+        assert sid in panes, "the snapshot must predate the kill for this to test anything"
+
+        await person.call("kill", id=sid)
+        agent._reconcile(panes, {}, snapshot_at)  # the tick that was already in flight, finishing
+
+        s = await person.call("get", id=sid)
+        assert (s["state"], s["pane"]) == ("exited", False)
+        await person.call("remove", id=sid)  # and so `remove` is not refused
+        assert sid not in agent._killed_at  # no key outlives the record
 
 
 async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_up_twice(agent, tmp_path):
@@ -1284,3 +1423,53 @@ async def test_re_confirming_the_same_stop_time_does_not_ask_a_session_to_wrap_u
         assert s["wrapup_sent_at"] is None
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
+
+
+async def test_a_reply_past_asyncios_default_line_limit_is_read(agent, tmp_path):
+    """TD-066: a `list` of six records grew past 64 KiB after a day of mail and every `ao` failed. The
+    client and the agent open their streams with the same 8 MiB limit."""
+    async with LocalClient() as c:
+        s = await c.call("create", name="big", dir=str(tmp_path), adapter="shell")
+        await c.call("progress", id=s["id"], ref="TD-1", status="claimed", why="x" * 200_000)
+        views = await c.call("list")
+        assert len(json.dumps(views)) > 65_536 and any(v["id"] == s["id"] for v in views)
+        await c.call("kill", id=s["id"])
+
+
+async def test_the_tools_own_title_is_observed_from_the_pane(agent, hookstub, tmp_path, monkeypatch):
+    """TD-074 step 3, design §4.5a **title** / §4.3 `title()`: the pane's terminal title is read with
+    the pane list each tick and handed to the session's adapter, which alone says what of it is a
+    name. Observed, like `tail`, so it is node-owned; cleaned and capped; no wake fires on it; and an
+    adapter without the method — `shell` — gives none, whatever its pane says."""
+    from sessionorc.models import NODE_OWNED, wake_digest
+
+    assert "title" in NODE_OWNED  # observed on the host where the pane lives, exactly as `tail` is
+    monkeypatch.setattr(
+        hookstub, "title", lambda pane_title: pane_title.strip().lstrip("✳").strip() or None, raising=False
+    )
+
+    def osc(text: str) -> str:
+        return f"printf '\\033]2;{text}\\007'"
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="titled", dir=str(tmp_path), adapter=hookstub.name)
+        sid = s["id"]
+        assert s["title"] is None  # nothing until a pane has been observed with one
+        before = wake_digest(s)
+        await c.call("send", id=sid, text=osc("✳ Error Checker"))
+        assert await wait_for(lambda: _title(c, sid, "Error Checker"))
+        got = await c.call("get", id=sid)
+        # a name, not a status: it changes rarely and never wakes a lead waiting on this session
+        assert wake_digest(got) == before
+        # capped: a name, not a line
+        await c.call("send", id=sid, text=osc("x" * 200))
+        assert await wait_for(lambda: _title(c, sid, "x" * 80))
+        # a shell says nothing at all: its adapter has no `title()`
+        sh = await c.call("create", name="plainsh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        await c.call("send", id=sh["id"], text=osc("✳ Error Checker"))
+        await asyncio.sleep(FAST_TICK * 3)
+        assert (await c.call("get", id=sh["id"]))["title"] is None
+
+
+async def _title(c, sid: str, want: str) -> bool:
+    return (await c.call("get", id=sid))["title"] == want

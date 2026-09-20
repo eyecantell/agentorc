@@ -8,13 +8,20 @@ then each member with `controllers: [lead id]`.
 
 Design §4.9 "Starting and stopping" and "Home and reach". Two things that section describes are
 deliberately not built here and say so rather than pretending: a member that is `{team: <name>}` (a
-nested team) is refused with its name, and a repo whose checkout entry names another host is
-reported as out of reach until phase 2's transport.
+nested team) is refused with its name, and a repo whose checkout entry names a host the team is not
+on is reported as out of reach.
+
+A team lands on one host (design §4.4a "Teams across hosts", TD-057 step 4a): its definition's
+`host:`, else the host the start runs on. Checkouts are resolved on *that* host; the roles and
+briefs are read from the checkout's path here when it is a directory here (this host, or a
+container node sharing the path), and otherwise from the checkout on that host, through `files`
+— the home's `host_files`, a read across the link (step 4b.3) — by the same loader.
 """
 
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -97,12 +104,16 @@ class Launch:
     unattended: bool = True
     lead: bool = False
     ledger: str | None = None
+    host: str = ""  # the host this session lands on; "" is the host the start runs on
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
         session lives in `<repo>/.claude/worktrees/<name>`, so the main checkout stays the
-        person's and the anchor rule (§9 invariant 2) holds per member without anyone counting."""
+        person's and the anchor rule (§9 invariant 2) holds per member without anyone counting.
+        `host` is sent only when the session lands elsewhere (§4.4, a client never sends a
+        parameter it has not set): the home routes the create to that node."""
         return {
+            **({"host": self.host} if self.host else {}),
             "name": self.name,
             "dir": str(self.dir),
             "adapter": repoconfig.DEFAULT_ADAPTER,
@@ -130,6 +141,7 @@ class Plan:
     source: Path | None = None
     lead: Launch | None = None
     members: list[Launch] = field(default_factory=list)
+    host: str = ""  # where the team lands when that is not the host the start runs on (§4.4a)
     warnings: list[str] = field(default_factory=list)
     """Briefs that name one run (TD-042). Said out loud, like `out_of_reach`; never a refusal."""
 
@@ -171,7 +183,7 @@ def project_block(org: orgmod.Org, projects: list[str], host: str, home: str = "
         if path is None:
             # §4.9: an entry for another host is noted, not an error — phase 2's transport reaches it
             elsewhere = ", ".join(sorted(by_host)) or "nowhere"
-            lines.append(f"- {rname}: not checked out on {host} (declared on {elsewhere}) — out of reach until phase 2")
+            lines.append(f"- {rname}: not checked out on {host} (declared on {elsewhere}) — out of reach")
         else:
             lines.append(f"- {rname}: {path}" + ("  — your home" if rname == home else ""))
     return "\n".join([*lines, "", REACH_NOTE, "", ""])
@@ -207,14 +219,37 @@ def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> t
 Spec = orgmod.MemberDef | orgmod.LeadDef | None
 
 
-def _brief(role: repoconfig.Role, member: Spec, checkout: Path, lane: list[str]) -> str | None:
+# `(host, checkout, [paths relative to it])` → `{path: text, or None when there is no such file}`:
+# another host's checkout, read there (the home's `host_files`). Raises `OSError` for a failure.
+Files = Callable[[str, str, list[str]], dict[str, "str | None"]]
+
+
+def _reader_on(files: Files, host: str, checkout: Path) -> repoconfig.Reader:
+    """A `repoconfig.Reader` for a checkout on another host: only its own files, by their path
+    relative to it — a brief outside the checkout is not read across the link at all."""
+
+    def read(path: Path) -> str | None:
+        try:
+            rel = str(Path(path).relative_to(checkout))
+        except ValueError:
+            raise OSError(
+                f"{path} is outside the checkout {checkout}: only a checkout's own files are read on {host}"
+            ) from None
+        return files(host, str(checkout), [rel]).get(rel)
+
+    return read
+
+
+def _brief(
+    role: repoconfig.Role, member: Spec, checkout: Path, lane: list[str], read: repoconfig.Reader | None = None
+) -> str | None:
     """The role's template with `{lane}` filled, or the member's `brief:` override read from its
-    home checkout. A lead may override its brief too — an orchestrator's is the one a repo most
+    home checkout. A lead may override its brief too — a lead's is the one a repo most
     often keeps its own copy of (2026-09-13)."""
     if member is not None and member.brief:
         override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
-        return override.brief_text(lane)
-    return role.brief_text(lane)
+        return override.brief_text(lane, read=read)
+    return role.brief_text(lane, read=read)
 
 
 def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
@@ -225,23 +260,39 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     role_name: str,
     home: str,
     host: str,
+    here: str,
     profile_override: str | None,
     member: Spec,  # the lead's own definition or a member's: both carry lane, brief, grants, profile
     lead: bool,
     block: str,
+    files: Files | None = None,
 ) -> Launch:
     where = f"team {team.name}: {name}"
     project = project_of(org, team.projects, home)
     checkout = org.checkout(project, home, host)
     if checkout is None:
-        raise TeamError(f"{where}: repo {home!r} has no checkout on {host} — its project names another host (phase 2)")
+        declared = ", ".join(sorted((org.projects[project].repos.get(home) or {}) if project in org.projects else []))
+        raise TeamError(
+            f"{where}: repo {home!r} has no checkout on {host} (declared on {declared or 'no host'}) — "
+            f"add `{host}: <path>` under it in org.yml, or set the team's `host:`"
+        )
     checkout = Path(checkout).expanduser()
+    read: repoconfig.Reader | None = None  # this host's disk
     if not checkout.is_dir():
-        raise TeamError(f"{where}: {checkout} does not exist on {host} (repo {home!r}) — nothing was started")
+        if host == here:
+            raise TeamError(f"{where}: {checkout} does not exist on {host} (repo {home!r}) — nothing was started")
+        if files is None:
+            raise TeamError(
+                f"{where}: {checkout} is not a directory on {here}, and nothing here reads it on {host} "
+                f"(repo {home!r}) — nothing was started"
+            )
+        # Another host's checkout that is not a directory here — a machine node (a container node
+        # shares the path): its roles and briefs are read there, by the same loader (step 4b.3).
+        read = _reader_on(files, host, checkout)
     try:
-        cfg = repoconfig.load(checkout)
+        cfg = repoconfig.load(checkout, read=read)
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
-    except (KeyError, ValueError) as e:
+    except (KeyError, ValueError, OSError) as e:
         raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     lane = list(member.lane) if member is not None and member.lane else list(role.lane)
     grants = list(member.grants) if member is not None and member.grants is not None else list(role.grants)
@@ -255,14 +306,14 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     try:
-        prompt = _brief(role, member, checkout, lane)
+        prompt = _brief(role, member, checkout, lane, read)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
         prompt = block + prompt if prompt else block
     return Launch(
         name=name,
-        role=role_name,
+        role=role.name,  # the current name, even when the definition still says `orchestrator` (TD-055)
         home=home,
         dir=checkout,
         team=team.name,
@@ -274,16 +325,19 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         unattended=member.unattended if member is not None else True,  # a lead may ask to be watched
         lead=lead,
         ledger=cfg.ledger,
+        host=host if host != here else "",
     )
 
 
-def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -> Plan:
+def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, files: Files | None = None) -> Plan:
     """Resolve a definition into the sessions it starts, checking everything that can be checked
-    without the agent: the checkouts exist on this host, every role, profile and brief resolves,
-    and no member asks for something this phase does not build. Raises `TeamError` on the first
-    thing that would have stopped the start — nothing is created here (§4.9: never half a team)."""
+    without the agent: the checkouts are declared on the team's host (and exist, when that is this
+    one — `host` is the host the start runs on), every role, profile and brief resolves, and no
+    member asks for something this phase does not build. Raises `TeamError` on the first thing
+    that would have stopped the start — nothing is created here (§4.9: never half a team)."""
     team = find(org, name)
-    p = Plan(team=team.name, source=team.source)
+    here, host = host, team.host or host  # the team lands on its `host:`, else where the start runs (§4.4a)
+    p = Plan(team=team.name, source=team.source, host=host if host != here else "")
     reach = bool(project_block(org, team.projects, host))
     if team.lead.role != orgmod.PERSON:
         p.lead = _launch(
@@ -293,10 +347,12 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -
             role_name=team.lead.role,
             home=team.lead.home,
             host=host,
+            here=here,
             profile_override=profile or team.lead.profile,
             member=team.lead,  # its lane, brief, grants and unattended read like a member's
             lead=True,
             block=project_block(org, team.projects, host, team.lead.home) if reach else "",
+            files=files,
         )
     seen: set[str] = {p.lead.name} if p.lead else set()
     for member in team.members:
@@ -318,10 +374,12 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None) -
                     role_name=member.role,
                     home=member.home,
                     host=host,
+                    here=here,
                     profile_override=profile,
                     member=member,
                     lead=False,
                     block=block,
+                    files=files,
                 )
             )
     # One line per finding, not per session: a team's members share a brief, and four copies of

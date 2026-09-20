@@ -11,6 +11,7 @@
   --limited: #7c3aed; --limited-bg: #ede9fe; --limited-fg: #5b21b6;
   --done: #059669; --done-bg: #d1fae5; --done-fg: #065f46;
   --warn-bg: #fff7ed; --warn-line: #fdba74; --warn-fg: #7c2d12; --scraped: #d9a441;
+  --alarm: #b45309; --alarm-bg: #fef3c7; --alarm-fg: #7c2d12;  /* design §4.8a: an identity alarm's mark */
   --primary: #1c2128; --primary-fg: #fff;
 }
 html[data-theme="dark"] {
@@ -22,6 +23,7 @@ html[data-theme="dark"] {
   --idle-bg: #2a313a; --idle-fg: #c9d1db; --stalled-bg: #4a1414; --stalled-fg: #fecaca;
   --limited-bg: #2e1d5c; --limited-fg: #ddd6fe; --done-bg: #0d3d2c; --done-fg: #a7f3d0;
   --warn-bg: #3a2410; --warn-line: #9a5b1c; --warn-fg: #fdba74;
+  --alarm: #d97706; --alarm-bg: #3f2a0c; --alarm-fg: #fcd34d;
   --primary: #e6e9ee; --primary-fg: #0f1216;
 }
 * { box-sizing: border-box; }
@@ -47,7 +49,6 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; }
 .btn.sm { height: 24px; font-size: 11px; padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
 .btn.on { background: var(--idle-bg); color: var(--fg); }
-.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; } .seg .btn { border: 0; border-radius: 0; }
 .input { height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: 13px; font-family: inherit; display: flex; align-items: center; }
 input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; }
 .field { display: flex; flex-direction: column; gap: 5px; } .field label { font-size: 11px; font-weight: 600; color: var(--strong); text-transform: uppercase; letter-spacing: .04em; }
@@ -56,7 +57,13 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .warn { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 4px; color: var(--warn-fg); font-size: 12px; }
 .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 .pill .dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-.pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
+/* design §4.5a **state icon**: a page of cards is read by shape before it is read by word */
+.pill::before { font-size: 9px; line-height: 1; }
+.pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
+/* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
+.pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
+.pill.s-done::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; }
+.sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: 9px; letter-spacing: 0; }  /* not the idle glyph's tuning */
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
    dashed, the same signal a scraped state carries */
@@ -74,9 +81,39 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .inbox .mail .st { font-size: 10.5px; color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
 .inbox .mail .body { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
 .badge.unread { color: var(--working-fg); background: var(--working-bg); border-color: var(--working); text-decoration: none; }
+/* the top bar's Inbox number: what is waiting on a person, not unread mail (§4.5a, TD-069) */
+.badge.needs { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); text-decoration: none; }
 .maildlg { width: min(560px, 92vw); color: var(--fg); } .maildlg::backdrop { background: rgba(0,0,0,.35); }
 .maildlg .row[hidden] { display: none; }
-#personinbox .badge { margin-left: 4px; } #personlist { max-height: 60vh; overflow: auto; }
+#personinbox .badge { margin-left: 4px; }
+/* the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**): full width, three sections, one row
+   per thing. Every colour is a token — a light theme is required later (TD-071 item 8). */
+.inboxpage .isec { display: flex; flex-direction: column; gap: 8px; }
+.inboxpage details.isec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+.inboxpage details.isec > summary::-webkit-details-marker { display: none; }
+.inboxpage details.isec > summary::before { content: "▸"; color: var(--muted); font-size: 11px; }
+.inboxpage details.isec[open] > summary::before { content: "▾"; }
+.inboxpage .snoozedbox > summary { list-style: none; cursor: pointer; color: var(--muted); }
+.inboxpage .snoozedbox > summary::-webkit-details-marker { display: none; }
+.inboxpage .mailrow { padding: 10px 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 5px; }
+.inboxpage .mailrow[hidden] { display: none; }
+.inboxpage .mailrow:first-child { border-top: 0; }
+.inboxpage .mailrow .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; font-weight: 600; }
+.inboxpage .mailrow .st { font-size: 10.5px; color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
+/* the whole text, no scroll box: a 2,000-character message reads in full, and an unbroken token wraps */
+.inboxpage .mailrow .body { font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 110ch; }
+/* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
+.inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
+.inboxpage .mfoot, .inboxpage .mhead { row-gap: 4px; }
+/* design §4.5a **Inbox row: state** (TD-069 step 2): a state row wears the card's own pill, which
+   is a span and never a control. The alarms list is text, one line per alarm. */
+.inboxpage .staterow .pill { cursor: default; }
+.inboxpage .alarms { margin: 0; padding-left: 18px; font-size: 12px; color: var(--alarm-fg); }
+.inboxpage .alarms li { margin: 2px 0; }
+.inboxpage .staterow[data-row="alarm"], .inboxpage .staterow[data-row="alarm_host"] { border-left: 2px solid var(--alarm); padding-left: 8px; }
+/* design §4.8a: the card's identity mark — a warning, not the amber needs-you ring, and never
+   pressable: the Inbox row is where anything is done about it (TD-077 step 2). */
+.badge.alarmmark { cursor: default; color: var(--alarm-fg); background: var(--alarm-bg); border-color: var(--alarm); }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
@@ -91,27 +128,45 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 /* Org team groups (design §4.5a, §4.9): a header row per team over its own grid; the flat page is one headerless group */
 #groups { display: flex; flex-direction: column; gap: 22px; } .tgroup[hidden] { display: none; }
+/* A team is one card holding its sessions' cards (design §4.5a **team groups**, 2026-09-16); *No
+   team* and the flat grid (`data-team=""`) stay plain sections. */
+.tgroup:not([data-team=""]) { border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px 14px; background: var(--line2); }
+.ghead .btn[hidden] { display: none; }
+/* a team with nothing live: its cards folded behind the header's count, and the card itself quieter */
+.tgroup.folded:not(.filtering) .grid { display: none; } .tgroup.folded:not(.filtering) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.tgroup[data-live="0"]:not([data-team=""]) { background: transparent; border-style: dashed; }
+.tgroup:not(:has(.sc)) .grid { display: none; } .tgroup:not(:has(.sc)) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }  /* a definition nothing carries yet */
 .ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; font-size: 12px; } .ghead .h2 { font-size: 14px; }
 .ghead .name { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; color: var(--fg); text-decoration: none; }
 .badge.team { cursor: pointer; color: var(--fg); }
-/* Org Teams strip (design §4.5a): one row per definition, Start / Stop / Stop now; a plain line when none is defined */
+/* what is left of the Org Teams strip (design §4.5a): one line about the definitions themselves, when there is something to say */
 .strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 2px; border-bottom: 1px solid var(--line); }
-.strip .team-row { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
-.strip .team-row b { font-family: "JetBrains Mono", monospace; font-size: 12.5px; }
-.strip .team-row .meta { max-width: 22ch; } .strip .team-row .live { min-width: 6ch; }
 .strip .warnish { color: var(--warn-fg); }
-.strip .btn[hidden] { display: none; }  /* `.btn` is inline-flex, which would otherwise beat the attribute */
 .badge[hidden] { display: none; }      /* same trap: `.badge` is inline-block (TD-026's Focus stop control) */
 .sc { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow: hidden; position: relative; } .sc.off { opacity: .55; }
 .sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; } .sc-foot { display: flex; gap: 6px; align-items: center; }
+/* The head row wraps: a long name plus role and team badges used to push the state pill out past
+   the card's edge, where `overflow: hidden` clipped it (seen live 2026-09-16). */
+.sc-body > .row:first-child { flex-wrap: wrap; row-gap: 4px; } .sc-body > .row:first-child .badge { white-space: nowrap; }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }
 .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--idle); }
 .sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); }
 .sc.s-stalled .sbar { background: var(--stalled); } .sc.s-limited .sbar { background: var(--limited); } .sc.s-done .sbar { background: var(--done); }
-.sc.highlight { box-shadow: 0 0 0 2px var(--needs); }
+.sc.s-needs { box-shadow: 0 0 0 2px var(--needs); }  /* ringed: what to press, seen from across the room */
 .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid var(--border); font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status.needs { border-color: var(--needs); color: var(--needs-fg); } .status.ok { border-color: var(--done); } .status.bad { border-color: var(--stalled); } .status.lim { border-color: var(--limited); }
+/* design §4.5a **doing** line (§4.8, TD-074): what the session says it is doing. Prose rather than
+   pane output, so a long line wraps instead of being clipped mid-word; no colour of its own — the
+   state tile stays the one coloured thing on a card. */
+.status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: var(--strong); }
+/* design §4.5a **title** (§4.3 `title()`, TD-074): the tool's own name for the session, beside
+   agentorc's. Secondary — agentorc's name leads — and clipped on a card (`.meta` ellipsises), with
+   the whole of it on hover. */
+.tool-title { max-width: 16em; flex: 0 1 auto; }
+/* design §4.8 *Role presets*: the role badge's picture — `currentColor`, no fill, so it takes the
+   badge's muted ink and never reads as something to press. */
+.badge .ricon { vertical-align: -2px; margin-right: 3px; }
 .term { background: var(--term); color: var(--termfg); font-family: "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; padding: 10px 12px; border-radius: 4px; white-space: pre; overflow: hidden; }
 .term.tail { font-size: 11px; line-height: 1.55; padding: 6px 9px; color: var(--tail); min-height: 54px; }
 details.more { position: relative; } details.more summary { list-style: none; } details.more summary::-webkit-details-marker { display: none; }
