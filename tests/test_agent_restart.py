@@ -38,7 +38,10 @@ async def stop(task: asyncio.Task) -> None:
 async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     monkeypatch.setattr("sessionorc.agent.TICK_SECONDS", 0.3)
-    monkeypatch.setattr("sessionorc.agent.CREATE_GRACE", timedelta(seconds=1))
+    # Long enough that no tick can judge the paneless record below `exited` before the migration
+    # is asserted, however loaded the machine is; the second half of the test shortens it on
+    # purpose to exercise the grace passing (TD-078).
+    monkeypatch.setattr("sessionorc.agent.CREATE_GRACE", timedelta(seconds=300))
     tmux = Tmux(socket_name=private_socket_name())
     try:
         first, task = await start(tmux)
@@ -63,11 +66,19 @@ async def test_restart_reloads_and_reconciles(tmp_path, monkeypatch):
         assert set(second.sessions) == {sh["id"], cmd["id"], "ao-old-prompt"}
         assert second.sessions[sh["id"]].unattended is True  # persisted field survives
         migrated = second.sessions["ao-old-prompt"]
+        # What the *load* made of the old record, not what a tick has since made of it: the record
+        # has no pane, so under the one-second grace this test used to run with, a tick that fired
+        # between `start` and here read it as `exited` and the assertion failed — once in a loaded
+        # full run, not reproducible alone (TD-078). The grace above is what makes this line about
+        # the migration and nothing else.
         assert migrated.state == "idle" and migrated.pending is None and migrated.confidence == "hook"
         async with LocalClient() as c:
             await wait_state(c, sh["id"], "idle")
             await wait_state(c, cmd["id"], "working")
-            # no pane behind the old record: it is judged exited once the grace has passed
+            # no pane behind the old record: it is judged exited once the grace has passed — which
+            # is now made to happen rather than waited out, so the test bounds on the rule and not
+            # on a race between one second of grace and the machine's load (TD-078)
+            monkeypatch.setattr("sessionorc.agent.CREATE_GRACE", timedelta(seconds=0))
             await wait_state(c, "ao-old-prompt", "exited")
             with pytest.raises(AgentError, match="kill it first"):
                 await c.call("remove", id=cmd["id"])

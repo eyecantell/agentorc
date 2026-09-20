@@ -53,7 +53,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-075 | Every question a worker has goes to the person: a go-between — the lead, or a session beside it, on a stronger model — could answer what is already written down and steering, and pass up the rest with a recommendation | Medium | Open |
 | TD-076 | Rename the lifecycle role `lead` → `manager`, name the go-between `techlead`, and retire the bare word `lead` — never re-point it | Medium | Open |
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
-| TD-078 | `tests/test_agent_restart.py::test_restart_reloads_and_reconciles` failed once in a full run and passed alone and on the re-run: a timing flake to pin down before it costs a merge | Low | Open |
+| TD-078 | Two timing flakes in the suite: the restart test's migration assertion (fixed, PR #264) and a `send` that raced its pane in `test_send_wait_three_outcomes` (open) | Low | Partly done |
 | TD-079 | The Inbox is a queue: nothing leaves it without an answer, what resolves itself leaves a trail, FYI is counted, and an answer is followed to its outcome | High | Open |
 | TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Open |
 | TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Open |
@@ -900,7 +900,7 @@ Not proposed: **the lead describing each member** (second-hand, a token cost eve
 
 **Priority:** Low
 **Added:** 2026-09-19 (the anchor session; reported by the worker that built TD-069 step 1)
-**Status:** Open — seen once, not reproduced.
+**Status:** Partly done — **the first sighting is reproduced and fixed** (PR #264, 2026-09-20): the file in a loop under two concurrent full suites failed once in 25 at the migration assertion (`assert 'exited' == 'idle'`), because the test stored a **paneless** record and ran under a one-second `CREATE_GRACE` with 0.3 s ticks — a tick between `start()` and the assertion judged it `exited`, correctly. The grace is now long while the migration is asserted and zero for the half that is about the grace passing, so each line bounds on its own rule; 40 runs under the same load, no failure. **The second sighting below is open** and is the same family, in a different test.
 **Location:** `tests/test_agent_restart.py` (`test_restart_reloads_and_reconciles`)
 
 **Why:** during the fix round of PR #249 a full local run had this one test fail; it passed alone (the file's 6 tests) and on the clean full re-run (538 passed), and the branch touched nothing it exercises. CI has not shown it. A test that can go red on a full run costs a merge sooner or later, and the way to lose an hour to it is to meet it for the first time with a deadline.
