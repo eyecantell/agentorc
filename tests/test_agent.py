@@ -6,7 +6,7 @@ import subprocess
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import FAST_TICK, derived, wait_state
+from conftest import FAST_TICK, derived, wait_for, wait_state
 
 from sessionorc import adapters, naming, paths, reports
 from sessionorc.agent import WRAPUP_GRACE
@@ -1434,3 +1434,42 @@ async def test_a_reply_past_asyncios_default_line_limit_is_read(agent, tmp_path)
         views = await c.call("list")
         assert len(json.dumps(views)) > 65_536 and any(v["id"] == s["id"] for v in views)
         await c.call("kill", id=s["id"])
+
+
+async def test_the_tools_own_title_is_observed_from_the_pane(agent, hookstub, tmp_path, monkeypatch):
+    """TD-074 step 3, design §4.5a **title** / §4.3 `title()`: the pane's terminal title is read with
+    the pane list each tick and handed to the session's adapter, which alone says what of it is a
+    name. Observed, like `tail`, so it is node-owned; cleaned and capped; no wake fires on it; and an
+    adapter without the method — `shell` — gives none, whatever its pane says."""
+    from sessionorc.models import NODE_OWNED, wake_digest
+
+    assert "title" in NODE_OWNED  # observed on the host where the pane lives, exactly as `tail` is
+    monkeypatch.setattr(
+        hookstub, "title", lambda pane_title: pane_title.strip().lstrip("✳").strip() or None, raising=False
+    )
+
+    def osc(text: str) -> str:
+        return f"printf '\\033]2;{text}\\007'"
+
+    async with LocalClient() as c:
+        s = await c.call("create", name="titled", dir=str(tmp_path), adapter=hookstub.name)
+        sid = s["id"]
+        assert s["title"] is None  # nothing until a pane has been observed with one
+        before = wake_digest(s)
+        await c.call("send", id=sid, text=osc("✳ Error Checker"))
+        assert await wait_for(lambda: _title(c, sid, "Error Checker"))
+        got = await c.call("get", id=sid)
+        # a name, not a status: it changes rarely and never wakes a lead waiting on this session
+        assert wake_digest(got) == before
+        # capped: a name, not a line
+        await c.call("send", id=sid, text=osc("x" * 200))
+        assert await wait_for(lambda: _title(c, sid, "x" * 80))
+        # a shell says nothing at all: its adapter has no `title()`
+        sh = await c.call("create", name="plainsh", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        await c.call("send", id=sh["id"], text=osc("✳ Error Checker"))
+        await asyncio.sleep(FAST_TICK * 3)
+        assert (await c.call("get", id=sh["id"]))["title"] is None
+
+
+async def _title(c, sid: str, want: str) -> bool:
+    return (await c.call("get", id=sid))["title"] == want

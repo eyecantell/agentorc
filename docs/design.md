@@ -2609,7 +2609,7 @@ unattended:
   creds_min_hours: 0.25
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}   # profile: §4.9
-  hunter: {brief: docs/briefs/hunter.md}
+  hunter: {brief: docs/briefs/hunter.md, icon: search}   # icon: §4.8, one name from the fixed set
   lead: {brief: docs/briefs/lead.md, grants: [control]}
 controllers: [orchestrator-ao-1]      # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody

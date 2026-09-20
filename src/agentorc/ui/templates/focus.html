@@ -7,6 +7,11 @@
     <div class="row gap" id="fhead">
       <a class="muted" href="/">← Org</a>
       <span class="mono title">{{ s.place }} / {{ s.name }}</span>
+      {# design §4.5a Focus header **title** (§4.3 `title()`, TD-074): the session's name as its tool
+         holds it, beside agentorc's own name for it. Display only — it is set in the tool, and
+         agentorc has no rename of its own — so it carries no control. #}
+      {% if s.title %}<span class="meta tool-title"
+            title="the session's name as its tool holds it (design §4.5a) — set in the tool, not in agentorc">{{ s.title }}</span>{% endif %}
       <span id="fstate"></span>
       {# design §6 / §4.5a (TD-026): when this session stops, and the control that edits it. Drawn
          only for an unattended session, because a stop time is a policy and policies leave an

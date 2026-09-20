@@ -175,6 +175,29 @@ RULES_FILE = Path(__file__).with_name("screen_rules.toml")
 
 COMPOSER_GLYPH = "❯"  # the composer's prompt glyph; submitted prompts repeat it above, the composer is the last
 
+# The tool's terminal title (design §4.5a **title**, §4.3 `title()`, TD-074). Claude Code writes the
+# conversation's name there — the one a person gave it with the tool's own rename (*Error Checker*),
+# else the tool's own summary — behind a status glyph that changes as it works (*✳ Error Checker*,
+# seen on a live pane 2026-09-19). The decoration comes off; what is left is a name, unless it is the
+# tool's own default or a shell's, in which case there is no name to show.
+TITLE_GLYPHS = "✳✻✽✶✢✺✵∗·•●◐◓◑◒"  # the status marks the tool cycles through, and the dots beside them
+TITLE_DEFAULTS = frozenset({"claude", "claude code"})  # what it sets before the conversation has a name
+# A shell's own title, the usual one on a pane the tool has not renamed: `user@host: ~/dir`.
+TITLE_HOSTISH = re.compile(r"^[^\s@]+@[^\s:]+:")
+
+
+def _undecorated(pane_title: str) -> str:
+    """The terminal title with the tool's leading status glyphs and spacing removed. Braille cells
+    (U+2800–U+28FF) are the spinner's frames — a glyph by position rather than by character."""
+    text = pane_title.strip()
+    # One mark, and only when a space follows it — the tool's form is `✳ Name`. A name a person
+    # chose may open with a character of its own, so nothing else is taken (review of PR #240).
+    if len(text) > 1 and text[1].isspace() and (text[0] in TITLE_GLYPHS or "⠀" <= text[0] <= "⣿"):
+        text = text[2:]
+    elif text and len(text) == 1 and (text in TITLE_GLYPHS or "⠀" <= text <= "⣿"):
+        text = ""
+    return text.strip()
+
 
 class ClaudeCodeAdapter:
     name = "claude-code"
@@ -237,6 +260,17 @@ class ClaudeCodeAdapter:
             if text.startswith(COMPOSER_GLYPH):
                 return text[len(COMPOSER_GLYPH) :].strip("\xa0 ")
         return None
+
+    def title(self, pane_title: str) -> str | None:
+        """The session's name as the tool holds it (design §4.3 `title()`, §4.5a **title**, TD-074):
+        the terminal title with the tool's decoration stripped. `None` when what is left is not a
+        name — nothing at all, the tool's own default (*Claude Code*), or a shell's `user@host: dir`
+        on a pane the tool never titled. Display only: agentorc never sets it, and a name is set
+        where it was set, in the tool's own rename."""
+        text = _undecorated(pane_title or "")
+        if not text or text.lower() in TITLE_DEFAULTS or TITLE_HOSTISH.match(text):
+            return None
+        return text
 
     # -- locators --------------------------------------------------------------------------------
 

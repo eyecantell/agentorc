@@ -169,3 +169,35 @@ def test_grants_orchestrate_in_a_role_is_read_as_control(tmp_path, capsys, monke
     role = repoconfig.resolve_role(repoconfig.load(tmp_path), "reviewer")
     assert role.grants == ["control"]
     assert "grant `orchestrate` is now `control`" in capsys.readouterr().err
+
+
+def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
+    """TD-074 step 4, design §4.8 *Role presets*: a preset may carry an `icon:` — one name from the
+    set the UI ships, never markup from a config file. The built-ins carry `lead: flag`,
+    `grinder: wrench`, `hunter: search` and `plain` none; a layer overrides it per key like every
+    other key; an unknown name is refused when the file is read, as an unknown grant is."""
+    builtin = {r.name: r.icon for r in repoconfig.roles(repoconfig.RepoConfig())}
+    assert builtin == {"grinder": "wrench", "hunter": "search", "lead": "flag", "plain": None}
+    assert "icon" in repoconfig.ROLE_KEYS
+    assert set(builtin.values()) - {None} <= set(repoconfig.ICONS)
+    # the repo's own file overrides it, and its other keys are untouched
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {icon: terminal}\n  reviewer: {icon: eye}\n")
+    cfg = repoconfig.load(tmp_path)
+    grinder = repoconfig.resolve_role(cfg, "grinder")
+    assert grinder.icon == "terminal" and grinder.brief == "grinder.md" and grinder.lane == ["free-pick"]
+    assert repoconfig.resolve_role(cfg, "reviewer").icon == "eye"
+    assert grinder.to_dict()["icon"] == "terminal"
+    # built-in < org < repo, per key: the org layer speaks for a role the repo's file leaves alone
+    overlay = {"hunter": {"icon": "book"}, "grinder": {"icon": "shield"}}
+    assert repoconfig.resolve_role(cfg, "hunter", overlay).icon == "book"
+    assert repoconfig.resolve_role(cfg, "grinder", overlay).icon == "terminal"  # the repo still wins
+    # an explicit null is "no icon", and the layer that says so is the one that counts
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: null}\n")
+    assert repoconfig.resolve_role(repoconfig.load(tmp_path), "lead").icon is None
+    # an unknown name is refused when the file is read, naming the key and what is known
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: rocket}\n")
+    with pytest.raises(ValueError, match=r"icon: unknown icon 'rocket'"):
+        repoconfig.load(tmp_path)
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: 7}\n")
+    with pytest.raises(ValueError, match="icon must be a string"):
+        repoconfig.load(tmp_path)

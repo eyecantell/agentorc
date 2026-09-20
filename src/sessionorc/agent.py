@@ -83,6 +83,7 @@ SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken
 PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)
 SUBMIT_SECONDS = 1.5  # `send`: how long the composer gets to empty after Enter, per try (TD-027)
 COMPOSER_LINES = 12  # raw rows an adapter's `composer` reads (the composer sits above a status line or two)
+TITLE_CAP = 80  # characters of the tool's own title kept (design §4.5a **title**, TD-074): a name, not a line
 SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends
 # `ACTING_RPCS` lives in `sessionorc.mail` beside the gates, and is re-exported here for the
 # callers that always read it from the agent.
@@ -732,6 +733,7 @@ class HostAgent:
     def _observe(self, s: Session, pane: PaneInfo, tail: list[str], now: datetime) -> None:
         adapter = adapters.get(s.adapter)
         s.tail = [_clean(t) for t in tail]
+        s.title = _pane_title(adapter, pane.title)
         s.pane = True
         if s.run_log:
             with contextlib.suppress(OSError):
@@ -3656,6 +3658,22 @@ def _grants(names: list[str]) -> list[str]:
 async def _falsy(coro: Any) -> bool:
     """`not await coro`: a composer that reads empty ("") or unreadable (None) counts as emptied."""
     return not await coro
+
+
+def _pane_title(adapter: Any, pane_title: str) -> str | None:
+    """The session's name as its tool holds it (design §4.5a **title**, TD-074): the pane's terminal
+    title handed to the session's adapter, which alone knows what of it is a name (§4.3 `title()`).
+    An adapter without the method — `shell`, a command run — gives none, and so does a broken one:
+    a title is a display, and no tick is lost over one. Cleaned as a tail is, and shorter."""
+    reader = getattr(adapter, "title", None)
+    if reader is None:
+        return None
+    try:
+        name = reader(pane_title or "")
+    except Exception:  # noqa: BLE001 — one adapter's title never costs the tick
+        log.exception("adapter %s: title() failed", getattr(adapter, "name", adapter))
+        return None
+    return (_clean(str(name)).strip()[:TITLE_CAP] or None) if name else None
 
 
 def _clean(text: str) -> str:
