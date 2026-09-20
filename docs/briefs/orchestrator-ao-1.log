@@ -601,3 +601,4 @@
 19:53  escalated: board line filed for the parked worker and #269 — PR #274, Sonnet fact-check SHIP, cadence comment posted, squash-merged b6b075e, check_cadence pass; orch-parked-worker worktree removed
 19:57  tdgrind-ao-1: a wrap-up prompt reached it at 19:57 (its pane shows the standard 'this session is being wrapped up' text; wrapup_sent_at is unset on the record, so it did not come from my hand) → letting it finish; watching for out_of_work
 20:00  wrap-up: Paul wrapped this lead up. tdgrind-ao-1 exited clean (worktree clean, nothing unpushed) after its own wrap-up prompt at 19:57. Final cadence sweep --since 12h: 24 agentorc PRs, every one verdict pass; samscrape had none. Board line updated as PR #276 (fact-check running).
+20:05  wrap-up: board line updated — PR #276, Sonnet fact-check FIXED (2 findings, both fixed), cadence comment posted, squash-merged, check_cadence pass; worktree removed. ao progress none declared. Log branch pushed. Ending.
