@@ -414,7 +414,7 @@
       f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
       layout();
     });
-    // Start, Stop and Stop now are all on the team's card, and so is its fold.
+    // Start, Wind down and Stop now are all on the team's card, and so is its fold.
     box.addEventListener("click", (e) => {
       const b = e.target.closest("[data-team-act]");
       if (b) return teamAct(b.dataset.team, b.dataset.teamAct, b);

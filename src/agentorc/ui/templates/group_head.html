@@ -16,9 +16,9 @@
 {% if g.live or not g.team %}<span class="meta">{{ g.live }} live</span>
 {% elif g.wound_down %}<span class="meta" title="every session that carried this team's badge declared it was out of work — Start is the restart">wound down{% if g.wound_down_age %} {{ g.wound_down_age }} ago{% endif %}</span>
 {% else %}<span class="meta">stopped</span>{% endif %}
-{# Start, or Stop / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the
+{# Start, or Wind down / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the
    control sits on the thing it acts on, and only a team with a definition has either. #}
-{% if g.team and g.defined %}{% if g.live %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="wrap up the members, then the lead (`ao team stop`)">Stop</button>
+{% if g.team and g.defined %}{% if g.live %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="each member finishes what it holds and exits, then the lead (`ao team stop`)">Wind down</button>
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="kill every session carrying this badge (`ao team stop --now`)">Stop now</button>
 {% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="the same sequence as `ao team start`: every check before any session is created">Start</button>{% endif %}{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}

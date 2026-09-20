@@ -277,6 +277,7 @@ def test_a_live_teams_card_carries_stop_and_stop_now_and_never_folds(world, clie
     head = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
     head = head[: head.index('<div class="grid">')]
     assert 'data-team-act="stop" data-team="ao-grind" title' in head
+    assert ">Wind down</button>" in head and ">Stop</button>" not in head  # the label says how it differs from Stop now
     assert 'data-team-act="stopnow" data-team="ao-grind" title' in head
     assert 'data-team-act="start"' not in head and "data-fold" not in head
     # A badge with no definition has nothing `ao team start|stop` could read: no control at all.
