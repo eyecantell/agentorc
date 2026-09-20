@@ -326,6 +326,15 @@ def view(s: dict[str, Any], fleet: list[dict[str, Any]] | None = None, *, fleet_
     d["out_of_work"] = (
         {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
     )
+    # design §4.5a card **doing** line (§4.8, TD-074): what the session says it is doing, always with
+    # its age — *says · 11m ago* — so a stale line reads as stale. Text a model wrote: shown, never
+    # acted on, and escaped like everything else. `None` for a session that has said nothing, which
+    # is what makes the slot fall back to the tail; shaped like the chip above, so one malformed
+    # record costs that card its line and not the grid.
+    doing = s.get("doing")
+    doing = doing if isinstance(doing, dict) else {}
+    text = str(doing.get("text") or "").strip() if isinstance(doing.get("text"), str) else ""
+    d["doing"] = {"text": text, "age": _age(doing.get("at"), now)} if text else None
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
@@ -438,7 +447,12 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
             {
                 "team": team,
                 "label": team or "No team",
-                "lead": {k: lead[k] for k in ("id", "name", "state", "state_class", "state_label", "scraped")}
+                # `doing` rides with the lead (design §4.5a **team groups**, TD-074): the team card's
+                # header shows its lead's line, which is the lead reporting on the team without
+                # being asked to narrate each member.
+                "lead": {
+                    k: lead.get(k) for k in ("id", "name", "state", "state_class", "state_label", "scraped", "doing")
+                }
                 if lead
                 else None,
                 "lead_elsewhere": lead_elsewhere,  # its card sits under its own badge, not here

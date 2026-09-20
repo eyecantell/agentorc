@@ -889,6 +889,58 @@ async def test_out_of_work_is_the_sessions_own_declared_word(agent, tmp_path):
         await person.call("kill", id=sid)
 
 
+async def test_doing_is_one_line_the_session_says_about_itself(agent, tmp_path):
+    """TD-074 steps 1–2, design §4.8 `doing`: `doing: {text, at}` on the record, a value and not a
+    log — the last line replaces the one before and `--clear` empties it. One line, control bytes
+    stripped, capped at 200; empty after cleaning is refused. Only the session itself may write it
+    (§9 invariant 14), nothing derives it, no wake fires on it, and an exit leaves it in place."""
+    from sessionorc.models import wake_digest
+    from sessionorc.store import SessionStore
+
+    async with LocalClient() as person:
+        s = await person.call("create", name="doer", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
+        sid = s["id"]
+        assert s["doing"] is None
+        before = wake_digest(s)
+        # a person, and any other session, cannot say it for this one
+        with pytest.raises(AgentError, match="only .* may say what it is doing"):
+            await person.call("doing", id=sid, text="reading the ledger")
+        async with LocalClient(caller="ao-stranger") as stranger:
+            with pytest.raises(AgentError, match="only .* may say what it is doing"):
+                await stranger.call("doing", id=sid, text="reading the ledger")
+        async with LocalClient(caller=sid) as me:
+            with pytest.raises(AgentError, match="needs a line"):
+                await me.call("doing", id=sid, text="   ")
+            with pytest.raises(AgentError, match="needs a line"):
+                await me.call("doing", id=sid, text="\x1b[31m\x07")  # nothing left once it is cleaned
+            s = await me.call("doing", id=sid, text="reading the ledger for the next entry")
+            assert s["doing"]["text"] == "reading the ledger for the next entry" and s["doing"]["at"]
+            # no wake fires on it: a lead waiting on this worker is not woken by a status line
+            assert wake_digest(s) == before
+            # persisted, and reloaded with the record
+            on_disk = json.loads((paths.sessions_dir() / f"{sid}.json").read_text())
+            assert on_disk["doing"]["text"].startswith("reading the ledger")
+            assert SessionStore(paths.sessions_dir()).load(sid).doing == s["doing"]
+            # the last value only — a replacement, never an entry beside the one before
+            first_at = s["doing"]["at"]
+            s = await me.call("doing", id=sid, text="opening the PR")
+            assert s["doing"]["text"] == "opening the PR" and isinstance(s["doing"], dict)
+            assert s["doing"]["at"] >= first_at
+            # one line, control bytes stripped, capped at 200
+            s = await me.call("doing", id=sid, text="first \x1b[31mline\x07\nsecond line")
+            assert s["doing"]["text"] == "first line"
+            s = await me.call("doing", id=sid, text="x" * 500)
+            assert s["doing"]["text"] == "x" * 200
+            # cleared on the session's own word, and nothing else changes
+            s = await me.call("doing", id=sid, clear=True)
+            assert s["doing"] is None
+            s = await me.call("doing", id=sid, text="waiting on the review")
+        # an exit leaves it in place: it is the last thing the session said
+        await person.call("kill", id=sid)
+        await wait_state(person, sid, "exited")
+        assert (await person.call("get", id=sid))["doing"]["text"] == "waiting on the review"
+
+
 async def test_a_session_past_its_stop_time_is_wrapped_up_then_killed(agent, tmp_path):
     """TD-026 gap 1, design §6: a session started by hand with `--unattended` had no stopper at all.
     At its `run_until` the agent asks it to wrap up — once, in the client's words — and kills it the

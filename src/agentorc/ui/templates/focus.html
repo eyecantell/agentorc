@@ -18,6 +18,10 @@
          reason on hover. Not a state — the session still reads `idle` or `exited`. #}
       {% if s.out_of_work %}<span class="badge oow"
             title="{{ s.out_of_work.why or 'no reason recorded' }}">out of work{% if s.out_of_work.age %} {{ s.out_of_work.age }}{% endif %}</span>{% endif %}
+      {# design §4.8 `doing` (TD-074): what the session says it is doing, beside the other things it
+         said about itself, always with its age. Its own words: shown, never acted on. #}
+      {% if s.doing %}<span class="meta doing"
+            title="what this session says it is doing (design §4.8): its own words">{{ s.doing.text }} · says{% if s.doing.age %} · {{ s.doing.age }} ago{% endif %}</span>{% endif %}
       {# design §4.5a Focus header **grants** chip (§4.8): click a grant to revoke it, a dim one to grant it #}
       <span class="grants" id="fgrants" data-id="{{ s.id }}" data-grants="{{ s.grants_all | join(',') }}"></span>
       {# design §4.5a Focus header **controllers** chip (§4.8, TD-036): who may act on this

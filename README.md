@@ -128,7 +128,8 @@ with the reason when it is down: *ssh failed*, *agent down on the home*, or *ref
 The package installs `agentorc` and an `ao` alias. Reading: `ao status [-v]`, `ao tail`,
 `ao explain`. Acting on a session: `ao new`, `ao shell`, `ao send`, `ao keys`, `ao allow` /
 `ao deny`, `ao mode`, `ao kill`, `ao close`, `ao forget`. Capabilities and reports (design §4.8):
-`ao grant` / `ao revoke`, `ao progress claim|done|drop`, `ao finding`. Serving: `ao ui`,
+`ao grant` / `ao revoke`, `ao progress claim|done|drop`, `ao finding`, `ao doing "<one line>"` (what
+this session is doing now — its card shows it with its age; `--clear` empties it). Serving: `ao ui`,
 `ao service`. A container node (design §4.4a): `ao host up|rebuild|forget|status <name>`; `ao new
 --host <name>` starts a session on it, every act on the `<id>@<name>` it prints is gated here
 and run there, and `ao focus <id>@<name>` attaches through `docker exec`. `ao new

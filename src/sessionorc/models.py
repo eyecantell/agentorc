@@ -89,6 +89,7 @@ HOME_OWNED = frozenset(
         "progress",
         "findings",
         "out_of_work",
+        "doing",
         "ledger",
         "seen_at",
         "inbox",
@@ -425,6 +426,12 @@ class Session:
     # session itself writes it and nothing derives it (§9 invariant 14); a later declared claim
     # clears it, since the session has work again.
     out_of_work: dict[str, str] | None = None
+    # `{text, at}`: the session's own word for what it is doing now (`ao doing`, design §4.8, the
+    # third report channel, 2026-09-19). A value, not a log — the last line replaces the one before,
+    # as `out_of_work` does — and only the session itself writes it (§9 invariant 14). Never
+    # derived, nothing keys on it, no wake fires on it (so it is out of `wake_digest`), and an exit
+    # leaves it in place, as the last thing the session said.
+    doing: dict[str, str] | None = None
     # The preset the session was started under (design §4.8): a badge, and nothing keys on it
     # (§9 invariant 9). Empty for a session started without one.
     role: str = ""

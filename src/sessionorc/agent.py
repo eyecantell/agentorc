@@ -1586,6 +1586,34 @@ class HostAgent:
         s.out_of_work = {"at": now_iso(), "why": why.strip()}
         return await self._report(s, True, None)
 
+    async def rpc_doing(self, id: str, text: str = "", clear: bool = False, caller: Any = None) -> dict[str, Any]:
+        """`ao doing "<line>"` (design §4.8, the third report channel, TD-074): one line, the
+        session's own word for what it is doing now. `doing: {text, at}` on the record — a value
+        beside the entry lists, as `out_of_work` is, so the last line replaces the one before and
+        `--clear` empties it.
+
+        Ungated like the other channels, and, like `out_of_work`, only the session itself may write
+        it (§9 invariant 14): it is *the session says*, and a lead describing a member would be
+        second-hand. One line (a newline ends it), control bytes stripped as a tail's are, capped at
+        200 characters; a line that cleans to nothing is refused. Nothing derives it, nothing keys
+        on it and no wake fires on it — it is shown, never acted on, and an exit leaves it in
+        place."""
+        s = self._find(id)  # a node's session reports here (step 5): the field is the home's
+        if mail.is_person(caller) or str(caller) != s.id:
+            raise RpcError(
+                f"only {s.id} may say what it is doing: it is the session's own word (design §9 invariant 14)"
+            )
+        if clear:
+            s.doing = None
+        else:
+            line = _clean(str(text or "").split("\n", 1)[0]).strip()
+            if not line:
+                raise RpcError('ao doing needs a line: `ao doing "<what you are doing now>"`, or --clear (design §4.8)')
+            s.doing = {"text": line, "at": now_iso()}
+        self._save(s)
+        await self._push_changes()
+        return s.view()
+
     async def rpc_finding(
         self, id: str, ref: str, priority: str | None = None, source: str = "declared"
     ) -> dict[str, Any]:

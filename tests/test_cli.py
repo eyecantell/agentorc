@@ -1006,6 +1006,34 @@ def test_progress_none_declares_out_of_work(subprocess_agent, tmp_path, capsys, 
     call_sync("kill", id=sid)
 
 
+def test_doing_says_one_line_and_status_shows_it_with_its_age(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-074 step 1 (design §4.8 `doing`): `ao doing "<line>"` lands on this session's own record,
+    the last line replaces the one before, `--clear` empties it, and `ao status -v` prints it with
+    its age. A person with no session of their own is told, not guessed at."""
+    assert cli.main(["--json", "shell", "doer", "-d", str(tmp_path)]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["doing"]) == 2
+    assert "needs a line" in capsys.readouterr().err
+    assert cli.main(["doing", "--clear", "reading the ledger"]) == 2
+    assert "takes no line" in capsys.readouterr().err
+    assert cli.main(["doing", "reading the ledger for the next entry"]) == 0
+    assert capsys.readouterr().out.strip() == f"{sid}: doing — reading the ledger for the next entry"
+    assert cli.main(["doing", "opening", "the", "PR"]) == 0  # a line typed unquoted is still one line
+    assert capsys.readouterr().out.strip() == f"{sid}: doing — opening the PR"
+    assert cli.main(["status", "-v"]) == 0
+    assert re.search(r"doing \S+ ago: opening the PR", capsys.readouterr().out)
+    assert cli.main(["--json", "status"]) == 0
+    assert next(x for x in json.loads(capsys.readouterr().out) if x["id"] == sid)["doing"]["text"] == "opening the PR"
+    assert cli.main(["doing", "--clear"]) == 0
+    assert capsys.readouterr().out.strip() == f"{sid}: doing cleared"
+    assert call_sync("get", id=sid)["doing"] is None
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["doing", "nothing of mine to say"]) == 2
+    assert "no session" in capsys.readouterr().err
+    call_sync("kill", id=sid)
+
+
 def test_progress_sends_force_only_when_asked(monkeypatch, capsys):
     """A host agent older than TD-056 refuses an unknown `force` keyword, and the CLI is routinely
     newer than the running agent until its restart: a plain claim must not send it (2026-09-17).
