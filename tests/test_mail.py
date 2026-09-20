@@ -1362,3 +1362,103 @@ async def test_an_envelope_carries_its_senders_team(agent, tmp_path):
         left = [e for e in (await person.call("inbox"))["entries"] if e["from"] == badged][0]
         assert left["team"] == "alpha"
         await person.call("kill", id=plain)
+
+
+# -- resume, and the two halves of it step 0 got wrong (review of PR #245) -----------------------
+
+
+async def test_a_resumed_askers_questions_to_the_person_are_not_closed_as_asker_gone(agent, hookstub, tmp_path):
+    """Design §4.10 "Ids follow the move" against *What a person is asked*: an `ask` to the person
+    never expires, so it outlives the record that sent it, and `asker_gone` is the only thing that
+    closes it. A **resume** is not a gone asker — the conversation continues under the new id — so
+    the person inbox's copies follow the move: their `from` is rewritten, the superseded record is
+    skipped when it is forgotten a day later, the person's reply reaches the **new** record, a
+    `system` note about the entry lands there, and the per-sender depth counts them under the new
+    id. (Step 0 closed all of them the moment `CLOSED_KEEP` expired the old record.)"""
+    async with LocalClient() as person:
+        for d in ("w", "w2"):
+            (tmp_path / d).mkdir()
+        w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
+            "id"
+        ]
+        await person.call("hook", session=w, adapter_id="conv-69", state="idle")
+        async with LocalClient(caller=w) as c:
+            ask = (await c.call("msg", to="person", text="merge PR 9?", kind="ask"))["entry"]["id"]
+            steer = (await c.call("msg", to="person", text="fmt?", kind="steer", default="black", bound=600))["entry"]
+        await person.call("kill", id=w)
+        await wait_state(person, w, "exited")
+        w2 = (
+            await person.call(
+                "create",
+                name="w2",
+                dir=str(tmp_path / "w2"),
+                adapter=hookstub.name,
+                unattended=True,
+                resume="conv-69",
+            )
+        )["id"]
+        assert w2 != w and (await person.call("get", id=w))["superseded_by"] == w2
+        # the ids followed the move: the person inbox names the conversation that is running
+        held = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
+        assert [held[ask]["from"], held[steer["id"]]["from"]] == [w2, w2]
+        # the superseded record is forgotten a day later, and closes nothing
+        agent.sessions[w].closed_at = (datetime.now(UTC) - timedelta(days=2)).isoformat().replace("+00:00", "Z")
+        await agent.tick()
+        assert w not in agent.sessions
+        held = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
+        assert [held[ask]["closed_reason"], held[steer["id"]]["closed_reason"]] == [None, None]
+        # a `system` note about the steer reaches the new record, not the ghost of the old one
+        await person.call("inbox_pause", msg=steer["id"])
+        told = (await person.call("inbox", id=w2))["entries"]
+        assert [(e["from"], e["text"]) for e in told] == [
+            ("system", f"steer {steer['id']} paused by the person: do not take your default yet")
+        ]
+        # the person's reply reaches the new record too, and closes the question there
+        rep = await person.call("msg", text="yes, merge it", kind="reply", reply_to=ask)
+        assert rep["delivered"] == [w2] and rep["closed"] == ask
+        assert [e["text"] for e in (await person.call("inbox", id=w2))["entries"]][-1] == "yes, merge it"
+        # …and the per-sender depth counts them under the new id, and none under the old one
+
+        def counted(sid):
+            return sum(1 for e in agent.person_inbox if e.from_ == sid and (not e.read_at or e.open))
+
+        assert (counted(w2), counted(w)) == (2, 0)  # the paused steer, still open, and the unread ask
+        await person.call("kill", id=w2)
+
+
+async def test_a_lapse_wakes_uncharged_across_a_resume_and_a_restart(agent, hookstub, tmp_path, monkeypatch):
+    """Design §4.10: a lapse wakes **uncharged**, so a spent budget cannot hold a sender past the
+    bound it set itself. The mark is on the note, not beside the records, so it survives the two
+    things that can happen between the lapse and the wake it earns: the sender being **resumed**
+    (the note moves with the conversation) and the host agent **restarting** (it is reloaded).
+    Step 0 kept it in a set on the agent, and lost it to both."""
+    from sessionorc.agent import HostAgent
+
+    monkeypatch.setattr(mail, "WAKE_BUDGET", 0)  # spent: nothing but a free wake fires
+    async with LocalClient() as person:
+        for d in ("w", "w2"):
+            (tmp_path / d).mkdir()
+        w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
+            "id"
+        ]
+        await person.call("hook", session=w, adapter_id="conv-70", state="idle")
+        async with LocalClient(caller=w) as c:
+            await c.call("msg", to="person", text="fmt?", kind="steer", default="black", bound=0.2)
+        await person.call("kill", id=w)
+        await wait_state(person, w, "exited")
+        await asyncio.sleep(0.3)
+        await agent._sweep_mail(datetime.now(UTC))  # it lapses on time, exited or not
+        assert [e.uncharged for e in agent.sessions[w].inbox] == [True]
+        w2 = (
+            await person.call(
+                "create", name="w2", dir=str(tmp_path / "w2"), adapter=hookstub.name, unattended=True, resume="conv-70"
+            )
+        )["id"]
+        # the note moved with the conversation, its mark with it
+        assert [(e.from_, e.uncharged) for e in agent.sessions[w2].inbox] == [("system", True)]
+        # a fresh host agent on the same store reloads the mark: a restart does not charge the wake
+        assert [e.uncharged for e in HostAgent(tmux=agent.tmux).sessions[w2].inbox] == [True]
+        got = agent._decide_wake(agent.sessions[w2], member_change=False)
+        assert got is not None and got["charged"] is False and got["cause"] == "mail"
+        assert agent.sessions[w2].wake_refilled_at is None  # it refilled nothing either
+        await person.call("kill", id=w2)

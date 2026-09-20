@@ -2364,7 +2364,9 @@ now one of three things, and the envelope says which:
   silence is not); **`asker_gone`** (the asker's record was **closed or forgotten** — new with this
   rule: until now only an *addressee's* going closed an entry, and an `ask` that cannot expire
   needs the other half, or a forgotten worker's questions stand forever; an asker that merely
-  *exited* leaves it open, since a resume may still want the answer); or the refusal below. The
+  *exited* leaves it open, since a resume may still want the answer, and **a record closed because
+  a resume superseded it is not a gone asker either** — the conversation continues under the new
+  id, which the rewrite above moved its questions to); or the refusal below. The
   asker does not wait on it: it takes other work, or declares itself out of work (§4.9a), and a
   reply that lands after it exited waits in its inbox and moves with a resume, as all mail does.
   **It is still mail, and mail is not durable** (§9 invariant 13): a question whose answer must
@@ -2656,7 +2658,13 @@ Outside those stages an entry leaves only with its record or by a person's hand:
   record's pair tallies and pending `ask` addressees that name it — one host agent holds every
   record in the org — the home, §4.4a — so the rewrite is local. (Resume stays on one host: a
   tool's conversation lives in that host's files, and a resume across hosts is not supported.)
-  Entries already delivered keep `from` as it was; instead, **a message addressed to a closed
+  **And in `from`, on the copies the conversation itself owns** (2026-09-19, review of TD-069 step
+  0): the moved `outbox`, and the **person inbox**'s copies of what the old id asked. An `ask` to
+  the person does not expire, so it outlives the record that sent it, and its `from` is what the
+  per-sender depth, the advice line, the delivery of a `system` note about it and the person's
+  Reply all read; left naming the old id, a question the resumed session is still waiting on would
+  be closed `asker_gone` when the superseded record is dropped a day later. Entries already
+  delivered into **another session's** inbox keep `from` as it was; instead, **a message addressed to a closed
   record that a live one superseded is forwarded to the successor**, and the sender's reply says
   so. Without it, a lead's Reply to a worker that crashed and was resumed would be refused, the
   worker being closed.

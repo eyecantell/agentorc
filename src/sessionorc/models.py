@@ -219,6 +219,11 @@ class MailEntry:
     team: str | None = None  # the sender's `team` at send, stamped by the home (§4.10, 2026-09-19)
     snoozed_until: str | None = None  # a person-inbox entry the person set aside; the Inbox page only
     paused_at: str | None = None  # a person-inbox `steer` whose clock the person stopped (§4.10 *Pause*)
+    # A `system` note whose wake is **uncharged** (§4.10: a lapse is the home's clock, not another
+    # session's message). It is on the entry rather than in a set beside the records so that it
+    # survives what the entry survives: a resume moves it with the note, and a host-agent restart
+    # reloads it — the wake is decided when the session is next reachable, which may be after both.
+    uncharged: bool = False
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root

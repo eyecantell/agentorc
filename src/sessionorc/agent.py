@@ -250,10 +250,6 @@ class HostAgent:
         self._subscribers: dict[asyncio.StreamWriter, dict[str, str]] = {}
         self._gone: list[str] = []  # forgotten ids not yet announced (`_forget` → `_push_changes`)
         self._waits: set[_Wait] = set()  # every `wait` blocked right now, each on its own connection
-        # sessions owed one **uncharged** mail wake: a `steer` of theirs lapsed, which is the home's
-        # own clock and not another session's message (design §4.10). In memory only — a wake owed
-        # across a host-agent restart is a wake the lapse note itself will earn on the next tick.
-        self._uncharged: set[str] = set()
         # every open client connection: a stop closes them, or `Server.wait_closed()` waits on the
         # UI's subscription and each blocked `wait` forever (TD-058)
         self._conns: set[asyncio.StreamWriter] = set()
@@ -814,7 +810,6 @@ class HostAgent:
             self._mail_hints,
         ):
             side.pop(sid, None)
-        self._uncharged.discard(sid)
 
     def _forget(self, sid: str) -> None:
         gone = self.sessions.get(sid)
@@ -826,7 +821,7 @@ class HostAgent:
         # its bound runs whatever becomes of the addressee, so the sender's copy lapses on time.
         for e in [e for e in gone.inbox if e.open and e.kind != "steer"]:
             self._close_entry(e.id, "expired", now_iso())
-        self._asker_gone(sid, self._address(gone))
+        self._asker_gone(gone, self._address(gone))
         self.sessions.pop(sid, None)
         self.store.delete(sid)
         # Scrub the id from every subscriber's map and queue the one `gone`: whichever
@@ -836,14 +831,23 @@ class HostAgent:
         self._scrub(sid)
         self._gone.append(sid)
 
-    def _asker_gone(self, *ids: str) -> None:
+    def _asker_gone(self, s: Session, *ids: str) -> None:
         """Design §4.10 *What a person is asked*: an `ask` to the person cannot expire, so the
         other half of its lifecycle is the **asker's** — closing or forgetting a record closes the
         open `ask`s and `steer`s it put to the person, `closed_reason: asker_gone`, or a forgotten
         worker's questions would stand forever. An asker that merely **exited** leaves them open: a
-        resume may still want the answer. Nothing is told — there is no one left to tell."""
+        resume may still want the answer. Nothing is told — there is no one left to tell.
+
+        **A record a resume superseded is not a gone asker** (review of PR #245): the conversation
+        continues under the new id, `_move_mail` moved its questions' `from` there with it, and this
+        record is closed only as the bookkeeping of that move — forgetting it a day later must not
+        close a question the resumed session is still waiting on. The id rewrite is what makes this
+        so; this is the second line, for a superseded record whose person-inbox copy was pruned and
+        written again, or a rewrite a future path misses."""
+        if s.superseded_by:
+            return
         at = now_iso()
-        for e in [e for e in self.person_inbox if e.from_ in ids and e.open]:
+        for e in [e for e in self.person_inbox if e.from_ in (s.id, *ids) and e.open]:
             self._close_entry(e.id, "asker_gone", at)
 
     # -- RPC methods -----------------------------------------------------------------------------
@@ -1132,6 +1136,18 @@ class HostAgent:
         # not decided (and charged) a second time, and a spent budget is not reset by a resume
         new.mail_decided, new.wakes, new.wake_refilled_at = old.mail_decided, list(old.wakes), old.wake_refilled_at
         old.inbox, old.outbox, old.threads, old.sends = [], [], {}, []
+        # **The person inbox's copies follow the move too** (§4.10 "Ids follow the move"; review of
+        # PR #245). An `ask` to the person does not expire, so a question the old id put there can
+        # outlive the record that sent it — and its `from` is load-bearing in four places: the
+        # per-sender depth, the advice line, where a `system` note about it is delivered, and where
+        # the person's Reply is addressed. Left naming the old id, the question would be closed
+        # `asker_gone` when the superseded record is forgotten a day later, although the
+        # conversation it belongs to is still running.
+        moved = [e for e in self.person_inbox if e.from_ == old.id]
+        for e in moved:
+            e.from_ = new.id
+        if moved:
+            self.person_store.save(self.person_inbox)
         for r in self.sessions.values():
             if r.id in (old.id, new.id):
                 continue
@@ -1148,10 +1164,16 @@ class HostAgent:
 
     @staticmethod
     def _rename(entries: list[MailEntry], old: str, new: str) -> list[MailEntry]:
+        """The old id rewritten to the new one in entries the resume carries. `from_` too, on the
+        copies this record owns — its **outbox**, where `from_` is this conversation and the home
+        reads it to deliver a `system` note about the entry (review of PR #245). A delivered copy
+        in someone else's inbox is never passed here and keeps `from` as it was (§4.10)."""
         for e in entries:
             e.to = [new if x == old else x for x in e.to]
             e.copies = [new if x == old else x for x in e.copies]
             e.pending = [x for x in e.pending if x != old]
+            if e.from_ == old:
+                e.from_ = new
         return entries
 
     def occupants(self, directory: Path) -> list[str]:
@@ -1242,7 +1264,7 @@ class HostAgent:
         # way — but it would make the guard's one-tick bound untrue (review of PR #199).
         self._killed_at.pop(id, None)
         self.store.save(s)
-        self._asker_gone(s.id, self._address(s))  # its open questions to the person close with it (§4.10)
+        self._asker_gone(s, self._address(s))  # its open questions to the person close with it (§4.10)
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
 
@@ -2093,18 +2115,31 @@ class HostAgent:
           **refill** the budget;
         - `note` — a **resume**, ordinary: it wakes within the budget like any `note`;
         - `uncharged` — a **lapse**: outside the budget, neither spending nor refilling it, so a
-          spent budget cannot hold a sender past the bound it set itself."""
+          spent budget cannot hold a sender past the bound it set itself. It is carried on the note
+          (`MailEntry.uncharged`) rather than beside the records, so it survives the two things
+          that happen between a lapse and the wake it earns: a **resume**, which moves the note to
+          the new record, and a host-agent **restart**, which reloads it (review of PR #245).
+
+        A sender that has since been resumed is followed to its successor, as mail addressed to a
+        superseded record is (§4.10 lifecycle): the note is about the conversation, not the id."""
         entry = MailEntry(id="m-" + secrets.token_hex(6), from_=SYSTEM, to=[to], at=now_iso(), kind="note", text=text)
+        entry.uncharged = wake == "uncharged"
         if to == PERSON:
             self.person_inbox.append(entry)
             self.person_store.save(self.person_inbox)
             return
-        r = self._graph().get(to)
+        records = self._graph()
+        sid, seen = to, {to}
+        while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
+            sid = r.superseded_by
+            if sid in seen:
+                break
+            seen.add(sid)
+        r = records.get(sid)
         if r is None:
             return  # the sender's record is gone: there is nobody left to tell
+        entry.to = [sid]
         r.inbox.append(entry)
-        if wake == "uncharged":
-            self._uncharged.add(r.id)
         if wake == "person":
             self._refill(r)  # saves the record and pokes the waits
         else:
@@ -2438,9 +2473,11 @@ class HostAgent:
         - none, or `s` is a person's session (never woken by mail) → None, nothing recorded;
         - a member's change is waking it anyway → a **free** wake: recorded `charged: False`,
           watermark advanced over all of it;
-        - a `steer` of its own **lapsed** → an **uncharged** wake, free in the same sense and for
-          the same reason it is not a refill: it is the home's clock, not another session's
-          message (design §4.10), so a spent budget cannot hold a sender past its own bound;
+        - one of the undecided entries is a note the home marked `uncharged` — a `steer` of its own
+          **lapsed** → a free wake, free in the same sense and for the same reason it is not a
+          refill: it is the home's clock, not another session's message (design §4.10), so a spent
+          budget cannot hold a sender past its own bound. The mark is on the note, so it survives a
+          resume and a restart between the lapse and the moment the session is next reachable;
         - the budget holds → one unit spent however many entries it covers, `charged: True`,
           watermark advanced;
         - the budget is spent → None: the mail has landed, nothing wakes, **the watermark stays**,
@@ -2453,10 +2490,9 @@ class HostAgent:
         if not fresh:
             return None
         now = datetime.now(UTC)
-        free = member_change or s.id in self._uncharged
+        free = member_change or any(e.uncharged for e in fresh)
         if not free and mail.wake_budget_spent(s, now):
             return None
-        self._uncharged.discard(s.id)
         decision = {
             "at": now.isoformat(timespec="microseconds"),
             "cause": "member" if member_change else "mail",
