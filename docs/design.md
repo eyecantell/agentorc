@@ -2651,7 +2651,7 @@ the id, every time that is so.
 person's own bookkeeping, as editing a `Due:` date is, and the sender is not told. It persists
 with the person inbox. It affects **the Inbox page only** — the entry leaves its section and the page's count until that time, or until the person clears it — and
 nothing else: it is still unread if it was, it still occupies the depths above, and a snoozed `ask` stays
-open. It is offered on an `ask`, a `note` and a board item; a `steer` has **Pause** instead (above).
+open. It is offered on an `ask` and on a board item; a `note` is dismissed rather than snoozed, since nothing is waiting on it (§4.5a gives an FYI row one control), and a `steer` has **Pause** instead (above).
 
 **An envelope carries its sender's `team`** from this date, stamped by the home at send beside
 `from` — the Inbox filters by team, and a join to the sender's record fails exactly when the page
