@@ -1537,8 +1537,28 @@ def create_app() -> FastAPI:
         the simplest correct thing is one snapshot per poll — a row whose state changed in between
         is corrected by the next one, and a permission answered here leaves at once because the
         press refreshes."""
-        got, states = await person_view()
+        try:
+            got, states = await person_view()
+        except HTTPException as e:
+            if e.status_code != 503:
+                raise
+            # The page's own load already answers a host agent that is down with a banner; its
+            # **poll** answered a bare 503, which the client could only drop on the floor — the
+            # rows would sit there looking current (design §4.5 *there is no silent failure path*,
+            # TD-069's leftover). So the poll says it in a shape the page can render: no entries,
+            # no counts claimed, and the reason in words.
+            return {
+                "entries": [],
+                "sections": {k: [] for k in INBOX_SECTIONS},
+                "needs": None,  # not zero: nothing is *known* to be waiting, which is not *nothing is*
+                "snoozed_n": 0,
+                "html": {},
+                "unread": None,
+                "agent_down": True,
+                "why": str(e.detail),
+            }
         sections = inbox_sections(got["entries"], states=states)
+        got["agent_down"] = False
         got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
         got["needs"] = sections["count"]
         got["snoozed_n"] = len(sections["snoozed"])

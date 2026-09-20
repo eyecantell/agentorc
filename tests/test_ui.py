@@ -257,6 +257,29 @@ def test_org_renders_with_agent_down(tmp_path, monkeypatch):
         assert r.status_code == 503
 
 
+def test_the_inbox_poll_says_the_agent_is_down_instead_of_a_bare_503(tmp_path, monkeypatch):
+    """TD-069's leftover, design §4.5 *there is no silent failure path*: the Inbox **page** already
+    answered a down host agent with a banner; its **poll** answered a bare 503, which a client can
+    only drop — leaving the rows on screen looking current. The poll now answers in a shape the
+    page can say, and claims no count: `needs: null` is *not known*, which is not *nothing*."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "nohome"))
+    from agentorc.ui.app import create_app
+
+    with TestClient(create_app()) as c:
+        r = c.get("/api/person/inbox")
+        assert r.status_code == 200
+        got = r.json()
+        assert got["agent_down"] is True and "unreachable" in got["why"]
+        assert got["needs"] is None and got["entries"] == [] and got["html"] == {}
+        # the page carries the banner at all times, hidden until it is true, so the poll can show it
+        page = c.get("/inbox").text
+        assert 'id="agentdown"' in page and 'id="agentdownwhy"' in page
+        import agentorc.ui as ui
+
+        js = (pathlib.Path(ui.__file__).parent / "static" / "app.js").read_text()
+        assert "agentdown" in js and "got.needs !== null" in js
+
+
 def test_vscode_url_opens_a_new_window(monkeypatch, tmp_path):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  vscode_host: kmaster\n")

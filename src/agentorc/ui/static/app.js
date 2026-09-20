@@ -250,8 +250,10 @@
       if (!r.ok) return null;
       got = await r.json();
     } catch (e) { return null; }
+    // `needs: null` is *not known* — the host agent is down — and a chip that read 0 would be a
+    // lie in the one place a person looks to see whether anything is waiting (TD-069).
     const chip = $("#personneeds"), n = got.needs || 0;
-    if (chip) { chip.textContent = n ? String(n) : ""; chip.classList.toggle("hidden", !n); }
+    if (chip && got.needs !== null) { chip.textContent = n ? String(n) : ""; chip.classList.toggle("hidden", !n); }
     return got;
   };
   if ($("#personneeds")) {
@@ -539,6 +541,13 @@
 
   async function refreshInbox() {
     const got = await AO.refreshInboxCount();
+    const down = $("#agentdown");
+    if (down) {
+      // the banner the page renders at load, turned on and off by the poll: a host agent that goes
+      // away under an open page must not leave its rows looking current (design §4.5)
+      down.hidden = !(got && got.agent_down);
+      if (got && got.agent_down && got.why) $("#agentdownwhy").textContent = got.why;
+    }
     if (!got || !got.html) return;
     IN_SECS.forEach((k) => {
       const el = $("#rows-" + k);

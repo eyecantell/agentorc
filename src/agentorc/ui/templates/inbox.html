@@ -11,7 +11,10 @@
     <span class="grow"></span>
     <input class="input" id="ifilter" placeholder="filter… (team:name)" style="width: 220px;" title="team:name shows one team, team: shows what carries none; anything else matches sender, text and about">
   </div>
-  {% if agent_down %}<div class="warn">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} — no mail can be read until it is back <span class="grow"></span><a class="btn sm ghost" href="/inbox">Retry</a></div>{% endif %}
+  {# Always drawn, hidden until it is true: the page's poll turns it on when the host agent goes
+     away under it, so the rows on screen are not silently frozen (design §4.5 *no silent failure
+     path*, TD-069). The poll's own words go in `#agentdownwhy`. #}
+  <div class="warn" id="agentdown"{% if not agent_down %} hidden{% endif %}>⚠ <b>{{ host }}</b>: <span id="agentdownwhy">host agent unreachable</span>{% if volatile %} (a volatile host: asleep?){% endif %} — no mail can be read until it is back <span class="grow"></span><a class="btn sm ghost" href="/inbox">Retry</a></div>
 
   {# Snoozed: in none of the sections and in no count until its time — and never lost (§4.10). #}
   <details class="card pad snoozedbox" id="snoozedbox"{% if not sections.snoozed %} hidden{% endif %}>
