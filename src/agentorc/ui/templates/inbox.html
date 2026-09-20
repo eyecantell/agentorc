@@ -17,7 +17,8 @@
 {% set info = {
   'needs': 'Sessions that stopped for you — a permission, a question, a cap, a stall, work that was never pushed, an identity alarm — questions a session cannot go on without, and steering you have paused. What is on the tool’s clock first, then oldest first. This section is the number in the top bar; the Org’s “needs you” counts the session states alone. A state row is the session’s own: its controls are the card’s, and a mark that is not a control never looks like one. Reading this page marks nothing and rings nothing — a person is not the session; and anything with a date on it belongs on the board.',
   'steering': 'Each says what it will do unless you say otherwise, and when. Soonest first. Doing nothing is a valid answer: at the time shown the sender goes with its default, and nothing has failed. Reply says otherwise; Go with it closes it now; Pause stops the clock.',
-  'fyi': 'Notes, what the home reported about your own messages, late replies, and what lapsed or was declined — kept for 12 hours and then pruned. Nothing here is counted. Newest first. Dismiss removes an entry; the sender keeps its copy.',
+  'waiting': 'Questions you have answered whose asker still owes you the outcome — what came of your answer (§4.10). Never counted: it waits on a session, not on you. Dismiss says you do not need to hear back — the debt ends and the asker is told. When an asker exits without reporting, or reports that it is blocked, that row is under Needs you instead, because only you or its manager can move it.',
+  'fyi': 'Notes, what the home reported about your own messages, late replies, outcomes under the questions they close, the trail of rows that resolved without you, and what lapsed or was declined — kept for 12 hours and then pruned. Its own number is never added to the one beside it: that one is what needs you. This section opens itself when it holds something this browser has not seen. Newest first. Dismiss removes an entry, and Dismiss all removes the ones on screen — never mail that arrived after the page was drawn.',
 } %}
 {% macro imark(sec, name) -%}
 <button class="imark" type="button" data-info="info-{{ sec }}" id="i-{{ sec }}" aria-controls="info-{{ sec }}" aria-expanded="false" aria-describedby="info-{{ sec }}" aria-label="About {{ name }}" title="{{ info[sec] }}">i</button>
@@ -54,11 +55,26 @@
     <div class="note empty" hidden>Nothing is steering.</div>
   </section>
 
+  {# design §4.5a **Inbox section: Waiting on them** (§4.10 *Outcomes*, TD-079 step 2): under
+     *Steering*, in neither number, and empty for most people most of the time — so it draws only
+     when it has something, like the snoozed box above. #}
+  <section class="isec{% if not sections.waiting %} hidden{% endif %}" id="sec-waiting">
+    <div class="row gap wrap sechead"><span class="h2">Waiting on them</span><span class="meta" id="n-waiting"></span>{{ imark('waiting', 'Waiting on them') }}</div>
+    <p class="note secinfo" id="info-waiting" hidden>{{ info['waiting'] }}</p>
+    <div class="inboxrows" id="rows-waiting">{% with rows = sections.waiting, section = 'waiting' %}{% include "inbox_rows.html" %}{% endwith %}</div>
+  </section>
+
   {# FYI's fold **is** its heading (§4.5 screen 6 *Layout*): the disclosure's own ▾ before the name
      and no second fold control anywhere. The **i** inside the summary is a button, so the script
      stops its press from reaching the disclosure. #}
   <details class="isec" id="sec-fyi">
-    <summary class="row gap wrap sechead"><span class="h2">FYI</span><span class="meta" id="n-fyi"></span>{{ imark('fyi', 'FYI') }}</summary>
+    <summary class="row gap wrap sechead"><span class="h2">FYI</span><span class="meta" id="n-fyi"></span>{{ imark('fyi', 'FYI') }}
+      {#- §4.10: **Dismiss all** dismisses the entries **this browser has on screen**, by id, never
+          *everything FYI holds now* — mail that arrived after the page was drawn is exactly what
+          must not go unseen. One confirm, written by the page with the number it is about. -#}
+      <span class="grow"></span>
+      <button class="btn sm ghost" id="dismissall" type="button" title="dismiss the FYI entries on screen — never one that arrived after the page was drawn">Dismiss all</button>
+    </summary>
     <p class="note secinfo" id="info-fyi" hidden>{{ info['fyi'] }}</p>
     <div class="inboxrows" id="rows-fyi">{% with rows = sections.fyi, section = 'fyi' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing here.</div>

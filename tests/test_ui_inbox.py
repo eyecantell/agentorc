@@ -447,16 +447,20 @@ def test_pause_moves_a_steer_into_needs_you_and_counts_it_and_resume_gives_the_t
 
 
 @pytest.mark.integration
-def test_go_with_it_closes_a_steer_now_and_the_row_moves_to_fyi(client, tmp_path):
+def test_go_with_it_closes_a_steer_now_and_the_row_moves_to_waiting_on_them(client, tmp_path):
     """§4.5a **Inbox row: `steer`** → **Go with it**: closes it `go_with_it`, the sender is told and
-    need not wait out the bound; doing nothing would have lapsed to the same end."""
+    need not wait out the bound; doing nothing would have lapsed to the same end.
+
+    From TD-079 step 2 the row lands in **Waiting on them**, not FYI: *a `go_with_it` close owes an
+    outcome too* (§4.10 *Outcomes*), so the sender still has to say what came of it — and the page
+    says so where the agent already enforces it. Still in **neither** number, as it was in FYI."""
     sender = sender_session(client, tmp_path)
     steer = send(sender, text="branching", kind="steer", default="off main")["id"]
     r = client.post("/api/person/gowithit", json={"msg": steer})
     assert r.status_code == 200 and r.json()["closed_reason"] == "go_with_it"
     got = client.get("/api/person/inbox").json()
-    assert got["sections"]["fyi"] == [steer] and got["needs"] == 0
-    assert "closed · go with it" in got["html"]["fyi"]
+    assert got["sections"]["waiting"] == [steer] and got["sections"]["fyi"] == [] and got["needs"] == 0
+    assert "you let it go with its default" in got["html"]["waiting"]
     assert client.post("/api/person/gowithit", json={"msg": steer}).status_code == 400  # already closed
 
 
@@ -1180,3 +1184,232 @@ def test_a_state_row_prints_the_session_name_once(tmp_path, monkeypatch):
     other = {**same, "title": "Error Checker"}
     html = rows("needs", [other])
     assert ">push<" in html and ">Error Checker<" in html
+
+
+# -- the queue: outcomes, the trail, the second number, Dismiss all (TD-079 step 2) ---------------
+
+
+def answered(mid, **kw):
+    """A question the person answered, which therefore owes an outcome (§4.10 *Outcomes*)."""
+    e = entry(mid, "ask", closed_reason=kw.pop("closed_reason", "replied"), closed_by="person",
+              closed_at=kw.pop("closed_at", "2026-09-19T11:00:00Z"), **kw)  # fmt: skip
+    return e
+
+
+def sections_of(entries, *, states=(), trail=(), snoozed=None, fleet=None, now=None):
+    """`inbox_sections` over entries the page has already annotated, as `person_inbox` does."""
+    from agentorc.ui.app import _owing, inbox_sections
+
+    at = now or datetime(2026, 9, 19, 12, tzinfo=UTC)
+    records = {r["id"]: r for r in (fleet or [])}
+    for e in entries:
+        _owing(e, records.get(e["from"]), at)
+    return inbox_sections(entries, now=at, states=states, trail=trail, attention_snoozed=snoozed)
+
+
+@pytest.mark.unit
+def test_an_answered_question_waits_on_them_and_is_in_neither_number():
+    """§4.10 *Outcomes*: a question the person answered owes an outcome back. While its asker is
+    live the row is under **Waiting on them** — never counted, because it waits on a session, not
+    on the person — with the answer given and how long it has owed it."""
+    e = answered("m-1", text="merge it?", answers=["merge it", "hold"], answer=0)
+    got = sections_of([e], fleet=[{"id": "ao-w1", "state": "working"}])
+    assert [x["id"] for x in got["waiting"]] == ["m-1"] and got["count"] == 0
+    assert not got["needs"] and not got["fyi"]
+    html = rows("waiting", got["waiting"])
+    assert "you answered &ldquo;merge it&rdquo;" in html and "1h 0m ago" in html
+    assert "waiting on w1 to report the outcome" in html
+    assert 'data-act="dismiss" data-id="person" data-msg="m-1"' in html
+    # a question still open owes nothing yet, and a declined or lapsed one never will (§4.10)
+    assert sections_of([entry("m-2", "ask")])["waiting"] == []
+    assert sections_of([answered("m-3", closed_reason="declined")])["waiting"] == []
+    assert sections_of([answered("m-4", closed_reason="lapsed")])["waiting"] == []
+
+
+@pytest.mark.unit
+def test_a_blocked_outcome_and_an_asker_that_exited_are_counted_under_needs_you():
+    """§4.10: *`blocked` is not a dead end* — work stopped on something only a person can move — and
+    a debt whose asker **exited without reporting** is the same shape: only a person, or its
+    manager, can find out what happened. Both are in *Needs you*, and both are counted."""
+    blocked = answered("m-1", outcome={"state": "blocked", "text": "needs a token", "at": "2026-09-19T11:30:00Z"})
+    gone = answered("m-2", from_="ao-w2", from_name="w2")
+    got = sections_of([blocked, gone], fleet=[{"id": "ao-w1", "state": "working"}, {"id": "ao-w2", "state": "exited"}])
+    assert sorted(x["id"] for x in got["needs"]) == ["m-1", "m-2"] and got["count"] == 2
+    assert not got["waiting"] and not got["fyi"]
+    html = rows("needs", got["needs"])
+    assert "outcome · blocked" in html and "needs a token" in html
+    assert "its asker exited without reporting" in html
+    assert "blocked on something only a person can move" in html
+    # neither is an `ask` row: an answered question is not declined with Delete or set aside
+    assert 'data-act="unmail"' not in html and 'data-act="snooze"' not in html
+    assert html.count('data-act="dismiss"') == 2
+
+
+@pytest.mark.unit
+def test_a_done_outcome_is_fyi_under_the_question_and_its_note_is_not_a_row_of_its_own():
+    """§4.10: a `done` or `dropped` outcome is shown **under the question it closes** —
+    *you said "merge it" → done: merged as #261* — and the reporting `note`, which is an ordinary
+    entry in its own right, is listed under that question rather than beside it."""
+    done = {"state": "done", "text": "merged as #261", "at": "2026-09-19T11:30:00Z", "by": "m-2"}
+    q = answered("m-1", text="merge it?", answers=["merge it"], answer=0, outcome=done)
+    note = entry("m-2", "note", text="done: merged as #261")
+    got = sections_of([q, note], fleet=[{"id": "ao-w1", "state": "working"}])
+    assert [x["id"] for x in got["fyi"]] == ["m-1"]  # the note is not a second row
+    assert got["count"] == 0 and got["fyi_n"] == 1 and not got["waiting"]
+    html = rows("fyi", got["fyi"])
+    assert "you answered &ldquo;merge it&rdquo;" in html and "outcome · done" in html and "merged as #261" in html
+
+
+@pytest.mark.unit
+def test_the_trail_puts_a_row_that_resolved_without_you_into_fyi():
+    """§4.10 *The Inbox is a queue*: a state row that went away by some other road — the session
+    was resumed, the permission was answered in the terminal — does not simply vanish. The home
+    writes the ending; the page draws it in FYI, and **Dismiss** is the only way it leaves."""
+    t = {"id": "t-1", "sid": "ao-w1", "name": "w1", "team": "ao-grind", "kind": "permission",
+         "text": "run git push?", "since": "2026-09-19T11:00:00Z", "resolved_at": "2026-09-19T11:30:00Z",
+         "how": "answered in the terminal", "count": 2, "first": "2026-09-19T11:10:00Z",
+         "last": "2026-09-19T11:30:00Z"}  # fmt: skip
+    got = sections_of([], trail=[t])
+    assert [x["id"] for x in got["fyi"]] == ["t-1"] and got["fyi_n"] == 1 and got["count"] == 0
+    html = rows("fyi", got["fyi"])
+    assert "resolved: answered in the terminal" in html and "&times;2" in html
+    assert "it was a <b>permission</b> row, up for 30m" in html
+    assert 'data-act="dismiss" data-id="person" data-msg="t-1"' in html
+    assert 'data-kind="trail"' in html and 'class="badge kindmark k-trail"' in html  # a mark, not a control
+    # a malformed trail entry costs its row, never the page (the `_age` rule)
+    assert sections_of([], trail=["nonsense", {}, t])["fyi_n"] == 1
+
+
+@pytest.mark.unit
+def test_a_state_row_can_be_snoozed_and_a_snoozed_one_is_in_no_section_and_no_count():
+    """§4.5a **Inbox row: state** / §4.10: `stalled?` and unpushed work are the two rows not on the
+    tool's clock, so they are the two that may be set aside. The snooze is the home's, keyed on the
+    record **and the row kind** — a session's permission and its stalled row are two rows."""
+    stalled = {"row": "stalled", "id": "ao-w1:stalled", "sid": "ao-w1", "name": "w1", "text": "quiet for 40m",
+               "state_label": "stalled?", "state_class": "stalled", "at": "2026-09-19T11:00:00Z"}  # fmt: skip
+    perm = {"row": "permission", "id": "ao-w1:permission", "sid": "ao-w1", "name": "w1", "text": "run git push?",
+            "state_label": "needs you", "state_class": "needs", "at": "2026-09-19T11:00:00Z", "age": "1h"}  # fmt: skip
+    html = rows("needs", [stalled, perm])
+    assert 'data-act="attention_snooze" data-id="person" data-sid="ao-w1" data-row="stalled"' in html
+    assert 'data-row="permission" data-when' not in html  # never on the tool's own clock
+    # snoozing the stalled row leaves the permission where it was: two rows, one key each
+    got = sections_of([], states=[stalled, perm], snoozed={"ao-w1|stalled": "2026-09-19T15:00:00Z"})
+    assert [x["id"] for x in got["needs"]] == ["ao-w1:permission"] and got["count"] == 1
+    assert [x["id"] for x in got["snoozed"]] == ["ao-w1:stalled"]
+    sn = rows("snoozed", got["snoozed"])
+    assert "in 3h 0m" in sn and "the state itself is untouched" in sn
+    assert 'data-act="attention_snooze" data-id="person" data-sid="ao-w1" data-row="stalled"' in sn
+    assert "…" not in sn
+    # a snooze whose time has passed is no snooze: the row is back, and nothing was lost
+    back = sections_of([], states=[stalled], snoozed={"ao-w1|stalled": "2026-09-19T09:00:00Z"})
+    assert [x["id"] for x in back["needs"]] == ["ao-w1:stalled"]
+
+
+@pytest.mark.unit
+def test_fyi_carries_its_own_quiet_number_which_is_never_added_to_the_first(monkeypatch, tmp_path):
+    """§4.10: *Inbox 1 · 5* — the second number is FYI's entries and is **never** added to the
+    first, which is what needs a person. The section opens itself when its count is higher than
+    this browser last saw, which is how a folded, uncounted FYI stops hiding mail."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import templates
+
+    got = sections_of([entry("m-1", "ask"), entry("m-2", "note"), entry("m-3", "note")])
+    assert got["count"] == 1 and got["fyi_n"] == 2
+    html = templates.get_template("inbox.html").render(
+        sections=got, person_needs=got["count"], person_fyi=got["fyi_n"], host="kmaster", active="Inbox",
+        agent_down=False, volatile=False, usage={},
+    )  # fmt: skip
+    assert '<span id="needsn">1</span> needs you' in html
+    assert 'id="personneeds">1</span>' in html and 'id="personfyi"' in html and ">· 2</span>" in html
+    assert 'id="dismissall"' in html
+    js = (UI / "static" / "app.js").read_text()
+    assert 'store.get("inboxfyiseen", 0)' in js and 'store.set("inboxfyiseen", n)' in js
+    assert 'fyi.textContent = m ? `· ${m}` : ""' in js  # the second number, its own chip
+    assert "got.fyi_n !== null" in js  # not known is not zero, as for the first
+    css = (UI / "static" / "app.css").read_text()
+    assert "#personinbox .badge.fyin" in css and "border-color: transparent" in css  # a mark, never a control
+
+
+@pytest.mark.unit
+def test_an_fyi_entry_newer_than_this_browser_last_saw_is_marked_new():
+    """§4.5 screen 6 *Layout* / §4.10: the same comparison that opens the section by itself also
+    marks the entries that are why. It is the **browser's** own memory — nothing on the entry and
+    nothing at the home changes, so reading still changes no row — and it is a mark, never a
+    control: no border of its own, nothing to press."""
+    html = rows("fyi", [entry("m-1", "note", at="2026-09-19T10:00:00Z")])
+    assert 'data-at="2026-09-19T10:00:00Z"' in html  # what the comparison reads
+    js = (UI / "static" / "app.js").read_text()
+    assert 'store.get("inboxfyiseenat", "")' in js and 'store.set("inboxfyiseenat", newest)' in js
+    assert 'r.classList.toggle("isnew", !!seen && !!at && at > seen)' in js  # never on a first visit
+    css = (UI / "static" / "app.css").read_text()
+    mark = next(ln for ln in css.splitlines() if ".mailrow.isnew .mhead::after" in ln)
+    assert 'content: "new"' in mark and "cursor" not in mark and "border" not in mark
+
+
+@pytest.mark.unit
+def test_a_row_control_carries_its_border_and_the_hosts_alarm_row_has_no_team(tmp_path, monkeypatch):
+    """Two things the live page at 1920 showed on 2026-09-20 that no test held. §4.5 screen 6
+    *Layout* reads *marks are flat, controls are bordered* — but `.btn.ghost` is borderless
+    site-wide, so on a row where every control is a ghost button nothing looked pressable. And the
+    host's own alarm list is about **no record** (§4.8a), so *No team* on it said nothing."""
+    css = (UI / "static" / "app.css").read_text()
+    ctl = next(ln for ln in css.splitlines() if ".inboxpage .mailrow .btn.ghost" in ln)
+    assert "border-color: var(--border)" in ctl
+    host_row = {"row": "alarm_host", "id": "host:alarm", "sid": "", "name": "kmaster", "text": "",
+                "alarms": [{"words": "a request named ao-w1", "at": "2026-09-19T11:00:00Z", "count": 1}],
+                "mode": "observe", "at": "2026-09-19T11:00:00Z"}  # fmt: skip
+    html = rows("needs", [host_row])
+    assert "No team" not in html and 'class="badge team"' not in html
+    assert "kmaster" in html and 'data-act="identity_ack"' in html  # the row itself is unchanged
+    # every other state row keeps the badge, which is also its team filter
+    mine = {**host_row, "row": "alarm", "sid": "ao-w1", "name": "w1", "id": "ao-w1:alarm"}
+    assert 'class="badge team"' in rows("needs", [mine])
+
+
+@pytest.mark.unit
+def test_a_steer_the_person_let_go_owes_an_outcome_exactly_as_a_question_does():
+    """§4.10 *Outcomes*: *a `go_with_it` close owes one too* — and `go_with_it` is a `steer`'s own
+    close reason. The agent enforces the debt on `ASK_KINDS`, `steer` included (`MailEntry.owes`),
+    so the page must read the same set: a narrower one left a `steer`'s debt in FYI, uncounted,
+    while `ao progress none` was still refusing its sender (review of PR #287)."""
+    from agentorc.ui.app import OWING_KINDS
+    from sessionorc.models import ASK_KINDS
+
+    assert set(OWING_KINDS) == set(ASK_KINDS)  # one rule, two readings of it
+    gone = entry("m-1", "steer", default="off main", closed_reason="go_with_it",
+                 closed_at="2026-09-19T11:00:00Z", closed_by="person")  # fmt: skip
+    got = sections_of([gone], fleet=[{"id": "ao-w1", "state": "working"}])
+    assert [x["id"] for x in got["waiting"]] == ["m-1"] and not got["fyi"] and got["count"] == 0
+    assert "you let it go with its default" in rows("waiting", got["waiting"])
+    # and the same steer whose asker has exited is counted, as an answered question's would be
+    quiet = sections_of([dict(gone)], fleet=[{"id": "ao-w1", "state": "exited"}])
+    assert [x["id"] for x in quiet["needs"]] == ["m-1"] and quiet["count"] == 1
+    # a steer nobody answered owes nothing: it lapsed, and the sender took its default unasked
+    assert sections_of([entry("m-2", "steer", closed_reason="lapsed")])["waiting"] == []
+
+
+@pytest.mark.unit
+def test_the_asker_doing_line_is_the_shape_every_other_surface_draws():
+    """The fleet record the page reads is the raw one off `list`, whose `doing` is `{text, at}` —
+    a row wants `{text, age}`, as the card and the Focus header draw it (§4.8, TD-074). Read the
+    raw shape straight and the *says … ago* half of the line silently never renders."""
+    e = answered("m-1")
+    got = sections_of([e], fleet=[{"id": "ao-w1", "state": "working",
+                                   "doing": {"text": "rebasing #269", "at": "2026-09-19T11:30:00Z"}}])  # fmt: skip
+    html = rows("waiting", got["waiting"])
+    assert "doing: rebasing #269 · says 30m ago" in html
+    # no `doing`, no line — and a malformed one costs the line, never the page
+    assert "doing:" not in rows("waiting", sections_of([answered("m-2")], fleet=[{"id": "ao-w1"}])["waiting"])
+    assert "doing:" not in rows(
+        "waiting", sections_of([answered("m-3")], fleet=[{"id": "ao-w1", "doing": 7}])["waiting"]
+    )
+
+
+@pytest.mark.unit
+def test_a_person_act_refreshes_the_page_once():
+    """Every control on this page carries `data-id="person"`, and the dispatcher already refreshes
+    on that — a second, per-action refresh meant two `/inbox` fetches per press (review of #287)."""
+    js = (UI / "static" / "app.js").read_text()
+    assert '(staterow || id === "person") && typeof AO.refreshInboxPage === "function"' in js
+    assert '["dismiss", "attention_snooze"].includes(action) && typeof AO.refreshInboxPage' not in js

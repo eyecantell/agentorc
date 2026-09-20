@@ -91,6 +91,10 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .maildlg { width: min(560px, 92vw); color: var(--fg); } .maildlg::backdrop { background: rgba(0,0,0,.35); }
 .maildlg .row[hidden] { display: none; }
 #personinbox .badge { margin-left: 4px; }
+/* §4.10 *The Inbox is a queue*: FYI's own **quiet** number — *Inbox 1 · 5*. Never added to the
+   first, and deliberately plainer than it: the first is what needs a person. A mark, not a
+   control: the whole chip is the link, and this never had a border. */
+#personinbox .badge.fyin { border-color: transparent; background: transparent; color: var(--muted); font-weight: 500; margin-left: 2px; }
 /* the Inbox page (design §4.5 screen 6 *Layout*, §4.5a **Inbox page**; design round 2, TD-082).
    **One centred column**, 1100 px at most: a queue reads top to bottom, and a message's text runs
    the width of its row instead of wrapping at a measure of its own inside an empty box — the
@@ -127,6 +131,11 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .inboxpage .inboxrows { display: flex; flex-direction: column; gap: 8px; }
 .inboxpage .mailrow:hover { border-color: var(--border); }
 .inboxpage .mailrow:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+/* §4.5 screen 6 *Layout* / §4.10: an FYI entry newer than this browser last saw is marked **new**
+   — the browser's own memory, as the fold is. A mark and never a control: no border, no cursor,
+   nothing to press; the row's own surface is what it sits on. */
+.inboxpage .mailrow.isnew { border-color: var(--working); }
+.inboxpage .mailrow.isnew .mhead::after { content: "new"; order: 99; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--working); }
 .inboxpage .mailrow[hidden] { display: none; }
 .inboxpage .mailrow .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; font-weight: 600; }
 .inboxpage .mailrow .st { font-size: 10.5px; color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
@@ -138,6 +147,11 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
    the role badge, the state pill (which never had a border) — is flat and unbordered; everything
    bordered on a row is a control. The team badge keeps its border, because it is a button. */
 .inboxpage .mailrow .badge:not(.team) { border-color: transparent; }
+/* …and the other half of the same rule, which the live page showed was missing (the anchor, from
+   the 1920 shot of 2026-09-20): `.btn.ghost` is borderless site-wide, so on a row where every
+   control is a ghost button — Reply, Snooze, Open, Dismiss, Acknowledge — *nothing* looked
+   pressable and the rule read only one way. On this page a control carries its border. */
+.inboxpage .mailrow .btn.ghost { border-color: var(--border); }
 .inboxpage .mfoot, .inboxpage .mhead { row-gap: 4px; }
 /* design §4.5a **Inbox row: suggested answers** (§4.10, TD-070): the sender's words, drawn **apart
    from the row's own controls** — its own row, indented behind a *suggested by …* label and set

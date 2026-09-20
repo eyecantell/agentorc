@@ -73,6 +73,84 @@
 </details>
 {%- endmacro %}
 
+{# ── design §4.10 *Outcomes* (§4.5a **Inbox section: Waiting on them**; TD-079 step 2) ─────────
+   What became of the answer a person gave. Three shapes of the same fact, in three sections:
+   *Waiting on them* — answered, nothing back yet, its asker still live; *Needs you* — the asker
+   **exited without reporting**, or reported **`blocked`**, both of which only a person (or the
+   asker's manager) can move; *FYI* — `done` or `dropped`, under the question it closes.
+
+   The **answer given** is what the person inbox still holds: a pressed suggested answer is in the
+   entry itself, and a typed reply is not — it went to the asker's inbox, not to this one — so the
+   row says which of the two it was rather than inventing words the person did not write. #}
+
+{% macro answer_given(e) -%}
+<div class="st dflt">{% if e.answer_given %}you answered &ldquo;{{ e.answer_given }}&rdquo;{% else %}{{ e.answer_how }}{% endif %}{% if e.owed_age %} · {{ e.owed_age }} ago{% endif %}</div>
+{%- endmacro %}
+
+{# The outcome itself, as a mark and never a control — `outcome · done` is what a row **is**. #}
+{% macro outcome_line(e) -%}
+{%- set o = e.outcome or {} %}
+{%- if o.state %}<div class="row gap wrap"><span class="badge kindmark k-outcome o-{{ o.state }}">outcome · {{ o.state }}</span><span class="st">{{ o.text or '—' }}{% if e.outcome_age %} · {{ e.outcome_age }} ago{% endif %}</span></div>{% endif %}
+{%- endmacro %}
+
+{# *Waiting on them*: never counted — it waits on a session, not on the person. **Dismiss** says
+   *I do not need to hear back*: it ends the debt and the asker is told (`inbox_dismiss`). #}
+{% macro waiting(e, section) -%}
+{{ head(e) }}
+{{ body(e) }}
+{{ answer_given(e) }}
+{%- if e.asker_doing %}<div class="st" title="what the asker says it is doing (design §4.8): its own words">doing: {{ e.asker_doing.text }}{% if e.asker_doing.age %} · says {{ e.asker_doing.age }} ago{% endif %}</div>{% endif %}
+<div class="row gap wrap mfoot">
+  <span class="st">answered · waiting on {{ e.from_name or e['from'] }} to report the outcome</span>
+  <span class="grow"></span>
+  {{ reply_btn(e) }}
+  <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this? It says you do not need to hear back: the debt ends and {{ e.from_name or e['from'] }} is told.">Dismiss</button>
+</div>
+{%- endmacro %}
+
+{# In *Needs you*, counted: `blocked`, and a debt whose asker exited without reporting. Both are
+   work that stopped on something only a person can move (§4.10). A person's **Reply** here is an
+   ordinary reply and starts no new debt; one begins only if the session asks again. #}
+{% macro owed(e, section) -%}
+{{ head(e) }}
+{{ body(e) }}
+{{ answer_given(e) }}
+{{ outcome_line(e) }}
+<div class="row gap wrap mfoot">
+  {%- if e.asker_gone_quiet %}
+  <span class="st">its asker {{ e.asker_state }} without reporting what came of your answer — only you, or its manager, can find out</span>
+  {%- else %}
+  <span class="st">blocked on something only a person can move — your reply is an ordinary reply and starts no new debt</span>
+  {%- endif %}
+  <span class="grow"></span>
+  {%- if e.from_open %}<a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
+  {{ reply_btn(e) }}
+  <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this? It says you do not need to hear back: the debt ends and {{ e.from_name or e['from'] }} is told.">Dismiss</button>
+</div>
+{%- endmacro %}
+
+{# design §4.10 *The Inbox is a queue* (TD-079 step 1b): **the trail** — what a state row's ending
+   left behind, so a row that resolved by some other road (the session was resumed, the permission
+   was answered in the terminal) does not simply vanish. The home writes these; nothing here is a
+   control but **Dismiss**, and `resolved: <how>` is a mark. #}
+{% macro trail(e, section) -%}
+<div class="row gap wrap mhead">
+  {%- if e.sid %}<span class="ref" title="{{ e.sid }}">{{ e.name or e.sid }}</span>{% endif %}
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <span class="badge kindmark k-trail">trail</span>
+  <span class="st">resolved: {{ e.how or 'resolved' }}</span>
+  {%- if e.count and e.count > 1 %} <span class="st">&times;{{ e.count }}</span>{% endif %}
+  <span class="grow"></span>
+  <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
+</div>
+{%- if e.text %}<div class="body">{{ e.text }}</div>{% endif %}
+<div class="row gap wrap mfoot">
+  <span class="st">it was a <b>{{ e.kind }}</b> row{% if e.for_words %}, up for {{ e.for_words }}{% endif %} — it left the Inbox without you answering it, so it is here</span>
+  <span class="grow"></span>
+  <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}">Dismiss</button>
+</div>
+{%- endmacro %}
+
 {# What became of a question, in the words §4.10 gives each close path. Never a control. #}
 {% macro state_line(e) -%}
 {%- if e.closed_reason == 'lapsed' %}lapsed · the sender went with its default
@@ -135,6 +213,9 @@
 {{ head(e) }}
 {{ body(e) }}
 {%- if e.default %}<div class="st dflt">unless you say otherwise: {{ e.default }}</div>{% endif %}
+{#- §4.10 *Outcomes*: a `done` or `dropped` outcome is shown **under the question it closes** —
+    *you said "merge it" → done: merged as #261* — and the reporting note is not a row of its own. -#}
+{%- if e.outcome %}{{ answer_given(e) }}{{ outcome_line(e) }}{% endif %}
 <div class="row gap wrap mfoot">
   {%- set st = state_line(e) | trim %}
   {%- if st %}<span class="st">{{ st }}</span>{% endif %}
@@ -145,6 +226,16 @@
 
 {# The snoozed list (§4.10 *Snooze*): the row as its kind draws it, with **Unsnooze** — clearing
    `snoozed_until` — so a snooze is never a way to lose mail. #}
+{% macro state_snoozed(e, section) -%}
+{{ state_head(e) }}
+<div class="body">{{ e.text }}</div>
+<div class="row gap wrap mfoot">
+  <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">{% if e.until_words %}in {{ e.until_words }}{% else %}any moment now{% endif %}</span> — the state itself is untouched</span>
+  <span class="grow"></span>
+  <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" title="bring this row back into its section now">Unsnooze</button>
+</div>
+{%- endmacro %}
+
 {% macro snoozed(e, section) -%}
 {{ head(e) }}
 {{ body(e) }}
@@ -171,7 +262,12 @@
       out when it only repeats it (`push  push` on Paul's screenshot, TD-082 finding 4). -#}
   {%- if e.title and e.title != e.name %} <span class="meta tool-title" title="the session's name as its tool holds it (design §4.5a): {{ e.title }}">{{ e.title }}</span>{% endif %}
   {%- if e.role %} <span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ role_svg(e.role_icon) }}{{ e.role }}</span>{% endif %}
+  {#- the host's own alarm list is about **no record** (§4.8a), so it has no team to carry and no
+      team to be filtered by: *No team* on that row said nothing (the anchor, from the live page,
+      2026-09-20). Every other state row keeps the badge, which is also its team filter. -#}
+  {%- if e.row != 'alarm_host' %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  {%- endif %}
   <span class="grow"></span>
   {%- if e.state_label %}<span class="pill s-{{ e.state_class }}{% if e.scraped %} scraped{% endif %}" title="{{ 'guessed from the screen' if e.scraped else 'reported by the tool' }} — the state, not a control">{{ e.state_label }}</span>{% endif %}
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}">{{ e.age or '' }}</span>{% endif %}
@@ -182,6 +278,22 @@
    shown and never acted on. #}
 {% macro doing_line(e) -%}
 {%- if e.doing %}<div class="st dflt" title="what this session says it is doing (design §4.8): its own words">doing: {{ e.doing.text }}{% if e.doing.age %} · says {{ e.doing.age }} ago{% endif %}</div>{% endif %}
+{%- endmacro %}
+
+{# §4.5a **Inbox row: state**: a Snooze on the two rows that are **not on the tool's clock** —
+   `stalled?` and unpushed work. It is the home's (`attention_snooze`), keyed on the record *and*
+   the row kind, because a session's permission and its stalled row are two rows. A permission, a
+   question and `limited` are never offered one: something is waiting on the tool's own clock. #}
+{% macro state_snooze(e) -%}
+{%- if e.row in ('stalled', 'unpushed') %}
+<details class="more"><summary class="btn sm ghost" title="set this row aside until later; the state itself is untouched">Snooze</summary>
+  <div class="menu">
+    <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="1h">in 1 hour</button>
+    <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="tomorrow">tomorrow 08:00</button>
+    <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="pick">a date and time…</button>
+  </div>
+</details>
+{%- endif %}
 {%- endmacro %}
 
 {% macro open_btn(e, label) -%}
@@ -209,10 +321,12 @@
   {%- elif e.row == 'unpushed' %}
   <span class="st">exited with work that is only here — the row goes when it is pushed, or the session is forgotten</span>
   <span class="grow"></span>
+  {{ state_snooze(e) }}
   {{ open_btn(e, 'Details') }}
   {%- else %}
   <span class="st">{% if e.row == 'stalled' %}no output for a while: it may be thinking, or stuck{% else %}answer it in the terminal{% endif %}</span>
   <span class="grow"></span>
+  {{ state_snooze(e) }}
   {{ open_btn(e, 'Open') }}
   {%- endif %}
 </div>
@@ -240,15 +354,26 @@
 {%- endmacro %}
 
 {% macro row(e, section) -%}
-{%- if e.row %}
-<div class="mailrow staterow" tabindex="0" data-msg="{{ e.id }}" data-kind="state" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ e.find }}">
-{%- if e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
+{%- if e.row == 'trail' %}
+<div class="mailrow trailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="trail" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.name or '') ~ ' ' ~ (e.kind or '') ~ ' ' ~ (e.how or '') ~ ' ' ~ (e.text or '')) | lower }}">
+{{ trail(e, section) }}
+</div>
+{%- elif e.row %}
+<div class="mailrow staterow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ e.find }}">
+{%- if section == 'snoozed' %}{{ state_snoozed(e, section) }}
+{%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 </div>
 {%- else %}
-<div class="mailrow" tabindex="0" data-msg="{{ e.id }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '')) | lower }}">
+<div class="mailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '')) | lower }}">
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
 {%- if section == 'snoozed' %}{{ snoozed(e, section) }}
+{%- elif section == 'waiting' %}{{ waiting(e, section) }}
+{#- in *Needs you* an entry that is not open is one of the two §4.10 puts there: a `blocked`
+    outcome, or a debt whose asker exited without reporting. Both are answered, so neither is
+    an `ask` row — offering Snooze or Delete on one would be offering to decline an answered
+    question. The section decides, as it does for a closed `steer` in FYI. -#}
+{%- elif section == 'needs' and (e.owes or e.outcome) %}{{ owed(e, section) }}
 {%- elif section == 'fyi' %}{{ fyi(e, section) }}
 {%- elif e.kind == 'steer' %}{{ steer(e, section) }}
 {%- else %}{{ ask(e, section) }}

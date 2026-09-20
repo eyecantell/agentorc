@@ -149,6 +149,20 @@
         if (!until) return;
         body = { msg: b.dataset.msg, until };
       }
+      // design §4.10 *The Inbox is a queue* (TD-079 step 2): **Dismiss** — the one way a `note`,
+      // an outcome debt or a trail entry leaves. A list of ids, because *Dismiss all* sends the
+      // ones on screen; one press sends a list of one, through the same route and the same RPC.
+      if (action === "dismiss") body = { msg: [b.dataset.msg] };
+      // §4.5a **Inbox row: state**: a state row's snooze. It is keyed on the record **and the row
+      // kind** — the home has no mail entry to hang it on — and no `until` is the clear.
+      if (action === "attention_snooze") {
+        body = { id: b.dataset.sid, kind: b.dataset.row };
+        if (b.dataset.when) {
+          const until = snoozeUntil(b.dataset.when);
+          if (!until) return;
+          body.until = until;
+        }
+      }
       if (action === "control-add") {
         const who = prompt("Which session may act on this one? (its id or name from ao status)");
         if (!who) return;
@@ -169,6 +183,8 @@
       if (action === "resume") AO.toast("resumed — the clock runs again, with what was left", true);
       if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
       if (action === "identity_ack") AO.toast("acknowledged — the agent's log keeps every alarm", true);
+      if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
+      if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
       // the state is answered, so the row is gone: it is taken out here rather than waited for, and
       // the refresh below puts back whatever the record actually says
       if (staterow) staterow.remove();
@@ -254,6 +270,11 @@
     // lie in the one place a person looks to see whether anything is waiting (TD-069).
     const chip = $("#personneeds"), n = got.needs || 0;
     if (chip && got.needs !== null) { chip.textContent = n ? String(n) : ""; chip.classList.toggle("hidden", !n); }
+    // §4.10 *The Inbox is a queue* (TD-079 step 2): FYI's own quiet number, *Inbox 1 · 5*, never
+    // added to the first. `null` is *not known* here too — a chip reading 0 with the host agent
+    // down would be the same lie the first one refuses to tell.
+    const fyi = $("#personfyi"), m = got.fyi_n || 0;
+    if (fyi && got.fyi_n !== null && got.fyi_n !== undefined) { fyi.textContent = m ? `· ${m}` : ""; fyi.classList.toggle("hidden", !m); }
     return got;
   };
   if ($("#personneeds")) {
@@ -529,7 +550,7 @@
   // poll swaps a whole section's markup: nothing here composes markup out of what a session wrote.
   // What lives in the browser is what belongs to this browser — the filter, the FYI fold — exactly
   // as the Org's filter and team folds do.
-  const IN_SECS = ["needs", "steering", "fyi", "snoozed"];
+  const IN_SECS = ["needs", "steering", "waiting", "fyi", "snoozed"];
 
   // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
   // which is what the entry stores; the prompt is in the person's own clock.
@@ -590,6 +611,22 @@
       f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
       store.set("inboxfilter", f.value); inboxFilter();
     });
+    // §4.10: **Dismiss all** — the entries this browser has **on screen**, by id, never
+    // *everything FYI holds now*: mail that arrived after the page was drawn is what must not go
+    // unseen. The confirm says the number it is about, and the ids come off the DOM for that
+    // reason. It sits in FYI's `<summary>`, so its press must not also fold the section.
+    const all = $("#dismissall");
+    if (all) all.addEventListener("click", async (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const ids = [...$$("#rows-fyi .mailrow")].map((r) => r.dataset.msg).filter(Boolean);
+      if (!ids.length) return AO.toast("nothing in FYI to dismiss", true);
+      if (!confirm(`Dismiss ${ids.length} FYI ${ids.length === 1 ? "entry" : "entries"}? Only the ones on screen now — anything that arrives after this is untouched.`)) return;
+      try {
+        await act("person", "dismiss", { msg: ids });
+        AO.toast(`dismissed ${ids.length} — the sender is told where one was owed`, true);
+      } catch (err) { AO.toast(`dismiss failed: ${err.message}`); }
+      refreshInbox();
+    });
     AO.refreshInboxPage = refreshInbox;
     inboxFilter();
     refreshInbox();
@@ -623,8 +660,32 @@
     if (!got || got.agent_down || !got.html) return;
     IN_SECS.forEach((k) => {
       const el = $("#rows-" + k);
-      if (AO.maySwapSection(el, document.activeElement)) el.innerHTML = got.html[k] || "";
+      if (el && AO.maySwapSection(el, document.activeElement)) el.innerHTML = got.html[k] || "";
     });
+    // *Waiting on them* is empty for most people most of the time, so it draws only when it has
+    // something — like the snoozed box (§4.5a **Inbox section: Waiting on them**).
+    const w = $("#sec-waiting");
+    if (w) w.classList.toggle("hidden", !(got.sections && (got.sections.waiting || []).length));
+    // §4.10: **FYI opens itself when its count is higher than this browser last saw it**, and is
+    // otherwise as the person left it. That comparison is the browser's own — nothing on an entry
+    // and nothing at the home changes, so reading still changes no row. A folded, uncounted FYI
+    // is how five notes sat unseen for three days, which is the failure this closes.
+    const fyi = $("#sec-fyi"), n = got.fyi_n || 0;
+    if (fyi && got.fyi_n !== null && got.fyi_n !== undefined) {
+      if (n > store.get("inboxfyiseen", 0)) { fyi.open = true; store.set("inboxfyi", true); }
+      store.set("inboxfyiseen", n);
+      // …and the entries that are why: an FYI entry newer than this browser last saw is marked
+      // **new** — a mark and never a control, and the browser's own memory, as the fold is:
+      // nothing on the entry and nothing at the home changes, so reading still changes no row.
+      const seen = store.get("inboxfyiseenat", ""), rowsFyi = $$("#rows-fyi .mailrow");
+      let newest = seen;
+      rowsFyi.forEach((r) => {
+        const at = r.dataset.at || "";
+        r.classList.toggle("isnew", !!seen && !!at && at > seen);
+        if (at > newest) newest = at;
+      });
+      if (newest) store.set("inboxfyiseenat", newest);
+    }
     showLocalTimes();
     $("#needsn").textContent = got.needs || 0;
     $("#needspill").classList.toggle("hidden", !got.needs);
