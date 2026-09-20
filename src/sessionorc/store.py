@@ -80,6 +80,30 @@ class PersonInboxStore:
         _atomic_write(self.path, json.dumps({"entries": [e.to_dict() for e in entries]}, indent=1))
 
 
+class AttentionStore:
+    """The attention trail and the state-row snoozes (design §4.10 *The Inbox is a queue*, TD-079).
+    One file holding two things that belong to the **home** rather than to any record: `trail`, the
+    endings of the state rows the Inbox showed, newest first; and `snoozed`, a person's *not now*
+    per record and row kind. Written whole on every change; a missing or unreadable file is an
+    empty trail and no snoozes, never a crash — the same rule the person inbox follows."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = path or paths.attention_file()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def load(self) -> tuple[list[dict[str, Any]], dict[str, str]]:
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            trail = [d for d in raw.get("trail", []) if isinstance(d, dict) and d.get("id")]
+            snoozed = {str(k): str(v) for k, v in (raw.get("snoozed") or {}).items() if v}
+            return trail, snoozed
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return [], {}
+
+    def save(self, trail: list[dict[str, Any]], snoozed: dict[str, str]) -> None:
+        _atomic_write(self.path, json.dumps({"trail": trail, "snoozed": snoozed}, indent=1))
+
+
 class IdentityAlarmStore:
     """The host's **own** identity alarms (design §4.8a, TD-077 step 2): the ones about no record —
     a claim from outside every pane, an unreadable peer — which have nowhere else to live, since a

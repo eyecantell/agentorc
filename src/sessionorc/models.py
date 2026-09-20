@@ -189,6 +189,34 @@ class FindingEntry:
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
 
 
+ATTENTION_KINDS = ("permission", "question", "needs", "stalled", "limited", "unpushed")
+
+
+def attention_kind(s: Session) -> str:
+    """Which **state row** this record is, or `""` for one that needs nobody (design §4.5a *Inbox
+    row: state*, §4.10 *The Inbox is a queue*). The home needs this to know when a row **ends**,
+    so that what became of it leaves a trail; the page has its own form of the same predicate over
+    the view it renders (`agentorc.ui.app.state_kind`) — **a parity pair**: a kind added to one is
+    added to the other, and `tests/test_attention.py` holds them to the same answers.
+
+    `unpushed` is the one the two read differently and deliberately: the page adds *what Ready to
+    close says*, which is the page's own checklist, while the home reads the record's own git
+    facts. Both mean *exited with work that is not pushed*; the page's words are richer."""
+    pend = s.pending.to_dict() if s.pending else {}
+    if s.state == "needs-you":
+        if pend.get("kind") == "permission" and pend.get("tool_use_id"):
+            return "permission"
+        return "question" if pend.get("text") or pend.get("kind") else "needs"
+    if s.state == "stalled?":
+        return "stalled"
+    if s.state == "limited":
+        return "limited"
+    git = s.git or {}
+    if s.state == "exited" and (git.get("dirty") or git.get("ahead")):
+        return "unpushed"
+    return ""
+
+
 @dataclass
 class MailEntry:
     """One message as it sits in an inbox — or, the same entry, in its sender's `outbox`
