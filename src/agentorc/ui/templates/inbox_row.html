@@ -1,0 +1,133 @@
+{# design §4.5a **Inbox row: `ask`**, **Inbox row: `steer`**, **Inbox row: `note` and the rest of
+   FYI** (§4.5 screen 6, §4.10; TD-069 step 1). **One renderer per kind**, dispatched by `row()`,
+   so a row of another kind — a session state (step 2), a due board item (step 3) — joins a
+   section by gaining a macro here and changing nothing else.
+
+   Everything a session wrote is rendered as text by Jinja's escaping and never as markup, and a
+   kind mark is a `<span>`: nothing on the page that is not a control looks like one (TD-071 item 8). #}
+
+{% macro head(e) -%}
+<div class="row gap wrap mhead">
+  <span class="ref" title="{{ e['from'] }}{% if e.from_role %} · {{ e.from_role }}{% endif %}">{{ e.from_name or e['from'] }}</span>
+  {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <span class="badge kindmark k-{{ e.kind }}">{{ e.kind }}</span>
+  {%- if e.about %} <span class="st">re {{ e.about }}</span>{% endif %}
+  {%- if e.reply_to %} <span class="st">reply to {{ e.reply_to }}</span>{% endif %}
+  <span class="grow"></span>
+  <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
+</div>
+{%- endmacro %}
+
+{# The whole text, no scroll box: a 2,000-character message reads in full (§4.5 *Done when*), and a
+   long unbroken token wraps rather than widening the page. #}
+{% macro body(e) -%}
+<div class="body">{{ e.text }}</div>
+{%- endmacro %}
+
+{% macro reply_btn(e) -%}
+{%- if e['from'] not in ('person', 'system') %}<button class="btn sm ghost" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}">Reply</button>{% endif %}
+{%- endmacro %}
+
+{# §4.5a **Snooze** on an `ask`: 1 h · tomorrow 08:00 · a date. The person's own bookkeeping — the
+   sender is never told (§4.10 *Snooze*). A `steer` has Pause instead and is offered no Snooze. #}
+{% macro snooze_btn(e) -%}
+<details class="more"><summary class="btn sm ghost" title="set it aside until later">Snooze</summary>
+  <div class="menu">
+    <button data-act="snooze" data-id="person" data-msg="{{ e.id }}" data-when="1h">in 1 hour</button>
+    <button data-act="snooze" data-id="person" data-msg="{{ e.id }}" data-when="tomorrow">tomorrow 08:00</button>
+    <button data-act="snooze" data-id="person" data-msg="{{ e.id }}" data-when="pick">a date and time…</button>
+  </div>
+</details>
+{%- endmacro %}
+
+{# What became of a question, in the words §4.10 gives each close path. Never a control. #}
+{% macro state_line(e) -%}
+{%- if e.closed_reason == 'lapsed' %}lapsed · the sender went with its default
+{%- elif e.closed_reason == 'go_with_it' %}closed · go with it
+{%- elif e.closed_reason == 'declined' %}declined · the sender was told
+{%- elif e.closed_reason == 'asker_gone' %}closed · the asker is gone
+{%- elif e.closed_reason == 'replied' or e.closed_by %}answered by {{ e.closed_by or 'your reply' }}
+{%- elif e.closed_reason == 'expired' or e.expired_at %}expired
+{%- endif %}
+{%- endmacro %}
+
+{# §4.5a **Inbox row: `ask`** — the whole text, sender, `about`, age, and no countdown: an `ask` to
+   the person does not expire (§4.10). Reply · Delete (confirms; it declines) · Snooze. #}
+{% macro ask(e, section) -%}
+{{ head(e) }}
+{{ body(e) }}
+<div class="row gap wrap mfoot">
+  <span class="st">open · no bound — it waits until you answer it</span>
+  <span class="grow"></span>
+  {{ reply_btn(e) }}
+  {{ snooze_btn(e) }}
+  <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Delete this question? That declines it: the sender is told, and nothing else answers it.">Delete</button>
+</div>
+{%- endmacro %}
+
+{# §4.5a **Inbox row: `steer`** — the text, **the default it will take**, and the time left.
+   Reply says otherwise; Go with it closes it now; Pause stops the clock and Resume gives back what
+   was left. No Snooze: pause stops the clock, snooze hides a running one, and both invite the
+   wrong press (§4.10). #}
+{% macro steer(e, section) -%}
+{{ head(e) }}
+{{ body(e) }}
+<div class="st dflt">unless you say otherwise: {{ e.default or '—' }}</div>
+<div class="row gap wrap mfoot">
+  {%- if e.paused_at %}
+  <span class="st">paused · the clock is stopped, and the sender was told not to take its default yet</span>
+  {%- else %}
+  <span class="st timeleft" data-deadline="{{ e.bound or '' }}">{% if e.bound %}…{% else %}no bound{% endif %}</span>
+  {%- endif %}
+  <span class="grow"></span>
+  {{ reply_btn(e) }}
+  <button class="btn sm ghost" data-act="gowithit" data-id="person" data-msg="{{ e.id }}" data-confirm="Go with it? The sender takes its default now instead of waiting out the clock.">Go with it</button>
+  {%- if e.paused_at %}
+  <button class="btn sm ghost" data-act="resume" data-id="person" data-msg="{{ e.id }}" title="give back the time that was left">Resume</button>
+  {%- else %}
+  <button class="btn sm ghost" data-act="pause" data-id="person" data-msg="{{ e.id }}" title="stop the clock: the sender is told not to take its default yet">Pause</button>
+  {%- endif %}
+</div>
+{%- endmacro %}
+
+{# §4.5a **Inbox row: `note` and the rest of FYI** — the text; **Dismiss** deletes. No Reply here,
+   on a `system` note least of all: it reports what happened to your own message, and there is
+   nobody to reply to (§4.10). #}
+{% macro fyi(e, section) -%}
+{{ head(e) }}
+{{ body(e) }}
+{%- if e.default %}<div class="st dflt">unless you say otherwise: {{ e.default }}</div>{% endif %}
+<div class="row gap wrap mfoot">
+  {%- set st = state_line(e) | trim %}
+  {%- if st %}<span class="st">{{ st }}</span>{% endif %}
+  <span class="grow"></span>
+  <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this entry? It leaves your inbox; the sender keeps its copy.">Dismiss</button>
+</div>
+{%- endmacro %}
+
+{# The snoozed list (§4.10 *Snooze*): the row as its kind draws it, with **Unsnooze** — clearing
+   `snoozed_until` — so a snooze is never a way to lose mail. #}
+{% macro snoozed(e, section) -%}
+{{ head(e) }}
+{{ body(e) }}
+<div class="row gap wrap mfoot">
+  {#- the instant is stored UTC; the person set it in their own clock and reads it back in it,
+      as every other time on the page is shown. The raw instant stays on hover. -#}
+  <span class="st">snoozed until <span class="localtime" data-at="{{ e.snoozed_until }}" title="{{ e.snoozed_until }}">…</span></span>
+  <span class="grow"></span>
+  <button class="btn sm ghost" data-act="unsnooze" data-id="person" data-msg="{{ e.id }}" title="bring it back into its section now">Unsnooze</button>
+</div>
+{%- endmacro %}
+
+{% macro row(e, section) -%}
+<div class="mailrow" data-msg="{{ e.id }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '')) | lower }}">
+{#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
+    not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
+{%- if section == 'snoozed' %}{{ snoozed(e, section) }}
+{%- elif section == 'fyi' %}{{ fyi(e, section) }}
+{%- elif e.kind == 'steer' %}{{ steer(e, section) }}
+{%- else %}{{ ask(e, section) }}
+{%- endif %}
+</div>
+{%- endmacro %}

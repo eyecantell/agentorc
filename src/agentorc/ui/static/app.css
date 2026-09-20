@@ -79,9 +79,30 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .inbox .mail .st { font-size: 10.5px; color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
 .inbox .mail .body { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
 .badge.unread { color: var(--working-fg); background: var(--working-bg); border-color: var(--working); text-decoration: none; }
+/* the top bar's Inbox number: what is waiting on a person, not unread mail (§4.5a, TD-069) */
+.badge.needs { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); text-decoration: none; }
 .maildlg { width: min(560px, 92vw); color: var(--fg); } .maildlg::backdrop { background: rgba(0,0,0,.35); }
 .maildlg .row[hidden] { display: none; }
-#personinbox .badge { margin-left: 4px; } #personlist { max-height: 60vh; overflow: auto; }
+#personinbox .badge { margin-left: 4px; }
+/* the Inbox page (design §4.5 screen 6, §4.5a **Inbox page**): full width, three sections, one row
+   per thing. Every colour is a token — a light theme is required later (TD-071 item 8). */
+.inboxpage .isec { display: flex; flex-direction: column; gap: 8px; }
+.inboxpage details.isec > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+.inboxpage details.isec > summary::-webkit-details-marker { display: none; }
+.inboxpage details.isec > summary::before { content: "▸"; color: var(--muted); font-size: 11px; }
+.inboxpage details.isec[open] > summary::before { content: "▾"; }
+.inboxpage .snoozedbox > summary { list-style: none; cursor: pointer; color: var(--muted); }
+.inboxpage .snoozedbox > summary::-webkit-details-marker { display: none; }
+.inboxpage .mailrow { padding: 10px 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 5px; }
+.inboxpage .mailrow[hidden] { display: none; }
+.inboxpage .mailrow:first-child { border-top: 0; }
+.inboxpage .mailrow .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; font-weight: 600; }
+.inboxpage .mailrow .st { font-size: 10.5px; color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
+/* the whole text, no scroll box: a 2,000-character message reads in full, and an unbroken token wraps */
+.inboxpage .mailrow .body { font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 110ch; }
+/* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
+.inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
+.inboxpage .mfoot, .inboxpage .mhead { row-gap: 4px; }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
