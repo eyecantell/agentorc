@@ -129,7 +129,10 @@ The package installs `agentorc` and an `ao` alias. Reading: `ao status [-v]`, `a
 `ao explain`. Acting on a session: `ao new`, `ao shell`, `ao send`, `ao keys`, `ao allow` /
 `ao deny`, `ao mode`, `ao kill`, `ao close`, `ao forget`. Capabilities and reports (design §4.8):
 `ao grant` / `ao revoke`, `ao progress claim|done|drop`, `ao finding`, `ao doing "<one line>"` (what
-this session is doing now — its card shows it with its age; `--clear` empties it). Serving: `ao ui`,
+this session is doing now — its card shows it with its age; `--clear` empties it). Who is calling
+(design §4.8a): `ao whoami` (what the host agent takes this process to be, from its connection),
+`ao identity` (this host's mode — `local: {identity: off | observe | enforce}` in `hosts.yml`,
+`observe` by default — its tally of connections, and its identity alarms). Serving: `ao ui`,
 `ao service`. A container node (design §4.4a): `ao host up|rebuild|forget|status <name>`; `ao new
 --host <name>` starts a session on it, every act on the `<id>@<name>` it prints is gated here
 and run there, and `ao focus <id>@<name>` attaches through `docker exec`. `ao new

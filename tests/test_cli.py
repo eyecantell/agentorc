@@ -1078,3 +1078,37 @@ def test_progress_sends_force_only_when_asked(monkeypatch, capsys):
     assert cli.main(["progress", "claim", "TD-900"]) == 0
     assert cli.main(["progress", "claim", "TD-900", "--force"]) == 0
     assert sent[0]["force"] is None and sent[1]["force"] is True
+
+
+def test_whoami_and_identity_say_what_the_host_agent_sees(subprocess_agent, capsys, monkeypatch):
+    """Design §4.8a: `ao whoami` is the connection's classification, `ao identity` the host's mode,
+    tally and alarms. The suite's agent runs identity `off` (conftest), and both say so plainly;
+    the alarm lines are checked against a canned reply, since `off` raises none."""
+    assert cli.main(["whoami"]) == 0
+    assert "identity is off on this host" in capsys.readouterr().out
+    assert cli.main(["identity"]) == 0
+    out = capsys.readouterr().out
+    assert "identity off" in out and "no connection classified yet" in out and "no identity alarms" in out
+
+    alarm = {"channel": "session ao-a", "claimed": "ao-b", "rpc": "msg", "count": 3, "at": "t1", "last": "t3"}
+    bare = {"channel": "outside", "claimed": "", "rpc": "hook", "count": 1, "at": "t0", "last": "t0"}
+    canned = {
+        "identity": {
+            "host": "kmaster",
+            "mode": "observe",
+            "detached_check": True,
+            "tally": {"outside": 880, "session:ancestry": 4102, "session:sid": 37},
+            "alarms": [bare],
+            "sessions": {"ao-a": [alarm]},
+        },
+        "whoami": {"channel": "session", "session": "ao-a", "signal": "sid"},
+    }
+    monkeypatch.setattr(cli, "call_sync", lambda method, **_: canned[method])
+    assert cli.main(["identity"]) == 0
+    out = capsys.readouterr().out
+    assert "kmaster: identity observe · detached-process check on" in out
+    assert "session:ancestry 4,102" in out and "session:sid 37" in out
+    assert "ALARM (no record): outside claimed no caller on hook ×1 (t0)" in out
+    assert "ALARM ao-a: session ao-a claimed ao-b on msg ×3 (t1 … t3)" in out
+    assert cli.main(["whoami"]) == 0
+    assert capsys.readouterr().out.strip() == "session ao-a (by sid)"

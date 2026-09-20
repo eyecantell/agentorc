@@ -1764,8 +1764,10 @@ Putting a cheaper, less-trusted model beside a high-trust one (TD-075) waits on 
 this section.
 
 **The channel.** On every connection to its own socket the host agent reads the peer's
-credentials (`SO_PEERCRED`: pid, uid) once, at accept, and classifies the connection — not the
-request — as one of:
+credentials (`SO_PEERCRED`: pid, uid) and classifies **the connection — not the request — once, at
+its first request, for its life**: the pid is the one that connected, and asking `/proc` about it
+again later could be asking about whoever holds that pid *now* (a process that connects, hands
+the socket to a child and exits must not become whatever reuses its pid). A connection is one of:
 
 - **session X** — the peer belongs to the pane of a record on this host whose pane is live, by
   the first of three signals that answers, each read from `/proc/<pid>/stat`: **ancestry** — the
@@ -1787,8 +1789,10 @@ request — as one of:
   that is already another session's. Everything a session runs is under its pane: the tool, its
   shells, its hooks (which send no `caller` at all today), `ao`. **A pane the tick has not listed
   yet** — a session's first hook can arrive before the first tick after `create` — is looked up
-  on demand: a connection that matches no known pane triggers one pane list before it is
-  classified, at most once a second — and a connection that arrives while one is in flight, or
+  on demand: **while some live record on this host has a pane the last list did not show**, a
+  connection that matches no known pane triggers one pane list before it is classified, at most
+  once a second (when every live record's pane is known, a peer that matched none is under none,
+  so the person's terminal and the UI — nearly every such connection — never wait) — and a connection that arrives while one is in flight, or
   inside that second, **waits for the next list rather than being judged against the old one**;
   only a connection that matches nothing once a fresh list has landed is *outside* or *unknown*.
 - **outside** — no ancestor is a pane of ours: a person's terminal, the UI's process, a systemd
@@ -1802,15 +1806,18 @@ request — as one of:
   is read, and when it is off:** the agent compares `/proc/<peer>/cgroup` with
   `/proc/<tmux server pid>/cgroup` (cgroup v2's single line, or v1's `name=systemd` line), and
   the clause is **on only when the tmux server's cgroup is the agent's own
-  (`/proc/self/cgroup`) and that path is a systemd `.service`**. Otherwise it is a no-op and such
+  (`/proc/self/cgroup`), that path is a systemd `.service`, and the agent is that service's own
+  process — its parent is systemd**. The last condition is what CI taught on the first push of the
+  build: a test runner sits inside *some* `.service` together with the person standing in it, and
+  so does any agent a worker starts from inside an `ao` pane; there the cgroup tells nobody apart,
+  and with the clause on the person read as *unknown*. Otherwise it is a no-op and such
   a peer is plainly *outside* — never a silent refusal: a tmux server that predates the unit or
   was started from a person's shell, `pdm run agentorc-agent serve`, and **a container node**
   (no systemd, one cgroup for everything; and with `person: false` there is no person for a
   detached process to pass as). `ao status -v` says *detached-process check: on | off* beside
-  the mode, so a host where it is off is not taken for one where it is on.
+  the mode, so a host where it is off is not taken for one where it is on: **where it is off and the host carries a person, `enforce` does not stop a fully detached process that sends no `caller`** — it reads as *outside*, which is the person. That is a dev run or an old tmux server, never the installed home (check on) nor an agents-only node (no person to pass as).
 
-The classification is cached per `(pid, process start time)` for the connection's life; a pid
-that is reused is a different start time.
+The classification is the connection's for its life, and is never asked again.
 
 **The rule: the channel decides, and a claim that disagrees is never innocent.**
 
@@ -1824,7 +1831,12 @@ that is reused is a different start time.
 
 Reads that are never gated (`status`, `tail`, `explain`, `ping`, …; §4.4a's first table row) are
 served on every channel and raise no alarm: they tell a caller nothing the socket's mode did not
-already grant. The **`hook` RPC** is bound the same way: its `session` parameter must be the
+already grant. **A read on that list must decide nothing on its `caller`** — the claim reaches it
+unjudged from outside a pane — so `host_files`, which serves the person or a `control` holder, is
+*not* on it and is judged like any act (the red-team of the build found it listed: a session that
+left its `caller` out read a checkout as the person; a test now holds every name on the list to
+the rule). From under a pane even a read runs as that pane's session — no refusal, no alarm, only
+no borrowed name. The **`hook` RPC** is bound the same way: its `session` parameter must be the
 channel's session, or it is refused with an alarm — a hook runs under its tool, under its pane.
 `ao … --id <other>` is unchanged: that is a parameter the gates already judge, not an identity.
 **Where it lives:** one step at the head of dispatch, before the node table and before any gate —
@@ -1838,7 +1850,7 @@ never-gated read, **`whoami`**, returns the connection's classification and the 
 decided it, the UI calls it at startup and shows a banner when the answer is not *outside*, and
 `ao whoami` prints it for a person or a session checking their own channel. `ao identity` (below) is a never-gated read too: tallies and this host's alarms tell a session nothing it could not learn by trying.
 
-**An identity alarm** is `{at, channel, claimed, rpc}` — identical `{channel, claimed, rpc}` alarms coalesce into one entry carrying a `count` and its first and last time, so a loop cannot push a different alarm out of the list: kept on the record it is about (the last
+**An identity alarm** is `{at, channel, claimed, rpc}` — identical `{channel, claimed, rpc}` alarms coalesce into one entry carrying a `count` and its first and last time, so a loop cannot push a different alarm out of the list; the list keeps the **first** nineteen distinct alarms and counts every later one in a closing *(others)* entry — never the newest twenty, which a session could use to bury its one real forgery under twenty made-up ones (the host agent's log has every alarm, a line each; the list is what a page shows), and only a *new* alarm is written to disk at once — a repeat moves a count in memory and the next tick writes it, so a loop of forgeries is not a disk write each: kept on the record it is about (the last
 20, `identity_alarms`), or in a small list of the home's own when it is about no record. It is
 shown — a mark on the card, and a row under *Needs you* in the Inbox (§4.5 screen 6), because it
 is either a bug of ours or a session misbehaving and a person should know which — and it wakes
@@ -1857,7 +1869,7 @@ carries **`identity: off | observe | enforce`** — `local: {identity: observe}`
 beside `volatile:`; default `observe` for the release that introduces it; `off` classifies
 nothing and is today's behaviour, for an emergency and for the test suite (below), and the page
 says *identity: off* as loudly as it says *observe*: in `observe` it classifies, records alarms and serves every
-request exactly as before; `enforce` applies the table. The anchor turns a host to `enforce`
+request exactly as before; `enforce` applies the table. **A check that itself fails** — a bug of ours, tmux not answering — is logged, and the request is served exactly as before under `observe` (the promise that nothing a caller sees changes covers our own mistakes), while under `enforce` everything but a read is refused, since a check that can be made to fail would otherwise be a way round it; a person recovers with `identity: observe` in `hosts.yml`, which needs no RPC. The anchor turns a host to `enforce`
 after a day of `observe` there with no alarm that was not a real forgery — sessions, hooks, the
 UI, the systemd units, a person's terminal, VS Code's terminal, the SessionStart hook and a
 node's forwarded calls having all been seen. **`ao identity`** is what makes that checkable: the
