@@ -346,7 +346,11 @@ def test_skill_prints_the_rules(capsys):
         "ao progress none",  # TD-053 step 1: declared before exiting, or the exit reads as a crash
     ):
         assert must in out.lower() or must in out, must
-    assert out.count("\n") <= 120
+    # A budget, not a law: the skill is read in full by every session that runs `ao --skill`, so
+    # it stays skimmable. Raised from 120 to 125 on 2026-09-20 (TD-079 step 3) for the outcome
+    # rule — a command no session is told to run is half-shipped, which is this test's own
+    # argument. Raise it only for a rule a session cannot work without, and compress first.
+    assert out.count("\n") <= 125
 
 
 def test_grant_revoke_and_the_caller(subprocess_agent, tmp_path, capsys, monkeypatch):
@@ -863,6 +867,25 @@ def test_the_skill_tells_a_session_that_ao_wait_exists():
     skill = (pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "skill.md").read_text()
     assert "ao wait" in skill
     assert "silence is not an event" in skill.lower()  # the limit, where the reader will act on it
+
+
+def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
+    """TD-079 step 3 (design §4.10 *Outcomes*): a command a session is never told to run is
+    half-shipped. Every brief a session is started from — the package's role templates and this
+    repo's own — and `ao --skill` say that an answered question owes an outcome and name the one
+    command that settles it. The lead's says the manager chases its members' debts and never
+    reports one for them; and all of them say that a `note` is not a way to ask."""
+    root = pathlib.Path(__file__).parents[1]
+    workers = ["src/agentorc/briefs/grinder.md", "src/agentorc/briefs/hunter.md", "docs/briefs/tdgrind-ao-1.md"]
+    for rel in [*workers, "src/agentorc/skill.md"]:
+        text = (root / rel).read_text()
+        assert "--outcome done|blocked|dropped" in text, rel
+        assert "--for" in text and "--thread" in text, rel
+        assert "tell me if you want less" in text, rel  # the kind, in the words the mistake was made in
+    for rel in ("src/agentorc/briefs/lead.md", "docs/briefs/orchestrator-ao-1.md"):
+        text = (root / rel).read_text()
+        assert "owed:" in text, rel  # where a manager reads a member's debt
+        assert "Never report an outcome **for** a" in text, rel
 
 
 def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
