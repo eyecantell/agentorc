@@ -888,13 +888,14 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 
 **Priority:** Low
 **Added:** 2026-09-20 (`tdgrind-ao-1`, the half of TD-086 item (2) that entry could not build)
-**Status:** Resolved 2026-09-20 (PR #338, `grinder-ao-1`)
+**Status:** Resolved
 **Location:** `src/agentorc/cli.py` (the exit-3 path and its *start it with: agentorc-agent serve* hint), design §4.8a (the session channel), `src/agentorc/skill.md`
 
 **Why:** TD-086 item (2) asked that the hint be printed **never to a session**, recognised by *`AGENTORC_SESSION` set, or a session channel*. The first signal is built (#300). The second is the host agent's own classification (§4.8a, by peer credentials and process ancestry), and it is unavailable in the one branch that prints the hint, because that branch is reached only when nothing is answering to be asked. So an `ao` run by a session with the variable unset — a reparented background job, a hook — still reads *start it with: agentorc-agent serve*, the one thing a session's skill forbids.
 
-**Fix:** resolved 2026-09-20 (PR #338). The signal is the **ancestors' start-up environment**. The launch sets `AGENTORC_SESSION` on the pane's first process, so on exit 3 the CLI walks its own `ppid` chain (64 hops) and reads each ancestor's `/proc/<pid>/environ` (`agentorc.cli._session_by_ancestry`). A hit means the session is told to stop. It chooses the sentence only and is never an identity. It lives in design §4.8a *With no host agent to ask*. A detached job that also lost its chain still reads as a person; the skill's Never list covers that case.
+**Fix:** give the CLI a signal that does not need the agent — decided in §4.8a (below).
 
 **Done when** an `ao` run from inside an agentorc session with `AGENTORC_SESSION` unset, against no host agent, is told to stop rather than to start one.
 
 **Related:** TD-086 (archive), design §4.8a, TD-077 (the same classification).
+**Resolved:** 2026-09-20 (PR #338, `grinder-ao-1`) — The signal is the **ancestors' start-up environment**. The launch sets `AGENTORC_SESSION` on the pane's first process, so on exit 3 the CLI walks its own `ppid` chain (64 hops) and reads each ancestor's `/proc/<pid>/environ` (`agentorc.cli._session_by_ancestry`). A hit means the session is told to stop. It chooses the sentence only and is never an identity. It lives in design §4.8a *With no host agent to ask*. A detached job that also lost its chain still reads as a person; the skill's Never list covers that case.
