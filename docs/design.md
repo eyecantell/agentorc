@@ -3000,7 +3000,12 @@ it from resting on a brief alone, since *briefs are skimmed, a refusal is not* (
 `ao` reply to a session that owes an outcome says so** — *you owe 2 outcomes: m-…, m-…* — beside
 the unread-mail line (and like it home-owned: a node served alone says what the home last told it,
 the count riding with the unread-mail hint, §4.4a); **`ao progress none` is refused while one is owed**, naming them (`dropped`
-is an honest way out); and **Ready to close gains a row** for it (§4.2). A `go_with_it` close owes
+is an honest way out); and **Ready to close gains a row** for it (§4.2). Those three tell the
+**owing** session. A **manager** reads its members' debts on their records — `ao status -v` prints
+an `owed:` line beside the other mail marks (2026-09-20, TD-079 step 3) — and the briefs say what
+to do with one: a member that owes and is working is left alone, one idle past twenty minutes or
+about to be wrapped up gets one send naming the ids, and **a manager never reports an outcome for
+a member**, since it did not do the work and the person would be reading its guess. A `go_with_it` close owes
 one too; its `system` note is unchanged, and the sender learns of the debt as of any other, from
 the line on its next `ao` reply. The debt ends when the outcome lands; when the person
 **Dismisses** the row (*I do not need to hear back* — the asker is told by a `system` note, as for

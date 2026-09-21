@@ -238,7 +238,10 @@ def cmd_status(args: argparse.Namespace) -> int:
             # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
             if unread := s.get("unread"):
                 print(f"{'':<{w}}      mail:   {unread} unread")
-            for k in ("open_asks", "expired", "addressee_exited", "bound_hit"):
+            # `owed` is here for **someone else's** eyes (design §4.10 *Outcomes*, TD-079 step 3):
+            # the owing session is told on every `ao` reply of its own, but a lead reading its
+            # members cannot see a debt it is meant to chase unless the record says so.
+            for k in ("open_asks", "expired", "addressee_exited", "bound_hit", "owed"):
                 if ids := (s.get("mail") or {}).get(k):
                     print(f"{'':<{w}}      {k.replace('_', ' ')}: {', '.join(ids)}")
             for e in (s.get("sends") or [])[-3:]:
