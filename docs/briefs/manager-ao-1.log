@@ -62,3 +62,5 @@
 08:22  grinder-ao-1: working (created 14:21:59Z) → ok; grinder-ao-2: working (created 14:22:00Z) → ok; no open PRs; cadence changes all landed before both started → no relay
 08:22–08:29 quiet (grinder-ao-1 claimed TD-094, grinder-ao-2 claimed TD-075)
 08:31  grinder-ao-1: note m-5cc0225c5c9d — its claim on the mail half of TD-075 (from the anchor) refused by grinder-ao-2's lease on the page half; files disjoint → reply: claim with --force, stay out of src/agentorc/ui (a lease is advisory, §4.8). PR #357 (TD-094, src/sessionorc) opened 14:28Z, in the anchor's queue — ask at 16:28Z if still open
+08:32–08:43 quiet (grinder-ao-2 opened #358, idle 3 s, working)
+08:44  grinder-ao-2: merged #358 (TD-075 page half, steps 2–3) → cadence check pass (review recorded); working on the team header count; grinder-ao-1: working on TD-094 (#357 in the anchor's queue), has not forced the TD-075 claim yet → ok
