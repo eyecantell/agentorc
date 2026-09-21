@@ -551,7 +551,9 @@ def cmd_team_start(args: argparse.Namespace) -> int:
         # than on the happy path, not less (review of PR #139).
         for warning in e.plan.warnings:
             print(f"{warning} (TD-042: a brief describes the job, not the run)", file=sys.stderr)
-        return fail(args, f"{e} (above)", 1, unrepeatable=list(e.plan.warnings))
+        for note in e.plan.notes:  # a seat without its primer (§4.9b) is as true of what did start
+            print(note, file=sys.stderr)
+        return fail(args, f"{e} (above)", 1, unrepeatable=list(e.plan.warnings), notes=list(e.plan.notes))
     except (teams.TeamError, ValueError) as e:
         return fail(args, str(e), 1)
 
@@ -988,7 +990,7 @@ def cmd_msg(args: argparse.Namespace) -> int:
     if args.pass_up:
         return _pass_up(args, words)
     if args.recommend:
-        return fail(args, '--recommend goes with --pass-up <id>: it is your line on a question you pass up', 2)
+        return fail(args, "--recommend goes with --pass-up <id>: it is your line on a question you pass up", 2)
     answer: int | None = None
     if args.pick is not None:
         if words:
@@ -1653,7 +1655,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--thread",
         metavar="ID",
-        help="ask again on an answered question's thread: it lands with the thread above it and settles the first",
+        help="ask the person again on a question's thread: an answered one of yours to the person (settled as asked "
+        "again), or your own open ask to a session that has not answered (closed there, design §4.9b)",
     )
     p.add_argument(
         "--source",

@@ -354,6 +354,9 @@ def test_a_team_may_carry_one_techlead_seat(tmp_path):
     f.write_text(base + "    techlead: {profile: strong}\n")
     seat = org.load(f).teams["t"].techlead
     assert (seat.name, seat.home, seat.profile, seat.brief, seat.grants) == ("t-techlead", "r", "strong", None, None)
+    assert seat.context is None
+    f.write_text(base + "    techlead: {context: docs/primer.md}\n")  # the primer (§4.9b *Its standing context*)
+    assert org.load(f).teams["t"].techlead.context == "docs/primer.md"
     f.write_text(base)
     assert org.load(f).teams["t"].techlead is None
     for bad, why in (("{role: grinder}", r"unknown key\(s\) \['role'\]"), ("{grants: [control]}", "unknown key"),

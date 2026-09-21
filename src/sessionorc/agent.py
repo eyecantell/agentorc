@@ -1941,13 +1941,13 @@ class HostAgent:
         s.seen_at = now_iso()
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_set_mode(self, id: str, unattended: bool) -> dict[str, Any]:
         s = self._find(id)  # the home's own copy of another host's record too (4a)
         s.unattended = bool(unattended)
         self._save(s)
-        return s.view()
+        return self._view(s)
 
     async def rpc_set_stop(
         self, id: str, run_until: str | None = None, wrapup_prompt: str | None = None
@@ -1977,7 +1977,7 @@ class HostAgent:
             s.wrapup_prompt = str(wrapup_prompt).strip() or None
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_set_grants(
         self, id: str, add: list[str] | None = None, remove: list[str] | None = None
@@ -1989,7 +1989,7 @@ class HostAgent:
         s.capabilities = [g for g in GRANTS if (g in s.capabilities or g in adding) and g not in removing]
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_set_controllers(
         self, id: str, add: list[str] | None = None, remove: list[str] | None = None
@@ -2015,7 +2015,7 @@ class HostAgent:
         s.controllers = _controllers([c for c in s.controllers + adding if c not in removing])
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_progress(
         self,
@@ -2171,7 +2171,7 @@ class HostAgent:
             s.doing = {"text": line, "at": now_iso()}
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_finding(
         self, id: str, ref: str, priority: str | None = None, source: str = "declared"
@@ -2189,7 +2189,7 @@ class HostAgent:
         if applied:
             self._save(s)
             await self._push_changes()
-        out = s.view()
+        out = self._view(s)
         if not applied:
             out["refused"] = entry.to_dict()
         return out
@@ -2260,6 +2260,31 @@ class HostAgent:
         if key:
             self._remember_nonce(key, (result, None))
         return result
+
+    @staticmethod
+    def _question_to_take_up(me: Session | None, mid: str) -> MailEntry | None:
+        """The caller's own **open** `ask` or `steer` to a session, which `--thread` takes to the
+        person when that session has not answered it (design §4.9b *When it cannot answer*,
+        `TECHLEAD_WAIT`) — or None when `mid` is no question of the caller's to a session, and the
+        thread is the person's own (`_owing_question`). Refused: a question passed up already, since
+        the person holds it; one already closed, since nothing waits on it."""
+        held = [e for e in (me.outbox if me is not None else []) if e.id == mid and PERSON not in e.to]
+        if not held:
+            return None
+        e = held[0]
+        if e.kind not in ("ask", "steer"):
+            raise RpcError(f"{mid} is a {e.kind}: only an ask or a steer is taken to the person on its thread")
+        if e.passed_up:
+            raise RpcError(
+                f"{mid} was passed up at {e.passed_up}: the person holds it already — wait for their answer "
+                "(design §4.9b)"
+            )
+        if not e.open:
+            raise RpcError(
+                f"{mid} is closed ({e.closed_reason or 'answered'}): nothing waits on it — read its answer with "
+                "ao inbox, or ask the person afresh (design §4.9b)"
+            )
+        return e
 
     def _owing_question(self, sender: str, mid: str) -> MailEntry:
         """The entry `mid` settles, checked to owe an outcome from this caller (design §4.10
@@ -2489,6 +2514,7 @@ class HostAgent:
         # again on the same thread and settles the first as `asked_again`. Both name an entry the
         # **home** verifies — unlike `--about`, which is free text nobody checks.
         settle: MailEntry | None = None
+        taken: MailEntry | None = None  # the caller's own open question to a session, taken to the person
         state = str(outcome or "").strip()
         if state and not for_:
             raise RpcError(
@@ -2520,7 +2546,9 @@ class HostAgent:
                 )
             if named != [PERSON]:
                 raise RpcError("--thread follows up a question put to the person: name `person` as the addressee")
-            settle = self._owing_question(sender, str(thread))
+            taken = self._question_to_take_up(me, str(thread))
+            if taken is None:
+                settle = self._owing_question(sender, str(thread))
         # -- forwarding: a closed record a live one superseded hands its mail on -------------------
         forwarded: dict[str, str] = {}
 
@@ -2570,7 +2598,8 @@ class HostAgent:
         # A reporting note and a follow-up both belong to the **question's own thread** (design
         # §4.10 *Outcomes*): the person reads the answer and what came of it in one place, and the
         # thread's exchange bound counts them where they belong (review of PR #267).
-        root = settle.root if settle is not None else (replied.root if replied is not None else "")
+        on_thread = settle or taken
+        root = on_thread.root if on_thread is not None else (replied.root if replied is not None else "")
         now = datetime.now(UTC)
         if counts and (mail.THREAD_BOUND is not None or mail.PAIR_BOUND is not None):
             self._check_bounds(sender, named, root, now)
@@ -2682,6 +2711,10 @@ class HostAgent:
             self.person_store.save(self.person_inbox)
         if closes and replied is not None:
             self._mark(replied.id, closed_by=mid, closed_at=at, closed_reason="replied")
+        if taken is not None:
+            # the question goes to the person, so the session it was put to is no longer asked it:
+            # its seat stops counting it, and a late answer from it closes nothing (§4.9b)
+            self._close_entry(taken.id, "asked_person", at)
         if settle is not None:
             # Written on every copy, as a close is: the person's Inbox lists it under the question,
             # and the asker's own card stops saying it owes one. `by` is this entry — an ordinary

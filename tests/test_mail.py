@@ -2108,3 +2108,49 @@ async def test_a_copy_follows_a_resume_as_an_addressee_does(agent, tmp_path):
         assert r["delivered"] == [w] and r["copies"] == [tl2] and r["forwarded"] == {tl: tl2}
         assert r["entry"]["id"] in [e.id for e in agent.sessions[tl2].inbox]
         assert r["entry"]["id"] not in [e.id for e in old.inbox]
+
+
+async def test_an_ask_a_techlead_left_unanswered_is_taken_to_the_person_on_its_thread(agent, tmp_path, monkeypatch):
+    """Design §4.9b *When it cannot answer* (TD-075 step 4, `TECHLEAD_WAIT`): `--thread` names the
+    caller's own open question to a session; the new `ask` lands in the person inbox on its thread,
+    and the first closes on every copy as `asked_person`, so the seat stops counting it and a late
+    answer closes nothing. Refused: a question passed up (the person holds it), one already closed,
+    a note, and anyone else's question."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl, w2 = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl", "w2")]
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc, LocalClient(caller=w2) as w2c:
+            q = (await wc.call("msg", to=tl, text="rebase or merge?", kind="ask"))["entry"]
+            assert (await person.call("get", id=tl))["asks_waiting"] == 1
+            # a full person inbox refuses the follow-up, and the first stays open at the techlead
+            depth = mail.PERSON_SENDER_DEPTH
+            monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 0)
+            with pytest.raises(AgentError, match="person inbox"):
+                await wc.call("msg", to="person", text="rebase or merge?", kind="ask", thread=q["id"])
+            assert (await person.call("get", id=tl))["asks_waiting"] == 1
+            monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", depth)
+            text = "rebase or merge? tl did not answer"
+            up = await wc.call("msg", to="person", text=text, kind="ask", thread=q["id"])
+            held = [e for e in agent.person_inbox if e.id == up["entry"]["id"]]
+            assert held and held[0].root == q["root"] and held[0].from_ == w
+            for r in (agent.sessions[tl].inbox, agent.sessions[w].outbox):
+                assert [e.closed_reason for e in r if e.id == q["id"]] == ["asked_person"]
+            assert (await person.call("get", id=tl))["asks_waiting"] == 0
+            # a late answer from the techlead is delivered and closes nothing: the person's is owed on
+            late = await tc.call("msg", reply_to=q["id"], kind="reply", text="merge")
+            assert late["closed"] is None and held[0].open
+
+            q2 = (await wc.call("msg", to=tl, text="squash?", kind="ask"))["entry"]
+            await tc.call("pass_up", id=q2["id"], recommend="squash")
+            with pytest.raises(AgentError, match="passed up"):
+                await wc.call("msg", to="person", text="squash?", kind="ask", thread=q2["id"])
+            q3 = (await wc.call("msg", to=tl, text="tag it?", kind="ask"))["entry"]
+            await tc.call("msg", reply_to=q3["id"], kind="reply", text="no")
+            with pytest.raises(AgentError, match="is closed"):
+                await wc.call("msg", to="person", text="tag it?", kind="ask", thread=q3["id"])
+            note = (await wc.call("msg", to=tl, text="fyi"))["entry"]
+            with pytest.raises(AgentError, match="only an ask or a steer"):
+                await wc.call("msg", to="person", text="?", kind="ask", thread=note["id"])
+            q4 = (await wc.call("msg", to=tl, text="mine", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match="person inbox holds no question"):
+                await w2c.call("msg", to="person", text="not yours", kind="ask", thread=q4["id"])

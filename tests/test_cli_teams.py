@@ -728,6 +728,14 @@ def test_a_partial_start_still_says_the_brief_names_one_run(world, capsys, monke
     assert "already started" in err
     assert "TD-042" in err and "a clock time" in err
 
+    # a techlead seat without its primer (§4.9b) is said on this path too (review of PR #370)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
+    write_org(tmp_path, doc)
+    state["sessions"].clear()
+    calls["n"] = 0
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "has no `context:`" in capsys.readouterr().err
+
 
 def test_on_a_node_the_org_lives_on_the_home_and_status_says_what_the_listing_is(world, capsys):
     """Design §4.4a, TD-057 step 2: `org.yml` lives on the home, so a node reads no local copy; and
@@ -973,6 +981,34 @@ def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world
     made = creates(state)
     assert "techlead" not in [p["role"] for p in made]
     assert all("techlead is `none`" in p["prompt"] for p in made)
+
+
+def test_a_techlead_seat_reads_its_primer_first_and_the_start_warns_without_one(world, capsys):
+    """TD-075 step 1b, design §4.9b *Its standing context*: `context:` on the seat is its primer —
+    a path in its home checkout, filled into the seat's brief as `{context}` — and `ao team start`
+    says so, and starts anyway, when the seat has none or the file is not there."""
+    tmp_path, state = world
+    primer = tmp_path / "agentorc" / "docs" / "primer.md"
+    primer.parent.mkdir(parents=True, exist_ok=True)
+    primer.write_text("# primer\n")
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "context": "docs/primer.md"}
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    seat = next(p for p in creates(state) if p["role"] == "techlead")
+    assert "`docs/primer.md`" in seat["prompt"] and "{context}" not in seat["prompt"]
+    assert "primer" not in capsys.readouterr().err  # there, so nothing is said
+
+    for context, said in ((None, "has no `context:`"), ("docs/gone.md", "docs/gone.md is not in")):
+        doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", **({"context": context} if context else {})}
+        (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+        state["sessions"].clear()
+        state["calls"].clear()
+        assert cli.main(["team", "start", "ao-grind"]) == 0  # said, and the team started
+        assert said in capsys.readouterr().err
+        assert [p["name"] for p in creates(state)] == ["orc-ao", "techlead-ao", "grind-1", "grind-2", "hunt"]
+        seat = next(p for p in creates(state) if p["role"] == "techlead")
+        assert f"`{context or 'none'}`" in seat["prompt"]  # as written; `none` sends it to the repo's map
 
 
 def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):

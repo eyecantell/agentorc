@@ -97,8 +97,11 @@ teams:
   is refused.
 - **`techlead:`** — optional, one per team: the go-between that answers teammates' questions
   before they reach you (design §4.9b). `name` (default `<team>-techlead`), and optionally `home`,
-  `profile`, `brief`; no `role` and no `grants`. It is started after the manager, under it, and
-  every brief in the team names it as `{techlead}`. Without one, questions come to you as now.
+  `profile`, `brief`, `context`; no `role` and no `grants`. It is started after the manager, under
+  it, and every brief in the team names it as `{techlead}`. Without one, questions come to you as
+  now. **`context:`** is the seat's **primer** — a path in its home checkout that its brief reads
+  first (`{context}`); `ao team start` says so, and starts anyway, when it is missing. See
+  *A techlead's primer* below before the first start with a seat.
 - **`members:`** — each is a role and a `count`; `name` is the **prefix**, and above one member the
   sessions are `<name>-1`, `<name>-2`, …
   **`{team: other-team}` — a nested team — parses but is refused at `start`, because it is not
@@ -159,6 +162,29 @@ Check what resolves, from inside the repo:
 ```
 ao roles
 ```
+
+### A techlead's primer
+
+A techlead starts cold, for one batch of questions, and sees only the asker's framing; a design
+of any size cannot be read per fill. So the seat reads a primer first — this repo's is
+`docs/briefs/techlead-context.md`, a model for another's (design §4.9b *Its standing context*).
+
+- **It is an index, never a source.** An answer cites the document the primer pointed to, read
+  there; the primer itself is never cited, so a stale one can misdirect a search and cannot
+  become an authority.
+- **What goes in:** what the project is, in a page; its parts and which depends on which; who may
+  do what; how a change lands (review, merge rights, what is never touched); the questions already
+  decided, each with **where it is written**; and what always goes up. Two to three thousand
+  words — it is read on every fill.
+- **What stays out:** anything that would be quoted as the answer itself; anything that changes
+  weekly (the ledger's contents, who is working on what); secrets.
+- **When:** before the first `ao team start` with a techlead seat; and again in the PR that
+  changes the architecture, a standing decision or the merge rules — that PR updates the primer,
+  and its fact-check reads the primer against the change.
+- **Who:** a session of **that** repo with its design in front of it, or the person — never a
+  session reaching across from another repo, which knows neither its decisions nor its never-list.
+- **Held to its pointers by a test** where the repo can: every section, path and ledger id it
+  names must exist (`tests/test_primer.py` in agentorc).
 
 ## 5. Start it, and read it
 

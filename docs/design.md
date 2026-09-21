@@ -2692,15 +2692,15 @@ and the four briefs; the word is no longer reserved (§4.8 *The names*). Nothing
 yet, and the preset brief says what to do when `ao` refuses a verb it names (`--source`,
 `--pass-up`, `ao inbox --sent`).
 
-- **The seat.** A team definition may carry **`techlead: {name, profile, brief, home}`** beside
+- **The seat.** A team definition may carry **`techlead: {name, profile, brief, home, context}`** beside
   `manager:` — optional, one per team, a session and never `person`. The preset **`techlead`**:
   brief `techlead.md`, no lane, **no grants**, icon `book`, label *Tech lead*. It carries the
   `team` badge, so every member may already message it and it them (§4.10 *sideways*) — no new
   mail edge. A member's and a manager's brief take **`{techlead}`** — the seat's session id,
   filled at launch as `{lane}` is, `none` where the team has none — and say: *a `steer`, and an
   `ask` that is about the work, go to `{techlead}`; with no techlead, to the person as now.*
-  As built: `techlead:` takes `name` (default `<team>-techlead`), `home`, `profile` and `brief`,
-  and nothing else — no `role:`, the seat is the role, and no `grants:`; `ao team start` creates
+  As built: `techlead:` takes `name` (default `<team>-techlead`), `home`, `profile`, `brief` and
+  `context` (the primer, below), and nothing else — no `role:`, the seat is the role, and no `grants:`; `ao team start` creates
   the manager, then the seat with `controllers: [manager]`, then the members, and fills
   `{techlead}` in every brief with the id the seat will take, worked out before anything starts
   (§4.1's `ao-<scope>-<name>`, `@<host>` for a team on another host) — should the seat come up
@@ -2760,6 +2760,31 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   below). It is **a manager's act, never the core's** (§4.9a): the host agent starts nothing
   and does not read `org.yml`. At wind-down the seat is closed by `ao team stop` with the rest,
   and a manager that winds down with `asks_waiting` > 0 says so on the board.
+- **Its standing context: a primer (2026-09-21, asked for by Paul; built 2026-09-21 — this
+  repo's primer, the key, `{context}` and the warning).** A techlead starts cold and sees only the asker's framing, and a
+  design of this size cannot be read per fill — so without something standing it answers
+  narrowly. The seat takes **`context: <path>`**, a file in the team's home checkout that the
+  techlead's brief names as its **first read** (`{context}`, filled at launch as `{lane}` is and
+  as the path is written; `none` where there is none, and the brief then says to read the repo's
+  own map — `CLAUDE.md`, the design's headings — instead). `ao team start` **warns, and starts
+  anyway**, when a techlead seat has no `context:` or the file is not in its home checkout (not
+  looked for on another host when nothing here can read it); the Teams strip shows the same line
+  as a toast. **It is an index, never a source**:
+  an answer's `--source` is the document the primer pointed to, read there; a primer is never
+  cited, so a stale one can misdirect a search and cannot become an authority. What goes in:
+  what the project is in a page; its parts and which depends on which; who may do what; how a
+  change lands (review, merge rights, what is never touched); the questions already decided,
+  each with **where it is written**; and what always goes up. What stays out: anything that
+  would be quoted as the answer itself, anything that changes weekly (the ledger's contents,
+  who is working on what), and secrets. Two to three thousand words — it is read on every fill.
+  **When**: before the first `ao team start` with a techlead seat; and again **in the PR that
+  changes** the architecture, a standing decision or the merge rules — that PR updates the
+  primer, and its fact-check reads the primer against the change. **Who**: a session of that
+  repo with its design in front of it, or the person — never a session reaching across from
+  another repo, which knows neither its decisions nor its never-list. **Held to its pointers
+  by a test** where the repo can: every section, path and ledger id it names must exist
+  (`tests/test_primer.py` here). `ao team --skill` and the `techlead.md` preset carry the same
+  guidance in their own words, for the person or agent standing a team up elsewhere.
 - **What it may answer.** A **`steer`**: it answers, or says *go with your default*, which is an
   answer. An **`ask`**: **only when the answer is already written down** — the design, the
   ledger, a brief, a decision of the person's — and it **says where**: `ao msg --reply-to <id>
@@ -2837,7 +2862,14 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   to its default, as designed. A worker whose `ask` to the techlead is unanswered after
   **`TECHLEAD_WAIT`, thirty minutes**, asks the person on the same thread (`--thread`), saying
   so — the worker's brief carries it, so a team with no manager, or a manager that is itself
-  capped, still reaches a person.
+  capped, still reaches a person. **As built (TD-075 step 4, 2026-09-21):** `--thread` names the
+  worker's own **open** `ask` or `steer` to a session as well as its answered question to the
+  person; the new question lands in the person inbox on the first one's thread, and the first
+  **closes on every copy as `asked_person`**, so the techlead's `asks_waiting` stops counting it
+  and a late answer from the techlead closes nothing — the person's answer is the one owed on.
+  Refused, in words: a note (only a question is followed up), a question already passed up (the
+  person holds it), or one already closed.
+  Thirty minutes is the brief's number; the home does not time it.
 - **Alarms (§4.8a *Who answers first*) need more than this, deliberately.** That path wants a
   techlead that is a **live controller of the record** holding a grant — **`alarms`**, named
   here — on a host that enforces and carries no person. Only a **person's** `ao team start`
@@ -3260,7 +3292,7 @@ and **an entry is open exactly when it is an `ask`, `steer` or `conflict` with n
 fields that existed before it are kept and still written, so nothing that reads them changes:
 `replied` sets `closed_by` (the reply's id) and `closed_at`; `expired` — a session-to-session
 `ask` whose bound ran out, or whose addressee was closed or forgotten — sets `expired_at`, as
-today; `lapsed`, `declined`, `go_with_it` and `asker_gone` set `closed_at` alone. Retention for
+today; `lapsed`, `declined`, `go_with_it`, `asker_gone` and `asked_person` (§4.9b *When it cannot answer*) set `closed_at` alone. Retention for
 every closed entry runs from `closed_at` or `expired_at`, whichever it has. Entries written
 before this date have no `closed_reason`; they read as closed when `closed_by` or `expired_at` is
 set, which is the rule until now.
@@ -3416,7 +3448,9 @@ the asker settles it in one of two ways:
   answer given, as far as the person inbox still holds them (an owing question is never pruned, so
   the one being followed up always is) — and settles the first as `outcome: asked_again`; the new
   one, once answered, owes its own. It is an ordinary `ask` for every bound, the per-thread
-  exchange bound included.
+  exchange bound included. It also takes up the caller's own **unanswered** question to a session
+  — a techlead that did not answer within `TECHLEAD_WAIT` — closing the first as `asked_person`
+  (§4.9b *When it cannot answer*).
 **`blocked` is not a dead end.** A `blocked` outcome lands in ***Needs you***, counted, not in FYI —
 *blocked: <line>* under the question and the answer — with **Reply** (a person's reply on the
 thread, into the asker's inbox) and **Dismiss**: work that stopped on something only a person can

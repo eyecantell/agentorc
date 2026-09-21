@@ -9,7 +9,7 @@ teams:
   ao-grind:
     projects: [agentorc]
     manager: {role: manager, name: manager-ao-1}
-    techlead: {name: techlead-ao-1}   # optional, one per team: the go-between (§4.9b)
+    techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}   # optional: the go-between (§4.9b)
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
       - {team: ao-ui}                 # a nested team
@@ -73,6 +73,7 @@ class TechleadDef:
     home: str = ""
     profile: str | None = None
     brief: str | None = None  # overrides the preset's `techlead.md`
+    context: str | None = None  # the primer, a path in its home checkout: the brief's `{context}`
     lane: list[str] = field(default_factory=list)
     grants: list[str] | None = None
     unattended: bool = True
@@ -259,7 +260,7 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
 MEMBER_KEYS = (*MANAGER_KEYS, "count", "team")
 TEAM_KEYS = ("projects", "manager", "lead", "techlead", "members", "host")
-TECHLEAD_KEYS = ("name", "home", "profile", "brief")
+TECHLEAD_KEYS = ("name", "home", "profile", "brief", "context")
 TECHLEAD_ROLE = "techlead"
 
 
@@ -351,7 +352,7 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
 
 
 def _techlead(team: str, raw: Any, key: str) -> TechleadDef:
-    """`techlead: {name, home, profile, brief}` (design §4.9b). No `role:` — the seat is the role —
+    """`techlead: {name, home, profile, brief, context}` (design §4.9b). No `role:` — the seat is the role —
     and no `grants:`: the preset holds none, and the one grant the design names for it (`alarms`)
     is not built. `techlead: person` is refused as any non-mapping is."""
     raw = _mapping(raw, key)
@@ -361,6 +362,7 @@ def _techlead(team: str, raw: Any, key: str) -> TechleadDef:
         home=_str(raw.get("home"), f"{key}.home"),
         profile=_opt_str(raw.get("profile"), f"{key}.profile"),
         brief=_opt_str(raw.get("brief"), f"{key}.brief"),
+        context=_opt_str(raw.get("context"), f"{key}.context"),
     )
 
 
