@@ -79,6 +79,12 @@ STALL_AFTER = timedelta(minutes=20)
 # holder's record ending. Long enough for one medium TD without a renewal, short enough that a
 # stood-down worker does not hold a reference into the next day.
 LEASE_TTL = timedelta(hours=12)
+# A `restart` declared inside this of the record's own start is marked `early` (design §4.9a
+# *A run that ends with work left*, TD-083). The word still stands — it is the session's — but a
+# controller does not act on an early one and puts it on the board instead: a run that is over
+# before it began did not run out of context. The home applies the bound because it holds the
+# start time, so a controller reads a field and never a clock.
+RESTART_EARLY = timedelta(minutes=30)
 GIT_EVERY = timedelta(seconds=10)  # git status per live session, cheap and cached
 # Derived report entries per session (design §4.8, TD-028 step 3): a `gh` call and a little git, so
 # a slow cadence. Nothing waits on it and a failure derives nothing (`sessionorc.reports`).
@@ -1901,20 +1907,28 @@ class HostAgent:
         Org renders whichever are non-empty — and one reference is one entry, upserted in place.
 
         `status="none"` is `ao progress none --why` (design §4.9a): no reference and no entry, but
-        `out_of_work: {at, why}` on the record. It is the one write on this channel that is not
-        open to everyone — only the session itself may make it, declared, with a reason (§9
-        invariant 14).
+        `out_of_work: {at, why}` on the record. `status="restart"` is the third ending (§4.9a
+        *A run that ends with work left*, TD-083): the same shape, setting
+        `restart_wanted: {at, why, early?}` — *my run is over and my lane is not*. They are the
+        two writes on this channel that are not open to everyone — only the session itself may
+        make either, declared, with a reason (§9 invariant 14) — and they refuse each other.
 
         A declared claim is a **lease** (§4.8, TD-056): refused while another live record holds an
         unexpired declared claim on the same reference, naming the holder; `force` claims anyway and
         the reply carries `lease_overridden`."""
         s = self._find(id)  # a node's session reports here (step 5): the field is the home's
-        if status == "none":
+        if status in ("none", "restart"):
             if ref or pr is not None:
-                raise RpcError('progress none takes no reference and no PR, only why="<the search that came up empty>"')
-            return await self._out_of_work(s, why, source, caller)
+                raise RpcError(
+                    f"progress {status} takes no reference and no PR, only "
+                    f'why="{"the search that came up empty" if status == "none" else "why this run is over"}"'
+                )
+            return await self._ending(s, status, why, source, caller)
         if status not in PROGRESS_STATUSES:
-            raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none")
+            raise RpcError(
+                f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, "
+                "none, restart"
+            )
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
         holder = self._lease_holder(s, entry) if status == "claimed" and entry.source == "declared" else None
         if holder is not None and not force:
@@ -1925,7 +1939,9 @@ class HostAgent:
             )
         applied = s.report_progress(entry)
         if applied and status == "claimed" and entry.source == "declared":
-            s.out_of_work = None  # a session that claims something has work again
+            # a session that claims something went on after all — both endings are taken back
+            # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
+            s.out_of_work = s.restart_wanted = None
         out = await self._report(s, applied, entry)
         if holder is not None and applied:
             out["lease_overridden"] = holder
@@ -1945,29 +1961,62 @@ class HostAgent:
                             return {"session": o.id, "at": e.at}
         return None
 
-    async def _out_of_work(self, s: Session, why: str | None, source: str, caller: Any) -> dict[str, Any]:
+    async def _ending(self, s: Session, status: str, why: str | None, source: str, caller: Any) -> dict[str, Any]:
+        """The two ways a run ends by the session's own word (design §4.9a): **`none`** — I
+        searched and there is nothing I may pick — and **`restart`** — my run is over and my lane
+        is not (TD-083). Both are facts about the session, not states, both are written only by
+        the session they are about (§9 invariant 14), and **they refuse each other**: a session is
+        out of work or it wants another run at it, never both.
+
+        A **third** ending was missing until 2026-09-20 and its absence parked a team for ninety
+        minutes: a grinder ended a long run on purpose with work still on the ledger, and could
+        say so only in prose — it was not out of work, and a Claude Code `/exit` does not leave,
+        so it was never `exited` and no rule of its manager's fired."""
+        word = "out of work" if status == "none" else "a restart"
         if _source(source) != "declared":
-            raise RpcError("out of work is declared, never derived (design §9 invariant 14)")
+            raise RpcError(f"{word} is declared, never derived (design §9 invariant 14)")
         if mail.is_person(caller) or str(caller) != s.id:
+            said = "declare itself out of work" if status == "none" else "declare a restart of itself"
             raise RpcError(
-                f"only {s.id} may declare itself out of work: it is the session's own word that it searched "
+                f"only {s.id} may {said}: it is the session's own word about its own run "
                 "(design §9 invariant 14)"
             )
         if not (why or "").strip():
+            reason = "the search that came up empty" if status == "none" else "why this run is over"
             raise RpcError(
-                'ao progress none needs --why "<the search that came up empty>": a declaration without its '
+                f'ao progress {status} needs --why "<{reason}>": a declaration without its '
                 "reason is refused (design §4.9a)"
             )
         if owed := s.owed():
             # Design §4.10 *Outcomes*: the person answered; what became of it is owed before this
-            # session stops. `dropped` is an honest way out, and one line settles each.
+            # session stops. `dropped` is an honest way out, and one line settles each. A restart
+            # owes them for a reason of its own: the fresh run does not carry the conversation the
+            # debt was made in, so nobody is left who can report it.
             raise RpcError(
                 f"{s.id} owes {len(owed)} outcome{'s' if len(owed) != 1 else ''} to the person: report each with "
-                f'ao msg person --outcome done|blocked|dropped "<one line>" --for <id> before declaring yourself '
-                f"out of work — {', '.join(owed)} (design §4.9a, §4.10 *Outcomes*)",
+                f'ao msg person --outcome done|blocked|dropped "<one line>" --for <id> before declaring '
+                f"{word} — {', '.join(owed)} (design §4.9a, §4.10 *Outcomes*)",
                 owed=owed,
             )
-        s.out_of_work = {"at": now_iso(), "why": why.strip()}
+        other = "restart_wanted" if status == "none" else "out_of_work"
+        if getattr(s, other):
+            said = "wants a restart" if other == "restart_wanted" else "is out of work"
+            raise RpcError(
+                f"{s.id} already {said} (since {getattr(s, other)['at']}): a session is out of work or it wants "
+                "another run at it, never both — claim something to take that back (design §4.9a)"
+            )
+        if status == "none":
+            s.out_of_work = {"at": now_iso(), "why": why.strip()}
+        else:
+            # The word stands whenever it is said — it is the session's — but one said inside
+            # `RESTART_EARLY` of this record's own start is marked, and a controller does not act
+            # on it: a run that is over before it began did not run out of context. The bound is
+            # applied here because the home holds the start time; the controller reads a field.
+            mark = {"at": now_iso(), "why": why.strip()}
+            with contextlib.suppress(ValueError, TypeError):
+                if datetime.now(UTC) - _parse(s.created) < RESTART_EARLY:
+                    mark["early"] = True
+            s.restart_wanted = mark
         return await self._report(s, True, None)
 
     async def rpc_doing(self, id: str, text: str = "", clear: bool = False, caller: Any = None) -> dict[str, Any]:

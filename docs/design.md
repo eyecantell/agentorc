@@ -1370,7 +1370,7 @@ noted). If a control is not in this table it does not exist.
 | card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the host agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026) — landed 2026-09-13. On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the host agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the host agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *no stop time* rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs. Setting a **different** time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill — landed 2026-09-14 |
 | New session | **Until** field | the stop time the session starts with: `06:00` (the next one, in your clock), `+8h`, or an ISO time. Refused on a session that is not **Unattended**, since policies leave interactive sessions alone (§4.2); empty means nothing stops it, which is what every session was before (§6, TD-026) — landed 2026-09-13 |
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a) — design 2026-09-14, built 2026-09-17, TD-053 step 6. The words are fixed and the reason is the hover: a `why` names every entry the session looked at and what gates each, which a card cannot hold. The row is drawn for a declaration even when neither report channel has anything in it |
-| card / Focus header | **restart wanted** chip | design 2026-09-20, TD-083, not built — when the record carries `restart_wanted`: fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a **mark**, never pressable, and not a state — the session still reads `idle` or `exited`. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*) |
+| card / Focus header | **restart wanted** chip | design 2026-09-20, TD-083; the field it draws from is **built** (step 1, 2026-09-21) and the chip is not — when the record carries `restart_wanted`: fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a **mark**, never pressable, and not a state — the session still reads `idle` or `exited`. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*) |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a) — design 2026-09-14, built 2026-09-17, TD-053 step 6; on the team's card since 2026-09-18, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team — landed 2026-09-13 |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
@@ -1520,7 +1520,7 @@ name and resolves it within the current repo or directory (TD-030), so the hint 
 Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao progress done
 TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, `ao progress none --why "..."` (the
 session found no work it may pick — §4.9a, design 2026-09-14, built since — TD-053), `ao progress restart --why "..."` (the
-session's run is over and its lane is not — §4.9a *A run that ends with work left*, design 2026-09-20, TD-083, not built), and `ao finding TD-029 --priority low`
+session's run is over and its lane is not — §4.9a *A run that ends with work left*, design 2026-09-20, TD-083, built 2026-09-21 by its step 1), and `ao finding TD-029 --priority low`
 (each a small RPC on the calling session's own record — `--id` for another's, since the channels
 are ungated; `ao status -v` prints the same report line the card will, and `--json` the entries). Presets are picked at start, `ao new
 --role grinder --lane TD-027,TD-019` (`--lane` landed with TD-028 step 2; `--role` and `ao roles`
@@ -1571,7 +1571,7 @@ says what it is doing now:
   all: `ao progress none --why` sets `out_of_work: {at, why}` as its own field on the record, beside
   the entry list rather than in it — so the upsert-by-reference rule below is untouched, and a
   session with no work and no references still has somewhere to say so. (A second such RPC,
-  designed 2026-09-20 and not built: `ao progress restart --why` sets `restart_wanted: {at, why}`
+  designed 2026-09-20, built 2026-09-21: `ao progress restart --why` sets `restart_wanted: {at, why}`
   the same way — §4.9a *A run that ends with work left*, TD-083.) It is the session's own word
   that it searched and found nothing it may pick, which is what tells its lead an exit was an ending
   rather than a crash (§4.9a, design 2026-09-14; the declaration landed 2026-09-17, TD-053 step 1).
@@ -2433,7 +2433,7 @@ what each member looked for and did not find, taken from the `why` on each recor
 the point of the whole mechanism — the org has finished the work a person defined, and the next
 move is a person's.
 
-**A run that ends with work left (2026-09-20, TD-083; designed, not built).** There is a third
+**A run that ends with work left (2026-09-20, TD-083; the declaration built 2026-09-21 by step 1, the chip and the briefs still to come).** There is a third
 ending this section did not have a word for. On 2026-09-20 a grinder ended its run *on purpose*
 after ten merged PRs — its context was long, the ledger still held entries it could pick, and it
 said, rightly, that a fresh start would do them better. It could say so only in prose. It was not
@@ -2444,7 +2444,7 @@ question lapsed to its default, and a team with work on the ledger sat parked fo
 until a person restarted it by hand. Both of this section's rules were obeyed and the result was
 wrong, because the rules had two endings — *finished* and *crashed* — and this was neither.
 
-- **The third declaration.** `ao progress restart --why "<why this run is over>"`, one more verb
+- **The third declaration** (**built**, step 1). `ao progress restart --why "<why this run is over>"`, one more verb
   on the ungated `progress` channel, sets **`restart_wanted: {at, why}`** on the session's own
   record — a fact, not a state, written only by the session it is about (§9 invariant 14), home-
   owned like `out_of_work`, and cleared the same way: a later declared claim means the session

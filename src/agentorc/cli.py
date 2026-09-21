@@ -236,6 +236,11 @@ def cmd_status(args: argparse.Namespace) -> int:
                 print(f"{'':<{w}}      filed:  {', '.join(_finding(f) for f in s['findings'])}")
             if ow := s.get("out_of_work"):
                 print(f"{'':<{w}}      out of work {_age(ow['at'])}: {ow['why']}")
+            # the third ending (§4.9a, TD-083): what a controller reads to decide a restart, and
+            # `early` is why it would not — the field, never a clock of the controller's own
+            if rw := s.get("restart_wanted"):
+                early = " (early)" if rw.get("early") else ""
+                print(f"{'':<{w}}      restart wanted{early} {_age(rw['at'])}: {rw['why']}")
             # design §4.8 `doing` (TD-074): what the session says it is doing, always with its age —
             # which is what makes a stale line read as stale
             if (doing := s.get("doing")) and doing.get("text"):
@@ -842,15 +847,22 @@ def cmd_progress(args: argparse.Namespace) -> int:
     """`ao progress claim|done|drop <ref>` (design §4.8): declare a lane item claimed before the
     first edit and its result before moving on. Ungated, and lands on this session's own record.
     `ao progress none --why "…"` (§4.9a) takes no reference: this session searched and found
-    nothing it may pick, which tells its lead an exit is an ending rather than a crash."""
+    nothing it may pick, which tells its lead an exit is an ending rather than a crash. And
+    `ao progress restart --why "…"` (§4.9a *A run that ends with work left*, TD-083) is the
+    third ending: **my run is over and my lane is not** — start me again, under this name and
+    this brief, with nothing of this conversation. The two refuse each other."""
     sid = _own_session(args)
     if sid is None:
         return 2
-    if args.action == "none":
+    if args.action in ("none", "restart"):
         if args.ref or args.pr:
-            return fail(args, 'ao progress none takes no reference and no --pr, only --why "<the search>"', 2)
-        s = call_sync("progress", id=sid, status="none", why=args.why)
-        return emit(args, s, lambda: print(f"{s['id']}: out of work — {s['out_of_work']['why']}"))
+            return fail(args, f'ao progress {args.action} takes no reference and no --pr, only --why "<why>"', 2)
+        s = call_sync("progress", id=sid, status=args.action, why=args.why)
+        if args.action == "none":
+            return emit(args, s, lambda: print(f"{s['id']}: out of work — {s['out_of_work']['why']}"))
+        want = s["restart_wanted"]
+        early = " (early — your controller will put it on the board, not act on it)" if want.get("early") else ""
+        return emit(args, s, lambda: print(f"{s['id']}: restart wanted{early} — {want['why']}"))
     if not args.ref:
         return fail(args, f"ao progress {args.action} needs a reference", 2)
     status = {"claim": "claimed", "done": "done", "drop": "dropped"}[args.action]
@@ -1486,11 +1498,18 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("sessions", nargs="+", metavar="session", help="the sessions it controls (id or name)")
     p.set_defaults(fn=cmd_control)
 
-    p = add("progress", help="declare a reference claimed, done, or dropped, or yourself out of work (design §4.8)")
-    p.add_argument("action", choices=["claim", "done", "drop", "none"])
+    p = add(
+        "progress",
+        help="declare a reference claimed, done or dropped, or yourself out of work or wanting a restart (§4.8)",
+    )
+    p.add_argument("action", choices=["claim", "done", "drop", "none", "restart"])
     p.add_argument("ref", nargs="?", help="a ledger id (TD-027), a PR number, or an attention-board line")
     p.add_argument("--pr", help="the PR the work is on")
-    p.add_argument("--why", help="why it was dropped; with `none`, the search that came up empty (required)")
+    p.add_argument(
+        "--why",
+        help="why it was dropped; with `none` the search that came up empty, with `restart` why this run "
+        "is over (required for both)",
+    )
     p.add_argument("--force", action="store_true", help="claim a reference another live session holds (design §4.8)")
     p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
     p.set_defaults(fn=cmd_progress)
