@@ -254,7 +254,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* the slot: two lines and a caption, whatever it holds — a longer text clamped, the whole on hover */
 .sc-slot { height: 66px; justify-content: space-between; }
 .sc-slot > .status { height: calc(2 * 1.55em); padding: 0 0 0 10px; line-height: 1.55; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
-.sc-slot > .term.tail { height: 46px; min-height: 0; }
+.sc-slot > .status.tail { white-space: pre-line; color: var(--muted); }
 .sc-slot > .caption { height: 16px; } .sc-slot > .caption.ready { color: var(--fg); }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }
 .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ended); }

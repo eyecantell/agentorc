@@ -66,9 +66,7 @@
   {# (5) the slot: one text, the first that applies — what needs a person, an ending, what it says
      it is doing, its last output — two lines, the whole on hover, and a caption (`card_slot`) #}
   <div class="sc-slot">
-    {% if s.slot.kind == 'tail' %}<div class="term tail">{% for line in s.slot.tail %}{{ line }}
-{% endfor %}</div>
-    {% else %}<div class="status {{ s.slot.kind }}" title="{{ s.slot.full }}">{{ s.slot.text }}</div>{% endif %}
+    <div class="status {{ s.slot.kind }}" title="{{ s.slot.full }}">{{ s.slot.text }}</div>
     <div class="caption meta {{ s.slot.ccls }}"{% if s.slot.ccls == 'countdown' %} data-deadline="{{ s.deadline }}"{% endif %}>{{ s.slot.caption }}</div>
   </div>
   {# (6) the foot: the next act first, by state (`next_act`), then Focus or Details where it was

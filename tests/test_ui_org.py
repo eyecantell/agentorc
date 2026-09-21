@@ -506,7 +506,7 @@ def test_the_slot_holds_one_text_the_first_that_applies_and_a_caption(tmp_path, 
     assert view(_card())["slot"]["text"] == "last: ❯ "
     assert view(_card(tail=[]))["slot"]["text"] == "at prompt"
     w = view(_card(state="working", tail=["a", "b", "c"]))["slot"]
-    assert w["kind"] == "tail" and w["tail"] == ["b", "c"]  # two lines, as the slot is
+    assert w["kind"] == "tail" and w["text"] == "b\nc"  # two lines, as the slot is
 
 
 def test_ready_to_close_is_the_caption_and_the_next_act_is_the_foots_first_button(tmp_path, monkeypatch):

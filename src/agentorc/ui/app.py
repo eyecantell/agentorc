@@ -758,11 +758,11 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     the checklist passes, else *says · age* under a `doing` line. `text` is a session's or a tool's
     words: escaped by the template, shown, never a control.
 
-    `kind` picks the rule's colour (`needs`, `lim`, `bad`, `ok`, `doing`, `tail`, or ""), `full`
-    is the hover, and `tail` is the lines of a working pane, drawn as the pane draws them."""
+    `kind` picks the rule's colour (`needs`, `lim`, `bad`, `ok`, `doing`, `tail`, or "") and `full`
+    is the hover; a working pane's two lines keep their line break (`tail`)."""
     state, pend = d["state"], d["pending"]
     ptext = str(pend.get("text") or "")
-    kind, text, full, tail = "", "", "", []
+    kind, text, full = "", "", ""
     if state == "needs-you" and pend:
         # a hook permission says its tool and command; a question says that it is one
         kind = "needs"
@@ -799,7 +799,9 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     elif d["doing"]:
         kind, text = "doing", d["doing"]["text"]
     elif state in ("working", "stalled?"):
-        kind, tail = "tail", [str(line) for line in (d.get("tail") or [])[-2:]]
+        # the pane's last two lines, as they stand — for a shell or a command run that is the work
+        tail = [str(line) for line in (d.get("tail") or [])[-2:] if str(line).strip()]
+        kind, text = "tail", "\n".join(tail) or "at prompt"
     else:
         tail_last = (d.get("tail") or [""])[-1]
         text = f"last: {tail_last}" if tail_last else "at prompt"
@@ -810,7 +812,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         caption, ccls = "ready to close ✓", "ready"
     elif kind == "doing":
         caption = "says" + (f" · {d['doing']['age']} ago" if d["doing"]["age"] else "")
-    return {"kind": kind, "text": text, "full": full or text, "tail": tail, "caption": caption, "ccls": ccls}
+    return {"kind": kind, "text": text, "full": full or text, "caption": caption, "ccls": ccls}
 
 
 def next_act(d: dict[str, Any]) -> str:
