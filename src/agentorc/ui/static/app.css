@@ -46,6 +46,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
    "one too many", and inline-block is what gives a span a width to measure at all. */
 #usagechip { font-size: 11px; color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
 #usagechip .cap { color: var(--limited); } #usagechip .near { color: var(--topfg); font-weight: 600; }
+#usagechip .stale { opacity: .6; font-style: italic; }  /* a held reading whose last poll was refused (TD-087) */
 #usagemore { cursor: default; }
 .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }

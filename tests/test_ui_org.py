@@ -292,6 +292,97 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
     assert "five_hour" not in html and "weekly" not in html
 
 
+# One profile's usage as the host agent holds it after a poll (design §4.2, TD-087), for the chip's
+# rule in both its homes — `usage_chip` for the server's render and `AO.usageChip` for a pushed event.
+USAGE_CASES = {
+    "fresh": {"windows": [{"label": "5h", "pct": 19, "resets": "r1"}, {"label": "wk", "pct": 88, "resets": None}],
+              "fetched": "2026-09-20T20:00:00Z", "reason": "ok"},
+    "legacy": {"windows": [{"label": "day", "pct": 40, "resets": "r2"}], "fetched": "x"},  # before TD-087: no reason
+    "held_429": {"windows": [{"label": "wk", "pct": 49, "resets": "r3"}], "fetched": "2026-09-20T20:00:00Z",
+                 "reason": "rate_limited", "retry_after": 1800},
+    "held_cap": {"windows": [{"label": "5h", "pct": 100, "resets": "r4"}], "fetched": "f", "reason": "error"},
+    "held_odd_wait": {"windows": [{"label": "wk", "pct": 49}], "reason": "rate_limited", "retry_after": 150},
+    "never_read": {"reason": "no_credentials"},
+    "unknown_word": {"reason": "brand_new_reason"},
+    "no_quota": {"windows": [], "fetched": "x", "reason": "ok"},
+    "junk_window": {"windows": [{"label": "5h", "pct": "19"}, "nonsense"], "reason": "ok"},
+    "not_a_dict": "garbage",
+}  # fmt: skip
+
+
+def test_a_refused_usage_poll_draws_the_held_reading_stale_rather_than_nothing():
+    """design §4.5a **usage** chip, TD-087. The chip was empty through three promotes because the
+    endpoint answered 429 and every failure was one silence. The host agent now keeps the last good
+    reading with the adapter's `reason` beside it (PR #307); this is the page's half — **stale, not
+    out**. The windows still print (a five-hour window does not change while we are refused), dimmed
+    with *· stale*, and the hover says when the reading was taken and why the poll since failed. A
+    refusal with nothing ever held is *no reading*, drawn the same way: a chip that silently went
+    out is the thing this entry was. A tool that reports no quota still has no chip."""
+    from agentorc.ui.app import usage_chip
+
+    got = {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
+    assert got["fresh"] == {"text": "grind wk 88%", "title": "wk 88% (resets ?) · 5h 19% (resets r1)",
+                            "pct": 88, "cls": "near"}  # fmt: skip
+    assert got["legacy"]["text"] == "grind day 40%" and got["legacy"]["cls"] == ""  # no reason is ok, not stale
+    held = got["held_429"]
+    assert held["text"] == "grind wk 49% · stale" and held["cls"] == "stale" and held["pct"] == 49
+    assert held["title"].startswith("held reading from 2026-09-20T20:00:00Z — the last poll was refused: ")
+    assert "rate-limited by the usage endpoint, which asked to be left 30 min" in held["title"]
+    assert held["title"].endswith("wk 49% (resets r3)")  # every window is still on hover
+    # a stale reading at a cap is still red: it is the best evidence there is
+    assert got["held_cap"]["cls"] == "cap stale" and "could not be read" in got["held_cap"]["title"]
+    assert "asked to be left 3 min" in got["held_odd_wait"]["title"]  # rounded up, in both homes alike
+    assert got["never_read"]["text"] == "grind no reading" and got["never_read"]["cls"] == "stale"
+    assert "no credentials for this profile" in got["never_read"]["title"]
+    assert "brand_new_reason" in got["unknown_word"]["title"]  # a word we do not know is shown, not dropped
+    assert got["no_quota"] is None and got["not_a_dict"] is None
+    assert got["junk_window"] is None  # a window whose number is not a number is not drawn from
+
+
+def test_the_usage_chip_rule_is_the_same_in_the_page_and_in_app_js(tmp_path):
+    """The chip is drawn twice — server-side at page load, and by `app.js` on each pushed `usage`
+    event — so the rule lives twice, and a rule kept in two places is held to one set of cases here
+    or the two drift (the page would say *stale* until the first push, and then not)."""
+    import json
+    import shutil
+    import subprocess
+
+    from agentorc.ui.app import usage_chip
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript too, and nothing else runs it")
+    probe = tmp_path / "usage_probe.js"
+    probe.write_text(USAGE_PROBE)
+    app_js = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static" / "app.js"
+    out = subprocess.run([node, str(probe), str(app_js), json.dumps(USAGE_CASES)],
+                         capture_output=True, text=True, timeout=30)  # fmt: skip
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout) == {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
+    assert "AO.usageChip(ev.profile, ev.usage)" in app_js.read_text()  # and the push really uses it
+
+
+USAGE_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = () => ({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false });
+global.window = {};
+global.document = { documentElement: el(), body: el(), activeElement: null,
+  querySelector: () => null, querySelectorAll: () => [], addEventListener: noop, createElement: el };
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const cases = JSON.parse(process.argv[3]), out = {};
+for (const k of Object.keys(cases)) out[k] = window.AO.usageChip("grind", cases[k]);
+console.log(JSON.stringify(out));
+"""
+
+
 def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on_those(tmp_path, monkeypatch):
     """design §4.5a **restart wanted** (§4.9a *A run that ends with work left*, TD-083): the third
     ending — *my run is over and my lane is not*. A **mark**, never pressable, and not a state: the

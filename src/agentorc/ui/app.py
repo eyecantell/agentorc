@@ -9,6 +9,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 import os
 import time
 from collections.abc import Collection
@@ -66,6 +67,60 @@ def suggested_answers(e: Any) -> list[str]:
 
 
 templates.env.globals["suggested_answers"] = suggested_answers
+
+# Why a profile's last usage poll gave no reading (design §4.2, §4.5a **usage** chip; TD-087): the
+# adapter's `reason` word, put into words for the chip's hover. The page keys on the word and
+# never on text; a word this table does not know is printed as itself rather than dropped.
+USAGE_WHY = {
+    "rate_limited": "rate-limited by the usage endpoint",
+    "no_credentials": "no credentials for this profile",
+    "no_profile": "no such profile",
+    "error": "the usage endpoint could not be read",
+}
+NEAR_CAP = 80  # "at or near a cap" (§4.5a): never collapsed into +n; `app.js` keeps the same number
+
+
+def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
+    """One profile's top-bar chip (design §4.5a **usage**, TD-073, TD-087), or None for no chip.
+
+    The worst window is printed, every window on hover, red at a cap. **A held reading goes stale,
+    not out** (TD-087): when the last poll was refused, the host agent keeps the last good windows
+    with the `reason` beside them, and the chip draws them dimmed with *· stale* and says on hover
+    when they were read and why the poll since failed — *the chip went out* and *the allowance is
+    spent* are different things to a person. A refusal with no reading ever held is `<profile> no
+    reading`, the same way: a chip that silently went out is what this entry was. An `ok` answer
+    with no windows is an adapter that reports no quota, which has no chip.
+
+    `app.js`'s `AO.usageChip` is the same rule for a pushed `usage` event; the tests hold the two
+    to the same cases."""
+    if not isinstance(u, dict):
+        return None
+    windows = [w for w in (u.get("windows") or []) if isinstance(w, dict) and isinstance(w.get("pct"), int | float)]
+    reason = str(u.get("reason") or "ok")
+    stale = reason != "ok"
+    if not windows and not stale:
+        return None
+    why = ""
+    if stale:
+        why = "the last poll was refused: " + USAGE_WHY.get(reason, reason)
+        if isinstance(u.get("retry_after"), int | float):
+            why += f", which asked to be left {max(1, math.ceil(u['retry_after'] / 60))} min"
+    if not windows:
+        title = f"no usage reading for {prof} yet — {why}"
+        return {"text": f"{prof} no reading", "title": title, "pct": 0, "cls": "stale"}
+    ws = sorted(windows, key=lambda w: w["pct"], reverse=True)
+    worst = ws[0]
+    title = " · ".join(f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})" for w in ws)
+    cls = "cap" if worst["pct"] >= 100 else "near" if worst["pct"] >= NEAR_CAP else ""
+    text = f"{prof} {worst.get('label')} {worst['pct']}%"
+    if stale:
+        title = f"held reading from {u.get('fetched') or 'an unknown time'} — {why}. {title}"
+        text += " · stale"
+        cls = f"{cls} stale".strip()
+    return {"text": text, "title": title, "pct": worst["pct"], "cls": cls}
+
+
+templates.env.globals["usage_chip"] = usage_chip
 
 # The New session form's `controller` field when nothing is ticked: an empty list means nobody may
 # act on the session, which is design §4.8's explicit default. Module-level so the signature keeps
