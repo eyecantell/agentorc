@@ -2071,6 +2071,7 @@ def create_app() -> FastAPI:
                 "needs": None,  # not zero: nothing is *known* to be waiting, which is not *nothing is*
                 "fyi_n": None,  # the same rule for the second number: not known is not zero
                 "snoozed_n": 0,
+                "answered_marks": None,  # not known either: the team headers keep what they showed
                 "html": {},
                 "unread": None,
                 "agent_down": True,
@@ -2087,6 +2088,10 @@ def create_app() -> FastAPI:
         # the browser last saw, which is what stops a folded FYI hiding mail nobody counted.
         got["fyi_n"] = sections["fyi_n"]
         got["snoozed_n"] = len(sections["snoozed"])
+        # §4.5a **team header** → *answered for you* count (§4.9b, TD-075): each row's team and
+        # time, and nothing it says — the browser counts those newer than it last opened the group
+        # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
+        got["answered_marks"] = [{"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]]
         got["html"] = inbox_html(sections)
         return got
 

@@ -26,4 +26,9 @@
 {% if g.team and g.defined %}{% if g.live %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="each member finishes what it holds and exits, then the manager (`ao team stop`)">Wind down</button>
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="kill every session carrying this badge (`ao team stop --now`)">Stop now</button>
 {% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="the same sequence as `ao team start`: every check before any session is created">Start</button>{% endif %}{% endif %}
+{# design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): how many answers this
+   team's sessions gave from the record since this browser last opened the Inbox's group — a
+   **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,
+   since what "last opened" means lives in the browser; it is empty and hidden as rendered. #}
+{% if g.team %}<span class="meta answeredmark hidden" data-answered-team="{{ g.team }}" title="answers this team's sessions gave for you from the record since you last opened Answered for you in the Inbox (design §4.9b) — read them there"></span>{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}

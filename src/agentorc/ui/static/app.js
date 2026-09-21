@@ -317,6 +317,30 @@
   // the person inbox, so nothing on the pushed stream carries it: this polls the same route the
   // page does, a person's read that marks nothing. (The dialog that hung here until 2026-09-19
   // relied on that same rule and is retired with the page's arrival.)
+  // design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): the rows' team and
+  // time from the poll, counted here against the newest one this browser has seen with the Inbox's
+  // *Answered for you* group open — the browser's own memory, as FYI's *new* mark is, so looking
+  // changes nothing at the home. A mark, never a control. `null` is *not known* (the host agent is
+  // down): the headers keep what they showed rather than claim nothing was answered.
+  const ANSWERED_SEEN = "inboxansweredseenat";
+  let answeredMarks = null;
+  AO.answeredCounts = function (marks, seen) {
+    const n = {};
+    (marks || []).forEach((m) => {
+      const at = m.at || "";
+      if (!seen || at > seen) n[m.team || ""] = (n[m.team || ""] || 0) + 1;
+    });
+    return n;
+  };
+  function syncAnsweredMarks() {
+    if (!answeredMarks) return;
+    const n = AO.answeredCounts(answeredMarks, store.get(ANSWERED_SEEN, ""));
+    $$("[data-answered-team]").forEach((el) => {
+      const k = n[el.dataset.answeredTeam] || 0;
+      el.textContent = k ? `${k} answered for you` : "";
+      el.classList.toggle("hidden", !k);
+    });
+  }
   AO.refreshInboxCount = async function () {
     let got;
     try {
@@ -333,12 +357,15 @@
     // down would be the same lie the first one refuses to tell.
     const fyi = $("#personfyi"), m = got.fyi_n || 0;
     if (fyi && got.fyi_n !== null && got.fyi_n !== undefined) { fyi.textContent = m ? `· ${m}` : ""; fyi.classList.toggle("hidden", !m); }
+    if (Array.isArray(got.answered_marks)) { answeredMarks = got.answered_marks; syncAnsweredMarks(); }
     return got;
   };
   if ($("#personneeds")) {
     // the Org page and the Inbox page render the count server-side; every other page reads it at
     // load. On the Inbox page the poll is the page's own, which refreshes the rows as well.
-    if (location.pathname !== "/" && location.pathname !== "/inbox") AO.refreshInboxCount();
+    // The Org reads it at load too: its number is server-rendered, but the team headers' *answered
+    // for you* marks are counted in the browser (§4.9b) and would otherwise wait a whole poll.
+    if (location.pathname !== "/inbox") AO.refreshInboxCount();
     setInterval(() => (AO.refreshInboxPage || AO.refreshInboxCount)(), 20000);
   }
 
@@ -578,6 +605,7 @@
     });
     // a header re-rendered for a delta must not re-arm a request in flight
     $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
+    syncAnsweredMarks();  // …nor lose the answered-for-you mark the browser counted (§4.9b)
   }
   // A stop returns before its manager does (design §4.9: the members settle first, which is minutes).
   // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
@@ -691,7 +719,7 @@
     const ans = $("#sec-answered");
     if (ans) {
       ans.open = store.get("inboxanswered", true);
-      ans.addEventListener("toggle", () => store.set("inboxanswered", ans.open));
+      ans.addEventListener("toggle", () => { store.set("inboxanswered", ans.open); markAnsweredSeen(); });
     }
     f.addEventListener("input", () => { store.set("inboxfilter", f.value.trim()); inboxFilter(); });
     // the row's team badge filters to that team; pressing it again clears the box (as on the Org)
@@ -767,6 +795,16 @@
     return !(focused && focused !== document.body && el.contains(focused));
   };
 
+  // §4.9b: the team header's *answered for you* count runs from the last time the person **opened
+  // the group** — here, the newest row on screen while the group is open and the tab is in view.
+  function markAnsweredSeen() {
+    const sec = $("#sec-answered");
+    if (!sec || !sec.open || sec.classList.contains("hidden") || document.visibilityState === "hidden") return;
+    let newest = store.get(ANSWERED_SEEN, "");
+    $$("#rows-answered .mailrow").forEach((r) => { if ((r.dataset.at || "") > newest) newest = r.dataset.at; });
+    if (newest) store.set(ANSWERED_SEEN, newest);
+  }
+
   async function refreshInbox() {
     const got = await AO.refreshInboxCount();
     const down = $("#agentdown");
@@ -794,6 +832,7 @@
     // there would be a section that is never anything
     const a = $("#sec-answered");
     if (a) a.classList.toggle("hidden", !(got.sections && (got.sections.answered || []).length));
+    markAnsweredSeen();
     // §4.10: **FYI opens itself when its count is higher than this browser last saw it**, and is
     // otherwise as the person left it. That comparison is the browser's own — nothing on an entry
     // and nothing at the home changes, so reading still changes no row. A folded, uncounted FYI
