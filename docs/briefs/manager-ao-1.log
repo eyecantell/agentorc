@@ -113,3 +113,4 @@
 17:03–17:13 quiet; grinder-ao-1: #380 (TD-095 mockups) merged → cadence pass, review recorded (FIXED · sonnet · docs); next a src/sessionorc TD-095 item for the anchor to merge (2 h clock starts at its PR)
 17:13–17:24 quiet; grinder-ao-1: #383 (TD-095 report ref once, src/sessionorc/models.py) opened 23:16Z → anchor's 2 h clock to 01:16Z
 17:24  techlead-ao-1: exited with asks_waiting 1 → FILL #1 at 23:24:45Z (ao new --keep-mail, same name/dir/worktree/profile grind, role techlead, brief rendered by teams.plan) → working, asks_waiting 3 on the new record
+17:25  techlead-ao-1: fill #1 idle at 23:25Z (~1 min), 0 waiting → ao close. Batch: 3 steers from grinder-ao-2 (TD-095) — 2 answered with a source (design §4.5 card anatomy, §4.8 doing), 0 passed up, 0 lapsed, 1 withdrawn test send closed 'nothing to answer'; primer present, nothing stale; it notes --reply-to … --pick cannot carry text
