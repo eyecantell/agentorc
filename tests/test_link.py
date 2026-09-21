@@ -1452,7 +1452,9 @@ async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_p
     """§4.8a (TD-077 step 2, review of PR #251): identity alarms are **node-owned** — observed
     where the socket is — so **Acknowledge** on a node's record is routed to that node, which
     clears its own list; the home takes the cleared record from the reply, and no later report
-    brings the alarms back. Without an `id` the RPC is the host's own list and never travels. A
+    brings the alarms back — and the **home** writes the trail word for it (*dismissed by you*,
+    the control's name since 2026-09-20; `identity_ack` keeps the wire name), because the node's
+    own bookkeeping never reaches the home's trail. Without an `id` the RPC is the host's own list and never travels. A
     person at the node may clear only that node's records; a session is refused at both ends."""
     async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
         acts = Acts(node, monkeypatch)
@@ -1464,6 +1466,7 @@ async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_p
         node._id_alarm({"channel": f"session {w['id']}", "claimed": "ao-b", "rpc": "msg"}, w["id"])
         seen = await until(home, address, lambda v: bool((v or {}).get("identity_alarms")))
         assert [a["claimed"] for a in seen["identity_alarms"]] == ["ao-b"]
+        await asyncio.sleep(FAST_TICK * 2)  # a home tick notes the alarm row, so its ending has one to end
 
         async with LocalClient(sock=home.dir / "agent.sock", caller="ao-someone") as as_session:
             with pytest.raises(AgentError, match="only by a person"):
@@ -1479,6 +1482,13 @@ async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_p
         assert (await at_home(home, address))["identity_alarms"] == []
         await asyncio.sleep(FAST_TICK * 3)
         assert (await at_home(home, address))["identity_alarms"] == []
+        # and the **home** wrote the word, keyed by the record's address: the act ran at the node,
+        # so without this the row's ending would read *resolved* (TD-077 a1; review of PR #269)
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            trail = (await person.call("inbox"))["trail"]
+        assert [(e["sid"], e["kind"], e["how"]) for e in trail if e["kind"] == "alarm"] == [
+            (address, "alarm", "dismissed by you")
+        ]
 
         # a person at the node clears that node's records and no other host's: a home record is
         # simply no session here, exactly as a `kill` of one is (§4.4a) — and this never travels

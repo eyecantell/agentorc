@@ -478,12 +478,14 @@ async def test_the_hosts_own_alarms_persist_across_a_restart_and_the_tally_does_
     assert dict(fresh.identity_tally) == {}
 
 
-async def test_acknowledge_clears_a_list_for_a_person_and_for_nobody_else(agent, tmp_path):
-    """§4.5a **Inbox row: identity alarm** → **Acknowledge** (`identity_ack`): a person clears one
-    record's alarms, or — naming none — the host's own, and the row leaves the Inbox. It is
-    refused to **every** session, its own alarms included: a session that could clear the list
-    could erase the evidence of its own forgery. The agent's log keeps every alarm, so nothing is
-    lost by acknowledging."""
+async def test_dismiss_clears_a_list_for_a_person_and_for_nobody_else(agent, tmp_path):
+    """§4.5a **Inbox row: identity alarm** → **Dismiss** (`identity_ack` — the control was renamed
+    from *Acknowledge* on 2026-09-20, TD-077 a1, and the **wire name stays**: it is in `NODE_ACTS`,
+    where a rename is a protocol change that buys a person nothing). A person clears one record's
+    alarms, or — naming none — the host's own, and the row leaves the Inbox, leaving a trail entry
+    that says **dismissed by you**. It is refused to **every** session, its own alarms included: a
+    session that could clear the list could erase the evidence of its own forgery. The agent's log
+    keeps every alarm, so nothing is lost by dismissing."""
     from sessionorc.store import IdentityAlarmStore
 
     async with LocalClient() as me:
@@ -509,6 +511,8 @@ async def test_acknowledge_clears_a_list_for_a_person_and_for_nobody_else(agent,
     async with LocalClient() as person:
         got = await person.call("identity_ack", id=a)
         assert got["cleared"] is True and got["alarms"] == []
+        # the word the trail will carry when the alarm row ends, in the control's own name
+        assert agent._attention_how[f"{a}|alarm"] == "dismissed by you"
         report = await person.call("identity")
         assert a not in report["sessions"] and [x["claimed"] for x in report["alarms"]] == [a]
         assert (await person.call("identity_ack"))["id"] == "person"
