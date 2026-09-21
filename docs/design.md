@@ -2705,7 +2705,10 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   `{techlead}` in every brief with the id the seat will take, worked out before anything starts
   (§4.1's `ao-<scope>-<name>`, `@<host>` for a team on another host) — should the seat come up
   under another id (a stale tmux session holding it), the start says so. A hand-started session
-  (`ao new --role grinder`) reads `none`. `ao team list` names the seat.
+  (`ao new --role grinder`) reads `none`. `ao team list` names the seat, and a team whose members
+  all declared reads *wound down* without the seat's word (2026-09-21): the seat is known by the
+  name its definition gives it — or that name with the numeric suffix a stale tmux session forces,
+  unless a member is defined under it — never by a role badge.
 - **It answers cold, and is filled on demand.** A techlead is **started per batch of questions
   and ends when it has answered them**: no context piles up over a night, an idle team costs
   nothing, and — Paul's second reason — *composing the message forces the worker to pull the
@@ -2799,7 +2802,15 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   entry's id>`, which is in its own inbox; and a question **passed up** and answered by the person owes one
   in the ordinary way. The Inbox groups these
   under *Answered for you* (§4.5a), uncounted, newest first, and the team's header carries the
-  number since the person last opened the group — a **mark**. **Overrule** on such a row is a
+  number since the person last opened the group — a **mark**. **As built (TD-075 step 2, the mail
+  half, 2026-09-20):** `ao msg --reply-to <id> --source "…"` — refused off a reply, from a person
+  (*a person's answer needs no source*), and past one line of 200 characters; the FYI is a `note`
+  in the person inbox, from the answerer, on the question's thread, with the answer as its text
+  and the question's `about`; it is counted in the person inbox's depths as any entry is, so a full
+  inbox refuses the reply itself rather than let the answer land unseen; a reply **to** the person
+  files none. The Overrule branch applies when the person's reply names no addressee, and the
+  `handed` mark is on the asker's copy alone. `ao inbox` prints a reply's source and the FYI's
+  *who asked what, who answered, from where*. The page's group, row and count are the page half. **Overrule** on such a row is a
   reply **to the asker**, marked `[person]`, on the question's own thread, with a copy to the
   answerer; a person's word outranks a teammate's by the rule every brief already has. The
   failure this guards against is a confident wrong go-between steering a team all night unseen.

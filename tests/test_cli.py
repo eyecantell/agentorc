@@ -1510,3 +1510,30 @@ def test_msg_pass_up_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path
     assert "  1. keep it" in out and "  2. delete it" in out
     for sid in (asker, passer):
         call_sync("kill", id=sid)
+
+
+def test_msg_source_and_the_answered_for_you_lines(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-075 step 2 (design §4.9b): `ao msg --reply-to <id> --source "<where>"` sends a reply
+    answered from the record and says the person is told; the asker's `ao inbox` prints the source,
+    and the person's prints the FYI — who asked what, who answered, from where."""
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    asker = call_sync("create", name="src-asker", dir=str(tmp_path / "a"), adapter="shell", team="src-t")["id"]
+    answerer = call_sync("create", name="src-answerer", dir=str(tmp_path / "b"), adapter="shell", team="src-t")["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", asker)
+    assert cli.main(["--json", "msg", answerer, "is the seat counted in a wind-down?", "--kind", "ask"]) == 0
+    q = json.loads(capsys.readouterr().out)["entry"]
+    monkeypatch.setenv("AGENTORC_SESSION", answerer)
+    assert cli.main(["msg", "--reply-to", q["id"], "no, never", "--source", "design §4.9b, the seat"]) == 0
+    out = capsys.readouterr().out
+    assert "source: design §4.9b, the seat" in out and "the person is told: answered for you" in out
+    monkeypatch.setenv("AGENTORC_SESSION", asker)
+    assert cli.main(["inbox"]) == 0
+    assert "  source: design §4.9b, the seat" in capsys.readouterr().out
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert f"answered for you — {asker} asked: is the seat counted in a wind-down?" in out
+    assert f"answered by {answerer} from design §4.9b, the seat; a reply here goes to the asker" in out
+    for sid in (asker, answerer):
+        call_sync("kill", id=sid)

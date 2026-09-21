@@ -291,6 +291,14 @@ class MailEntry:
     # first; the asker's and the passer's copies keep their own.
     passed_up: str | None = None
     recommend: dict[str, str] | None = None
+    # Answered from the record (design §4.9b, TD-075 step 2). `source` is on a **reply**: one line
+    # saying where its answer is written down (a file and section, a dated decision), at most
+    # `mail.SOURCE_CAP` characters, only ever drawn as text. `answered` is on the **FYI** the home
+    # files to the person for such a reply — `{question, asker, answerer, source}` — and a reply to
+    # an entry carrying it goes to the asker with a copy to the answerer (the Overrule path). Both
+    # key on these fields, never on the role of whoever answered (§9 invariant 9).
+    source: str | None = None
+    answered: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
