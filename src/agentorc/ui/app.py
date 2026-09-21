@@ -551,6 +551,27 @@ def view(
     d["out_of_work"] = (
         {"why": str(oow.get("why") or "").strip(), "age": _age(oow.get("at"), now)} if oow.get("at") else None
     )
+    # design §4.5a **restart wanted** chip (§4.9a *A run that ends with work left*, TD-083): the
+    # third ending — *my run is over and my lane is not*. Shaped exactly like `out_of_work` above,
+    # and for the same reasons: fixed words, the `why` on hover because it is a sentence a card
+    # cannot hold, and one malformed record costs that card its chip and not the grid.
+    #
+    # **`early` is carried, and it is the one thing the design did not have to say.** The home
+    # marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller
+    # **does not act on it** — a run that was over before it began did not run out of context. So
+    # an early one must not read as an ordinary one: a person seeing the same chip would expect the
+    # same thing to happen next, and nothing will.
+    rw = s.get("restart_wanted")
+    rw = rw if isinstance(rw, dict) else {}
+    d["restart_wanted"] = (
+        {
+            "why": str(rw.get("why") or "").strip(),
+            "age": _age(rw.get("at"), now),
+            "early": bool(rw.get("early")),
+        }
+        if rw.get("at")
+        else None
+    )
     # design §4.8a (TD-077 step 2): the identity alarms kept on this record — requests that named
     # this session from somewhere it does not live. A **mark**, never a control: it says *a person
     # should look*, and what to do about it is a row in the Inbox. Shaped like the chips above, so

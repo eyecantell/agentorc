@@ -176,6 +176,11 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* design §4.8a *An alarm's answers* (TD-077 a2): **suspended** — flat and never pressable, like
    every mark. It is the suspension's only record on a page (a suspension ends no row, so it writes
    no trail), so it is quiet but not faint: a person must be able to see that it is there. */
+/* design §4.5a **restart wanted** (§4.9a, TD-083): a mark like *out of work*, which carries no
+   style of its own — so neither does this, except for the one thing that must not look the same.
+   An **early** one is the one a controller does not act on, so it is marked as needing a person
+   rather than a restart; still flat, still nothing to press. */
+.badge.rw.early { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); }
 .badge.suspendedmark { cursor: default; color: var(--alarm-fg); background: transparent; border-color: var(--alarm); text-transform: uppercase; letter-spacing: .04em; font-size: 9.5px; }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }

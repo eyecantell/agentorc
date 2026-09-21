@@ -3,6 +3,8 @@ grouping function, and one render of the page template over its output."""
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from agentorc.ui.app import team_groups
@@ -288,3 +290,53 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
     assert 'data-profile="openai" data-pct="100" class="cap"' in html and "openai day 100%" in html
     assert 'data-profile="quietly"' not in html  # no windows, no chip
     assert "five_hour" not in html and "weekly" not in html
+
+
+def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on_those(tmp_path, monkeypatch):
+    """design §4.5a **restart wanted** (§4.9a *A run that ends with work left*, TD-083): the third
+    ending — *my run is over and my lane is not*. A **mark**, never pressable, and not a state: the
+    session still reads `idle` or `exited`. Shaped like *out of work*, which is the chip it stands
+    beside and the rule it follows.
+
+    **The one thing the design did not have to say, and the field now does:** `early`. The home
+    marks a restart asked for inside the record's own first half hour, and a **controller does not
+    act on it** — a run that was over before it began did not run out of context. So an early one
+    must not look like an ordinary one: a person reading the same chip would expect the same thing
+    to happen next, and nothing will."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import templates, view
+
+    base = {"id": "ao-w1", "name": "w1", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+            "state": "idle", "since": "2026-09-21T01:00:00Z", "confidence": "hook", "pane": True,
+            "tail": ["…"], "created": "2026-09-21T00:00:00Z"}  # fmt: skip
+    card, focus = templates.get_template("card.html"), templates.get_template("focus.html")
+
+    assert view(base)["restart_wanted"] is None and "restart wanted" not in card.render(s=view(base))
+
+    said = {"at": "2026-09-21T01:30:00Z", "why": "TD-090 is half done and my context is full"}
+    v = view({**base, "restart_wanted": said})
+    assert v["restart_wanted"]["why"].startswith("TD-090") and v["restart_wanted"]["early"] is False
+    pages = [("card", card.render(s=v))]
+    pages.append(("focus", focus.render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")))
+    for where, html in pages:
+        assert "restart wanted" in html, where
+        assert "TD-090 is half done" in html, where  # the why is the hover: a card cannot hold it
+        assert "· early" not in html, where
+        assert "data-act" not in html.split("badge rw")[1].split("</span>")[0], where  # never pressable
+
+    early = view({**base, "restart_wanted": {**said, "early": True}})
+    assert early["restart_wanted"]["early"] is True
+    pages = [("card", card.render(s=early))]
+    pages.append(("focus", focus.render(s={**early, "grants_all": [], "ready": []}, host="h", active="Org")))
+    for where, html in pages:
+        assert "restart wanted · early" in html, where
+        assert "a controller does not act on it" in html, where  # the hover says why it is different
+        assert 'class="badge rw early"' in html, where
+    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    assert ".badge.rw.early" in css  # …and it does not look the same
+
+    # a malformed record costs that card its chip and never the grid — the rule every chip here has
+    for junk in ("nonsense", 7, [], {"why": "no at, so nothing was said"}):
+        assert view({**base, "restart_wanted": junk})["restart_wanted"] is None, junk
+    assert view({**base, "restart_wanted": {"at": "2026-09-21T01:30:00Z"}})["restart_wanted"]["why"] == ""
