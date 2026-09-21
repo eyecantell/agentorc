@@ -106,3 +106,6 @@
 ## Run started 2026-09-21 22:56Z (ao team start ao-grind)
 
 16:58  grinder-ao-1, grinder-ao-2, techlead-ao-1: working (created 22:56Z) → ok; cadence-changes: last entry landed 09-12, no relays; #375–#378 merged since last run are not members' branches
+17:06  anchor note m-0d8970a632c6: techlead trial (TD-075 step 5), keep the fill numbers; grinder-ao-1 note: stopping at 86% weekly usage, then corrected: continuing on TD-095 mockups (restart_wanted early still on its record) → two notes to person; grinder-ao-2: working TD-095 page → ok
+17:06  techlead-ao-1: idle, 0 asks waiting → ao close (trial: closed at start, 0 fills so far)
+17:06  cadence: #371 (TD-057) and #373 (TD-077) merged by the anchor 18:53Z — both pass; review rows recorded, not verified
