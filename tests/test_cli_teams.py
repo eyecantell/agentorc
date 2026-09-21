@@ -26,7 +26,7 @@ def org_doc(root: Path, *, two_repos: bool = False) -> dict:
         "teams": {
             "ao-grind": {
                 "projects": ["ao"],
-                "lead": {"role": "lead", "name": "orc-ao", "home": "agentorc"},
+                "manager": {"role": "manager", "name": "orc-ao", "home": "agentorc"},
                 "members": [
                     {"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick", "home": "agentorc"},
                     {"role": "hunter", "name": "hunt", "lane": "ui", "home": "agentorc"},
@@ -184,7 +184,7 @@ def test_an_unresolvable_role_or_profile_aborts(world, capsys):
 def test_a_nested_team_member_says_it_is_not_built_rather_than_pretending(world, capsys):
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["inner"] = {"projects": ["ao"], "lead": {"role": "person"}, "members": []}
+    doc["teams"]["inner"] = {"projects": ["ao"], "manager": {"role": "person"}, "members": []}
     doc["teams"]["ao-grind"]["members"].append({"team": "inner"})
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 1
@@ -205,7 +205,7 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "grind-1", "grind-2", "hunt"]
     lead, grind1, hunt = made[0], made[1], made[3]
-    assert lead["controllers"] == [] and lead["capabilities"] == ["control"] and lead["role"] == "lead"
+    assert lead["controllers"] == [] and lead["capabilities"] == ["control"] and lead["role"] == "manager"
     lead_id = "ao-agentorc-orc-ao"
     assert all(p["controllers"] == [lead_id] for p in made[1:])
     # a worktree per session in its home repo (§4.9 "Home and reach"), and both badges
@@ -215,27 +215,29 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert "## Lane: free-pick" in grind1["prompt"] and "## Area: ui" in hunt["prompt"]
     assert "## Project:" not in grind1["prompt"]  # one repo: no reach to describe
     out = capsys.readouterr().out
-    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  lead lead")
+    assert out.splitlines()[0].startswith("ao-agentorc-orc-ao  manager manager")
     assert "member grinder" in out
 
 
-def test_a_definition_still_naming_role_orchestrator_starts_a_lead(world, capsys, monkeypatch):
-    """TD-055 step 2: an `org.yml` written before the rename — `lead: {role: orchestrator}` and a
-    `roles: orchestrator:` overlay, the live shape — starts the lead with the lead brief, grants and
-    the overlay's profile, records `role: lead`, and says once that the name changed."""
+def test_a_definition_still_naming_lead_or_orchestrator_starts_a_manager(world, capsys, monkeypatch):
+    """TD-055 step 2, then TD-076 step 2: an `org.yml` written before the renames — the `lead:` key,
+    `role: orchestrator` and a `roles: orchestrator:` overlay — starts the manager with the manager
+    brief, grants and the overlay's profile, records `role: manager`, and says once per old word
+    that the name changed."""
     from agentorc import repoconfig
 
     monkeypatch.setattr(repoconfig, "_warned", set())
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["ao-grind"]["lead"]["role"] = "orchestrator"
+    doc["teams"]["ao-grind"]["lead"] = {**doc["teams"]["ao-grind"].pop("manager"), "role": "orchestrator"}
     doc["roles"]["orchestrator"] = {"profile": "org-grind"}
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 0
     lead = creates(state)[0]
-    assert lead["role"] == "lead" and lead["capabilities"] == ["control"] and lead["profile"] == "org-grind"
-    assert "You are a **lead**" in lead["prompt"]
-    assert capsys.readouterr().err.count("role `orchestrator` is now `lead`") == 1
+    assert lead["role"] == "manager" and lead["capabilities"] == ["control"] and lead["profile"] == "org-grind"
+    assert "You are a **manager**" in lead["prompt"]
+    err = capsys.readouterr().err
+    assert err.count("role `orchestrator` is now `manager`") == 1 and err.count("`lead:` is now `manager:`") == 1
 
 
 def test_an_interactive_member_is_started_but_said_to_be_out_of_its_leads_reach(world, capsys):
@@ -259,7 +261,7 @@ def test_an_interactive_member_is_started_but_said_to_be_out_of_its_leads_reach(
 def test_a_person_lead_starts_no_lead_session_and_members_are_controlled_by_nobody(world):
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["ao-grind"]["lead"] = {"role": "person"}
+    doc["teams"]["ao-grind"]["manager"] = {"role": "person"}
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 0
     made = creates(state)
@@ -395,7 +397,7 @@ def test_a_members_brief_override_replaces_the_roles_template(world):
 def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
     tmp_path, state = world
     (tmp_path / "agentorc" / ".agentorc.yml").write_text(
-        yaml.safe_dump({"teams": {"repo-team": {"lead": {"role": "person"}, "members": [{"role": "hunter"}]}}})
+        yaml.safe_dump({"teams": {"repo-team": {"manager": {"role": "person"}, "members": [{"role": "hunter"}]}}})
     )
     assert cli.main(["team", "start", "repo-team"]) == 0
     made = creates(state)
@@ -453,7 +455,7 @@ def test_a_lead_stopping_its_own_team_is_the_wind_down_and_is_never_typed_at(wor
     ]  # fmt: skip
     assert [p["id"] for m, p in state["calls"] if m == "close"] == ["ao-agentorc-grind-1", "ao-agentorc-hunt"]
     out = capsys.readouterr().out
-    assert "lead: is you" in out and "ao close ao-agentorc-orc-ao" in out
+    assert "manager: is you" in out and "ao close ao-agentorc-orc-ao" in out
     assert "left open: 2 unpushed (vs origin/x)" in out
     assert "still working" not in out  # the lead's own line is not a member that missed the window
     assert by_id["ao-agentorc-orc-ao"]["state"] == "working"  # untouched by its own command
@@ -543,12 +545,12 @@ def test_status_lists_the_members_with_state_lane_and_report_line(world, capsys)
 def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, capsys):
     tmp_path, state = world
     (tmp_path / "agentorc" / ".agentorc.yml").write_text(
-        yaml.safe_dump({"teams": {"repo-team": {"lead": {"role": "person"}, "members": [{"role": "hunter"}]}}})
+        yaml.safe_dump({"teams": {"repo-team": {"manager": {"role": "person"}, "members": [{"role": "hunter"}]}}})
     )
     assert cli.main(["team", "list"]) == 0
     out = capsys.readouterr().out
     assert "ao-grind" in out and "stopped" in out and str(tmp_path / "home" / "org.yml") in out
-    assert "repo-team" in out and "lead: person" in out and str(tmp_path / "agentorc" / ".agentorc.yml") in out
+    assert "repo-team" in out and "manager: person" in out and str(tmp_path / "agentorc" / ".agentorc.yml") in out
     started(state)
     capsys.readouterr()
     assert cli.main(["--json", "team", "list"]) == 0
@@ -595,7 +597,7 @@ def test_profile_precedence_built_in_org_repo_member_flag(world):
     assert profile_of() == "member-grind"
     assert profile_of(argv=("team", "start", "ao-grind", "-p", "paul")) == "paul"
     # the lead's own `profile:` beats the role's, and `--profile` beats that
-    doc["teams"]["ao-grind"]["lead"]["profile"] = "paul"
+    doc["teams"]["ao-grind"]["manager"]["profile"] = "paul"
     write_org(tmp_path, doc)
     assert profile_of("orc-ao") == "paul"
     assert profile_of("orc-ao", argv=("team", "start", "ao-grind", "-p", "org-grind")) == "org-grind"
@@ -804,7 +806,7 @@ def test_ao_team_skill_prints_the_recipe_without_an_agent_and_exits(capsys):
         ".agentorc.yml",
         "projects:",
         "members:",
-        "lead: {role: person}",  # the form the loader accepts — the bare string is refused
+        "manager: {role: person}",  # the form the loader accepts — the bare string is refused
         "--close",
     ):
         assert must in out, must
@@ -852,16 +854,16 @@ def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path
             "cm-grind": {
                 "projects": ["contractmatch"],
                 "host": "contractmatch",
-                "lead": {"role": "lead", "name": "orchestrator-cm"},
-                "members": [{"role": "grinder", "count": 2, "name": "tdgrind-cm", "lane": "free-pick"}],
+                "manager": {"role": "manager", "name": "manager-cm"},
+                "members": [{"role": "grinder", "count": 2, "name": "grinder-cm", "lane": "free-pick"}],
             }
         },
     }
     (tmp_path / "org.yml").write_text(yaml.safe_dump(org_yml))
     org = orgmod.load()
     team = org.teams["cm-grind"]
-    assert team.host == "contractmatch" and team.lead.name == "orchestrator-cm"
-    assert team.members[0].names() == ["tdgrind-cm-1", "tdgrind-cm-2"]  # the prefix rule the recipe states
+    assert team.host == "contractmatch" and team.manager.name == "manager-cm"
+    assert team.members[0].names() == ["grinder-cm-1", "grinder-cm-2"]  # the prefix rule the recipe states
     assert org.checkout("contractmatch", "contractmatch", "kmaster") is not None
 
     repo = tmp_path / "repo"
@@ -869,17 +871,17 @@ def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path
     (repo / ".agentorc.yml").write_text(
         "roles:\n"
         "  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}\n"
-        "  lead: {brief: docs/briefs/lead.md, grants: [control]}\n"
-        "controllers: [orchestrator-cm]\n"
+        "  manager: {brief: docs/briefs/manager.md, grants: [control]}\n"
+        "controllers: [manager-cm]\n"
         "ledger: docs/technical_debt.md\n"
     )
     cfg = repoconfig.discover(repo)
-    assert cfg.controllers == ["orchestrator-cm"] and cfg.ledger == "docs/technical_debt.md"
+    assert cfg.controllers == ["manager-cm"] and cfg.ledger == "docs/technical_debt.md"
     got = {r.name: r for r in repoconfig.roles(cfg)}
     assert got["grinder"].profile == "grind" and got["grinder"].icon == "wrench"
-    assert got["lead"].grants == ["control"]
+    assert got["manager"].grants == ["control"]
     # and the built-in roles the recipe's table names all resolve
-    for name in ("lead", "grinder", "hunter", "plain"):
+    for name in ("manager", "grinder", "hunter", "plain"):
         assert name in got, name
 
 
@@ -906,8 +908,8 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
         yaml.safe_dump({
             "projects": {"p": {"repos": {"r": {"h": str(tmp_path)}}}},
             "teams": {
-                "outer": {"projects": ["p"], "lead": {"role": "lead"}, "members": [{"team": "inner"}]},
-                "inner": {"projects": ["p"], "lead": {"role": "lead"}, "members": [{"role": "grinder"}]},
+                "outer": {"projects": ["p"], "manager": {"role": "manager"}, "members": [{"team": "inner"}]},
+                "inner": {"projects": ["p"], "manager": {"role": "manager"}, "members": [{"role": "grinder"}]},
             },
         })
     )  # fmt: skip

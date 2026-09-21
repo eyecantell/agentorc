@@ -216,7 +216,7 @@ def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> t
 
 # A lead and a member are shaped alike where a launch is concerned (§4.9): both name a lane, a
 # brief override, grants, a profile and whether they are unattended. `None` is the person-lead case.
-Spec = orgmod.MemberDef | orgmod.LeadDef | None
+Spec = orgmod.MemberDef | orgmod.ManagerDef | None
 
 
 # `(host, checkout, [paths relative to it])` → `{path: text, or None when there is no such file}`:
@@ -339,19 +339,19 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
     here, host = host, team.host or host  # the team lands on its `host:`, else where the start runs (§4.4a)
     p = Plan(team=team.name, source=team.source, host=host if host != here else "")
     reach = bool(project_block(org, team.projects, host))
-    if team.lead.role != orgmod.PERSON:
+    if team.manager.role != orgmod.PERSON:
         p.lead = _launch(
             org=org,
             team=team,
-            name=team.lead.name,
-            role_name=team.lead.role,
-            home=team.lead.home,
+            name=team.manager.name,
+            role_name=team.manager.role,
+            home=team.manager.home,
             host=host,
             here=here,
-            profile_override=profile or team.lead.profile,
-            member=team.lead,  # its lane, brief, grants and unattended read like a member's
+            profile_override=profile or team.manager.profile,
+            member=team.manager,  # its lane, brief, grants and unattended read like a member's
             lead=True,
-            block=project_block(org, team.projects, host, team.lead.home) if reach else "",
+            block=project_block(org, team.projects, host, team.manager.home) if reach else "",
             files=files,
         )
     seen: set[str] = {p.lead.name} if p.lead else set()

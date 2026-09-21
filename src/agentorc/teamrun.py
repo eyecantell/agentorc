@@ -86,7 +86,7 @@ def split(name: str, sessions: list[dict[str, Any]], org: orgmod.Org) -> tuple[d
     """The lead and the members among the sessions carrying a team's badge: the lead is the session
     the definition names (a team with a `person` lead has none), the rest are members in name order."""
     team = org.teams.get(name)
-    lead_name = team.lead.name if team and team.lead.role != orgmod.PERSON else None
+    lead_name = team.manager.name if team and team.manager.role != orgmod.PERSON else None
     lead = next((s for s in sessions if s.get("name") == lead_name), None)
     return lead, sorted((s for s in sessions if s is not lead), key=lambda s: s.get("name") or s["id"])
 
@@ -141,7 +141,7 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "name": t.name,
                 "source": str(t.source) if t.source else None,
                 "projects": list(t.projects),
-                "lead": t.lead.name if t.lead.role != orgmod.PERSON else "person",
+                "manager": t.manager.name if t.manager.role != orgmod.PERSON else "person",
                 "members": sum(len(m.names()) for m in t.members if m.team is None),
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
@@ -223,7 +223,7 @@ def start(
     # prose and the judgement is the author's — but it is said out loud, like `out_of_reach`.
     return plan, {
         "team": name,
-        "lead": lead_id or None,
+        "manager": lead_id or None,
         "sessions": created,
         "out_of_reach": out_of_reach,
         "unrepeatable": list(plan.warnings),
@@ -259,7 +259,7 @@ def stop_members(call: Call, org: orgmod.Org, name: str, *, now: bool = False, c
             continue
         st.acted.append(_stop_one(call, s, "member", now=now))
     if now and lead is not None:  # a kill has nothing to wait for: the lead goes with them
-        st.acted.append(_own_end(lead) if st.lead_is_caller else _stop_one(call, lead, "lead", now=True))
+        st.acted.append(_own_end(lead) if st.lead_is_caller else _stop_one(call, lead, "manager", now=True))
         st.lead = None
     return st
 
@@ -283,7 +283,7 @@ def stop_lead(call: Call, st: Stopping, *, timeout: float = STOP_TIMEOUT, close:
             if entry["role"] == "member":
                 _close_settled(call, entry, records.get(entry["id"]))
     if st.lead is not None:
-        st.acted.append(_own_end(st.lead) if st.lead_is_caller else _stop_one(call, st.lead, "lead", now=st.now))
+        st.acted.append(_own_end(st.lead) if st.lead_is_caller else _stop_one(call, st.lead, "manager", now=st.now))
         st.lead = None
     return st
 
@@ -327,7 +327,7 @@ def _unsafe_to_close(record: dict[str, Any]) -> str | None:
 def _own_end(lead: dict[str, Any]) -> dict[str, Any]:
     """The lead's entry when the lead is the one running the stop: nothing is sent to it."""
     return {
-        **_entry(lead, "lead"),
+        **_entry(lead, "manager"),
         "action": f"is you — finish your last acts, then `ao close {lead['id']}`",
         "state": lead.get("state") or "?",
     }

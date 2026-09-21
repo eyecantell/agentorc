@@ -23,7 +23,7 @@ ORG = {
     "teams": {
         "ao-grind": {
             "projects": ["agentorc"],
-            "lead": {"role": "lead", "name": "orchestrator-ao-1"},
+            "manager": {"role": "manager", "name": "manager-ao-1"},
             "members": [
                 {"role": "grinder", "count": 2, "name": "tdgrind-ao", "lane": "free-pick"},
                 {"role": "hunter", "name": "hunter-ao", "lane": "ui"},
@@ -31,7 +31,7 @@ ORG = {
         },
         "guardians": {
             "projects": ["guardians"],
-            "lead": {"home": "guardians", "profile": "orc"},
+            "manager": {"home": "guardians", "profile": "orc"},
             "members": [
                 {"role": "grinder", "home": "guardians-api", "brief": "docs/briefs/api-grinder.md"},
                 {"team": "guardians-ui"},
@@ -39,7 +39,7 @@ ORG = {
         },
         "guardians-ui": {
             "projects": ["guardians"],
-            "lead": {"role": "person"},
+            "manager": {"role": "person"},
             "members": [{"role": "grinder", "home": "guardians", "unattended": False, "grants": ["control"]}],
         },
     },
@@ -75,20 +75,20 @@ def test_every_default_of_section_4_9(tmp_path):
     o = org.load(write(tmp_path, ORG))
     grind = o.teams["ao-grind"]
     assert grind.source == tmp_path / "org.yml" and grind.projects == ["agentorc"]
-    assert grind.lead == org.LeadDef(role="lead", name="orchestrator-ao-1", home="agentorc", profile=None)
+    assert grind.manager == org.ManagerDef(role="manager", name="manager-ao-1", home="agentorc", profile=None)
     two, one = grind.members
     # count 1, name = the role, unattended true, grants/brief/profile = the role's, home = the only repo
     assert one == org.MemberDef(role="hunter", name="hunter-ao", home="agentorc", lane=["ui"])
     assert one.count == 1 and one.unattended is True and one.grants is None and one.brief is None
     assert two.count == 2 and two.lane == ["free-pick"] and two.names() == ["tdgrind-ao-1", "tdgrind-ao-2"]
     assert one.names() == ["hunter-ao"]
-    # lead defaults: role lead, name <team>-lead
+    # manager defaults: role manager, name <team>-lead
     g = o.teams["guardians"]
-    assert g.lead.role == "lead" and g.lead.name == "guardians-lead" and g.lead.profile == "orc"
+    assert g.manager.role == "manager" and g.manager.name == "guardians-lead" and g.manager.profile == "orc"
     assert g.members[0].home == "guardians-api" and g.members[0].brief == "docs/briefs/api-grinder.md"
     assert g.members[1] == org.MemberDef(team="guardians-ui")
     ui = o.teams["guardians-ui"]
-    assert ui.lead.role == "person" and ui.lead.home == ""  # no lead session, so no home to require
+    assert ui.manager.role == "person" and ui.manager.home == ""  # no manager session, so no home to require
     assert ui.members[0].unattended is False and ui.members[0].grants == ["control"]
     assert o.team_repos(g) == ["guardians", "guardians-api"]
 
@@ -104,7 +104,7 @@ def test_member_name_defaults_to_the_role_and_lane_forms(tmp_path):
         },
     }
     t = org.load(write(tmp_path, doc)).teams["t"]
-    assert t.projects == ["p"] and t.lead.name == "t-lead" and t.lead.home == "r"
+    assert t.projects == ["p"] and t.manager.name == "t-lead" and t.manager.home == "r"
     assert [m.name for m in t.members] == ["grinder", "x"]
     assert t.members[0].lane == ["TD-027", "TD-019"] and t.members[1].lane == ["a"]
 
@@ -166,9 +166,9 @@ def test_member_name_defaults_to_the_role_and_lane_forms(tmp_path):
         (
             {
                 "projects": {"p": {"repos": {"r": {"h": "/r"}}}},
-                "teams": {"t": {"projects": ["p"], "lead": {"home": "z"}}},
+                "teams": {"t": {"projects": ["p"], "manager": {"home": "z"}}},
             },
-            "teams.t.lead.home: 'z' is not a repo of the team's projects",
+            "teams.t.manager.home: 'z' is not a repo of the team's projects",
         ),
         (
             {
@@ -187,9 +187,11 @@ def test_malformed_files_name_the_key(tmp_path, doc, message):
 
 def test_home_is_required_above_one_repo(tmp_path):
     doc = dict(ORG, teams={"g": {"projects": ["guardians"], "members": [{"role": "grinder"}]}})
-    with pytest.raises(ValueError, match=r"teams\.g\.lead\.home is required when .*\['guardians', 'guardians-api'\]"):
+    with pytest.raises(
+        ValueError, match=r"teams\.g\.manager\.home is required when .*\['guardians', 'guardians-api'\]"
+    ):
         org.load(write(tmp_path, doc))
-    doc["teams"]["g"]["lead"] = {"home": "guardians"}
+    doc["teams"]["g"]["manager"] = {"home": "guardians"}
     with pytest.raises(ValueError, match=r"teams\.g\.members\[0\]\.home is required"):
         org.load(write(tmp_path, doc))
     doc["teams"]["g"]["members"][0]["home"] = "guardians-api"
@@ -214,7 +216,7 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     repo.mkdir()
     base = org.load(write(tmp_path, ORG))
     repo_teams = {
-        "grind": {"lead": {"name": "orc"}, "members": [{"role": "grinder", "count": 2, "name": "tdgrind"}]},
+        "grind": {"manager": {"name": "orc"}, "members": [{"role": "grinder", "count": 2, "name": "tdgrind"}]},
         "ao-grind": {"members": [{"role": "impostor"}]},  # collides with the org file: the org wins
     }
     merged = org.merge_repo_teams(base, repo, repo_teams)
@@ -225,7 +227,7 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     assert merged.checkout("myrepo", "myrepo", local_host().name) == repo.resolve()
     g = merged.teams["grind"]
     assert g.projects == ["myrepo"] and g.source == repo / ".agentorc.yml"
-    assert g.lead == org.LeadDef(role="lead", name="orc", home="myrepo")
+    assert g.manager == org.ManagerDef(role="manager", name="orc", home="myrepo")
     assert g.members[0].names() == ["tdgrind-1", "tdgrind-2"] and g.members[0].home == "myrepo"
     assert merged.teams["ao-grind"] is base.teams["ao-grind"]  # org wins, source still org.yml
     assert merged.teams["ao-grind"].source == tmp_path / "org.yml"
@@ -245,7 +247,7 @@ def test_merge_repo_teams(tmp_path, monkeypatch):
     assert merged.projects["myrepo"].repos == {"myrepo": {"elsewhere": Path("/x")}}
 
 
-def test_a_lead_may_name_its_own_brief_lane_grants_and_mode(tmp_path):
+def test_a_manager_may_name_its_own_brief_lane_grants_and_mode(tmp_path):
     """§4.9's lead had only role, name, home and profile, so a `brief:` on it was read by nobody —
     and a lead's brief is the one a repo most often keeps its own copy of. Found while
     writing the first real org.yml (2026-09-13)."""
@@ -254,12 +256,12 @@ def test_a_lead_may_name_its_own_brief_lane_grants_and_mode(tmp_path):
         "teams": {
             "t": {
                 "projects": ["p"],
-                "lead": {"role": "lead", "brief": "docs/briefs/orc.md", "lane": "TD-1", "unattended": False},
+                "manager": {"role": "manager", "brief": "docs/briefs/orc.md", "lane": "TD-1", "unattended": False},
             }
         },
     }
     (tmp_path / "org.yml").write_text(yaml.safe_dump(doc))
-    lead = org.load(tmp_path / "org.yml").teams["t"].lead
+    lead = org.load(tmp_path / "org.yml").teams["t"].manager
     assert lead.brief == "docs/briefs/orc.md" and lead.lane == ["TD-1"] and lead.unattended is False
     assert lead.grants is None  # unsaid: the role's, as for a member
 
@@ -270,7 +272,7 @@ def test_a_key_nobody_reads_is_an_error_naming_it(tmp_path):
     base = {"projects": {"p": {"repos": {"r": {"kmaster": str(tmp_path)}}}}}
     for block, bad in (
         ({"projects": ["p"], "leed": {}}, "leed"),
-        ({"projects": ["p"], "lead": {"role": "lead", "breif": "x"}}, "breif"),
+        ({"projects": ["p"], "manager": {"role": "manager", "breif": "x"}}, "breif"),
         ({"projects": ["p"], "members": [{"role": "grinder", "profil": "grind"}]}, "profil"),
     ):
         (tmp_path / "org.yml").write_text(yaml.safe_dump({**base, "teams": {"t": block}}))
@@ -288,11 +290,11 @@ def test_grants_orchestrate_in_a_team_is_read_as_control(tmp_path, capsys, monke
     f.write_text(
         "projects: {p: {repos: {r: {kmaster: /tmp}}}}\n"
         "teams:\n"
-        "  t: {projects: [p], lead: {grants: [orchestrate]},\n"
+        "  t: {projects: [p], manager: {grants: [orchestrate]},\n"
         "      members: [{role: grinder, grants: [orchestrate, control]}]}\n"
     )
     g = org.load(f).teams["t"]
-    assert g.lead.grants == ["control"] and g.members[0].grants == ["control"]
+    assert g.manager.grants == ["control"] and g.members[0].grants == ["control"]
     assert capsys.readouterr().err.count("grant `orchestrate` is now `control`") == 1
 
 
@@ -303,11 +305,40 @@ def test_a_team_may_name_the_host_it_lands_on(tmp_path):
     f.write_text(
         "projects: {p: {repos: {r: {contractmatch: /home/x/r}}}}\n"
         "teams:\n"
-        "  t: {projects: [p], host: contractmatch, lead: {role: lead}, members: [{role: grinder}]}\n"
-        "  u: {projects: [p], lead: {role: lead}}\n"
+        "  t: {projects: [p], host: contractmatch, manager: {role: manager}, members: [{role: grinder}]}\n"
+        "  u: {projects: [p], manager: {role: manager}}\n"
     )
     loaded = org.load(f)
     assert loaded.teams["t"].host == "contractmatch" and loaded.teams["u"].host == ""
     f.write_text("projects: {p: {repos: {r: {k: /x}}}}\nteams: {t: {projects: [p], members: [{role: g, host: k}]}}\n")
     with pytest.raises(ValueError, match="host"):
+        org.load(f)
+
+
+def test_the_old_lead_key_is_read_as_manager_and_both_are_refused(tmp_path, capsys, monkeypatch):
+    """TD-076 step 2, design §4.8 *The names*: a team definition's `lead:` is the old name of
+    `manager:` — read as the same thing for one release, said once per process; a definition that
+    carries both is refused by name, since which one was meant is not ours to guess."""
+    from agentorc import repoconfig
+
+    monkeypatch.setattr(repoconfig, "_warned", set())
+    base = "projects: {p: {repos: {r: {kmaster: /tmp}}}}\nteams:\n"
+    f = tmp_path / "org.yml"
+    f.write_text(
+        base + "  t: {projects: [p], lead: {role: lead, name: orc}}\n  u: {projects: [p], lead: {role: person}}\n"
+    )
+    o = org.load(f)
+    assert o.teams["t"].manager == org.ManagerDef(role="lead", name="orc", home="r")  # resolved at plan time
+    assert o.teams["u"].manager.role == org.PERSON
+    assert capsys.readouterr().err.count("`lead:` is now `manager:` (TD-076)") == 1
+    f.write_text(base + "  t: {projects: [p], lead: {name: a}, manager: {name: b}}\n")
+    with pytest.raises(ValueError, match=r"teams\.t: carries both `manager:` and `lead:`"):
+        org.load(f)
+
+
+def test_techlead_is_refused_as_an_org_role(tmp_path):
+    """TD-076 step 2: `techlead` is reserved (design §4.8), in `org.yml`'s `roles:` as in a repo's."""
+    f = tmp_path / "org.yml"
+    f.write_text("roles:\n  techlead: {profile: x}\n")
+    with pytest.raises(ValueError, match=r"roles\.techlead: role `techlead` is reserved"):
         org.load(f)

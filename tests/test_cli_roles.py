@@ -57,10 +57,10 @@ def test_role_fills_brief_lane_grants_profile_and_the_record(repo, capsys):
 
     calls.clear()
     # the flags win: --profile, --prompt, --lane; --grant adds to the preset's grants
-    assert cli.main(["new", "o1", "--role", "lead", "-p", "paul", "--prompt", "hi", "--grant", "control"]) == 0
+    assert cli.main(["new", "o1", "--role", "manager", "-p", "paul", "--prompt", "hi", "--grant", "control"]) == 0
     p = created(calls)
     assert p["profile"] == "paul" and p["prompt"] == "hi" and p["capabilities"] == ["control"]
-    assert p["role"] == "lead" and p["lane"] == []
+    assert p["role"] == "manager" and p["lane"] == []
 
     calls.clear()
     assert cli.main(["new", "h1", "--role", "hunter"]) == 0
@@ -72,17 +72,24 @@ def test_role_fills_brief_lane_grants_profile_and_the_record(repo, capsys):
     assert p["role"] == "" and p["prompt"] is None and p["capabilities"] == [] and p["ledger"] == "docs/debt.md"
 
 
-def test_role_orchestrator_still_starts_a_lead_and_says_so(repo, capsys, monkeypatch):
-    """TD-055 step 2: `--role orchestrator` is a deprecated alias for one release — the session is
-    started as `lead`, with the lead brief and grants, and stderr names the new word."""
+def test_role_orchestrator_or_lead_still_starts_a_manager_and_says_so(repo, capsys, monkeypatch):
+    """TD-055 step 2, repointed by TD-076 step 2: `--role orchestrator` and `--role lead` are
+    deprecated aliases for one release — the session is started as `manager`, with the manager
+    brief and grants, and stderr names the new word. `--role techlead` is refused by name."""
     from agentorc import repoconfig
 
     monkeypatch.setattr(repoconfig, "_warned", set())
     _, calls = repo
-    assert cli.main(["new", "o2", "--role", "orchestrator"]) == 0
-    p = created(calls)
-    assert p["role"] == "lead" and p["capabilities"] == ["control"] and "**lead**" in p["prompt"]
-    assert "role `orchestrator` is now `lead`" in capsys.readouterr().err
+    for old in ("orchestrator", "lead"):
+        calls.clear()
+        assert cli.main(["new", f"o-{old}", "--role", old]) == 0
+        p = created(calls)
+        assert p["role"] == "manager" and p["capabilities"] == ["control"] and "**manager**" in p["prompt"]
+        assert f"role `{old}` is now `manager` (TD-076)" in capsys.readouterr().err
+    calls.clear()
+    assert cli.main(["new", "t1", "--role", "techlead"]) != 0
+    assert not any(m == "create" for m, _ in calls)
+    assert "`techlead` is reserved" in capsys.readouterr().err
 
 
 def test_grant_orchestrate_on_the_command_line_is_sent_as_control(repo, capsys):
@@ -160,7 +167,7 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     out = capsys.readouterr().out
     assert (
         out.startswith("roles: built-in only")
-        and re.search(r"^lead +\[built-in\]", out, re.M)
+        and re.search(r"^manager +\[built-in\]", out, re.M)
         and "grants: control" in out
     )
     (root / ".agentorc.yml").write_text(

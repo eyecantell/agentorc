@@ -15,7 +15,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
     assert cfg.ready_when == ["tree_clean", "branch_pushed", "no_subagents"]
     assert cfg.commands == [] and cfg.unattended is None and cfg.controllers == [] and cfg.teams == {}
     assert cfg.ledger == "docs/technical_debt.md"
-    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "lead", "plain"]
+    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "plain"]
 
 
 def test_the_section_5_example_loads(tmp_path):
@@ -30,12 +30,12 @@ unattended:
 roles:
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}
   hunter: {brief: docs/briefs/hunter.md}
-  lead: {brief: docs/briefs/orchestrator.md, grants: [control]}
+  manager: {brief: docs/briefs/manager.md, grants: [control]}
   reviewer: {grants: [], lane: [ui, tests], controllers: [ui-orc]}
 controllers: [orchestrator-ao-1]
 ledger: docs/debt.md
 teams:
-  grind: {lead: {role: lead, name: orc}, members: [{role: grinder, count: 2}]}
+  grind: {manager: {role: manager, name: orc}, members: [{role: grinder, count: 2}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - {name: test, run: pdm run test}
@@ -45,7 +45,7 @@ commands:
     assert cfg.path == tmp_path / ".agentorc.yml"
     assert cfg.unattended == {"workers": 3, "window": {"weekday": "20:00-06:00", "weekend": "all"}}
     assert cfg.controllers == ["orchestrator-ao-1"] and cfg.ledger == "docs/debt.md"
-    assert cfg.teams["grind"]["lead"] == {"role": "lead", "name": "orc"}
+    assert cfg.teams["grind"]["manager"] == {"role": "manager", "name": "orc"}
     assert cfg.ready_when[2] == "pr_merged" and cfg.commands == [{"name": "test", "run": "pdm run test"}]
     # a repo's `roles:` overrides per key: what it does not say stays built-in
     g = repoconfig.resolve_role(cfg, "grinder")
@@ -53,11 +53,11 @@ commands:
         "docs/briefs/grinder.md", "repo", ["free-pick"], [], "grind"
     )  # fmt: skip
     assert g.source == "built-in + repo"
-    o = repoconfig.resolve_role(cfg, "lead")
+    o = repoconfig.resolve_role(cfg, "manager")
     assert o.grants == ["control"] and o.lane == [] and o.controllers == []
     r = repoconfig.resolve_role(cfg, "reviewer")
     assert r.source == "repo" and r.brief is None and r.lane == ["ui", "tests"] and r.controllers == ["ui-orc"]
-    assert [x.name for x in repoconfig.roles(cfg)] == ["grinder", "hunter", "lead", "plain", "reviewer"]
+    assert [x.name for x in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "plain", "reviewer"]
     with pytest.raises(KeyError, match="unknown role 'nope'; known: grinder, hunter"):
         repoconfig.resolve_role(cfg, "nope")
 
@@ -139,27 +139,44 @@ def test_discover_walks_up_to_the_file_or_the_git_root(tmp_path):
     assert repoconfig.discover(plain).root == plain
 
 
-def test_orchestrator_is_a_deprecated_alias_for_lead(tmp_path, capsys, monkeypatch):
-    """TD-055 step 2: the `orchestrator` role is `lead`. The old name still resolves for one release —
+def test_orchestrator_and_lead_are_deprecated_aliases_for_manager(tmp_path, capsys, monkeypatch):
+    """TD-055 step 2, repointed by TD-076 step 2: `orchestrator` and `lead` are both `manager` — one
+    lookup, never a chain (design §4.8 *The names*). Each old name still resolves for one release —
     as a name and as a `roles:` key in the org overlay or the repo's file — with one line naming the
-    new word, and nothing lists or records `orchestrator` any more."""
+    new word, and nothing lists or records either old name any more."""
     monkeypatch.setattr(repoconfig, "_warned", set())
+    assert set(repoconfig.ROLE_ALIASES.values()).isdisjoint(repoconfig.ROLE_ALIASES)  # no chain
     (tmp_path / ".agentorc.yml").write_text("roles:\n  orchestrator: {profile: repo-prof}\n")
     cfg = repoconfig.load(tmp_path)
     role = repoconfig.resolve_role(
-        cfg, "orchestrator", {"orchestrator": {"lane": ["TD-1"]}, "lead": {"profile": "org"}}
+        cfg, "orchestrator", {"orchestrator": {"lane": ["TD-1"]}, "manager": {"profile": "org"}}
     )
-    assert role.name == "lead" and role.grants == ["control"] and role.brief == "lead.md"
-    assert role.lane == ["TD-1"]  # the org overlay's old key folded into `lead`
+    assert role.name == "manager" and role.grants == ["control"] and role.brief == "manager.md"
+    assert role.lane == ["TD-1"]  # the org overlay's old key folded into `manager`
     assert role.profile == "repo-prof"  # the repo layer still wins over the org layer
-    assert "orchestrator" not in repoconfig.role_names(cfg, {"orchestrator": {}})
+    for _ in range(2):  # met twice, said once
+        assert repoconfig.resolve_role(repoconfig.RepoConfig(), "lead").name == "manager"
+    names = repoconfig.role_names(cfg, {"orchestrator": {}, "lead": {}})
+    assert "orchestrator" not in names and "lead" not in names
     err = capsys.readouterr().err
-    assert err.count("role `orchestrator` is now `lead`") == 1  # once per process, however often it is met
+    assert err.count("role `orchestrator` is now `manager` (TD-076)") == 1  # once per process
+    assert err.count("role `lead` is now `manager` (TD-076)") == 1
     # within one layer, a new key the person wrote beside the old one wins per key
     both = repoconfig.resolve_role(
-        repoconfig.RepoConfig(), "lead", {"orchestrator": {"profile": "old", "lane": ["x"]}, "lead": {"profile": "new"}}
+        repoconfig.RepoConfig(), "manager", {"lead": {"profile": "old", "lane": ["x"]}, "manager": {"profile": "new"}}
     )
     assert both.profile == "new" and both.lane == ["x"]
+
+
+def test_techlead_is_reserved_and_refused_by_name(tmp_path):
+    """TD-076 step 2, design §4.8 *The names*: `techlead` is reserved until TD-075 builds it — a
+    repo that defines it, or a role asked for by that name, is refused with a line saying why and
+    never as an unknown role."""
+    with pytest.raises(ValueError, match="`techlead` is reserved for the go-between of TD-075"):
+        repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  techlead: {grants: [control]}\n")
+    with pytest.raises(ValueError, match=r"`roles`\.techlead: role `techlead` is reserved"):
+        repoconfig.load(tmp_path)
 
 
 def test_grants_orchestrate_in_a_role_is_read_as_control(tmp_path, capsys, monkeypatch):
@@ -173,11 +190,11 @@ def test_grants_orchestrate_in_a_role_is_read_as_control(tmp_path, capsys, monke
 
 def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     """TD-074 step 4, design §4.8 *Role presets*: a preset may carry an `icon:` — one name from the
-    set the UI ships, never markup from a config file. The built-ins carry `lead: flag`,
+    set the UI ships, never markup from a config file. The built-ins carry `manager: flag`,
     `grinder: wrench`, `hunter: search` and `plain` none; a layer overrides it per key like every
     other key; an unknown name is refused when the file is read, as an unknown grant is."""
     builtin = {r.name: r.icon for r in repoconfig.roles(repoconfig.RepoConfig())}
-    assert builtin == {"grinder": "wrench", "hunter": "search", "lead": "flag", "plain": None}
+    assert builtin == {"grinder": "wrench", "hunter": "search", "manager": "flag", "plain": None}
     assert "icon" in repoconfig.ROLE_KEYS
     assert set(builtin.values()) - {None} <= set(repoconfig.ICONS)
     # the repo's own file overrides it, and its other keys are untouched

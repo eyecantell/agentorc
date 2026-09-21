@@ -49,7 +49,7 @@ def test_pages_and_shell_flow(client, tmp_path):
     r = client.get("/new")
     assert r.status_code == 200 and "claude-code" in r.text and "shell" in r.text
     # the Role pick-list (design §4.5a): the built-ins, plus what the directory's repo defines
-    assert 'name="role"' in r.text and "lead [built-in] · grants control" in r.text
+    assert 'name="role"' in r.text and "manager [built-in] · grants control" in r.text
     (tmp_path / ".agentorc.yml").write_text("controllers: [orc]\nroles: {reviewer: {lane: [ui]}}\n")
     r = client.get(f"/new?dir={tmp_path}")
     assert "reviewer [repo]" in r.text and 'data-default="orc"' in r.text

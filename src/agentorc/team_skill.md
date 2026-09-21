@@ -12,14 +12,14 @@ itself from the tool rather than from a memory of the design.
 Every command below is one you can run. Nothing here explains why — design §4.9 (teams), §4.8
 (roles), §4.4a (nodes) and §5 (a repo's own file) do that, and this points at them where it helps.
 
-**What a team is.** A named definition of sessions to start together: a **lead** and its
+**What a team is.** A named definition of sessions to start together: a **manager** and its
 **members**, each under a **role**, all of them over one or more **projects** (a project is repos,
 and where each repo is checked out on each host). `ao team start` reads the definition, checks
-everything first, then creates the lead and each member with the lead as its controller. Nothing
+everything first, then creates the manager and each member with the manager as its controller. Nothing
 about a team is stored on a session's record but two strings, `team` and `project`, and nothing
 keys on them (§9 invariant 9) — the definition is the whole of it. **One exception, and it lands
-exactly on the `lead: {role: person}` case below:** the mail gate's *sideways* edge keys on the
-`team` badge, so on a team with no lead session the badge is the only edge between members there
+exactly on the `manager: {role: person}` case below:** the mail gate's *sideways* edge keys on the
+`team` badge, so on a team with no manager session the badge is the only edge between members there
 is (§4.10). Everywhere else the badge is a label.
 
 ---
@@ -84,15 +84,17 @@ teams:
   cm-grind:
     projects: [contractmatch]
     host: contractmatch          # omit to run on the machine you start it from
-    lead: {role: lead, name: orchestrator-cm}
+    manager: {role: manager, name: manager-cm}
     members:
-      - {role: grinder, count: 2, name: tdgrind-cm, lane: free-pick}
+      - {role: grinder, count: 2, name: grinder-cm, lane: free-pick}
 ```
 
-- **`lead:`** — always a mapping. `role` (default `lead`), `name` (default `<team>-lead`), and
-  optionally `home`, `profile`, `lane`, `brief`, `grants`, `unattended`. **`lead: {role: person}`**
-  means *the person leads*: no lead session is started. (`lead: person`, the bare string, is
-  refused — *teams.<name>.lead must be a mapping, not str*.)
+- **`manager:`** — always a mapping. `role` (default `manager`), `name` (default `<team>-lead`), and
+  optionally `home`, `profile`, `lane`, `brief`, `grants`, `unattended`. **`manager: {role: person}`**
+  means *the person manages*: no manager session is started. (`manager: person`, the bare string, is
+  refused — *teams.<name>.manager must be a mapping, not str*.) `lead:`, its name until
+  2026-09-20 (TD-076), is still read for one release with a line saying so; a team carrying both
+  is refused.
 - **`members:`** — each is a role and a `count`; `name` is the **prefix**, and above one member the
   sessions are `<name>-1`, `<name>-2`, …
   **`{team: other-team}` — a nested team — parses but is refused at `start`, because it is not
@@ -111,18 +113,21 @@ A role is a preset: a brief, a lane, grants, a profile, an icon. Three are built
 
 | role | brief | grants |
 |---|---|---|
-| `lead` | the package's `lead.md` | `control` |
+| `manager` | the package's `manager.md` | `control` |
 | `grinder` | the package's `grinder.md` | none |
 | `hunter` | the package's `hunter.md` | none |
 | `plain` | none | none |
+
+(`lead` and `orchestrator`, the manager's old names, still resolve to it for one release;
+`techlead` is reserved and refused until TD-075 builds it.)
 
 — and a repo overrides any key in its `.agentorc.yml`:
 
 ```yaml
 roles:
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}
-  lead: {brief: docs/briefs/lead.md, grants: [control]}
-controllers: [orchestrator-cm]
+  manager: {brief: docs/briefs/manager.md, grants: [control]}
+controllers: [manager-cm]
 ledger: docs/technical_debt.md
 ```
 
@@ -155,7 +160,7 @@ ao roles
 
 ```
 ao team list                 # every definition, its source file, and whether it is live
-ao team start cm-grind       # every check first, then the lead, then each member
+ao team start cm-grind       # every check first, then the manager, then each member
 ao team status cm-grind      # each member with its state, lane and report line
 ```
 
@@ -178,7 +183,7 @@ For what a **role** resolved to, read `ao roles` in the repo; `ao status -v` sho
 ## 6. Stop it
 
 ```
-ao team stop cm-grind                 # wrap up the members, then the lead — each finishes and exits
+ao team stop cm-grind                 # wrap up the members, then the manager — each finishes and exits
 ao team stop cm-grind --now           # kill instead of asking
 ao team stop cm-grind --close         # also close each member that settled clean and pushed
 ```

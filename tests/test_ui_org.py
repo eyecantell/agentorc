@@ -40,7 +40,7 @@ def test_a_team_with_nothing_live_keeps_its_card_below_the_live_ones_and_no_team
     a group with no members, because its card is where Start lives."""
     (g,) = team_groups([sess("ao-a", "a", team="ao-grind", state="exited")])
     assert g["team"] == "ao-grind" and g["live"] == 0 and g["ids"] == ["ao-a"] and not g["defined"]
-    rows = [{"name": "zz-idle", "lead": "orc", "members": 2, "projects": ["p"], "wound_down": None}]
+    rows = [{"name": "zz-idle", "manager": "orc", "members": 2, "projects": ["p"], "wound_down": None}]
     views = [sess("ao-a", "a", team="ao-grind", state="exited"), sess("ao-b", "b"), sess("ao-c", "c", team="live")]
     groups = team_groups(views, rows)
     assert [g["team"] for g in groups] == ["live", "", "ao-grind", "zz-idle"]  # live, No team, stopped
