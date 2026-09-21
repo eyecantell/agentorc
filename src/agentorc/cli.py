@@ -981,6 +981,10 @@ def cmd_msg(args: argparse.Namespace) -> int:
     likely answers on a question; `--pick <n>` answers one of them by the number `ao inbox` prints
     (from 1) and sends that answer's own text. Refusals print as the host agent words them."""
     words = list(args.words)
+    if args.pass_up:
+        return _pass_up(args, words)
+    if args.recommend:
+        return fail(args, '--recommend goes with --pass-up <id>: it is your line on a question you pass up', 2)
     answer: int | None = None
     if args.pick is not None:
         if words:
@@ -1112,6 +1116,26 @@ def _inbox_status(e: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
+def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
+    """`ao msg --pass-up <id> --recommend "<line>" [--answer …]` (design §4.9b): a question you
+    were asked goes to the person as the asker's, with your recommendation first among its
+    answers. It carries no text of its own — the asker's words are the question."""
+    if words:
+        return fail(args, "--pass-up sends the asker's own question: leave the text out, say yours with --recommend", 2)
+    if extra := [f for f, v in (("--reply-to", args.reply_to), ("--kind", args.kind), ("--about", args.about)) if v]:
+        return fail(args, f"--pass-up keeps the asker's question as it was: {', '.join(extra)} does not apply", 2)
+    if not args.recommend:
+        return fail(args, '--pass-up needs your recommendation: --recommend "<one line>"', 2)
+    got = call_sync("pass_up", id=args.pass_up, recommend=args.recommend, answers=args.answer or None)
+
+    def prose() -> None:
+        print(f"{got['msg']} passed up → person, recommending: {got['recommend']['text']}")
+        for i, a in enumerate(got.get("answers") or [], 1):
+            print(f"  {i}. {a}")
+
+    return emit(args, got, prose)
+
+
 def cmd_inbox(args: argparse.Namespace) -> int:
     """`ao inbox [--unread]` (design §4.10): this session's own mailbox — reading it is what marks
     an entry read, and the host agent does that, never this command. With no `AGENTORC_SESSION`
@@ -1138,6 +1162,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  {line}")
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
+            if r := e.get("recommend"):  # passed up: the passer's line, labelled as its own (design §4.9b)
+                print(f"  passed up by {r.get('by')}, who recommends: {r.get('text')}")
             if e.get("source"):  # answered from the record, and where (design §4.9b)
                 print(f"  source: {e['source']}")
             if a := e.get("answered"):  # the person's FYI for such an answer (design §4.9b)
@@ -1586,6 +1612,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="report what became of an answered question: one line, with --for <its id>",
     )
     p.add_argument("--for", dest="for_", metavar="ID", help="the question an --outcome settles (its own id)")
+    # design §4.9b (TD-075 step 3): a question you cannot answer from the record goes up, once
+    p.add_argument(
+        "--pass-up",
+        metavar="ID",
+        help="pass a question you were asked to the person, as the asker's, with --recommend (once)",
+    )
+    p.add_argument("--recommend", metavar="LINE", help="with --pass-up: your one-line recommendation")
     p.add_argument(
         "--thread",
         metavar="ID",

@@ -283,6 +283,14 @@ class MailEntry:
     # asker's outbox — so work that travels the other way had no debt at all. `identity_log` is
     # its first and only writer; nothing else sets it until a design says so.
     handed: bool = False
+    # Passed up (design §4.9b *Passing up keeps the thread and the asker*, TD-075 step 3): when the
+    # addressee of an open `ask` or `steer` handed it to the person — once — with its own
+    # recommendation. `passed_up` is the time, written on every copy; `recommend` is `{by, text}`,
+    # the passer's one line, drawn as text and labelled as the passer's, never the asker's. The
+    # person-inbox copy carries the passer's suggested answers as its `answers`, the recommendation
+    # first; the asker's and the passer's copies keep their own.
+    passed_up: str | None = None
+    recommend: dict[str, str] | None = None
     # Answered from the record (design §4.9b, TD-075 step 2). `source` is on a **reply**: one line
     # saying where its answer is written down (a file and section, a dated decision), at most
     # `mail.SOURCE_CAP` characters, only ever drawn as text. `answered` is on the **FYI** the home
@@ -314,11 +322,20 @@ class MailEntry:
         if self.handed:
             return self.from_ == PERSON and not self.outcome
         return (
-            PERSON in self.to
+            (PERSON in self.to or bool(self.passed_up))  # a question passed up is the person's to answer (§4.9b)
             and self.kind in ASK_KINDS
             and self.closed_reason in ("replied", "go_with_it")
             and not self.outcome
         )
+
+    def owes_for(self, *, session_inbox: bool) -> bool:
+        """`owes`, asked of one copy where it is held. A copy in a **session's inbox** owes only
+        when it is `handed` — work the person handed that session. Every other debt belongs to the
+        asker, on its outbox copy, and to the person inbox's copy it is listed under. Without this,
+        a question passed up (§4.9b) would owe on the passer's copy too, and on any copy recipient's,
+        and those could then neither be deleted nor pruned (review of PR #347). `Session.owed()`,
+        `inbox_delete` and the retention sweep all ask it this way."""
+        return self.owes and (self.handed or not session_inbox)
 
     @property
     def open(self) -> bool:
@@ -688,7 +705,11 @@ class Session:
         lives in its **inbox**. One number, because `ao progress none`, `ao progress restart`,
         `mail.owed` and *Ready to close* all read this and none of them cares which direction the
         work came from."""
-        return [e.id for e in self.outbox if e.owes] + [e.id for e in self.inbox if e.owes]
+        # the inbox half is handed work alone: a question passed up owes on the **asker's** outbox
+        # copy, never on the copy the passer holds (§4.9b)
+        return [e.id for e in self.outbox if e.owes_for(session_inbox=False)] + [
+            e.id for e in self.inbox if e.owes_for(session_inbox=True)
+        ]
 
     def wake_budget_spent(self) -> bool:
         """Exhaustion is visible (design §4.10): on the record, and so on the card and every `ao`
