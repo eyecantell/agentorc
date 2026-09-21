@@ -1190,12 +1190,12 @@ agent there.
 Screens:
 
 1. **Org** (home; named Herd, then Team, until the team definitions of §4.9 landed): a **card grid** (decision 2026-09-04, over a table — keeps each session's
-   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). What a card carries, and where, is *The card's anatomy*, below (until it is built the page draws the 2026-09-04 card: host/repo, name, age, state pill, profile line, where, the dirty / unpushed flag, a slot, and Focus / VS Code / more).
+   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). What a card carries, and where, is *The card's anatomy*, below (being built from 2026-09-21 in slices, TD-095 — its entry says which have landed: the state colours and the six rows with the slot's order and the next act in the foot are built; the foot's quiet styling, the team header, `open_in:` and *mine* are not yet).
    The **more** menu holds Wrap up, Kill
    (confirms), Close (enabled only when Ready to close passes; a card that passes also shows it
    inline, see §4.2), Open shell here, Copy tmux command. A scraped state shows as a dashed pill outline.
    **The card's anatomy (2026-09-21, TD-095; decided with Paul from a screenshot of the live page,
-   `docs/mockups/reviews/2026-09-21-org-cards.png` — designed, not built).** That page said one
+   `docs/mockups/reviews/2026-09-21-org-cards.png` — designed; being built, TD-095).** That page said one
    name four times on a card, repeated the manager's card in its team's header, said an ending
    three ways, drew cards of five different heights with the state pill in three places, and gave
    *working* a blue close in weight to the grey of what had ended. So: **a card is six rows, the

@@ -564,6 +564,24 @@ def view(
     if git.get("branch"):
         where += f" → {git['branch']}"
     d["where"] = where
+    # design §4.5 *The card's anatomy*, row 3 (TD-095): **where**, alone on its row — the branch
+    # by name, shortened in the middle so both ends read, whole on hover; a detached HEAD by its
+    # short sha; the directory for a session with no repo. `wt/<name> ·` leads only when the
+    # worktree is not the session's own name, which on a team is every member's.
+    wt = Path(s["dir"]).name if s.get("repo") and s.get("dir") and s["dir"] != s["repo"] else ""
+    d["wt_prefix"] = f"wt/{wt} · " if wt and wt != s.get("name") else ""
+    branch = str(git.get("branch") or "")
+    if branch == "(detached)":
+        oid = str(git.get("oid") or "")
+        d["branch_full"] = f"detached at {oid[:7]}" if oid else "detached HEAD"
+    elif branch and branch != "?":
+        d["branch_full"] = f"branch {branch}"
+    else:
+        d["branch_full"] = "" if s.get("repo") else str(s.get("dir") or "")
+    d["branch_line"] = _middle(d["branch_full"], BRANCH_SHOWN)
+    # what leads row 3 outside a team's own group, where the header does not say it: `host / repo ·`,
+    # or `host /` before the directory of a session with no repo
+    d["place_prefix"] = f"{d['place']} · " if s.get("repo") else f"{d['host']} / "
     flags = []
     if git.get("dirty"):
         flags.append("dirty")
@@ -660,6 +678,9 @@ def view(
     # for every adapter that gives none, which is what draws nothing.
     tool_title = s.get("title")
     d["title"] = tool_title.strip() if isinstance(tool_title, str) else ""
+    # on a card only when it says something the name does not (TD-095): a team's members are
+    # titled by their names, and the same word twice is noise. Focus shows it as before.
+    d["title_shown"] = d["title"] if d["title"] != s.get("name") else ""
     # The role's icon (design §4.8 *Role presets*): resolved here from the role's *name* — nothing in
     # the core keys on a role (§9 invariant 9) and no icon is stored on the record. Without a map
     # (a caller that did not resolve one) the badge draws its word alone, as it always has.
@@ -696,11 +717,118 @@ def view(
         for o in (fleet or [])
         if s.get("id") in (o.get("controllers") or [])
     ]
+    # *under `<manager>`* is not drawn inside a team's own group when that manager is the only
+    # controller (§4.5a, TD-095): the group says it. The card cannot know which group it is drawn
+    # in, so it marks the chip and the stylesheet hides it there — a filtered grid still shows it.
+    only = by_id.get(d["under"][0]["id"]) if len(d["under"]) == 1 else None
+    d["under_is_manager"] = bool(
+        only and s.get("team") and only.get("team") == s.get("team") and has_control(only.get("capabilities"))
+    )
     d["holds_control"] = has_control(s.get("capabilities"))
     # `fleet_known=False`: the caller asked for the fleet and did not get it. An empty members list
     # then means *unknown*, and Ready to close must not read it as *none* (review of PR #195).
     d["ready"] = ready_to_close(s, d["members"] if fleet_known else None)
+    d["ready_ok"] = bool(d["ready"]) and all(ok for _, ok in d["ready"])
+    d["slot"] = card_slot(d)
+    d["next_act"] = next_act(d)
     return d
+
+
+BRANCH_SHOWN = 34  # characters of row 3's branch a card shows before it shortens it in the middle
+
+
+def _middle(text: str, width: int) -> str:
+    """`text` shortened in the middle to `width` characters, so both ends read — a branch is told
+    apart by its prefix (`td095-`) and its end (`-rows`) alike. Whole when it fits."""
+    if len(text) <= width:
+        return text
+    keep = width - 1
+    return f"{text[: keep - keep // 2]}…{text[len(text) - keep // 2 :]}"
+
+
+def _first_line(text: str) -> str:
+    return text.strip().splitlines()[0] if text.strip() else ""
+
+
+def card_slot(d: dict[str, Any]) -> dict[str, Any]:
+    """The card's slot (design §4.5 *The card's anatomy*, row 5; §4.5a **doing**, TD-095): **one
+    text, the first that applies**, and a caption. (a) what needs a person or explains a stop, (b)
+    an ending — exited, closed, or a declaration — (c) what the session says it is doing, (d) its
+    last output. The caption: the time a pending answer has left, else *ready to close ✓* whenever
+    the checklist passes, else *says · age* under a `doing` line. `text` is a session's or a tool's
+    words: escaped by the template, shown, never a control.
+
+    `kind` picks the rule's colour (`needs`, `lim`, `bad`, `ok`, `doing`, `tail`, or ""), `full`
+    is the hover, and `tail` is the lines of a working pane, drawn as the pane draws them."""
+    state, pend = d["state"], d["pending"]
+    ptext = str(pend.get("text") or "")
+    kind, text, full, tail = "", "", "", []
+    if state == "needs-you" and pend:
+        # a hook permission says its tool and command; a question says that it is one
+        kind = "needs"
+        text = ptext if pend.get("kind") == "permission" else f"{pend.get('kind')}: {ptext}"
+    elif state == "unreachable" and pend and pend.get("host_unreachable"):
+        # design §4.4a "Permission prompts follow the same line": the waiter is on the node
+        kind, text = "needs", f"{pend.get('kind')}: {ptext} — answer it at {d['host']}"
+    elif state == "limited" and pend:
+        kind, text = "lim", ptext
+    elif state == "stalled?" and pend:
+        # design §4.2: "a `stalled?` that can say why" — a screen rule's note (TD-032)
+        kind, text = "needs", ptext
+    elif state == "unreachable" and d["host_note"]:
+        text = d["host_note"]
+    elif state == "exited":
+        code = d.get("exit_code")
+        kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")
+    elif state == "closed":
+        kind, text = "ok", "closed by you"
+        full = f"closed by you at {d['closed_at']}" if d.get("closed_at") else ""
+    elif d["out_of_work"] or d["restart_wanted"]:
+        # a declaration (§4.9a): the fixed words, then the first line of its reason
+        # (§4.9a); the whole reason and when it was said are the hover — a card holds one clock
+        said = d["out_of_work"] or d["restart_wanted"]
+        words = "out of work" if d["out_of_work"] else "restart wanted"
+        if not d["out_of_work"] and said["early"]:
+            words += " · early — for a person"
+        why = said["why"]
+        text = words + (f" — {_first_line(why)}" if why else "")
+        when = f" {said['age']} ago" if said["age"] else ""
+        full = f"{words}{when} — {why or 'no reason recorded'}"
+        if not d["out_of_work"] and said["early"]:
+            full += " — asked inside its own first half hour, so a controller does not act on it (design §4.9a)"
+    elif d["doing"]:
+        kind, text = "doing", d["doing"]["text"]
+    elif state in ("working", "stalled?"):
+        kind, tail = "tail", [str(line) for line in (d.get("tail") or [])[-2:]]
+    else:
+        tail_last = (d.get("tail") or [""])[-1]
+        text = f"last: {tail_last}" if tail_last else "at prompt"
+    caption, ccls = "", ""
+    if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
+        caption, ccls = "via hook", "countdown"  # the page's clock fills in the time left
+    elif d["ready_ok"] and state in ("idle", "exited"):
+        caption, ccls = "ready to close ✓", "ready"
+    elif kind == "doing":
+        caption = "says" + (f" · {d['doing']['age']} ago" if d["doing"]["age"] else "")
+    return {"kind": kind, "text": text, "full": full or text, "tail": tail, "caption": caption, "ccls": ccls}
+
+
+def next_act(d: dict[str, Any]) -> str:
+    """The foot's first button, by state (design §4.5 *The card's anatomy*, row 6, TD-095): what a
+    person would press next. `allow` (with Deny beside it) for a hook permission; `forget` for an
+    exited session, ready to close or not — there is no process left to close; `close` for an idle
+    session the checklist passes; `details` when the pane is gone; else `focus`. A `limited`
+    session's *Switch profile…* / *Wait* have no route yet, so it falls to Focus."""
+    state, pend = d["state"], d["pending"]
+    if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
+        return "allow"
+    if state == "exited":
+        return "forget"
+    if state == "idle" and d["ready_ok"]:
+        return "close"
+    if state == "closed" or d.get("pane") is False:
+        return "details"
+    return "focus"
 
 
 def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ()) -> list[tuple[str, bool]]:
