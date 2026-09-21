@@ -2699,28 +2699,45 @@ until step 1 below lands.
   needed context*, while the reader is not anchored by the worker's whole narrative. So a
   question to it **stands on its own**: the question, what was tried, where the asker looked, the
   default (a `steer` has one by construction) and up to four suggested answers (§4.10). The
-  mechanics are ones the design already has. `ao team start` starts the seat like any member; it
-  finds its inbox empty, declares `ao progress none`, and its manager closes it. Mail to an
-  exited record is delivered and waits (§4.10: an `ask` stays *pending*; a `steer`'s bound runs
-  on and the asker goes with its default — which is the right failure). **The manager fills the
-  seat** — lifecycle is its job: a techlead record that is `exited` or `closed`, or `idle` and
-  declared out of work, with **`asks_waiting` > 0** is started again with the crash rule's own
-  `ao new` (same name, directory, worktree, profile, brief), which supersedes the record in
-  place and **carries its inbox and outbox** (§4.1; built — `_supersede`). `asks_waiting` is
-  the one new field: the count of open `ask`s and `steer`s addressed to the record, computed by
-  the home like `unread`, **a number and never their text** — nobody reads another session's
-  inbox — printed by `ao status -v`, and part of the wake digest, so a manager blocked in `ao
-  wait` returns when a question lands on an empty seat. Fills have a ceiling of their own in the
-  manager's brief — six in an hour, then the board — and do not count as crash restarts. It is
-  **a manager's act, never the core's** (§4.9a): the host agent starts nothing and does not read
-  `org.yml`.
+  mechanics are mostly ones the design already has, **and two are new**. `ao team start` starts
+  the seat with the rest of the team; it finds its inbox empty and stops. Mail to an exited or
+  closed record is delivered and waits (§4.10: an `ask` stays *pending*; a `steer`'s bound runs
+  on and the asker goes with its default — which is the right failure).
+  **A seat is empty or filled — never *finished*.** The techlead is its manager's member in the
+  graph (the manager creates it) but it holds no lane, so §4.9a does not count it: it is never
+  *out of work*, it makes no ending declaration, it is not among *every member is finished*,
+  and §4.9a's *never sent to and never restarted* is about members that declared, which a seat
+  never does. What its manager reads instead is one structured field, **`asks_waiting`** — new:
+  the count of open `ask`s and `steer`s addressed to the record, computed by the home like
+  `unread`, **a number and never their text** (nobody reads another session's inbox), printed by
+  `ao status -v`, and part of the wake digest, so a manager blocked in `ao wait` returns when a
+  question lands on an empty seat. **The manager's rule for the seat**: `idle` with
+  `asks_waiting` 0 → `ao close` it (it writes no code; anything dirty or unpushed in its
+  worktree is the board's, and it is left open); `idle` with `asks_waiting` > 0 for twenty
+  minutes → the one send any idle member gets, naming the number; **`exited` or `closed` with
+  `asks_waiting` > 0 → fill it**: `ao new --keep-mail`, same name, directory, worktree, profile
+  and brief. **`--keep-mail` is the second new thing** (`create(keep_mail=true)`): a fresh start
+  under a name forgets the old record's mail (§4.1 — *the name now belongs to the new session*),
+  which is right everywhere but here, where the mail was addressed to the seat and the new
+  session **is** the seat's next holder; so this one start moves the old record's mail to the
+  new one exactly as a resume does (`_move_mail`, built for §4.1's resume) and resumes nothing
+  of the conversation. It is open to whoever may make that start anyway, and changes nothing
+  else about it. Fills have a ceiling of their own in the manager's brief — six in an hour,
+  then the board — and do not count as crash restarts. A full mailbox (`MAILBOX_DEPTH`) refuses
+  the asker as it refuses anyone, and the asker then asks the person (*When it cannot answer*,
+  below). It is **a manager's act, never the core's** (§4.9a): the host agent starts nothing
+  and does not read `org.yml`. At wind-down the seat is closed by `ao team stop` with the rest,
+  and a manager that winds down with `asks_waiting` > 0 says so on the board.
 - **What it may answer.** A **`steer`**: it answers, or says *go with your default*, which is an
   answer. An **`ask`**: **only when the answer is already written down** — the design, the
   ledger, a brief, a decision of the person's — and it **says where**: `ao msg --reply-to <id>
-  --source "<file and section, or the decision's date>" "…"`. It **checks the asker's claims in
+  --source "<file and section, or the decision's date>" "…"` — `source` is one line of text, at most 200 characters, stored on the reply and only ever drawn as text. It **checks the asker's claims in
   the repo** before it answers; it sees only the asker's framing, and that is the cost of
-  starting cold. It reads its own sent mail first (its outbox survives the fill), so two
-  questions in one night are answered alike. **Never**, whatever it believes is obvious:
+  starting cold. It reads its own sent mail first — **`ao inbox --sent`, new**: a session's own
+  outbox, its own and nobody else's, ungated as its inbox is; nothing reads an outbox today —
+  so two questions in one night are answered alike; `--keep-mail` carries the outbox with the
+  inbox, and a sent reply that carries a `source` is kept there for seven days whatever else
+  is pruned. **Never**, whatever it believes is obvious:
   anything destructive, outward-facing, spending, credentials, a change of scope, a permission
   prompt, or a question the asker addressed to the person by name. Everything else goes up.
 - **Passing up keeps the thread and the asker.** `ao msg --pass-up <id> --recommend "<one
@@ -2737,6 +2754,14 @@ until step 1 below lands.
   FYI: ***answered for you** — the question, the answer, the source, who asked and who
   answered*. It keys on the structured field, **never on a role** (§9 invariant 9): a manager
   that answers from the design with `--source` is told the same way. The Inbox groups these
+  The FYI is filed **from the answerer** and carries a structured **`answered: {question,
+  asker, answerer, source}`**; a reply to an entry that carries `answered` is addressed **to the
+  asker, with a copy to the answerer**, on the question's own thread — that, and not the
+  ordinary reply-to-sender default, is what **Overrule** calls. **The debt (§4.10 *Outcomes*)**:
+  an answer from a teammate creates none — the question was never the person's; an **Overrule**
+  does — the person has now answered it, so the asker owes an outcome on the question's id as
+  if it had asked the person; and a question **passed up** and answered by the person owes one
+  in the ordinary way. The Inbox groups these
   under *Answered for you* (§4.5a), uncounted, newest first, and the team's header carries the
   number since the person last opened the group — a **mark**. **Overrule** on such a row is a
   reply **to the asker**, marked `[person]`, on the question's own thread, with a copy to the
