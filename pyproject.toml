@@ -64,10 +64,18 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 # **A hang must fail, and say where** (TD-063, TD-078). Twice a job has died with no output at
 # all: 26 minutes on PR #192, unattributed to this day, and 14 minutes on 2026-09-20 whose last
-# line was the test *before* the one that hung. A per-test bound turns that into an ordinary
-# failure, in the right file, and `thread` dumps every thread's stack — which is the only
-# evidence a wait with no bound ever leaves. 120 s is far above the slowest test here (the link
-# and restart files run whole in about 11 s) and far below a CI job's patience.
+# line was the test *before* the one that hung. The bound is **per test item** — setup, call and
+# teardown — not per file, and 120 s is more than a tenfold margin over the slowest test here
+# (about 10 s, the one that restarts an agent under a blocked wait) while staying far under a CI
+# job's patience, so a runner several times slower than this machine still cannot go red on it.
+#
+# `thread` rather than `signal`, deliberately, and it is not free: on expiry it dumps **every
+# thread's stack** and then `os._exit`s, so the run ends there — no fixture teardown, no summary,
+# the remaining tests unrun. That is the right trade for this suite because the hangs it is aimed
+# at are in *threads* — `asyncio.to_thread`, a tmux read, a client waiting on a reply — and
+# `signal` can only raise in the main thread: it would fail the test and leave the stuck thread
+# running, which is a worse run than one that stops. A stopped run with a stack beats a cancelled
+# job with none, and the stacks are the whole point (review of PR #314).
 timeout = 120
 timeout_method = "thread"
 markers = [
