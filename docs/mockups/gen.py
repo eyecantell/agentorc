@@ -294,7 +294,7 @@ EXTRA = {
     # declared itself out of work and nobody has looked yet: `idle` in every payload, drawn as
     # *finished · unseen*; the ending is said once, in the slot, and *ready to close ✓* is its caption
     "tdgrind-4": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "#809 · 2/2 done",
-                  "unseen": True, "ready": True, "ending": "out of work — the rest of the ledger is Paul's or design-first"},
+                  "unseen": True, "ready": True, "ending": "out of work — nothing open on the ledger that my brief lets me take"},
     "main":      {"findings": "1 filed"},
     "errors-alerts": {"title": "Error Checker"},
 }
@@ -307,49 +307,8 @@ TEAMS = [
     ("cadence-sweep", "dev-cadence/.agentorc.yml", "sweeper", 0, "dev-cadence"),
 ]
 
-def report_line(name):
-    """design §4.5a card **report line**: only when a channel is non-empty; a derived entry is
-    dashed, like a scraped state."""
-    e = EXTRA.get(name, {})
-    if not (e.get("report") or e.get("findings")):
-        return ""
-    left = f'<span class="meta{" scraped" if e.get("derived") else ""}" style="{"border-bottom: 1px dashed #d9a441;" if e.get("derived") else ""}">{e["report"]}</span>' if e.get("report") else ""
-    right = f'<span class="meta">{e["findings"]}</span>' if e.get("findings") else ""
-    return f'<div style="display: flex; align-items: center; gap: 8px;">{left}<span style="flex-grow: 1;"></span>{right}</div>'
-
 def doing_of(name):
     return EXTRA.get(name, {}).get("doing")
-
-def doing_slot(name):
-    """design §4.5a card **doing** line: the session's own words, with the age beneath them, so a
-    line nobody refreshed reads as stale. Text a model wrote — shown, never a control."""
-    text, age = EXTRA[name]["doing"]
-    return (f'<div class="status doing" title="what this session says it is doing (design §4.8): its own words">{text}</div>'
-            f'<div><span class="meta">says · {age} ago</span></div>')
-
-def tool_title(name):
-    """design §4.5a card **title** (§4.3 `title()`): the session's name as its tool holds it,
-    beside agentorc's own. It is set in the tool — agentorc keeps no second name — so it carries
-    no control, and it is always shown, never a fallback for the doing line (Paul, 2026-09-19)."""
-    t = EXTRA.get(name, {}).get("title")
-    return f'<span class="meta" title="the session\'s name as its tool holds it — set in the tool, not in agentorc">{t}</span>' if t else ""
-
-def team_badges(name):
-    """the card's **team** badge (§4.9) and its **under `<controller>`** chip (§4.8)."""
-    e = EXTRA.get(name, {})
-    out = ""
-    if e.get("team"):
-        out += f'<span class="badge" title="click: filter the grid to this team">{e["team"]}</span>'
-    if e.get("role"):
-        out += (f'<span class="badge" title="the role preset it was started under (design §4.8): '
-                f'a label, nothing keys on it">{role_icon(e["role"])}{e["role"]}</span>')
-    return out
-
-def under_row(name):
-    e = EXTRA.get(name, {})
-    if not e.get("under"):
-        return ""
-    return f'<div><span class="meta">under <span class="badge" title="may act on this session (design §4.8)">{e["under"]}</span></span></div>'
 
 def teams_strip():
     rows = ""
@@ -418,6 +377,8 @@ def team_desktop():
                     f'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" '
                     f'stroke-linecap="round" aria-hidden="true"><path d="{PERSON}"></path></svg>interactive</span>')
         marks = f'<span class="mark" title="unread mail">✉ {e["mail"]}</span>' if e.get("mail") else ""
+        # the team badge is what the group says: drawn only outside the team's own group
+        team = f'<span class="badge" title="click: filter the grid to this team">{e["team"]}</span>' if e.get("team") and not in_team else ""
         stops = f'<span class="mode">· {e["stops"]}</span>' if e.get("stops") else ""
         # (3) where, at full width, with the dirty / unpushed flag at the right
         flag_html = f'<span class="flag">{ICON["warn"]}{flag}</span>' if flag else ""
@@ -476,7 +437,7 @@ def team_desktop():
         return f'''<div class="card ac{ring}{off}">
   <div class="sbar" style="background: {bar};"></div>
   <div class="r"><span class="name">{name}</span>{title_html}<span class="grow"></span>{state_pill}</div>
-  <div class="r">{role}{mode}{stops}{marks}<span class="grow"></span><span class="meta" title="in this state since">{age}</span></div>
+  <div class="r">{team}{role}{mode}{stops}{marks}<span class="grow"></span><span class="meta" title="in this state since">{age}</span></div>
   <div class="r"><span class="meta fill">{where_row(host, repo, name, where, in_team)}</span><span class="grow"></span>{flag_html}</div>
   <div class="r"><span class="meta fill">{tool}</span><span class="grow"></span>{rep_html}{found}</div>
   <div class="aslot {cls}"><div class="t">{text}</div>{f'<div class="cap">{cap}</div>' if cap else ""}</div>
