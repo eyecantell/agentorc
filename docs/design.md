@@ -2730,7 +2730,7 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   for `out_of_work` and `restart_wanted` — it is not there today), so a manager blocked in `ao wait` returns when a
   question lands on an empty seat. **As built (TD-075 step 4, 2026-09-20):** `asks_waiting` is on
   every view and in `wake_digest`; `ao status -v` prints *asks waiting: N*; an entry counts when it
-  is open, an `ask` or a `steer`, and names the record in `to` — compared whole, host included, since names are unique per host (§4.4a); a copy does not. A node holds no inbox, so the home pushes it the count with the unread hint and a node's own view shows that. **The manager's rule for the seat**: `idle` with
+  is open, an `ask` or a `steer`, and names the record in `to` — compared whole, host included, since names are unique per host (§4.4a); a copy does not, and nor does an entry the record has passed up (it waits on the person, and a seat filled for it would have nothing to answer). The wake digest carries *whether* any wait, not how many, so a manager wakes when the count leaves zero and not on 1→2. A node holds no inbox, so the home pushes it the count with the unread hint and a node's own view shows that. **The manager's rule for the seat**: `idle` with
   `asks_waiting` 0 → `ao close` it (it writes no code; anything dirty or unpushed in its
   worktree is the board's, and it is left open); `idle` with `asks_waiting` > 0 for twenty
   minutes → the one send any idle member gets, naming the number; **`exited` or `closed` with
@@ -3030,7 +3030,7 @@ instead of forbidden:
   metered — which also makes the budget adapter-neutral, since it is counting the thing every tool
   has rather than a delivery mechanism.
 - **It bounds mail, not every wake.** `wait` also returns when a member's `state`, `progress` or
-  `findings` changes (and, designed with §4.9b and not built, when its `asks_waiting` leaves zero — a question on an empty techlead seat), unmetered, so *a worker reports, its manager wakes and sends, the worker
+  `findings` changes (and when its `asks_waiting` leaves zero — a question on an empty techlead seat, §4.9b), unmetered, so *a worker reports, its manager wakes and sends, the worker
   reports again* is the same loop without a message in it. The wake budget does not claim to catch
   that one: a manager's rounds, the restart ceiling (§4.8) and the usage gate (§6) are what bound it.
   Stated so the budget is not credited with a guarantee it does not give.

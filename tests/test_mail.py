@@ -1947,6 +1947,8 @@ async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_ans
             assert up[0].default == "keep --pass-up" and up[0].bound == q["bound"]  # passing up buys no time
             assert up[0].answers == ["rename it --escalate", "keep --pass-up"] and up[0].read_at is None
             assert up[0].recommend == {"by": tl, "text": "rename it --escalate"} and up[0].passed_up
+            # the person's to answer now: no seat need be filled for it (§4.9b, TD-075 step 4)
+            assert (await person.call("get", id=tl))["asks_waiting"] == 0
             # every copy says it went up; the asker's keeps its own answers
             mine = [e for e in agent.sessions[w].outbox if e.id == q["id"]][0]
             assert mine.passed_up and mine.answers == ["keep it"]
