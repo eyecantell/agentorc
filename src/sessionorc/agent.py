@@ -4365,6 +4365,8 @@ class HostAgent:
         reply = reply if isinstance(reply, dict) else {}
         if reply.get("record"):
             self._take_records(host, [reply["record"]], whole=False)
+            if method == "create" and mail.is_person(caller):
+                self._lift_by_person(host, str(reply["record"].get("id") or ""))
         elif reply.get("gone") and rid:
             self._forget_remote(host, rid)
         result = reply.get("result")
@@ -4626,6 +4628,16 @@ class HostAgent:
             old = held if old_id == rid else mine.get(old_id)
             if old is None:
                 continue  # never known here (a home that started after it went): nothing to move
+            if old.suspended and not new.suspended:
+                # **Except `suspended`** (§4.8a, the anchor's read of PR #371): the mark is the home's,
+                # and a node's word is not one of the roads that lift it. The node refuses a session
+                # from its replica's copy of the mark, but that copy is only as fresh as the last push —
+                # suspended while the link was down, the name retaken there, the link back. A person's
+                # own create through the home lifts it (`_route_act`), as it does on one host.
+                new.suspended = dict(old.suspended)
+                log.warning(
+                    "link from %s: %s took the name of suspended %s — the mark stands on it", host, rid, old_id
+                )
             if x.get("mail"):
                 self._move_mail(old, new)
             elif old is held:
@@ -4639,6 +4651,25 @@ class HostAgent:
         mine[rid] = new
         log.info("link from %s: %s supersedes %s", host, rid, ", ".join(str(x["id"]) for x in told))
         return True
+
+    def _lift_by_person(self, host: str, rid: str) -> None:
+        """A person's `create` through the home, on a node: the supersession it made is one the home
+        authorised, so it lifts a suspension as a person's create or resume does on one host
+        (§4.8a) — on the new record, which `_take_supersession` may have marked from the report
+        that overtook this reply, and on the conversation it resumed. Only this create's own
+        supersessions (`at` is its start), never an older one the record still lists."""
+        mine = self.remote.get(host, {})
+        rec = mine.get(rid)
+        if rec is None:
+            return
+        for x in rec.supersedes:
+            if not isinstance(x, dict) or x.get("at") != rec.created:
+                continue
+            old = mine.get(str(x.get("id") or ""))
+            for r in (rec, old):
+                if r is not None and r.suspended:
+                    r.suspended = None
+                    self._remote_store(host).save(r)
 
     def _forget_remote(self, host: str, rid: str) -> None:
         if self.remote.get(host, {}).pop(rid, None) is None:

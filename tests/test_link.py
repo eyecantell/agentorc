@@ -1252,6 +1252,46 @@ async def test_a_fresh_start_on_a_node_is_a_new_record_at_the_home_and_keep_mail
             await person.call("kill", id=address)
 
 
+async def test_a_suspension_outlives_a_supersession_on_a_node_and_a_persons_create_at_the_home_lifts_it(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """TD-057, the anchor's read of PR #371: taking a node's new session whole must not take the
+    home's `suspended` with it — the mark is the home's (§4.8a, §9 invariant 15), and a node's
+    report is not one of the two roads that lift it. Suspended while the link is down (marked, the
+    kill cannot cross), the name taken again on the node, which never heard; the link returns and
+    the home's record is the new session, still suspended. A person's own create through the home
+    lifts it, as a person's create does on one host."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        monkeypatch.setattr(link, "BACKOFF_FIRST", 5.0)
+        monkeypatch.setattr(link, "BACKOFF_MAX", 5.0)
+        node._home_mux.close("the lid closed")
+        await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            with pytest.raises(AgentError, match="is marked suspended"):
+                await person.call("suspend", id=address, why="claimed another session's id")
+        async with LocalClient() as at_node:  # the node never heard: the name is taken again there
+            await at_node.call("kill", id=w["id"])
+            again = await at_node.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        assert again["id"] == w["id"] and again["supersedes"][0]["id"] == w["id"] and not again["suspended"]
+        await until(home, address, lambda v: v and v["state"] != "unreachable" and v["created"] == again["created"])
+        assert (await at_home(home, address))["suspended"]["why"] == "claimed another session's id"
+        assert await wait_for(lambda: bool(node.sessions[w["id"]].suspended), timeout=10.0, step=0.1)  # pushed
+        # a person's own create through the home is a road that lifts it
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            await person.call("kill", id=address)
+            await until(home, address, lambda v: v and v["state"] in ("exited", "closed"))
+            fresh = await person.call(
+                "create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True, host="laptop"
+            )
+            assert fresh["id"] == address and not fresh["suspended"]
+            assert not (await at_home(home, address))["suspended"]
+            await person.call("kill", id=address)
+
+
 async def test_a_resume_on_a_node_moves_the_homes_mail_and_forwards_what_is_still_addressed_to_it(agent):
     """TD-057: a resume on a node under another name closes the old record there and moves its
     (empty) mailbox; the successor's `supersedes` has the home move its own copy's mail and record

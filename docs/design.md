@@ -620,7 +620,11 @@ long-lived link. The home is also a node for its own host's sessions (one proces
   resume, `--keep-mail`). The home takes each supersession once, from the report or from the
   routed create's reply. A record replaced **at the same id** is taken **whole**, as a record
   the home has never seen is adopted: it is a new session, and a merge by owner would give it the
-  old run's home-owned fields (its stop time, `out_of_work`, `doing`) and its mail. The old run's
+  old run's home-owned fields (its stop time, `out_of_work`, `doing`) and its mail — **except
+  `suspended`**, which stands on the successor (and on one that resumed a suspended record's
+  conversation): the mark is the home's, a node's word is not one of the roads that lift it
+  (§4.8a), and the node's replica of it is only as fresh as the last push. A person's own create
+  through the home lifts it, as a person's create does on one host. The old run's
   mail moves to the new record when `mail` says so, and otherwise goes with the old record, as it
   does on one host. A record continued **under another id** hands its mail to the successor and
   records `superseded_by` at the home, so mail still addressed to it is forwarded.
