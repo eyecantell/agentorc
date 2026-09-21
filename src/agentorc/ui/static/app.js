@@ -635,7 +635,7 @@
   // poll swaps a whole section's markup: nothing here composes markup out of what a session wrote.
   // What lives in the browser is what belongs to this browser — the filter, the FYI fold — exactly
   // as the Org's filter and team folds do.
-  const IN_SECS = ["needs", "steering", "waiting", "fyi", "snoozed"];
+  const IN_SECS = ["needs", "steering", "waiting", "answered", "fyi", "snoozed"];
 
   // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
   // which is what the entry stores; the prompt is in the person's own clock.
@@ -687,6 +687,12 @@
     f.value = store.get("inboxfilter", "");
     $("#sec-fyi").open = store.get("inboxfyi", false);  // folded by default, remembered here
     $("#sec-fyi").addEventListener("toggle", () => store.set("inboxfyi", $("#sec-fyi").open));
+    // §4.9b *Answered for you*: open until the person folds it, and remembered here as FYI's is
+    const ans = $("#sec-answered");
+    if (ans) {
+      ans.open = store.get("inboxanswered", true);
+      ans.addEventListener("toggle", () => store.set("inboxanswered", ans.open));
+    }
     f.addEventListener("input", () => { store.set("inboxfilter", f.value.trim()); inboxFilter(); });
     // the row's team badge filters to that team; pressing it again clears the box (as on the Org)
     document.addEventListener("click", (e) => {
@@ -784,6 +790,10 @@
     // something — like the snoozed box (§4.5a **Inbox section: Waiting on them**).
     const w = $("#sec-waiting");
     if (w) w.classList.toggle("hidden", !(got.sections && (got.sections.waiting || []).length));
+    // *Answered for you* (§4.9b) the same way: most teams have no techlead, and an empty heading
+    // there would be a section that is never anything
+    const a = $("#sec-answered");
+    if (a) a.classList.toggle("hidden", !(got.sections && (got.sections.answered || []).length));
     // §4.10: **FYI opens itself when its count is higher than this browser last saw it**, and is
     // otherwise as the person left it. That comparison is the browser's own — nothing on an entry
     // and nothing at the home changes, so reading still changes no row. A folded, uncounted FYI

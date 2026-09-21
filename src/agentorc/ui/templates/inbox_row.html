@@ -49,11 +49,14 @@
    re-checks that the two agree, so the label is a label and nothing more. No confirm: a reply is
    mail (§4.10). It follows **Reply** exactly — rendered only by the macros that offer Reply, and
    so absent from an FYI row, a closed question, a `system` note and the snoozed list. #}
+{#- A question **passed up** (§4.9b, TD-075 step 3) carries the passer's answers, not the asker's
+    — the recommendation first — so the group names the passer: whose words they are is the point. -#}
 {% macro answers(e) -%}
 {%- set opts = suggested_answers(e) %}
+{%- set by = e.passer_name or e.from_name or e['from'] %}
 {%- if opts and e['from'] not in ('person', 'system') %}
-<div class="row gap wrap sugg" role="group" aria-label="suggested answers from {{ e.from_name or e['from'] }}">
-  <span class="st sugglabel">suggested by {{ e.from_name or e['from'] }}</span>
+<div class="row gap wrap sugg" role="group" aria-label="suggested answers from {{ by }}">
+  <span class="st sugglabel">suggested by {{ by }}</span>
   {%- for a in opts %}
   <button class="btn sm answer" data-act="answer" data-id="person" data-msg="{{ e.id }}" data-index="{{ loop.index0 }}" title="{{ a }}"><span class="alabel">&ldquo;{{ a }}&rdquo;</span>{% if e.default and a == e.default %}<span class="st adflt">default</span>{% endif %}</button>
   {%- endfor %}
@@ -162,11 +165,22 @@
 {%- endif %}
 {%- endmacro %}
 
+{# design §4.5a **Inbox row: passed up** (§4.9b; TD-075 step 3): the asker's own question, under
+   its own heading, with one addition — *`<passer>` recommends: `<line>`*, **labelled and drawn as
+   text**, from the entry's structured `recommend`. Never a control: the recommendation is also the
+   first suggested answer, which is the one press the passing up is for. #}
+{% macro recommends(e) -%}
+{%- if e.passed_up and e.recommend and e.recommend.text %}
+<div class="st dflt recommends" title="passed up to you by {{ e.recommend.by }}: its recommendation, not the asker's">{{ e.passer_name or e.recommend.by }} recommends: {{ e.recommend.text }}</div>
+{%- endif %}
+{%- endmacro %}
+
 {# §4.5a **Inbox row: `ask`** — the whole text, sender, `about`, age, and no countdown: an `ask` to
    the person does not expire (§4.10). Reply · Delete (confirms; it declines) · Snooze. #}
 {% macro ask(e, section) -%}
 {{ head(e) }}
 {{ body(e) }}
+{{ recommends(e) }}
 {{ answers(e) }}
 <div class="row gap wrap mfoot">
   <span class="st">open · no bound — it waits until you answer it</span>
@@ -185,6 +199,7 @@
 {{ head(e) }}
 {{ body(e) }}
 <div class="st dflt">unless you say otherwise: {{ e.default or '—' }}</div>
+{{ recommends(e) }}
 {{ answers(e) }}
 <div class="row gap wrap mfoot">
   {%- if e.paused_at %}
@@ -221,6 +236,39 @@
   {%- if st %}<span class="st">{{ st }}</span>{% endif %}
   <span class="grow"></span>
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this entry? It leaves your inbox; the sender keeps its copy.">Dismiss</button>
+</div>
+{%- endmacro %}
+
+{# ── design §4.5a **Inbox row: answered for you** (§4.9b; TD-075 step 2) ───────────────────────
+   A question a teammate answered from the record, told to the person: the question, who asked,
+   the answer, who answered and **where it is written down** — every one of them text, drawn from
+   the entry's structured `answered` and never parsed out of a message. **Overrule** is a Reply to
+   this entry, which the home sends **to the asker** with a copy to the answerer, on the question's
+   own thread, marked `[person]` — so the compose names the asker, not the answerer who sent the
+   FYI. **Dismiss** ends the row. Both are drawn by this macro alone, which `row()` reaches only on
+   an entry carrying `answered`: never on another kind, and never on who sent it. #}
+{% macro answered(e, section) -%}
+{%- set a = e.answered %}
+{%- set asker = e.asker_name or a.asker or 'the asker' %}
+<div class="row gap wrap mhead">
+  <span class="ref" title="{{ e['from'] }} — who answered">{{ e.from_name or e['from'] }}</span>
+  {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <span class="badge kindmark k-answered">answered for you</span>
+  {%- if e.about %} <span class="st">re {{ e.about }}</span>{% endif %}
+  <span class="grow"></span>
+  <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
+</div>
+<div class="st asked"><span title="{{ a.asker or '' }}">{{ asker }}</span> asked{% if e.asker_open %} <a class="btn sm ghost" href="/focus/{{ e.asker_open }}" title="Focus on {{ asker }}">Open</a>{% endif %}</div>
+<div class="body quoted">{{ a.question or '—' }}</div>
+<div class="st asked">{{ e.from_name or e['from'] }} answered</div>
+{{ body(e) }}
+<div class="st dflt">source: {{ a.source or '—' }}</div>
+<div class="row gap wrap mfoot">
+  <span class="st">answered from the record — nothing waits on you</span>
+  <span class="grow"></span>
+  <button class="btn sm" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ asker }}" data-quote="{{ a.question or '' }}" title="your answer instead: it goes to {{ asker }} on the question's own thread, copied to {{ e.from_name or e['from'] }}, and {{ asker }} owes you what came of it">Overrule</button>
+  <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}">Dismiss</button>
 </div>
 {%- endmacro %}
 
@@ -405,11 +453,12 @@
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 </div>
 {%- else %}
-<div class="mailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '')) | lower }}">
+<div class="mailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '') ~ (' ' ~ (e.asker_name or '') ~ ' ' ~ (e.answered.question or '') ~ ' ' ~ (e.answered.source or '') if section == 'answered' else '')) | lower }}">
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
 {%- if section == 'snoozed' %}{{ snoozed(e, section) }}
 {%- elif section == 'waiting' %}{{ waiting(e, section) }}
+{%- elif section == 'answered' %}{{ answered(e, section) }}
 {#- in *Needs you* an entry that is not open is one of the two §4.10 puts there: a `blocked`
     outcome, or a debt whose asker exited without reporting. Both are answered, so neither is
     an `ask` row — offering Snooze or Delete on one would be offering to decline an answered

@@ -168,6 +168,10 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
    controls. Its own row is also what keeps it from wrapping into the controls row. A label too
    long for its button is cut with an ellipsis here and whole on `title` (the template). Colours
    are tokens, as every colour on the page is (TD-071 item 8). */
+/* design §4.5a **Inbox row: answered for you** (§4.9b, TD-075 step 2): the asker's question is
+   set off by a rule as a quotation is, so the question and the answer given in the person's name
+   never read as one message. Tokens, as every colour here is. */
+.inboxpage .mailrow .body.quoted { padding-left: 10px; border-left: 2px solid var(--line); color: var(--strong); }
 .inboxpage .sugg { row-gap: 4px; padding: 4px 0 2px 10px; border-left: 2px solid var(--line); }
 .inboxpage .sugg .sugglabel { font-style: italic; }
 .inboxpage .btn.answer { max-width: 30ch; }

@@ -1135,7 +1135,7 @@ def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
     for tpl in (UI / "templates").glob("*.html"):
         for tag in re.findall(r"<details[^>]*>", tpl.read_text(encoding="utf-8")):
             menu = 'class="more"' in tag
-            section = 'id="sec-fyi"' in tag or 'id="snoozedbox"' in tag
+            section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox"))
             assert menu != section, f"{tpl.name}: {tag} is neither a menu the handler folds nor a known section"
 
 
@@ -1480,6 +1480,7 @@ def test_a_person_act_refreshes_the_page_once():
     js = (UI / "static" / "app.js").read_text()
     assert '(staterow || id === "person") && typeof AO.refreshInboxPage === "function"' in js
     assert '["dismiss", "attention_snooze"].includes(action) && typeof AO.refreshInboxPage' not in js
+
 
 # -- TD-081 step 2: Resume, Resume with changes…, Reopen and push ---------------------------------
 
@@ -1855,5 +1856,215 @@ def test_the_terminals_two_client_rules_are_reachable_and_right():
     js = (UI / "static" / "app.js").read_text()
     assert "AO.termClose(e.code, opened, delay, e.reason)" in js and "AO.paneIsGone(ev.session)" in js
     assert "e.code !== 1006" not in js  # the reason rule lives in `termClose`, not beside it
-    assert 'ws.onmessage = (m) => { delay = 500;' in js  # the one place the backoff resets
+    assert "ws.onmessage = (m) => { delay = 500;" in js  # the one place the backoff resets
     assert "ws.onopen = () => { delay = 500; }" not in js.split("AO.focus")[-1]  # never on open
+
+
+# -- design §4.5a **Inbox row: answered for you** (§4.9b; TD-075 step 2, the page half) -----------
+
+
+def answered_fyi(mid, **kw):
+    """The FYI the home files when a teammate answers from the record: a `note` from the answerer
+    carrying `answered: {question, asker, answerer, source}` (§4.9b)."""
+    a = {
+        "question": "does step 3 wait for step 2?",
+        "asker": "ao-w1",
+        "answerer": "ao-tl",
+        "source": "TD-075 build order",
+    }
+    a.update(kw.pop("answered", {}))
+    kw.setdefault("text", "yes, it builds on it")
+    kw.setdefault("asker_name", "w1")
+    kw.setdefault("asker_open", "ao-w1")
+    return entry(mid, "note", from_="ao-tl", from_name="tl", from_open="ao-tl", answered=a, **kw)
+
+
+@pytest.mark.unit
+def test_answered_for_you_is_its_own_section_uncounted_newest_first_and_apart_from_fyi():
+    """§4.9b / §4.5a: an entry carrying `answered` is under *Answered for you* — never in FYI with
+    the notes, never in either number — newest first. A plain note stays FYI, and a snoozed one is
+    snoozed like anything else."""
+    from agentorc.ui.app import INBOX_SECTIONS
+
+    assert INBOX_SECTIONS.index("waiting") < INBOX_SECTIONS.index("answered") < INBOX_SECTIONS.index("fyi")
+    old = answered_fyi("m-1", at="2026-09-19T09:00:00Z")
+    new = answered_fyi("m-2", at="2026-09-19T11:00:00Z")
+    note = entry("m-3", "note")
+    later = answered_fyi("m-4", snoozed_until="2026-09-20T08:00:00Z")
+    got = sections_of([old, new, note, later])
+    assert [e["id"] for e in got["answered"]] == ["m-2", "m-1"]
+    assert [e["id"] for e in got["fyi"]] == ["m-3"] and got["fyi_n"] == 1
+    assert [e["id"] for e in got["snoozed"]] == ["m-4"]
+    assert got["count"] == 0 and not got["needs"]
+    # a malformed `answered` costs the row its group, never the page: it reads as a plain note
+    assert [e["id"] for e in sections_of([entry("m-5", "note", answered="yes")])["fyi"]] == ["m-5"]
+    assert [e["id"] for e in sections_of([entry("m-6", "note", answered={})])["fyi"]] == ["m-6"]
+
+
+@pytest.mark.unit
+def test_an_answered_row_says_who_asked_what_who_answered_and_where_and_offers_overrule_and_dismiss():
+    """§4.5a **Inbox row: answered for you**: the question, the answer, the source, who asked and
+    who answered — all text. **Overrule** is a Reply to this entry that the compose names **the
+    asker** for, since the home sends it there (copied to the answerer); **Dismiss** ends the row."""
+    html = rows("answered", [answered_fyi("m-1", team="ao-grind", about="TD-075")])
+    assert "answered for you" in html and "re TD-075" in html
+    assert "w1</span> asked" in html and "does step 3 wait for step 2?" in html
+    assert "tl answered" in html and "yes, it builds on it" in html
+    assert "source: TD-075 build order" in html
+    assert 'href="/focus/ao-w1"' in html and 'href="/focus/ao-tl"' in html
+    over = re.search(r"<button[^>]*>Overrule</button>", html).group(0)
+    assert 'data-act="reply" data-id="person" data-msg="m-1"' in over
+    assert 'data-name="w1"' in over and 'data-quote="does step 3 wait for step 2?"' in over
+    assert 'data-act="dismiss" data-id="person" data-msg="m-1"' in html
+    # nothing else a reply-able row offers: no plain Reply to the answerer, no Snooze, no answers
+    assert ">Reply<" not in html and 'data-act="snooze"' not in html and 'data-act="answer"' not in html
+    # the filter finds a row by the asker, the question and the source too
+    find = re.search(r'data-find="([^"]*)"', html).group(1)
+    assert "w1" in find and "does step 3" in find and "td-075 build order" in find
+
+
+@pytest.mark.unit
+def test_overrule_is_drawn_only_on_an_answered_entry_and_everything_in_it_is_text():
+    """§4.5a: *neither is offered on anything but this kind* — it keys on the structured field, not
+    on who sent the entry; a note from the same answerer is an ordinary FYI row. And every field a
+    session wrote — the question, the answer, the source — is escaped text, never markup."""
+    got = sections_of([entry("m-1", "note", from_="ao-tl", from_name="tl", text="nothing answered")])
+    assert "Overrule" not in rows("fyi", got["fyi"])
+    hostile = answered_fyi(
+        "m-2",
+        text="<b>merge</b>",
+        answered={"question": "<script>x()</script>", "source": '"><img src=x>'},
+    )
+    html = rows("answered", [hostile])
+    assert "<script>" not in html and "<b>merge</b>" not in html and "<img" not in html
+    assert "&lt;script&gt;x()&lt;/script&gt;" in html and "&lt;b&gt;merge&lt;/b&gt;" in html
+
+
+@pytest.mark.unit
+def test_the_page_draws_the_group_only_when_it_holds_something_and_the_poll_swaps_it():
+    """The group is a fold whose heading is its disclosure, drawn only when it has rows (as *Waiting
+    on them* is); the poll swaps its rows and hides it again when it empties."""
+    tpl = (UI / "templates" / "inbox.html").read_text()
+    assert 'id="sec-answered"' in tpl and 'id="rows-answered"' in tpl and "imark('answered'" in tpl
+    js = (UI / "static" / "app.js").read_text()
+    assert '"answered"' in js.split("const IN_SECS")[1].split("\n")[0]
+    assert '$("#sec-answered")' in js and "got.sections.answered" in js
+
+
+@pytest.mark.integration
+def test_an_answer_from_the_record_is_a_row_and_overrule_reaches_the_asker(client, tmp_path):
+    """End to end (§4.9b): a teammate's reply with `source` lands under *Answered for you* on the
+    page, naming the asker; **Overrule** — the same `/api/person/reply` Reply uses — reaches the
+    asker, copied to the answerer; **Dismiss** ends the row."""
+    from sessionorc.client import LocalClient
+
+    async def setup():
+        async with LocalClient() as person:
+            ids = []
+            for n in ("askr", "answr"):
+                got = await person.call(
+                    "create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="ao-t"
+                )
+                ids.append(got["id"])
+        w, tl = ids
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, text="does step 3 wait?", kind="ask"))["entry"]
+            r = await tc.call("msg", reply_to=q["id"], kind="reply", text="yes", source="design §4.9b")
+        return w, tl, r["answered_for_you"]
+
+    w, tl, fyi = asyncio.run(setup())
+    got = client.get("/api/person/inbox").json()
+    assert got["sections"]["answered"] == [fyi] and fyi not in got["sections"]["fyi"] and got["needs"] == 0
+    html = got["html"]["answered"]
+    assert "askr</span> asked" in html and "source: design §4.9b" in html and ">Overrule</button>" in html
+    assert 'id="sec-answered"' in client.get("/inbox").text
+
+    r = client.post("/api/person/reply", json={"reply_to": fyi, "text": "no — step 3 can start now"})
+    assert r.status_code == 200 and r.json()["delivered"] == [w]
+    held = asyncio.run(_inbox_of(w))
+    assert [e["text"] for e in held if e["kind"] == "reply" and e["from"] == "person"] == ["no — step 3 can start now"]
+    assert any(e["text"] == "no — step 3 can start now" for e in asyncio.run(_inbox_of(tl)))  # the copy
+
+    assert client.post("/api/person/dismiss", json={"msg": [fyi]}).status_code == 200
+    assert fyi not in client.get("/api/person/inbox").json()["sections"]["answered"]
+
+
+# -- design §4.5a **Inbox row: passed up** (§4.9b; TD-075 step 3, the page half) ------------------
+
+
+def passed_up(mid, kind="ask", **kw):
+    """The asker's own question in the person inbox, passed up with the passer's recommendation and
+    its suggested answers, the recommendation first (§4.9b)."""
+    kw.setdefault("text", "rename the flag?")
+    kw.setdefault("recommend", {"by": "ao-tl", "text": "keep the old name"})
+    kw.setdefault("passer_name", "tl")
+    kw.setdefault("answers", ["keep the old name", "rename it"])
+    return entry(mid, kind, passed_up="2026-09-19T10:30:00Z", **kw)
+
+
+@pytest.mark.unit
+def test_a_passed_up_question_is_the_askers_row_with_the_recommendation_drawn_as_text():
+    """§4.5a **Inbox row: passed up**: the asker's question under its own heading — an `ask` in
+    *Needs you*, counted; a `steer` in *Steering* with its time left — with *`<passer>` recommends:
+    `<line>`* **labelled and drawn as text**, and the passer's suggested answers as the row's
+    answer buttons, the recommendation first, labelled as the passer's. Reply goes to the asker."""
+    ask = passed_up("m-1")
+    steer = passed_up("m-2", "steer", default="rename it", bound="2026-09-19T12:30:00Z")
+    got = sections_of([ask, steer])
+    assert [e["id"] for e in got["needs"]] == ["m-1"] and got["count"] == 1
+    assert [e["id"] for e in got["steering"]] == ["m-2"]
+    for sec, e in (("needs", ask), ("steering", steer)):
+        html = rows(sec, [e])
+        assert "tl recommends: keep the old name" in html
+        rec = re.search(r'<div class="st dflt recommends"[^>]*>', html).group(0)
+        assert "<button" not in rec and "data-act" not in rec  # text, never a control
+        assert "suggested by tl" in html and "suggested by w1" not in html
+        assert html.index("&ldquo;keep the old name&rdquo;") < html.index("&ldquo;rename it&rdquo;")
+        assert 'data-act="reply" data-id="person" data-msg="' + e["id"] + '" data-name="w1"' in html  # to the asker
+        assert html.index("recommends:") < html.index('class="row gap wrap sugg"')
+
+
+@pytest.mark.unit
+def test_a_question_not_passed_up_has_no_recommendation_and_its_answers_are_the_senders():
+    """The line keys on `passed_up` and a structured `recommend` together; an ordinary question —
+    or one whose `recommend` is malformed — draws neither the line nor another name on its answers,
+    and a hostile recommendation is text."""
+    plain = rows("needs", [entry("m-1", "ask", answers=["yes", "no"])])
+    assert "recommends" not in plain and "suggested by w1" in plain
+    odd = rows("needs", [entry("m-2", "ask", passed_up="2026-09-19T10:30:00Z", recommend="keep it")])
+    assert "recommends" not in odd
+    hostile = passed_up("m-3", recommend={"by": "ao-tl", "text": "<b>keep</b>"})
+    html = rows("needs", [hostile])
+    assert "<b>keep</b>" not in html and "tl recommends: &lt;b&gt;keep&lt;/b&gt;" in html
+
+
+@pytest.mark.integration
+def test_a_question_passed_up_reaches_the_page_as_the_askers_with_the_passers_recommendation(client, tmp_path):
+    """End to end (§4.9b): `pass_up` puts the asker's own question in the person inbox; the page draws
+    it in *Needs you* from the asker, with the passer's recommendation and answers; the first
+    answer press is the recommendation and reaches the asker."""
+    from sessionorc.client import LocalClient
+
+    async def setup():
+        async with LocalClient() as person:
+            ids = []
+            for n in ("askr2", "passr"):
+                got = await person.call(
+                    "create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="ao-t2"
+                )
+                ids.append(got["id"])
+        w, tl = ids
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, text="rename the flag?", kind="ask"))["entry"]
+            await tc.call("pass_up", id=q["id"], recommend="keep the old name", answers=["rename it"])
+        return w, q["id"]
+
+    w, qid = asyncio.run(setup())
+    got = client.get("/api/person/inbox").json()
+    assert got["sections"]["needs"] == [qid] and got["needs"] == 1
+    html = got["html"]["needs"]
+    assert "askr2</span>" in html and "passr recommends: keep the old name" in html and "suggested by passr" in html
+    r = client.post("/api/person/reply", json={"reply_to": qid, "answer": 0})
+    assert r.status_code == 200 and r.json()["delivered"] == [w]
+    picked = [e for e in asyncio.run(_inbox_of(w)) if e["kind"] == "reply"]
+    assert [(e["text"], e["answer"]) for e in picked] == [("keep the old name", 0)]
