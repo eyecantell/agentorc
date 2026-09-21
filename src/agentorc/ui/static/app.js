@@ -1264,7 +1264,9 @@
       $("#reportscard").classList.toggle("hidden", !(progress.length || findings.length));
       $("#progresslist").innerHTML = progress.map((p) => {
         const derived = (p.source || "declared") !== "declared";
-        const pr = p.pr ? ` <span class="st">→ #${esc(p.pr)}</span>` : "";
+        // a reference is shown once (§4.5a **report line**, TD-095): an entry whose reference is
+        // its PR never reads `#359 → #359` — the rule `report_line` follows for the card
+        const pr = p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ #${esc(p.pr)}</span>` : "";
         const why = p.why ? ` <span class="st">${esc(p.why)}</span>` : "";
         const drop = p.status === "claimed"
           ? ` <button class="btn sm ghost" data-act="drop" data-id="${id}" data-ref="${esc(p.ref)}" data-confirm="Drop ${esc(p.ref)}? It is recorded as dropped by you.">Drop</button>` : "";

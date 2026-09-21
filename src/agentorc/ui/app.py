@@ -539,7 +539,7 @@ def view(
     # seconds, so a finish in the same second as the last look reads as seen.
     d["unseen"] = state == "idle" and (not s.get("seen_at") or (s.get("since") or "") > s["seen_at"])
     if d["unseen"]:
-        d["state_label"] = "finished · unseen"
+        d["state_label"] = "idle · unseen"  # not *finished*: that word is a declaration's (§4.9a, TD-095 e)
         d["rank"] = STATE_RANK["idle"] - 0.5
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
