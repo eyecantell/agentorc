@@ -1013,6 +1013,8 @@ class HostAgent:
             self._bells,
         ):
             side.pop(sid, None)
+        if not (lock := self._typing.get(sid)) or not lock.locked():
+            self._typing.pop(sid, None)  # a held one stays: its typist is mid-paste, the name reused or not
         for key in [k for k in self._attention_how if k.split("|", 1)[0] == sid]:
             del self._attention_how[key]
         for key in [k for k in self._attention if k.split("|", 1)[0] == sid]:
