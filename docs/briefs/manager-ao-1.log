@@ -71,3 +71,4 @@
 09:11–09:37 quiet; grinder-ao-1 opened #361 (15:14Z) and #362, TD-075 mail half, both in the anchor's queue
 09:38–09:58 quiet; grinder-ao-1 opened #363, note m-aa4ef44f7cec: #357 #360–#362 reviewed, waiting on the anchor (TD-093); still working (td075-copies-follow-resume)
 10:06  inbox: person (via the anchor) m-0f39df749988 — live test of Log TD with alarm-probe (a throwaway shell under me): leave it alone, settle the handed mail with --outcome dropped → noted; grinder-ao-1 opened #364
+10:17  inbox: identity alarm m-dffe0475a488 on alarm-probe (the announced test) → ao msg --outcome dropped "the anchor's live test of Log TD" --for it; settled 16:16:53Z. The skill's form ao msg person --outcome … "<line>" --for … fails (argparse: unrecognized arguments); options before the positionals works
