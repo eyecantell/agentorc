@@ -864,3 +864,42 @@ def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path
     # and the built-in roles the recipe's table names all resolve
     for name in ("lead", "grinder", "hunter", "plain"):
         assert name in got, name
+
+
+@pytest.mark.unit
+def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_path, monkeypatch):
+    """The failure a guide dies of, second kind: a shape the **loader** accepts and the **planner**
+    refuses. `{team: other-team}` parses — `org.py` carries it in its own docstring example — and
+    `ao team list` shows it, so it reads as built; `teams.plan()` raises *is a nested team, which
+    is not built yet*. The first draft of this file told people to use it (fact-check of PR #302).
+
+    So the recipe is held to the planner as well as to the loader: it may not present a shape as
+    working unless `plan()` accepts it, and where it names one that does not work it must say so."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    import importlib
+
+    import yaml
+
+    from agentorc import org as orgmod
+    from agentorc import teams
+    from agentorc.cli import team_skill_text
+
+    importlib.reload(orgmod)
+    (tmp_path / "org.yml").write_text(
+        yaml.safe_dump({
+            "projects": {"p": {"repos": {"r": {"h": str(tmp_path)}}}},
+            "teams": {
+                "outer": {"projects": ["p"], "lead": {"role": "lead"}, "members": [{"team": "inner"}]},
+                "inner": {"projects": ["p"], "lead": {"role": "lead"}, "members": [{"role": "grinder"}]},
+            },
+        })
+    )  # fmt: skip
+    org = orgmod.load()
+    assert org.teams["outer"].members[0].team == "inner"  # the loader takes it…
+    with pytest.raises(teams.TeamError, match="is a nested team, which is not built yet"):
+        teams.plan(org, "outer", host="h")  # …and the planner does not
+
+    # so the recipe says exactly that, rather than presenting it as a feature
+    text = team_skill_text()
+    assert "{team: other-team}" in text and "refused at `start`" in text
+    assert "not\n  built" in text  # the sentence wraps in the file; the claim is what matters

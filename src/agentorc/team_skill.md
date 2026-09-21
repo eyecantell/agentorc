@@ -17,7 +17,10 @@ Every command below is one you can run. Nothing here explains why — design §4
 and where each repo is checked out on each host). `ao team start` reads the definition, checks
 everything first, then creates the lead and each member with the lead as its controller. Nothing
 about a team is stored on a session's record but two strings, `team` and `project`, and nothing
-keys on them (§9 invariant 9) — the definition is the whole of it.
+keys on them (§9 invariant 9) — the definition is the whole of it. **One exception, and it lands
+exactly on the `lead: {role: person}` case below:** the mail gate's *sideways* edge keys on the
+`team` badge, so on a team with no lead session the badge is the only edge between members there
+is (§4.10). Everywhere else the badge is a label.
 
 ---
 
@@ -27,9 +30,11 @@ keys on them (§9 invariant 9) — the definition is the whole of it.
 ao status
 ```
 
-`no sessions` (or a list) means the agent is up. **Exit 3 means it is not** — a person starts one
-with `agentorc-agent serve`, or installs the units with `ao service install`. A session that gets
-exit 3 stops there and says so: it never starts one (`ao --skill`).
+`no sessions` (or a list) means the agent is up. **Exit 3 means the command could not reach one**,
+and the line says which of two things happened: *the host agent restarted under this command — run
+it again* (it is up; run it again and nothing else), or *host agent not reachable*, which is the
+one a person answers with `agentorc-agent serve`, or `ao service install` for the units. A session
+that gets exit 3 stops there and says so: **it never starts one** (`ao --skill`).
 
 ## 1. Decide where the team runs
 
@@ -89,8 +94,11 @@ teams:
   means *the person leads*: no lead session is started. (`lead: person`, the bare string, is
   refused — *teams.<name>.lead must be a mapping, not str*.)
 - **`members:`** — each is a role and a `count`; `name` is the **prefix**, and above one member the
-  sessions are `<name>-1`, `<name>-2`, …  A member may instead be `{team: other-team}`, which
-  nests that team's members under this one.
+  sessions are `<name>-1`, `<name>-2`, …
+  **`{team: other-team}` — a nested team — parses but is refused at `start`, because it is not
+  built** (design §4.9: the flat case ships first). Write the teams flat and start each on its own
+  until it is. The trap is that `ao team list` accepts it and only `ao team start` refuses it,
+  which is the one place in this recipe where a file that reads fine is not one.
 - Both take `lane:` — the references that member works, in order — and `unattended:` (default
   true).
 
@@ -122,6 +130,20 @@ Resolution is lowest first: the package's built-ins, then an org-wide `roles:` o
 `org.yml`, then the repo's own — each overriding **per key**, so a repo that sets only `brief`
 keeps the built-in's grants. A `brief:` path is relative to the repo root; a built-in name is the
 package's own file. `{lane}` in a brief is replaced with the member's lane.
+
+**A `profile:` must already exist**, in `~/.agentorc/profiles.yml` — it is an account of a tool,
+not a word you may invent, and `ao team start` refuses a name that is not declared:
+
+```yaml
+default: paul
+profiles:
+  paul:  {adapter: claude-code, account: paul,  model: opus,   config_dir: ~/.claude}
+  grind: {adapter: claude-code, account: grind, model: sonnet, config_dir: ~/.claude-grind}
+```
+
+With no file at all there is one implicit profile, `default`, on the tool's own config directory —
+so a team that names none works, and a team that names `grind` needs the block above **and** a
+`claude` login inside that `config_dir`, which is a person's one-time step and nobody else's.
 
 Check what resolves, from inside the repo:
 
@@ -177,11 +199,14 @@ they are about behaving inside a session; these are about setting one up.
    malformed file and names the key; fix it there rather than at `start`.
 3. **Never invent a host, a repo path or a profile.** A checkout that is not in `projects:` for the
    host the team runs on is a refusal, not a guess — ask the person for the path.
-4. **The one-time human steps are not yours**: a profile's `claude` login, a node's `env` file,
+4. **Check the profile before you name it.** A `profile:` in a role or a member must be a key in
+   `~/.agentorc/profiles.yml`; `ao team start` refuses one that is not, and the file is the only
+   place that says which exist.
+5. **The one-time human steps are not yours**: a profile's `claude` login, a node's `env` file,
    anything that needs a credential. Say which are outstanding and stop.
-5. **Report what you did with the tool's own words**: paste `ao team status <name>`. Do not
+6. **Report what you did with the tool's own words**: paste `ao team status <name>`. Do not
    summarise a state you did not read.
-6. **`ao --json` on every call** when you are parsing, never prose (`ao --skill`).
+7. **`ao --json` on every call** when you are parsing, never prose (`ao --skill`).
 
 ## Where this leaves the older documents
 
