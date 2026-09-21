@@ -1609,3 +1609,35 @@ async def test_the_tools_own_title_is_observed_from_the_pane(agent, hookstub, tm
 
 async def _title(c, sid: str, want: str) -> bool:
     return (await c.call("get", id=sid))["title"] == want
+
+
+async def test_a_restart_is_refused_while_an_outcome_is_owed_and_wakes_the_lead(agent, hookstub, tmp_path):
+    """TD-083 step 1, the two halves a CLI test cannot reach. **The debt** (§4.10 *Outcomes*): a
+    restart is refused while the session owes the person an outcome, for a reason of its own —
+    the fresh run does not carry the conversation the debt was made in, so nobody is left who
+    can report it. **The wake** (§4.8): a lead acts on `restart_wanted` — it closes the member
+    and starts it again — so a wait returns on it, as it does on the other two endings."""
+    (tmp_path / "w").mkdir()
+    async with LocalClient() as person:
+        lead = (await person.call("create", name="l", dir=str(tmp_path), adapter="shell", argv=["bash"]))["id"]
+        w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name))["id"]
+        await person.call("set_controllers", id=w, add=[lead])
+        async with LocalClient(caller=w) as worker:
+            ask = (await worker.call("msg", to="person", text="which one?", kind="ask"))["entry"]
+        await person.call("msg", to=w, text="the first", kind="reply", reply_to=ask["id"])
+        async with LocalClient(caller=w) as worker:
+            with pytest.raises(AgentError, match="owes 1 outcome.*before declaring a restart"):
+                await worker.call("progress", id=w, status="restart", why="context is long")
+            await worker.call("msg", to="person", text="did it", outcome="done", for_=ask["id"])
+
+        # settled: now it may. The cursor is taken first and the wait after the declaration, so
+        # what is asserted is the **digest** — that `restart_wanted` is a change a lead is woken
+        # by — rather than a race between a task and a tick.
+        await person.call("wait", timeout=0.1, caller=lead)  # a first wait records the cursor
+        async with LocalClient(caller=w) as worker:
+            await worker.call("progress", id=w, status="restart", why="context is long, the lane is not done")
+        got = await person.call("wait", timeout=5, caller=lead)
+        changed = {c["id"]: c for c in got["changed"]}
+        assert changed[w]["restart_wanted"]["why"] == "context is long, the lane is not done"
+        for sid in (lead, w):
+            await person.call("kill", id=sid)

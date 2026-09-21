@@ -1393,3 +1393,51 @@ def test_the_probe_is_one_ping_it_never_raises_and_it_cannot_hang(monkeypatch, t
     monkeypatch.setattr(climod.clientmod, "LocalClient", Stub)
     assert climod._agent_answers() is True and calls == ["ping"]
     assert aio.get_event_loop_policy() is not None  # the probe left no loop of its own behind
+
+
+def test_progress_restart_is_the_third_ending(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-083 step 1 (design §4.9a *A run that ends with work left*): a worker that ends a long
+    run **on purpose**, with work still on the ledger, had no word for it — it was not out of
+    work, its `/exit` did not leave, and a team sat parked for ninety minutes until a person
+    acted. `ao progress restart --why` says it: my run is over and my lane is not.
+
+    It is the session's own word (§9 invariant 14), refused without a reason, refused while an
+    outcome is owed — the fresh run does not carry the conversation the debt was made in — and it
+    and `none` refuse each other. A later declared claim takes it back."""
+    assert cli.main(["--json", "shell", "again", "-d", str(tmp_path)]) == 0
+    sid = json.loads(capsys.readouterr().out)["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+
+    assert cli.main(["progress", "restart"]) == 1
+    assert "needs --why" in capsys.readouterr().err
+    assert cli.main(["progress", "restart", "TD-1", "--why", "x"]) == 2
+    assert "takes no reference" in capsys.readouterr().err
+
+    assert cli.main(["progress", "restart", "--why", "context is long; the ledger still has work"]) == 0
+    out = capsys.readouterr().out.strip()
+    assert out == (
+        f"{sid}: restart wanted (early — your controller will put it on the board, not act on it) "
+        "— context is long; the ledger still has work"
+    )
+    rec = call_sync("get", id=sid)
+    assert rec["restart_wanted"]["why"] == "context is long; the ledger still has work"
+    # a record started seconds ago: the word stands, and it is marked early (§4.9a)
+    assert rec["restart_wanted"]["early"] is True
+
+    # the two endings refuse each other
+    assert cli.main(["progress", "none", "--why", "nothing left"]) == 1
+    assert "already wants a restart" in capsys.readouterr().err
+
+    # and a claim takes it back: the session went on after all
+    assert cli.main(["progress", "claim", "TD-083"]) == 0
+    capsys.readouterr()
+    assert call_sync("get", id=sid)["restart_wanted"] is None
+
+    # nobody else may declare it
+    monkeypatch.delenv("AGENTORC_SESSION")
+    try:
+        call_sync("progress", id=sid, status="restart", why="not mine to say", caller="ao-someone")
+        raise AssertionError("another session declared a restart")
+    except AgentError as e:
+        assert "only" in str(e) and "own word" in str(e)
+    call_sync("kill", id=sid)
