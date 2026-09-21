@@ -2802,6 +2802,20 @@ class HostAgent:
         kept = [e for e in s.inbox if e.id != msg]
         if len(kept) == len(s.inbox):
             raise RpcError(f"{s.id}'s inbox holds no entry {msg}")
+        # **A debt is not deleted away** (design §4.8a *An alarm's answers*, §4.10 *Outcomes*;
+        # review of PR #318). A handed entry is the first debt-bearing mail that lives in an
+        # ordinary session's **inbox** rather than in the asker's outbox, so it is the first that
+        # this delete could reach — and it computes `owes` from the entry, so deleting the object
+        # would discharge the debt with no outcome, no trail and nobody told. Dismiss it from the
+        # person's Inbox instead, which ends it *and* tells the session, or let it report one.
+        if owing := [e for e in s.inbox if e.id == msg and e.owes]:
+            raise RpcError(
+                f"{msg} is work the person handed {s.id} and it still owes an outcome: deleting it would "
+                "settle nothing and tell nobody. Let it report one — ao msg person --outcome "
+                f'done|blocked|dropped "<line>" --for {msg} — or Dismiss the row, which ends the debt '
+                "and says so (design §4.8a, §4.10 *Outcomes*)",
+                owes=owing[0].id,
+            )
         s.inbox = kept
         _prune_tallies(s)  # a delete is the other way an entry leaves (review of PR #214)
         self._save(s)
@@ -3733,7 +3747,7 @@ class HostAgent:
         the reader's form"): its own as stored, another host's re-addressed."""
         return s.controllers if s.host == self.host else [self._from_host(x, s.host) for x in s.controllers]
 
-    def _answers_for(self, s: Session) -> dict[str, str] | None:
+    def _answers_for(self, s: Session, graph: dict[str, Session] | None = None) -> dict[str, str] | None:
         """The session that answers for this record (design §4.8a *An alarm's answers*): its
         **first live controller**, in the order `controllers` holds them — the session that
         created it (§4.8 *Create adds the creator*), which for a team's member is its lead.
@@ -3742,7 +3756,7 @@ class HostAgent:
         keys on `team` or `role`, and the host agent does not read `org.yml`. `None` where there
         is no such session — a record a person started with no controller, a lead's own record,
         a controller that has exited — and the page says so in words where it is missing."""
-        graph = self._graph()
+        graph = self._graph() if graph is None else graph
         for c in self._ctl(s):
             other = graph.get(c)
             if other is not None and other.state not in ("exited", "closed"):
@@ -4392,12 +4406,21 @@ class HostAgent:
         entry = sent.get("entry") or {}
         if mid := entry.get("id"):
             self._mark(mid, handed=True)  # the debt: it is work the person handed on (§4.10)
+        # **The alarms are the node's** (§4.8a; review of PR #318). The message, the debt and the
+        # trail are the home's, and this call is not in `NODE_ACTS` because of them — but clearing
+        # a node's list here would clear a replica the node's next report puts straight back, the
+        # very race `identity_ack` is routed to avoid. So the clearing is routed, as that act, and
+        # the home takes the cleared record from the reply; the word is written after, because
+        # routing an `identity_ack` writes *dismissed by you* and this ending is not a dismissal.
+        if s.host != self.host:
+            await self._route_act("identity_ack", {"id": self._address(s)}, None, s.host)
+        else:
+            s.identity_alarms = []
+            self._id_dirty.discard(s.id)
+            self._save(s)
         self._attention_ended(self._address(s), f"logged by you → {to['name']}", "alarm")
-        s.identity_alarms = []
-        self._id_dirty.discard(s.id)
-        self._save(s)
         await self._push_changes()
-        return {"id": s.id, "filed": True, "to": to, "entry": mid, "alarms": []}
+        return {"id": self._address(s), "filed": True, "to": to, "entry": mid, "alarms": []}
 
     async def rpc_suspend(self, id: str, why: str | None = None, caller: Any = None) -> dict[str, Any]:
         """**Suspend** a session over an identity alarm (design §4.8a *An alarm's answers*, §4.5a
@@ -4529,7 +4552,9 @@ class HostAgent:
 
     # -- one org, to a client (design §4.4a "A node's records at the home") -----------------------
 
-    def _view(self, s: Session, *, bookkeeping: bool = False) -> dict[str, Any]:
+    def _view(
+        self, s: Session, *, bookkeeping: bool = False, graph: dict[str, Session] | None = None
+    ) -> dict[str, Any]:
         """The view a client gets. This host's record is `s.view()`. Another host's carries its
         address as `id`, and while that host's link is down reads `unreachable` — an overlay on the
         view, never a state on the record."""
@@ -4539,7 +4564,7 @@ class HostAgent:
         # 9). The page draws **Log TD** only where this is non-null and says *no session answers
         # for this one* where it is, which it can only do if it knows before it draws; and the
         # RPC reads the same function, so drawn-or-not and refused-or-not cannot disagree.
-        v["alarm_to"] = self._answers_for(s)
+        v["alarm_to"] = self._answers_for(s, graph)
         if s.host == self.host:
             return v
         v["id"] = f"{s.id}@{s.host}"
@@ -4558,8 +4583,13 @@ class HostAgent:
         return v
 
     def _views(self) -> list[dict[str, Any]]:
+        # one graph for the batch, not one per record: `_views` runs on nearly every RPC through
+        # `_push_changes`, and `_answers_for` reading its own would make that quadratic in the
+        # org's size (review of PR #318)
+        graph = self._graph()
         return [
-            self._view(s) for s in (*self.sessions.values(), *(r for h in self.remote.values() for r in h.values()))
+            self._view(s, graph=graph)
+            for s in (*self.sessions.values(), *(r for h in self.remote.values() for r in h.values()))
         ]
 
     def _remember_dir(self, directory: Path) -> None:

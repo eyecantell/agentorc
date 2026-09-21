@@ -2109,7 +2109,15 @@ answer to the alarm.
   asked, and must also count the entries in its **inbox** that `owes` is now true of, since that one number is what `ao progress none`, `mail.owed`
   and *Ready to close* all read —
   `identity_log` is its first user, and nothing else sets the mark until a design says so. The
-  list is then cleared and the trail says *logged by you → `<controller>`*. It is offered only
+  list is then cleared and the trail says *logged by you → `<controller>`*. **On a node's
+  record the clearing is routed and the rest is not**: the message, the debt and the trail are
+  the home's — mail lives there — but `identity_alarms` are the node's, so the home asks the
+  node to clear its own list (as `identity_ack` does) and writes the word after, since that act
+  over the link writes *dismissed by you* and this ending is not a dismissal. **And the debt
+  cannot be deleted away**: a handed entry lives in a session's own inbox, which is the first
+  debt-bearing mail a person's `inbox_delete` can reach, so deleting one that still owes is
+  refused in words — it is ended by an outcome, or by the person's **Dismiss**, which tells the
+  session (review of PR #318). It is offered only
   where that session exists: a record with a live controller. On a record without one — a
   session a person started with no controller, a manager's own alarm (a manager has none) — the row
   says *no session answers for this one* and the person has **Open**, **Dismiss** and, while

@@ -1537,3 +1537,37 @@ async def test_a_suspend_is_the_homes_act_wherever_it_is_asked(home, hookstub, t
             back = await at_node.call("suspend", id=w2["id"])
         assert back["suspended"] and (await at_home(home, addr2))["suspended"]
         await until(home, addr2, lambda v: v and v["state"] in ("exited", "closed"))
+
+
+async def test_log_td_on_a_nodes_record_clears_the_alarm_where_it_lives(home, hookstub, tmp_path, monkeypatch):
+    """§4.8a *An alarm's answers* → **Log TD** on a node's record (TD-077 b, review of PR #318).
+    The message, the debt and the trail are the **home's** — mail lives there — so the call is
+    not a `NODE_ACT` and runs here. But `identity_alarms` are **node-owned**, so clearing the
+    home's replica would clear something the node's next report puts straight back: the very
+    race `identity_ack` is routed to avoid. The clearing is therefore routed, as that act, and
+    the trail word is written after it, because an `identity_ack` over the link writes *dismissed
+    by you* and this ending is not a dismissal."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        acts = Acts(node, monkeypatch)
+        async with LocalClient() as c:
+            lead = await c.call("create", name="l", dir=str(tmp_path), adapter="shell", argv=["bash"])
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            await person.call("set_controllers", id=address, add=[f"{lead['id']}@laptop"])
+        await until(home, address, lambda v: bool((v or {}).get("controllers")))
+        node._id_alarm({"channel": f"session {w['id']}", "claimed": "ao-b", "rpc": "msg"}, w["id"])
+        await until(home, address, lambda v: bool((v or {}).get("identity_alarms")))
+
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            got = await person.call("identity_log", id=address)
+            assert got["filed"] is True and got["to"]["id"] == f"{lead['id']}@laptop"
+            trail = (await person.call("inbox"))["trail"]
+        # the clearing crossed the link as an `identity_ack`, so it happened where the list lives
+        assert acts.taken[-1]["rpc"] == "identity_ack"
+        assert node.sessions[w["id"]].identity_alarms == []
+        # …and stays cleared through the node's next report, which is the whole point
+        await asyncio.sleep(FAST_TICK * 3)
+        assert (await at_home(home, address))["identity_alarms"] == []
+        assert trail == [] or all(e["how"] != "dismissed by you" for e in trail)

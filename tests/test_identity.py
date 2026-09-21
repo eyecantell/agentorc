@@ -702,3 +702,35 @@ async def test_log_td_hands_an_alarm_to_the_session_that_answers_for_it(agent, h
         assert (await person.call("get", id=lead))["mail"]["owed"] == []
         for sid in (w, lead):
             await person.call("kill", id=sid)
+
+
+async def test_a_handed_debt_is_not_deleted_away(agent, hookstub, tmp_path):
+    """Review of PR #318: a handed entry is the first debt-bearing mail that lives in a session's
+    own **inbox** rather than in the asker's outbox, so it is the first that `inbox_delete` can
+    reach — and `owes` is computed from the entry, so deleting the object would discharge the
+    debt with no outcome, no trail and nobody told. It is refused, with the two roads that do
+    end it."""
+    for d in ("l", "w"):
+        (tmp_path / d).mkdir()
+    async with LocalClient() as person, LocalClient() as feeder:
+        lead = (await person.call("create", name="l", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
+            "id"
+        ]
+        await feeder.call("hook", session=w, state="idle")
+        await wait_state(person, w, "idle")
+        await person.call("set_controllers", id=w, add=[lead])
+        agent._id_alarm({"channel": f"session {w}", "claimed": "ao-b", "rpc": "msg"}, w)
+        filed = await person.call("identity_log", id=w)
+
+        with pytest.raises(AgentError, match="still owes an outcome"):
+            await person.call("inbox_delete", msg=filed["entry"], id=lead)
+        assert (await person.call("get", id=lead))["mail"]["owed"] == [filed["entry"]]
+
+        # settled, and then it is an ordinary entry a person may remove
+        async with LocalClient(caller=lead) as session:
+            await session.call("msg", to="person", text="filed as TD-999", outcome="done", for_=filed["entry"])
+        await person.call("inbox_delete", msg=filed["entry"], id=lead)
+        assert [e["id"] for e in (await person.call("inbox", id=lead))["entries"]] == []
+        for sid in (w, lead):
+            await person.call("kill", id=sid)

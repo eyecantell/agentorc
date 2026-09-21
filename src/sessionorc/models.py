@@ -296,7 +296,11 @@ class MailEntry:
         **And the other direction** (§4.8a *An alarm's answers*, TD-077 b): an entry **from** the
         person marked `handed` is a debt on its **addressee**, settled the same way and by the
         same command. Until it there was no such thing — a debt existed only on a session's own
-        question — so a piece of work the person handed a session could be dropped in silence."""
+        question — so a piece of work the person handed a session could be dropped in silence.
+        That branch reads **only** `from_`, `handed` and `outcome`: today `identity_log` is the
+        one writer and it always sends a `note`, which can never open or close, so `kind` and
+        `closed_reason` have nothing to say. A future writer that hands an `ask` would have to
+        settle what an unanswered one owes before setting the mark (review of PR #318)."""
         if self.handed:
             return self.from_ == PERSON and not self.outcome
         return (
