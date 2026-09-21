@@ -1193,9 +1193,11 @@ def test_the_card_shows_what_the_session_says_it_is_doing_before_the_tail(tmp_pa
     assert text in card.render(s=noage)
 
 
-def test_a_teams_header_shows_its_leads_doing_line(tmp_path, monkeypatch):
-    """design §4.5a **team groups** (§4.8, TD-074): the team card's header carries the lead's line,
-    with its age — the lead reporting on the team without narrating each member."""
+def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch):
+    """design §4.5a **team groups** (§4.8, TD-074; reversed by Paul 2026-09-21, TD-095): the header
+    carried the manager's name, state and line, and the manager's card said them again directly
+    beneath it. The line is on the card, the first in the group; the header says where the team's
+    sessions are and how many are in each state."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     from agentorc.ui.app import team_groups, templates, view
 
@@ -1207,13 +1209,12 @@ def test_a_teams_header_shows_its_leads_doing_line(tmp_path, monkeypatch):
          "team": "ao-grind", "controllers": ["ao-orc"], "tail": ["…"]},
     ]  # fmt: skip
     (g,) = team_groups([view(r, records) for r in records])
-    assert g["manager"]["doing"]["text"] == "round 3: reviewing PR 236"
     head = templates.get_template("group_head.html").render(g=g)
-    assert "round 3: reviewing PR 236" in head and "says · 11m ago" in head
-    # a lead that has said nothing adds no line
-    (quiet,) = team_groups([view({**rec, "doing": None}, records) for rec in records])
-    assert quiet["manager"]["doing"] is None
-    assert "says" not in templates.get_template("group_head.html").render(g=quiet)
+    assert "round 3: reviewing PR 236" not in head and ">orc<" not in head and "s-idle" not in head
+    assert g["counts"] == ["1 working", "1 unseen"] and "· 1 working · 1 unseen" in head
+    assert g["place"].endswith(f" / {tmp_path}") and g["place"] in head  # no repo: host / directory
+    card = templates.get_template("card.html").render(s=g["members"][0])
+    assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card
 
 
 def test_the_role_label_is_what_the_badge_the_team_header_and_the_inbox_row_show(tmp_path, monkeypatch):
@@ -1243,10 +1244,13 @@ def test_the_role_label_is_what_the_badge_the_team_header_and_the_inbox_row_show
     assert ">TD grinder</span>" in card.render(s=views[1])
     assert "the role preset it was started under — grinder" in card.render(s=views[1])  # the key, on hover
     assert ">Grinder</span>" in card.render(s=views[2])  # a repo this host cannot read: the default
-    # the team header calls its manager by the manager's label, escaped
+    # the manager's card carries its label, escaped; the team header names a manager only when its
+    # card is in another group (TD-095: the header no longer repeats the manager's card)
+    assert ">Shift &lt;lead&gt;</span>" in card.render(s=views[0])
     (g,) = [g for g in uiapp.team_groups(views) if g["team"] == "ao-grind"]
-    head = uiapp.templates.get_template("group_head.html").render(g=g)
-    assert '<span class="meta">Shift &lt;lead&gt;</span> <a class="name" href="/focus/ao-m">manager-ao-1</a>' in head
+    head = uiapp.templates.get_template("group_head.html").render(g={**g, "manager_elsewhere": True})
+    assert 'Shift &lt;lead&gt; <a class="name" href="/focus/ao-m">manager-ao-1</a> elsewhere' in head
+    assert "manager-ao-1" not in uiapp.templates.get_template("group_head.html").render(g=g)
     # …and an Inbox row carries the badge the card does
     row = uiapp.state_rows([{**views[1], "state": "stalled?"}])[0]
     assert row["role_label"] == "TD grinder"
