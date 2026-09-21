@@ -52,6 +52,10 @@ ICONS = ("flag", "wrench", "search", "eye", "book", "shield", "terminal", "perso
 # an Inbox row show in place of the bare key. A person's text, drawn escaped; nothing keys on it.
 LABEL_CAP = 40
 LANE_PLACEHOLDER = "{lane}"
+# The team's techlead seat (design §4.9b): its session id, filled at launch as `{lane}` is; `none`
+# where the team has none, or the session was started by hand, so a brief reads right either way.
+TECHLEAD_PLACEHOLDER = "{techlead}"
+NO_TECHLEAD = "none"
 
 # The built-in presets (design §4.8's table): each a brief template shipped with the package
 # (`agentorc/briefs/<role>.md`, `{lane}` filled at launch), a default lane shape, and its grants.
@@ -60,6 +64,9 @@ PRESETS: dict[str, dict[str, Any]] = {
     "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": [], "icon": "wrench", "label": "Grinder"},
     "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": [], "icon": "search", "label": "Hunter"},
     "manager": {"brief": "manager.md", "lane": [], "grants": ["control"], "icon": "flag", "label": "Manager"},
+    # The go-between (design §4.9b, TD-075): answers teammates' questions from the record, passes the
+    # rest up. No grants — it acts on no session; the design's `alarms` grant is not built.
+    "techlead": {"brief": "techlead.md", "lane": [], "grants": [], "icon": "book", "label": "Tech lead"},
     "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
@@ -71,8 +78,8 @@ DEFAULT_ROLE = "plain"
 ROLE_ALIASES: dict[str, str] = {"orchestrator": "manager", "lead": "manager"}
 # Reserved role names (design §4.8 *The names*): a word that is decided but not built. Refused by
 # name wherever a role is named or defined, so it cannot arrive in live data meaning something
-# the entry that builds it then has to read around.
-RESERVED_ROLES: dict[str, str] = {"techlead": "reserved for the go-between of TD-075, which is not built yet"}
+# the entry that builds it then has to read around. Empty since `techlead` was built (TD-075 step 1).
+RESERVED_ROLES: dict[str, str] = {}
 _warned: set[str] = set()
 
 
@@ -171,9 +178,12 @@ class Role:
         """`built-in`, `repo`, `built-in + repo` …: for `ao roles` and the form's note."""
         return " + ".join(self.sources) or "built-in"
 
-    def brief_text(self, lane: list[str] | None = None, *, read: Reader | None = None) -> str | None:
+    def brief_text(
+        self, lane: list[str] | None = None, *, read: Reader | None = None, techlead: str | None = None
+    ) -> str | None:
         """The opening prompt this role gives a session: its template with `{lane}` filled from
-        `lane` (default the role's own). None for a role without a brief (`plain`). `read` reads a
+        `lane` (default the role's own) and `{techlead}` with the team's seat (`none` without one).
+        None for a role without a brief (`plain`). `read` reads a
         repo's brief file — this host's disk by default, or another host's checkout across the link
         (design §4.4a "Teams across hosts", TD-057 step 4b.3); a built-in template is always the
         package's own."""
@@ -191,6 +201,7 @@ class Role:
                 raise ValueError(f"role {self.name!r}: brief {path} cannot be read ({e.strerror or e})") from None
             if text is None:
                 raise ValueError(f"role {self.name!r}: brief {path} cannot be read (no such file)")
+        text = text.replace(TECHLEAD_PLACEHOLDER, techlead or NO_TECHLEAD)
         return text.replace(LANE_PLACEHOLDER, ", ".join(lane if lane is not None else self.lane) or "(none given)")
 
     def to_dict(self) -> dict[str, Any]:

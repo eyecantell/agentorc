@@ -142,6 +142,7 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "source": str(t.source) if t.source else None,
                 "projects": list(t.projects),
                 "manager": t.manager.name if t.manager.role != orgmod.PERSON else "person",
+                "techlead": t.techlead.name if t.techlead else None,  # the seat (§4.9b), if any
                 "members": sum(len(m.names()) for m in t.members if m.team is None),
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
@@ -203,12 +204,23 @@ def start(
     if held:
         raise NamesHeld(name, held)
     created: list[dict[str, Any]] = []
+    notes: list[str] = []
     lead_id = ""
     try:
         if plan.lead:
             rec = call("create", **plan.lead.create_params([]))
             created.append(rec)
             lead_id = str(rec["id"])
+        if plan.techlead:
+            # The seat is its manager's member (design §4.9b): the manager is its controller, as
+            # for any member. Its id was named in every brief before it existed (`{techlead}`).
+            rec = call("create", **plan.techlead.create_params([lead_id] if lead_id else []))
+            created.append(rec)
+            if str(rec["id"]) != plan.techlead_id:
+                notes.append(
+                    f"the techlead started as {rec['id']}, but the briefs name {plan.techlead_id} — "
+                    "a stale tmux session holds that id; tell the team, or restart it once that session is gone"
+                )
         for m in plan.members:
             # A person runs a team start, so no attenuation applies (§4.8 create rule); a
             # lead running it is subject to it as for any create, in the host agent.
@@ -227,6 +239,7 @@ def start(
         "sessions": created,
         "out_of_reach": out_of_reach,
         "unrepeatable": list(plan.warnings),
+        "notes": notes,
     }
 
 

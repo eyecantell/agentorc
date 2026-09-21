@@ -556,6 +556,8 @@ def cmd_team_start(args: argparse.Namespace) -> int:
             print(_team_line(rec, args.name, p))
         for warning in result.get("unrepeatable", []):
             print(f"{warning} (TD-042: a brief describes the job, not the run)", file=sys.stderr)
+        for note in result.get("notes", []):
+            print(note, file=sys.stderr)
         for name in result["out_of_reach"]:
             print(
                 f"{name} is interactive, so {p.lead.name if p.lead else 'the manager'} cannot act on it "
@@ -569,7 +571,7 @@ def cmd_team_start(args: argparse.Namespace) -> int:
 
 def _team_line(rec: dict[str, Any], team: str, p: teams.Plan) -> str:
     launch = next((x for x in p.launches if x.name == rec.get("name")), None)
-    what = "manager" if launch and launch.lead else "member"
+    what = "manager" if launch and launch.lead else "techlead" if launch and launch.seat else "member"
     role = f" {launch.role}" if launch and launch.role else ""
     return f"{rec['id']}  {what}{role}  {rec.get('dir', '')}"
 
@@ -671,7 +673,9 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             # CLI would disagree about the same definition.
             live = f"{r['live']} live" if r["live"] else ("wound down" if r["wound_down"] else "stopped")
             print(
-                f"{r['name']:<{w}}  {live:<10}  manager: {r['manager']}  members: {r['members']}  "
+                f"{r['name']:<{w}}  {live:<10}  manager: {r['manager']}  "
+                + (f"techlead: {r['techlead']}  " if r.get("techlead") else "")
+                + f"members: {r['members']}  "
                 f"projects: {', '.join(r['projects'])}  [{r['source']}]"
             )
 

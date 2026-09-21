@@ -53,9 +53,10 @@ not mix:
   resolve to `manager` for one release and warn. *Not:* lead, orchestrator, orc, supervisor.
   — **decided** 2026-09-19 (Paul), confirmed 2026-09-20 (TD-076, design §4.8 *The names*).
 - **techlead** — the technical go-between of TD-075: a session that answers technical
-  questions for a team's workers before they reach a person. Shown as *Tech lead*. **Reserved,
-  not built**: what it holds and may do is TD-075's to design, and until then no role of this
-  name can be defined. — **decided** as a name 2026-09-19 (Paul); the role itself *proposed*.
+  questions for a team's workers before they reach a person. Shown as *Tech lead*. A team's
+  optional `techlead:` seat; started per batch of questions, holds no grant (design §4.9b). —
+  **decided** as a name 2026-09-19 (Paul); the seat, the preset and the briefs *built* 2026-09-20
+  (TD-075 step 1), its mail verbs not yet.
 - **lead** — **retired** 2026-09-20 (TD-076). It named the manager; it is never given a new
   meaning, so that a record badged `lead` and a definition's `lead:` key cannot come to mean a
   different session than the one they were written for. In text dated before the rename it

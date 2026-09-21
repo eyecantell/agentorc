@@ -28,6 +28,7 @@ from typing import Any
 
 from agentorc import org as orgmod
 from agentorc import profiles, repoconfig
+from sessionorc import naming
 
 WRAPUP_PROMPT = (
     "agentorc: this session is being wrapped up. Stop starting new work now. Commit and push whatever "
@@ -103,6 +104,7 @@ class Launch:
     lane: list[str] = field(default_factory=list)
     unattended: bool = True
     lead: bool = False
+    seat: bool = False  # the team's techlead (§4.9b)
     ledger: str | None = None
     host: str = ""  # the host this session lands on; "" is the host the start runs on
 
@@ -135,11 +137,14 @@ class Launch:
 
 @dataclass
 class Plan:
-    """What `ao team start` would do: the lead (None when a person leads) and the members in order."""
+    """What `ao team start` would do: the lead (None when a person leads), the techlead seat (None
+    when the definition has none) and the members in order."""
 
     team: str
     source: Path | None = None
     lead: Launch | None = None
+    techlead: Launch | None = None
+    techlead_id: str = ""  # the id the seat will take, which every brief's `{techlead}` names
     members: list[Launch] = field(default_factory=list)
     host: str = ""  # where the team lands when that is not the host the start runs on (§4.4a)
     warnings: list[str] = field(default_factory=list)
@@ -147,7 +152,8 @@ class Plan:
 
     @property
     def launches(self) -> list[Launch]:
-        return ([self.lead] if self.lead else []) + list(self.members)
+        """In creation order: the manager, the seat (its controller is the manager, §4.9b), the members."""
+        return ([self.lead] if self.lead else []) + ([self.techlead] if self.techlead else []) + list(self.members)
 
 
 def find(org: orgmod.Org, name: str) -> orgmod.TeamDef:
@@ -214,9 +220,10 @@ def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> t
     return project_block(org, [project], host, home), ""
 
 
-# A lead and a member are shaped alike where a launch is concerned (§4.9): both name a lane, a
-# brief override, grants, a profile and whether they are unattended. `None` is the person-lead case.
-Spec = orgmod.MemberDef | orgmod.ManagerDef | None
+# A lead, a member and the techlead seat are shaped alike where a launch is concerned (§4.9): each
+# names a lane, a brief override, grants, a profile and whether it is unattended. `None` is the
+# person-lead case.
+Spec = orgmod.MemberDef | orgmod.ManagerDef | orgmod.TechleadDef | None
 
 
 # `(host, checkout, [paths relative to it])` → `{path: text, or None when there is no such file}`:
@@ -241,15 +248,36 @@ def _reader_on(files: Files, host: str, checkout: Path) -> repoconfig.Reader:
 
 
 def _brief(
-    role: repoconfig.Role, member: Spec, checkout: Path, lane: list[str], read: repoconfig.Reader | None = None
+    role: repoconfig.Role,
+    member: Spec,
+    checkout: Path,
+    lane: list[str],
+    read: repoconfig.Reader | None = None,
+    techlead: str = "",
 ) -> str | None:
-    """The role's template with `{lane}` filled, or the member's `brief:` override read from its
-    home checkout. A lead may override its brief too — a lead's is the one a repo most
-    often keeps its own copy of (2026-09-13)."""
+    """The role's template with `{lane}` and `{techlead}` filled, or the member's `brief:` override
+    read from its home checkout. A lead may override its brief too — a lead's is the one a repo
+    most often keeps its own copy of (2026-09-13)."""
     if member is not None and member.brief:
         override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
-        return override.brief_text(lane, read=read)
-    return role.brief_text(lane, read=read)
+        return override.brief_text(lane, read=read, techlead=techlead)
+    return role.brief_text(lane, read=read, techlead=techlead)
+
+
+def seat_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
+    """The id the team's techlead will take (design §4.9b `{techlead}`), known before anything is
+    created so the manager's brief — the first session started — can already name it: §4.1's
+    `ao-<scope>-<name>` from its checkout, qualified `@<host>` when the team lands on another
+    host, as the home addresses that host's records. "" without a seat, or without a checkout
+    (the seat's own launch then refuses the start, naming it)."""
+    if team.techlead is None:
+        return ""
+    checkout = org.checkout(project_of(org, team.projects, team.techlead.home), team.techlead.home, host)
+    if checkout is None:
+        return ""
+    checkout = Path(checkout).expanduser()
+    sid = naming.base_id(checkout, str(checkout), team.techlead.name)
+    return sid if host == here else f"{sid}@{host}"
 
 
 def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
@@ -266,6 +294,8 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     lead: bool,
     block: str,
     files: Files | None = None,
+    techlead: str = "",
+    seat: bool = False,
 ) -> Launch:
     where = f"team {team.name}: {name}"
     project = project_of(org, team.projects, home)
@@ -306,7 +336,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     try:
-        prompt = _brief(role, member, checkout, lane, read)
+        prompt = _brief(role, member, checkout, lane, read, techlead)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
@@ -324,6 +354,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         lane=lane,
         unattended=member.unattended if member is not None else True,  # a lead may ask to be watched
         lead=lead,
+        seat=seat,
         ledger=cfg.ledger,
         host=host if host != here else "",
     )
@@ -339,6 +370,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
     here, host = host, team.host or host  # the team lands on its `host:`, else where the start runs (§4.4a)
     p = Plan(team=team.name, source=team.source, host=host if host != here else "")
     reach = bool(project_block(org, team.projects, host))
+    p.techlead_id = tid = seat_id(org, team, host, here)
     if team.manager.role != orgmod.PERSON:
         p.lead = _launch(
             org=org,
@@ -353,8 +385,30 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             lead=True,
             block=project_block(org, team.projects, host, team.manager.home) if reach else "",
             files=files,
+            techlead=tid,
         )
     seen: set[str] = {p.lead.name} if p.lead else set()
+    if team.techlead is not None:
+        seat = team.techlead
+        if seat.name in seen:
+            raise TeamError(f"team {team.name}: two sessions would be called {seat.name!r} — a name is one session")
+        seen.add(seat.name)
+        p.techlead = _launch(
+            org=org,
+            team=team,
+            name=seat.name,
+            role_name=orgmod.TECHLEAD_ROLE,
+            home=seat.home,
+            host=host,
+            here=here,
+            profile_override=profile or seat.profile,
+            member=seat,
+            lead=False,
+            block=project_block(org, team.projects, host, seat.home) if reach else "",
+            files=files,
+            techlead=tid,
+            seat=True,
+        )
     for member in team.members:
         if member.team is not None:
             raise TeamError(
@@ -380,6 +434,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                     lead=False,
                     block=block,
                     files=files,
+                    techlead=tid,
                 )
             )
     # One line per finding, not per session: a team's members share a brief, and four copies of

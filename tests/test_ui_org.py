@@ -7,7 +7,7 @@ import pathlib
 
 import pytest
 
-from agentorc.ui.app import team_groups
+from agentorc.ui.app import team_groups, templates
 
 pytestmark = pytest.mark.unit
 
@@ -48,6 +48,12 @@ def test_a_team_with_nothing_live_keeps_its_card_below_the_live_ones_and_no_team
     assert idle["defined"] and idle["ids"] == [] and idle["def_manager"] == "orc" and idle["projects"] == ["p"]
     # a definition alone turns grouping on: a stopped team is a card, not a line above a flat grid
     assert [g["team"] for g in team_groups([sess("ao-b", "b")], rows)] == ["", "zz-idle"]
+    # a definition with a techlead seat (TD-075, design §4.9b) names it on the card, as `ao team list` does
+    assert idle["def_techlead"] is None
+    (seated,) = team_groups([], [{**rows[0], "techlead": "tl-1"}])
+    head = templates.get_template("group_head.html").render(g=seated)
+    assert "Manager orc · Tech lead tl-1 · 2 members" in head
+    assert "Tech lead" not in templates.get_template("group_head.html").render(g=idle)
 
 
 def test_two_teams_each_with_a_lead():

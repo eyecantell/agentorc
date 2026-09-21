@@ -75,7 +75,8 @@ def test_role_fills_brief_lane_grants_profile_and_the_record(repo, capsys):
 def test_role_orchestrator_or_lead_still_starts_a_manager_and_says_so(repo, capsys, monkeypatch):
     """TD-055 step 2, repointed by TD-076 step 2: `--role orchestrator` and `--role lead` are
     deprecated aliases for one release — the session is started as `manager`, with the manager
-    brief and grants, and stderr names the new word. `--role techlead` is refused by name."""
+    brief and grants, and stderr names the new word. `--role techlead` starts the go-between (TD-075
+    step 1), with no grant and its brief saying it has no seat to name."""
     from agentorc import repoconfig
 
     monkeypatch.setattr(repoconfig, "_warned", set())
@@ -87,9 +88,10 @@ def test_role_orchestrator_or_lead_still_starts_a_manager_and_says_so(repo, caps
         assert p["role"] == "manager" and p["capabilities"] == ["control"] and "**manager**" in p["prompt"]
         assert f"role `{old}` is now `manager` (TD-076)" in capsys.readouterr().err
     calls.clear()
-    assert cli.main(["new", "t1", "--role", "techlead"]) != 0
-    assert not any(m == "create" for m, _ in calls)
-    assert "`techlead` is reserved" in capsys.readouterr().err
+    assert cli.main(["new", "t1", "--role", "techlead"]) == 0
+    p = created(calls)
+    assert p["role"] == "techlead" and p["capabilities"] == [] and "**techlead**" in p["prompt"]
+    assert "{techlead}" not in p["prompt"] and "$AGENTORC_SESSION" in p["prompt"]
 
 
 def test_grant_orchestrate_on_the_command_line_is_sent_as_control(repo, capsys):

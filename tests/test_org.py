@@ -336,9 +336,28 @@ def test_the_old_lead_key_is_read_as_manager_and_both_are_refused(tmp_path, caps
         org.load(f)
 
 
-def test_techlead_is_refused_as_an_org_role(tmp_path):
-    """TD-076 step 2: `techlead` is reserved (design §4.8), in `org.yml`'s `roles:` as in a repo's."""
+def test_techlead_is_an_org_role_like_any_other(tmp_path):
+    """TD-075 step 1: `techlead` is a preset now (design §4.9b), so `org.yml`'s `roles:` may carry
+    it — the usual place to give the go-between a stronger profile."""
     f = tmp_path / "org.yml"
     f.write_text("roles:\n  techlead: {profile: x}\n")
-    with pytest.raises(ValueError, match=r"roles\.techlead: role `techlead` is reserved"):
-        org.load(f)
+    assert org.load(f).roles["techlead"] == {"profile": "x"}
+
+
+def test_a_team_may_carry_one_techlead_seat(tmp_path):
+    """TD-075 step 1, design §4.9b: `techlead: {name, home, profile, brief}` beside `manager:`; the
+    name defaults to `<team>-techlead` and `home` follows the members' rule. The seat is the role
+    and holds no grant, so `role:` and `grants:` are refused as unknown keys, and so is a bare
+    string — `techlead: person` included: a person answering questions is the person."""
+    f = tmp_path / "org.yml"
+    base = "projects: {p: {repos: {r: {kmaster: /tmp/r}}}}\nteams:\n  t:\n    projects: [p]\n"
+    f.write_text(base + "    techlead: {profile: strong}\n")
+    seat = org.load(f).teams["t"].techlead
+    assert (seat.name, seat.home, seat.profile, seat.brief, seat.grants) == ("t-techlead", "r", "strong", None, None)
+    f.write_text(base)
+    assert org.load(f).teams["t"].techlead is None
+    for bad, why in (("{role: grinder}", r"unknown key\(s\) \['role'\]"), ("{grants: [control]}", "unknown key"),
+                     ("person", "must be a mapping"), ("{home: nope}", "not a repo of the team")):  # fmt: skip
+        f.write_text(base + f"    techlead: {bad}\n")
+        with pytest.raises(ValueError, match=why):
+            org.load(f)

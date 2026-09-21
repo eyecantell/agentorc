@@ -9,6 +9,7 @@ teams:
   ao-grind:
     projects: [agentorc]
     manager: {role: manager, name: manager-ao-1}
+    techlead: {name: techlead-ao-1}   # optional, one per team: the go-between (§4.9b)
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
       - {team: ao-ui}                 # a nested team
@@ -63,6 +64,21 @@ class ManagerDef:
 
 
 @dataclass
+class TechleadDef:
+    """A team's techlead seat (design §4.9b): always the `techlead` role, always a session — a
+    person answering questions is the person, which every team already has. The last three fields
+    are fixed, so a launch reads the seat as it reads a member: no lane, the role's grants (none)."""
+
+    name: str = ""  # default `<team>-techlead`, filled by the loader
+    home: str = ""
+    profile: str | None = None
+    brief: str | None = None  # overrides the preset's `techlead.md`
+    lane: list[str] = field(default_factory=list)
+    grants: list[str] | None = None
+    unattended: bool = True
+
+
+@dataclass
 class MemberDef:
     role: str = ""
     count: int = 1
@@ -88,6 +104,7 @@ class TeamDef:
     projects: list[str] = field(default_factory=list)
     manager: ManagerDef = field(default_factory=ManagerDef)
     members: list[MemberDef] = field(default_factory=list)
+    techlead: TechleadDef | None = None  # the seat (§4.9b), when the definition has one
     source: Path | None = None  # the file it was read from (`ao team list` names it)
     host: str = ""  # where every session lands (design §4.4a "Teams across hosts"); "" is the host the start runs on
 
@@ -241,7 +258,9 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 
 MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
 MEMBER_KEYS = (*MANAGER_KEYS, "count", "team")
-TEAM_KEYS = ("projects", "manager", "lead", "members", "host")
+TEAM_KEYS = ("projects", "manager", "lead", "techlead", "members", "host")
+TECHLEAD_KEYS = ("name", "home", "profile", "brief")
+TECHLEAD_ROLE = "techlead"
 
 
 def _no_stray(raw: dict[str, Any], known: tuple[str, ...], key: str) -> None:
@@ -320,7 +339,29 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         raise ValueError(f"{key}.members must be a list")
     members = [_member(m, f"{key}.members[{i}]") for i, m in enumerate(members_raw)]
     projects = [_str(p, f"{key}.projects") for p in projects]
-    return TeamDef(name, projects, manager, members, source, host=_str(raw.get("host"), f"{key}.host"))
+    return TeamDef(
+        name,
+        projects,
+        manager,
+        members,
+        techlead=_techlead(name, raw.get("techlead"), f"{key}.techlead") if "techlead" in raw else None,
+        source=source,
+        host=_str(raw.get("host"), f"{key}.host"),
+    )
+
+
+def _techlead(team: str, raw: Any, key: str) -> TechleadDef:
+    """`techlead: {name, home, profile, brief}` (design §4.9b). No `role:` — the seat is the role —
+    and no `grants:`: the preset holds none, and the one grant the design names for it (`alarms`)
+    is not built. `techlead: person` is refused as any non-mapping is."""
+    raw = _mapping(raw, key)
+    _no_stray(raw, TECHLEAD_KEYS, key)
+    return TechleadDef(
+        name=_str(raw.get("name"), f"{key}.name", default=f"{team}-techlead"),
+        home=_str(raw.get("home"), f"{key}.home"),
+        profile=_opt_str(raw.get("profile"), f"{key}.profile"),
+        brief=_opt_str(raw.get("brief"), f"{key}.brief"),
+    )
 
 
 # ── validation ────────────────────────────────────────────────────────────────────────────────
@@ -340,6 +381,8 @@ def _validate(org: Org, label: str) -> None:
             raise ValueError(f"{key}: its projects {team.projects} list no repos")
         if team.manager.role != PERSON:  # a person manages from nowhere: no session, so no home
             team.manager.home = _home(team.manager.home, repos, f"{key}.manager.home")
+        if team.techlead is not None:
+            team.techlead.home = _home(team.techlead.home, repos, f"{key}.techlead.home")
         for i, m in enumerate(team.members):
             mkey = f"{key}.members[{i}]"
             if m.team is not None:
