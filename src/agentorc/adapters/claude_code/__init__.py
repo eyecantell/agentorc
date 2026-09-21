@@ -55,6 +55,29 @@ class Window:
     resets: str | None
 
 
+class UsageRefused(Exception):
+    """Why the usage endpoint gave no reading (TD-087). `reason` is one of `rate_limited`,
+    `no_credentials`, `no_profile` and `error` — a word the core keys on, never prose — and
+    `retry_after` is the endpoint's own `Retry-After` in seconds when it sent one."""
+
+    def __init__(self, reason: str, retry_after: float | None = None):
+        super().__init__(reason)
+        self.reason, self.retry_after = reason, retry_after
+
+
+def _retry_after(e: Exception) -> float | None:
+    """`Retry-After` as seconds, when the endpoint sent one and it is a number. The date form is
+    legal HTTP and is not parsed: an unreadable header is None, and the caller doubles instead."""
+    try:
+        raw = e.headers.get("Retry-After")  # type: ignore[attr-defined]
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        return max(float(str(raw).strip()), 0.0) if raw else None
+    except (TypeError, ValueError):
+        return None
+
+
 @dataclass
 class Usage:
     """Every window this account has, worst last or not — the order is the endpoint's. A tool with
@@ -396,22 +419,45 @@ class ClaudeCodeAdapter:
 
     def usage_for(self, profile: str) -> dict | None:
         """The core-facing form of `usage()`: by profile name, as a plain dict —
-        `{"windows": [{"label", "pct", "resets"}, ...], "fetched"}` (TD-001, TD-073)."""
+        `{"windows": [{"label", "pct", "resets"}, ...], "fetched", "reason": "ok"}` (TD-001,
+        TD-073), or **why there is no reading** (TD-087): `{"reason": "rate_limited",
+        "retry_after": <seconds or None>}`, `{"reason": "no_credentials"}`, `{"reason": "error"}`.
+
+        A reason, never prose: *rate-limited*, *no credentials*, *no network* and *no profile*
+        were one silence — every failure returned `None` — so the chip stayed empty, the journal
+        said nothing, the poll asked again a minute later, and a session at its cap was not marked
+        `limited` while the endpoint refused us. The core does not act on the words; it logs a
+        change of reason once, backs off on `rate_limited` and keeps the last good reading.
+        """
         try:
-            u = self.usage(profiles_mod.get(profile or None))
+            prof = profiles_mod.get(profile or None)
         except (KeyError, ValueError):
-            return None
-        return asdict(u) if u else None
+            return {"reason": "no_profile"}
+        try:
+            u = self.usage(prof)
+        except UsageRefused as e:
+            return {"reason": e.reason, "retry_after": e.retry_after}
+        return {**asdict(u), "reason": "ok"} if u else {"reason": "error"}
 
     def usage(self, profile: Profile, timeout: float = 10.0) -> Usage | None:
         """This account's quota windows from the OAuth usage endpoint tdgrind already polls —
         for Claude Code the 5-hour and the weekly one, labelled `5h` and `wk`. The token never
-        touches argv; a failure returns None (never gates anything)."""
+        touches argv; nothing here gates anything.
+
+        Raises `UsageRefused` with a **reason** for every failure it can name (TD-087): the
+        endpoint answers HTTP 429 `rate_limit_error` when the account's allowance is spent — by
+        us, by the tool, by anything else on the same account — and a caller told only `None`
+        answers it with another request a minute later. **A 200 whose body does not parse is the
+        one that still returns `None`**: `parse_usage` reads what it can and answers nothing when
+        the shape is not what it knows, which is a shape question and not a reason; `usage_for`
+        turns that into `error`, which is what it is.
+        """
+        import urllib.error
         import urllib.request
 
         c = self._creds(profile)
         if not c or not c.get("accessToken"):
-            return None
+            raise UsageRefused("no_credentials")
         req = urllib.request.Request(
             USAGE_URL,
             headers={
@@ -423,8 +469,12 @@ class ClaudeCodeAdapter:
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:  # noqa: S310 — fixed https URL
                 return parse_usage(json.loads(r.read().decode()))
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                raise UsageRefused("rate_limited", _retry_after(e)) from None
+            raise UsageRefused("error") from None
         except Exception:  # noqa: BLE001
-            return None
+            raise UsageRefused("error") from None
 
 
 def _pid_alive(pid: int, proc_start: object) -> bool:

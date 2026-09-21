@@ -380,15 +380,18 @@ def test_external_sessions_reads_every_profiles_registry(tmp_path, monkeypatch):
     assert sorted(e.name for e in got) == ["in-a", "in-b"]  # once per dir, never the other tool's
 
 
-def test_usage_for_by_profile_name(tmp_path, monkeypatch):
-    """TD-001: the core asks by profile name and gets a plain dict; unknown profile or no data → None."""
+def test_usage_for_by_profile_name_and_why_when_there_is_no_reading(tmp_path, monkeypatch):
+    """TD-001: the core asks by profile name and gets a plain dict. TD-087: and when there is no
+    reading it is told **why**, in a word it can key on — *rate-limited*, *no credentials*, *no
+    profile* and *an error* were one silence, so the chip stayed empty, the journal said nothing,
+    and the poll asked again a minute later against an endpoint answering 429."""
     import unittest.mock as um
 
-    from agentorc.adapters.claude_code import Usage, Window
+    from agentorc.adapters.claude_code import Usage, UsageRefused, Window
 
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))  # no profiles.yml: only `default` exists
     ad = ClaudeCodeAdapter()
-    assert ad.usage_for("no-such-profile") is None
+    assert ad.usage_for("no-such-profile") == {"reason": "no_profile"}
     u = Usage(
         windows=[Window(label="5h", pct=42, resets="2026-09-10T04:00:00Z"), Window(label="wk", pct=7, resets=None)],
         fetched="x",
@@ -400,9 +403,47 @@ def test_usage_for_by_profile_name(tmp_path, monkeypatch):
                 {"label": "wk", "pct": 7, "resets": None},
             ],
             "fetched": "x",
+            "reason": "ok",
         }
     with um.patch.object(ClaudeCodeAdapter, "usage", return_value=None):
-        assert ad.usage_for("default") is None
+        assert ad.usage_for("default") == {"reason": "error"}
+    for refused, want in (
+        (UsageRefused("rate_limited", 90.0), {"reason": "rate_limited", "retry_after": 90.0}),
+        (UsageRefused("rate_limited"), {"reason": "rate_limited", "retry_after": None}),
+        (UsageRefused("no_credentials"), {"reason": "no_credentials", "retry_after": None}),
+    ):
+        with um.patch.object(ClaudeCodeAdapter, "usage", side_effect=refused):
+            assert ad.usage_for("default") == want
+
+
+def test_a_429_is_read_as_rate_limited_with_its_retry_after(tmp_path, monkeypatch):
+    """TD-087: the endpoint answers HTTP 429 `rate_limit_error` when the account's allowance is
+    spent — by us, by the tool, by anything else on the same account. It is the one answer that
+    means *ask less often*, so it is the one the caller must be able to tell from a network
+    error; and its `Retry-After`, when it sends a number, is the endpoint's own word on when."""
+    import unittest.mock as um
+    import urllib.error
+
+    from agentorc.adapters.claude_code import UsageRefused
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    ad = ClaudeCodeAdapter()
+    prof = profiles.get(None)
+    with um.patch.object(ClaudeCodeAdapter, "_creds", return_value={"accessToken": "t"}):
+        for err, reason, after in (
+            (urllib.error.HTTPError("u", 429, "rate_limit_error", {"Retry-After": "120"}, None), "rate_limited", 120.0),
+            (urllib.error.HTTPError("u", 429, "rate_limit_error", {}, None), "rate_limited", None),
+            (urllib.error.HTTPError("u", 429, "x", {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}, None), "rate_limited", None),  # noqa: E501
+            (urllib.error.HTTPError("u", 500, "boom", {}, None), "error", None),
+            (OSError("no route to host"), "error", None),
+        ):
+            with um.patch("urllib.request.urlopen", side_effect=err), pytest.raises(UsageRefused) as e:
+                ad.usage(prof)
+            assert (e.value.reason, e.value.retry_after) == (reason, after)
+    # and no credentials never reaches the network at all
+    with um.patch.object(ClaudeCodeAdapter, "_creds", return_value=None), pytest.raises(UsageRefused) as e:
+        ad.usage(prof)
+    assert e.value.reason == "no_credentials"
 
 
 def test_composer_reads_painted_text_only():

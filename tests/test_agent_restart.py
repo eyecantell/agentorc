@@ -6,7 +6,8 @@ store with a still-running agent (design §9 invariant 1)."""
 
 import asyncio
 import contextlib
-from datetime import timedelta
+import time
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from conftest import kill_private_server, private_socket_name, wait_for, wait_state
@@ -300,3 +301,60 @@ async def test_a_wait_against_no_agent_at_all_is_still_an_error(tmp_path, monkey
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     with pytest.raises(AgentUnavailable, match="not reachable"):
         await client.wait_rpc(caller="ao-nobody", timeout=30.0)
+
+
+async def test_the_last_usage_reading_survives_a_restart(tmp_path, monkeypatch):
+    """TD-087 item 3: the readings lived in memory, so **every promote forgot them** — eight in
+    one day — and the agent polled at once against an endpoint that answers 429, while the chip
+    vanished rather than going stale. The last good reading is now on disk with its `fetched`
+    time, so a restarted agent has something to show and nothing to ask for."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    tmux = Tmux(socket_name=private_socket_name())
+    reading = {"windows": [{"label": "5h", "pct": 61, "resets": None}], "fetched": "t1", "reason": "ok"}
+    a = HostAgent(tmux=tmux)
+    a._usage["p1"] = reading
+    a.usage_store.save(a._usage)
+    # a second agent, as a promote makes one — built, not served, so the assertion is about the
+    # load and not about when the first tick runs
+    a2 = HostAgent(tmux=tmux)
+    # the reading is back — and the **reason** is not, because why the last poll failed is the
+    # running agent's business and means nothing after a restart
+    assert a2._usage == {"p1": {"windows": [{"label": "5h", "pct": 61, "resets": None}], "fetched": "t1"}}
+    # what does *not* survive is a profile no live session runs under: the tick prunes it, which
+    # is TD-073's rule (one tool in use is one chip) and is why the file is not an archive
+    assert a2.usage_store.load() == a2._usage
+
+
+async def test_a_restart_keeps_the_polls_allowance_too(tmp_path, monkeypatch):
+    """Anchor's read of PR #307: keeping the reading kept the chip but not the allowance —
+    `_usage_checked` started empty, so a promote still polled at once. The first poll after a
+    restart is now seeded from the held reading's `fetched`: due when `fetched + USAGE_EVERY` has
+    passed, never sooner; a reading with no readable time is polled at once, as before."""
+    from sessionorc.agent import USAGE_EVERY
+
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    tmux = Tmux(socket_name=private_socket_name())
+
+    def iso(dt):
+        return dt.replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+    now = datetime.now(UTC)
+    a = HostAgent(tmux=tmux)
+    for prof, fetched in {
+        "fresh": iso(now - timedelta(seconds=60)),  # fetched a minute ago: not due for four more
+        "old": iso(now - timedelta(seconds=USAGE_EVERY + 60)),  # a period and more: due now
+        "ahead": iso(now + timedelta(hours=1)),  # a clock that stepped back: a full period, not sooner
+        "odd": "t1",  # not a time: polled at once
+    }.items():
+        a._usage[prof] = {"windows": [], "fetched": fetched}
+    a.usage_store.save(a._usage)
+    a2 = HostAgent(tmux=tmux)
+    mono = time.monotonic()
+
+    def due(prof):
+        return mono - a2._usage_checked.get(prof, -USAGE_EVERY) >= USAGE_EVERY  # the tick's own test
+
+    assert not due("fresh") and USAGE_EVERY - 70 < a2._usage_checked["fresh"] + USAGE_EVERY - mono <= USAGE_EVERY - 59
+    assert due("old")
+    assert not due("ahead") and a2._usage_checked["ahead"] == pytest.approx(mono, abs=5)
+    assert "odd" not in a2._usage_checked and due("odd")

@@ -1641,3 +1641,64 @@ async def test_a_restart_is_refused_while_an_outcome_is_owed_and_wakes_the_lead(
         assert changed[w]["restart_wanted"]["why"] == "context is long, the lane is not done"
         for sid in (lead, w):
             await person.call("kill", id=sid)
+
+
+async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one(
+    agent, hookstub, tmp_path, monkeypatch
+):
+    """TD-087. Three things kept the usage chip empty and a capped session unmarked: every
+    failure was one silence (`None`), a 429 was answered with another request a minute later,
+    and the readings lived in memory, so each promote forgot them and polled at once.
+
+    Now the adapter answers with a **reason**; a reading is replaced only by a newer reading, so
+    a refusal leaves the last one standing with the reason beside it — *the chip went out* and
+    *the allowance is spent* are different things to a person, and a five-hour window does not
+    change while we are refused. A 429 waits the endpoint's own `Retry-After`, or doubles; any
+    other answer goes back to the ordinary cadence, since only a 429 says *ask less often*."""
+    from sessionorc.agent import USAGE_BACKOFF_MAX, USAGE_EVERY
+    from sessionorc.store import UsageStore
+
+    monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    async with LocalClient() as c:
+        s = await c.call("create", name="u", dir=str(tmp_path), adapter="hookstub", profile="p9")
+        hookstub.usage_value = {"windows": [{"label": "5h", "pct": 40, "resets": None}], "fetched": "t1"}
+        assert await wait_for(lambda: bool(agent._usage.get("p9")), timeout=5.0, step=0.1)
+        assert agent._usage["p9"] == {"windows": [{"label": "5h", "pct": 40, "resets": None}], "fetched": "t1"} | {
+            "reason": "ok"
+        }
+        assert UsageStore().load()["p9"]["fetched"] == "t1"  # and it is on disk, for the next promote
+
+        # a 429 keeps the reading, says why, and waits the endpoint's own word on when
+        hookstub.usage_value = {"reason": "rate_limited", "retry_after": 900.0}
+        assert await wait_for(lambda: agent._usage["p9"].get("reason") == "rate_limited", timeout=5.0, step=0.1)
+        assert agent._usage["p9"]["windows"] == [{"label": "5h", "pct": 40, "resets": None}]  # not lost
+        assert agent._usage["p9"]["fetched"] == "t1" and agent._usage["p9"]["retry_after"] == 900.0
+        assert agent._usage_wait["p9"] == 900.0
+
+        # with no Retry-After it doubles instead, to a ceiling — and the old `retry_after` goes
+        # with the poll that gave it, rather than standing as this refusal's word on when
+        agent._usage_wait["p9"] = USAGE_BACKOFF_MAX
+        again = agent._usage_reading("p9", {"reason": "rate_limited"})
+        assert again is not None and "retry_after" not in again and again["reason"] == "rate_limited"
+        assert agent._usage_wait["p9"] == USAGE_BACKOFF_MAX  # already at the ceiling
+        agent._usage["p9"] = again
+        assert agent._usage_reading("p9", {"reason": "rate_limited"}) is None  # now nothing changed to say
+        agent._usage_wait["p9"] = 100.0
+        agent._usage_reading("p9", {"reason": "rate_limited"})
+        assert agent._usage_wait["p9"] == 200.0
+
+        # any other answer is the ordinary cadence again — only a 429 says *ask less often*
+        agent._usage["p9"] = agent._usage_reading("p9", {"reason": "error"})
+        assert "p9" not in agent._usage_wait
+        assert agent._usage["p9"]["reason"] == "error" and agent._usage["p9"]["windows"]
+        # an adapter that raises is an error too, never a crash in the poll
+        assert agent._usage_reading("p9", RuntimeError("boom")) is None  # already `error`: nothing new to say
+
+        # a good reading replaces it and clears the reason
+        assert agent._usage_reading("p9", {"windows": [], "fetched": "t2", "reason": "ok"}) == {
+            "windows": [],
+            "fetched": "t2",
+            "reason": "ok",
+        }
+        assert USAGE_EVERY == 300.0  # five minutes: the shortest window the endpoint reports is five hours
+        await c.call("kill", id=s["id"])

@@ -57,6 +57,13 @@ def attention_file() -> Path:
     return home() / "attention.json"
 
 
+def usage_file() -> Path:
+    """The last good usage reading per profile (TD-087). It survives a restart on purpose: the
+    readings lived in memory, so each promote forgot them and polled at once — eight promotes in
+    one day, against an endpoint that answers 429."""
+    return home() / "usage.json"
+
+
 def socket_path() -> Path:
     return home() / "agent.sock"
 
