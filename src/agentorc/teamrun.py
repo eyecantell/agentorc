@@ -106,7 +106,7 @@ def org_with_repo_teams(org: orgmod.Org, roots: list[Path | str]) -> tuple[orgmo
     return org, notes
 
 
-def wound_down(sessions: list[dict[str, Any]]) -> str | None:
+def wound_down(sessions: list[dict[str, Any]], seat: str | None = None) -> str | None:
     """When a team's sessions all declared they were out of work, the latest of those instants
     (design §4.9a, §4.5a **Teams** strip, TD-053 step 6) — else None.
 
@@ -116,8 +116,12 @@ def wound_down(sessions: list[dict[str, Any]]) -> str | None:
     counting ledger rows, exactly as §4.9a asks: one member's exhaustion is not the team's, and a
     single session that never declared means the team stopped for some other reason. A team with no
     session carrying its badge has never run, or has been forgotten, and is neither.
+
+    `seat` is the team's techlead, by the name its definition gives it (design §4.9b, TD-075 step 4):
+    a seat is empty or filled, never finished, so it never declares and is not counted — read from
+    the definition, never from a role badge (§9 invariant 9).
     """
-    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions]
+    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions if s.get("name") != seat]
     if not seen or not all(d.get("at") for d in seen):
         return None
     # `str` before `max`: two declarations of different types would otherwise be a TypeError, and
@@ -146,7 +150,7 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "members": sum(len(m.names()) for m in t.members if m.team is None),
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
-                "wound_down": None if n_live else wound_down(mine),
+                "wound_down": None if n_live else wound_down(mine, t.techlead.name if t.techlead else None),
             }
         )
     return rows_out
