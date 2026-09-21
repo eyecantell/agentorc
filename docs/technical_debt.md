@@ -54,7 +54,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-091 | Nothing says how much context a session has left, or that it has just compacted | Low | Open |
 | TD-092 | Nothing reaches a person who is not looking at the page when a session needs them | Low | Open |
 | TD-093 | Who must look at a PR before it merges is a sentence in a brief and a message in an inbox, not something a team is configured with | Medium | Open |
-| TD-095 | The Org's cards say the same thing several times, are uneven in size, and *working* does not stand apart from the ended states | Medium | Open |
+| TD-095 | The Org's cards say the same thing several times, are uneven, and *working* does not stand apart | Medium | Open |
 
 ---
 
