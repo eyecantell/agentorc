@@ -1329,16 +1329,56 @@ def test_exit_three_says_restarted_when_one_answers_and_never_tells_a_session_to
     err = capsys.readouterr().err
     assert "stop here; a session never starts one" in err and "agentorc-agent serve" not in err
 
-    # (c) nothing answers, and the caller is a person: the hint is theirs, and only theirs
+    # (c) nothing answers, and the caller is a person: the hint is theirs, and only theirs — with the
+    # ancestry probe stubbed, since this suite may itself be running inside an agentorc pane
     monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    monkeypatch.setattr(climod, "_session_by_ancestry", lambda: None)
     assert climod._run(args) == 3
     assert "start it with: agentorc-agent serve" in capsys.readouterr().err
+
+    # (d) TD-089: the variable is gone but a process above this one was started in a session's pane
+    monkeypatch.setattr(climod, "_session_by_ancestry", lambda: "ao-x-1")
+    assert climod._run(args) == 3
+    err = capsys.readouterr().err
+    assert "stop here; a session never starts one" in err and "agentorc-agent serve" not in err
 
     # --json says which it was without prose, for a caller that parses (TD-030)
     monkeypatch.setattr(climod, "_agent_answers", lambda: True)
     assert climod._run(argparse.Namespace(json=True, fn=boom, id=None)) == 3
     got = json.loads(capsys.readouterr().out)
     assert got["restarted"] is True and got["error"] == "host agent closed the connection"
+
+
+
+def test_a_session_is_found_by_its_ancestors_environment_when_its_own_is_gone(tmp_path):
+    """TD-089, design §4.8a *With no host agent to ask*: the launch sets `AGENTORC_SESSION` on the
+    pane's first process, so a process that lost it still has an ancestor started with it. The walk
+    reads `/proc/<pid>/stat` for the parent (a `comm` with spaces and parentheses included) and
+    `/proc/<pid>/environ` for the variable; it stops at init, at a process it may not read, at a
+    broken chain and at the hop bound, and every failure is *no session*."""
+    from agentorc import cli as climod
+
+    def proc(pid, ppid, env=None, comm="sh"):
+        d = tmp_path / str(pid)
+        d.mkdir()
+        (d / "stat").write_text(f"{pid} ({comm}) S {ppid} {pid} {pid} 0 -1 4194560\n")
+        if env is not None:
+            (d / "environ").write_bytes(b"\0".join(f"{k}={v}".encode() for k, v in env.items()) + b"\0")
+
+    proc(40, 30, {"PATH": "/bin"}, comm="ao (a) b")  # ourselves: our own environ is os.environ's, not read
+    proc(30, 20, {"PATH": "/bin"})  # a hook's shell that scrubbed the variable
+    proc(20, 10, {"AGENTORC_SESSION": "ao-agentorc-w-1", "PATH": "/bin"}, comm="claude")
+    proc(10, 1, {"PATH": "/bin"}, comm="tmux: server")
+    assert climod._session_by_ancestry(tmp_path, pid=40) == "ao-agentorc-w-1"
+    assert climod._session_by_ancestry(tmp_path, pid=10) is None  # the chain reaches init: a person's
+    proc(50, 60, {"PATH": "/bin"})
+    proc(60, 1)  # no environ file: another user's process, so the chain is not ours
+    assert climod._session_by_ancestry(tmp_path, pid=50) is None
+    proc(70, 99, {})  # the parent exited under the walk
+    assert climod._session_by_ancestry(tmp_path, pid=70) is None
+    proc(80, 81, {"AGENTORC_SESSION": ""})
+    proc(81, 80, {"AGENTORC_SESSION": ""})  # an empty value is not a session, and a loop is bounded
+    assert climod._session_by_ancestry(tmp_path, pid=80) is None
 
 
 @pytest.mark.unit

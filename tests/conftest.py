@@ -170,6 +170,10 @@ def _never_this_machines_home(tmp_path_factory):
     mp.setenv("AGENTORC_HOME", str(tmp_path_factory.mktemp("unit-home")))
     mp.setenv("CLAUDE_CONFIG_DIR", str(tmp_path_factory.mktemp("unit-claude")))
     mp.delenv("AGENTORC_SESSION", raising=False)  # a test run inside an ao session is not a caller
+    # …and nor is its ancestry: the exit-3 sentence reads the pane's environment above `ao` (TD-089)
+    from agentorc import cli
+
+    mp.setattr(cli, "PROC", tmp_path_factory.mktemp("no-proc"))
     yield
     mp.undo()
 
