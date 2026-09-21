@@ -47,6 +47,17 @@ def test_translate_state_events():
     assert translate({"hook_event_name": "PreCompact"}) is None
 
 
+def test_a_compaction_is_not_a_start():
+    """TD-090: a compaction ends in SessionStart(source=compact); a manual `/compact` fires nothing
+    after it, so reading it as `working` left an idle session `stalled?` for ever."""
+    ev = {"hook_event_name": "SessionStart", "session_id": "u1", "source": "compact"}
+    assert translate(ev) == {"adapter_id": "u1"}  # no state: it stays what it was
+    assert translate({**ev, "model": "claude-opus-5"}) == {"adapter_id": "u1", "model": "claude-opus-5"}
+    assert translate({"hook_event_name": "SessionStart", "source": "compact"}) is None
+    for source in ("startup", "resume", "clear"):
+        assert translate({**ev, "source": source})["state"] == "working"
+
+
 def test_translate_permission_and_questions():
     p = translate(
         {
