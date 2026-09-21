@@ -15,7 +15,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
     assert cfg.ready_when == ["tree_clean", "branch_pushed", "no_subagents"]
     assert cfg.commands == [] and cfg.unattended is None and cfg.controllers == [] and cfg.teams == {}
     assert cfg.ledger == "docs/technical_debt.md"
-    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "plain"]
+    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "techlead", "plain"]
 
 
 def test_the_section_5_example_loads(tmp_path):
@@ -57,7 +57,7 @@ commands:
     assert o.grants == ["control"] and o.lane == [] and o.controllers == []
     r = repoconfig.resolve_role(cfg, "reviewer")
     assert r.source == "repo" and r.brief is None and r.lane == ["ui", "tests"] and r.controllers == ["ui-orc"]
-    assert [x.name for x in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "plain", "reviewer"]
+    assert [x.name for x in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "techlead", "plain", "reviewer"]
     with pytest.raises(KeyError, match="unknown role 'nope'; known: grinder, hunter"):
         repoconfig.resolve_role(cfg, "nope")
 
@@ -170,15 +170,34 @@ def test_orchestrator_and_lead_are_deprecated_aliases_for_manager(tmp_path, caps
     assert both.profile == "new" and both.lane == ["x"]
 
 
-def test_techlead_is_reserved_and_refused_by_name(tmp_path):
-    """TD-076 step 2, design §4.8 *The names*: `techlead` is reserved until TD-075 builds it — a
-    repo that defines it, or a role asked for by that name, is refused with a line saying why and
-    never as an unknown role."""
-    with pytest.raises(ValueError, match="`techlead` is reserved for the go-between of TD-075"):
-        repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  techlead: {grants: [control]}\n")
-    with pytest.raises(ValueError, match=r"`roles`\.techlead: role `techlead` is reserved"):
+def test_techlead_is_a_preset_and_a_reserved_word_is_still_refused_by_name(tmp_path, monkeypatch):
+    """TD-075 step 1, design §4.9b: `techlead` is a built-in preset — `techlead.md`, no lane, no
+    grants, icon `book`, label *Tech lead* — and a repo may override its keys like any other's.
+    The reserved-words table it left stays (§4.8 *The names*): a word in it is still refused with
+    its reason wherever a role is named or defined, never as an unknown role."""
+    tl = repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
+    assert (tl.brief, tl.lane, tl.grants, tl.icon, tl.display) == ("techlead.md", [], [], "book", "Tech lead")
+    assert "**techlead**" in tl.brief_text()
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  techlead: {profile: strong}\n")
+    assert repoconfig.resolve_role(repoconfig.load(tmp_path), "techlead").profile == "strong"
+    assert repoconfig.RESERVED_ROLES == {}
+    monkeypatch.setitem(repoconfig.RESERVED_ROLES, "advisor", "reserved for a test")
+    with pytest.raises(ValueError, match="`advisor` is reserved for a test"):
+        repoconfig.resolve_role(repoconfig.RepoConfig(), "advisor")
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  advisor: {grants: [control]}\n")
+    with pytest.raises(ValueError, match=r"`roles`\.advisor: role `advisor` is reserved"):
         repoconfig.load(tmp_path)
+
+
+def test_techlead_placeholder_names_the_seat_or_says_none():
+    """Design §4.9b `{techlead}`: a member's and a manager's brief take it, filled with the seat's
+    id at a team start and `none` for a session started by hand, so no brief ever shows the
+    placeholder itself. (The seat's own brief reads its id from `$AGENTORC_SESSION`.)"""
+    cfg = repoconfig.RepoConfig()
+    for name in ("grinder", "hunter", "manager"):
+        role = repoconfig.resolve_role(cfg, name)
+        assert "{techlead}" not in role.brief_text() and "`none`" in role.brief_text()
+        assert "`ao-agentorc-techlead-ao-1`" in role.brief_text(techlead="ao-agentorc-techlead-ao-1")
 
 
 def test_grants_orchestrate_in_a_role_is_read_as_control(tmp_path, capsys, monkeypatch):
@@ -197,7 +216,13 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
     the role's name with its first letter raised, and an old name is read through the renamed-roles
     table, so a record badged `orchestrator` or `lead` reads *Manager*."""
     builtin = {r.name: r.display for r in repoconfig.roles(repoconfig.RepoConfig())}
-    assert builtin == {"grinder": "Grinder", "hunter": "Hunter", "manager": "Manager", "plain": "Plain"}
+    assert builtin == {
+        "grinder": "Grinder",
+        "hunter": "Hunter",
+        "manager": "Manager",
+        "techlead": "Tech lead",
+        "plain": "Plain",
+    }
     assert "label" in repoconfig.ROLE_KEYS
     assert repoconfig.default_label("orchestrator") == repoconfig.default_label("lead") == "Manager"
     assert repoconfig.default_label("reviewer") == "Reviewer" and repoconfig.default_label("") == ""
@@ -222,7 +247,7 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     `grinder: wrench`, `hunter: search` and `plain` none; a layer overrides it per key like every
     other key; an unknown name is refused when the file is read, as an unknown grant is."""
     builtin = {r.name: r.icon for r in repoconfig.roles(repoconfig.RepoConfig())}
-    assert builtin == {"grinder": "wrench", "hunter": "search", "manager": "flag", "plain": None}
+    assert builtin == {"grinder": "wrench", "hunter": "search", "manager": "flag", "techlead": "book", "plain": None}
     assert "icon" in repoconfig.ROLE_KEYS
     assert set(builtin.values()) - {None} <= set(repoconfig.ICONS)
     # the repo's own file overrides it, and its other keys are untouched

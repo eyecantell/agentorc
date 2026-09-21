@@ -922,3 +922,54 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
     text = team_skill_text()
     assert "{team: other-team}" in text and "refused at `start`" in text
     assert "not\n  built" in text  # the sentence wraps in the file; the claim is what matters
+
+
+def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world, capsys, monkeypatch):
+    """TD-075 step 1, design §4.9b *The seat*: a definition's `techlead:` starts after the manager
+    and before the members, as the `techlead` preset — no lane, no grants — with the manager as its
+    controller, and `{techlead}` in every brief is the id it takes, worked out before anything was
+    created. A team without a seat reads `none`. Should the seat come up under another id, the
+    start says so; `ao team list` names the seat."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "profile": "paul"}
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    made = creates(state)
+    assert [p["name"] for p in made] == ["orc-ao", "techlead-ao", "grind-1", "grind-2", "hunt"]
+    seat = made[1]
+    assert seat["role"] == "techlead" and seat["capabilities"] == [] and seat["lane"] == []
+    assert seat["controllers"] == ["ao-agentorc-orc-ao"] and seat["team"] == "ao-grind"
+    assert seat["profile"] == "paul" and "**techlead**" in seat["prompt"]
+    for p in (made[0], *made[2:]):
+        assert "`ao-agentorc-techlead-ao`" in p["prompt"] and "{techlead}" not in p["prompt"]
+    out = capsys.readouterr()
+    assert "ao-agentorc-techlead-ao  techlead techlead" in out.out and "stale tmux" not in out.err
+    assert cli.main(["team", "list"]) == 0
+    assert "techlead: techlead-ao" in capsys.readouterr().out
+
+    # the seat came up under another id: the start stands and says so
+    state["sessions"].clear()
+    state["calls"].clear()
+    real = cli.call_sync
+
+    def suffixed(method, **params):
+        rec = real(method, **params)
+        if method == "create" and params["name"] == "techlead-ao":
+            rec["id"] += "-2"
+        return rec
+
+    monkeypatch.setattr(cli, "call_sync", suffixed)
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    err = capsys.readouterr().err
+    assert "started as ao-agentorc-techlead-ao-2, but the briefs name ao-agentorc-techlead-ao" in err
+
+    # no seat: every brief says `none`, and nothing is started for it
+    monkeypatch.setattr(cli, "call_sync", real)
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(org_doc(tmp_path)))
+    state["sessions"].clear()
+    state["calls"].clear()
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    made = creates(state)
+    assert "techlead" not in [p["role"] for p in made]
+    assert all("techlead is `none`" in p["prompt"] for p in made)

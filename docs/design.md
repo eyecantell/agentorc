@@ -1882,7 +1882,7 @@ deliberately not warned about: briefs cite dated ADRs and state what was true on
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
 | `manager` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
-| `techlead` (**designed 2026-09-20, TD-075 — not built, the word still reserved**, §4.9b) | answer a teammate's `steer`, and an `ask` only where the answer is written down, saying where (`--source`); check the asker's claims in the repo; pass everything else up with a recommendation and suggested answers; never anything destructive, outward-facing, spending, credentials, scope or a permission; read your own sent mail first; end when the inbox is empty | — | none (`alarms` only from a person's own team start, §4.9b) | mail, and nothing else |
+| `techlead` (**designed 2026-09-20, TD-075; the preset and its brief built 2026-09-20 (step 1) — the mail verbs the brief names are steps 2–4**, §4.9b) | answer a teammate's `steer`, and an `ask` only where the answer is written down, saying where (`--source`); check the asker's claims in the repo; pass everything else up with a recommendation and suggested answers; never anything destructive, outward-facing, spending, credentials, scope or a permission; read your own sent mail first; end when the inbox is empty | — | none (`alarms` only from a person's own team start, §4.9b) | mail, and nothing else |
 | `plain` | — (no template) | — | none | whatever it declares |
 
 The manager preset was called `orchestrator` until 2026-09-17 (TD-055 step 2, `docs/glossary.md`)
@@ -1916,10 +1916,12 @@ session would make every one of those lie. So:
   reads `ao`'s output as a model does, not as a parser.
 - **After the one release** the two old words stop resolving and are **refused by name** — *`lead`
   was renamed `manager` (TD-076)* — and that refusal stays: the word is never free to be taken. That is **a second, small table — retired words, each with the word that replaced it** — beside the renamed-roles one, and it is where this rename parts from TD-055's, whose aliases are simply deleted when their release is over: `orchestrator` falling back to *unknown role* costs nothing, since nobody wants the word, while `lead` is wanted, and a word that is merely unknown is one a repo's `roles:` may define tomorrow. Until then the warning line names the rename that retired the word it was given — TD-076 for both, since `orchestrator` now resolves to `manager` because of it.
-- **`techlead` is reserved, not built.** TD-075 designs what it holds and may do; until then it
-  is not a preset, and a repo or an org that defines a role of that name — or an `ao new --role
-  techlead` — is refused with a line saying why, not as an unknown role, so the word cannot arrive in live data meaning something TD-075 then has to read
-  around.
+- **`techlead` was reserved until it was built.** TD-075 designs what it holds and may do; until
+  its step 1 landed (2026-09-20) it was not a preset, and a repo or an org that defined a role of
+  that name — or an `ao new --role techlead` — was refused with a line saying why, not as an
+  unknown role, so the word could not arrive in live data meaning something TD-075 then had to
+  read around. It is now a built-in preset like the others; the reserved-words table stays, empty,
+  for the next word decided before it is built.
 - **A role has a display label.** A preset or a `roles:` entry may carry **`label:`** — *Manager*,
   *Tech lead*, *Grinder*, *Hunter* are the built-ins'; the default is the role's name with its
   first letter raised; `plain` has none and draws no badge, as today. The label is what the role
@@ -2685,16 +2687,25 @@ attention, answering those it believes are obvious* — a role of its own on a h
 because *handling the lifecycle of an agent is something Sonnet could handle* and the go-between's
 tokens should not be spent on it. **It is a ladder, not a new mechanism**: a worker's question
 goes to the techlead where its team has one, the techlead answers it or passes it up, and the
-person is the top. Nothing here is built; the word `techlead` stays reserved (§4.8 *The names*)
-until step 1 below lands.
+person is the top. **Step 1 is built (2026-09-20, TD-075)**: the seat, the preset, `{techlead}`
+and the four briefs; the word is no longer reserved (§4.8 *The names*). Nothing else here is built
+yet, and the preset brief says what to do when `ao` refuses a verb it names (`--source`,
+`--pass-up`, `ao inbox --sent`).
 
 - **The seat.** A team definition may carry **`techlead: {name, profile, brief, home}`** beside
   `manager:` — optional, one per team, a session and never `person`. The preset **`techlead`**:
   brief `techlead.md`, no lane, **no grants**, icon `book`, label *Tech lead*. It carries the
   `team` badge, so every member may already message it and it them (§4.10 *sideways*) — no new
   mail edge. A member's and a manager's brief take **`{techlead}`** — the seat's session id,
-  filled at launch as `{lane}` is, empty where the team has none — and say: *a `steer`, and an
+  filled at launch as `{lane}` is, `none` where the team has none — and say: *a `steer`, and an
   `ask` that is about the work, go to `{techlead}`; with no techlead, to the person as now.*
+  As built: `techlead:` takes `name` (default `<team>-techlead`), `home`, `profile` and `brief`,
+  and nothing else — no `role:`, the seat is the role, and no `grants:`; `ao team start` creates
+  the manager, then the seat with `controllers: [manager]`, then the members, and fills
+  `{techlead}` in every brief with the id the seat will take, worked out before anything starts
+  (§4.1's `ao-<scope>-<name>`, `@<host>` for a team on another host) — should the seat come up
+  under another id (a stale tmux session holding it), the start says so. A hand-started session
+  (`ao new --role grinder`) reads `none`. `ao team list` names the seat.
 - **It answers cold, and is filled on demand.** A techlead is **started per batch of questions
   and ends when it has answered them**: no context piles up over a night, an idle team costs
   nothing, and — Paul's second reason — *composing the message forces the worker to pull the

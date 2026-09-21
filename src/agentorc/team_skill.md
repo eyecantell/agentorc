@@ -95,6 +95,10 @@ teams:
   refused — *teams.<name>.manager must be a mapping, not str*.) `lead:`, its name until
   2026-09-20 (TD-076), is still read for one release with a line saying so; a team carrying both
   is refused.
+- **`techlead:`** — optional, one per team: the go-between that answers teammates' questions
+  before they reach you (design §4.9b). `name` (default `<team>-techlead`), and optionally `home`,
+  `profile`, `brief`; no `role` and no `grants`. It is started after the manager, under it, and
+  every brief in the team names it as `{techlead}`. Without one, questions come to you as now.
 - **`members:`** — each is a role and a `count`; `name` is the **prefix**, and above one member the
   sessions are `<name>-1`, `<name>-2`, …
   **`{team: other-team}` — a nested team — parses but is refused at `start`, because it is not
@@ -109,17 +113,17 @@ instead, and travels with the checkout. The org file wins a name collision.
 
 ## 4. Say what the roles are
 
-A role is a preset: a brief, a lane, grants, a profile, an icon. Three are built in —
+A role is a preset: a brief, a lane, grants, a profile, an icon. Four are built in —
 
 | role | brief | grants |
 |---|---|---|
 | `manager` | the package's `manager.md` | `control` |
 | `grinder` | the package's `grinder.md` | none |
 | `hunter` | the package's `hunter.md` | none |
+| `techlead` | the package's `techlead.md` | none |
 | `plain` | none | none |
 
-(`lead` and `orchestrator`, the manager's old names, still resolve to it for one release;
-`techlead` is reserved and refused until TD-075 builds it.)
+(`lead` and `orchestrator`, the manager's old names, still resolve to it for one release.)
 
 — and a repo overrides any key in its `.agentorc.yml`:
 
