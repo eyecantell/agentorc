@@ -10,7 +10,7 @@ A brief is the opening prompt of an unattended worker. Launch one from the main 
 session gets its own worktree and branch, per design §4.5a, New session "Where: new worktree"):
 
 ```
-pdm run ao new -d ~/agentorc -w tdgrind-ao-1 --unattended --prompt "$(cat docs/briefs/tdgrind-ao-1.md)" tdgrind-ao-1
+pdm run ao new -d ~/agentorc -w grinder-ao-1 --unattended --prompt "$(cat docs/briefs/grinder-ao-1.md)" grinder-ao-1
 ```
 
 There are no policies for these yet (design §6 usage gate and the run-window policy are
@@ -18,7 +18,7 @@ phase 3), so each brief carries its own stop time and usage rule. Edit the date 
 in the brief before relaunching. The samscrape workers still run under samscrape's
 `scripts/tdgrind.sh` supervisor; moving them into agentorc is the phase 3 work.
 
-`orchestrator-ao-1.md` is the first lead (design §4.8): a session holding the
+`manager-ao-1.md` is the first lead (design §4.8): a session holding the
 `control` grant that keeps the unattended workers going and runs the cadence check
 (`scripts/check_cadence.py`, cadence §4) on what they call done. **By hand** — which is what this
 file is about — launch it **after** the workers and attach it to them in the same step; see
@@ -26,7 +26,7 @@ Membership below, which is the part that is easy to forget and looks like a brok
 is. (`ao team start` does both for you, in the right order, and is the ordinary way in.)
 
 ```
-pdm run ao new -d ~/agentorc -w orchestrator-ao-1 --unattended -p grind --grant control --prompt "$(cat docs/briefs/orchestrator-ao-1.md)" orchestrator-ao-1
+pdm run ao new -d ~/agentorc -w manager-ao-1 --unattended -p grind --grant control --prompt "$(cat docs/briefs/manager-ao-1.md)" manager-ao-1
 ```
 
 **Membership (design §4.8, TD-036).** The grant lets a lead act on other sessions; it
@@ -35,7 +35,7 @@ empty list means nobody may. A person's `ao new` sets no controller — there is
 **every worker launched by hand needs attaching**, in the same step as the grant:
 
 ```
-ao control orchestrator-ao-1 add tdgrind-ao-1 tdgrind-1 tdgrind-2 tdgrind-3
+ao control manager-ao-1 add grinder-ao-1 tdgrind-1 tdgrind-2 tdgrind-3
 ao status -v            # each worker's `under:`, and the lead's `members:`
 ```
 
