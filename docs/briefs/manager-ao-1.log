@@ -82,3 +82,4 @@
 11:15  #361 (src/sessionorc, 15:14Z) past 2 h in the anchor's queue, #362–#364 behind it → ask to the person for the anchor (as it asked), board line on orch-sessionorc-queue-0921b, PR #369 (also marks the 07:27Z wind-down line done), Sonnet fact-check running
 11:30  board PR #369: Sonnet fact-check NOT READY, 2 findings (#362 is a brief, not src/sessionorc; team start 14:22Z) → fixed, cadence-review FIXED posted, CI green, check pass, squash-merged 09a105d. grinder-ao-1 opened #370 (td075-techlead-context)
 11:38  grinder-ao-1: merged #370 (TD-075 step 1b, techlead context) → cadence pass
+11:39–11:51 quiet; grinder-ao-1 claimed TD-057, opened #371 (src/sessionorc, anchor's queue); #372 td-095-card-layout is not a member's
