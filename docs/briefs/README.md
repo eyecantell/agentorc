@@ -52,3 +52,7 @@ they are needed: `guardians-orchestrator.md` (blocked — the repos are not on t
 devcontainer question in design §10 is open) and `director.md` (needs two leads before
 it is worth running). Both carry the restart ceiling and `one_for_one` scope from TD-036.
 
+`techlead-context.md` is the techlead's **primer** (design §4.9b): its first read on every fill — the
+project in a few thousand words, an index and never a source. The PR that changes the architecture,
+a standing decision or the merge rules updates it; `tests/test_primer.py` holds its pointers to ones
+that exist.
