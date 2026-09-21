@@ -1,130 +1,97 @@
 {# One session card. Rendered on page load and re-rendered per delta on /events; the client swaps
-   it by id. Controls per design §4.5a. #}
+   it by id. Controls per design §4.5a. **Six rows, the same six on every card, in the same places,
+   at one height** (design §4.5 *The card's anatomy*, TD-095): a row with nothing to say stays,
+   empty, rather than moving what is below it. What a team's group already says is marked `ingroup`
+   and hidden inside that group by the stylesheet — the card cannot know where it is drawn. #}
 <div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}" id="card-{{ s.id }}"
      data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
      data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}"{% if s.unseen %} data-unseen="1"{% endif %}>
   <div class="sbar"></div>
   <div class="sc-body">
-    <div class="row">
+    {# (1) name and state: the name once, the tool's title only when it differs (§4.5a **title**,
+       TD-074: display only, set in the tool), and the pill — the state and nothing else — at the right #}
+    <div class="row r1">
       <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>
-      {# design §4.5a card **title** (§4.3 `title()`, TD-074): the session's name as its tool holds
-         it, beside agentorc's own name for it. Display only — it is set in the tool, never here —
-         so it carries no control; secondary and truncated, with the whole of it on hover. The Org
-         filter matches the card's text, so it matches this too. #}
-      {% if s.title %}<span class="meta tool-title" title="the session's name as its tool holds it (design §4.5a) — set in the tool, not in agentorc: {{ s.title }}">{{ s.title }}</span>{% endif %}
-      <button class="badge toggle{% if s.unattended %} on{% endif %}" data-act="mode" data-id="{{ s.id }}"
-              title="click: switch to {{ 'interactive' if s.unattended else 'unattended' }}">{{ 'unattended' if s.unattended else 'interactive' }}</button>
-      {# design §4.8 *Role presets* (TD-074): the preset's icon inside the badge — a label's picture,
-         small and monochrome, so the state pill stays the one coloured thing. A role with no icon,
-         or one this build does not know, draws its word alone. #}
-      {% if s.role %}<span class="badge" title="the role preset it was started under — {{ s.role }} (design §4.8): a label, nothing keys on it">{{ role_svg(s.role_icon) }}{{ s.role_label or s.role }}</span>{% endif %}
-      {# design §4.5a card **team** badge (§4.9): the team the session was started under; a badge,
-         nothing keys on it (§9 invariant 9). Click filters the grid to that team, client-side. #}
-      {% if s.team %}<button class="badge team" data-team="{{ s.team }}" title="team {{ s.team }} — click: show only this team">{{ s.team }}</button>{% endif %}
-      {# design §4.5a card **unread** chip (§4.10): the record's count, never a body; nothing at
-         zero, which is the common case. Opens the Focus Inbox panel. #}
-      {% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}
-      {# design §4.8a (TD-077 step 2): this session made a request under another session's name. A
-         **mark**, not a control — it is never pressable, and what to do about it is a row in the
-         Inbox, where its answers live. The newest alarm is the hover. #}
-      {% if s.alarm_note %}<span class="badge alarmmark" title="{{ s.alarm_note }} — it is either a bug of ours or a session misbehaving; the Inbox has the list and what can be done about it (design §4.8a)">⚠ identity</span>{% endif %}
-      {# design §4.8a *An alarm's answers* (TD-077 a2): **suspended** — flat, never pressable, and
-         the suspension's only record on a page, since a suspension ends no row and writes no
-         trail. The two ways out are a person's Resume and Forget, which exist already. #}
-      {% if s.suspended_note %}<span class="badge suspendedmark" title="{{ s.suspended_note }}">suspended</span>{% endif %}
+      {% if s.title_shown %}<span class="meta tool-title" title="the session's name as its tool holds it (design §4.5a) — set in the tool, not in agentorc: {{ s.title_shown }}">{{ s.title_shown }}</span>{% endif %}
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ s.host_note or ('guessed from the screen' if s.scraped else 'reported by the tool') }}"><span class="dot"></span>{{ s.state_label }}</span>
     </div>
-    <div class="row"><span class="meta strong">{{ s.place }}</span><span class="grow"></span><span class="meta age" data-since="{{ s.since }}">{{ s.age }}</span></div>
-    <div class="row"><span class="meta strong">{{ s.where }}</span><span class="grow"></span>{% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}</div>
-    {# design §4.4a: an unreachable host's reason, and for a container node what the home is doing about it #}
-    {% if s.host_note %}<div class="row"><span class="meta" title="the host's link, as the home sees it">{{ s.host_note }}</span></div>{% endif %}
-    <div class="meta">{{ s.profile_line }}</div>
-    {# design §4.5a card **under `<controller>`** chip (§4.8, TD-036): who may act on this session. Shown
-       only when the list is non-empty — a person's own session has none, which is the common case
-       and not worth a line. A controller whose session is gone keeps its entry, shown dim. #}
-    {% if s.under %}<div class="row"><span class="meta">under
-      {% for c in s.under %}<a class="badge controller{% if c.gone %} scraped{% endif %}" href="/focus/{{ c.id }}"
-         title="{{ 'this controller\'s session is gone — re-attach or remove it' if c.gone else 'may act on this session (design §4.8)' }}">{{ c.name }}</a>{% endfor %}
-    </span></div>{% endif %}
-    {# design §6 / §4.5a: when this session stops (TD-026). Shown only when something will — which
-       is every unattended session given a time and no other. #}
-    {% if s.stop_note %}<div class="row"><span class="meta" title="the agent asks it to wrap up at this time, then stops it">{{ s.stop_note }}</span></div>{% endif %}
-    {# design §4.5a card **report line**: only when a channel is non-empty (§4.8, TD-028 step 4),
-       and the **out of work** chip beside it (§4.9a, TD-053 step 6) — which is why the row is drawn
-       for a declaration even when neither channel has anything to say. #}
-    {% if s.report or s.findings_line or s.out_of_work or s.restart_wanted %}<div class="row report">
-      {% if s.out_of_work %}<span class="badge oow"
-            title="{{ s.out_of_work.why or 'no reason recorded' }}">out of work{% if s.out_of_work.age %} {{ s.out_of_work.age }}{% endif %}</span>{% endif %}
-      {# design §4.5a **restart wanted** chip (§4.9a, TD-083): the third ending — beside the report
-         line, exactly as *out of work* is, a **mark** and never pressable, and not a state: the
-         session still reads `idle` or `exited`. An **early** one says so, because a controller
-         does not act on those and a chip that looked the same would promise that it would. #}
-      {% if s.restart_wanted %}<span class="badge rw{% if s.restart_wanted.early %} early{% endif %}"
-            title="{{ s.restart_wanted.why or 'no reason recorded' }}{% if s.restart_wanted.early %} — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a){% endif %}">restart wanted{% if s.restart_wanted.early %} · early{% endif %}{% if s.restart_wanted.age %} {{ s.restart_wanted.age }}{% endif %}</span>{% endif %}
+    {# (2) what it is: the role, the mode as a word — never pressable, its toggle is in *more* —
+       the marks, the stops note, and the one clock on a card #}
+    <div class="row r2">
+      {# design §4.8 *Role presets* (TD-074, TD-076): the preset's icon and label; a label, nothing keys on it #}
+      {% if s.role %}<span class="badge" title="the role preset it was started under — {{ s.role }} (design §4.8): a label, nothing keys on it">{{ role_svg(s.role_icon) }}{{ s.role_label or s.role }}</span>{% endif %}
+      {# design §4.5a **unattended / interactive**: a mark, not a control. *interactive* is the one
+         that stands out — the person's own sessions are what a person looks for (TD-095, second pass) #}
+      {% if s.unattended %}<span class="meta mode" title="unattended: its policies act on it — switch it from more ⋯">unattended</span>
+      {% else %}<span class="meta mode mine" title="interactive: yours — no policy acts on it; switch it from more ⋯">{{ role_svg('person') }}interactive</span>{% endif %}
+      {# design §4.5a card **team** badge (§4.9): not drawn inside that team's own group (TD-095);
+         click filters the grid to that team, client-side #}
+      {% if s.team %}<button class="badge team ingroup" data-team="{{ s.team }}" title="team {{ s.team }} — click: show only this team">{{ s.team }}</button>{% endif %}
+      {# design §4.5a card **unread** chip (§4.10): the record's count, never a body; nothing at zero #}
+      {% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}
+      {# design §4.8a (TD-077 step 2): a **mark**, never pressable; the Inbox row is where it is answered #}
+      {% if s.alarm_note %}<span class="badge alarmmark" title="{{ s.alarm_note }} — it is either a bug of ours or a session misbehaving; the Inbox has the list and what can be done about it (design §4.8a)">⚠ identity</span>{% endif %}
+      {# design §4.8a *An alarm's answers* (TD-077 a2): **suspended** — flat, never pressable #}
+      {% if s.suspended_note %}<span class="badge suspendedmark" title="{{ s.suspended_note }}">suspended</span>{% endif %}
+      {# design §6 / §4.5a **stops** note (TD-026): plain text after the mode, only when something will stop it #}
+      {% if s.stop_note %}<span class="meta" title="the agent asks it to wrap up at this time, then stops it">{{ s.stop_note }}</span>{% endif %}
+      <span class="grow"></span>
+      <span class="meta age" data-since="{{ s.since }}" title="how long it has been {{ s.state_label }}">{{ s.age }}</span>
+    </div>
+    {# (3) where, alone: host / repo outside a team's group, the worktree when it is not the
+       session's name, the branch; *under <controller>* ends it; the dirty / unpushed flag at the right #}
+    <div class="row r3">
+      <span class="meta strong where" title="{{ s.place_prefix }}{{ s.wt_prefix }}{{ s.branch_full }}"><span class="ingroup">{{ s.place_prefix }}</span>{{ s.wt_prefix }}{{ s.branch_line }}</span>
+      {# design §4.5a card **under `<controller>`** chip (§4.8, TD-036): who may act on this
+         session. Not drawn inside a team's group when the only controller is its manager (TD-095) #}
+      {% if s.under %}<span class="meta under{% if s.under_is_manager %} ingroup{% endif %}">under
+        {% for c in s.under %}<a class="badge controller{% if c.gone %} scraped{% endif %}" href="/focus/{{ c.id }}"
+           title="{{ 'this controller\'s session is gone — re-attach or remove it' if c.gone else 'may act on this session (design §4.8)' }}">{{ c.name }}</a>{% endfor %}
+      </span>{% endif %}
+      <span class="grow"></span>
+      {% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}
+    </div>
+    {# (4) what runs it, and what it reports: tool · account · model on every card; the report
+       line (§4.5a, TD-028 step 4) and the findings count at the right, only when non-empty #}
+    <div class="row r4">
+      <span class="meta">{{ s.profile_line }}</span>
+      <span class="grow"></span>
       {% if s.report %}<span class="meta{% if s.report_derived %} scraped{% endif %}"
             title="{{ 'the agent derived this from the branch and its PRs — the session did not declare it' if s.report_derived else 'declared by the session' }}">{{ s.report }}</span>{% endif %}
-      <span class="grow"></span>
       {% if s.findings_line %}<span class="meta">{{ s.findings_line }}</span>{% endif %}
-    </div>{% endif %}
+    </div>
   </div>
+  {# (5) the slot: one text, the first that applies — what needs a person, an ending, what it says
+     it is doing, its last output — two lines, the whole on hover, and a caption (`card_slot`) #}
   <div class="sc-slot">
-    {# Allow / Deny only when the hook gave something to answer (`tool_use_id`): the route 409s without
-       it, and the Inbox's row (`state_kind`) already reads it that way — a permission with none falls to
-       the *answer in the terminal* branch below (review of PR #251) #}
-    {% if s.state == 'needs-you' and s.pending and s.pending.kind == 'permission' and s.pending.tool_use_id %}
-      <div class="status needs">{{ s.pending.text }}</div>
-      <div class="row gap">
-        <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>
-        <button class="btn sm" data-act="deny" data-id="{{ s.id }}">Deny</button>
-        <span class="meta countdown" data-deadline="{{ s.deadline }}">via hook</span>
-      </div>
-    {% elif s.state == 'unreachable' and s.pending and s.pending.host_unreachable %}
-      {# design §4.4a "Permission prompts follow the same line": the waiter is on the node, out of reach #}
-      <div class="status needs">{{ s.pending.kind }}: {{ s.pending.text }} — host unreachable</div>
-      <div class="row gap"><span class="meta">answer it at {{ s.host }}, in the tool's own dialog (Focus)</span></div>
-    {% elif s.state == 'needs-you' and s.pending %}
-      <div class="status needs">{{ s.pending.kind }}: {{ s.pending.text }}</div>
-      <div class="row gap"><span class="meta">answer in the terminal (Focus)</span></div>
-    {% elif s.state == 'limited' and s.pending %}
-      <div class="status lim">{{ s.pending.text }}</div>
-    {% elif s.state in ('working', 'stalled?') %}
-      {# design §4.2: "a `stalled?` that can say why" — a screen rule's note, above the tail (TD-032) #}
-      {% if s.state == 'stalled?' and s.pending %}<div class="status needs">{{ s.pending.text }}</div>{% endif %}
-      {# design §4.5a card **doing** line (§4.8, TD-074): what the session says it is doing comes
-         before the tail — for a TUI the tail is the tool's chrome. A session that has said nothing
-         keeps the tail, which is what every card showed before 2026-09-19. Text a model wrote:
-         escaped, shown, and never a control. #}
-      {% if s.doing %}<div class="status doing" title="what this session says it is doing (design §4.8): its own words">{{ s.doing.text }}</div>
-      <div class="row"><span class="meta">says{% if s.doing.age %} · {{ s.doing.age }} ago{% endif %}</span></div>
-      {% else %}<div class="term tail">{% for line in s.tail[-3:] %}{{ line }}
-{% endfor %}</div>{% endif %}
-    {% elif s.state == 'exited' %}
-      <div class="status {{ 'bad' if s.exit_code else '' }}">exited{% if s.exit_code is not none %} · code {{ s.exit_code }}{% endif %}{% if s.ready and not (s.ready | map(attribute=1) | select('equalto', false) | list) %} · ready to close ✓{% endif %}</div>
-      <div class="row gap"><button class="btn sm" data-act="remove" data-id="{{ s.id }}">Forget</button></div>
-    {% elif s.state == 'closed' %}
-      <div class="status ok">closed by you{% if s.closed_at %} · {{ s.closed_at[:16].replace('T', ' ') }}{% endif %}</div>
-    {% elif s.state == 'idle' and s.ready and not (s.ready | map(attribute=1) | select('equalto', false) | list) %}
-      <div class="status ok">ready to close ✓</div>
-      <div class="row gap"><button class="btn sm" data-act="close" data-id="{{ s.id }}">Close session</button></div>
-    {% elif s.doing %}
-      {# the same line, for an idle session: its last word stands until it says another (§4.8) #}
-      <div class="status doing" title="what this session says it is doing (design §4.8): its own words">{{ s.doing.text }}</div>
-      <div class="row"><span class="meta">says{% if s.doing.age %} · {{ s.doing.age }} ago{% endif %}</span></div>
-    {% else %}
-      <div class="status">{% if s.tail %}last: {{ s.tail[-1] }}{% else %}at prompt{% endif %}</div>
-    {% endif %}
+    <div class="status {{ s.slot.kind }}" title="{{ s.slot.full }}">{{ s.slot.text }}</div>
+    <div class="caption meta {{ s.slot.ccls }}"{% if s.slot.ccls == 'countdown' %} data-deadline="{{ s.deadline }}"{% endif %}>{{ s.slot.caption }}</div>
   </div>
+  {# (6) the foot: the next act first, by state (`next_act`), then Focus or Details where it was
+     not first, the editor button, and more #}
   <div class="sc-foot">
     {% set nopane = s.state == 'closed' or s.pane is sameas false %}
-    <a class="btn sm {{ 'ghost' if nopane else 'primary' }}" href="/focus/{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
+    {% if s.next_act == 'allow' %}
+      {# Allow / Deny only when the hook gave something to answer (`tool_use_id`): the route 409s
+         without it (review of PR #251) #}
+      <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>
+      <button class="btn sm" data-act="deny" data-id="{{ s.id }}">Deny</button>
+    {% elif s.next_act == 'forget' %}
+      <button class="btn sm" data-act="remove" data-id="{{ s.id }}">Forget</button>
+    {% elif s.next_act == 'close' %}
+      <button class="btn sm" data-act="close" data-id="{{ s.id }}">Close session</button>
+    {% endif %}
+    <a class="btn sm {{ 'primary' if s.next_act == 'focus' else 'ghost' }}" href="/focus/{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
     {% if s.vscode %}<a class="btn sm ghost" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
     <span class="grow"></span>
     <details class="more">
       <summary class="btn sm ghost" title="more">⋯</summary>
       <div class="menu">
         <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail into its inbox — lands, types nothing">Message…</button>
+        {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
+        <button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>
         <button data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
         <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">Kill</button>
         <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?">Close</button>

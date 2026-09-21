@@ -479,7 +479,9 @@ def test_a_stalled_card_says_why_when_a_screen_rule_explained_it(tmp_path, monke
     stood_down = {**s, "pending": {"kind": "note", "text": "stood down: another device took over this session"}}
     html = card.render(s=view(stood_down))
     assert "stood down: another device took over this session" in html
-    assert "code 4090" in html  # the tail is still there under it
+    # the slot holds one text, the first that applies (design §4.5 *The card's anatomy*, TD-095):
+    # the note that explains the stop, not the tail under it
+    assert "code 4090" not in html and view(stood_down)["slot"]["kind"] == "needs"
 
 
 def test_the_name_check_endpoint_answers_before_start(client, tmp_path):
@@ -1094,7 +1096,10 @@ def test_a_declaration_of_no_work_is_a_chip_on_the_card_and_the_focus_header(tmp
     at = (datetime.now(UTC) - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
     done = {**base, "out_of_work": {"at": at, "why": why}}
     html = card.render(s=view(done))
-    assert "out of work 2h" in html and why in html  # the words, and the reason on hover
+    # in the slot since TD-095 (an ending): the words and the reason's first line, and on hover the
+    # whole reason and when it was said — the card's one clock is the state's
+    assert f"out of work — {why}" in html and "out of work 2h" in view(done)["slot"]["full"]
+    assert 'class="badge oow' not in html
     assert view(done)["out_of_work"]["age"].startswith("2h")
     # the chip does not pretend to be a state: the card still reads `idle` (§4.2's unseen-idle rule)
     assert 'data-state="idle"' in html and "out-of-work" not in html
@@ -1261,7 +1266,7 @@ def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_d
         "pending": {"kind": "permission", "text": "Bash: git push", "tool_use_id": "tu", "host_unreachable": True},
     }  # fmt: skip
     html = templates.get_template("card.html").render(s=view(s))
-    assert "permission: Bash: git push — host unreachable" in html and "answer it at laptop" in html
+    assert "permission: Bash: git push — answer it at laptop" in html
     assert 'data-act="allow"' not in html
 
 
@@ -1437,11 +1442,16 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
     assert 'title="the role preset it was started under — lead' in lead  # the key is still there, on hover
     # the repo's own `roles:` wins, exactly as it does for every other key
     assert ICON_PATHS["terminal"] in grinder and ICON_PATHS["wrench"] not in grinder
+
     # `plain` carries no icon, and a session with no role carries no badge at all
-    assert "ricon" not in plain and "ricon" not in none
+    # (the mode's own `person` mark on an interactive card is not the role's: look at the badge alone)
+    def role_badge(html):
+        return html.split('title="the role preset')[1].split("</span>")[0]
+
+    assert "ricon" not in role_badge(plain) and 'title="the role preset' not in none
     # a caller that resolved no icons still renders the badge's word — the default label — and nothing breaks
     bare = card.render(s=uiapp.view(records[0], records))
-    assert "ricon" not in bare and ">Manager</span>" in bare
+    assert "ricon" not in role_badge(bare) and ">Manager</span>" in bare
 
 
 def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_path, monkeypatch):
@@ -1457,7 +1467,8 @@ def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_pat
         "pending": {"kind": "permission", "text": "Bash: git push"},
     }  # fmt: skip
     html = templates.get_template("card.html").render(s=view(s))
-    assert 'data-act="allow"' not in html and "answer in the terminal (Focus)" in html
+    # the foot's next act is Focus, where the tool's own dialog is (design §4.5 *The card's anatomy*)
+    assert 'data-act="allow"' not in html and view(s)["next_act"] == "focus"
     with_id = {**s, "pending": {**s["pending"], "tool_use_id": "tu"}}
     assert 'data-act="allow"' in templates.get_template("card.html").render(s=view(with_id))
 
