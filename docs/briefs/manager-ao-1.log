@@ -116,3 +116,4 @@
 17:25  techlead-ao-1: fill #1 idle at 23:25Z (~1 min), 0 waiting → ao close. Batch: 3 steers from grinder-ao-2 (TD-095) — 2 answered with a source (design §4.5 card anatomy, §4.8 doing), 0 passed up, 0 lapsed, 1 withdrawn test send closed 'nothing to answer'; primer present, nothing stale; it notes --reply-to … --pick cannot carry text
 17:25–17:28 quiet; grinder-ao-1: #383 green + SHIP, waiting on the anchor; idle 23:28Z with TD-095 claimed (20 min → 23:48Z)
 17:28–17:31 quiet; open TD-095 PRs #383 (src/sessionorc, 23:16Z → 01:16Z), #384, #385 (src/sessionorc/gitinfo.py, 23:22Z → 01:22Z), #386, #387
+17:33  grinder-ao-1: dropped #383 (anchor's merge) and declared out_of_work 23:33Z (why on its record); grinder-ao-2: working TD-095 page → ok
