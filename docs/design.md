@@ -1202,9 +1202,14 @@ Screens:
    same six on every card, in the same places, at one height** — a row with nothing to say stays,
    empty, rather than moving what is below it. (1) **name and state**: the session's name, the
    tool's title beside it **only when it differs from the name**, and the state pill, always at
-   the right. (2) **what it is**: the role's label and icon, the mode as a **plain word**
-   (*unattended* / *interactive* — not a chip and not pressable; its toggle is in **more** and on
-   the Focus header), the marks (unread, identity, suspended), and at the right **the one clock on
+   the right. (2) **what it is**: the role's label and icon, the mode — never pressable, its toggle in **more** and on the Focus header — drawn so that
+   **the person's own sessions are the ones that stand out** (second pass, Paul 2026-09-21):
+   *unattended* is a plain, quiet word, the common case on a team; ***interactive*** takes the
+   `person` icon and the text's full strength, because *which of these are mine* is something a
+   person looks for — a worker a person has taken over by flipping it is theirs too, which is
+   what the mode means. **`person` is reserved for this mark**: it leaves the set a role's
+   `icon:` may name (§4.8 — no built-in uses it; a repo's role that names it is refused when the
+   file is read, with the reason), so a card never shows the same glyph twice for two reasons, the marks (unread, identity, suspended), and at the right **the one clock on
    a card**: how long it has been in this state — the record's `since`, counted in the browser,
    which costs nothing to know. (3) **where**, alone and at full width: `branch <name>`, the name shortened in the middle so
    both ends read and whole on hover; `detached at <short sha>` for a detached HEAD; the directory
@@ -1237,7 +1242,17 @@ Screens:
    on a session that is still there (`idle`) → **Close session**; `closed`, or a pane that is gone
    → **Details**; everything else —
    `working`, `idle`, `stalled?`, a question to answer in the terminal — → **Focus**. Then Focus
-   (or Details) as a quiet button where it was not first, **VS Code**, and **more** at the right. **An ending is said once per place**: the pill
+   (or Details) where it was not first, the **editor** button, and **more** at the right. **The
+   foot is quiet, and quiet never looks disabled** (second pass, 2026-09-21: the first build's
+   filled white button was the loudest thing on a card after the *needs you* ring, and its
+   borderless, dimmed neighbours read as switched off): the next act is an **outlined** button
+   with the text's normal strength, the others are **plain links** at normal strength, **among the foot's controls, *dimmed* means
+   disabled and nothing else** (a gone controller's chip, a stale reading and an unreachable card are dim for
+   their own reasons, and none of them is a button), and the only **filled** button a card ever carries is
+   **Allow**, on a *needs you* card, where loud is right. **The editor button is the person's**:
+   its label and its link come from the person's UI configuration (§5 *The person's own*) — VS
+   Code by default, another editor, or none at all, which removes the button from every card and
+   from Focus. **An ending is said once per place**: the pill
    says the **state and nothing else** — a session that declared itself out of work is still
    `idle` (*finished · unseen* until a person has looked, §4.2), since a declaration is not a state
    (§4.9a), and the first sketch's grey *finished* pill was the sketch's mistake; the slot says how
@@ -1260,7 +1275,11 @@ Screens:
    *new* mail) — an idle card with unread mail is blue twice, which reads rightly: it is at rest
    and has been spoken to. The legend (`docs/mockups/gen.py`, *States & badges*) changes with the
    tokens. **One order, no control**
-   (2026-09-18): inside a group the manager's card, then by urgency (`needs-you` → `limited` →
+   (2026-09-18; **second pass 2026-09-21, not built: within one urgency an `interactive` session
+   sorts ahead of an unattended one** — *one urgency* is one value of the rank the server already
+   sorts by, and the key becomes **(rank, interactive first, name)**; a worker that needs a
+   person still outranks the person's own idle session, and the manager's card is placed first
+   before any of this, whatever its mode): inside a group the manager's card, then by urgency (`needs-you` → `limited` →
    `stalled?` → `unreachable` on a non-volatile host → `working` → unseen `idle` (§4.2) → `idle` /
    `unreachable` on a volatile host → `exited` → `closed`); between groups, a live team with a
    `needs-you` session above the other live teams. A `needs-you` card is ringed and counted in the
@@ -1431,6 +1450,7 @@ noted). If a control is not in this table it does not exist.
 | top bar | **New session** | opens the New session form |
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
 | Org | ~~**Urgent first / Pinned**~~ | dropped 2026-09-18: there is one order — the manager, then urgency, inside a team; a live team with a `needs-you` session above the other live teams — and no control for it. A `needs-you` card keeps its ring and the header its *n needs you* count; the list to work through is the Inbox (TD-069) |
+| Org | ***mine*** | design 2026-09-21, TD-095 second pass, not built: one press beside the filter that shows only `interactive` sessions — the person's own, a taken-over worker included — and a second press that shows everything again. A toggle, not a word typed into the box: it has no value to type. **It composes with whatever is typed**, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing |
 | Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
 | Org banner | **Retry** | asks the host agent on an unreachable host again now instead of on the next tick |
 | card | **Allow / Deny** | answers a pending permission through the hook channel; shown with the time left |
@@ -1438,7 +1458,7 @@ noted). If a control is not in this table it does not exist.
 | card | **Wait** | dismisses the limited slot until the reset time |
 | card | **Close session** (inline, only when Ready to close passes) | kill + reap worktree → `closed` |
 | card | **Focus** | opens the Focus screen |
-| card | **VS Code** | `vscode://` link for the session's directory on its host (browser-handled) |
+| card | **VS Code** — the **editor** button | `vscode://` link for the session's directory on its host (browser-handled). **Configurable, and removable** (design 2026-09-21, TD-095 second pass, not built): the label and the link's template are the person's (§5 *The person's own*, `open_in:`); `none` draws no button, here and on Focus |
 | card | **more ▾** | Wrap up · Kill (confirms) · Close (as above) · Open shell here · Copy tmux command · **Switch to interactive / unattended** (design 2026-09-21, TD-095, not built — the mode's toggle, moved here from the card's badge) |
 | card / Focus header | **unattended / interactive** badge | a toggle: click flips the session's mode in its record (host-agent RPC); policies pick the change up on their next tick. **On a card the mode is a plain word beside the role, never pressable, and the toggle is an entry of *more* — *Switch to interactive* / *Switch to unattended* (design 2026-09-21, TD-095, not built; until then the card draws the toggle as a badge, only when unattended): a control that changes whether policies may act on a session is not a one-click target on a card a person is scanning, and *unattended* — nobody is sitting at it, so agentorc may act on it, and its tool was launched with the profile's `unattended_args`, which for Claude Code skip its permission prompts — is the common case and should not be the loudest thing on a card.** The Focus header always shows the toggle. Flipping to interactive is how a person takes over a worker, and takes it out of its controllers' reach on their next call (§9 invariant 5); flipping to unattended hands a session to the run window and usage gate, and needs the repo's `unattended:` block |
 | Due strip / Attention | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
@@ -1506,8 +1526,8 @@ noted). If a control is not in this table it does not exist.
 | Resumable | **Adopt…** | attach to a hand-started tmux session and name it |
 | Commands | **Run / Stop** | start a `kind: command` session / kill it |
 | Commands | **log**, **Focus** | the run log; the run's terminal |
-| Commands | **edit yml** | opens `.agentorc.yml` in VS Code |
-| Focus header | **VS Code** | same `vscode://` link as the card |
+| Commands | **edit yml** | opens `.agentorc.yml` in the person's editor — the same `open_in:` as the card's button, and not drawn under `none` (design 2026-09-21, TD-095 second pass, not built); as built, in VS Code |
+| Focus header | **VS Code** — the **editor** button | the same button as the card's, from the person's `open_in:` (§5 *The person's own*; design 2026-09-21, TD-095 second pass, not built) — `none` removes it here too. As built: same `vscode://` link as the card |
 | Org top bar | **filter…** text box | matches name, repo, directory, branch; client-side |
 | Resumable | **search transcripts…**, Recent / Closed / With board items, date range | filters over the transcript index — *phase 4 polish; phases 1–3 ship the plain list* |
 | Commands | host / repo filters | client-side filters — *phase 4* |
@@ -1935,7 +1955,7 @@ template, a default lane shape, default grants, and — since 2026-09-13, §4.9 
 pick-list adds an agent by skillset in one choice; the record keeps the name as `role` for the
 badge and nothing keys on it (§9 invariant 9). A preset may also carry an **`icon:`** (2026-09-19,
 TD-074) — one name from a fixed set the UI ships (`flag`, `wrench`, `search`, `eye`, `book`,
-`shield`, `terminal`, `person`; an unknown name is refused when the file is read, as an unknown grant is), never
+`shield`, `terminal` — and `person`, until TD-095's second pass is built, which **reserves `person` for the card's *interactive* mark** and refuses it as a role's icon, §4.5 *The card's anatomy*; an unknown name is refused when the file is read, as an unknown grant is), never
 markup from a config file — drawn small and monochrome inside the role badge, so the state tile
 stays the one coloured thing on a card. The built-ins carry `manager: flag`, `grinder: wrench`,
 `hunter: search`. It is a label's picture and nothing more: **a card's layout does not vary by
@@ -3868,6 +3888,7 @@ those is refused when the graph does not permit it; a session out of wake budget
   session host carries its own copy; the ssh entries, now the node→home link of §4.4a, remain phase 2. **`home:`** (2026-09-16,
   §4.4a) names the host whose agent holds the org's graph and mail; an agent whose file names no
   `home:`, or names itself, is the home. On Paul's machines it is `home: kmaster`.
+- **The person's own** (design 2026-09-21, TD-095 second pass, not built): **`ui.yml`**, beside `hosts.yml` and `org.yml` in the agentorc home (`~/.agentorc`, or `AGENTORC_HOME` — resolved as its siblings are), read by the UI process on the machine it runs on. It is the one scope that is a person's preference and nobody else's business, which hosts, repos and the org are not; today one UI process serves one person — nothing in this design has it serve two — and if that ever changes this scope moves with the person, not the process. Its first key is **`open_in:`**, the editor button of the card, the Focus header and *edit yml*: **`vscode`** — the default, and what a missing file means: today's two forms, `vscode://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank` and, where the UI runs on the machine the person sits at, `vscode://file{path}?windowId=_blank`; **`cursor`** — the same two forms under the `cursor://` scheme, which the builder **confirms against the editor's own documentation before it ships** and records here; **`{label: "…", url: "…"}`** — a template of the person's own, which is how any other editor is reached (Zed, a JetBrains Gateway link: their remote forms are not the same shape, so they are not presets); or **`none`**, which removes the button everywhere. A template takes `{path}` (percent-encoded, as today — TD-011) and `{remote}`, the host's `vscode_host` from `hosts.yml` — an ssh alias in the person's own `~/.ssh/config`, whatever editor reads it; with no `{remote}` in it, a template is used as it stands on every host. **A template must be `scheme://…`, and `javascript`, `data`, `vbscript` and `file` are refused as schemes** — the scheme being the part before `://`, parsed, never a substring (`vscode://file…` is scheme `vscode`); one that does not parse, or is refused, is named on the page when it is served and the default button is drawn — the file is the person's own, and a pasted bad line should still not become a link that runs. The label is text the person wrote, escaped. Nothing here reaches a host agent: no session and no policy reads it.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
   duplicated. A repo without dev-cadence can still be listed there. Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
