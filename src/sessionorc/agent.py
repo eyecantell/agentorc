@@ -3319,13 +3319,16 @@ class HostAgent:
     def _keep(e: MailEntry, now: datetime, *, inbox: bool, person: bool = False) -> bool:
         """Lifecycle stage 3 (design §4.10): a read entry is kept for the retention window from
         `read_at` — or, for an `ask`, from when it closed or expired — and an open `ask` is never
-        pruned. An unread inbox entry never ages out. The sender's copy runs from `at`. `person`:
+        pruned. An unread inbox entry never ages out. The sender's copy runs from `at`, and a sent
+        reply carrying a `source` is kept `SOURCED_RETENTION` whatever else is pruned. `person`:
         the copy is the person inbox's, where a question the person answered is listed as owed."""
         if e.open or e.owes_for(session_inbox=inbox and not person) or mail.MAIL_RETENTION is None:
             # `owes`: a question that was answered and not reported back is kept until it is
             # (design §4.10 *Outcomes*) — the follow-up `--thread` names it, and the person's
             # Inbox lists it under *Waiting on them*, so pruning it would strand both.
             return True
+        if not inbox and e.source and _parse(e.at) + mail.SOURCED_RETENTION > now:
+            return True  # a sourced reply, in its sender's outbox (§4.9b): what `inbox --sent` reads
         since = e.expired_at or e.closed_at or (e.read_at if inbox else e.at)
         if since is None:
             return True

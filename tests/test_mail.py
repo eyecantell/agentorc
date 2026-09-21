@@ -2067,3 +2067,26 @@ async def test_an_answer_from_the_record_is_told_to_the_person_and_an_overrule_r
             with pytest.raises(AgentError, match="person inbox"):
                 await tc.call("msg", reply_to=q3["id"], kind="reply", text="yes", source="design §4.9b")
             assert not [e for e in agent.sessions[w].inbox if e.reply_to == q3["id"]]
+
+
+async def test_a_sourced_reply_is_kept_in_its_senders_outbox_for_seven_days(agent, tmp_path, monkeypatch):
+    """Design §4.9b (TD-075 step 4): a sent reply carrying a `source` stays in the sender's outbox
+    for `SOURCED_RETENTION` whatever else is pruned — `ao inbox --sent` is how a techlead started
+    cold answers alike — while an unsourced reply, and the asker's copy of the sourced one, go at
+    the ordinary retention."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl")]
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q1 = (await wc.call("msg", to=tl, text="rebase?", kind="ask"))["entry"]
+            q2 = (await wc.call("msg", to=tl, text="squash?", kind="ask"))["entry"]
+            sourced = await tc.call("msg", reply_to=q1["id"], kind="reply", text="yes", source="design §4.9b")
+            plain = await tc.call("msg", reply_to=q2["id"], kind="reply", text="yes")
+            await wc.call("inbox")  # read, so the asker's copies age from now
+            monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(seconds=0))
+            await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
+            sent = [e.id for e in agent.sessions[tl].outbox]
+            assert sourced["entry"]["id"] in sent and plain["entry"]["id"] not in sent
+            assert sourced["entry"]["id"] not in [e.id for e in agent.sessions[w].inbox]
+            await agent._sweep_mail(datetime.now(UTC) + mail.SOURCED_RETENTION + timedelta(seconds=1))
+            assert sourced["entry"]["id"] not in [e.id for e in agent.sessions[tl].outbox]
