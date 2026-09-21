@@ -1214,6 +1214,75 @@ async def test_a_closed_home_record_is_superseded_by_the_nodes_new_session_of_th
     assert agent.remote["laptop"]["ao-x-w"].dir == "/tmp/new"
 
 
+async def test_a_fresh_start_on_a_node_is_a_new_record_at_the_home_and_keep_mail_keeps_the_mail(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """TD-057, found 2026-09-21: a name taken again on a node replaces the record **in place**, and
+    the home used to merge that report into the old record by owner — so the new session came up
+    with the old run's home-owned fields (its stop time, its `out_of_work`) and its mail, and
+    `--keep-mail` moved an empty mailbox on the node. The node's record now says what it
+    `supersedes`, and the home does it to its own copies: a fresh start is a new record, and
+    `--keep-mail` brings the old run's mail with it."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        seat = dict(name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True, host="laptop")
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            v = await person.call("create", **seat)
+            address = v["id"]
+            from datetime import UTC, datetime, timedelta
+
+            later = (datetime.now(UTC) + timedelta(hours=1)).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+            await person.call("set_stop", id=address, run_until=later)
+            await person.call("msg", to=[address], text="the question that caused the fill", kind="note")
+            await person.call("kill", id=address)
+            await until(home, address, lambda r: r is not None and r["state"] == "exited")
+            # a fresh start: the old run's stop time and mail went with the old record
+            fresh = await person.call("create", **seat)
+            assert fresh["id"] == address and fresh["run_until"] is None
+            assert (await person.call("get", id=address))["unread"] == 0
+            await person.call("msg", to=[address], text="for the seat", kind="note")
+            await person.call("kill", id=address)
+            await until(home, address, lambda r: r is not None and r["state"] == "exited")
+            # `--keep-mail`: the new session holds the mail the old one was sent, at the home
+            kept = await person.call("create", keep_mail=True, **seat)
+            assert kept["id"] == address and kept["unread"] == 1
+            assert [e["text"] for e in (await person.call("inbox", id=address))["entries"]] == ["for the seat"]
+            held = await at_home(home, address)
+            assert held["supersedes"][0]["id"] == address.removesuffix("@laptop") and held["supersedes"][0]["mail"]
+            await person.call("kill", id=address)
+
+
+async def test_a_resume_on_a_node_moves_the_homes_mail_and_forwards_what_is_still_addressed_to_it(agent):
+    """TD-057: a resume on a node under another name closes the old record there and moves its
+    (empty) mailbox; the successor's `supersedes` has the home move its own copy's mail and record
+    `superseded_by`, as the graph addresses the successor. The second report of the same
+    supersession is an ordinary report: nothing is moved or replaced again."""
+    from sessionorc.models import MailEntry
+
+    old = record("ao-x-w", state="exited", created="2026-09-20T00:00:00Z", out_of_work={"at": "t", "why": "old run"})
+    agent._take_records("laptop", [old], whole=True)
+    held = agent.remote["laptop"]["ao-x-w"]
+    held.inbox.append(
+        MailEntry(id="m-1", from_="person", to=["ao-x-w@laptop"], at="2026-09-20T01:00:00Z", kind="note", text="hi")
+    )
+    new = record("ao-x-w2", name="w2", created="2026-09-21T00:00:00Z",
+                 supersedes=[{"id": "ao-x-w", "mail": True, "at": "2026-09-21T00:00:00Z"}])  # fmt: skip
+    agent._take_records("laptop", [new], whole=False)
+    succ = agent.remote["laptop"]["ao-x-w2"]
+    assert [e.id for e in succ.inbox] == ["m-1"] and succ.inbox[0].to == ["ao-x-w2@laptop"]
+    assert held.inbox == [] and held.superseded_by == "ao-x-w2@laptop"
+    succ.doing = {"at": "t", "text": "set at the home since"}
+    agent._take_records("laptop", [{**new, "state": "idle"}], whole=False)
+    assert agent.remote["laptop"]["ao-x-w2"] is succ and succ.state == "idle" and succ.doing  # applied, not replaced
+
+    # replaced in place without `mail`: a new record, and the old run's home-owned fields stay behind
+    again = record("ao-x-w2", name="w2", created="2026-09-22T00:00:00Z",
+                   supersedes=[{"id": "ao-x-w2", "mail": False, "at": "2026-09-22T00:00:00Z"}])  # fmt: skip
+    agent._take_records("laptop", [again], whole=False)
+    third = agent.remote["laptop"]["ao-x-w2"]
+    assert third is not succ and third.inbox == [] and third.doing is None and third.created == "2026-09-22T00:00:00Z"
+
+
 async def test_the_replica_is_repaired_from_the_home_on_every_new_link(home, hookstub, tmp_path, monkeypatch):
     """The push after a snapshot (step 4b.2): a replica that drifted from the home — a home restored
     from an old store, an act whose second half failed — takes the home's copy when the link is
