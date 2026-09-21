@@ -351,10 +351,14 @@
    `identity_ack` stays, because a wire name is not a control. The host agent's log keeps every
    alarm, so it loses nothing.
 
-   §4.5a gives the row three more — **Suspend**, **Log TD** and **Open** — of which only **Open**
-   is buildable today: *Suspend* and *Log TD* each need an RPC of the host agent's that does not
-   exist yet, and a control drawn against a method that is not there is the one thing §4.2 forbids.
-   They arrive with those. #}
+   §4.5a gives the row three more — **Open**, **Suspend** and **Log TD**. **Open** and **Suspend**
+   are built (the second from 2026-09-20, with `rpc_suspend`); **Log TD** is not drawn at all until
+   `identity_log` exists, because a control against a method that is not there is the one thing
+   §4.2 forbids, and a disabled one would be a promise the page cannot keep.
+
+   The two are different in kind, which is why they read differently below: **Dismiss** and
+   **Log TD** are *answers* and end the row; **Open** and **Suspend** act on the session and leave
+   it standing (§4.10 — only an answer ends a row). #}
 {% macro alarm(e, section) -%}
 {{ state_head(e) }}
 <div class="body">{% if e.row == 'alarm_host' %}Requests to this host that named a session they did not come from — kept here because they are about no record, so nobody is blamed for someone else's claim.{% else %}Requests that named this session and did not come from it.{% endif %}</div>
@@ -366,6 +370,15 @@
 <div class="row gap wrap mfoot">
   <span class="st">identity: {{ e.mode or 'unknown' }}{% if e.mode == 'observe' %} — recorded and served exactly as before (design §4.8a){% elif e.mode == 'enforce' %} — the request was refused{% elif e.mode == 'off' %} — nothing is classified on this host{% endif %}</span>
   <span class="grow"></span>
+  {#- §4.8a *An alarm's answers*: **Suspend** stops the session at once — no wrap-up, because a
+      session under suspicion is not asked to tidy — keeps its worktree and its conversation, and
+      marks the record, which **only a person lifts**, by resuming it or forgetting it. It **acts
+      on the session and leaves the row standing**: a suspension is not an answer to the alarm.
+      Offered only on a record's row and only while that session is live — the host's own list is
+      about no record, and suspending what is already stopped would be a mark with no act. -#}
+  {%- if e.sid and e.row != 'alarm_host' and not e.suspended_note and e.state not in ('exited', 'closed') %}
+  <button class="btn sm" data-act="suspend" data-id="person" data-who="{{ e.sid }}" data-name="{{ e.name }}" data-confirm="Suspend {{ e.name }}? It is stopped at once, with no wrap-up — its worktree, conversation and run log are kept. No session can start it again under that name: only you lift it, by resuming it yourself or forgetting it.">Suspend</button>
+  {%- endif %}
   {%- if e.sid %}{{ open_btn(e, 'Open') }}{% endif %}
   <button class="btn sm ghost" data-act="identity_ack" data-id="person" data-who="{{ e.sid }}" data-confirm="Dismiss these alarms? The list is cleared and the row leaves; the host agent's log keeps every one of them, a line each.">Dismiss</button>
 </div>

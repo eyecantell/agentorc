@@ -2003,6 +2003,16 @@ def create_app() -> FastAPI:
                 raise HTTPException(400, "a state row's snooze names the session and the row kind")
             got = await call("attention_snooze", id=sid, kind=kind, until=str(body.get("until") or "").strip() or None)
             return JSONResponse({"ok": True, **got})
+        if action == "suspend":
+            # design §4.8a *An alarm's answers* (TD-077 a2): **Suspend** — a person's own act, and
+            # refused to every session by the agent for the reason `identity_ack` is, turned around:
+            # a session that could suspend could stop its rival. Caller-less, like every control on
+            # this page; `why` is left to the agent, which composes it from the alarm's own words.
+            who = str(body.get("id") or "").strip()
+            if not who:
+                raise HTTPException(400, "suspend names the session to suspend")
+            got = await call("suspend", id=who)
+            return JSONResponse({"ok": True, **got})
         if action == "identity_ack":
             # design §4.5a **Inbox row: identity alarm** (§4.8a, TD-077 step 2): a person has seen
             # the alarms and decided what they were, so the list is cleared and the row leaves.

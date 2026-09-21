@@ -141,6 +141,12 @@
       // **Dismiss** and the wire name is `identity_ack`: a wire name is not a control, so the
       // rename of 2026-09-20 did not touch it (§4.5a).
       if (action === "identity_ack") body = { id: b.dataset.who || "" };
+      // §4.8a *An alarm's answers* (TD-077 a2): **Suspend** — a person's own act on a session, and
+      // the one control on an alarm row that **leaves the row standing**: it stops the session, it
+      // does not answer the alarm. The confirm is the page's own words (the global gate reads
+      // `data-confirm` before this runs), and `why` is left to the agent, which composes it from
+      // the alarm's own fields — a page that wrote its own reason would be writing the record.
+      if (action === "suspend") body = { id: b.dataset.who || "" };
       // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
       // is the one that decides what may be done, and its refusal comes back as a toast.
@@ -203,11 +209,14 @@
       if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
       // the wire name stays `identity_ack`; the control is **Dismiss** (§4.5a, renamed 2026-09-20)
       if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
+      if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
       // the state is answered, so the row is gone: it is taken out here rather than waited for, and
-      // the refresh below puts back whatever the record actually says
-      if (staterow) staterow.remove();
+      // the refresh below puts back whatever the record actually says. **Suspend is the exception**
+      // (§4.8a): it acts on the session and *leaves the row standing* — the alarm is still there to
+      // be answered — so the row is refreshed in place rather than taken out from under the person.
+      if (staterow && action !== "suspend") staterow.remove();
       if ((staterow || id === "person") && typeof AO.refreshInboxPage === "function") {
         // the control that was pressed is about to go with its row, and while it holds the focus
         // the refresh below would politely decline to redraw the section it sits in
