@@ -187,3 +187,15 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     assert next(r for r in data["roles"] if r["name"] == "grinder")["source"] == "built-in + repo"
     (root / ".agentorc.yml").write_text("roles: {grinder: {grants: [fly]}}\n")
     assert cli.main(["roles"]) == 1 and "unknown grant 'fly'" in capsys.readouterr().err
+
+
+def test_new_keep_mail_is_sent_only_when_asked(repo):
+    """TD-075 step 4 (design §4.9b): `ao new --keep-mail` asks the host agent to keep the mail of
+    the record the name held; without the flag the parameter is not sent at all, so an older host
+    agent is never handed a keyword it would refuse."""
+    _, calls = repo
+    assert cli.main(["new", "seat", "--keep-mail"]) == 0
+    assert created(calls)["keep_mail"] is True
+    calls.clear()
+    assert cli.main(["new", "seat2"]) == 0
+    assert "keep_mail" not in created(calls)
