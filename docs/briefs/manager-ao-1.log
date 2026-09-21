@@ -68,3 +68,4 @@
 08:53  grinder-ao-2: merged #359 (TD-075 team-header count; page half complete) → cadence check pass (review recorded); grinder-ao-1: working, TD-075 mail half on td075-asks-waiting-passed-up → ok
 08:53  grinder-ao-2: out_of_work 14:53:04Z + idle → finished (why: ledger re-read at 89de0bd, rest is grinder-ao-1's, design-first, Paul's, or sessionorc) → nothing
 08:54–09:10 quiet; grinder-ao-1 opened #360 (TD-075 mail half, src/sessionorc, 14:57Z → ask at 16:57Z); grinder-ao-2 finished, one short turn 15:10Z (nothing sent by me), idle again
+09:11–09:37 quiet; grinder-ao-1 opened #361 (15:14Z) and #362, TD-075 mail half, both in the anchor's queue
