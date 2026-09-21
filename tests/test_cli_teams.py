@@ -423,7 +423,7 @@ def test_stop_wraps_the_members_up_before_the_lead_and_now_kills(world, capsys):
     assert [p["id"] for p in sent] == [
         "ao-agentorc-grind-1", "ao-agentorc-grind-2", "ao-agentorc-hunt", "ao-agentorc-orc-ao",
     ]  # fmt: skip
-    assert all(p["text"] == teams.WRAPUP_PROMPT for p in sent)
+    assert all(p["text"] == teams.WRAPUP_PROMPT and p["wrapup"] is True for p in sent)  # holds the doorbell off
     assert "wrap-up sent" in capsys.readouterr().out
     state["calls"].clear()
     for s in state["sessions"]:

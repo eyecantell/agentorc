@@ -166,7 +166,7 @@ not mix:
 - **thread** — a root message and every `reply` chained to it. — *proposed*.
 - **wake** — a turn that mail caused: a doorbell starting one, or `ao wait` returning on mail.
   **Wake budget** — how many wakes a session may take in a rolling window. — *proposed*; the `wait`
-  half and the budget (unlimited until step 6) *built* 2026-09-16 (TD-052 step 3); the doorbell is step 7.
+  half and the budget (unlimited until step 6) *built* 2026-09-16 (TD-052 step 3); the doorbell *built* 2026-09-20 (step 7).
 - **bound_hit** — the mark the home writes on a thread when its exchange bound refuses a send;
   every participant's card and `ao` replies show it, and a person's message clears it (design
   §4.10). — *proposed* (2026-09-16).

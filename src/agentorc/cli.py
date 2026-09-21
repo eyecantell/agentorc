@@ -19,6 +19,7 @@ from agentorc import org as orgmod
 from agentorc import repoconfig, teamrun, teams
 from sessionorc import client as clientmod
 from sessionorc import hosts, naming
+from sessionorc import mail as mailmod
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
@@ -249,6 +250,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
             if unread := s.get("unread"):
                 print(f"{'':<{w}}      mail:   {unread} unread")
+            # a doorbell that would not submit twice (§4.10): the sender learns its mail did not wake
+            if bell := s.get("doorbell_failed"):
+                print(f"{'':<{w}}      doorbell failed {_age(bell['at'])}: {bell['error']}")
             # `owed` is here for **someone else's** eyes (design §4.10 *Outcomes*, TD-079 step 3):
             # the owing session is told on every `ao` reply of its own, but a lead reading its
             # members cannot see a debt it is meant to chase unless the record says so.
@@ -1758,7 +1762,7 @@ def unread_line(args: argparse.Namespace) -> None:
         return
     lines = []
     if n := int(m.get("unread") or 0):
-        lines.append(f"[agentorc] you have {n} unread messages — run ao inbox")
+        lines.append(mailmod.unread_line(n))
         if m.get("wake_budget_spent"):
             lines[-1] += " (wake budget spent)"
     # Design §4.10 *Outcomes*: the person answered and is waiting to hear what came of it. One line

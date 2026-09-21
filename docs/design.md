@@ -604,8 +604,9 @@ long-lived link. The home is also a node for its own host's sessions (one proces
   arrival order.
 - **Each field has one owner, and merges go by owner, never by last write** (third review,
   2026-09-16). **The node owns what it observes and enforces on its host:** `state`, `confidence`,
-  `pending`, `pane`, `tail`, `last_output`, `exit_code`, `git`, `model`, usage, the run log and
-  `wrapup_sent_at`. **The home owns the graph and intent:** `controllers`, `capabilities`, `team`,
+  `pending`, `pane`, `tail`, `last_output`, `exit_code`, `git`, `model`, usage, the run log,
+  `wrapup_sent_at`, and the two a `send` or a ring leaves on its pane (§4.10, TD-052 step 7):
+  `wrapup_at` and `doorbell_failed`. **The home owns the graph and intent:** `controllers`, `capabilities`, `team`,
   `project`, `role`, `lane`, `unattended`, `run_until`, the wrap-up prompt, reports, the inbox,
   `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and `mail_decided`. Example: the link is down, the node wraps a worker up
   and it exits, and meanwhile a person at the home extends its `run_until`; on reconnect the node's
@@ -754,7 +755,8 @@ see.
   the node cancels it by token when its client goes away (`cancel`), so no ghost wait is charged a
   wake at the home, and a link that drops ends it. *Reachable* includes the link being up because
   a session that is not blocked in a wait here has no other doorbell yet — a hook-confirmed idle
-  rings nothing on one host either (TD-052 step 7), and across the link it will be that.
+  is rung on the host whose agent holds the mailbox (TD-052 step 7, 2026-09-20), and a node, which
+  holds no inbox, rings nothing; across the link the ring will be that.
 - **Landed — host unreachable.** Mail to a session whose link is down lands in the home's copy and
   the sender's reply names it under `unreachable` (`ao msg` prints *landed — host unreachable*);
   its card shows the unread count under the overlay. Nothing waits anywhere but the mailbox: the
@@ -3077,6 +3079,22 @@ The rules that bound both:
   host agent's next tick if the session is still idle with mail unread; a second failure is written to
   the record where the sender and the UI can see it, and nothing more is typed until the session's
   state next changes.
+
+As built (TD-052 step 7, 2026-09-20): the host agent looks on every tick, and a ring is its own
+task so a submit never holds the tick up. *A wrap-up under way* is a passed or answered stop time
+(`run_until`, `wrapup_sent_at`) or **`wrapup_at`**, which a `send` marked `wrapup` stamps — the
+card's and Focus's Wrap up and `ao team stop`, which includes a manager's wind-down, send the
+wrap-up prompt that way, because the host agent cannot tell it from another send by its text — and
+which the next plain send clears, a new instruction being a run carrying on. The usage gate and the
+run window reach it as stop times when they are built (TD-026). *Rung only for new mail* is the
+`mail_decided` watermark: a ring is `_decide_wake`, recorded `via: doorbell`; a tick that decides
+nothing records nothing, so a refilled budget rings on the next tick; one ring per idle stretch
+(a stretch ends when the record's state changes). A session blocked in `wait` is left to it. The
+retry is not a second decision or a second charge, and it types only into an empty composer — a
+stuck first try leaves its own line there, which is then the second failure. The failure is
+`doorbell_failed` (`{at, error}`), printed under the session in `ao status -v` and cleared by the
+next ring that lands. The line is `sessionorc.mail.unread_line`, the same text the per-command line
+prints.
 
 **The message gate is weaker than `control`, and reads off the graph that already exists.**
 No new list, no new grant. A session may message:

@@ -341,7 +341,7 @@ def _stop_one(call: Call, s: dict[str, Any], role: str, *, now: bool) -> dict[st
         if now:
             call("kill", id=s["id"])
         else:
-            call("send", id=s["id"], text=teams.WRAPUP_PROMPT)
+            call("send", id=s["id"], text=teams.WRAPUP_PROMPT, wrapup=True)
     except Exception as e:  # noqa: BLE001 — the transport's error is the reason, whichever it is
         return {**_entry(s, role), "action": f"refused: {e}", "state": s.get("state") or "?", "refused": True}
     return {**_entry(s, role), "action": "killed" if now else "wrap-up sent", "state": "killed" if now else "?"}
