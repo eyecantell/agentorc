@@ -149,8 +149,9 @@ NODE_READS = frozenset({"tail", "explain"})
 # records' policy fields as they change", step 4b.2): the home-owned fields, less the mailbox — the
 # inbox, outbox, threads, wakes and `mail_decided` stay the home's, and no message body ever reaches
 # a node — less `sends`, which every pane's own node writes first (a send runs there) and the merge
-# unions, and less `superseded_by`, which the node writes itself when a resume there supersedes a
-# record and the home does not hear (a node's report carries node-owned fields only).
+# unions, and less `superseded_by`, which each end writes for itself: the node when a resume there
+# supersedes a record, the home when the successor's report says so (`supersedes`, node-owned;
+# `_take_supersession`, TD-057).
 INTENT_FIELDS = HOME_OWNED - frozenset(
     {"inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "superseded_by"}
 )
@@ -1133,7 +1134,7 @@ class HostAgent:
         arrive pre-silenced."""
         who = self._address(s)
         now = datetime.now(UTC)
-        for key in [k for k in self._attention if k.split("|", 1)[0] == s.id]:
+        for key in [k for k in self._attention if k.split("|", 1)[0] == who]:  # keyed by address (the graph's)
             was, since, text = self._attention.pop(key)
             slot = key.split("|", 1)[1]
             word = self._attention_how.get(f"{who}|{slot}") or self._attention_how.get(f"{who}|*") or how
@@ -1353,6 +1354,10 @@ class HostAgent:
                 previous_run=previous_run,
                 host=self.host,
             )
+            if isinstance(holder, Session):
+                # the record of this name it replaced, for the home, which holds the mail (§4.4a)
+                kept = bool(keep_mail or (resume and holder.adapter_id == resume))
+                s.supersedes = [{"id": holder.id, "mail": kept, "at": s.created}]
             self.sessions[sid] = s
             self.store.save(s)
             self._remember_dir(directory)
@@ -1547,6 +1552,7 @@ class HostAgent:
                 other.superseded_by = new_sid
                 if new is not None:
                     self._move_mail(other, new)
+                    new.supersedes.append({"id": other.id, "mail": True, "at": new.created})
                 self.store.save(other)
         if replaced is not None and new is not None and replaced.id == new_sid and replaced.adapter_id == adapter_id:
             self._move_mail(replaced, new)
@@ -1560,14 +1566,17 @@ class HostAgent:
         # before the name was taken, and marking it again here would leave the word on the id the
         # **live** record now holds — where `*` stands until the record goes, so its next, unrelated
         # ending would wear *resumed* with nothing resumed (review of PR #282).
-        if old.id != new.id:
-            self._attention_ended(old.id, "resumed", "*")
+        #
+        # Ids are **addresses** here (`_address`): the same thing on this host's records, and
+        # `id@host` on a node's records at the home, which moves their mail when a node reports
+        # the supersession (`_take_supersession`, TD-057).
+        a, b = self._address(old), self._address(new)
+        if a != b:
+            self._attention_ended(a, "resumed", "*")
         now = datetime.now(UTC)
-        new.inbox = self._rename([self._copy(e) for e in old.inbox if self._keep(e, now, inbox=True)], old.id, new.id)
-        new.outbox = self._rename(
-            [self._copy(e) for e in old.outbox if self._keep(e, now, inbox=False)], old.id, new.id
-        )
-        new.threads = {k.replace(f"pair:{old.id}", f"pair:{new.id}"): t for k, t in old.threads.items()}
+        new.inbox = self._rename([self._copy(e) for e in old.inbox if self._keep(e, now, inbox=True)], a, b)
+        new.outbox = self._rename([self._copy(e) for e in old.outbox if self._keep(e, now, inbox=False)], a, b)
+        new.threads = {k.replace(f"pair:{a}", f"pair:{b}"): t for k, t in old.threads.items()}
         new.sends = list(old.sends)
         # the wake decisions follow the conversation too, so moved mail a wake already covered is
         # not decided (and charged) a second time, and a spent budget is not reset by a resume
@@ -1580,24 +1589,26 @@ class HostAgent:
         # the person's Reply is addressed. Left naming the old id, the question would be closed
         # `asker_gone` when the superseded record is forgotten a day later, although the
         # conversation it belongs to is still running.
-        moved = [e for e in self.person_inbox if e.from_ == old.id]
+        moved = [e for e in self.person_inbox if e.from_ == a]
         for e in moved:
-            e.from_ = new.id
+            e.from_ = b
         if moved:
             self.person_store.save(self.person_inbox)
-        for r in self.sessions.values():
-            if r.id in (old.id, new.id):
+        for r in self._graph().values():
+            if r is old or r is new:
                 continue
+            # the mailbox is addressed as this host reads it, on every record (`_msg` lands entries
+            # by graph address) — only `controllers` are kept in a node's own form
             touched = False
-            if f"pair:{old.id}" in r.threads:
-                r.threads[f"pair:{new.id}"] = r.threads.pop(f"pair:{old.id}")
+            if f"pair:{a}" in r.threads:
+                r.threads[f"pair:{b}"] = r.threads.pop(f"pair:{a}")
                 touched = True
-            pending = [e for e in (*r.inbox, *r.outbox) if old.id in e.pending]
+            pending = [e for e in (*r.inbox, *r.outbox) if a in e.pending]
             if pending:  # the addressee that exited is back: its ask is open again, addressed to it
-                self._rename(pending, old.id, new.id)
+                self._rename(pending, a, b)
                 touched = True
             if touched:
-                self.store.save(r)
+                self._save(r)
 
     @staticmethod
     def _rename(entries: list[MailEntry], old: str, new: str) -> list[MailEntry]:
@@ -4354,6 +4365,8 @@ class HostAgent:
         reply = reply if isinstance(reply, dict) else {}
         if reply.get("record"):
             self._take_records(host, [reply["record"]], whole=False)
+            if method == "create" and mail.is_person(caller):
+                self._lift_by_person(host, str(reply["record"].get("id") or ""))
         elif reply.get("gone") and rid:
             self._forget_remote(host, rid)
         result = reply.get("result")
@@ -4564,7 +4577,9 @@ class HostAgent:
             rid = str(raw["id"])
             seen.add(rid)  # listed, whether or not it could be taken: a snapshot forgets only what it omits
             try:
-                if rid in mine:
+                if self._take_supersession(host, mine, rid, raw):
+                    pass  # a new session: taken whole, the records it replaced or continued dealt with
+                elif rid in mine:
                     try:
                         apply_node(mine[rid], raw)
                     except NotTheSameSession:
@@ -4586,6 +4601,75 @@ class HostAgent:
             for rid in [r for r in mine if r not in seen]:
                 self._forget_remote(host, rid)
         return len(seen)
+
+    def _take_supersession(self, host: str, mine: dict[str, Session], rid: str, raw: dict[str, Any]) -> bool:
+        """A node's record that `supersedes` others it has not yet told this home about (design
+        §4.4a, TD-057): what the name rule and a resume did **there** — to the node's replicas,
+        which hold no mail — done here to the home's own copies, which do. Once per supersession:
+        the home's copy carries the same list afterwards, and a later report is an ordinary one.
+
+        - **Replaced in place** (the same id: a fresh start under a name, `--keep-mail`, a resume
+          under the same name) — the record is a new session, so it is taken **whole**, as an
+          unknown one is adopted: its home-owned fields are the ones its create set, never the old
+          run's `out_of_work`, `progress` or `doing`. The old run's mail moves to it when `mail`
+          says so (a resume, `--keep-mail`), and otherwise goes with the old record, as it does
+          on one host (`_take_name`); its attention rows end *forgotten*.
+        - **Continued under another id** (a resume): the old record's mail moves to the new one,
+          and the old one records `superseded_by`, so mail still addressed to it is forwarded.
+
+        Returns whether the record was taken here (the caller then does not apply it again)."""
+        told = [x for x in raw.get("supersedes") or [] if isinstance(x, dict) and x.get("id")]
+        held = mine.get(rid)
+        if not told or (held is not None and held.supersedes == told):
+            return False
+        new = Session.from_dict(raw)
+        for x in told:
+            old_id = str(x["id"])
+            old = held if old_id == rid else mine.get(old_id)
+            if old is None:
+                continue  # never known here (a home that started after it went): nothing to move
+            if old.suspended and not new.suspended:
+                # **Except `suspended`** (§4.8a, the anchor's read of PR #371): the mark is the home's,
+                # and a node's word is not one of the roads that lift it. The node refuses a session
+                # from its replica's copy of the mark, but that copy is only as fresh as the last push —
+                # suspended while the link was down, the name retaken there, the link back. A person's
+                # own create through the home lifts it (`_route_act`), as it does on one host.
+                new.suspended = dict(old.suspended)
+                log.warning(
+                    "link from %s: %s took the name of suspended %s — the mark stands on it", host, rid, old_id
+                )
+            if x.get("mail"):
+                self._move_mail(old, new)
+            elif old is held:
+                self._attention_gone(old, "forgotten")
+                self._scrub(self._address(old))
+            if old is not held:
+                # the home's field (§4.4a), as the graph addresses the successor — `_msg`'s forwarding
+                # walk reads it there; the node's own close of the old record arrives by report
+                old.superseded_by = self._address(new)
+                self._remote_store(host).save(old)
+        mine[rid] = new
+        log.info("link from %s: %s supersedes %s", host, rid, ", ".join(str(x["id"]) for x in told))
+        return True
+
+    def _lift_by_person(self, host: str, rid: str) -> None:
+        """A person's `create` through the home, on a node: the supersession it made is one the home
+        authorised, so it lifts a suspension as a person's create or resume does on one host
+        (§4.8a) — on the new record, which `_take_supersession` may have marked from the report
+        that overtook this reply, and on the conversation it resumed. Only this create's own
+        supersessions (`at` is its start), never an older one the record still lists."""
+        mine = self.remote.get(host, {})
+        rec = mine.get(rid)
+        if rec is None:
+            return
+        for x in rec.supersedes:
+            if not isinstance(x, dict) or x.get("at") != rec.created:
+                continue
+            old = mine.get(str(x.get("id") or ""))
+            for r in (rec, old):
+                if r is not None and r.suspended:
+                    r.suspended = None
+                    self._remote_store(host).save(r)
 
     def _forget_remote(self, host: str, rid: str) -> None:
         if self.remote.get(host, {}).pop(rid, None) is None:

@@ -84,6 +84,7 @@ NODE_OWNED = frozenset(
         "doorbell_failed",
         "run_log",
         "previous_run",
+        "supersedes",
         "closed_at",
     }
 )
@@ -551,6 +552,13 @@ class Session:
     # The run log of the exited session of the same name this one replaced (design §4.1, TD-030):
     # the name is reused, so the previous run stays reachable from the record that took it over.
     previous_run: str | None = None
+    # What this session's create replaced or continued (design §4.4a, TD-057): `{id, mail, at}` per
+    # record — the one of its name it replaced in place, the exited one whose conversation it
+    # resumed — `mail` when that record's mailbox is this one's now (a resume, `--keep-mail`), `at`
+    # this session's start. Written on the host the session runs on, which is where the name rule
+    # ran; the home holds the mailbox, so it reads this once from a node's report and does the
+    # same to its own copies (`HostAgent._take_supersession`).
+    supersedes: list[dict[str, Any]] = field(default_factory=list)
     closed_at: str | None = None
     seen_at: str | None = None  # last time a person looked (Focus opened, card acted on); TD-017
     git: dict[str, Any] | None = None  # branch, dirty, ahead, behind, files (sessionorc.gitinfo)

@@ -606,12 +606,28 @@ long-lived link. The home is also a node for its own host's sessions (one proces
   2026-09-16). **The node owns what it observes and enforces on its host:** `state`, `confidence`,
   `pending`, `pane`, `tail`, `last_output`, `exit_code`, `git`, `model`, usage, the run log,
   `wrapup_sent_at`, and the two a `send` or a ring leaves on its pane (§4.10, TD-052 step 7):
-  `wrapup_at` and `doorbell_failed`. **The home owns the graph and intent:** `controllers`, `capabilities`, `team`,
+  `wrapup_at` and `doorbell_failed` — and `supersedes`, what a create there replaced or continued
+  (below). **The home owns the graph and intent:** `controllers`, `capabilities`, `team`,
   `project`, `role`, `lane`, `unattended`, `run_until`, the wrap-up prompt, reports, the inbox,
   `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and `mail_decided`. Example: the link is down, the node wraps a worker up
   and it exits, and meanwhile a person at the home extends its `run_until`; on reconnect the node's
   `exited` and `wrapup_sent_at` stand, and so does the home's new `run_until` — which now applies to
   nothing, because a stopped session is not resurrected.
+- **A supersession on a node is done again at the home** (TD-057, 2026-09-21). §4.1's name rule
+  and a resume run where the session starts, on the node's replicas, which hold no mail. So a new
+  record says what it **`supersedes`**: `{id, mail, at}` for each record its create replaced in
+  place or whose conversation it continued, `mail` when that record's mailbox is now its own (a
+  resume, `--keep-mail`). The home takes each supersession once, from the report or from the
+  routed create's reply. A record replaced **at the same id** is taken **whole**, as a record
+  the home has never seen is adopted: it is a new session, and a merge by owner would give it the
+  old run's home-owned fields (its stop time, `out_of_work`, `doing`) and its mail — **except
+  `suspended`**, which stands on the successor (and on one that resumed a suspended record's
+  conversation): the mark is the home's, a node's word is not one of the roads that lift it
+  (§4.8a), and the node's replica of it is only as fresh as the last push. A person's own create
+  through the home lifts it, as a person's create does on one host. The old run's
+  mail moves to the new record when `mail` says so, and otherwise goes with the old record, as it
+  does on one host. A record continued **under another id** hands its mail to the successor and
+  records `superseded_by` at the home, so mail still addressed to it is forwarded.
 - **A node keeps its own host's records on disk**, as every host agent does today — a replica whose
   home-owned fields the home's copy overrides. That replica is what a person acts through while
   offline, what the node's policies read, and what rebuilds the home (below).
@@ -1118,7 +1134,7 @@ decides* means call by call.
   then for each record whose pushed fields or unread count change. The fields are the home-owned
   ones less the mailbox — never `inbox`, `outbox`, `threads`, `wakes`, `mail_decided` or a message
   body — less `sends` (every send runs on the pane's own node, and the merge unions it) and less
-  `superseded_by` (written by the node's own resume, which the home does not hear), as the home
+  `superseded_by` (each end writes its own: the node at its resume, the home from `supersedes`), as the home
   stores them, which for another host's record is already the node's address form. The node
   applies them with `apply_home` — whatever else a push carries is not taken — and a changed
   `run_until` resets `wrapup_sent_at` as `set_stop` does. So a replica that drifted — a home
