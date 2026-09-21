@@ -1505,7 +1505,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["claim", "done", "drop", "none", "restart"])
     p.add_argument("ref", nargs="?", help="a ledger id (TD-027), a PR number, or an attention-board line")
     p.add_argument("--pr", help="the PR the work is on")
-    p.add_argument("--why", help="why it was dropped; with `none`, the search that came up empty (required)")
+    p.add_argument(
+        "--why",
+        help="why it was dropped; with `none` the search that came up empty, with `restart` why this run "
+        "is over (required for both)",
+    )
     p.add_argument("--force", action="store_true", help="claim a reference another live session holds (design §4.8)")
     p.add_argument("--id", help="the session to report for (default: your own, from AGENTORC_SESSION)")
     p.set_defaults(fn=cmd_progress)

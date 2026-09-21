@@ -1907,9 +1907,11 @@ class HostAgent:
         Org renders whichever are non-empty — and one reference is one entry, upserted in place.
 
         `status="none"` is `ao progress none --why` (design §4.9a): no reference and no entry, but
-        `out_of_work: {at, why}` on the record. It is the one write on this channel that is not
-        open to everyone — only the session itself may make it, declared, with a reason (§9
-        invariant 14).
+        `out_of_work: {at, why}` on the record. `status="restart"` is the third ending (§4.9a
+        *A run that ends with work left*, TD-083): the same shape, setting
+        `restart_wanted: {at, why, early?}` — *my run is over and my lane is not*. They are the
+        two writes on this channel that are not open to everyone — only the session itself may
+        make either, declared, with a reason (§9 invariant 14) — and they refuse each other.
 
         A declared claim is a **lease** (§4.8, TD-056): refused while another live record holds an
         unexpired declared claim on the same reference, naming the holder; `force` claims anyway and
@@ -1923,7 +1925,10 @@ class HostAgent:
                 )
             return await self._ending(s, status, why, source, caller)
         if status not in PROGRESS_STATUSES:
-            raise RpcError(f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none")
+            raise RpcError(
+                f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, "
+                "none, restart"
+            )
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
         holder = self._lease_holder(s, entry) if status == "claimed" and entry.source == "declared" else None
         if holder is not None and not force:
