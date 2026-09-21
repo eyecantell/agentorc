@@ -66,3 +66,4 @@
 08:44  grinder-ao-2: merged #358 (TD-075 page half, steps 2–3) → cadence check pass (review recorded); working on the team header count; grinder-ao-1: working on TD-094 (#357 in the anchor's queue), has not forced the TD-075 claim yet → ok
 08:49  grinder-ao-2 dropped TD-075 (lease released after its page half), grinder-ao-1 claimed it → lease conflict resolved without a force
 08:53  grinder-ao-2: merged #359 (TD-075 team-header count; page half complete) → cadence check pass (review recorded); grinder-ao-1: working, TD-075 mail half on td075-asks-waiting-passed-up → ok
+08:53  grinder-ao-2: out_of_work 14:53:04Z + idle → finished (why: ledger re-read at 89de0bd, rest is grinder-ao-1's, design-first, Paul's, or sessionorc) → nothing
