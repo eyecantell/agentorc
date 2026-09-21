@@ -70,3 +70,4 @@
 08:54–09:10 quiet; grinder-ao-1 opened #360 (TD-075 mail half, src/sessionorc, 14:57Z → ask at 16:57Z); grinder-ao-2 finished, one short turn 15:10Z (nothing sent by me), idle again
 09:11–09:37 quiet; grinder-ao-1 opened #361 (15:14Z) and #362, TD-075 mail half, both in the anchor's queue
 09:38–09:58 quiet; grinder-ao-1 opened #363, note m-aa4ef44f7cec: #357 #360–#362 reviewed, waiting on the anchor (TD-093); still working (td075-copies-follow-resume)
+10:06  inbox: person (via the anchor) m-0f39df749988 — live test of Log TD with alarm-probe (a throwaway shell under me): leave it alone, settle the handed mail with --outcome dropped → noted; grinder-ao-1 opened #364
