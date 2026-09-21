@@ -1112,6 +1112,8 @@ def _inbox_status(e: dict[str, Any]) -> str:
 def _sent(args: argparse.Namespace) -> int:
     """`ao inbox --sent` (design §4.9b, TD-075 step 4): this session's own outbox, oldest first —
     what it asked and answered, so a techlead answers this batch the way it answered the last."""
+    if args.unread:
+        return fail(args, "--sent lists what you sent, which you have no reading of: leave out --unread", 2)
     got = call_sync("inbox", sent=True)
 
     def prose() -> None:

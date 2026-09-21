@@ -4781,6 +4781,7 @@ class HostAgent:
         v["alarm_to"] = self._answers_for(s, graph)
         if s.host == self.host:
             return v
+        v["asks_waiting"] = s.asks_waiting(home=self.host)  # a bare `to` here names this host's session
         v["id"] = f"{s.id}@{s.host}"
         v["controllers"] = self._ctl(s)  # as this home addresses them
         state = self.links.get(s.host) or {"up": False, "since": None, "why": "not connected since the home started"}
