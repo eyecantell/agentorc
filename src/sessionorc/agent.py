@@ -2523,19 +2523,23 @@ class HostAgent:
             settle = self._owing_question(sender, str(thread))
         # -- forwarding: a closed record a live one superseded hands its mail on -------------------
         forwarded: dict[str, str] = {}
-        resolved: list[str] = []
-        for asked in named:
-            sid, seen = asked, {asked}
-            while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
-                sid = r.superseded_by
-                if sid in seen:
-                    break
-                seen.add(sid)
-            if sid != asked:
-                forwarded[asked] = sid  # the id the sender wrote → the record continuing it, however many hops
-            if sid not in resolved:
-                resolved.append(sid)
-        named = resolved
+
+        def follow(ids: list[str]) -> list[str]:
+            resolved: list[str] = []
+            for asked in ids:
+                sid, seen = asked, {asked}
+                while (r := records.get(sid)) is not None and r.state == "closed" and r.superseded_by:
+                    sid = r.superseded_by
+                    if sid in seen:
+                        break
+                    seen.add(sid)
+                if sid != asked:
+                    forwarded[asked] = sid  # the id the sender wrote → the record continuing it, however many hops
+                if sid not in resolved:
+                    resolved.append(sid)
+            return resolved
+
+        named = follow(named)
         # -- the gate, per addressee, all or nothing ------------------------------------------------
         for sid in named:
             if sid not in records and sid != PERSON:
@@ -2557,7 +2561,9 @@ class HostAgent:
         subject = records.get(self._addr(about)) if about and not reply_to and me is not None else None
         if subject is not None and sender in self._ctl(subject):
             copies = [c for c in self._ctl(subject) if c not in (sender, *named)]
-        copies = [c for c in copies if c in records]
+        # a copy follows a resume as an addressee does: a passer, or a thread's other controller,
+        # resumed since the thread began gets its copy on the record that continues it
+        copies = [c for c in follow(copies) if c in records and c not in (sender, *named)]
         # -- what this message counts as ------------------------------------------------------------
         closes = replied is not None and kind == "reply" and replied.open
         counts = sender != PERSON and not closes  # a person's message is never counted; a first reply is free
