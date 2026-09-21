@@ -2705,7 +2705,10 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   `{techlead}` in every brief with the id the seat will take, worked out before anything starts
   (§4.1's `ao-<scope>-<name>`, `@<host>` for a team on another host) — should the seat come up
   under another id (a stale tmux session holding it), the start says so. A hand-started session
-  (`ao new --role grinder`) reads `none`. `ao team list` names the seat.
+  (`ao new --role grinder`) reads `none`. `ao team list` names the seat, and a team whose members
+  all declared reads *wound down* without the seat's word (2026-09-21): the seat is known by the
+  name its definition gives it — or that name with the numeric suffix a stale tmux session forces,
+  unless a member is defined under it — never by a role badge.
 - **It answers cold, and is filled on demand.** A techlead is **started per batch of questions
   and ends when it has answered them**: no context piles up over a night, an idle team costs
   nothing, and — Paul's second reason — *composing the message forces the worker to pull the
@@ -2773,7 +2776,17 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   beside it, **labelled as the techlead's and drawn as text**. The person's reply goes **to the
   asker**, with a copy to the techlead; the asker's entry is answered by it, and the techlead's
   copy closes. One press for the person is the point: the recommendation's first suggested
-  answer is the recommendation.
+  answer is the recommendation. **As built (TD-075 step 3, the mail half, 2026-09-20):** the
+  `pass_up` RPC (a mail call, routed with `msg`) puts **the asker's own entry** — the same id,
+  sender, kind, text, default and bound — in the person inbox, so the person's ordinary reply does
+  the rest: it goes to the asker, is copied to the passer (in the entry's `to`), and closes every
+  copy. That copy's `answers` are the passer's, the recommendation first and no more than four in
+  all; the asker's and the passer's copies keep their own, and every copy gets `passed_up` and
+  `recommend: {by, text}`. A question passed up and answered **owes** on the asker's outbox copy
+  (`owes` reads `passed_up` as it reads the person in `to`), never on the passer's or a copy recipient's — a copy in a session's inbox owes only when `handed` (`owes_for`), so those copies delete and age out like any closed entry. Refused: a
+  copy recipient, a `note`, a closed entry, a second pass, the person's own question, a person
+  passing up, and a full person inbox (counted against the asker, whose question it is).
+  `ao inbox` prints *passed up by `<passer>`, who recommends: …*.
 - **Everything answered for the person is told to the person.** A reply that carries a
   **`source`** is one *answered from the record*, and the home files it to the person as an
   FYI: ***answered for you** — the question, the answer, the source, who asked and who
@@ -2792,7 +2805,15 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   entry's id>`, which is in its own inbox; and a question **passed up** and answered by the person owes one
   in the ordinary way. The Inbox groups these
   under *Answered for you* (§4.5a), uncounted, newest first, and the team's header carries the
-  number since the person last opened the group — a **mark**. **Overrule** on such a row is a
+  number since the person last opened the group — a **mark**. **As built (TD-075 step 2, the mail
+  half, 2026-09-20):** `ao msg --reply-to <id> --source "…"` — refused off a reply, from a person
+  (*a person's answer needs no source*), and past one line of 200 characters; the FYI is a `note`
+  in the person inbox, from the answerer, on the question's thread, with the answer as its text
+  and the question's `about`; it is counted in the person inbox's depths as any entry is, so a full
+  inbox refuses the reply itself rather than let the answer land unseen; a reply **to** the person
+  files none. The Overrule branch applies when the person's reply names no addressee, and the
+  `handed` mark is on the asker's copy alone. `ao inbox` prints a reply's source and the FYI's
+  *who asked what, who answered, from where*. The page's group, row and count are the page half. **Overrule** on such a row is a
   reply **to the asker**, marked `[person]`, on the question's own thread, with a copy to the
   answerer; a person's word outranks a teammate's by the rule every brief already has. The
   failure this guards against is a confident wrong go-between steering a team all night unseen.
