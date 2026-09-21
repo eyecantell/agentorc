@@ -329,6 +329,9 @@ class HostAgent:
         # A node's hint of each record's mail, as the home last pushed it: `(unread, budget spent)`.
         # Never an inbox — the mailbox is the home's — only what a reply's mail line needs.
         self._mail_hints: dict[str, tuple[int, bool, list[str]]] = {}
+        # …and the home's `asks_waiting` for each (§4.9b): a node holds no inbox to count, so its own
+        # view of a record shows the number the home last pushed, as fresh as the link.
+        self._asks_hints: dict[str, int] = {}
         self._snapshot_sent = False
         self._bg: set[asyncio.Task[None]] = set()  # fire-and-forget tasks, held so they are not collected
         if self.mode == "node":
@@ -1002,6 +1005,7 @@ class HostAgent:
             self._last_hook,
             self._killed_at,
             self._mail_hints,
+            self._asks_hints,
             self._bells,
         ):
             side.pop(sid, None)
@@ -3752,6 +3756,7 @@ class HostAgent:
                     bool(raw.get("wake_budget_spent")),
                     [str(x) for x in (raw.get("owed") or [])],
                 )
+                self._asks_hints[s.id] = int(raw.get("asks_waiting") or 0)
             fields = {k: raw[k] for k in INTENT_FIELDS if k in raw}
             before, stop_before = s.to_dict(), s.run_until
             try:
@@ -4246,6 +4251,7 @@ class HostAgent:
                     "unread": r.unread(),
                     "wake_budget_spent": r.wake_budget_spent(),
                     "owed": r.owed(),  # the outcome debt rides with the unread hint (§4.10 *Outcomes*)
+                    "asks_waiting": r.asks_waiting(home=self.host),  # the seat's count (§4.9b)
                 }
                 payload = json.dumps(item, sort_keys=True)
                 if sent.get(rid) != payload:
@@ -4780,6 +4786,8 @@ class HostAgent:
         # RPC reads the same function, so drawn-or-not and refused-or-not cannot disagree.
         v["alarm_to"] = self._answers_for(s, graph)
         if s.host == self.host:
+            if self.mode == "node":
+                v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)
             return v
         v["asks_waiting"] = s.asks_waiting(home=self.host)  # a bare `to` here names this host's session
         v["id"] = f"{s.id}@{s.host}"

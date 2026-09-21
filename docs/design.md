@@ -2727,7 +2727,7 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   for `out_of_work` and `restart_wanted` — it is not there today), so a manager blocked in `ao wait` returns when a
   question lands on an empty seat. **As built (TD-075 step 4, 2026-09-20):** `asks_waiting` is on
   every view and in `wake_digest`; `ao status -v` prints *asks waiting: N*; an entry counts when it
-  is open, an `ask` or a `steer`, and names the record in `to` — compared whole, host included, since names are unique per host (§4.4a); a copy does not. **The manager's rule for the seat**: `idle` with
+  is open, an `ask` or a `steer`, and names the record in `to` — compared whole, host included, since names are unique per host (§4.4a); a copy does not. A node holds no inbox, so the home pushes it the count with the unread hint and a node's own view shows that. **The manager's rule for the seat**: `idle` with
   `asks_waiting` 0 → `ao close` it (it writes no code; anything dirty or unpushed in its
   worktree is the board's, and it is left open); `idle` with `asks_waiting` > 0 for twenty
   minutes → the one send any idle member gets, naming the number; **`exited` or `closed` with

@@ -1069,7 +1069,12 @@ async def test_the_home_pushes_each_record_its_intent_and_its_unread_count_and_n
     )
     held = agent.remote["laptop"]["ao-x-w"]
     held.inbox = [
-        MailEntry(id="m-1", from_="person", to=["ao-x-w@laptop"], at="2026-09-18T10:00:00Z", kind="note", text="SECRET")
+        MailEntry(
+            id="m-1", from_="person", to=["ao-x-w@laptop"], at="2026-09-18T10:00:00Z", kind="note", text="SECRET"
+        ),
+        # an open ask addressed to it, and one to *this* host's session of the same id (§4.9b: whole addresses)
+        MailEntry(id="m-2", from_="person", to=["ao-x-w@laptop"], at="2026-09-18T10:00:00Z", kind="ask", text="?"),
+        MailEntry(id="m-3", from_="person", to=["ao-x-w"], at="2026-09-18T10:00:00Z", kind="ask", text="?"),
     ]
     agent._link_muxes["laptop"] = mux = FakeMux()
     agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
@@ -1079,9 +1084,10 @@ async def test_the_home_pushes_each_record_its_intent_and_its_unread_count_and_n
     await agent._push_changes()
     ((method, params),) = mux.sent
     (item,) = params["records"]
-    assert method == "intent" and item["id"] == "ao-x-w" and item["host"] == "laptop" and item["unread"] == 1
+    assert method == "intent" and item["id"] == "ao-x-w" and item["host"] == "laptop" and item["unread"] == 3
+    assert item["asks_waiting"] == 1  # the seat's count rides with the hints (TD-075 step 4)
     assert item["controllers"] == [f"ao-lead@{agent.host}", "ao-x-sib"]  # the node's form, as stored
-    assert set(item) <= INTENT_FIELDS | {"id", "host", "unread", "wake_budget_spent", "owed"}
+    assert set(item) <= INTENT_FIELDS | {"id", "host", "unread", "wake_budget_spent", "owed", "asks_waiting"}
     for never in ("inbox", "outbox", "threads", "wakes", "mail_decided", "sends", "state", "tail"):
         assert never not in item
     assert "SECRET" not in str(mux.sent)
@@ -1110,6 +1116,7 @@ async def test_a_node_takes_the_homes_intent_by_owner_and_keeps_the_count_as_a_h
                         "id": s.id, "host": agent.host, "team": "grind", "run_until": "2026-09-18T11:00:00Z",
                         "controllers": ["ao-lead@kmaster"], "unread": 3, "wake_budget_spent": True,
                         "owed": ["m-9"],  # the outcome debt rides with the hint (§4.10 *Outcomes*)
+                        "asks_waiting": 2,  # and the seat's count, which the node's own view shows (§4.9b)
                         "inbox": [{"id": "m-1", "from": "person", "text": "SECRET"}], "state": "exited",
                     },
                     {"id": s.id, "host": "desk", "team": "not-mine"},
@@ -1120,6 +1127,7 @@ async def test_a_node_takes_the_homes_intent_by_owner_and_keeps_the_count_as_a_h
         assert s.wrapup_sent_at is None  # a new stop time is a new run, as `set_stop` has it
         assert s.state == "idle" and s.inbox == []  # nothing the node owns, and never the mailbox
         assert agent._mail_hints[s.id] == (3, True, ["m-9"])
+        assert agent._view(s)["asks_waiting"] == 2 and s.asks_waiting() == 0  # no inbox here to count
         async with LocalClient(caller=s.id) as c:
             from sessionorc import client as clientmod
 
