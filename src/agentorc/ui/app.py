@@ -529,11 +529,9 @@ def view(
     now = datetime.now(UTC)
     d = dict(s)
     state = s["state"]
-    d["state_class"] = {
-        "needs-you": "needs",
-        "stalled?": "stalled",
-        "closed": "done",
-    }.get(state, state)
+    # `closed` is its own class since TD-095: it was `done`, drawn green, and on a card green now
+    # means working and nothing else (design §4.5 *The card's anatomy*) — closed is over, and grey.
+    d["state_class"] = {"needs-you": "needs", "stalled?": "stalled"}.get(state, state)
     d["state_label"] = {"needs-you": "needs you", "closed": "closed"}.get(state, state)
     d["rank"] = STATE_RANK.get(state, 9)
     # Finished while nobody was looking (design §4.2, TD-017): not a state, a rendering of `idle`
