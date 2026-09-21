@@ -376,6 +376,10 @@ class HostAgent:
         # entry — and the rings in flight, one per session.
         self._bells: dict[str, dict[str, Any]] = {}
         self._ringing: dict[str, asyncio.Task[None]] = {}
+        # One typist per pane (TD-094): `_submit` holds its session's lock from paste to confirmed
+        # submit, and a ring holds it from reading the composer to its own submit — so a ring never
+        # pastes into the middle of a `send`, where the two lines would be submitted as one.
+        self._typing: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         # every open client connection: a stop closes them, or `Server.wait_closed()` waits on the
         # UI's subscription and each blocked `wait` forever (TD-058)
         self._conns: set[asyncio.StreamWriter] = set()
@@ -1812,6 +1816,11 @@ class HostAgent:
         return entry
 
     async def _submit(self, sid: str, adapter: Any, text: str) -> None:
+        """`_type`, holding the session's typing lock: one typist per pane (TD-094)."""
+        async with self._typing[sid]:
+            await self._type(sid, adapter, text)
+
+    async def _type(self, sid: str, adapter: Any, text: str) -> None:
         """Paste, Enter, and confirm the prompt left the composer (TD-027, design §4.2). Only an
         adapter that can read its tool's composer (`composer(tail_raw)`, design §4.3) gets the
         confirmation; the rest get the blind paste + Enter. The paste is given a moment to paint
@@ -3457,12 +3466,24 @@ class HostAgent:
     async def _ring_once(self, sid: str, *, retry: bool) -> None:
         """One ring: the composer must read empty — a person's half-typed words would otherwise be
         submitted with the line appended — then the wake decision (the budget, and mail no wake has
-        covered: *rung only when the count has risen*), then the fixed line through `_submit`. A
+        covered: *rung only when the count has risen*), then the fixed line through `_type`. A
         retry was decided and charged by the first try, so it takes no second decision; it rings
-        only into an empty composer, since a stuck first try may have left the line there."""
+        only into an empty composer, since a stuck first try may have left the line there. All of
+        it holds the pane's typing lock, and a pane a `send` is typing into is left to the next
+        tick: read before that send's paste shows, the composer is empty, and a ring decided then
+        would paste into the middle of it — one submitted line, and mail the watermark had already
+        passed, so it was never rung again (TD-094)."""
         s = self.sessions.get(sid)
         if s is None:
             return
+        typing = self._typing[sid]
+        if typing.locked():
+            return  # a `send` is typing into the pane: the next tick looks again
+        async with typing:
+            await self._ring_typing(s, retry=retry)
+
+    async def _ring_typing(self, s: Session, *, retry: bool) -> None:
+        sid = s.id
         adapter = adapters.get(s.adapter)
         rev = s.rev
         tail = await asyncio.to_thread(self.tmux.capture_tail, sid, COMPOSER_LINES, raw=True)
@@ -3484,7 +3505,7 @@ class HostAgent:
             # which is how a refilled budget rings for mail that landed while it was spent
             bell = self._bells[sid] = {"rev": rev, "rung": False, "failures": 0}
         try:
-            await self._submit(sid, adapter, mail.unread_line(s.unread()))
+            await self._type(sid, adapter, mail.unread_line(s.unread()))  # the lock is held already
         except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste: both a failed ring
             if s.id in self.sessions:
                 self._bell_failed(s, bell, str(e) or type(e).__name__)
