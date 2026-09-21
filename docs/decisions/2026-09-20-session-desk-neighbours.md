@@ -34,8 +34,9 @@ Search terms, run 2026-09-20 with `gh search repos "<term>" --sort stars --updat
 tmux*, *coding agent sessions web dashboard*, *claude code hooks dashboard*, *agent orchestration tmux
 worktree*, *claude code session manager*, *multi-agent tmux*, *agents tmux worktree*, *claude code
 hooks*, *coding agents web dashboard tmux*, *claude code tmux web*, and *claude code tmux* sorted by
-update. Terms of four words or more mostly returned nothing. The five below are the in-niche
-projects the search found that no earlier survey covers; two more were looked at and set aside
+update. Terms of four words or more mostly returned nothing. The table holds the two name-holders
+that are in the niche and the four in-niche projects the search found that no earlier survey
+covers; two more were looked at and set aside
 (`primeline-ai/claude-tmux-orchestration`, ~1.1k lines of bash whose README now recommends
 subagents first; `disler/claude-code-hooks-multi-agent-observability`, an event viewer that
 controls nothing).
@@ -50,8 +51,8 @@ controls nothing).
 | **drewdrewthis/orchardist** (MIT, Rust/Go, `409d92d99f`) | command centre over worktrees, PRs, tmux and Claude sessions across machines: TUI, GraphQL daemon, desktop app | daemons **federated over ssh tunnels**; PR/CI state joined to each worktree; chat whose delivery is **verified in the recipient's transcript** | a web UI, unattended workers, supervision, grants, teams |
 
 `kevin101681/claude-code-dashboard` (`5f255cb471`) was read too and is left out of the table: it has
-**no licence file**, so nothing of it may be copied. Two ideas from it are recorded below as ideas
-only — a context gauge, and tying a pane to its current conversation id through the status line.
+**no licence file**, so nothing of it may be copied. Its context gauge is recorded below as an idea
+only, beside agentboss's.
 
 **Nobody combines the pieces.** Hooks feeding state is the norm (every project above but
 trillion-labs); two keep a screen scrape as fallback; two read the transcript or stream. Multi-host
