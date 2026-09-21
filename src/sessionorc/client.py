@@ -128,7 +128,9 @@ async def wait_rpc(
     grace: float = RECONNECT_GRACE,
 ) -> tuple[Any, int]:
     """The `wait` RPC, **carried across a host-agent restart** (TD-086 item 1). Returns
-    `(what wait returned, how many times the connection had to be remade)`.
+    `(what wait returned, how many times the connection was actually remade)` — remade, not
+    attempted: a restart takes a few tries at a quarter-second each, and counting those would
+    report one promote as four (review of PR #303).
 
     A promote restarts the unit under every blocked wait, and the wait's own connection dies with
     it: a lead's wake channel then stays gone until its next round, by a routine act of the
@@ -164,6 +166,8 @@ async def wait_rpc(
             return {"changed": [], "mail": [], "wake": None}, remakes
         try:
             async with LocalClient(sock=sock, caller=caller) as c:
+                if lost_at is not None:
+                    remakes += 1  # one per connection actually remade, not one per attempt
                 connected, lost_at = True, None  # back: a later drop gets a grace of its own
                 return await c.call("wait", timeout=left, scope=scope), remakes
         except AgentUnavailable:
@@ -173,7 +177,6 @@ async def wait_rpc(
             lost_at = now if lost_at is None else lost_at
             if now - lost_at > grace:
                 raise  # at some point a restart is an outage, and a person should be told
-            remakes += 1
             await asyncio.sleep(min(RECONNECT_STEP, max(deadline - loop.time(), 0.0)))
 
 

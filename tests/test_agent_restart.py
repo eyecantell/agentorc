@@ -284,7 +284,9 @@ async def test_a_wait_rides_out_a_restart_and_returns_the_change(tmp_path, monke
         _, task = await start(tmux)
 
         got, remakes = await asyncio.wait_for(waiting, 20)
-        assert remakes >= 1, "the wait was not remade — nothing rode out the restart"
+        # exactly one: the count is connections **remade**, not attempts at a quarter-second
+        # each, or one promote would report as four (review of PR #303)
+        assert remakes == 1, "the wait was not remade exactly once — nothing rode out the restart"
         assert [c["id"] for c in got["changed"]] == [w]  # and it returned the change it never saw
         await stop(task)
     finally:
