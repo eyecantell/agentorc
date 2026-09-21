@@ -896,6 +896,14 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
         assert "tell me if you want less" in text, rel  # the same kind rule as the workers', not a second one
 
 
+def test_the_manager_brief_fills_the_techlead_seat_on_its_questions():
+    """Design §4.9b (TD-075 step 4): the manager template reads the seat's `asks_waiting`, fills an
+    ended seat with its mail kept, and caps fills with a ceiling of its own."""
+    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
+    assert "ao new --keep-mail" in text and "asks_waiting" in text and "six in an hour" in text
+    assert "never restart it" not in text  # a fill is not the crash restart, and not forbidden
+
+
 def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-052 step 2 (design §4.10 "Surface"): `ao msg` prints what landed and refusals as the host
     agent words them; `ao inbox` opens with the fixed header, names who sent the last keystrokes,

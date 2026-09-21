@@ -713,6 +713,8 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Done when** Paul has decided the shape, and, if adopted, a team has run a night with it and the numbers of step 2 are in this entry.
 
+**PR #362 (grinder-ao-1, 2026-09-21):** the manager template carries §4.9b's rule for the seat, read from `asks_waiting` and filled with `ao new --keep-mail`: `working` → nothing; `idle` with none waiting → close; `idle` with questions waiting over twenty minutes → one send; `exited` or `closed` with questions waiting → fill it under the same name, directory, worktree, profile and brief; with none waiting → left empty. The ceiling is six fills an hour, then the board, and a fill is not a crash restart. This was the last of step 4's build.
+
 **Related:** TD-069 (needed / steering / FYI), TD-070 (suggested answers), TD-072 (mail triage), design §4.10 (mail marks), §4.8 (role presets, `control`), §9 invariant 9, the director brief (`docs/briefs/director.md`).
 
 ## TD-076: `lead` becomes `manager`, the go-between is `techlead`, and the bare word `lead` is retired
