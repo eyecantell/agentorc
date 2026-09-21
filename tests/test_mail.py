@@ -2092,7 +2092,7 @@ async def test_a_sourced_reply_is_kept_in_its_senders_outbox_for_seven_days(agen
             assert sourced["entry"]["id"] not in [e.id for e in agent.sessions[tl].outbox]
 
 
-async def test_an_ask_a_techlead_left_unanswered_is_taken_to_the_person_on_its_thread(agent, tmp_path):
+async def test_an_ask_a_techlead_left_unanswered_is_taken_to_the_person_on_its_thread(agent, tmp_path, monkeypatch):
     """Design §4.9b *When it cannot answer* (TD-075 step 4, `TECHLEAD_WAIT`): `--thread` names the
     caller's own open question to a session; the new `ask` lands in the person inbox on its thread,
     and the first closes on every copy as `asked_person`, so the seat stops counting it and a late
@@ -2104,6 +2104,13 @@ async def test_an_ask_a_techlead_left_unanswered_is_taken_to_the_person_on_its_t
         async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc, LocalClient(caller=w2) as w2c:
             q = (await wc.call("msg", to=tl, text="rebase or merge?", kind="ask"))["entry"]
             assert (await person.call("get", id=tl))["asks_waiting"] == 1
+            # a full person inbox refuses the follow-up, and the first stays open at the techlead
+            depth = mail.PERSON_SENDER_DEPTH
+            monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 0)
+            with pytest.raises(AgentError, match="person inbox"):
+                await wc.call("msg", to="person", text="rebase or merge?", kind="ask", thread=q["id"])
+            assert (await person.call("get", id=tl))["asks_waiting"] == 1
+            monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", depth)
             text = "rebase or merge? tl did not answer"
             up = await wc.call("msg", to="person", text=text, kind="ask", thread=q["id"])
             held = [e for e in agent.person_inbox if e.id == up["entry"]["id"]]

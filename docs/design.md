@@ -2865,7 +2865,8 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   person; the new question lands in the person inbox on the first one's thread, and the first
   **closes on every copy as `asked_person`**, so the techlead's `asks_waiting` stops counting it
   and a late answer from the techlead closes nothing — the person's answer is the one owed on.
-  Refused, in words: a question already passed up (the person holds it), or one already closed.
+  Refused, in words: a note (only a question is followed up), a question already passed up (the
+  person holds it), or one already closed.
   Thirty minutes is the brief's number; the home does not time it.
 - **Alarms (§4.8a *Who answers first*) need more than this, deliberately.** That path wants a
   techlead that is a **live controller of the record** holding a grant — **`alarms`**, named

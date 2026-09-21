@@ -289,6 +289,7 @@
         : e.closed_reason === "go_with_it" ? "closed · go with it"
         : e.closed_reason === "declined" ? "declined"
         : e.closed_reason === "asker_gone" ? "closed · the asker is gone"
+        : e.closed_reason === "asked_person" ? "closed · the asker took it to the person"
         : e.closed_by ? `answered by ${esc(e.closed_by)}`
         : e.expired_at ? "expired"
         : e.paused_at ? "paused · the clock is stopped"
