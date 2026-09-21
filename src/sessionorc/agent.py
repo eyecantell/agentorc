@@ -1204,7 +1204,13 @@ class HostAgent:
         wrapup_prompt: str | None = None,
         host: str | None = None,
         caller: str | None = None,
+        keep_mail: bool = False,
     ) -> dict[str, Any]:
+        """`keep_mail` (design §4.9b, TD-075 step 4): a fresh start under a name moves the mail of
+        the record it supersedes — inbox, outbox, tallies, wake decisions — as a resume does, and
+        resumes nothing of its conversation. It is how a techlead seat is filled without forgetting
+        the questions that caused the fill. Handing a record's mailbox to a successor is an act on
+        that record, so it is open to a person and to the record's own controllers alone."""
         if host and host != self.host:
             # Routed before the method runs (`_act_host`) when this is the home; a node asked for
             # another host's create got here through the link, and the link is one host's.
@@ -1269,6 +1275,8 @@ class HostAgent:
             holder = await self._name_holder(directory, repo, name)
             if isinstance(holder, Session):
                 self._refuse_suspended(holder, caller, "a create under that name")
+            if keep_mail:
+                self._check_keep_mail(holder, caller, resume)
             if resume:
                 for held in [r for r in self.sessions.values() if r.adapter_id == resume and r.suspended]:
                     self._refuse_suspended(held, caller, "a resume of that conversation")
@@ -1344,7 +1352,25 @@ class HostAgent:
             self._remember_dir(directory)
             if resume:
                 await self._supersede(resume, sid, replaced=holder if isinstance(holder, Session) else None)
+            elif keep_mail and isinstance(holder, Session):
+                self._move_mail(holder, s)  # the seat's mail, to the seat's next holder (§4.9b)
+                self.store.save(s)
         return s.view()
+
+    def _check_keep_mail(self, holder: Session | str | None, caller: Any, resume: str | None) -> None:
+        """`create(keep_mail=true)` is refused, naming the rule, unless it has a record to keep the
+        mail of and the caller may hand that record's mailbox on (design §4.9b)."""
+        if resume:
+            raise RpcError("a resume carries its mail already: --keep-mail is for a fresh start (design §4.9b)")
+        if not isinstance(holder, Session):
+            raise RpcError(
+                "--keep-mail keeps the mail of the record this name held, and no record holds it (design §4.9b)"
+            )
+        if not mail.is_person(caller) and self._addr(str(caller)) not in self._ctl(holder):
+            raise RpcError(
+                f"{caller} is not a controller of {holder.id}: handing a record's mailbox to a successor is an act "
+                "on that record, open to a person and to its own controllers (design §4.9b, §9 invariant 11)"
+            )
 
     async def rpc_name_check(
         self, dir: str, name: str, repo: str | None = None, host: str | None = None

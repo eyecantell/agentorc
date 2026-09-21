@@ -2749,7 +2749,12 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   holder could point a stranger's open questions, and the debts on them, at a session of its
   own making. It keys on the control graph, not on a role (§9 invariant 9), so it is not tied to
   techleads — a person restarting any session cold may keep its mail — and it changes nothing
-  else about the start. Fills have a ceiling of their own in the manager's brief — six in an hour,
+  else about the start. **As built (TD-075 step 4, 2026-09-20):** `ao new --keep-mail` sends
+  `keep_mail` only when given; the host agent refuses it with a `resume` (a resume carries its
+  mail already), with no record under the name to keep the mail of, and from a session not among
+  that record's `controllers`, each in words; otherwise, once the new session has started under
+  the name, the superseded record's inbox, outbox, tallies, `sends` and wake decisions move to it
+  by `_move_mail`. Fills have a ceiling of their own in the manager's brief — six in an hour,
   then the board — and do not count as crash restarts. A full mailbox (`MAILBOX_DEPTH`) refuses
   the asker as it refuses anyone, and the asker then asks the person (*When it cannot answer*,
   below). It is **a manager's act, never the core's** (§4.9a): the host agent starts nothing

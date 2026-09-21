@@ -441,6 +441,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         worktree=args.worktree,
         unattended=args.unattended,
         resume=args.resume,
+        **({"keep_mail": True} if getattr(args, "keep_mail", False) else {}),
         **defaults,
         team=getattr(args, "team", None) or "",  # badges (design §4.9): plain strings, unvalidated
         project=getattr(args, "project", None) or "",
@@ -1397,6 +1398,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--unattended", action="store_true")
     p.add_argument("--resume", help="the tool's session id to resume")
+    p.add_argument(
+        "--keep-mail",
+        action="store_true",
+        help="a fresh start that keeps the mail of the record this name held (a techlead seat's fill, §4.9b)",
+    )
     p.add_argument("--prompt", help="opening prompt")
     p.add_argument(
         "--grant",

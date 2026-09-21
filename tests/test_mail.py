@@ -1838,6 +1838,47 @@ async def test_the_debt_has_a_bound_of_its_own_and_is_never_pruned(agent, tmp_pa
         assert left[owed[1]]["outcome"]["state"] == "asker_gone"
 
 
+async def test_keep_mail_fills_a_seat_without_forgetting_the_questions_that_caused_it(agent, tmp_path):
+    """Design §4.9b (TD-075 step 4): `create(keep_mail=true)` under a name an exited record holds
+    starts a fresh session that holds that record's inbox and outbox, as a resume would, and
+    resumes nothing. Open to a person and to the held record's own controllers; refused for a
+    session that controls it not, with no record to keep, and with a resume."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        mgr = await mk("mgr", team="ao-grind", unattended=True, capabilities=["control"])
+        other = await mk("other", team="ao-grind", unattended=True, capabilities=["control"])
+        tl = await mk("tl", team="ao-grind", unattended=True, controllers=[mgr])
+        w = await mk("w", team="ao-grind", unattended=True)
+        async with LocalClient(caller=w) as wc:
+            q = (await wc.call("msg", to=tl, text="which base?", kind="ask"))["entry"]
+        async with LocalClient(caller=tl) as tc:
+            said = (await tc.call("msg", to=w, text="looking"))["entry"]
+        await person.call("kill", id=tl)
+        await wait_state(person, tl, "exited")
+        seat = {"name": "tl", "dir": str(tmp_path), "adapter": "shell", "argv": ["bash", "--norc"]}
+        seat.update(team="ao-grind", unattended=True, controllers=[mgr])
+        async with LocalClient(caller=other) as oc:
+            with pytest.raises(AgentError, match="not a controller of"):
+                await oc.call("create", keep_mail=True, **seat)
+        async with LocalClient(caller=mgr) as mc:
+            with pytest.raises(AgentError, match="no record holds it"):
+                await mc.call("create", keep_mail=True, **{**seat, "name": "tl-fresh"})
+            with pytest.raises(AgentError, match="a resume carries its mail"):
+                await mc.call("create", keep_mail=True, resume="abc", **seat)
+            filled = await mc.call("create", keep_mail=True, **seat)
+        assert filled["id"] == tl and filled["state"] != "exited"
+        rec = agent.sessions[tl]
+        assert [e.id for e in rec.inbox] == [q["id"]] and rec.inbox[0].open
+        assert [e.id for e in rec.outbox] == [said["id"]]
+        # without it, a fresh start under the name forgets the mail (§4.1): the rule it bends
+        await person.call("kill", id=tl)
+        await wait_state(person, tl, "exited")
+        await person.call("create", **seat)
+        assert agent.sessions[tl].inbox == []
+        for sid in (mgr, other, tl, w):
+            await person.call("kill", id=sid)
+
+
 async def test_asks_waiting_counts_open_questions_addressed_to_a_record_and_wakes_its_manager(
     agent, tmp_path, start_wait
 ):
