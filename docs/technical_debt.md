@@ -707,6 +707,8 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Proposed steps:** (1) briefs only, one team: workers ask their lead first; the lead's brief gains the answer / pass-up / never rules and the FYI; lead on the stronger profile. (2) Measure: how many questions, how many answered, how many Paul overruled, what the rounds cost. (3) Only then the product pieces: a forward that keeps the thread and the asker, the *answered for you* FYI as a kind the Inbox groups, and — if step 2 says so — the separate role.
 
+**PR #364 (grinder-ao-1, 2026-09-21):** a copy follows a resume as an addressee does (*Found in its review* under step 3): `_msg`'s forwarding walk (`follow()`, closed record → `superseded_by`, loop-safe) now also runs over the copies, so a passer resumed before the person answers gets its copy on the successor. A forwarded copy is reported in `forwarded` and deduplicated against the sender and the addressees.
+
 **Done when** Paul has decided the shape, and, if adopted, a team has run a night with it and the numbers of step 2 are in this entry.
 
 **Related:** TD-069 (needed / steering / FYI), TD-070 (suggested answers), TD-072 (mail triage), design §4.10 (mail marks), §4.8 (role presets, `control`), §9 invariant 9, the director brief (`docs/briefs/director.md`).
