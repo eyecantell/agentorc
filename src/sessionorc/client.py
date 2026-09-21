@@ -31,6 +31,14 @@ class AgentUnavailable(AgentError):
     pass
 
 
+class AgentStuck(AgentUnavailable):
+    """The agent is **there and did not answer** — a call's bound ran out on a connection that
+    never dropped (TD-063). A subclass, so every caller that handles *unavailable* keeps working,
+    and so the one caller that retries can tell the two apart: a connection that dropped is a
+    restart and is worth remaking, and a call that timed out on a live connection is a wedged
+    agent, which remaking only hides (review of PR #315)."""
+
+
 # The `mail` field of the last response any client in this process read (design §4.10 "a line on
 # every `ao` reply"): `{"unread": N, "wake_budget_spent": bool}` while the calling session has
 # unread mail, None otherwise. A CLI makes one or a few calls per command and prints the line once,
@@ -45,6 +53,16 @@ last_mail: dict[str, Any] | None = None
 # warning from its first call cleared by its last, which is exactly where an operator most needs it.
 # Deduped, so a long-lived client (the UI) is bounded by the number of distinct parameter names.
 last_ignored: list[str] = []
+
+
+# How long a call waits for its reply before it is an error with a method attached (TD-063).
+# **A hang is worth less than a failure**: `call` had no bound at all, so an RPC that never
+# answered blocked for ever — a CI job that died after fourteen minutes naming the test *before*
+# the one that stopped, and, worse, a live worker sitting in `ao send` that never comes back
+# while its lead reads it as working. The number is the one the agent already gives an act over
+# its own link (`agent.ACT_TIMEOUT`), so a call from here and a call one layer down wait alike;
+# the RPCs that legitimately block longer pass their own.
+CALL_TIMEOUT = 120.0
 
 
 class LocalClient:
@@ -72,8 +90,8 @@ class LocalClient:
             with contextlib.suppress(Exception):
                 await self._writer.wait_closed()
 
-    async def call(self, method: str, **params: Any) -> Any:
-        """One request, one reply.
+    async def call(self, method: str, *, _timeout: float | None = CALL_TIMEOUT, **params: Any) -> Any:
+        """One request, one reply, **bounded** (`_timeout`, TD-063).
 
         **A parameter that is not set is not sent** (design §4.4, TD-062 fix (a)): every optional
         RPC parameter defaults to `None` on the agent side and means the same thing absent, so a
@@ -81,6 +99,15 @@ class LocalClient:
         running host agent working — a call that does not use a new parameter never mentions it,
         and so cannot be refused as an unexpected keyword. It is a rule of this one choke point on
         purpose: no command can forget it, and none may hand-roll the filtering instead.
+
+        **A reply that never comes is an error naming the method**, not a wait without end. The
+        default is the same bound the agent gives an act over its own link, and it is generous
+        by a wide margin: every RPC but the ones below answers in milliseconds. The blocking
+        ones pass their own — `wait` its timeout, `send --wait` its timeout plus slack — which
+        is the shape `HostAgent._route_act` already gives those two calls one layer down (`_forward`,
+        the other direction, gives `wait` no bound at all); `_timeout=None` waits for ever here
+        too, deliberately, for a caller that means to. It is keyword-only and underscored
+        because every other keyword here is an RPC parameter on its way to the wire.
         """
         assert self._reader and self._writer
         self._n += 1
@@ -90,7 +117,13 @@ class LocalClient:
             req["caller"] = self.caller
         self._writer.write((json.dumps(req) + "\n").encode())
         await self._writer.drain()
-        line = await self._reader.readline()
+        try:
+            line = await asyncio.wait_for(self._reader.readline(), _timeout)
+        except TimeoutError:
+            raise AgentStuck(
+                f"the host agent did not answer {method!r} within {_timeout:g}s — it is stuck, not gone; "
+                f"look at its journal (journalctl --user -u agentorc-agent) before retrying"
+            ) from None
         if not line:
             raise AgentUnavailable("host agent closed the connection")
         resp = json.loads(line)
@@ -169,7 +202,14 @@ async def wait_rpc(
                 if lost_at is not None:
                     remakes += 1  # one per connection actually remade, not one per attempt
                 connected, lost_at = True, None  # back: a later drop gets a grace of its own
-                return await c.call("wait", timeout=left, scope=scope), remakes
+                # its own bound plus slack: a `wait` is meant to block, and the client must not
+                # give up on the very thing it is waiting for (TD-063)
+                return await c.call("wait", timeout=left, scope=scope, _timeout=left + CALL_TIMEOUT), remakes
+        except AgentStuck:
+            # the agent is there and did not answer: remaking the connection would hide a wedged
+            # agent behind a *nothing changed* at the deadline, which is worse than the hang this
+            # whole function is about (review of PR #315)
+            raise
         except AgentUnavailable:
             if not connected:
                 raise  # nothing ever answered: an agent that is down, not one that restarted
@@ -180,10 +220,19 @@ async def wait_rpc(
             await asyncio.sleep(min(RECONNECT_STEP, max(deadline - loop.time(), 0.0)))
 
 
-def call_sync(method: str, *, caller: str | None = None, **params: Any) -> Any:
+def call_sync(method: str, *, caller: str | None = None, _timeout: float | None = CALL_TIMEOUT, **params: Any) -> Any:
+    """One call on its own connection. **A `send --wait` is given its own bound plus slack**
+    (TD-063): it is the one ordinary command that means to block, and a client that gave up at
+    the default would abandon the very thing it asked for — the same rule `HostAgent._forward`
+    gives the same call one layer down, in `_route_act`."""
+
+    if method == "send" and params.get("wait") and _timeout is not None:
+        theirs = params.get("timeout")
+        _timeout = None if theirs is None else float(theirs) + CALL_TIMEOUT
+
     async def _go() -> Any:
         async with LocalClient(caller=caller) as c:
-            return await c.call(method, **params)
+            return await c.call(method, _timeout=_timeout, **params)
 
     return asyncio.run(_go())
 

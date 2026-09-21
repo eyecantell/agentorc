@@ -1666,11 +1666,13 @@ def _agent_answers() -> bool:
     failure is a no: this only ever chooses which sentence to print, so it must not raise, hang a
     second command on the way out of a failed one, or turn a missing socket into a traceback.
 
-    The bound is the point, and it is not `call_sync`'s: nothing in `sessionorc.client` times a
-    read out, so a process that is **accepting connections but not yet serving** — which is exactly
-    what a restarting unit is for a moment, and the state this whole entry is about — would leave
-    the probe in `readline()` for ever. The original call had already failed fast; a probe that
-    hangs would turn a deterministic exit 3 into a command that never returns (review of PR #300).
+    The bound is the point, and it is **tighter** than `call_sync`'s: a process that is
+    **accepting connections but not yet serving** — which is exactly what a restarting unit is for
+    a moment, and the state this whole entry is about — must not leave the probe waiting. It would
+    now end at `client.CALL_TIMEOUT` rather than for ever (TD-063 gave every call a bound, 2026-09-21),
+    but two minutes to choose a sentence is two minutes too long: the original call had already
+    failed fast, and a probe that waits turns a deterministic exit 3 into a command that hangs
+    (review of PR #300).
 
     It costs one connect on the path where nothing is listening either, which is deliberate: what a
     person acts on is the state **now**, and a socket that answers between the failure and this

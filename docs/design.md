@@ -483,6 +483,19 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   picker, and clipboard paste (screenshots) on desktop; the share sheet on the phone.
 - Permission decisions: the `PermissionRequest` hook script asks the host agent over the socket and
   blocks until the UI answers or the hook times out (§4.2).
+- **A call that is never answered is an error, not a wait without end** (2026-09-21, TD-063).
+  The client had no bound on reading a reply, so an RPC that never came back blocked for ever:
+  a CI job that died after fourteen minutes naming the test *before* the one that stopped, and —
+  the half that matters — a live worker sitting in `ao send` that never returns while its lead
+  reads it as `working`. A call waits `client.CALL_TIMEOUT`, the same 120 s the agent gives an
+  act over its own link, and then raises **naming the method**, so the next hang says which RPC
+  it was. The calls that mean to block pass their own bound — `wait` its timeout plus slack, and
+  `send --wait` the same — which is the shape `_route_act` already gives those two between hosts,
+  applied one layer down where the reply is read; `None` still waits for ever, for a caller that
+  means to. **A call that times out is not a connection that dropped**, and the one caller that
+  reconnects tells them apart (`AgentStuck`, a subclass so every other handler is unchanged): a
+  drop is a restart and is worth remaking, a timeout is a wedged agent, and remaking that only
+  hides it behind a *nothing changed* at the deadline.
 - **A reply is one line, and one no client can read is refused here** (TD-066). Every stream — the
   agent's socket, the client's, the link's — is opened with the same `FRAME_LIMIT` (8 MiB, §4.4a
   *Frames*), since asyncio's 64 KiB default is smaller than a `list` of a day's records. A longer
