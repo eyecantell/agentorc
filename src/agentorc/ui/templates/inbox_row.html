@@ -160,6 +160,7 @@
 {%- elif e.closed_reason == 'go_with_it' %}closed · go with it
 {%- elif e.closed_reason == 'declined' %}declined · the sender was told
 {%- elif e.closed_reason == 'asker_gone' %}closed · the asker is gone
+{%- elif e.closed_reason == 'asked_person' %}closed · the asker took it to the person
 {%- elif e.closed_reason == 'replied' or e.closed_by %}answered by {{ e.closed_by or 'your reply' }}
 {%- elif e.closed_reason == 'expired' or e.expired_at %}expired
 {%- endif %}

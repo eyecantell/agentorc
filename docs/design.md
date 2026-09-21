@@ -2862,7 +2862,14 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   to its default, as designed. A worker whose `ask` to the techlead is unanswered after
   **`TECHLEAD_WAIT`, thirty minutes**, asks the person on the same thread (`--thread`), saying
   so — the worker's brief carries it, so a team with no manager, or a manager that is itself
-  capped, still reaches a person.
+  capped, still reaches a person. **As built (TD-075 step 4, 2026-09-21):** `--thread` names the
+  worker's own **open** `ask` or `steer` to a session as well as its answered question to the
+  person; the new question lands in the person inbox on the first one's thread, and the first
+  **closes on every copy as `asked_person`**, so the techlead's `asks_waiting` stops counting it
+  and a late answer from the techlead closes nothing — the person's answer is the one owed on.
+  Refused, in words: a note (only a question is followed up), a question already passed up (the
+  person holds it), or one already closed.
+  Thirty minutes is the brief's number; the home does not time it.
 - **Alarms (§4.8a *Who answers first*) need more than this, deliberately.** That path wants a
   techlead that is a **live controller of the record** holding a grant — **`alarms`**, named
   here — on a host that enforces and carries no person. Only a **person's** `ao team start`
@@ -3285,7 +3292,7 @@ and **an entry is open exactly when it is an `ask`, `steer` or `conflict` with n
 fields that existed before it are kept and still written, so nothing that reads them changes:
 `replied` sets `closed_by` (the reply's id) and `closed_at`; `expired` — a session-to-session
 `ask` whose bound ran out, or whose addressee was closed or forgotten — sets `expired_at`, as
-today; `lapsed`, `declined`, `go_with_it` and `asker_gone` set `closed_at` alone. Retention for
+today; `lapsed`, `declined`, `go_with_it`, `asker_gone` and `asked_person` (§4.9b *When it cannot answer*) set `closed_at` alone. Retention for
 every closed entry runs from `closed_at` or `expired_at`, whichever it has. Entries written
 before this date have no `closed_reason`; they read as closed when `closed_by` or `expired_at` is
 set, which is the rule until now.
@@ -3441,7 +3448,9 @@ the asker settles it in one of two ways:
   answer given, as far as the person inbox still holds them (an owing question is never pruned, so
   the one being followed up always is) — and settles the first as `outcome: asked_again`; the new
   one, once answered, owes its own. It is an ordinary `ask` for every bound, the per-thread
-  exchange bound included.
+  exchange bound included. It also takes up the caller's own **unanswered** question to a session
+  — a techlead that did not answer within `TECHLEAD_WAIT` — closing the first as `asked_person`
+  (§4.9b *When it cannot answer*).
 **`blocked` is not a dead end.** A `blocked` outcome lands in ***Needs you***, counted, not in FYI —
 *blocked: <line>* under the question and the answer — with **Reply** (a person's reply on the
 thread, into the asker's inbox) and **Dismiss**: work that stopped on something only a person can
