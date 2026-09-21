@@ -351,10 +351,10 @@
    `identity_ack` stays, because a wire name is not a control. The host agent's log keeps every
    alarm, so it loses nothing.
 
-   §4.5a gives the row three more — **Open**, **Suspend** and **Log TD**. **Open** and **Suspend**
-   are built (the second from 2026-09-20, with `rpc_suspend`); **Log TD** is not drawn at all until
-   `identity_log` exists, because a control against a method that is not there is the one thing
-   §4.2 forbids, and a disabled one would be a promise the page cannot keep.
+   §4.5a gives the row three more — **Open**, **Suspend** and **Log TD**, all built (**Log TD** from
+   2026-09-20, with `identity_log`). **Log TD** is drawn only where the home says a session answers
+   for this record (`alarm_to`); where none does — the host's own list, a record nobody controls —
+   the row says so in words instead of drawing a control the agent would refuse.
 
    The two are different in kind, which is why they read differently below: **Dismiss** and
    **Log TD** are *answers* and end the row; **Open** and **Suspend** act on the session and leave
@@ -380,6 +380,16 @@
   <button class="btn sm" data-act="suspend" data-id="person" data-who="{{ e.sid }}" data-name="{{ e.name }}" data-confirm="Suspend {{ e.name }}? It is stopped at once, with no wrap-up — its worktree, conversation and run log are kept. No session can start it again under that name: only you lift it, by resuming it yourself or forgetting it.">Suspend</button>
   {%- endif %}
   {%- if e.sid %}{{ open_btn(e, 'Open') }}{% endif %}
+  {#- §4.8a *An alarm's answers* (TD-077 b): **Log TD** — an answer, so it ends the row. It hands
+      the alarms, in words the home composes, to the session that answers for this record, as mail
+      from you that owes you an outcome. The home names that session (`alarm_to`) and the RPC reads
+      the same answer, so the button is here exactly when the press can succeed; a controller that
+      goes between the draw and the press is refused in words, which comes back as the toast. -#}
+  {%- if e.row != 'alarm_host' and e.sid and e.alarm_to %}
+  <button class="btn sm" data-act="identity_log" data-id="person" data-who="{{ e.sid }}" data-to="{{ e.alarm_to.name }}" title="hand them to {{ e.alarm_to.name }} ({{ e.alarm_to.id }})" data-confirm="Hand these alarms to {{ e.alarm_to.name }} ({{ e.alarm_to.id }})? It gets them as mail from you, owes you an outcome on them (done, blocked or dropped), and the list is cleared here; the host agent's log keeps every one.">Log TD</button>
+  {%- else %}
+  <span class="st">no session answers for {% if e.row == 'alarm_host' %}the host's own list{% else %}this one{% endif %}: nothing to hand it to</span>
+  {%- endif %}
   <button class="btn sm ghost" data-act="identity_ack" data-id="person" data-who="{{ e.sid }}" data-confirm="Dismiss these alarms? The list is cleared and the row leaves; the host agent's log keeps every one of them, a line each.">Dismiss</button>
 </div>
 {%- endmacro %}

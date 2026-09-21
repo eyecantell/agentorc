@@ -472,6 +472,17 @@ def alarm_view(raw: Any) -> list[dict[str, Any]]:
     return out
 
 
+def alarm_to_view(raw: Any) -> dict[str, str] | None:
+    """Who **Log TD** would hand a record's alarms to (design §4.8a *An alarm's answers*, TD-077 b),
+    as the home's `alarm_to` gives it — `{"id", "name"}`, its first live controller — or None for
+    *nobody*. A shape another build wrote (a bare string, a dict with no id) is *nobody* too: the
+    row then says so in words, and costs nothing but the button."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("id"), str) or not raw["id"].strip():
+        return None
+    name = raw.get("name")
+    return {"id": raw["id"], "name": name if isinstance(name, str) and name.strip() else raw["id"]}
+
+
 def suspended_note(raw: Any) -> str:
     """The **suspended** mark's words, or "" (design §4.8a *An alarm's answers*, TD-077 a2).
 
@@ -960,6 +971,11 @@ def state_rows(
                     "at": max((a["last"] or a["at"]) for a in alarms) or row["at"],
                     "age": "",
                     "alarms": alarms,
+                    # §4.8a *An alarm's answers* (TD-077 b): who **Log TD** would hand these to — the
+                    # home's own answer (`alarm_to`, the record's first live controller from the
+                    # control graph), never worked out here, so drawn-or-not and the RPC's
+                    # refused-or-not cannot disagree.
+                    "alarm_to": alarm_to_view(v.get("alarm_to")),
                     "mode": identity_mode,
                     "find": _find_text(row["find"], *(a["words"] for a in alarms)),
                 }
@@ -2088,6 +2104,17 @@ def create_app() -> FastAPI:
             if not who:
                 raise HTTPException(400, "suspend names the session to suspend")
             got = await call("suspend", id=who)
+            return JSONResponse({"ok": True, **got})
+        if action == "identity_log":
+            # design §4.5a **Inbox row: identity alarm** (§4.8a *An alarm's answers*, TD-077 b):
+            # **Log TD** hands the record's alarms to the session that answers for it, as mail from
+            # the person that owes an outcome, and clears the list. The agent picks the controller
+            # and composes the words; the page names nobody. A controller that went between the
+            # draw and the press is refused by the agent in words, which is the toast.
+            who = str(body.get("id") or "").strip()
+            if not who:
+                raise HTTPException(400, "Log TD names the session whose alarms it hands on")
+            got = await call("identity_log", id=who)
             return JSONResponse({"ok": True, **got})
         if action == "identity_ack":
             # design §4.5a **Inbox row: identity alarm** (§4.8a, TD-077 step 2): a person has seen

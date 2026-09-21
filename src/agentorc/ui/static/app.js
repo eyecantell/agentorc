@@ -147,6 +147,9 @@
       // `data-confirm` before this runs), and `why` is left to the agent, which composes it from
       // the alarm's own fields — a page that wrote its own reason would be writing the record.
       if (action === "suspend") body = { id: b.dataset.who || "" };
+      // §4.8a *An alarm's answers* (TD-077 b): **Log TD** — an answer, so the row goes. The agent
+      // picks the controller and writes the words; the page sends only whose alarms they are.
+      if (action === "identity_log") body = { id: b.dataset.who || "" };
       // design §4.5a **Inbox row** controls (§4.10, TD-069 step 1): the person's own acts on their
       // own inbox. Each posts to `/api/person/<action>`, which calls the RPC caller-less; the agent
       // is the one that decides what may be done, and its refusal comes back as a toast.
@@ -209,6 +212,7 @@
       if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
       // the wire name stays `identity_ack`; the control is **Dismiss** (§4.5a, renamed 2026-09-20)
       if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
+      if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
@@ -239,7 +243,7 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      AO.toast(`${action} failed: ${e.message}`);
+      AO.toast(`${action === "identity_log" ? "Log TD" : action} failed: ${e.message}`);  // a control is not its wire name
       if (staterow && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
     }
   });
