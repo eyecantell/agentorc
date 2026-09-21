@@ -15,7 +15,8 @@ by reading the posted text. Two sessions in the agentorc repo hit it on 2026-09-
 had to patch a cadence-review comment through `gh api -X PATCH .../issues/comments/<id>`, which
 is also the fix when it happens.
 
-**How to apply:** `cat > /tmp/.../body.md <<'EOF' … EOF` then `gh pr comment N --body-file …`.
+**How to apply:** write the body into the session's scratchpad directory, not `/tmp`
+(`cat > "$SCRATCH/body.md" <<'EOF' … EOF`), then `gh pr comment N --body-file "$SCRATCH/body.md"`.
 A single-quoted heredoc delimiter is what makes it literal.
 
 Related: [[open-the-pr-before-writing-its-number]].
