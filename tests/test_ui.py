@@ -1199,13 +1199,49 @@ def test_a_teams_header_shows_its_leads_doing_line(tmp_path, monkeypatch):
          "team": "ao-grind", "controllers": ["ao-orc"], "tail": ["…"]},
     ]  # fmt: skip
     (g,) = team_groups([view(r, records) for r in records])
-    assert g["lead"]["doing"]["text"] == "round 3: reviewing PR 236"
+    assert g["manager"]["doing"]["text"] == "round 3: reviewing PR 236"
     head = templates.get_template("group_head.html").render(g=g)
     assert "round 3: reviewing PR 236" in head and "says · 11m ago" in head
     # a lead that has said nothing adds no line
     (quiet,) = team_groups([view({**rec, "doing": None}, records) for rec in records])
-    assert quiet["lead"]["doing"] is None
+    assert quiet["manager"]["doing"] is None
     assert "says" not in templates.get_template("group_head.html").render(g=quiet)
+
+
+def test_the_role_label_is_what_the_badge_the_team_header_and_the_inbox_row_show(tmp_path, monkeypatch):
+    """design §4.8 *The names* (TD-076 step 3): a role's **label** is what the page shows in place of
+    the bare key — the role badge on a card, the team header's word for its manager, an Inbox row —
+    and the key stays on hover, since it is what `--role` and `--json` read. A repo's own label wins;
+    one this host cannot read falls back to the default, the name raised, never to nothing. It is a
+    person's text and is drawn escaped."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    import asyncio
+
+    from agentorc.ui import app as uiapp
+
+    roles = "roles:\n  manager: {label: Shift <lead>}\n  grinder: {label: TD grinder}\n"
+    (tmp_path / ".agentorc.yml").write_text(roles)
+    base = {"kind": "agent", "adapter": "claude-code", "dir": str(tmp_path), "repo": str(tmp_path),
+            "state": "idle", "since": "2026-09-20T16:00:00Z", "team": "ao-grind"}  # fmt: skip
+    records = [
+        {**base, "id": "ao-m", "name": "manager-ao-1", "role": "manager", "capabilities": ["control"]},
+        {**base, "id": "ao-g", "name": "grinder-ao-1", "role": "grinder", "controllers": ["ao-m"]},
+        {**base, "id": "ao-x", "name": "elsewhere", "role": "grinder", "repo": "/no/such/repo", "team": None},
+    ]
+    uiapp._icon_cache.clear()
+    icons = asyncio.run(uiapp.role_icons(records))
+    views = [uiapp.view(r, records, icons=icons) for r in records]
+    card = uiapp.templates.get_template("card.html")
+    assert ">TD grinder</span>" in card.render(s=views[1])
+    assert "the role preset it was started under — grinder" in card.render(s=views[1])  # the key, on hover
+    assert ">Grinder</span>" in card.render(s=views[2])  # a repo this host cannot read: the default
+    # the team header calls its manager by the manager's label, escaped
+    (g,) = [g for g in uiapp.team_groups(views) if g["team"] == "ao-grind"]
+    head = uiapp.templates.get_template("group_head.html").render(g=g)
+    assert '<span class="meta">Shift &lt;lead&gt;</span> <a class="name" href="/focus/ao-m">manager-ao-1</a>' in head
+    # …and an Inbox row carries the badge the card does
+    row = uiapp.state_rows([{**views[1], "state": "stalled?"}])[0]
+    assert row["role_label"] == "TD grinder"
 
 
 def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_dialog(tmp_path, monkeypatch):
@@ -1392,13 +1428,17 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
     icons = asyncio.run(uiapp.role_icons(records))
     card = uiapp.templates.get_template("card.html")
     lead, grinder, plain, none = (card.render(s=uiapp.view(r, records, icons=icons)) for r in records)
-    assert ICON_PATHS["flag"] in lead and ">lead</span>" in lead  # the picture, and the word beside it
+    # the picture, and the **label** beside it (design §4.8 *The names*, TD-076): a record badged
+    # with the retired word `lead` is labelled through the renamed-roles table, so it reads *Manager*
+    assert ICON_PATHS["flag"] in lead and ">Manager</span>" in lead and ">lead</span>" not in lead
+    assert 'title="the role preset it was started under — lead' in lead  # the key is still there, on hover
     # the repo's own `roles:` wins, exactly as it does for every other key
     assert ICON_PATHS["terminal"] in grinder and ICON_PATHS["wrench"] not in grinder
     # `plain` carries no icon, and a session with no role carries no badge at all
     assert "ricon" not in plain and "ricon" not in none
-    # a caller that resolved no icons still renders the badge's word, and nothing breaks
-    assert "ricon" not in card.render(s=uiapp.view(records[0], records))
+    # a caller that resolved no icons still renders the badge's word — the default label — and nothing breaks
+    bare = card.render(s=uiapp.view(records[0], records))
+    assert "ricon" not in bare and ">Manager</span>" in bare
 
 
 def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_path, monkeypatch):

@@ -489,14 +489,14 @@
   // The page is one or more `.tgroup` sections, each an optional header plus its own `.grid`: one
   // per team when any session carries a `team` badge or any team is defined (design §4.5a **team
   // groups**, §4.9), and one unnamed, headerless group otherwise. One order, no control (design
-  // §4.5, 2026-09-18): inside a group the lead's card, then urgency, then name.
+  // §4.5, 2026-09-18): inside a group the manager's card, then urgency, then name.
   const sections = () => $$("#groups .tgroup");
   function layout() {
     const box = $("#groups"); if (!box) return;
     sections().forEach((sec) => {
-      const grid = $(".grid", sec), lead = sec.dataset.lead || "";
+      const grid = $(".grid", sec), manager = sec.dataset.manager || "";
       const cards = $$(".sc", grid);
-      cards.sort((a, b) => (b.dataset.id === lead) - (a.dataset.id === lead) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
+      cards.sort((a, b) => (b.dataset.id === manager) - (a.dataset.id === manager) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
         .forEach((c) => grid.appendChild(c));
     });
     applyFilter();
@@ -533,7 +533,7 @@
   function syncGroups(gs) {
     const box = $("#groups"); if (!box) return;
     box.classList.toggle("flat", !gs);
-    const wanted = gs || [{ team: "", lead: "", ids: $$("#groups .sc").map((c) => c.dataset.id), html: "" }];
+    const wanted = gs || [{ team: "", manager: "", ids: $$("#groups .sc").map((c) => c.dataset.id), html: "" }];
     const keep = [];
     wanted.forEach((g) => {
       let sec = sections().find((s) => s.dataset.team === g.team);
@@ -542,7 +542,7 @@
         sec.className = "tgroup"; sec.dataset.team = g.team;
         sec.innerHTML = '<div class="grid"></div>';
       }
-      sec.dataset.lead = g.lead || "";
+      sec.dataset.manager = g.manager || "";
       sec.dataset.live = g.live || 0;
       let head = $(".ghead", sec);
       if (g.html) {
@@ -579,10 +579,10 @@
     // a header re-rendered for a delta must not re-arm a request in flight
     $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
   }
-  // A stop returns before its lead does (design §4.9: the members settle first, which is minutes).
+  // A stop returns before its manager does (design §4.9: the members settle first, which is minutes).
   // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
   // rather than leaving a failure nobody ever sees (design §4.5 "Errors"; review of PR #124).
-  async function watchStop(name, lead) {
+  async function watchStop(name, manager) {
     for (let i = 0; i < 90; i++) {
       await new Promise((r) => setTimeout(r, 5000));
       let rows = [];
@@ -590,9 +590,9 @@
       const row = rows.find((t) => t.name === name);
       if (!row) return;
       if (row.error) { AO.toast(`${name}: ${row.error}`); return; }
-      if (!row.stopping) { AO.toast(`${name}: ${lead} stopped`, true); return; }
+      if (!row.stopping) { AO.toast(`${name}: ${manager} stopped`, true); return; }
     }
-    AO.toast(`${name}: ${lead} is still stopping — see the agent log`);
+    AO.toast(`${name}: ${manager} is still stopping — see the agent log`);
   }
   // The button is not the guard: a stop moves its members' states at once, each delta re-renders
   // the header, and the fresh Stop would be pressable while the first request is still out — a
@@ -614,13 +614,13 @@
       if (!r.ok) throw new Error(o.detail || r.statusText);
       AO.toast(o.text || `${name}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started`, true);
       // The same two things `ao team start|stop` says and a request could not: a member the
-      // definition starts interactive is out of its lead's reach (design §9 invariant 5), and the
-      // lead's own stop happens after the response (review of PR #124).
+      // definition starts interactive is out of its manager's reach (design §9 invariant 5), and the
+      // manager's own stop happens after the response (review of PR #124).
       (o.out_of_reach || []).forEach((who) =>
-        AO.toast(`${name}: ${who} is interactive, so its lead cannot act on it — §9 invariant 5`));
+        AO.toast(`${name}: ${who} is interactive, so its manager cannot act on it — §9 invariant 5`));
       // TD-042: a brief written for one night cannot start the next. The team started; this is a note.
       (o.unrepeatable || []).forEach((w) => AO.toast(`${name}: ${w}`));
-      if (o.lead) watchStop(name, o.lead);
+      if (o.manager) watchStop(name, o.manager);
     } catch (e) {
       AO.toast(`${name}: ${e.message}`);
     } finally {

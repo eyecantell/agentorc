@@ -36,18 +36,18 @@
      path: the flat page is a single unnamed group with its header omitted. #}
   <div id="groups"{% if groups is none %} class="flat"{% endif %}>
     {% if groups is none %}
-    <section class="tgroup" data-team="" data-lead=""><div class="grid">
+    <section class="tgroup" data-team="" data-manager=""><div class="grid">
       {% for s in sessions %}{% include "card.html" %}{% endfor %}
     </div></section>
     {% else %}{% for g in groups %}
-    <section class="tgroup" data-team="{{ g.team }}" data-lead="{{ g.lead.id if g.lead else '' }}" data-live="{{ g.live }}">
+    <section class="tgroup" data-team="{{ g.team }}" data-manager="{{ g.manager.id if g.manager else '' }}" data-live="{{ g.live }}">
       <div class="row gap wrap ghead">{% include "group_head.html" %}</div>
       <div class="grid">{% for s in g.members %}{% include "card.html" %}{% endfor %}</div>
     </section>
     {% endfor %}{% endif %}
   </div>
   <div class="note" id="empty" {% if sessions %}hidden{% endif %}>No sessions on {{ host }}. Start one with <b>New session</b> or <b>Shell</b>.</div>
-  <div class="note">Inside a team: the lead, then whatever needs you first. A dashed pill means the state was guessed from the screen. A <b>team</b> badge on a card filters the page to that team; clear the filter box to see everyone again.</div>
+  <div class="note">Inside a team: the manager, then whatever needs you first. A dashed pill means the state was guessed from the screen. A <b>team</b> badge on a card filters the page to that team; clear the filter box to see everyone again.</div>
 </div>
 {% endblock %}
 {% block scripts %}<script>AO.org();</script>{% endblock %}

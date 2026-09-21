@@ -1925,6 +1925,11 @@ session would make every one of those lie. So:
   roles from this host's disk, so a label a repo on *another* host gives its role is not seen
   and the badge falls back to the default — the role's name, raised — never to nothing. An old
   badge is labelled through the renamed-roles table: `role: orchestrator` draws *Manager*.
+  **Built 2026-09-20 (TD-076 step 3)**: `label:` in both `roles:` layers (one line, 40 characters
+  at most, checked when the file is read), the built-ins' three, `ao roles` printing it, and the
+  page — the badge (the key on hover), the team header's word for its manager (*Manager* where the
+  manager's record carries no role), an Inbox row — with the page's own *lead* words and the
+  `/api/teams/<t>/stop` answer's key saying *manager*.
 - **Session names stop carrying history.** In the team definitions `orchestrator-ao-1` becomes
   `manager-ao-1` and `tdgrind-ao-N` becomes `grinder-ao-N`, and their brief files are renamed with
   them. A name is what a record, a worktree, a launch branch and a run log are keyed by (§4.1),

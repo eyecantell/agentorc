@@ -381,38 +381,40 @@ def stop_fields(until: str, unattended: bool) -> dict[str, str]:
         raise HTTPException(400, str(e)) from None
 
 
-ICON_TTL = 5.0  # seconds a resolved role icon is kept, the `DEFS_TTL` idiom (design §4.5a)
-# (repo, role) → (read at, icon name). Module-level, so every open page and every delta shares one
-# read: resolving an icon is a `.agentorc.yml` per repo, which must never ride the render path.
-_icon_cache: dict[tuple[str, str], tuple[float, str]] = {}
+ICON_TTL = 5.0  # seconds a resolved role icon and label are kept, the `DEFS_TTL` idiom (design §4.5a)
+# (repo, role) → (read at, (icon name, label)). Module-level, so every open page and every delta
+# shares one read: resolving a role is a `.agentorc.yml` per repo, which must never ride the render path.
+_icon_cache: dict[tuple[str, str], tuple[float, tuple[str, str]]] = {}
 
 
-def _icon_for(repo: str, role: str, org_roles: Any) -> str:
-    """The role's icon in that repo (design §4.8): the repo's own `roles:` over the org's over the
-    built-in, resolved by `repoconfig` — the core never keys on a role, and the UI is free to
-    (§9 invariant 9). A repo with no file, an unreadable one, a role nothing defines: no icon,
-    never an error on the page."""
+def _look_for(repo: str, role: str, org_roles: Any) -> tuple[str, str]:
+    """The role's icon and display label in that repo (design §4.8): the repo's own `roles:` over
+    the org's over the built-in, resolved by `repoconfig` — the core never keys on a role, and the
+    UI is free to (§9 invariant 9). A repo with no file, an unreadable one, a role nothing defines,
+    a repo on another host: no icon, and the **default label** — the role's name, raised, an old
+    name read through the renamed-roles table — never nothing (§4.8 *The names*)."""
     try:
         cfg = repoconfig.load(repo) if repo else repoconfig.RepoConfig()
-        return repoconfig.resolve_role(cfg, role, org_roles).icon or ""
+        r = repoconfig.resolve_role(cfg, role, org_roles)
+        return r.icon or "", r.display
     except (KeyError, ValueError, OSError):
-        return ""
+        return "", repoconfig.default_label(role)
 
 
-async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, str], str]:
-    """The icon per (repo, role) the fleet carries, off the loop and cached for `ICON_TTL` seconds —
-    a role redefined by hand shows on the next load, or within that, exactly as a team definition
-    does. Passed into `view`, so the record itself never carries an icon."""
+async def role_icons(sessions: Collection[dict[str, Any]]) -> dict[tuple[str, str], tuple[str, str]]:
+    """The (icon, label) per (repo, role) the fleet carries, off the loop and cached for `ICON_TTL`
+    seconds — a role redefined by hand shows on the next load, or within that, exactly as a team
+    definition does. Passed into `view`, so the record itself never carries either."""
     now = time.monotonic()
     want = {(str(s.get("repo") or ""), str(s.get("role") or "")) for s in sessions if s.get("role")}
-    if stale := [k for k in want if now - _icon_cache.get(k, (0.0, ""))[0] > ICON_TTL]:
+    if stale := [k for k in want if now - _icon_cache.get(k, (0.0, ("", "")))[0] > ICON_TTL]:
 
-        def resolve() -> dict[tuple[str, str], str]:
+        def resolve() -> dict[tuple[str, str], tuple[str, str]]:
             try:
                 org_roles = org_here()[0].roles  # read once per batch, not once per pair (review of PR #240)
             except (ValueError, OSError):
                 org_roles = None
-            return {k: _icon_for(*k, org_roles) for k in stale}
+            return {k: _look_for(*k, org_roles) for k in stale}
 
         got = await asyncio.to_thread(resolve)
         _icon_cache.update({k: (now, v) for k, v in got.items()})
@@ -663,7 +665,11 @@ def view(
     # The role's icon (design §4.8 *Role presets*): resolved here from the role's *name* — nothing in
     # the core keys on a role (§9 invariant 9) and no icon is stored on the record. Without a map
     # (a caller that did not resolve one) the badge draws its word alone, as it always has.
-    d["role_icon"] = (icons or {}).get((str(s.get("repo") or ""), str(s.get("role") or "")), "")
+    # the role badge (design §4.8 *The names*, TD-076): its picture and its **label** — what it
+    # shows in place of the bare key. Resolved with the icon, off the render path; a view built
+    # without `icons` still says the role, by its default label, never nothing.
+    look = (icons or {}).get((str(s.get("repo") or ""), str(s.get("role") or "")))
+    d["role_icon"], d["role_label"] = look or ("", repoconfig.default_label(str(s.get("role") or "")))
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
@@ -748,14 +754,14 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
     (2026-09-18): dead cards under a team's name are still that team's, and a definition no session
     carries is a group with no members, because its card is where Start lives.
 
-    The badge decides the group; `controllers` decides the lead: the one member holding
+    The badge decides the group; `controllers` decides the manager: the one member holding
     `control` that other members of the same group list as a controller. A group without one
-    has no lead card and its header says so. Within a group the lead comes first, then the rest in
+    has no manager card and its header says so. Within a group the manager comes first, then the rest in
     urgent-first order (the same `rank`, `name` key the flat grid sorts by); the client re-sorts
     per group in Pinned mode. Down the page: the teams with something live, the sessions with no
     badge as *No team*, then the teams with nothing live.
 
-    A lead carrying a different badge from its members — which `ao team start` never produces, but a
+    A manager carrying a different badge from its members — which `ao team start` never produces, but a
     hand-typed `ao new --team` can — is still found, by looking across the whole fleet rather than
     only inside the group (review of PR #117). Its card stays where its own badge puts it; the
     header names it and says so, because moving the card would contradict the badge."""
@@ -768,37 +774,39 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
     groups: list[dict[str, Any]] = []
     for team in sorted(by_team):
         members = sorted(by_team[team], key=lambda v: (v["rank"], v["name"]))
-        lead, lead_elsewhere = None, False
+        manager, manager_elsewhere = None, False
         if team != NO_TEAM:
             named = {c for m in members for c in (m.get("controllers") or [])}
-            # The fleet, not just this group: a lead whose own badge differs is still this group's
-            # lead, and saying "led by you" over a group that plainly has one would be a lie.
-            leads = sorted(
+            # The fleet, not just this group: a manager whose own badge differs is still this group's
+            # manager, and saying "managed by you" over a group that plainly has one would be a lie.
+            managers = sorted(
                 (v for v in views if has_control(v.get("capabilities")) and v["id"] in named),
                 key=lambda v: (str(v.get("team") or "") != team, v["rank"], v["name"]),  # our own badge first
             )
-            if leads:
-                lead = leads[0]
-                if lead in members:
-                    members.remove(lead)
-                    members.insert(0, lead)
+            if managers:
+                manager = managers[0]
+                if manager in members:
+                    members.remove(manager)
+                    members.insert(0, manager)
                 else:
-                    lead_elsewhere = True
+                    manager_elsewhere = True
         projects = sorted({str(m.get("project")) for m in members if m.get("project")})
         row = defs.get(team) or {}
         groups.append(
             {
                 "team": team,
                 "label": team or "No team",
-                # `doing` rides with the lead (design §4.5a **team groups**, TD-074): the team card's
-                # header shows its lead's line, which is the lead reporting on the team without
-                # being asked to narrate each member.
-                "lead": {
-                    k: lead.get(k) for k in ("id", "name", "state", "state_class", "state_label", "scraped", "doing")
+                # `doing` rides with the manager (design §4.5a **team groups**, TD-074): the team
+                # card's header shows its manager's line, which is the manager reporting on the team
+                # without being asked to narrate each member. `role_label` is what the header calls
+                # it (§4.8 *The names*, TD-076): *Manager*, or whatever label its role carries.
+                "manager": {
+                    k: manager.get(k)
+                    for k in ("id", "name", "state", "state_class", "state_label", "scraped", "doing", "role_label")
                 }
-                if lead
+                if manager
                 else None,
-                "lead_elsewhere": lead_elsewhere,  # its card sits under its own badge, not here
+                "manager_elsewhere": manager_elsewhere,  # its card sits under its own badge, not here
                 "members": members,
                 "ids": [m["id"] for m in members],
                 "projects": projects or list(row.get("projects") or []),
@@ -807,7 +815,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),
-                "def_lead": row.get("manager"),  # the definition's word, for a card with no sessions yet
+                "def_manager": row.get("manager"),  # the definition's word, for a card with no sessions yet
                 "def_members": row.get("members"),
                 # *nothing running* and *nothing left to run* are different facts (§4.9a)
                 "wound_down": row.get("wound_down"),
@@ -925,6 +933,7 @@ def state_rows(
             "team": v.get("team") or "",
             "role": v.get("role") or "",
             "role_icon": v.get("role_icon") or "",
+            "role_label": v.get("role_label") or "",
             "title": v.get("title") or "",
             "doing": v.get("doing"),
             "state": v.get("state") or "",
@@ -990,6 +999,7 @@ def state_rows(
                 "team": "",
                 "role": "",
                 "role_icon": "",
+                "role_label": "",
                 "title": "",
                 "doing": None,
                 "state": "",
@@ -1354,7 +1364,7 @@ def create_app() -> FastAPI:
         return [
             {
                 "team": g["team"],
-                "lead": (g["lead"] or {}).get("id", ""),
+                "manager": (g["manager"] or {}).get("id", ""),
                 "live": g["live"],
                 "ids": g["ids"],
                 "html": head.render(g=g),
@@ -1865,8 +1875,8 @@ def create_app() -> FastAPI:
                     "team": name,
                     "now": now,
                     "sessions": st.acted,
-                    "lead": None,
-                    "text": f"{name}: already stopping — its lead follows when the members settle",
+                    "manager": None,
+                    "text": f"{name}: already stopping — its manager follows when the members settle",
                 }
             )
         if st.lead is not None:
@@ -1882,7 +1892,9 @@ def create_app() -> FastAPI:
         msg = f"{name}: {'killed' if now else 'wrap-up sent to'} {sent} session{'' if sent == 1 else 's'}"
         if pending:
             msg += f" — {pending} follows when they settle"
-        return JSONResponse({"ok": True, "team": name, "now": now, "sessions": st.acted, "lead": pending, "text": msg})
+        return JSONResponse(
+            {"ok": True, "team": name, "now": now, "sessions": st.acted, "manager": pending, "text": msg}
+        )
 
     @app.get("/api/sessions/{sid}/inbox")
     async def api_inbox(sid: str):

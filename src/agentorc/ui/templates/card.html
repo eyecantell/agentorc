@@ -17,7 +17,7 @@
       {# design §4.8 *Role presets* (TD-074): the preset's icon inside the badge — a label's picture,
          small and monochrome, so the state pill stays the one coloured thing. A role with no icon,
          or one this build does not know, draws its word alone. #}
-      {% if s.role %}<span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ role_svg(s.role_icon) }}{{ s.role }}</span>{% endif %}
+      {% if s.role %}<span class="badge" title="the role preset it was started under — {{ s.role }} (design §4.8): a label, nothing keys on it">{{ role_svg(s.role_icon) }}{{ s.role_label or s.role }}</span>{% endif %}
       {# design §4.5a card **team** badge (§4.9): the team the session was started under; a badge,
          nothing keys on it (§9 invariant 9). Click filters the grid to that team, client-side. #}
       {% if s.team %}<button class="badge team" data-team="{{ s.team }}" title="team {{ s.team }} — click: show only this team">{{ s.team }}</button>{% endif %}
