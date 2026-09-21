@@ -13,14 +13,18 @@ CSS = """
   .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
   .pill .dot { display: none; } .pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .s-working { background: #dbeafe; color: #1e40af; }
+  /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
+     alive, at rest, may be spoken to (finished · unseen is idle's blue); everything over or out of
+     reach one grey (--ended). On a card green means working and nothing else. */
+  .s-working { background: #dcfce7; color: #166534; }
   .s-needs { background: #fde68a; color: #7c3d00; }
-  .s-idle { background: #e5e7eb; color: #4b5563; }
+  .s-idle { background: #dbeafe; color: #1e40af; }
+  .s-ended { background: #e5e7eb; color: #4b5563; }
   .s-stalled { background: #fecaca; color: #991b1b; }
-  .s-exited { background: #e5e7eb; color: #6b7280; }
-  .s-done { background: #d1fae5; color: #065f46; }
+  .s-exited, .s-closed { background: #e5e7eb; color: #4b5563; }
+  .s-done { background: #d1fae5; color: #065f46; } /* Focus's reports and checklist only — --done leaves the card */
   .s-limited { background: #ede9fe; color: #5b21b6; }
-  .s-unreachable { background: #e5e7eb; color: #6b7280; }
+  .s-unreachable { background: #e5e7eb; color: #4b5563; }
   .card.off { opacity: .55; }
   .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
   .due + .due { border-top: 1px solid #eceef1; }
@@ -37,7 +41,7 @@ CSS = """
   .btn.ghost { border-color: transparent; background: transparent; color: #4b5563; }
   .btn.ghost:hover { background: #eef0f3; }
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
+  .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #374151; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
   .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
   /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
@@ -53,6 +57,30 @@ CSS = """
      row and stacked the stalled note on top of it (TD-074 step 6) */
   .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
   .sc-foot { display: flex; gap: 6px; align-items: center; }
+  /* the card's anatomy (design §4.5, TD-095): six rows, the same six on every card, at one height —
+     a row with nothing to say stays, empty, rather than moving what is below it */
+  .ac { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 26px 22px 20px 20px 62px 32px; row-gap: 6px; padding: 12px 14px 10px 17px; position: relative; overflow: hidden; }
+  .ac .r { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ac .r > * { flex-shrink: 0; } .ac .r > .fill { flex: 0 1 auto; min-width: 0; } .ac .r .grow { flex: 1; }
+  .ac .name { font-family: "JetBrains Mono", monospace; font-size: 15px; font-weight: 600; color: #111418; }
+  .ac .meta b { color: #374151; font-weight: 500; }
+  .mode { font-size: 11.5px; color: #6b7280; white-space: nowrap; }
+  .mode.mine { color: #1c2128; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
+  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10.5px; border: 1px solid #d9a441; color: #7c3d00; }
+  .aslot { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 2px 0 2px 10px; border-left: 2px solid #cbd0d6; font-size: 12px; color: #1c2128; overflow: hidden; }
+  .aslot .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
+  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 11px; color: #6b7280; white-space: nowrap; }
+  .aslot.need { border-color: #f59e0b; } .aslot.need .t { color: #7c3d00; } .aslot.bad { border-color: #dc2626; } .aslot.lim { border-color: #7c3aed; }
+  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; }
+  /* the quiet foot (second pass, 2026-09-21): the next act outlined at the text's strength, the rest
+     plain links at normal strength; dimmed means disabled and nothing else; the only filled button a
+     card carries is Allow */
+  .ac .foot { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; }
+  .ac .foot .next { white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 1px solid #6b7280; border-radius: 4px; color: #1c2128; font-size: 12px; font-weight: 500; }
+  .ac .foot .next.fill { background: #b45309; border-color: #b45309; color: #fff; }
+  .ac .foot .lk { white-space: nowrap; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; gap: 4px; color: #1c2128; font-size: 12px; }
+  .ac .foot svg { width: 13px; height: 13px; }
+  .ac.ring { box-shadow: 0 0 0 2px #f59e0b; border-color: #f59e0b; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
   .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
@@ -132,9 +160,14 @@ ICON = {
 # stays the one coloured thing on a card.
 ROLE_ICON = {
     "lead": "M5 21V4M5 4h11l-2 4 2 4H5",
+    "manager": "M5 21V4M5 4h11l-2 4 2 4H5",
     "grinder": "M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z",
     "hunter": "M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM16 16l5 5",
 }
+
+# `person` is reserved for the card's *interactive* mark (§4.5 *The card's anatomy*, second pass):
+# no role may name it, so a card never shows the same glyph twice for two reasons.
+PERSON = "M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"
 
 def role_icon(role):
     d = ROLE_ICON.get(role)
@@ -144,8 +177,11 @@ def role_icon(role):
             f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
             f'<path d="{d}"></path></svg>')
 
-BAR = {'needs': '#f59e0b', 'limited': '#7c3aed', 'stalled': '#dc2626', 'working': '#2563eb', 'idle': '#9ca3af', 'exited': '#9ca3af', 'done': '#059669', 'unreachable': '#9ca3af'}
-RANK = {"needs": 0, "limited": 1, "stalled": 2, "working": 3, "idle": 4, "exited": 5, "done": 6}
+# the card's left bar, the state token's strong colour: working green, idle blue, and one grey for
+# everything over or out of reach (§4.5 *The card's anatomy*, TD-095)
+BAR = {'needs': '#f59e0b', 'limited': '#7c3aed', 'stalled': '#dc2626', 'working': '#16a34a', 'idle': '#2563eb', 'exited': '#9ca3af', 'done': '#9ca3af', 'unreachable': '#9ca3af'}
+# §4.5 *One order*: … working → unseen idle → idle / unreachable on a volatile host → exited → closed
+RANK = {"needs": 0, "limited": 1, "stalled": 2, "working": 3, "unseen": 3.5, "idle": 4, "exited": 5, "done": 6}
 VOLATILE = {"laptop"}
 def rank(host, state):
     if state == "unreachable":
@@ -154,7 +190,8 @@ def rank(host, state):
 
 def pill(state, label=None, scraped=False):
     names = {"working": "working", "needs": "needs you", "idle": "idle", "stalled": "stalled?", "exited": "exited", "done": "closed", "limited": "limited", "unreachable": "unreachable"}
-    return f'<span class="pill s-{state}{" scraped" if scraped else ""}"><span class="dot"></span>{label or names[state]}</span>'
+    cls = {"done": "closed"}.get(state, state)  # a closed session is grey; s-done is Focus's green tick
+    return f'<span class="pill s-{cls}{" scraped" if scraped else ""}"><span class="dot"></span>{label or names[state]}</span>'
 
 def head(title):
     return f'<!doctype html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <script src="./support.js"></script>\n</head>\n<body>\n<x-dc>\n<helmet>{CSS}</helmet>\n'
@@ -175,10 +212,11 @@ def topbar(active="Org", narrow=False):
 SESS = [
     ("kmaster", "samscrape", "/home/kmaster/samscrape", [
         ("main", "claude-code · paul (max) · opus", "needs", "2m", "main", "", "hook", "Permission: Bash · git push origin td301-fix", ""),
-        ("orc-1", "claude-code · grind (pro) · opus", "idle", "4m", "wt/orc-1", "", "hook", "next tick in 1m", "unattended"),
-        ("tdgrind-1", "claude-code · grind (pro) · sonnet", "working", "14s", "wt/tdgrind-1 → td-301", "", "hook", "", "unattended"),
-        ("tdgrind-2", "claude-code · grind (pro) · sonnet", "stalled", "47m", "wt/tdgrind-2 → td-296", "3 unpushed", "hook", "no output 47m · creds expire in 0.2h", "unattended"),
-        ("tdgrind-3", "claude-code · grind (pro) · sonnet", "limited", "9m", "wt/tdgrind-3 → td-290", "", "hook", "5h window at 100% · resets 02:00 MDT (1h 51m)", "unattended"),
+        ("orc-1", "claude-code · grind · opus", "idle", "4m", "wt/orc-1", "", "hook", "next tick in 1m", "unattended"),
+        ("tdgrind-1", "claude-code · grind · sonnet", "working", "14s", "wt/tdgrind-1 → td-301", "", "hook", "", "unattended"),
+        ("tdgrind-2", "claude-code · grind · sonnet", "stalled", "47m", "wt/tdgrind-2 → td-296", "3 unpushed", "hook", "no output 47m · creds expire in 0.2h", "unattended"),
+        ("tdgrind-3", "claude-code · grind · sonnet", "limited", "9m", "wt/tdgrind-3 → td-290", "", "hook", "5h window at 100% · resets 02:00 MDT (1h 51m)", "unattended"),
+        ("tdgrind-4", "claude-code · grind · sonnet", "idle", "1h 12m", "wt/tdgrind-4 → td-299-summaries-fallback", "", "hook", "", "unattended"),
         ("errors-alerts", "claude-code · paul (max) · opus", "idle", "3h", "wt/errors-alerts", "dirty · 2 unpushed", "hook", "", ""),
     ]),
     ("kmaster", "contractmatch", "/home/kmaster/contractmatch", [
@@ -244,15 +282,19 @@ def due_strip(compact=False):
 # beside it, and `title` is the name its **tool** holds — Claude Code's own, often the person's
 # (*Error Checker*), shown beside agentorc's name and never a control. Both are display only.
 EXTRA = {
-    "orc-1":     {"team": "samscrape-grind", "role": "lead", "report": "last round 20:10 · 2 wrapped up", "grants": "control",
+    "orc-1":     {"team": "samscrape-grind", "role": "manager", "report": "round 41 · 2 wrapped up", "grants": "control",
                   "doing": ("round 41: reading four members, two claims to re-check", "2m")},
     "tdgrind-1": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-301 → #811 · 1/3 done", "findings": "2 filed",
-                  "doing": ("TD-301: pushing the branch for review", "14s"), "title": "DIU fetcher"},
+                  "doing": ("TD-301: pushing the branch for review", "14s"), "title": "DIU fetcher", "stops": "stops 06:00"},
     "tdgrind-2": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-296 → #437 · 2/2 done", "derived": True,
                   "doing": ("TD-296: waiting on CI for #437", "39m")},
     # no `doing` on tdgrind-3 on purpose: it is `limited`, and the slot shows the cap — what needs
     # a person comes first (§4.5a), so a line here would be data no branch draws (review of PR #288)
-    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed"},
+    "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed", "mail": 2},
+    # declared itself out of work and nobody has looked yet: `idle` in every payload, drawn as
+    # *finished · unseen*; the ending is said once, in the slot, and *ready to close ✓* is its caption
+    "tdgrind-4": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "#809 · 2/2 done",
+                  "unseen": True, "ready": True, "ending": "out of work — the rest of the ledger is Paul's or design-first"},
     "main":      {"findings": "1 filed"},
     "errors-alerts": {"title": "Error Checker"},
 }
@@ -315,7 +357,7 @@ def teams_strip():
     for team, source, lead, live, repo in TEAMS:
         if live:
             continue
-        state = '<span class="pill s-idle">not running</span>'
+        state = '<span class="pill s-ended">not running</span>'
         acts = '<span class="btn sm primary">Start</span>'
         rows += (f'<div class="due"><span style="font-weight: 600; font-size: 12.5px; width: 150px;">{team}</span>{state}'
                  f'<span class="meta">lead {lead} · {repo} · {source}</span>'
@@ -325,72 +367,145 @@ def teams_strip():
     {rows}
   </div>'''
 
+def where_row(host, repo, name, where, in_team):
+    """row 3 of the card's anatomy (§4.5): `branch <name>`, `wt/<name> ·` only when the worktree
+    is not the session's own name, a directory for a session with no repo, and — outside a team's
+    own group — `host / repo ·` in front of all of it."""
+    wt, branch, extra = None, None, ""
+    if where.startswith("wt/"):
+        rest = where[3:]
+        if rest.endswith(" (reaped)"):
+            rest, extra = rest[: -len(" (reaped)")], " · worktree reaped"
+        wt, _, branch = rest.partition(" → ")
+        branch = branch or wt
+    elif where.startswith(("~", "/")):
+        branch = None
+    else:
+        branch = where
+    parts = []
+    if not in_team:
+        parts.append(f"<b>{host}</b> / {repo}" if repo else f"<b>{host}</b> / {where}")
+    if wt and wt != name:
+        parts.append(f"wt/{wt}")
+    if branch:
+        parts.append(f"branch <b>{branch}</b>{extra}")
+    elif in_team or repo:
+        parts.append(where)
+    e = EXTRA.get(name, {})
+    if e.get("under") and not in_team:
+        parts.append(f"under <b>{e['under']}</b>")
+    return " · ".join(parts)
+
 def team_desktop():
-    def card(host, repo, s):
+    def card(host, repo, s, in_team):
         name, tool, state, age, where, flag, conf, pending, tag = s
-        tag_html = f'<span class="badge toggle on" title="click: switch to interactive">{tag}</span>' if tag else ""
-        flag_html = f'<span class="flag">{ICON["warn"]}{flag}</span>' if flag else ""
-        if state == "needs":
-            slot = f'<div class="status" style="border-color: #f59e0b; color: #7c3d00;">{pending}</div><div style="display: flex; gap: 6px;"><span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta" style="align-self: center;">via hook · 9m 12s left</span></div>'
-        elif state == "limited":
-            slot = f'<div class="status lim">{pending}</div><div style="display: flex; gap: 6px;"><span class="btn sm">Switch profile…</span><span class="btn sm ghost">Wait</span></div>'
-        elif state in ("working", "stalled") and doing_of(name):
-            # design §4.5a card **doing** line (§4.8, TD-074): what the session says it is doing
-            # comes *before* the tail — for a TUI the tail is the tool's chrome, never the work.
-            note = f'<div class="status needs">{pending}</div>' if state == "stalled" and pending else ""
-            slot = note + doing_slot(name)
-        elif state in ("working", "stalled"):
-            tail = pending if pending else "⏺ Edit(scripts/recover_stuck_notices.py)\n▌"
-            slot = f'<div class="term tail">{tail}</div>'
-        elif state == "done":
-            slot = f'<div class="status ok">{pending}</div>'
-        elif state == "unreachable":
-            slot = f'<div class="status">{pending}</div>'
-        elif state == "exited":
-            slot = f'<div class="status {"bad" if pending.startswith("not done") else ""}">{pending}</div>'
-        elif pending.startswith("ready"):
-            slot = f'<div class="status ok">{pending}</div><div style="display: flex; gap: 6px;"><span class="btn sm">Close session</span></div>'
-        elif doing_of(name):
-            # the same line for an idle session: its last word stands until it says another (§4.8)
-            slot = doing_slot(name)
-        elif tool == "shell":
-            slot = f'<div class="status">last: $ wg show wg0 · at prompt</div>'
+        e = EXTRA.get(name, {})
+        unseen = state == "idle" and e.get("unseen")
+        ready = e.get("ready") or pending.startswith("ready")
+        # (1) name and state: the tool's title only when it differs from the name; the pill says the
+        # state and nothing else — a declaration is not a state, so *out of work* is `idle`
+        title = e.get("title")
+        title_html = (f'<span class="meta fill" title="the session\'s name as its tool holds it">{title}</span>'
+                      if title and title != name else "")
+        state_pill = pill("idle", "● finished · unseen") if unseen else pill(state, scraped=(conf == "scraped"))
+        # (2) what it is: role, mode (a word, never pressable), marks, the stops note, the one clock
+        role = (f'<span class="badge" title="the role preset it was started under (design §4.8)">'
+                f'{role_icon(e["role"])}{e["role"]}</span>') if e.get("role") else ""
+        if tag == "unattended":
+            mode = '<span class="mode">unattended</span>'
         else:
-            # a session that has said nothing keeps the tail, which is what every card showed
-            # before 2026-09-19 — for `shell` and command runs the tail *is* the work
-            slot = f'<div class="status">last: ⏺ Edit(scripts/recover_stuck_notices.py)</div>'
-        border = "#f59e0b" if state == "needs" else "#dfe3e8"
-        place = f"{host} / {repo}" if repo else f"{host} / {where}"
-        return f'''<div class="card sc{" off" if state == "unreachable" else ""}" style="border-color: {border};">
-  <div class="sbar" style="background: {BAR[state]};"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">{name}</span>{tool_title(name)}{tag_html}{team_badges(name)}<span style="flex-grow: 1;"></span>{pill(state, scraped=(conf == "scraped"))}</div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">{place}</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">{age}</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">{where}</span><span style="flex-grow: 1;"></span>{flag_html}</div>
-    <div class="meta">{tool}</div>
-    {under_row(name)}
-    {report_line(name)}
-  </div>
-  <div class="sc-slot">{slot}</div>
-  <div class="sc-foot"><span class="btn sm primary">{ICON["focus"]}Focus</span><span class="btn sm ghost">{ICON["code"]}VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;">{ICON["more"]}</span></div>
+            mode = (f'<span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy">'
+                    f'<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" '
+                    f'stroke-linecap="round" aria-hidden="true"><path d="{PERSON}"></path></svg>interactive</span>')
+        marks = f'<span class="mark" title="unread mail">✉ {e["mail"]}</span>' if e.get("mail") else ""
+        stops = f'<span class="mode">· {e["stops"]}</span>' if e.get("stops") else ""
+        # (3) where, at full width, with the dirty / unpushed flag at the right
+        flag_html = f'<span class="flag">{ICON["warn"]}{flag}</span>' if flag else ""
+        # (4) what runs it, and what it reports — a reference shown once
+        rep = e.get("report", "")
+        dashed = ' style="border-bottom: 1px dashed #d9a441;"' if e.get("derived") else ""  # derived, not declared
+        rep_html = f'<span class="meta"{dashed}>{rep}</span>' if rep else ""
+        found = f'<span class="meta">{e["findings"]}</span>' if e.get("findings") else ""
+        # (5) the slot: one text, the first that applies, and a caption
+        cls, text, cap = "", "", ""
+        if state == "needs":
+            cls, text, cap = "need", pending, "via hook · 9m 12s left"
+        elif state == "limited":
+            cls, text = "lim", pending
+        elif state == "stalled":
+            cls, text = "bad", pending
+        elif state == "unreachable":
+            text = pending
+        elif state == "exited":
+            cls, text = "end", "exited · code 0"
+        elif state == "done":
+            cls, text = "end", pending
+        elif e.get("ending"):
+            cls, text = "end", e["ending"]
+        elif doing_of(name):
+            text, age_said = doing_of(name)
+            cap = f"says · {age_said} ago"
+        elif tool == "shell":
+            cls, text = "mono", ("$ wg show wg0 · at prompt" if state == "idle" else pending.splitlines()[-2].strip())
+        elif ready:
+            cls, text = "mono", "last: ⏺ Bash(git status) — nothing to commit"
+        else:
+            cls, text = "mono", "last: ⏺ Edit(scripts/recover_stuck_notices.py)"
+        if ready and state == "idle":
+            cap = "ready to close ✓"
+        # (6) the foot: its first button is the next act, by state
+        focus = f'<span class="lk">{ICON["focus"]}Focus</span>'
+        details = '<span class="lk">Details</span>'
+        if state == "needs":
+            first = '<span class="next fill">Allow</span><span class="lk">Deny</span>'
+            rest = focus
+        elif state == "limited":
+            first, rest = '<span class="next">Switch profile…</span><span class="lk">Wait</span>', focus
+        elif state == "exited":
+            first, rest = '<span class="next">Forget</span>', details
+        elif state == "done":
+            first, rest = '<span class="next">Details</span>', ""
+        elif ready and state == "idle":
+            first, rest = '<span class="next">Close session</span>', focus
+        else:
+            first, rest = f'<span class="next">{ICON["focus"]}Focus</span>', ""
+        editor = f'<span class="lk">{ICON["code"]}VS Code</span>' if state != "done" else ""
+        ring = " ring" if state == "needs" else ""
+        off = " off" if state == "unreachable" else ""
+        bar = BAR["idle"] if unseen else BAR[state]
+        return f'''<div class="card ac{ring}{off}">
+  <div class="sbar" style="background: {bar};"></div>
+  <div class="r"><span class="name">{name}</span>{title_html}<span class="grow"></span>{state_pill}</div>
+  <div class="r">{role}{mode}{stops}{marks}<span class="grow"></span><span class="meta" title="in this state since">{age}</span></div>
+  <div class="r"><span class="meta fill">{where_row(host, repo, name, where, in_team)}</span><span class="grow"></span>{flag_html}</div>
+  <div class="r"><span class="meta fill">{tool}</span><span class="grow"></span>{rep_html}{found}</div>
+  <div class="aslot {cls}"><div class="t">{text}</div>{f'<div class="cap">{cap}</div>' if cap else ""}</div>
+  <div class="foot">{first}{rest}{editor}<span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;">{ICON["more"]}</span></div>
 </div>'''
+
+    def key(t):
+        host, _, s = t
+        e = EXTRA.get(s[0], {})
+        r = RANK["unseen"] if s[2] == "idle" and e.get("unseen") else rank(host, s[2])
+        # §4.5 *One order*, second pass: (rank, interactive first, name)
+        return (r, s[8] == "unattended", s[0])
+
     ordered = []
     for host, repo, path, rows in SESS:
         for r in rows:
             ordered.append((host, repo, r))
-    ordered.sort(key=lambda t: rank(t[0], t[2][2]))
+    ordered.sort(key=key)
 
-    # design §4.5a Org **team groups** (§4.9): when any live session carries a `team` badge the grid
-    # is grouped — a header per team with its lead, projects and needs-you count, the lead's card
-    # first and its members after; everything else under *No team*, last. Derived on each tick from
-    # the badge and the `controllers` edges, never stored.
-    # 2026-09-16: a team is one card holding its sessions' cards, its Stop / Stop now on the header;
-    # *No team* stays a plain section.
+    # design §4.5a Org **team groups** (§4.9), redrawn to §4.5 *The card's anatomy* (TD-095): the
+    # header carries the team, the host / repo its sessions share, the counts by state, its marks and
+    # its controls — not its manager, whose card is the first in the group. *No team* is headed by
+    # its count and nothing else.
     GRID = "display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"
+    WORDS = {"needs": "needs you", "stalled": "stalled?", "done": "closed"}
 
     def group(title, sub, cards_html, needs=0, team=False):
         flag = pill("needs", f"{needs} needs you") if needs else ""
-        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm">Stop</span><span class="btn sm danger">Stop now</span>'
+        acts = ('<span style="flex-grow: 1;"></span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span>'
                 if team else "")
         box = "border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;" if team else ""
         return (f'<div style="display: flex; flex-direction: column; gap: 12px; {box}">'
@@ -404,31 +519,37 @@ def team_desktop():
         members = [t for t in ordered if EXTRA.get(t[2][0], {}).get("team") == team]
         if not members:
             continue
-        members.sort(key=lambda t: (t[2][0] != lead, rank(t[0], t[2][2])))
+        members.sort(key=key)
+        counted = list(members)
+        members.sort(key=lambda t: t[2][0] != lead)  # stable: the manager's card first, then urgency
         needs = sum(1 for t in members if t[2][2] == "needs")
-        lead_state = next((t[2][2] for t in members if t[2][0] == lead), "exited")
-        grid += group(team, f"lead {lead} ({lead_state}) · project {repo} · {len(members)} sessions · {source}",
-                      "".join(card(h, r, x) for h, r, x in members), needs, team=True)
+        places = {f"{h} / {r}" for h, r, _ in members}
+        place = places.pop() if len(places) == 1 else "mixed"
+        counts = {}  # by state, in the grid's own order (members are sorted already); needs you is the pill
+        for h, r, x in counted:
+            w = "unseen" if x[2] == "idle" and EXTRA.get(x[0], {}).get("unseen") else WORDS.get(x[2], x[2])
+            if x[2] != "needs":
+                counts[w] = counts.get(w, 0) + 1
+        tally = " · ".join(f"{n} {w}" for w, n in counts.items())
+        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True) for h, r, x in members), needs, team=True)
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
-    grid += group("No team", f"{len(rest)} sessions started on their own", "".join(card(h, r, x) for h, r, x in rest))
+    grid += group("No team", f"{len(rest)} sessions", "".join(card(h, r, x, False) for h, r, x in rest))
     cards = grid
-    return head("Org") + f'''<div style="width: 1440px; min-height: 1640px; background: #f4f5f7; display: flex; flex-direction: column;">
+    return head("Org") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   <div style="display: flex; align-items: center; gap: 10px;">
     <span style="font-size: 16px; font-weight: 600;">Org</span>
-    <span class="muted">13 sessions · 1 team · </span>{pill("needs", "1 needs you")}{pill("limited", "1 limited")}{pill("stalled", "1 stalled")}
+    <span class="muted">14 sessions · 1 team · </span>{pill("needs", "1 needs you")}{pill("limited", "1 limited")}{pill("stalled", "1 stalled")}
     <span style="flex-grow: 1;"></span>
     <span class="input" style="width: 200px; height: 28px; color: #9ca3af;">filter…</span>
     <span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">profile: all ▾</span><span class="btn ghost" style="color: #9ca3af;">☐ show command runs (2)</span>
-    <span style="width: 1px; height: 20px; background: #cbd0d6; margin: 0 8px;"></span>
-    <span style="display: inline-flex; border: 1px solid #cbd0d6; border-radius: 4px; overflow: hidden;"><span class="btn" style="border: 0; border-radius: 0; background: #e5e7eb; color: #111418;">Urgent first</span><span class="btn" style="border: 0; border-radius: 0;">Pinned</span></span>
   </div>
   {due_strip()}
   {teams_strip()}
   <div class="warn" style="background: #f3f4f6; border-color: #cbd0d6; color: #374151; align-items: center;">{ICON["warn"]}<span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
   <div style="display: flex; flex-direction: column; gap: 22px;">{cards}</div>
-  <div class="note"><b>Teams</b> lists every team defined in <span class="mono">~/.agentorc/org.yml</span> and in the repos' <span class="mono">.agentorc.yml</span>: <b>Start</b> runs the same sequence as <span class="mono">ao team start</span> (every check before any session is created), a running team is not listed — its card below carries <b>Stop</b> (wraps the members up, then the lead) and <b>Stop now</b> (kills). The grid groups by the <b>team</b> badge whenever a live session carries one — lead first, members after, everything else under <i>No team</i> — and each card shows who may act on it (<b>under</b>) and what it has reported. <b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed; an unreachable host sorts with idle when it is volatile, after stalled? when it is not. <b>Pinned</b> keeps every card where you dragged it and highlights the ones that need you instead. A dashed outline on a state pill means the state was guessed from the screen (shells, tools without hooks). Allow / Deny answer the permission through the tool's hook, so the dialog never reaches the terminal unless the hook times out. Command runs (kind: command) are on the Commands tab and hidden here by default.</div>
+  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (finished · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>: the manager's card first, then needs you → limited → stalled? → unreachable (non-volatile) → working → unseen idle → idle → exited → closed, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab.</div>
 </div>
 </div>
 ''' + TAIL
@@ -538,7 +659,7 @@ def focus():
       <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-301</span><span class="pill s-working">claimed</span><a href="#">#811</a><span class="meta">20:04</span><span style="flex-grow: 1;"></span><span class="badge">declared</span><span class="btn sm ghost">Drop</span></div>
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-299</span><span class="pill s-done">done</span><a href="#">#809</a><span class="meta">18:40</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-288</span><span class="pill s-idle">dropped</span><span class="meta">held by tdgrind-3</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-288</span><span class="pill s-ended">dropped</span><span class="meta">held by tdgrind-3</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
         <div style="border-top: 1px solid #eceef1; padding-top: 6px; display: flex; align-items: center; gap: 6px;"><span class="mono">TD-402</span><span class="badge">filed · medium</span><span class="meta">19:12</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-403</span><span class="badge">filed · low</span><span class="meta">19:48</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
       </div>
@@ -640,7 +761,7 @@ def new_session():
   </div>
   <div class="field"><label>Where</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>This directory</div><div class="note">the checkout itself, or any directory</div></div><span style="flex-grow: 1;"></span><span class="pill s-idle">in use by main</span></div>
+      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>This directory</div><div class="note">the checkout itself, or any directory</div></div><span style="flex-grow: 1;"></span><span class="pill s-ended">in use by main</span></div>
       <div class="radio on"><span class="rb"></span><div><div>New worktree</div><div class="note">for a git repo: <span class="mono">.claude/worktrees/&lt;name&gt;</span> on branch <span class="mono">&lt;name&gt;</span>, from origin's default branch; reused if it exists</div></div><span class="input mono" style="width: 240px; margin-left: auto;">td-302</span></div>
     </div>
   </div>
@@ -663,23 +784,41 @@ def new_session():
 
 def legend():
     rows = [
-        ("working", "A hook reported UserPromptSubmit / PreToolUse and output is still flowing."),
+        ("working", "Green: alive. A hook reported UserPromptSubmit / PreToolUse and output is still flowing. On a card green means working and nothing else."),
         ("needs", "Waiting on you: a permission (Allow / Deny answer it through the tool's hook; the terminal dialog only appears if the hook times out), a question (Focus — the terminal owns menus), or an empty prompt. Sorted to the top."),
         ("limited", "Hit a usage or token cap and is waiting on a reset. Reset time shown. Nothing you do unblocks it except switching the profile (account/model)."),
-        ("idle", "Turn finished (Stop hook), nothing pending. Flagged if the tree is dirty or unpushed."),
+        ("idle", "Blue: alive, at rest, and may be spoken to. Turn finished (Stop hook), nothing pending. Flagged if the tree is dirty or unpushed."),
+        ("unseen", "Still <span class=\"mono\">idle</span> in every payload, drawn in idle's blue with its own glyph and words: the session finished or declared itself out of work and nobody has looked since. A declaration is not a state — how it ended is said in the slot, <i>ready to close ✓</i> in its caption."),
         ("stalled", "Reported working, but no output for longer than the adapter's stall_after. How a credential lapse shows up."),
-        ("exited", "Process ended or tmux session gone. Run log kept. Shows which ready-to-close checks failed."),
-        ("done", "You clicked Close: session killed, worktree reaped, card kept a day then filed under Resumable. Only you close a session; the checklist just says when it is ready."),
-        ("unreachable", "The host stopped answering, so every card on it flips at once and keeps its last known state, greyed. Sorts with idle on a volatile host (asleep laptop), after stalled? on one that should be up."),
+        ("exited", "Grey, like everything over or out of reach. Process ended or tmux session gone. Run log kept; the slot says <i>exited · code N</i>, and the foot's first button is Forget."),
+        ("done", "Grey. You clicked Close: session killed, worktree reaped, card kept a day then filed under Resumable. Only you close a session; the checklist just says when it is ready. The slot says <i>closed by you</i>, in the text colour — no longer green."),
+        ("unreachable", "Grey, and the card is dimmed. The host stopped answering, so every card on it flips at once and keeps its last known state. Sorts with idle on a volatile host (asleep laptop), after stalled? on one that should be up."),
     ]
-    body = "".join(f'<tr><td style="width: 120px;">{pill(s)}</td><td>{d}</td></tr>' for s, d in rows)
-    return head("Legend") + f'''<div style="width: 760px; min-height: 820px; background: #f4f5f7; padding: 20px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
+    def lpill(s):
+        return pill("idle", "● finished · unseen") if s == "unseen" else pill(s)
+    body = "".join(f'<tr><td style="width: 150px;">{lpill(s)}</td><td>{d}</td></tr>' for s, d in rows)
+    # the state tokens the page's stylesheet carries (design §4.5 *The card's anatomy*, TD-095)
+    tokens = [
+        ("--working", "#16a34a", "working", "green — alive"),
+        ("--idle", "#2563eb", "idle, finished · unseen", "blue — alive, at rest, may be spoken to"),
+        ("--new", "#2563eb", "unread, <i>new</i> mail", "blue, idle's values under its own name, so the accent for what is new survives <i>working</i> turning green; an idle card with unread mail is blue twice, which reads rightly"),
+        ("--ended", "#9ca3af", "exited, closed, unreachable", "one grey for everything over or out of reach"),
+        ("--needs", "#f59e0b", "needs you", "amber, and the card is ringed — with red, the loudest on the page"),
+        ("--stalled", "#dc2626", "stalled?", "red"),
+        ("--limited", "#7c3aed", "limited", "violet"),
+    ]
+    tok = "".join(f'<tr><td class="mono" style="width: 150px; font-size: 11.5px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: {c}; margin-right: 6px; vertical-align: -1px;"></span>{t}</td>'
+                  f'<td class="mono" style="font-size: 11.5px; width: 230px;">{st}</td><td>{d}</td></tr>' for t, c, st, d in tokens)
+    return head("Legend") + f'''<div style="width: 900px; min-height: 1180px; background: #f4f5f7; padding: 20px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
   <div style="font-size: 16px; font-weight: 600;">States and badges</div>
   <div class="card"><table><tbody>{body}</tbody></table></div>
+  <div class="card"><table><tbody>{tok}</tbody></table></div>
   <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;">
     <div style="display: flex; gap: 10px; align-items: center;">{pill("working", scraped=True)}<span>Dashed outline: state guessed from the last screen lines (tool without hooks, plain shells). Solid: reported by the tool's hooks.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">claude-code · paul (max) · opus</span><span>Profile line: tool · account · model. Commands, policies, and usage gates key on the profile, so two accounts of one tool are tracked separately.</span></div>
-    <div style="display: flex; gap: 10px; align-items: center;"><span class="badge toggle on">unattended</span><span class="badge toggle">interactive</span><span>Mode toggle, on every card and the Focus header: click flips the session between unattended (run window, usage gate, wrap-up-then-kill, credential checks apply from the next tick) and interactive (never paused, nudged, or killed by a policy). Cards show it only when on; Focus always.</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;"><span class="mode" style="white-space: nowrap;">unattended</span><span class="mode mine" style="white-space: nowrap;"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="{PERSON}"></path></svg>interactive</span><span>The mode, on every card as a word, never pressable: <i>unattended</i> is quiet (run window, usage gate, wrap-up-then-kill and credential checks apply), <b>interactive</b> carries the person mark at the text's full strength — the person's own sessions are the ones that stand out (never paused, nudged, or killed by a policy). The toggle is in the card's <b>more</b> and on the Focus header. The person glyph is reserved for this mark: no role may name it.</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;"><span class="mark" style="white-space: nowrap;">✉ 2</span><span>Marks, on the card's second row: unread mail, an identity alarm, <i>suspended</i>. Never pressable.</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;"><span class="meta" style="flex-shrink: 0;">TD-301 → #811 · 1/3 done</span><span class="meta" style="flex-shrink: 0;">#809 · 2/2 done</span><span>The report line: a reference is shown once — where the entry's reference is the PR itself it is never <span class="mono">#809 → #809</span>. Dashed underline: derived by the host agent, not declared.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">shell</span><span>A shell is an adapter like any other: scraped state, no profile, exempt from the one-agent-per-directory rule, as are command runs. Predefined command runs are a separate kind and live on the Commands tab.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">kmaster ● laptop ◐</span><span>Host chips in the top bar: ● reachable, ◐ volatile host currently unreachable (asleep), ○ non-volatile host unreachable (a problem).</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="flag">{ICON["warn"]}dirty · 2 unpushed</span><span>Stranded-work flag: idle or exited with uncommitted or unpushed changes.</span></div>
@@ -870,7 +1009,7 @@ BOARD = [
 ]
 
 def attention():
-    dcls = {"over": "s-stalled", "today": "s-needs", "soon": "s-idle"}
+    dcls = {"over": "s-stalled", "today": "s-needs", "soon": "s-ended"}
     right = ""
     for repo, path, meta, warn, items in BOARD:
         warn_html = f'<div class="warn" style="padding: 6px 10px;">{ICON["warn"]}<span>{warn}</span></div>' if warn else ""
@@ -883,7 +1022,7 @@ def attention():
 </div>'''
         if repo == "samscrape":
             rows += '''<div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-idle" style="justify-self: start;">undated</span>
+  <span class="pill s-ended" style="justify-self: start;">undated</span>
   <div class="muted" style="font-size: 12.5px;">19 more items with no Due date — surfaced only here, never on the Org strip.</div>
   <span class="btn sm ghost">show ▾</span>
 </div>'''
@@ -992,7 +1131,7 @@ DARK = [
  (".btn.primary { background: #e6e9ee; color: #fff; border-color: #e6e9ee; }", ".btn.primary { background: #e6e9ee; color: #0e1116; border-color: #e6e9ee; }"),
  (".tab.on { background: #2b323b; color: #fff; }", ".tab.on { background: #2b323b; color: #fff; }"),
  ("#fffbeb", "#2a2410"), ("#fde68a", "#6b4d00"), ("#f5f3ff", "#221a33"), ("#ddd6fe", "#4c3a80"),
- ("#dbeafe", "#172554"), ("#1e40af", "#93c5fd"), ("#e5e7eb", "#2a313b"), ("#fecaca", "#4a1414"), ("#991b1b", "#fca5a5"), ("#d1fae5", "#0b3b2a"), ("#065f46", "#6ee7b7"), ("#ede9fe", "#2e1f5c"), ("#5b21b6", "#c4b5fd"), ("#7c3d00", "#fcd34d"),
+ ("#dcfce7", "#123d27"), ("#166534", "#bbf7d0"), ("#dbeafe", "#172554"), ("#1e40af", "#93c5fd"), ("#e5e7eb", "#2a313b"), ("#fecaca", "#4a1414"), ("#991b1b", "#fca5a5"), ("#d1fae5", "#0b3b2a"), ("#065f46", "#6ee7b7"), ("#ede9fe", "#2e1f5c"), ("#5b21b6", "#c4b5fd"), ("#7c3d00", "#fcd34d"),
  ("background: #0f1419;", "background: #05070a;"), ("background: #f3f4f6;", "background: #1f242c;"),
  ("background: #e5e7eb; color: #f1f3f6;", "background: #3a424d; color: #f1f3f6;"),
 ]
@@ -1054,7 +1193,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
