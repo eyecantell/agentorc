@@ -892,7 +892,6 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
         assert "tell me if you want less" in text, rel  # the same kind rule as the workers', not a second one
 
 
-
 def test_the_manager_brief_fills_the_techlead_seat_on_its_questions():
     """Design §4.9b (TD-075 step 4): the manager template reads the seat's `asks_waiting`, fills an
     ended seat with its mail kept, and caps fills with a ceiling of its own."""
