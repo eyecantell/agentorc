@@ -6,6 +6,7 @@ session a wrap-up is under way in. A ring that will not submit is tried once mor
 
 import asyncio
 import re
+import time
 
 import pytest
 from conftest import FAST_TICK, wait_for
@@ -147,6 +148,35 @@ async def test_the_doorbell_rings_only_where_it_may(agent, composerstubs, tmp_pa
         await c.call("msg", to=p, text="for the person's session")
         await _ticks()
         assert await _submitted(agent, p) == []
+
+
+async def test_a_ring_never_types_into_the_middle_of_a_send(agent, composerstubs, tmp_path, monkeypatch):
+    """TD-094: a `send` holds the pane from its paste to its confirmed submit. The send clears a
+    wrap-up stamp before it types, and a ring whose tick read the composer in that gap found it
+    empty, was decided, and pasted into the middle of the send's text — one submitted line, and
+    mail the watermark had passed, so it never rang again. Here the send's paste is held back for
+    several ticks with mail waiting on a hook-idle worker: the ring waits for the send and then
+    rings on its own line."""
+    async with LocalClient() as c:
+        w = await _worker(agent, c, tmp_path, "w")
+        lead = await _lead(c, tmp_path, w)
+        async with LocalClient(caller=lead) as ld:
+            await c.call("send", id=w, text="wrap up now", wrapup=True)
+            await ld.call("msg", to=w, text="one")
+            await _idle(agent, w)
+            await _ticks()
+            assert await _submitted(agent, w) == ["SUBMITTED wrap up now"]
+            paste = agent.tmux.paste
+
+            def slow_paste(sid: str, text: str) -> None:
+                if text == "carry on":
+                    time.sleep(6 * FAST_TICK)  # the ticks in this gap see an empty composer
+                paste(sid, text)
+
+            monkeypatch.setattr(agent.tmux, "paste", slow_paste)
+            await c.call("send", id=w, text="carry on")
+            assert await wait_for(lambda: _has(agent, w, LINE_1), timeout=6), "the doorbell never rang"
+            assert await _submitted(agent, w) == ["SUBMITTED wrap up now", "SUBMITTED carry on", LINE_1]
 
 
 async def test_a_ring_that_will_not_submit_is_tried_once_more_then_recorded(

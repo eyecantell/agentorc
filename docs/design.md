@@ -3056,7 +3056,9 @@ both the words the session sees are the host agent's, never the sender's:
 - **Idle: the doorbell.** When mail lands for a session whose `idle` came from a hook (confidence
   `hook`, §4.2), the host agent submits one fixed line into its pane through `send`'s own path — paste,
   Enter, composer confirmation (§4.2, TD-027): `[agentorc] you have N unread messages — run ao
-  inbox`. The line carries the count and nothing else: no `from`, no `kind`, no `about`, no body.
+  inbox`. One typist per pane: a ring never starts while a `send` is typing into the pane, and a
+  `send` waits for a ring's submit, so two lines are never pasted into one prompt (TD-094).
+  The line carries the count and nothing else: no `from`, no `kind`, no `about`, no body.
   That is what keeps it a message rather than a laundered `send`. `about` is free text the sender
   chose, and anything a sender chose that is pasted and followed by Enter *is* the recipient's
   next prompt, with no `control` check — invariant 11 bypassed by the mail system itself. The
