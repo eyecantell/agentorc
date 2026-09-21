@@ -5450,7 +5450,7 @@ def _alarm_report(s: Session, mode: str | None) -> str:
     n = len(s.identity_alarms or [])
     mode = a.get("mode") or mode
     lines = [
-        f"Identity alarm on {s.name} ({s.id}) — a request named this session and did not come from it.",
+        f"Identity alarm on {s.name} ({s.id}) — this session made a request under another session's name.",
         f"channel: {a.get('channel') or 'unknown'} · claimed: {a.get('claimed') or 'unknown'} "
         f"· rpc: {a.get('rpc') or 'unknown'} · seen {a.get('count') or 1}×",
         f"first {a.get('first') or a.get('at') or 'unknown'} · last {a.get('last') or a.get('at') or 'unknown'}"

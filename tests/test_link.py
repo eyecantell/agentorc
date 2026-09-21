@@ -1623,6 +1623,8 @@ async def test_log_td_says_the_nodes_mode_is_the_homes_act_at_a_node_and_sends_n
             body = (await handed(person, lead_addr))[-1]["text"]
         assert f"raised on laptop in identity {node_mode}" in body
         assert f"identity {home_mode}" not in body
+        # the alarm is on the session that **made** the request under another's name (§4.8a; TD-077)
+        assert "this session made a request under another session's name" in body
 
         # (2) asked **at the node**: forwarded, and the mail and its debt land at the home
         raise_alarm("ao-c")
