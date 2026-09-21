@@ -1086,6 +1086,7 @@ def test_the_same_line_says_what_outcomes_are_owed(capsys):
 
 def test_ao_wait_against_an_agent_without_the_wait_rpc_says_so_and_exits(monkeypatch, capsys):
     """The running lead's agent may predate the RPC: one line, non-zero, never a loop."""
+    from sessionorc import client as clientmod
     from sessionorc.client import AgentError
 
     async def unknown(self, method, **params):
@@ -1097,9 +1098,11 @@ def test_ao_wait_against_an_agent_without_the_wait_rpc_says_so_and_exits(monkeyp
     async def leave(self, *exc):
         return None
 
-    monkeypatch.setattr(cli.LocalClient, "call", unknown)
-    monkeypatch.setattr(cli.LocalClient, "__aenter__", enter)
-    monkeypatch.setattr(cli.LocalClient, "__aexit__", leave)
+    # patched on the class in `sessionorc.client`, which is where `wait_rpc` builds its
+    # connections since TD-086 item 1 — `ao wait` no longer opens one itself
+    monkeypatch.setattr(clientmod.LocalClient, "call", unknown)
+    monkeypatch.setattr(clientmod.LocalClient, "__aenter__", enter)
+    monkeypatch.setattr(clientmod.LocalClient, "__aexit__", leave)
     assert cli.main(["wait", "--timeout", "1"]) == 1
     err = capsys.readouterr().err
     assert "predates the wait RPC" in err and err.count("\n") == 1
