@@ -351,10 +351,14 @@
    `identity_ack` stays, because a wire name is not a control. The host agent's log keeps every
    alarm, so it loses nothing.
 
-   §4.5a gives the row three more — **Suspend**, **Log TD** and **Open** — of which only **Open**
-   is buildable today: *Suspend* and *Log TD* each need an RPC of the host agent's that does not
-   exist yet, and a control drawn against a method that is not there is the one thing §4.2 forbids.
-   They arrive with those. #}
+   §4.5a gives the row three more — **Open**, **Suspend** and **Log TD**. **Open** and **Suspend**
+   are built (the second from 2026-09-20, with `rpc_suspend`); **Log TD** is not drawn at all until
+   `identity_log` exists, because a control against a method that is not there is the one thing
+   §4.2 forbids, and a disabled one would be a promise the page cannot keep.
+
+   The two are different in kind, which is why they read differently below: **Dismiss** and
+   **Log TD** are *answers* and end the row; **Open** and **Suspend** act on the session and leave
+   it standing (§4.10 — only an answer ends a row). #}
 {% macro alarm(e, section) -%}
 {{ state_head(e) }}
 <div class="body">{% if e.row == 'alarm_host' %}Requests to this host that named a session they did not come from — kept here because they are about no record, so nobody is blamed for someone else's claim.{% else %}Requests that named this session and did not come from it.{% endif %}</div>
