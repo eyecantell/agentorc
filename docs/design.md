@@ -2112,7 +2112,7 @@ answer to the alarm.
   clears the list, and the trail says *dismissed by you* where it said *acknowledged by you*.
   **Built 2026-09-20** (the trail word, at the home and on a node's routed act alike; the
   control's label is the page's own half).
-- **Log TD** files the alarm where work is picked up. The host agent does not write a repo's
+- **Log TD** files the alarm where work is picked up (**built 2026-09-21, TD-077 b**; the control is the page's half). The host agent does not write a repo's
   ledger — it never commits on a session's behalf (§4.10 *A bounded exchange*), and board
   write-back (§4.4) is unbuilt — so *filing* is handing it to the session that answers for this
   one. **Which session is read from the control graph, never from a badge** (§9 invariant 9:
@@ -2121,8 +2121,14 @@ answer to the alarm.
   created it (§4.8 *Create adds the creator*), which for a team's member is its manager (§4.9). `identity_log` (a person's only, gated as `identity_ack`
   is) sends that controller one message from the person, its text composed by the home from the
   alarm's own fields and the record's — channel, claim, RPC, count, first and last time, the
-  host's mode, the session's `doing` line and last report; **never from anything the session
+  mode **the alarm was raised under** (each alarm carries its raising host's mode, so a node's
+  record never reads the home's mode under the node's name), the session's `doing` line and last report; **never from anything the session
   wrote beyond those two capped lines, which are quoted as text** — asking for a ledger entry.
+  **It is the home's act wherever it is asked**, as `suspend` is: the mail, the debt and the trail
+  live at the home, so a node forwards it (and refuses it in words while the home is unreachable),
+  and a node's record has its alarms cleared at the node — which must be reachable **before**
+  anything is sent, or a failed clearing would leave the row up for a second press and a second
+  debt.
   **It owes an outcome, and that is new**: TD-079's debt exists today only on a session's own
   question to the person (`_owing_question` looks in the person inbox for an entry *from the
   caller*), so a piece of work the *person* hands a session has no debt to settle. The
@@ -2134,7 +2140,15 @@ answer to the alarm.
   asked, and must also count the entries in its **inbox** that `owes` is now true of, since that one number is what `ao progress none`, `mail.owed`
   and *Ready to close* all read —
   `identity_log` is its first user, and nothing else sets the mark until a design says so. The
-  list is then cleared and the trail says *logged by you → `<controller>`*. It is offered only
+  list is then cleared and the trail says *logged by you → `<controller>`*. **On a node's
+  record the clearing is routed and the rest is not**: the message, the debt and the trail are
+  the home's — mail lives there — but `identity_alarms` are the node's, so the home asks the
+  node to clear its own list (as `identity_ack` does) and writes the word after, since that act
+  over the link writes *dismissed by you* and this ending is not a dismissal. **And the debt
+  cannot be deleted away**: a handed entry lives in a session's own inbox, which is the first
+  debt-bearing mail a person's `inbox_delete` can reach, so deleting one that still owes is
+  refused in words — it is ended by an outcome, or by the person's **Dismiss**, which tells the
+  session (review of PR #318). It is offered only
   where that session exists: a record with a live controller. On a record without one — a
   session a person started with no controller, a manager's own alarm (a manager has none) — the row
   says *no session answers for this one* and the person has **Open**, **Dismiss** and, while

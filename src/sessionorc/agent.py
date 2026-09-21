@@ -63,6 +63,7 @@ from sessionorc.models import (
     has_control,
     normalize_ref,
     now_iso,
+    report_line,
 )
 from sessionorc.store import (
     AttentionStore,
@@ -2187,9 +2188,24 @@ class HostAgent:
         return result
 
     def _owing_question(self, sender: str, mid: str) -> MailEntry:
-        """The person's copy of `mid`, checked to be the caller's own question that owes an outcome
-        (design §4.10 *Outcomes*). Every refusal says which of the five it is, because the remedy
-        differs: wait, nothing, ask again, nothing, and it is not yours."""
+        """The entry `mid` settles, checked to owe an outcome from this caller (design §4.10
+        *Outcomes*). Every refusal says which of the five it is, because the remedy differs:
+        wait, nothing, ask again, nothing, and it is not yours.
+
+        Two directions since TD-077 b. The caller's **own question to the person**, held in the
+        person inbox — the original case — and work the person **handed** the caller, which lives
+        in the caller's own inbox and is checked there first: it is the same debt and the same
+        command, and the only difference is which way the work travelled."""
+        s = self._graph().get(self._addr(sender))
+        if s is not None:
+            for e in s.inbox:
+                if e.id == mid and e.handed:
+                    if e.outcome:
+                        raise RpcError(
+                            f"{mid} is settled — its outcome is recorded as {e.outcome.get('state')}. If more is "
+                            "needed, ask again on the thread: --thread <id> (design §4.10 *Outcomes*)"
+                        )
+                    return e
         held = [e for e in self.person_inbox if e.id == mid]
         if not held or held[0].from_ != sender:
             raise RpcError(
@@ -2853,6 +2869,20 @@ class HostAgent:
         kept = [e for e in s.inbox if e.id != msg]
         if len(kept) == len(s.inbox):
             raise RpcError(f"{s.id}'s inbox holds no entry {msg}")
+        # **A debt is not deleted away** (design §4.8a *An alarm's answers*, §4.10 *Outcomes*;
+        # review of PR #318). A handed entry is the first debt-bearing mail that lives in an
+        # ordinary session's **inbox** rather than in the asker's outbox, so it is the first that
+        # this delete could reach — and it computes `owes` from the entry, so deleting the object
+        # would discharge the debt with no outcome, no trail and nobody told. Dismiss it from the
+        # person's Inbox instead, which ends it *and* tells the session, or let it report one.
+        if owing := [e for e in s.inbox if e.id == msg and e.owes]:
+            raise RpcError(
+                f"{msg} is work the person handed {s.id} and it still owes an outcome: deleting it would "
+                "settle nothing and tell nobody. Let it report one — ao msg person --outcome "
+                f'done|blocked|dropped "<line>" --for {msg} — or Dismiss the row, which ends the debt '
+                "and says so (design §4.8a, §4.10 *Outcomes*)",
+                owes=owing[0].id,
+            )
         s.inbox = kept
         _prune_tallies(s)  # a delete is the other way an entry leaves (review of PR #214)
         self._save(s)
@@ -3784,6 +3814,22 @@ class HostAgent:
         the reader's form"): its own as stored, another host's re-addressed."""
         return s.controllers if s.host == self.host else [self._from_host(x, s.host) for x in s.controllers]
 
+    def _answers_for(self, s: Session, graph: dict[str, Session] | None = None) -> dict[str, str] | None:
+        """The session that answers for this record (design §4.8a *An alarm's answers*): its
+        **first live controller**, in the order `controllers` holds them — the session that
+        created it (§4.8 *Create adds the creator*), which for a team's member is its lead.
+
+        Read from the control graph, never from a badge: §9 invariant 9 says nothing that acts
+        keys on `team` or `role`, and the host agent does not read `org.yml`. `None` where there
+        is no such session — a record a person started with no controller, a lead's own record,
+        a controller that has exited — and the page says so in words where it is missing."""
+        graph = self._graph() if graph is None else graph
+        for c in self._ctl(s):
+            other = graph.get(c)
+            if other is not None and other.state not in ("exited", "closed"):
+                return {"id": self._address(other), "name": other.name}
+        return None
+
     def _address(self, s: Session) -> str:
         return s.id if s.host == self.host else f"{s.id}@{s.host}"
 
@@ -4316,6 +4362,10 @@ class HostAgent:
     def _id_alarm(self, entry: dict[str, Any], about: str | None) -> None:
         at = now_iso()
         log.warning("identity alarm (%s): %s claimed %r on %s", self.identity_mode, *entry.values())
+        # Each alarm carries the mode it was raised under (review of PR #318): the list is the
+        # raising host's, and a report the home composes for a node's record must say the node's
+        # mode — *observe* records what *enforce* would have refused — never the home's.
+        entry = {**entry, "mode": self.identity_mode}
         s = self.sessions.get(about) if about else None
         if s is None:
             # The host's own list follows the record's rule (§4.8a): a *new* alarm is written at
@@ -4382,6 +4432,71 @@ class HostAgent:
         self._save(s)
         await self._push_changes()
         return {"id": s.id, "cleared": True, "alarms": []}
+
+    async def rpc_identity_log(self, id: str, caller: Any = None) -> dict[str, Any]:
+        """**Log TD** on an identity-alarm row (design §4.8a *An alarm's answers*, TD-077 b):
+        file the alarm where work is picked up.
+
+        The host agent does not write a repo's ledger — it never commits on a session's behalf
+        (§4.10 *A bounded exchange*) and board write-back is unbuilt — so *filing* is **handing
+        it to the session that answers for this one**: the record's first live controller, read
+        from the control graph and never from a badge (§9 invariant 9). The message is composed
+        **here**, from the alarm's own fields and the record's — channel, claim, RPC, count, the
+        first and last time, the host's mode — plus the session's `doing` line and its report
+        line, which are the only two things in it a model wrote and are quoted as text.
+
+        It goes as mail **from the person**, marked `handed`, so it **owes an outcome** the way
+        an answered question does (§4.10 *Outcomes*, extended by this): the controller reports
+        `done`, `blocked` or `dropped` on it, is refused `ao progress none` while it stands, and
+        it shows under *Ready to close*. Then the list is cleared and the trail says *logged by
+        you → `<controller>`*.
+
+        A person's only, gated exactly as `identity_ack` is, and **offered only where there is a
+        session to hand it to**: a record with no live controller — one a person started alone, a
+        lead's own — is refused in words, and the page reads `alarm_to` so it does not draw the
+        control there at all."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot file an identity alarm: it is a person's own act, in the Inbox (design §4.8a)"
+            )
+        s = self._graph().get(self._addr(id))
+        if s is None:
+            raise RpcError(f"no session {self._addr(id)}")
+        if not s.identity_alarms:
+            raise RpcError(f"{s.id} has no identity alarms to file (design §4.8a)")
+        to = self._answers_for(s)
+        if to is None:
+            raise RpcError(
+                f"no session answers for {s.id}: **Log TD** hands an alarm to the record's first live "
+                "controller, and this one has none — dismiss it, or suspend the session, or open it "
+                "(design §4.8a *An alarm's answers*)"
+            )
+        if s.host != self.host:
+            # the clearing below is routed to the node, so the node must be there **before**
+            # anything is sent: a send that then failed to clear would leave the row standing, and
+            # the person's second press would hand the controller a second copy and a second debt
+            # (review of PR #318). Refused in words, nothing sent — the `_node_mux` refusal.
+            self._node_mux(s.host)
+        mode = None if s.host != self.host else self.identity_mode  # a node's mode is on its alarms
+        sent = await self._msg(PERSON, _alarm_report(s, mode), [to["id"]], "note", None, None, None, None)
+        entry = sent.get("entry") or {}
+        if mid := entry.get("id"):
+            self._mark(mid, handed=True)  # the debt: it is work the person handed on (§4.10)
+        # **The alarms are the node's** (§4.8a; review of PR #318). The message, the debt and the
+        # trail are the home's, and this call is not in `NODE_ACTS` because of them — but clearing
+        # a node's list here would clear a replica the node's next report puts straight back, the
+        # very race `identity_ack` is routed to avoid. So the clearing is routed, as that act, and
+        # the home takes the cleared record from the reply; the word is written after, because
+        # routing an `identity_ack` writes *dismissed by you* and this ending is not a dismissal.
+        if s.host != self.host:
+            await self._route_act("identity_ack", {"id": self._address(s)}, None, s.host)
+        else:
+            s.identity_alarms = []
+            self._id_dirty.discard(s.id)
+            self._save(s)
+        self._attention_ended(self._address(s), f"logged by you → {to['name']}", "alarm")
+        await self._push_changes()
+        return {"id": self._address(s), "filed": True, "to": to, "entry": mid, "alarms": []}
 
     async def rpc_suspend(self, id: str, why: str | None = None, caller: Any = None) -> dict[str, Any]:
         """**Suspend** a session over an identity alarm (design §4.8a *An alarm's answers*, §4.5a
@@ -4513,11 +4628,19 @@ class HostAgent:
 
     # -- one org, to a client (design §4.4a "A node's records at the home") -----------------------
 
-    def _view(self, s: Session, *, bookkeeping: bool = False) -> dict[str, Any]:
+    def _view(
+        self, s: Session, *, bookkeeping: bool = False, graph: dict[str, Session] | None = None
+    ) -> dict[str, Any]:
         """The view a client gets. This host's record is `s.view()`. Another host's carries its
         address as `id`, and while that host's link is down reads `unreachable` — an overlay on the
         view, never a state on the record."""
         v = s.view(bookkeeping=bookkeeping)
+        # design §4.8a *An alarm's answers* (TD-077 b): **who answers for this record** — its
+        # first live controller, read from the control graph and never from a badge (§9 invariant
+        # 9). The page draws **Log TD** only where this is non-null and says *no session answers
+        # for this one* where it is, which it can only do if it knows before it draws; and the
+        # RPC reads the same function, so drawn-or-not and refused-or-not cannot disagree.
+        v["alarm_to"] = self._answers_for(s, graph)
         if s.host == self.host:
             return v
         v["id"] = f"{s.id}@{s.host}"
@@ -4536,8 +4659,13 @@ class HostAgent:
         return v
 
     def _views(self) -> list[dict[str, Any]]:
+        # one graph for the batch, not one per record: `_views` runs on nearly every RPC through
+        # `_push_changes`, and `_answers_for` reading its own would make that quadratic in the
+        # org's size (review of PR #318)
+        graph = self._graph()
         return [
-            self._view(s) for s in (*self.sessions.values(), *(r for h in self.remote.values() for r in h.values()))
+            self._view(s, graph=graph)
+            for s in (*self.sessions.values(), *(r for h in self.remote.values() for r in h.values()))
         ]
 
     def _remember_dir(self, directory: Path) -> None:
@@ -4924,6 +5052,40 @@ def _alarm_since(s: Session) -> str:
     """When an alarm row began: the first alarm's own time, not the record's state transition."""
     first = (s.identity_alarms or [{}])[0]
     return str(first.get("at") or first.get("first") or "")
+
+
+def _alarm_report(s: Session, mode: str | None) -> str:
+    """The words **Log TD** hands on (design §4.8a *An alarm's answers*, TD-077 b). Composed by
+    the home from the alarm's own fields and the record's, so nothing here is a model's prose
+    being passed off as a report: the two lines a session wrote — its `doing` and its report
+    line — are quoted as text and labelled, and everything else is a field.
+
+    It says which identity mode the alarm was raised under, because *observe* records what
+    *enforce* would have refused and a reader needs to know which they are looking at. That is
+    the mode on the alarm itself — the raising host's — and `mode` (this host's) only for a record
+    of this host whose alarm predates the field; for a node's record without it the clause is left
+    out rather than said with the home's mode under the node's name (review of PR #318)."""
+    a = (s.identity_alarms or [{}])[0]
+    n = len(s.identity_alarms or [])
+    mode = a.get("mode") or mode
+    lines = [
+        f"Identity alarm on {s.name} ({s.id}) — a request named this session and did not come from it.",
+        f"channel: {a.get('channel') or 'unknown'} · claimed: {a.get('claimed') or 'unknown'} "
+        f"· rpc: {a.get('rpc') or 'unknown'} · seen {a.get('count') or 1}×",
+        f"first {a.get('first') or a.get('at') or 'unknown'} · last {a.get('last') or a.get('at') or 'unknown'}"
+        + (f" · raised on {s.host} in identity {mode}" if mode else ""),
+    ]
+    if n > 1:
+        lines.append(f"and {n - 1} more distinct claim{'' if n == 2 else 's'} on the same record.")
+    if doing := (s.doing or {}).get("text"):
+        lines.append(f'it said it was doing: "{doing}"')
+    if line := report_line(s.view()):
+        lines.append(f"its report line: {line}")
+    lines.append(
+        "This is either a bug of ours or a session misbehaving. File it where work is picked up, "
+        "then report the outcome: ao msg person --outcome done|blocked|dropped \"<one line>\" --for <this id>."
+    )
+    return "\n".join(lines)
 
 
 def _alarm_words(s: Session) -> str:

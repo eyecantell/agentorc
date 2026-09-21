@@ -275,6 +275,12 @@ class MailEntry:
     # Written on every copy, as `read_at` and `closed_reason` are, so the asker's card and the
     # person's Inbox say the same thing.
     outcome: dict[str, Any] | None = None
+    # Design §4.8a *An alarm's answers* (TD-077 b): a piece of work the **person** handed to this
+    # session, which owes an outcome back exactly as the session's own answered question does.
+    # TD-079's debt exists only on a session's *own* question to the person — it is read from the
+    # asker's outbox — so work that travels the other way had no debt at all. `identity_log` is
+    # its first and only writer; nothing else sets it until a design says so.
+    handed: bool = False
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
@@ -285,7 +291,18 @@ class MailEntry:
         an outcome back, until one is reported or the home writes one. Read from the entry alone,
         so the asker's own copy in its outbox answers it — which is what the card, the `ao` reply
         line, `ao progress none` and Ready to close all read. A `declined` or `lapsed` close owes
-        nothing: nobody answered."""
+        nothing: nobody answered.
+
+        **And the other direction** (§4.8a *An alarm's answers*, TD-077 b): an entry **from** the
+        person marked `handed` is a debt on its **addressee**, settled the same way and by the
+        same command. Until it there was no such thing — a debt existed only on a session's own
+        question — so a piece of work the person handed a session could be dropped in silence.
+        That branch reads **only** `from_`, `handed` and `outcome`: today `identity_log` is the
+        one writer and it always sends a `note`, which can never open or close, so `kind` and
+        `closed_reason` have nothing to say. A future writer that hands an `ask` would have to
+        settle what an unanswered one owes before setting the mark (review of PR #318)."""
+        if self.handed:
+            return self.from_ == PERSON and not self.outcome
         return (
             PERSON in self.to
             and self.kind in ASK_KINDS
@@ -645,9 +662,13 @@ class Session:
         }
 
     def owed(self) -> list[str]:
-        """The questions this session put to the person that were answered and still owe an
-        outcome (design §4.10 *Outcomes*): its own copies, in the order they were sent."""
-        return [e.id for e in self.outbox if e.owes]
+        """Everything this session owes the person an outcome on (design §4.10 *Outcomes*): the
+        questions it asked and the person answered — its own copies in the **outbox**, in the
+        order they were sent — and, since TD-077 b, the work the person **handed** it, which
+        lives in its **inbox**. One number, because `ao progress none`, `ao progress restart`,
+        `mail.owed` and *Ready to close* all read this and none of them cares which direction the
+        work came from."""
+        return [e.id for e in self.outbox if e.owes] + [e.id for e in self.inbox if e.owes]
 
     def wake_budget_spent(self) -> bool:
         """Exhaustion is visible (design §4.10): on the record, and so on the card and every `ao`

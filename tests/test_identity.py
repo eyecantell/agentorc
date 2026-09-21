@@ -646,3 +646,92 @@ async def test_suspend_is_refused_on_a_record_that_is_already_stopped(agent, tmp
         with pytest.raises(AgentError, match="there is nothing to stop"):
             await person.call("suspend", id=sid)
         assert (await person.call("get", id=sid))["suspended"] is None
+
+
+async def test_log_td_hands_an_alarm_to_the_session_that_answers_for_it(agent, hookstub, tmp_path):
+    """§4.8a *An alarm's answers* → **Log TD** (TD-077 b): the host agent does not write a repo's
+    ledger, so *filing* is handing the alarm to the session that answers for this one — the
+    record's **first live controller**, read from the control graph and never from a badge. It
+    goes as mail from the person, **marked `handed`, so it owes an outcome**, which is new:
+    TD-079's debt existed only on a session's own question to the person, so work handed the
+    other way could be dropped in silence. Then the list is cleared and the trail says so."""
+    for d in ("l", "w"):
+        (tmp_path / d).mkdir()
+    async with LocalClient() as person, LocalClient() as feeder:
+        lead = (await person.call("create", name="l", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
+            "id"
+        ]
+        await feeder.call("hook", session=w, state="idle")
+        await wait_state(person, w, "idle")
+        async with LocalClient(caller=w) as itself:
+            await itself.call("doing", id=w, text="TD-431: reproducing the race")
+
+        # with no controller there is nobody to hand it to, and the page is told before it draws
+        for _ in range(3):  # the same claim three times: the list keeps the first and counts the rest
+            agent._id_alarm({"channel": f"session {w}", "claimed": "ao-b", "rpc": "msg"}, w)
+        assert (await person.call("get", id=w))["alarm_to"] is None
+        with pytest.raises(AgentError, match="no session answers for"):
+            await person.call("identity_log", id=w)
+
+        await person.call("set_controllers", id=w, add=[lead])
+        assert (await person.call("get", id=w))["alarm_to"] == {"id": lead, "name": "l"}
+        async with LocalClient(caller=lead) as session:  # a session may not file one
+            with pytest.raises(AgentError, match="a person's own act"):
+                await session.call("identity_log", id=w)
+
+        got = await person.call("identity_log", id=w)
+        assert got["filed"] is True and got["to"]["id"] == lead
+        assert (await person.call("get", id=w))["identity_alarms"] == []  # cleared, and the row ends
+        assert agent._attention_how[f"{w}|alarm"] == "logged by you → l"
+
+        # the lead has it, from the person, and it says what the alarm was — not what a model wrote
+        landed = [e for e in (await person.call("inbox", id=lead))["entries"] if e["from"] == "person"]
+        assert len(landed) == 1 and landed[0]["id"] == got["entry"]
+        body = landed[0]["text"]
+        assert "claimed: ao-b" in body and "rpc: msg" in body and "seen 3×" in body
+        assert 'it said it was doing: "TD-431: reproducing the race"' in body
+        # which mode the alarm was raised under: observe records what enforce refuses
+        assert f"in identity {agent.identity_mode}" in body
+
+        # **and it owes an outcome** — the debt the person handed on
+        assert (await person.call("get", id=lead))["mail"]["owed"] == [got["entry"]]
+        async with LocalClient(caller=lead) as session:
+            with pytest.raises(AgentError, match="owes 1 outcome"):
+                await session.call("progress", id=lead, status="none", why="nothing open")
+            await session.call("msg", to="person", text="filed as TD-999", outcome="done", for_=got["entry"])
+        assert (await person.call("get", id=lead))["mail"]["owed"] == []
+        for sid in (w, lead):
+            await person.call("kill", id=sid)
+
+
+async def test_a_handed_debt_is_not_deleted_away(agent, hookstub, tmp_path):
+    """Review of PR #318: a handed entry is the first debt-bearing mail that lives in a session's
+    own **inbox** rather than in the asker's outbox, so it is the first that `inbox_delete` can
+    reach — and `owes` is computed from the entry, so deleting the object would discharge the
+    debt with no outcome, no trail and nobody told. It is refused, with the two roads that do
+    end it."""
+    for d in ("l", "w"):
+        (tmp_path / d).mkdir()
+    async with LocalClient() as person, LocalClient() as feeder:
+        lead = (await person.call("create", name="l", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
+            "id"
+        ]
+        await feeder.call("hook", session=w, state="idle")
+        await wait_state(person, w, "idle")
+        await person.call("set_controllers", id=w, add=[lead])
+        agent._id_alarm({"channel": f"session {w}", "claimed": "ao-b", "rpc": "msg"}, w)
+        filed = await person.call("identity_log", id=w)
+
+        with pytest.raises(AgentError, match="still owes an outcome"):
+            await person.call("inbox_delete", msg=filed["entry"], id=lead)
+        assert (await person.call("get", id=lead))["mail"]["owed"] == [filed["entry"]]
+
+        # settled, and then it is an ordinary entry a person may remove
+        async with LocalClient(caller=lead) as session:
+            await session.call("msg", to="person", text="filed as TD-999", outcome="done", for_=filed["entry"])
+        await person.call("inbox_delete", msg=filed["entry"], id=lead)
+        assert [e["id"] for e in (await person.call("inbox", id=lead))["entries"]] == []
+        for sid in (w, lead):
+            await person.call("kill", id=sid)
