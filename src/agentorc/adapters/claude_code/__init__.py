@@ -444,10 +444,13 @@ class ClaudeCodeAdapter:
         for Claude Code the 5-hour and the weekly one, labelled `5h` and `wk`. The token never
         touches argv; nothing here gates anything.
 
-        Raises `UsageRefused` with a **reason** rather than swallowing the failure (TD-087): the
+        Raises `UsageRefused` with a **reason** for every failure it can name (TD-087): the
         endpoint answers HTTP 429 `rate_limit_error` when the account's allowance is spent — by
         us, by the tool, by anything else on the same account — and a caller told only `None`
-        answers it with another request a minute later.
+        answers it with another request a minute later. **A 200 whose body does not parse is the
+        one that still returns `None`**: `parse_usage` reads what it can and answers nothing when
+        the shape is not what it knows, which is a shape question and not a reason; `usage_for`
+        turns that into `error`, which is what it is.
         """
         import urllib.error
         import urllib.request

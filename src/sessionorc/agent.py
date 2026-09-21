@@ -783,20 +783,24 @@ class HostAgent:
             results = await asyncio.gather(
                 *(asyncio.to_thread(fn, prof) for prof, fn in due.items()), return_exceptions=True
             )
+            changed = False
             for prof, r in zip(due, results, strict=True):
                 self._usage_checked[prof] = mono
                 if (merged := self._usage_reading(prof, r)) is not None:
                     self._usage[prof] = merged
-                    self.usage_store.save(self._usage)
+                    changed = True
                     await self._broadcast({"event": "usage", "profile": prof, "usage": merged})
+            if changed:
+                self.usage_store.save(self._usage)  # once for the batch: the file is whole either way
         # Only profiles a live session is running under are shown (TD-073, Paul 2026-09-19): one
         # tool in use is one chip, and last night's profile does not sit in the top bar all day.
-        for prof in [p for p in self._usage if p not in {s.profile for s in live}]:
-            self._usage.pop(prof, None)
-            self._usage_checked.pop(prof, None)
-            self._usage_wait.pop(prof, None)
+        if dropped := [p for p in self._usage if p not in {s.profile for s in live}]:
+            for prof in dropped:
+                self._usage.pop(prof, None)
+                self._usage_checked.pop(prof, None)
+                self._usage_wait.pop(prof, None)
+                await self._broadcast({"event": "usage", "profile": prof, "usage": None})
             self.usage_store.save(self._usage)
-            await self._broadcast({"event": "usage", "profile": prof, "usage": None})
         for s in live:
             cap = _cap(self._usage.get(s.profile))
             if cap and s.state not in ("limited", "needs-you"):
@@ -827,6 +831,9 @@ class HostAgent:
         if reason == "rate_limited":
             after = r.get("retry_after")
             prev = self._usage_wait.get(prof, USAGE_EVERY)
+            # the endpoint's own word is floored at the ordinary cadence and **not** capped: a
+            # server saying *an hour and a half* is telling us something our ceiling is guessing
+            # at. The ceiling is for our own doubling, which has no such word behind it.
             self._usage_wait[prof] = (
                 max(float(after), USAGE_EVERY) if isinstance(after, int | float) else min(prev * 2, USAGE_BACKOFF_MAX)
             )
