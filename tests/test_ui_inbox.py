@@ -1699,3 +1699,107 @@ def test_suspend_is_offered_only_where_there_is_something_to_stop_and_leaves_the
     assert 'if (staterow && action !== "suspend") staterow.remove();' in js
     assert 'if (action === "suspend") body = { id: b.dataset.who || "" };' in js
     assert "why:" not in js.split('action === "suspend"')[1][:200]  # the agent composes the reason
+
+
+# -- TD-029: the terminal's two client rules, which had no harness until there was one ------------
+
+
+TERM_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = (o) => Object.assign({
+  dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false,
+}, o);
+const document = { documentElement: el(), body: el(), activeElement: null,
+  querySelector: () => null, querySelectorAll: () => [], addEventListener: noop, createElement: () => el() };
+const window = {};
+global.window = window; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/focus/ao-x", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const gone = window.AO.paneIsGone, close = window.AO.termClose;
+console.log(JSON.stringify({
+  gone_closed: gone({state: "closed", pane: true}),
+  gone_pane_false: gone({state: "working", pane: false}),
+  gone_working: gone({state: "working", pane: true}),
+  gone_exited_with_pane: gone({state: "exited", pane: true}),
+  gone_nothing: gone(null),
+  final_4404: close(4404, true, 500),
+  first_1006_before_open: close(1006, false, 500),
+  first_1006_after_open: close(1006, true, 500),
+  normal_1000: close(1000, true, 500),
+  reason_kept: close(1011, true, 500, "server went away"),
+  reason_absent: close(1011, true, 500, ""),
+  reason_on_1006_after_open: close(1006, true, 500, "odd but carried"),
+  reason_on_1006_before_open: close(1006, false, 500, "should not be shown"),
+  backoff: [500, 1000, 2000, 4000, 8000, 16000].map((d) => close(1000, true, d).delay),
+}));
+"""
+
+
+@pytest.mark.unit
+def test_the_terminals_two_client_rules_are_reachable_and_right():
+    """TD-029. Paul pressed **Close** on a Focus page on 2026-09-10 and the terminal reconnected
+    twice a second for sixteen seconds, printing tmux's *can't find session* until he pressed
+    Forget. Three hardenings landed in PR #71; two of them are **JavaScript**, and the entry has
+    said ever since that they cannot be tested *because it is JavaScript, which this repo has no
+    harness for*. That is no longer true — `tests/test_ui_inbox.py` has run a node probe over
+    `app.js` since TD-069 — so what was missing was not a harness but a rule a test could reach.
+
+    Both are pure now, for the reason `maySwapSection` is: **a rule inside a closure is a rule no
+    test can call.** What remains of TD-029 is what a browser alone can show, and it is narrower
+    for this.
+
+    The rule that mattered: *a connection the server accepts and then ends is not a working
+    terminal*, so the backoff **doubles** there and resets only on the first byte of pane output.
+    Resetting on open is what made it retry twice a second for ever."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rules are JavaScript, and nothing else runs them")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "term_probe.js"
+    probe.write_text(TERM_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+
+    # (a) the pane is gone for good — the two shapes a record says it with, and the three it does not
+    assert got["gone_closed"] is True and got["gone_pane_false"] is True
+    assert got["gone_working"] is False and got["gone_nothing"] is False
+    # an `exited` session that still has its pane is *not* gone: its last screen and run log are
+    # kept on purpose (TD-023), and ending the terminal there would throw them away
+    assert got["gone_exited_with_pane"] is False
+
+    # (c) 4404 is the server saying the pane is gone: final, and never retried
+    assert got["final_4404"] == {"retry": False, "final": True, "delay": 500,
+                                 "why": "no terminal for this session"}  # fmt: skip
+    # everything else retries — and **the delay doubles**, which is the whole fix: it must not
+    # reset here, because the socket opening is not evidence that a terminal is there
+    assert got["normal_1000"]["retry"] is True and got["normal_1000"]["final"] is False
+    assert got["normal_1000"]["delay"] == 1000
+    assert got["backoff"] == [1000, 2000, 4000, 8000, 10000, 10000]  # doubling, to a 10s ceiling
+    # a 1006 before the socket ever opened is a handshake that never reached the server, which is a
+    # different thing to tell a person than a server that closed on them
+    before = got["first_1006_before_open"]["why"]
+    assert "handshake failed" in before and "ssh -L" in before
+    assert "handshake" not in got["first_1006_after_open"]["why"] and "1006" in got["first_1006_after_open"]["why"]
+    # the close frame's own `reason` is **part of the sentence, so part of the rule** — the caller
+    # appending it separately is how the two came apart in review: the call site suppressed it for
+    # every 1006 where the original suppressed it only for one the socket never opened. Nothing can
+    # reach that difference today (a 1006 is client-synthesised and carries none, and this server
+    # sends none), which is why it is closed here rather than left as a comment.
+    assert got["reason_kept"]["why"] == "closed (code 1011, server went away)"
+    assert got["reason_absent"]["why"] == "closed (code 1011)"
+    assert "odd but carried" in got["reason_on_1006_after_open"]["why"]  # as the original did
+    assert "should not be shown" not in got["reason_on_1006_before_open"]["why"]  # as it did not
+
+    # …and the page really uses them, rather than keeping a second copy of the rule inline
+    js = (UI / "static" / "app.js").read_text()
+    assert "AO.termClose(e.code, opened, delay, e.reason)" in js and "AO.paneIsGone(ev.session)" in js
+    assert "e.code !== 1006" not in js  # the reason rule lives in `termClose`, not beside it
+    assert 'ws.onmessage = (m) => { delay = 500;' in js  # the one place the backoff resets
+    assert "ws.onopen = () => { delay = 500; }" not in js.split("AO.focus")[-1]  # never on open
