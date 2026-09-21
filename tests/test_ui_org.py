@@ -598,3 +598,25 @@ def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
     assert 'data-confirm="Close w?" disabled title="not ready to close — tree clean' in working
     clean = {"branch": "w", "dirty": 0, "unpushed": 0}
     assert 'data-confirm="Close w?">Close</button>' in foot(_card(git=clean))
+
+
+def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_count():
+    """Design §4.5 *The card's anatomy* (TD-095): the header carries the host / repo its sessions
+    share — *mixed* where they do not — and the counts by state in the grid's order, *needs you*
+    being its ringed mark instead; *No team* is headed by its count and nothing else."""
+    from agentorc.ui.app import group_place, state_counts, team_groups, templates
+
+    def v(sid, state, place, unseen=False, **kw):
+        return {**sess(sid, sid, state=state, **kw), "place": place, "unseen": unseen}
+
+    same = [v("a", "working", "kmaster / agentorc", team="t"), v("b", "idle", "kmaster / agentorc", team="t")]
+    assert group_place(same) == "kmaster / agentorc" and group_place([]) == ""
+    assert group_place([*same, v("c", "idle", "vps / agentorc", team="t")]) == "mixed"
+    many = [*same, v("c", "needs-you", "x"), v("d", "idle", "x", unseen=True), v("e", "limited", "x")]
+    assert state_counts(many) == ["1 limited", "1 working", "1 unseen", "1 idle"]  # urgency order
+    groups = team_groups([*same, v("n1", "idle", "kmaster / wg"), v("n2", "exited", "kmaster / wg")])
+    team, none = groups
+    head = templates.get_template("group_head.html").render(g=team)
+    assert "kmaster / agentorc" in head and "· 1 working · 1 idle" in head and " live<" not in head
+    nohead = templates.get_template("group_head.html").render(g=none)
+    assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead

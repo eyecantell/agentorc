@@ -875,6 +875,37 @@ NO_TEAM = ""  # the group key for sessions carrying no `team` badge; rendered as
 DEAD = ("exited", "closed")
 
 
+# The header's counts, in the order the grid sorts by (§4.5 *One order*). *needs you* is not among
+# them: the header carries it as its ringed mark, which is what a person scans a page of headers for.
+COUNT_ORDER = (
+    ("limited", "limited"),
+    ("stalled?", "stalled?"),
+    ("unreachable", "unreachable"),
+    ("working", "working"),
+    ("unseen", "unseen"),
+    ("idle", "idle"),
+    ("exited", "exited"),
+    ("closed", "closed"),
+)
+
+
+def state_counts(members: list[dict[str, Any]]) -> list[str]:
+    """A team header's counts by state — `["1 limited", "2 working", "1 unseen"]`, in urgency order,
+    zeros left out. An idle session nobody has looked at counts as *unseen*, as its pill says."""
+    tally: dict[str, int] = {}
+    for m in members:
+        key = "unseen" if m.get("unseen") else str(m.get("state") or "")
+        tally[key] = tally.get(key, 0) + 1
+    return [f"{tally[k]} {label}" for k, label in COUNT_ORDER if tally.get(k)]
+
+
+def group_place(members: list[dict[str, Any]]) -> str:
+    """Where a team's sessions are, said once in its header so no card has to (TD-095): the
+    `host / repo` they share, or *mixed* when they do not. Empty for a group with no sessions."""
+    places = {str(m.get("place") or "") for m in members}
+    return "" if not places else places.pop() if len(places) == 1 else "mixed"
+
+
 def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = ()) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
@@ -925,14 +956,10 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
             {
                 "team": team,
                 "label": team or "No team",
-                # `doing` rides with the manager (design §4.5a **team groups**, TD-074): the team
-                # card's header shows its manager's line, which is the manager reporting on the team
-                # without being asked to narrate each member. `role_label` is what the header calls
-                # it (§4.8 *The names*, TD-076): *Manager*, or whatever label its role carries.
-                "manager": {
-                    k: manager.get(k)
-                    for k in ("id", "name", "state", "state_class", "state_label", "scraped", "doing", "role_label")
-                }
+                # the header names its manager only when that card is in another group (TD-095: its
+                # name, state and line are on its own card, the first here); `role_label` is what it
+                # is called there (§4.8 *The names*, TD-076): *Manager*, or its role's own label.
+                "manager": {k: manager.get(k) for k in ("id", "name", "state", "role_label")}
                 if manager
                 else None,
                 "manager_elsewhere": manager_elsewhere,  # its card sits under its own badge, not here
@@ -941,6 +968,11 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "live": sum(1 for m in members if m.get("state") not in DEAD),
+                # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the
+                # team's sessions are, once, and how many are in each state — never its manager's
+                # name, state or line, which are on the manager's card, the first in the group
+                "place": group_place(members),
+                "counts": state_counts(members),
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),
