@@ -45,6 +45,10 @@ source-includes = []
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.24",
+    # A hung test is worth less than a failing one: it dies at the job level with no output at
+    # all — 26 minutes on PR #192, unattributed to this day, and 14 minutes on 2026-09-20. With
+    # this, it fails in the file that hung, with every thread's stack (TD-063).
+    "pytest-timeout>=2.3",
     "ruff>=0.6",
     "httpx>=0.27",
 ]
@@ -58,6 +62,14 @@ fmt = "ruff format src tests"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+# **A hang must fail, and say where** (TD-063, TD-078). Twice a job has died with no output at
+# all: 26 minutes on PR #192, unattributed to this day, and 14 minutes on 2026-09-20 whose last
+# line was the test *before* the one that hung. A per-test bound turns that into an ordinary
+# failure, in the right file, and `thread` dumps every thread's stack — which is the only
+# evidence a wait with no bound ever leaves. 120 s is far above the slowest test here (the link
+# and restart files run whole in about 11 s) and far below a CI job's patience.
+timeout = 120
+timeout_method = "thread"
 markers = [
     "unit: no tmux, sockets, or subprocesses; sub-second",
     "integration: spawns tmux, a host agent, git, or the hook script",
