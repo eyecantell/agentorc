@@ -2329,7 +2329,9 @@ class HostAgent:
                 raise RpcError("a source is one line of text (design §4.9b)")
             raw = source.strip()
             src = _clean(raw).strip()
-            if not src or "\n" in raw or len(raw) > mail.SOURCE_CAP:
+            # every line break Python knows — `\r`, `\u2028` too — not only `\n`: `_clean` would
+            # otherwise join two lines silently (review of PR #346)
+            if not src or len(raw.splitlines()) > 1 or len(raw) > mail.SOURCE_CAP:
                 raise RpcError(
                     f"a source is one line of at most {mail.SOURCE_CAP} characters: the file and section, or "
                     "the decision's date (design §4.9b)"

@@ -1888,6 +1888,8 @@ async def test_an_answer_from_the_record_is_told_to_the_person_and_an_overrule_r
             for bad, why in (
                 ({"to": tl, "text": "x", "source": "design §4.9b"}, "--reply-to"),
                 ({"reply_to": q2["id"], "text": "x", "source": "a\nb"}, "one line"),
+                ({"reply_to": q2["id"], "text": "x", "source": "a\rb"}, "one line"),
+                ({"reply_to": q2["id"], "text": "x", "source": "a\u2028b"}, "one line"),
                 ({"reply_to": q2["id"], "text": "x", "source": "x" * 201}, "at most 200"),
                 ({"reply_to": q2["id"], "text": "x", "source": "   "}, "one line"),
             ):
