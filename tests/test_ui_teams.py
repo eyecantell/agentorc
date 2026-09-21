@@ -95,7 +95,7 @@ def org_doc(root: Path) -> dict:
         "teams": {
             "ao-grind": {
                 "projects": ["ao"],
-                "lead": {"role": "lead", "name": "orc-ao"},
+                "manager": {"role": "manager", "name": "orc-ao"},
                 "members": [{"role": "grinder", "count": 2, "name": "grind", "lane": "free-pick"}],
             }
         },
@@ -156,7 +156,7 @@ def test_the_strip_lists_every_definition_with_its_source_projects_members_and_l
     tmp_path, fleet = world
     v = uiapp.teams_view([])
     (row,) = v["teams"]
-    assert row["name"] == "ao-grind" and row["lead"] == "orc-ao"
+    assert row["name"] == "ao-grind" and row["manager"] == "orc-ao"
     assert row["projects"] == ["ao"] and row["members"] == 2 and row["live"] == 0  # stopped
     assert row["source"] == str(tmp_path / "home" / "org.yml") and v["source"] == row["source"]
     # a team is live when a session carrying its badge is; a dead one does not count
@@ -205,15 +205,15 @@ def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
         yaml.safe_dump(
             {
                 "teams": {
-                    "ao-grind": {"lead": {"name": "shadow"}},  # the org file wins this name
-                    "repo-grind": {"lead": {"role": "person"}, "members": [{"role": "grinder"}]},
+                    "ao-grind": {"manager": {"name": "shadow"}},  # the org file wins this name
+                    "repo-grind": {"manager": {"role": "person"}, "members": [{"role": "grinder"}]},
                 }
             }
         )
     )
     rows = {r["name"]: r for r in uiapp.teams_view([])["teams"]}
-    assert rows["ao-grind"]["lead"] == "orc-ao"  # not `shadow`
-    assert rows["repo-grind"]["lead"] == "person" and rows["repo-grind"]["members"] == 1
+    assert rows["ao-grind"]["manager"] == "orc-ao"  # not `shadow`
+    assert rows["repo-grind"]["manager"] == "person" and rows["repo-grind"]["members"] == 1
     assert rows["repo-grind"]["source"].endswith("agentorc/.agentorc.yml")
 
 

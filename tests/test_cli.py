@@ -873,7 +873,7 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
     """TD-079 step 3 (design §4.10 *Outcomes*): a command a session is never told to run is
     half-shipped. Every brief a session is started from — the package's role templates and this
     repo's own — and `ao --skill` say that an answered question owes an outcome and name the one
-    command that settles it. The lead's says the manager chases its members' debts and never
+    command that settles it. The manager's says it chases its members' debts and never
     reports one for them; and all of them say that a `note` is not a way to ask."""
     root = pathlib.Path(__file__).parents[1]
     workers = ["src/agentorc/briefs/grinder.md", "src/agentorc/briefs/hunter.md", "docs/briefs/grinder-ao-1.md"]
@@ -882,7 +882,7 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
         assert "--outcome done|blocked|dropped" in text, rel
         assert "--for" in text and "--thread" in text, rel
         assert "tell me if you want less" in text, rel  # the kind, in the words the mistake was made in
-    for rel in ("src/agentorc/briefs/lead.md", "docs/briefs/manager-ao-1.md"):
+    for rel in ("src/agentorc/briefs/manager.md", "docs/briefs/manager-ao-1.md"):
         text = (root / rel).read_text()
         assert "owed:" in text, rel  # where a manager reads a member's debt
         assert "report an outcome for a" in text, rel  # and never in its place

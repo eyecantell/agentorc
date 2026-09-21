@@ -796,7 +796,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),
-                "def_lead": row.get("lead"),  # the definition's word, for a card with no sessions yet
+                "def_lead": row.get("manager"),  # the definition's word, for a card with no sessions yet
                 "def_members": row.get("members"),
                 # *nothing running* and *nothing left to run* are different facts (§4.9a)
                 "wound_down": row.get("wound_down"),

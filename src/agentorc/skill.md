@@ -71,7 +71,7 @@ Mutating — each one is a decision, so check the state first:
   `controllers`: a person, or one of its current controllers, does it with `ao grant <id>
   control` and `ao control <controller> add|remove <session>…`. Sessions you create list you as a
   controller from birth. `ao status -v` prints `under:` (who may act on a session) and `members:`
-  (what a lead may act on). A third refusal has no cure on your side: an interactive
+  (what a manager may act on). A third refusal has no cure on your side: an interactive
   session (`unattended: false` — a person's own, or a worker they took over with `ao mode`) is
   out of every session's reach, `ao control … add` included, and the host agent names §9 invariant 5.
   A worker you start without `--unattended` is such a session.

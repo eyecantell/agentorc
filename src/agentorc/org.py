@@ -8,14 +8,14 @@ projects:
 teams:
   ao-grind:
     projects: [agentorc]
-    lead: {role: lead, name: orchestrator-ao-1}
+    manager: {role: manager, name: manager-ao-1}
     members:
-      - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
+      - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
       - {team: ao-ui}                 # a nested team
   cm-grind:
     projects: [contractmatch]
     host: contractmatch               # every session lands on that node (§4.4a "Teams across hosts")
-    lead: {role: lead}
+    manager: {role: manager}
     members: [{role: grinder}]
 roles:
   grinder: {profile: grind}
@@ -36,12 +36,12 @@ from typing import Any
 
 import yaml
 
-from agentorc.repoconfig import deprecated_grant
+from agentorc.repoconfig import deprecated_grant, deprecated_team_key, reserved
 from sessionorc import hosts, paths
 from sessionorc.models import GRANT_ALIASES
 
-DEFAULT_LEAD_ROLE = "lead"
-PERSON = "person"  # a lead role meaning the person leads: no lead session is started (§4.9)
+DEFAULT_MANAGER_ROLE = "manager"
+PERSON = "person"  # a manager role meaning the person manages: no manager session is started (§4.9)
 
 
 @dataclass
@@ -51,14 +51,14 @@ class Project:
 
 
 @dataclass
-class LeadDef:
-    role: str = DEFAULT_LEAD_ROLE
+class ManagerDef:
+    role: str = DEFAULT_MANAGER_ROLE
     name: str = ""  # default `<team>-lead`, filled by the loader
     home: str = ""  # a repo name from the team's projects
     profile: str | None = None  # overrides the role's
     lane: list[str] = field(default_factory=list)
-    brief: str | None = None  # overrides the role's template — the lead brief a repo keeps
-    grants: list[str] | None = None  # None: the role's (`control` for `lead`)
+    brief: str | None = None  # overrides the role's template — the manager brief a repo keeps
+    grants: list[str] | None = None  # None: the role's (`control` for `manager`)
     unattended: bool = True
 
 
@@ -86,7 +86,7 @@ class MemberDef:
 class TeamDef:
     name: str
     projects: list[str] = field(default_factory=list)
-    lead: LeadDef = field(default_factory=LeadDef)
+    manager: ManagerDef = field(default_factory=ManagerDef)
     members: list[MemberDef] = field(default_factory=list)
     source: Path | None = None  # the file it was read from (`ao team list` names it)
     host: str = ""  # where every session lands (design §4.4a "Teams across hosts"); "" is the host the start runs on
@@ -135,6 +135,7 @@ def load(path: Path | None = None) -> Org:
     for tname, raw in _mapping(data.get("teams"), f"{label}: teams").items():
         org.teams[str(tname)] = _team(str(tname), raw, f"{label}: teams.{tname}", source=path)
     for rname, raw in _mapping(data.get("roles"), f"{label}: roles").items():
+        reserved(str(rname), f"{label}: roles.{rname}: role")
         org.roles[str(rname)] = dict(_mapping(raw, f"{label}: roles.{rname}"))
     _validate(org, label)
     return org
@@ -238,13 +239,13 @@ def _grants(raw: Any, key: str) -> list[str] | None:
     return list(dict.fromkeys(GRANT_ALIASES.get(g, g) for g in grants))
 
 
-LEAD_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
-MEMBER_KEYS = (*LEAD_KEYS, "count", "team")
-TEAM_KEYS = ("projects", "lead", "members", "host")
+MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
+MEMBER_KEYS = (*MANAGER_KEYS, "count", "team")
+TEAM_KEYS = ("projects", "manager", "lead", "members", "host")
 
 
 def _no_stray(raw: dict[str, Any], known: tuple[str, ...], key: str) -> None:
-    """A key nobody reads is a typo, and silence about it is how a lead's `brief:` disappears into
+    """A key nobody reads is a typo, and silence about it is how a manager's `brief:` disappears into
     a file that looks right (found while writing the first real org.yml, 2026-09-13)."""
     stray = sorted(k for k in raw if k not in known)
     if stray:
@@ -275,6 +276,20 @@ def _member(raw: Any, key: str) -> MemberDef:
     )
 
 
+def _manager_key(raw: dict[str, Any], key: str) -> str:
+    """Which key holds the team's manager (design §4.8 *The names*, TD-076): `manager:`, or the old
+    `lead:` for one release, said once per process. Both is refused: which was meant is not ours
+    to guess."""
+    if "lead" not in raw:
+        return "manager"
+    if "manager" in raw:
+        raise ValueError(
+            f"{key}: carries both `manager:` and `lead:` — `lead:` is the old name of `manager:` (TD-076); keep one"
+        )
+    deprecated_team_key("lead", "manager", key)
+    return "lead"
+
+
 def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
     raw = _mapping(raw, key)
     _no_stray(raw, TEAM_KEYS, key)
@@ -285,17 +300,18 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         projects = [projects]
     if not isinstance(projects, list):
         raise ValueError(f"{key}.projects must be a list of project names")
-    lead_raw = _mapping(raw.get("lead"), f"{key}.lead")
-    _no_stray(lead_raw, LEAD_KEYS, f"{key}.lead")
-    lead = LeadDef(
-        role=_str(lead_raw.get("role"), f"{key}.lead.role", default=DEFAULT_LEAD_ROLE),
-        name=_str(lead_raw.get("name"), f"{key}.lead.name", default=f"{name}-lead"),
-        home=_str(lead_raw.get("home"), f"{key}.lead.home"),
-        profile=_opt_str(lead_raw.get("profile"), f"{key}.lead.profile"),
-        lane=_lane(lead_raw.get("lane"), f"{key}.lead.lane"),
-        brief=_opt_str(lead_raw.get("brief"), f"{key}.lead.brief"),
-        grants=_grants(lead_raw.get("grants"), f"{key}.lead.grants"),
-        unattended=_flag(lead_raw.get("unattended"), f"{key}.lead.unattended", default=True),
+    mkey = _manager_key(raw, key)
+    manager_raw = _mapping(raw.get(mkey), f"{key}.{mkey}")
+    _no_stray(manager_raw, MANAGER_KEYS, f"{key}.{mkey}")
+    manager = ManagerDef(
+        role=_str(manager_raw.get("role"), f"{key}.{mkey}.role", default=DEFAULT_MANAGER_ROLE),
+        name=_str(manager_raw.get("name"), f"{key}.{mkey}.name", default=f"{name}-lead"),
+        home=_str(manager_raw.get("home"), f"{key}.{mkey}.home"),
+        profile=_opt_str(manager_raw.get("profile"), f"{key}.{mkey}.profile"),
+        lane=_lane(manager_raw.get("lane"), f"{key}.{mkey}.lane"),
+        brief=_opt_str(manager_raw.get("brief"), f"{key}.{mkey}.brief"),
+        grants=_grants(manager_raw.get("grants"), f"{key}.{mkey}.grants"),
+        unattended=_flag(manager_raw.get("unattended"), f"{key}.{mkey}.unattended", default=True),
     )
     members_raw = raw.get("members")
     if members_raw is None:
@@ -304,7 +320,7 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         raise ValueError(f"{key}.members must be a list")
     members = [_member(m, f"{key}.members[{i}]") for i, m in enumerate(members_raw)]
     projects = [_str(p, f"{key}.projects") for p in projects]
-    return TeamDef(name, projects, lead, members, source, host=_str(raw.get("host"), f"{key}.host"))
+    return TeamDef(name, projects, manager, members, source, host=_str(raw.get("host"), f"{key}.host"))
 
 
 # ── validation ────────────────────────────────────────────────────────────────────────────────
@@ -322,8 +338,8 @@ def _validate(org: Org, label: str) -> None:
         repos = org.team_repos(team)
         if not repos:
             raise ValueError(f"{key}: its projects {team.projects} list no repos")
-        if team.lead.role != PERSON:  # a person leads from nowhere: no session, so no home
-            team.lead.home = _home(team.lead.home, repos, f"{key}.lead.home")
+        if team.manager.role != PERSON:  # a person manages from nowhere: no session, so no home
+            team.manager.home = _home(team.manager.home, repos, f"{key}.manager.home")
         for i, m in enumerate(team.members):
             mkey = f"{key}.members[{i}]"
             if m.team is not None:

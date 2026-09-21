@@ -7,8 +7,8 @@ anchor: main-checkout-single
 unattended: {workers: 3, ...}         # kept as a block; the loader only knows it is present
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}
-  lead: {grants: [control], controllers: []}
-controllers: [orchestrator-ao-1]      # who may act on a session started here; omitted = nobody
+  manager: {grants: [control], controllers: []}
+controllers: [manager-ao-1]           # who may act on a session started here; omitted = nobody
 ledger: docs/technical_debt.md
 teams: {...}                          # §4.9; passed through for the team step
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
@@ -56,19 +56,27 @@ LANE_PLACEHOLDER = "{lane}"
 PRESETS: dict[str, dict[str, Any]] = {
     "grinder": {"brief": "grinder.md", "lane": ["free-pick"], "grants": [], "icon": "wrench"},
     "hunter": {"brief": "hunter.md", "lane": ["free"], "grants": [], "icon": "search"},
-    "lead": {"brief": "lead.md", "lane": [], "grants": ["control"], "icon": "flag"},
+    "manager": {"brief": "manager.md", "lane": [], "grants": ["control"], "icon": "flag"},
     "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
-# Renamed roles, old → new (TD-055, docs/glossary.md): the old name still resolves for one release,
-# wherever a role is named — `--role`, a team definition, an `org.yml` or `.agentorc.yml` `roles:`
-# key — and says so once per process, naming the new word.
-ROLE_ALIASES: dict[str, str] = {"orchestrator": "lead"}
+# Renamed roles, old → new (TD-055, TD-076, docs/glossary.md): the old name still resolves for one
+# release, wherever a role is named — `--role`, a team definition, an `org.yml` or `.agentorc.yml`
+# `roles:` key — and says so once per process, naming the new word. Looked up once, never chained
+# (design §4.8 *The names*): no entry's target is itself an old word, so `orchestrator` was
+# repointed to `manager` when `lead` was renamed, not left pointing at `lead`.
+ROLE_ALIASES: dict[str, str] = {"orchestrator": "manager", "lead": "manager"}
+# Reserved role names (design §4.8 *The names*): a word that is decided but not built. Refused by
+# name wherever a role is named or defined, so it cannot arrive in live data meaning something
+# the entry that builds it then has to read around.
+RESERVED_ROLES: dict[str, str] = {"techlead": "reserved for the go-between of TD-075, which is not built yet"}
 _warned: set[str] = set()
 
 
 def canonical_role(name: str) -> str:
-    """The role's current name; an old one is accepted with a deprecation line on stderr."""
+    """The role's current name; an old one is accepted with a deprecation line on stderr, and a
+    reserved one is a `ValueError` saying why."""
+    reserved(name, "role")
     new = ROLE_ALIASES.get(name)
     if new is None:
         return name
@@ -76,11 +84,26 @@ def canonical_role(name: str) -> str:
     return new
 
 
+def reserved(name: str, where: str) -> None:
+    """Refuse a reserved role name (`RESERVED_ROLES`) with its reason, not as an unknown role."""
+    if name in RESERVED_ROLES:
+        raise ValueError(f"{where} `{name}` is {RESERVED_ROLES[name]} (design §4.8)")
+
+
 def _deprecated(old: str, new: str) -> None:
     if old not in _warned:
         _warned.add(old)
         print(
-            f"role `{old}` is now `{new}` (TD-055); `{old}` is still accepted for one release — rename it",
+            f"role `{old}` is now `{new}` (TD-076); `{old}` is still accepted for one release — rename it",
+            file=sys.stderr,
+        )
+
+
+def deprecated_team_key(old: str, new: str, where: str) -> None:
+    if f"key:{old}" not in _warned:
+        _warned.add(f"key:{old}")
+        print(
+            f"{where}: `{old}:` is now `{new}:` (TD-076); `{old}:` is still accepted for one release — rename it",
             file=sys.stderr,
         )
 
@@ -246,7 +269,10 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         else:
             cfg.unattended = dict(value)
     elif key == "roles":
-        cfg.roles = {name: _role_block(name, raw, where) for name, raw in _mapping(value, where).items()}
+        blocks = _mapping(value, where)
+        for name in blocks:
+            reserved(name, f"{where}.{name}: role")
+        cfg.roles = {name: _role_block(name, raw, where) for name, raw in blocks.items()}
     elif key == "controllers":
         cfg.controllers = _str_list(value, where)
     elif key == "ready_when":

@@ -1372,8 +1372,8 @@ noted). If a control is not in this table it does not exist.
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027). Reads **Steer** with the hint "steers the turn in flight" while the session is `working`, and **Send** with "starts a new turn" when it is idle (§4.3) — one control, labelled for the job it is doing, since the person cannot otherwise tell which of the two they are about to do. `stalled?` steers too — it is a `working` session that stopped producing output (§4.2), a turn in flight — while `limited` says the cap holds what you send rather than claiming a turn starts, since nothing the person does clears a cap (§4.2; its controls are **Switch profile** and **Wait**). Disabled with a reason on `exited`, `closed` and `unreachable`, where there is no turn at all — landed 2026-09-14 (TD-047). **And the host agent refuses the same** (2026-09-20, TD-078): `send` and `keys` to a `closed` record were refused and to an `exited` one were not, so a send that reached the agent anyway — the CLI, a worker, a page drawn before the session went — was passed to tmux, which answered `no current target`: a tmux error for a question about a record, naming neither the session that had gone nor when. The refusal now says it in words, with the exit code. A screen rule is not involved; this is the record's own state |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
-| New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `lead`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule — landed 2026-09-13, TD-040 step a: the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked since 2026-09-14 (the row below), so nothing it grants applies unseen |
-| New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `control`). Unchecked by default for every preset but `lead`; shown with a one-line warning of what the grant allows — landed 2026-09-14 (TD-028 step 5): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and **what is ticked is what the session starts with**, so an untick on a `lead` preset means the session does not get the grant |
+| New session | **Role** preset + **Lane** field | `plain` (default) or a preset from §4.8 (built-in `grinder`, `hunter`, `manager`, or one the repo's `.agentorc.yml` defines). A preset fills the brief from its template, the lane's default, and the grants it carries; each can be edited before Start. Lane is the ordered list of references (`TD-027, TD-019`) or `free-pick`. Independent of the Unattended switch and of any schedule — landed 2026-09-13, TD-040 step a: the pick-list is rebuilt from the directory's `.agentorc.yml` as it is typed (`/api/roles`), the profile pick defaults to *the role's*, and the brief is filled at Start when the prompt is left empty; the Grants the preset carries are drawn and ticked since 2026-09-14 (the row below), so nothing it grants applies unseen |
+| New session | **Grants** checkboxes | the `capabilities` the session gets (§4.8; today only `control`). Unchecked by default for every preset but `manager`; shown with a one-line warning of what the grant allows — landed 2026-09-14 (TD-028 step 5): one box per grant in `sessionorc.models.GRANTS`, reticked from the role's `grants:` as the Role changes exactly as the Controllers picker is, and **what is ticked is what the session starts with**, so an untick on a `lead` preset means the session does not get the grant |
 | card | **doing** line (the card's slot) | display only. What the slot shows, first that applies: **what needs a person** (the pending permission or question, hook channel, §4.2 — unchanged); **what the session says it is doing** — its `doing` line (§4.8) with its age, *says · 11m ago*; **the pane's tail** — the last three lines while working, the last line when idle, as before. The line replaces **the tail only**: the statuses that share the slot — *exited · code N*, *closed by you*, *ready to close ✓* with its Close button — stay ahead of it, so an exited card still says it exited and a card that earned Close still offers it; the record keeps the line either way. A session whose adapter's tail *is* the work (`shell`, a command run) has no `doing` line and keeps the tail; a TUI session that has said nothing falls back to it, which is what a card showed before 2026-09-19. Nothing here is a control and nothing parses it (TD-071 item 8). A **team card's header** shows its manager's line the same way — decided 2026-09-19 (Paul), TD-074 |
 | card / Focus header | **title** — the session's name as its tool holds it | display only, beside the session name, whenever the adapter's `title()` gives one (§4.3): Claude Code sets its terminal title to the conversation's name — the one a person gave it with the tool's own rename (*Error Checker*, so they know what that session is for), else the tool's summary — and tmux holds it as `#{pane_title}`, read with the pane list each tick. **It is set in the tool, not here**: agentorc has no rename of its own, since a second name kept in the record would drift from the one the tool shows in its own picker and resume list. It is a name and not a status, so it is always shown and is not a fallback for the doing line (the 2026-09-19 proposal had it as one; Paul: *I set "Error Checker" so I would know the general purpose of that session*). The filter box matches it — TD-074 |
 | card | **report line** | shown only when a channel is non-empty: progress `TD-027 → PR #59 · 1/2 done`, findings `3 filed`, a manager's `last round 20:10 · 2 wrapped up`; an entry the host agent derived (not declared) is dashed, like a scraped state. Any session can have one — a plain interactive session that files a TD gets `1 filed` (landed 2026-09-12) |
@@ -1850,7 +1850,7 @@ badge and nothing keys on it (§9 invariant 9). A preset may also carry an **`ic
 TD-074) — one name from a fixed set the UI ships (`flag`, `wrench`, `search`, `eye`, `book`,
 `shield`, `terminal`, `person`; an unknown name is refused when the file is read, as an unknown grant is), never
 markup from a config file — drawn small and monochrome inside the role badge, so the state tile
-stays the one coloured thing on a card. The built-ins carry `lead: flag`, `grinder: wrench`,
+stays the one coloured thing on a card. The built-ins carry `manager: flag`, `grinder: wrench`,
 `hunter: search`. It is a label's picture and nothing more: **a card's layout does not vary by
 role** — a layout chosen by role would be the first thing to key on one — and the card already
 differs by role without a rule, because it draws whichever channels are non-empty. Three ship with the package; a repo may redefine
@@ -1873,14 +1873,15 @@ deliberately not warned about: briefs cite dated ADRs and state what was true on
 |---|---|---|---|---|
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
-| `lead` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
+| `manager` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
 | `plain` | — (no template) | — | none | whatever it declares |
 
-The lead preset was called `orchestrator` until 2026-09-17 (TD-055 step 2, `docs/glossary.md`).
-For one release the old name still resolves wherever a role is named — `--role`, a team
-definition's `role:`, a `roles:` key in `org.yml` or `.agentorc.yml` — to `lead`, and the client
-prints one line per process naming the new word; the record is written with `lead`. Records
-started before the rename keep `role: orchestrator` as a badge, which nothing keys on.
+The manager preset was called `orchestrator` until 2026-09-17 (TD-055 step 2, `docs/glossary.md`)
+and `lead` until 2026-09-20 (TD-076 step 2, below). For one release both old names still resolve
+wherever a role is named — `--role`, a team definition's `role:`, a `roles:` key in `org.yml` or
+`.agentorc.yml` — to `manager`, and the client prints one line per process naming the new word;
+the record is written with `manager`. Records started before a rename keep `role: orchestrator`
+or `role: lead` as a badge, which nothing keys on.
 
 **The names, 2026-09-20 (TD-076; decided by Paul 2026-09-19, confirmed 2026-09-20 together with the name
 the project itself is to take, `shiftlead` — TD-060).** The session that runs a team's lifecycle — starts its members, nudges them, wraps them
@@ -1937,9 +1938,9 @@ session would make every one of those lie. So:
   reads as the old line did. (*Proposed* — the glossary round was to settle it, and nothing
   argues for a change.)
 - **In this document**, the sweep has landed (2026-09-20): running text says *manager*. What
-  still says *lead* is one of two things. **Literal syntax**: the preset table's `lead` row and every config
-  example's `lead:` key and `role: lead` stay literally true —
-  it is what the code reads — until build step 2 lands and changes them with it. **Dated history**, which keeps the word of its day: a line that says what a
+  still says *lead* is one of two things. **Literal syntax**, until build step 2 landed
+  (2026-09-20) and changed the preset table's row and every config example's key with the code;
+  what is left of it is the default session name `<team>-lead` (§4.9), which step 2 kept: changing it would rename the manager of a running team that relies on it. **Dated history**, which keeps the word of its day: a line that says what a
   *lead* did on 2026-09-17 is not rewritten, as the lines about `orchestrator` were not.
 
 Each preset also carries the test for when it has **run out of work**, which is the role's and
@@ -2314,23 +2315,23 @@ inside the Project block, not a start.
 teams:
   ao-grind:
     projects: [agentorc]
-    lead: {role: lead, name: orchestrator-ao-1}
+    manager: {role: manager, name: manager-ao-1}
     members:
-      - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
+      - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
       - {role: hunter, name: hunter-ao, lane: ui}
   guardians:
     projects: [guardians]
     host: devenv                      # every session lands on that node (§4.4a "Teams across hosts")
-    lead: {role: lead, name: guardians-lead, home: guardians}
+    manager: {role: manager, name: guardians-lead, home: guardians}
     members:
       - {role: grinder, home: guardians-api, brief: docs/briefs/api-grinder.md}
-      - {team: guardians-ui}          # a nested team: its lead's controllers name this lead
+      - {team: guardians-ui}          # a nested team: its manager's controllers name this manager
 ```
 
 `host` (on the team, 2026-09-17, TD-057 step 4a): the host every session of the team lands on —
 a `nodes:` entry of the home — default the host the start runs on. Checkouts are resolved on it.
 
-`lead`: `role` (default `lead`; **`person`** means the person leads — no session is
+`manager` (`lead`, its name until TD-076, is read for one release; both is refused): `role` (default `manager`; **`person`** means the person manages — no session is
 started and members get an empty `controllers` list plus the team badge), `name` (default
 `<team>-lead`), `home` (a repo name from the team's projects — required when the projects list
 more than one repo, defaulted to the only one otherwise), `profile` (overrides the role's), and
@@ -2487,7 +2488,7 @@ therefore carries its own test, in §4.8's table beside the brief it hands out:
 | `grinder`, fixed lane | every lane reference is `done` or `dropped` — the case that already works |
 | `grinder`, `free-pick` | the ledger holds no entry it may pick: nothing open that its brief does not exclude, that is not already claimed by a live sibling, and that is not parked on `user_attention.md` waiting for a person |
 | `hunter` | its area is **gone**, not quiet — no such tests, no such path, no such deployment to probe |
-| `lead` | every member is **finished** (below): none is working or waiting on something, and none exited without saying why |
+| `manager` | every member is **finished** (below): none is working or waiting on something, and none exited without saying why |
 
 **Quiet is not empty**, which is the distinction Paul's two examples sit either side of. A role
 that consumes a list ends when the list ends. A role that watches a stream — a hunter on a
@@ -2927,7 +2928,7 @@ No new list, no new grant. A session may message:
 - **sideways** — a session carrying the same `team` badge (§4.9), and a session that shares a
   controlled target with it: the two managers over one worker, which is exactly TD-039's case. The
   badge edge is the one place anything keys on `team`, and invariant 9 names it as its exception:
-  for a `lead: person` team the badge is the only edge between members there is.
+  for a `manager: person` team the badge is the only edge between members there is.
 - **the person** — the org's person inbox, below; ungated.
 
 Anything else is refused, naming the rule. The graph is read on every call, like the grant and the
@@ -2940,7 +2941,7 @@ member gets its own copy (below), not a read of someone else's.
 sessions (Fable review, 2026-09-16).** The 2026-09-14 draft let a worker message "a person" and
 amended invariant 5 to allow it, but gave no edge that reached one: a person's session is never in
 a worker's `controllers` (`set_controllers` from a session onto an interactive target is refused),
-and a `lead: person` team badges its members, not the person's session. Rather than invent an
+and a `manager: person` team badges its members, not the person's session. Rather than invent an
 edge — *creator*, say — the person gets an inbox of their own: **one per org, held by the home host agent (§4.4a),
 belonging to no session record**, and persisted in its store beside the records
 (its own file, reloaded on restart). `ao msg person "…"` addresses it from any session, ungated,
@@ -3554,12 +3555,12 @@ unattended:
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
   grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}   # profile: §4.9
   hunter: {brief: docs/briefs/hunter.md, icon: search}   # icon: §4.8, one name from the fixed set
-  lead: {brief: docs/briefs/lead.md, grants: [control]}
-controllers: [orchestrator-ao-1]      # §4.8: who may act on a session started here (a preset may
+  manager: {brief: docs/briefs/manager.md, grants: [control]}
+controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
 teams:                                # §4.9: teams whose only project is this repo; org.yml wins a name
-  grind: {lead: {role: lead, name: lead}, members: [{role: grinder, count: 2, name: tdgrind}]}
+  grind: {manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
 commands:
   - name: test        ; run: pdm run test
@@ -3578,9 +3579,9 @@ projects:
 teams:
   ao-grind:
     projects: [agentorc]
-    lead: {role: lead, name: orchestrator-ao-1}
+    manager: {role: manager, name: manager-ao-1}
     members:
-      - {role: grinder, count: 2, name: tdgrind-ao, lane: free-pick}
+      - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
 roles:
   grinder: {profile: grind}
 ```
@@ -3720,7 +3721,7 @@ the block. A policy is agent code and needs no grant; a session doing the same w
    start and is a badge afterwards; `team` and `project` are badges from the start (§4.9), and the
    Org page's grouping is derived from `controllers` and the badge on each tick, never stored.
    **One named exception:** the message gate's sideways edge admits a session carrying the same
-   `team` badge (§4.10, 2026-09-16) — for a `lead: person` team there is no other edge between
+   `team` badge (§4.10, 2026-09-16) — for a `manager: person` team there is no other edge between
    members. It gates mail only; nothing that acts keys on `team`.
 10. A report entry the session declared is never overwritten by one the host agent derived; a
     derived entry is shown as such, like a scraped state.
