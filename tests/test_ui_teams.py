@@ -292,7 +292,7 @@ def test_the_state_pill_has_a_glyph_for_every_state_the_view_can_name():
     """Design §4.5a **state icon**: the glyph is CSS keyed on the pill's state class, so a state
     class with no rule is a pill with no icon — pinned here, since there is no JS/CSS harness."""
     css = (pathlib.Path(uiapp.__file__).parent / "static" / "app.css").read_text()
-    for cls in ("needs", "limited", "stalled", "working", "idle", "exited", "done", "unreachable"):
+    for cls in ("needs", "limited", "stalled", "working", "idle", "exited", "closed", "unreachable"):
         assert f".pill.s-{cls}::before" in css, cls
 
 

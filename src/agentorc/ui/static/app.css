@@ -13,8 +13,13 @@
   --link: #1f5fa8; --top: #1c2128; --topfg: #e6e9ee; --topdim: #aab3bf; --tab-on: #2b323b;
   --term: #0f1419; --termfg: #d5dbe3; --tail: #aab3bf;
   --needs: #f59e0b; --needs-bg: #fde68a; --needs-fg: #7c3d00;
-  --working: #2563eb; --working-bg: #dbeafe; --working-fg: #1e40af;
-  --idle: #9ca3af; --idle-bg: #e5e7eb; --idle-fg: #4b5563;
+  /* design §4.5 *The card's anatomy* (TD-095): *working* is green — alive; *idle* is blue — alive,
+     at rest, may be spoken to; everything over or out of reach is one grey (`--ended`). On a card
+     green means working and nothing else. Blue is also the accent for what is new (`--new`). */
+  --working: #16a34a; --working-bg: #dcfce7; --working-fg: #166534;
+  --idle: #2563eb; --idle-bg: #dbeafe; --idle-fg: #1e40af;
+  --ended: #9ca3af; --ended-bg: #e5e7eb; --ended-fg: #4b5563;
+  --new: #2563eb; --new-bg: #dbeafe; --new-fg: #1e40af;
   --stalled: #dc2626; --stalled-bg: #fecaca; --stalled-fg: #991b1b;
   --limited: #7c3aed; --limited-bg: #ede9fe; --limited-fg: #5b21b6;
   --done: #059669; --done-bg: #d1fae5; --done-fg: #065f46;
@@ -27,8 +32,9 @@ html[data-theme="dark"] {
   --card: #171b21; --input: #11151a; --border: #3a424d; --hover: #232a33;
   --link: #7fb2f0; --top: #0b0e12; --topfg: #e6e9ee; --topdim: #8b95a3; --tab-on: #232a33;
   --term: #0b0e12; --termfg: #d5dbe3; --tail: #8b95a3;
-  --needs-bg: #4a3608; --needs-fg: #fde68a; --working-bg: #1a2c52; --working-fg: #bfdbfe;
-  --idle-bg: #2a313a; --idle-fg: #c9d1db; --stalled-bg: #4a1414; --stalled-fg: #fecaca;
+  --needs-bg: #4a3608; --needs-fg: #fde68a; --working: #22c55e; --working-bg: #123d27; --working-fg: #bbf7d0;
+  --idle: #3b82f6; --idle-bg: #1a2c52; --idle-fg: #bfdbfe; --ended-bg: #2a313a; --ended-fg: #c9d1db;
+  --new: #3b82f6; --new-bg: #1a2c52; --new-fg: #bfdbfe; --stalled-bg: #4a1414; --stalled-fg: #fecaca;
   --limited-bg: #2e1d5c; --limited-fg: #ddd6fe; --done-bg: #0d3d2c; --done-fg: #a7f3d0;
   --warn-bg: #3a2410; --warn-line: #9a5b1c; --warn-fg: #fdba74;
   --alarm: #d97706; --alarm-bg: #3f2a0c; --alarm-fg: #fcd34d;
@@ -62,7 +68,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .btn.ghost { border-color: transparent; background: transparent; color: var(--strong); } .btn.ghost:hover { background: var(--hover); }
 .btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; }
 .btn.sm { height: 24px; font-size: 11px; padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
-.btn.on { background: var(--idle-bg); color: var(--fg); }
+.btn.on { background: var(--ended-bg); color: var(--fg); }
 .input { height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: 13px; font-family: inherit; display: flex; align-items: center; }
 input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; }
 .field { display: flex; flex-direction: column; gap: 5px; } .field label { font-size: 11px; font-weight: 600; color: var(--strong); text-transform: uppercase; letter-spacing: .04em; }
@@ -76,7 +82,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
 /* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
 .pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
-.pill.s-done::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; }
+.pill.s-closed::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; }
 .sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: 9px; letter-spacing: 0; }  /* not the idle glyph's tuning */
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
@@ -94,7 +100,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .inbox .mail.unread .ref { font-weight: 600; }
 .inbox .mail .st { font-size: 10.5px; color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
 .inbox .mail .body { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
-.badge.unread { color: var(--working-fg); background: var(--working-bg); border-color: var(--working); text-decoration: none; }
+.badge.unread { color: var(--new-fg); background: var(--new-bg); border-color: var(--new); text-decoration: none; }
 /* the top bar's Inbox number: what is waiting on a person, not unread mail (§4.5a, TD-069) */
 .badge.needs { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); text-decoration: none; }
 .maildlg { width: min(560px, 92vw); color: var(--fg); } .maildlg::backdrop { background: rgba(0,0,0,.35); }
@@ -143,8 +149,8 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* §4.5 screen 6 *Layout* / §4.10: an FYI entry newer than this browser last saw is marked **new**
    — the browser's own memory, as the fold is. A mark and never a control: no border, no cursor,
    nothing to press; the row's own surface is what it sits on. */
-.inboxpage .mailrow.isnew { border-color: var(--working); }
-.inboxpage .mailrow.isnew .mhead::after { content: "new"; order: 99; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--working); }
+.inboxpage .mailrow.isnew { border-color: var(--new); }
+.inboxpage .mailrow.isnew .mhead::after { content: "new"; order: 99; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--new); }
 .inboxpage .mailrow[hidden] { display: none; }
 .inboxpage .mailrow .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; font-weight: 600; }
 .inboxpage .mailrow .st { font-size: 10.5px; color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
@@ -198,8 +204,9 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
-.s-idle, .s-exited, .s-unreachable { background: var(--idle-bg); color: var(--idle-fg); } .s-stalled { background: var(--stalled-bg); color: var(--stalled-fg); }
-.s-done { background: var(--done-bg); color: var(--done-fg); } .s-limited { background: var(--limited-bg); color: var(--limited-fg); }
+.s-idle { background: var(--idle-bg); color: var(--idle-fg); } .s-stalled { background: var(--stalled-bg); color: var(--stalled-fg); }
+/* the shared idle / exited / unreachable rule is split (TD-095): what is over is grey, idle is not */
+.s-exited, .s-closed, .s-unreachable { background: var(--ended-bg); color: var(--ended-fg); } .s-limited { background: var(--limited-bg); color: var(--limited-fg); }
 .badge { display: inline-block; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; font-size: 10px; color: var(--muted); font-family: "JetBrains Mono", monospace; background: transparent; }
 .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
 .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; }
@@ -236,13 +243,13 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
    the card's edge, where `overflow: hidden` clipped it (seen live 2026-09-16). */
 .sc-body > .row:first-child { flex-wrap: wrap; row-gap: 4px; } .sc-body > .row:first-child .badge { white-space: nowrap; }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }
-.sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--idle); }
-.sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); }
-.sc.s-stalled .sbar { background: var(--stalled); } .sc.s-limited .sbar { background: var(--limited); } .sc.s-done .sbar { background: var(--done); }
+.sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ended); }
+.sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); } .sc.s-idle .sbar { background: var(--idle); }
+.sc.s-stalled .sbar { background: var(--stalled); } .sc.s-limited .sbar { background: var(--limited); }
 .sc.s-needs { box-shadow: 0 0 0 2px var(--needs); }  /* ringed: what to press, seen from across the room */
 .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid var(--border); font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.status.needs { border-color: var(--needs); color: var(--needs-fg); } .status.ok { border-color: var(--done); } .status.bad { border-color: var(--stalled); } .status.lim { border-color: var(--limited); }
+.status.needs { border-color: var(--needs); color: var(--needs-fg); } .status.ok { border-color: var(--ended); color: var(--fg); } .status.bad { border-color: var(--stalled); } .status.lim { border-color: var(--limited); }
 /* design §4.5a **doing** line (§4.8, TD-074): what the session says it is doing. Prose rather than
    pane output, so a long line wraps instead of being clipped mid-word; no colour of its own — the
    state tile stays the one coloured thing on a card. */

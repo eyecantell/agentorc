@@ -15,14 +15,18 @@
   .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
   .pill .dot { display: none; } .pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .s-working { background: #dbeafe; color: #1e40af; }
+  /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
+     alive, at rest, may be spoken to (finished · unseen is idle's blue); everything over or out of
+     reach one grey (--ended). On a card green means working and nothing else. */
+  .s-working { background: #dcfce7; color: #166534; }
   .s-needs { background: #fde68a; color: #7c3d00; }
-  .s-idle { background: #e5e7eb; color: #4b5563; }
+  .s-idle { background: #dbeafe; color: #1e40af; }
+  .s-ended { background: #e5e7eb; color: #4b5563; }
   .s-stalled { background: #fecaca; color: #991b1b; }
-  .s-exited { background: #e5e7eb; color: #6b7280; }
-  .s-done { background: #d1fae5; color: #065f46; }
+  .s-exited, .s-closed { background: #e5e7eb; color: #4b5563; }
+  .s-done { background: #d1fae5; color: #065f46; } /* Focus's reports and checklist only — --done leaves the card */
   .s-limited { background: #ede9fe; color: #5b21b6; }
-  .s-unreachable { background: #e5e7eb; color: #6b7280; }
+  .s-unreachable { background: #e5e7eb; color: #4b5563; }
   .card.off { opacity: .55; }
   .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
   .due + .due { border-top: 1px solid #eceef1; }
@@ -39,7 +43,7 @@
   .btn.ghost { border-color: transparent; background: transparent; color: #4b5563; }
   .btn.ghost:hover { background: #eef0f3; }
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
+  .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #374151; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
   .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
   /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
@@ -55,6 +59,30 @@
      row and stacked the stalled note on top of it (TD-074 step 6) */
   .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
   .sc-foot { display: flex; gap: 6px; align-items: center; }
+  /* the card's anatomy (design §4.5, TD-095): six rows, the same six on every card, at one height —
+     a row with nothing to say stays, empty, rather than moving what is below it */
+  .ac { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 26px 22px 20px 20px 62px 32px; row-gap: 6px; padding: 12px 14px 10px 17px; position: relative; overflow: hidden; }
+  .ac .r { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ac .r > * { flex-shrink: 0; } .ac .r > .fill { flex: 0 1 auto; min-width: 0; } .ac .r .grow { flex: 1; }
+  .ac .name { font-family: "JetBrains Mono", monospace; font-size: 15px; font-weight: 600; color: #111418; }
+  .ac .meta b { color: #374151; font-weight: 500; }
+  .mode { font-size: 11.5px; color: #6b7280; white-space: nowrap; }
+  .mode.mine { color: #1c2128; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
+  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10.5px; border: 1px solid #d9a441; color: #7c3d00; }
+  .aslot { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 2px 0 2px 10px; border-left: 2px solid #cbd0d6; font-size: 12px; color: #1c2128; overflow: hidden; }
+  .aslot .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
+  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 11px; color: #6b7280; white-space: nowrap; }
+  .aslot.need { border-color: #f59e0b; } .aslot.need .t { color: #7c3d00; } .aslot.bad { border-color: #dc2626; } .aslot.lim { border-color: #7c3aed; }
+  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; }
+  /* the quiet foot (second pass, 2026-09-21): the next act outlined at the text's strength, the rest
+     plain links at normal strength; dimmed means disabled and nothing else; the only filled button a
+     card carries is Allow */
+  .ac .foot { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; }
+  .ac .foot .next { white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 1px solid #6b7280; border-radius: 4px; color: #1c2128; font-size: 12px; font-weight: 500; }
+  .ac .foot .next.fill { background: #b45309; border-color: #b45309; color: #fff; }
+  .ac .foot .lk { white-space: nowrap; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; gap: 4px; color: #1c2128; font-size: 12px; }
+  .ac .foot svg { width: 13px; height: 13px; }
+  .ac.ring { box-shadow: 0 0 0 2px #f59e0b; border-color: #f59e0b; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
   .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
@@ -146,7 +174,7 @@
   <div class="ctl"><span class="btn sm primary">Reply</span><span class="btn sm ">Dismiss</span><span style="flex-grow: 1;"></span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
 </div>
   <div class="isec-h"><span>Steering</span><span class="n">1</span><span class="info">i</span><span style="flex-grow: 1;"></span></div>
-  <div class="mcard "><span class="sbar" style="background: #2563eb;"></span>
+  <div class="mcard "><span class="sbar" style="background: #16a34a;"></span>
   <div class="who"><span class="kind">steer</span><span class="nm">orchestrator-ao-1</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">9m ago · <b>21m left</b></span></div>
   <div class="txt">tdgrind-ao-1 has ended its run with the ledger still holding work. Restart it with fresh context, or stop the team for the night?</div><div class="meta">will go with: <b style="color: #374151;">Restart it once</b> — doing nothing is a valid answer</div><div class="sugg"><span class="lbl">suggested by orchestrator-ao-1</span><span class="btn sm ">“Restart it once” · default</span><span class="btn sm ">“Stop the team”</span></div>
   <div class="ctl"><span class="btn sm ">Reply</span><span class="btn sm primary">Go with it</span><span class="btn sm ">Pause</span><span style="flex-grow: 1;"></span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
