@@ -393,7 +393,7 @@ def normalize_ref(ref: str) -> str:
     return r
 
 
-# What counts as something worth waking a lead for (design §4.8 "Waking a lead", TD-049). The
+# What counts as something worth waking a manager for (design §4.8 "Waking a manager", TD-049). The
 # vocabulary is deliberately short, and the exclusions are the point: `last_output`, `tail`,
 # `since`, `seen_at`, `git`, `subagents` and `model` move on almost every tick of a healthy
 # session, so a digest over the whole record would wake a lead continuously and be worth less

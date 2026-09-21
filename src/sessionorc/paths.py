@@ -81,7 +81,7 @@ def link_socket(name: str) -> Path:
 
 
 def waits_dir() -> Path:
-    """One cursor file per waiter (`ao wait`, design §4.8 "Waking a lead", TD-049): what that
+    """One cursor file per waiter (`ao wait`, design §4.8 "Waking a manager", TD-049): what that
     caller had already seen when it last looked, so an event that arrives while it is busy is
     still there when it comes back."""
     return home() / "waits"
