@@ -728,9 +728,10 @@ def test_the_inbox_has_a_row_per_record_with_alarms_and_one_for_the_hosts_own_li
     # name is not a control, and `identity_ack` is what the agent's own tests drive
     assert ">Dismiss</button>" in html and "Acknowledge" not in html
     # …and of the two §4.5a gives the row beside it, **Suspend** arrived with `rpc_suspend`
-    # (TD-077 a2) and **Log TD** has not: a control against a method that is not there is what
-    # §4.2 forbids, so it is still not drawn and arrives with `identity_log`
-    assert ">Suspend</button>" in html and "Log TD" not in html
+    # (TD-077 a2) and **Log TD** with `identity_log` (TD-077 b) — but only where a session answers
+    # for the record, and this one's record names nobody (no `alarm_to`), so the row says so
+    assert ">Suspend</button>" in html and 'data-act="identity_log"' not in html
+    assert "no session answers for this one" in html and "no session answers for the host's own list" in html
     # every instant is handed to the browser to put in the person's own clock, as the snoozed row is
     assert 'class="localtime" data-at="2026-09-19T10:30:00Z"' in html
     assert ">2026-09-19T10:30:00Z<" not in html
@@ -853,6 +854,50 @@ def test_dismiss_on_an_alarm_is_a_persons_own_route_and_the_agents_rule_decides(
     assert ok.status_code == 200 and ok.json()["cleared"] is True and ok.json()["id"] == "person"
     bad = client.post("/api/person/identity_ack", json={"id": "ao-nope"})
     assert bad.status_code == 400 and "no session ao-nope" in bad.json()["detail"]
+
+
+def test_log_td_is_a_persons_own_route_and_a_controller_gone_since_the_draw_is_the_agents_refusal(client):
+    """§4.5a **Inbox row: identity alarm** → **Log TD** (TD-077 b): `/api/person/identity_log`
+    calls `identity_log` caller-less and adds no rule of its own. What the page most has to get
+    right is the press that can no longer succeed — the controller exited between the draw and the
+    press — and that is the agent's refusal, in words, carried as the 400 the toast prints. (That
+    the mail goes, owes an outcome and clears the list is `tests/test_identity.py`'s.)"""
+    assert client.post("/api/person/identity_log", json={}).status_code == 400  # it names a session
+    bad = client.post("/api/person/identity_log", json={"id": "ao-nope"})
+    assert bad.status_code == 400 and "no session ao-nope" in bad.json()["detail"]
+
+
+@pytest.mark.unit
+def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_record(tmp_path, monkeypatch):
+    """§4.8a *An alarm's answers*: **Log TD** hands the alarms to the record's first live
+    controller, and is **offered only where there is such a session**. The page does not work that
+    out — the home does, as `alarm_to` on the record's view, and the RPC reads the same answer — so
+    the button is here exactly when a press can succeed, and the row says so in words where not."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    states = state_rows_of(
+        [rec("ao-x", "working", identity_alarms=[ALARM], alarm_to="ao-agentorc-manager-ao-1")],
+        host="kmaster", identity_mode="enforce",
+    )  # fmt: skip
+    assert states[0]["alarm_to"] == "ao-agentorc-manager-ao-1"  # carried from the record's view
+    html = rows("needs", states)
+    assert 'data-act="identity_log" data-id="person" data-who="ao-x" data-to="ao-agentorc-manager-ao-1"' in html
+    assert ">Log TD</button>" in html and "Hand these alarms to ao-agentorc-manager-ao-1?" in html
+    assert "owes you an outcome" in html and "no session answers" not in html
+    # nobody answers — null, empty, or a shape another build wrote: words, never a control
+    for odd in (None, "", "  ", 7, ["ao-m"]):
+        st = state_rows_of([rec("ao-x", "working", identity_alarms=[ALARM], alarm_to=odd)], host="kmaster")
+        assert st[0]["alarm_to"] is None, odd
+        out = rows("needs", st)
+        assert 'data-act="identity_log"' not in out and "no session answers for this one" in out, odd
+    # the host's own list is about no record, whatever it carries
+    host_row = {**states[0], "row": "alarm_host", "sid": "", "name": "kmaster"}
+    assert 'data-act="identity_log"' not in rows("needs", [host_row])
+
+    js = (UI / "static" / "app.js").read_text()
+    assert 'if (action === "identity_log") body = { id: b.dataset.who || "" };' in js
+    # an answer, so the row goes (only Suspend leaves it standing), and a refusal names the control
+    assert 'if (staterow && action !== "suspend") staterow.remove();' in js
+    assert '${action === "identity_log" ? "Log TD" : action} failed' in js
 
 
 # -- what the review of PR #251 found -------------------------------------------------------------
