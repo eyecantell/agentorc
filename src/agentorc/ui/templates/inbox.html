@@ -18,6 +18,7 @@
   'needs': 'Sessions that stopped for you — a permission, a question, a cap, a stall, work that was never pushed, an identity alarm — questions a session cannot go on without, and steering you have paused. What is on the tool’s clock first, then oldest first. This section is the number in the top bar; the Org’s “needs you” counts the session states alone. A state row is the session’s own: its controls are the card’s, and a mark that is not a control never looks like one. Reading this page marks nothing and rings nothing — a person is not the session; and anything with a date on it belongs on the board.',
   'steering': 'Each says what it will do unless you say otherwise, and when. Soonest first. Doing nothing is a valid answer: at the time shown the sender goes with its default, and nothing has failed. Reply says otherwise; Go with it closes it now; Pause stops the clock.',
   'waiting': 'Questions you have answered whose asker still owes you the outcome — what came of your answer (§4.10). Never counted: it waits on a session, not on you. Dismiss says you do not need to hear back — the debt ends and the asker is told. When an asker exits without reporting, or reports that it is blocked, that row is under Needs you instead, because only you or its manager can move it.',
+  'answered': 'Questions a teammate answered for you from the record — the design, the ledger, a brief, a decision of yours — each with the question, who asked, the answer, who answered and where it is written down. Never counted: nothing waits on you. It is here so a confident wrong answer cannot steer a team unseen. Overrule sends your word to the one who asked, on the question’s own thread, with a copy to the one who answered; it outranks theirs, and the asker owes you what came of it. Dismiss removes the row. Newest first.',
   'fyi': 'Notes, what the home reported about your own messages, late replies, outcomes under the questions they close, the trail of rows that resolved without you, and what lapsed or was declined — kept for 12 hours and then pruned. Its own number is never added to the one beside it: that one is what needs you. This section opens itself when it holds something this browser has not seen. Newest first. Dismiss removes an entry, and Dismiss all removes the ones on screen — never mail that arrived after the page was drawn.',
 } %}
 {% macro imark(sec, name) -%}
@@ -63,6 +64,15 @@
     <p class="note secinfo" id="info-waiting" hidden>{{ info['waiting'] }}</p>
     <div class="inboxrows" id="rows-waiting">{% with rows = sections.waiting, section = 'waiting' %}{% include "inbox_rows.html" %}{% endwith %}</div>
   </section>
+
+  {# design §4.5a **Inbox row: answered for you** (§4.9b, TD-075 step 2): under *Waiting on them*,
+     uncounted, newest first — a fold whose heading is the disclosure, as FYI's is, open until the
+     person folds it, and drawn only when it holds something, as *Waiting on them* is. #}
+  <details class="isec{% if not sections.answered %} hidden{% endif %}" id="sec-answered" open>
+    <summary class="row gap wrap sechead"><span class="h2">Answered for you</span><span class="meta" id="n-answered"></span>{{ imark('answered', 'Answered for you') }}</summary>
+    <p class="note secinfo" id="info-answered" hidden>{{ info['answered'] }}</p>
+    <div class="inboxrows" id="rows-answered">{% with rows = sections.answered, section = 'answered' %}{% include "inbox_rows.html" %}{% endwith %}</div>
+  </details>
 
   {# FYI's fold **is** its heading (§4.5 screen 6 *Layout*): the disclosure's own ▾ before the name
      and no second fold control anywhere. The **i** inside the summary is a button, so the script

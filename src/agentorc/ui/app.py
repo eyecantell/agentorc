@@ -836,7 +836,9 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
 PERSON_ASK_KINDS = ("ask", "conflict")  # what reads as a question to the person; `steer` has its own rules
 # design §4.5 screen 6 / §4.10 *Outcomes* (TD-079 step 2): **Waiting on them** is the fourth
 # section, under *Steering* and in neither number — it waits on a session, not on the person.
-INBOX_SECTIONS = ("needs", "steering", "waiting", "fyi", "snoozed")
+# §4.9b (TD-075 step 2): **Answered for you** follows it, uncounted too — what a teammate answered
+# for the person from the record, each with **Overrule**.
+INBOX_SECTIONS = ("needs", "steering", "waiting", "answered", "fyi", "snoozed")
 
 
 def _entry_open(e: dict[str, Any]) -> bool:
@@ -1088,6 +1090,15 @@ def _outcome_of(e: dict[str, Any]) -> dict[str, Any]:
     return o if isinstance(o, dict) else {}
 
 
+def _answered_of(e: dict[str, Any]) -> dict[str, Any]:
+    """An entry's `answered` (§4.9b, TD-075 step 2) as a dict, or `{}` — the structured field the
+    home writes on an *answered for you* FYI, `{question, asker, answerer, source}`. The row and its
+    **Overrule** key on it and on nothing else: never on who sent the entry, never on a role (§9
+    invariant 9). Read as a shape, as `_outcome_of` is."""
+    a = e.get("answered")
+    return a if isinstance(a, dict) and a else {}
+
+
 def _trail_rows(trail: Collection[dict[str, Any]], now: datetime) -> list[dict[str, Any]]:
     """The trail as FYI rows (§4.10 *The Inbox is a queue*, TD-079): what a state row's **ending**
     left behind, so a row that resolved by some other road does not simply vanish. The home writes
@@ -1147,7 +1158,12 @@ def inbox_sections(
 
     The **trail** (§4.10) is FYI too: what a state row's ending left behind, so a row that resolved
     by some other road — the session was resumed, the permission was answered in the terminal —
-    does not simply vanish."""
+    does not simply vanish.
+
+    - **Answered for you** (§4.9b, TD-075 step 2) — the FYI the home files when a teammate answers
+      a question from the record (a reply carrying `source`): it carries `answered`, and is here
+      instead of in FYI, uncounted, newest first, so what was decided in the person's name is
+      never mixed in with the notes."""
     at = now or datetime.now(UTC)
     out: dict[str, list[dict[str, Any]]] = {k: [] for k in INBOX_SECTIONS}
     snoozed_rows = attention_snoozed or {}
@@ -1177,6 +1193,8 @@ def inbox_sections(
             # the asker exited without reporting: only a person or its manager can find out what
             # happened, so that one is counted; the rest wait on a live session and are not
             (out["needs"] if e.get("asker_gone_quiet") else out["waiting"]).append(e)
+        elif _answered_of(e):
+            out["answered"].append(e)  # §4.9b: uncounted, and apart from FYI's notes
         elif e["id"] in settles:
             continue  # the reporting note: drawn under the question it closes, not beside it
         else:
@@ -1185,6 +1203,7 @@ def inbox_sections(
     out["needs"].sort(key=_needs_key)
     out["steering"].sort(key=lambda e: (not e.get("bound"), str(e.get("bound") or "")))
     out["waiting"].sort(key=lambda e: str(e.get("closed_at") or e.get("at") or ""))
+    out["answered"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["fyi"].sort(key=lambda e: str(e.get("at") or ""), reverse=True)
     out["snoozed"].sort(key=lambda e: str(e.get("snoozed_until") or ""))
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"])}
@@ -1972,6 +1991,17 @@ def create_app() -> FastAPI:
             # whose row upgrades to the browser's own clock once the script runs.
             e["left"] = _left(e.get("bound"), at)
             e["until_words"] = _left(e.get("snoozed_until"), at)
+            # §4.9b (TD-075 step 3): a question **passed up** is the asker's own entry, and the
+            # passer — whose recommendation and suggested answers it carries — is named as a sender is
+            rec = e.get("recommend")
+            if e.get("passed_up") and isinstance(rec, dict) and rec.get("by"):
+                e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
+            # §4.9b: an *answered for you* row names **who asked** — the session Overrule writes
+            # to — by the name it is known by, and opens it while it is here
+            asker = str(_answered_of(e).get("asker") or "")
+            if asker:
+                e["asker_name"] = names.get(asker, asker)
+                e["asker_open"] = asker if asker in names else ""
         return got
 
     def inbox_html(sections: dict[str, Any]) -> dict[str, str]:
