@@ -24,7 +24,7 @@
       {# design §4.5a card **unread** chip (§4.10): the record's count, never a body; nothing at
          zero, which is the common case. Opens the Focus Inbox panel. #}
       {% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}
-      {# design §4.8a (TD-077 step 2): a request named this session and did not come from it. A
+      {# design §4.8a (TD-077 step 2): this session made a request under another session's name. A
          **mark**, not a control — it is never pressable, and what to do about it is a row in the
          Inbox, where its answers live. The newest alarm is the hover. #}
       {% if s.alarm_note %}<span class="badge alarmmark" title="{{ s.alarm_note }} — it is either a bug of ours or a session misbehaving; the Inbox has the list and what can be done about it (design §4.8a)">⚠ identity</span>{% endif %}

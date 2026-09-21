@@ -887,6 +887,8 @@ def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_r
     assert 'data-act="identity_log" data-id="person" data-who="ao-x" data-to="manager-ao-1"' in html
     assert ">Log TD</button>" in html and "Hand these alarms to manager-ao-1 (ao-agentorc-manager-ao-1)?" in html
     assert "owes you an outcome" in html and "no session answers" not in html
+    # a record's alarm is on the session that made the request, not the one it named (TD-077)
+    assert "Requests this session made under another session's name." in html
     # nobody answers — null, empty, or a shape another build wrote: words, never a control
     for odd in (None, "", "ao-m", 7, ["ao-m"], {}, {"id": "  "}, {"name": "m"}):
         st = state_rows_of([rec("ao-x", "working", identity_alarms=[ALARM], alarm_to=odd)], host="kmaster")

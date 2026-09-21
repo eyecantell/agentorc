@@ -410,7 +410,7 @@
    it standing (§4.10 — only an answer ends a row). #}
 {% macro alarm(e, section) -%}
 {{ state_head(e) }}
-<div class="body">{% if e.row == 'alarm_host' %}Requests to this host that named a session they did not come from — kept here because they are about no record, so nobody is blamed for someone else's claim.{% else %}Requests that named this session and did not come from it.{% endif %}</div>
+<div class="body">{% if e.row == 'alarm_host' %}Requests to this host that named a session they did not come from — kept here because they are about no record, so nobody is blamed for someone else's claim.{% else %}Requests this session made under another session's name.{% endif %}</div>
 <ul class="alarms">
   {%- for a in e.alarms %}
   <li>{{ a.words }} <span class="st">{% if a.count > 1 %}first <span class="localtime" data-at="{{ a.at }}" title="{{ a.at }}">{{ a.at_words or 'just now' }}</span>, last <span class="localtime" data-at="{{ a.last }}" title="{{ a.last }}">{{ a.last_words or 'just now' }}</span>{% else %}<span class="localtime" data-at="{{ a.at }}" title="{{ a.at }}">{{ a.at_words or 'just now' }}</span>{% endif %}</span></li>
