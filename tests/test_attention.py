@@ -6,7 +6,7 @@ itself."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import wait_state
+from conftest import park_ticks, wait_state
 
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import Pending, Session, attention_kind
@@ -257,6 +257,13 @@ async def test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows(agen
     bookkeeping a row leaves behind must not outlive it: the old record's row ends with the record
     — *forgotten*, named for the record it was about — and the new session of that id starts with
     no row, no words and no snooze of the old one's (review of PR #269)."""
+    # **No background tick inside the window below** (TD-088). The `agent` fixture runs a live
+    # tick loop, and a tick between the `kill` and the `create` ends the row on its own — the
+    # record is `exited`, so its kind is `""` — and writes *resolved* before the name rule can say
+    # what really ended it. That is a race in the test *and* a word this build has no better
+    # answer for; the entry holds the second half. The loop is stopped, not slowed: every tick
+    # from here is one this test takes by hand.
+    await park_ticks(agent)
     async with LocalClient() as person, LocalClient() as feeder:
         sid = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
         await feeder.call("hook", session=sid, state="needs-you", pending={"kind": "question", "text": "which one?"})
@@ -287,6 +294,13 @@ async def test_a_name_taken_back_by_a_resume_says_resumed(agent, hookstub, tmp_p
     conversation that held it** (TD-081 step 1), the record did not go — the person opened it — so
     its row's ending is *resumed*, not the *forgotten* of a record replaced by a new conversation
     of its name. Same id, one card, and the trail says which road the row left by (§4.10 rule 2)."""
+    # **No background tick inside the window below** (TD-088). The `agent` fixture runs a live
+    # tick loop, and a tick between the `kill` and the `create` ends the row on its own — the
+    # record is `exited`, so its kind is `""` — and writes *resolved* before the name rule can say
+    # what really ended it. That is a race in the test *and* a word this build has no better
+    # answer for; the entry holds the second half. The loop is stopped, not slowed: every tick
+    # from here is one this test takes by hand.
+    await park_ticks(agent)
     async with LocalClient() as person, LocalClient() as feeder:
         sid = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
         await feeder.call("hook", session=sid, adapter_id="conv-81", state="needs-you", pending={"kind": "question"})

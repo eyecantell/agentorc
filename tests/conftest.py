@@ -279,6 +279,24 @@ async def derived(agent, check, timeout: float = 10.0):
 # -- the in-process agent -----------------------------------------------------------------------
 
 
+async def park_ticks(agent) -> None:
+    """Stop the fixture's tick loop for the rest of the test, so a test that must own the clock
+    **owns** it: every tick after this is one the test takes by hand with `await agent.tick()`.
+
+    Narrowing the window is not the same as closing it — TD-078 and TD-088 are both a wait bounded
+    on something other than the thing waited for, and a sleep raced against the loop is exactly
+    that. Cancelling the task cannot race: it is awaited here, so an in-flight tick is finished or
+    cancelled before this returns. Nothing resumes it; `serve`'s own `finally` cancels a cancelled
+    task harmlessly at teardown.
+    """
+    t = getattr(agent, "_ticker", None)
+    if t is None:
+        return
+    t.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await t
+
+
 @pytest.fixture
 async def agent(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
