@@ -2092,6 +2092,24 @@ async def test_a_sourced_reply_is_kept_in_its_senders_outbox_for_seven_days(agen
             assert sourced["entry"]["id"] not in [e.id for e in agent.sessions[tl].outbox]
 
 
+async def test_a_copy_follows_a_resume_as_an_addressee_does(agent, tmp_path):
+    """TD-075 (found in #347's review): the person's answer to a passed-up question is copied to the
+    passer — and a passer resumed before the answer came gets its copy on the record that continues
+    it, not on its old, closed one. Forwarding followed addressees only until then."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl, tl2 = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl", "tl2")]
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, text="rename it?", kind="ask"))["entry"]
+            await tc.call("pass_up", id=q["id"], recommend="yes")
+        old = agent.sessions[tl]
+        old.state, old.superseded_by = "closed", tl2  # resumed as tl2, as `_supersede` leaves it
+        r = await person.call("msg", reply_to=q["id"], kind="reply", text="yes")
+        assert r["delivered"] == [w] and r["copies"] == [tl2] and r["forwarded"] == {tl: tl2}
+        assert r["entry"]["id"] in [e.id for e in agent.sessions[tl2].inbox]
+        assert r["entry"]["id"] not in [e.id for e in old.inbox]
+
+
 async def test_an_ask_a_techlead_left_unanswered_is_taken_to_the_person_on_its_thread(agent, tmp_path, monkeypatch):
     """Design §4.9b *When it cannot answer* (TD-075 step 4, `TECHLEAD_WAIT`): `--thread` names the
     caller's own open question to a session; the new `ask` lands in the person inbox on its thread,
