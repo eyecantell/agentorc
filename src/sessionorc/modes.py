@@ -28,7 +28,9 @@ HOME_EDITS = frozenset({"set_controllers", "set_grants", "set_stop", "set_mode",
 # writes: an empty inbox would say *no mail*, and the truth is *not known from here*.
 # The person's own bookkeeping on that mailbox travels with it (§4.10, TD-069): the org's person
 # inbox is the home's file, and a node that cannot reach it cannot pause anyone's clock.
-MAILBOX = frozenset({"msg", "inbox", "inbox_delete", "inbox_snooze", "inbox_pause", "inbox_resume", "inbox_go_with_it"})
+MAILBOX = frozenset(
+    {"msg", "pass_up", "inbox", "inbox_delete", "inbox_snooze", "inbox_pause", "inbox_resume", "inbox_go_with_it"}
+)
 # Reports are home-owned, and a claim is a lease checked against every sibling (TD-056). `doing` is
 # the third channel (§4.8, TD-074) and is home-owned like the other two, so it travels the same way:
 # refused while the link is down, forwarded to the home while it is up.

@@ -1877,3 +1877,191 @@ async def test_keep_mail_fills_a_seat_without_forgetting_the_questions_that_caus
         assert agent.sessions[tl].inbox == []
         for sid in (mgr, other, tl, w):
             await person.call("kill", id=sid)
+
+
+async def test_asks_waiting_counts_open_questions_addressed_to_a_record_and_wakes_its_manager(
+    agent, tmp_path, start_wait
+):
+    """Design §4.9b (TD-075 step 4): `asks_waiting` is the number of open `ask`s and `steer`s
+    addressed to a record — never a copy's, never a note, never a closed one — on every view, and
+    in the wake digest, so a manager blocked in `wait` returns when a question lands on its techlead
+    seat. `inbox --sent` is a session's own outbox, marks nothing, and is nobody else's to read."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        mgr = await mk("mgr", team="ao-grind", unattended=True)
+        w, tl = [await mk(n, team="ao-grind", unattended=True, controllers=[mgr]) for n in ("w", "tl")]
+        async with LocalClient(caller=mgr) as mc:
+            await mc.call("wait", timeout=0)  # the cursor, so a member's change is a change
+        client, task = await start_wait(mgr)
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, text="rebase or merge?", kind="ask"))["entry"]
+            got = await asyncio.wait_for(task, 10)
+            assert tl in [s["id"] for s in got["changed"]]
+            assert (await person.call("get", id=tl))["asks_waiting"] == 1
+            await wc.call("msg", to=tl, text="which base?", kind="steer", default="main")
+            await wc.call("msg", to=tl, text="fyi only")  # a note waits for nothing
+            assert (await person.call("get", id=tl))["asks_waiting"] == 2
+            # a copy is not addressed to it: mgr's ask about w is copied to w's other controllers
+            await person.call("set_controllers", id=w, add=[tl])
+            async with LocalClient(caller=mgr) as mc:
+                about = (await mc.call("msg", to=w, text="status?", kind="ask", about=w))["entry"]
+            assert tl in about["copies"] and (await person.call("get", id=tl))["asks_waiting"] == 2
+            await tc.call("msg", reply_to=q["id"], kind="reply", text="rebase")
+            assert (await person.call("get", id=tl))["asks_waiting"] == 1
+            # its own sent mail: the reply it just sent, nothing marked, nobody else's
+            sent = await tc.call("inbox", sent=True)
+            assert sent["sent"] and [e["reply_to"] for e in sent["entries"]] == [q["id"]]
+            with pytest.raises(AgentError, match="nobody reads another session's mail"):
+                await tc.call("inbox", sent=True, id=w)
+            assert [e["text"] for e in (await person.call("inbox", sent=True, id=w))["entries"]][:2] == [
+                "rebase or merge?",
+                "which base?",
+            ]
+            with pytest.raises(AgentError, match="keeps no sent list"):
+                await person.call("inbox", sent=True)
+        await client.__aexit__()
+
+
+async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_answer_goes_back(
+    agent, tmp_path, monkeypatch
+):
+    """Design §4.9b *Passing up keeps the thread and the asker* (TD-075 step 3). The addressee of an
+    open `ask` or `steer` passes it up once, with a recommendation: the person inbox holds the
+    asker's own entry — same id, sender, kind, default and bound — with the passer's answers, the
+    recommendation first, and `recommend` labelled as the passer's. The person's reply goes to the
+    asker, is copied to the passer, closes every copy, and the asker owes an outcome on it; the
+    passer owes nothing. Refused: a second time, a closed entry, a copy recipient, a note, a person."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl, mgr = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl", "mgr")]
+        await person.call("set_controllers", id=w, add=[mgr])
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc, LocalClient(caller=mgr) as mc:
+            st = await wc.call(
+                "msg", to=tl, text="rename the flag?", kind="steer", default="keep --pass-up", answers=["keep it"]
+            )
+            q = st["entry"]
+            got = await tc.call("pass_up", id=q["id"], recommend="rename it --escalate", answers=["keep --pass-up"])
+            assert got["answers"] == ["rename it --escalate", "keep --pass-up"]
+            up = [e for e in agent.person_inbox if e.id == q["id"]]
+            assert len(up) == 1 and up[0].from_ == w and up[0].kind == "steer" and up[0].text == "rename the flag?"
+            assert up[0].default == "keep --pass-up" and up[0].bound == q["bound"]  # passing up buys no time
+            assert up[0].answers == ["rename it --escalate", "keep --pass-up"] and up[0].read_at is None
+            assert up[0].recommend == {"by": tl, "text": "rename it --escalate"} and up[0].passed_up
+            # every copy says it went up; the asker's keeps its own answers
+            mine = [e for e in agent.sessions[w].outbox if e.id == q["id"]][0]
+            assert mine.passed_up and mine.answers == ["keep it"]
+
+            # once, and only by the addressee
+            with pytest.raises(AgentError, match="once"):
+                await tc.call("pass_up", id=q["id"], recommend="again")
+            with pytest.raises(AgentError, match="holds no entry"):
+                await wc.call("pass_up", id=q["id"], recommend="mine")
+            note = (await wc.call("msg", to=tl, text="fyi"))["entry"]
+            with pytest.raises(AgentError, match="only an ask or a steer"):
+                await tc.call("pass_up", id=note["id"], recommend="x")
+            ask2 = (await wc.call("msg", to=tl, text="?", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match="recommendation"):
+                await tc.call("pass_up", id=ask2["id"], recommend="  ")
+            await tc.call("msg", reply_to=ask2["id"], kind="reply", text="answered")
+            with pytest.raises(AgentError, match="already closed"):
+                await tc.call("pass_up", id=ask2["id"], recommend="late")
+            with pytest.raises(AgentError, match="top of the ladder"):
+                await person.call("pass_up", id=q["id"], recommend="x")
+            # a copy recipient did not receive the question: a manager's mail about its member is
+            # copied to the member's other controllers, and none of them may pass it up
+            await person.call("set_controllers", id=w, add=[tl])
+            about = (await mc.call("msg", to=w, text="which step?", kind="ask", about=w))["entry"]
+            assert tl in about["copies"]
+            with pytest.raises(AgentError, match="copied to you"):
+                await tc.call("pass_up", id=about["id"], recommend="x")
+
+            # the person picks the recommendation: to the asker, copied to the passer, closing it
+            r = await person.call("msg", reply_to=q["id"], kind="reply", text="rename it --escalate", answer=0)
+            assert r["delivered"] == [w] and r["copies"] == [tl] and r["closed"] == q["id"]
+            assert [e.closed_reason for e in agent.sessions[tl].inbox if e.id == q["id"]] == ["replied"]
+            assert q["id"] in agent.sessions[w].owed() and q["id"] not in agent.sessions[tl].owed()
+            # the passer's closed copy is an ordinary closed entry: it deletes, and it ages out —
+            # only the asker's outbox copy and the person's are kept for the debt (review of PR #347)
+            monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(seconds=0))
+            await agent.rpc_inbox(caller=tl)  # read, so retention runs from now
+            await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
+            assert q["id"] not in [e.id for e in agent.sessions[tl].inbox]
+            assert q["id"] in [e.id for e in agent.sessions[w].outbox]  # still owed: kept
+            assert q["id"] in [e.id for e in agent.person_inbox]
+            monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(hours=12))
+            ask3 = (await wc.call("msg", to=tl, text="and this?", kind="ask"))["entry"]
+            await tc.call("pass_up", id=ask3["id"], recommend="yes")
+            await person.call("msg", reply_to=ask3["id"], kind="reply", text="yes")
+            await person.call("inbox_delete", id=tl, msg=ask3["id"])  # nothing owed on the passer's copy
+            assert ask3["id"] not in [e.id for e in agent.sessions[tl].inbox]
+            # the asker settles it the ordinary way
+            await wc.call("msg", to="person", text="renamed, PR 1", outcome="done", for_=q["id"])
+            assert q["id"] not in agent.sessions[w].owed()
+
+
+async def test_an_answer_from_the_record_is_told_to_the_person_and_an_overrule_reaches_the_asker(
+    agent, tmp_path, monkeypatch
+):
+    """Design §4.9b (TD-075 step 2, the mail half). A reply with `--source` carries it, and the
+    home files the person an FYI **from the answerer** carrying `answered: {question, asker,
+    answerer, source}`. A person's reply to that FYI — Overrule — goes to the **asker** with a copy
+    to the answerer, on the question's own thread, and owes an outcome on the asker's copy only.
+    A reply to the person needs no FYI. `source` is one line on a reply by a session, and a full
+    person inbox refuses the reply rather than let the answer go unseen."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl")]
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, text="does step 3 wait for step 2?", kind="ask", about="TD-075"))["entry"]
+            got = await tc.call(
+                "msg", reply_to=q["id"], kind="reply", text="yes, it builds on it", source="TD-075 build order"
+            )
+            assert got["entry"]["source"] == "TD-075 build order" and got["delivered"] == [w]
+            fyi = [e for e in agent.person_inbox if e.id == got["answered_for_you"]]
+            assert fyi and fyi[0].from_ == tl and fyi[0].kind == "note" and fyi[0].text == "yes, it builds on it"
+            assert fyi[0].answered == {
+                "question": "does step 3 wait for step 2?",
+                "asker": w,
+                "answerer": tl,
+                "source": "TD-075 build order",
+            }
+            assert fyi[0].root == q["root"] and fyi[0].about == "TD-075"
+            assert (await wc.call("inbox"))["entries"][-1]["source"] == "TD-075 build order"
+
+            # Overrule: the person's reply to the FYI goes to the asker, copied to the answerer
+            over = await person.call("msg", reply_to=fyi[0].id, kind="reply", text="no — step 3 can start now")
+            assert over["delivered"] == [w] and over["copies"] == [tl]
+            assert over["entry"]["root"] == q["root"]
+            wrec, trec = agent.sessions[w], agent.sessions[tl]
+            assert [e.handed for e in wrec.inbox if e.id == over["entry"]["id"]] == [True]
+            assert [e.handed for e in trec.inbox if e.id == over["entry"]["id"]] == [False]
+            assert over["entry"]["id"] in wrec.owed() and over["entry"]["id"] not in trec.owed()
+
+            # a reply with no source files nothing; a reply *to the person* with one files nothing
+            q2 = (await wc.call("msg", to=tl, text="and step 4?", kind="ask"))["entry"]
+            assert (await tc.call("msg", reply_to=q2["id"], kind="reply", text="later"))["answered_for_you"] is None
+            ask = await person.call("msg", to=tl, text="which step are you on?", kind="ask")
+            n = len(agent.person_inbox)
+            r = await tc.call("msg", reply_to=ask["entry"]["id"], kind="reply", text="2", source="TD-075 status")
+            assert r["answered_for_you"] is None and len(agent.person_inbox) == n + 1  # just the reply itself
+
+            # `source` is one line, on a reply, by a session
+            for bad, why in (
+                ({"to": tl, "text": "x", "source": "design §4.9b"}, "--reply-to"),
+                ({"reply_to": q2["id"], "text": "x", "source": "a\nb"}, "one line"),
+                ({"reply_to": q2["id"], "text": "x", "source": "a\rb"}, "one line"),
+                ({"reply_to": q2["id"], "text": "x", "source": "a\u2028b"}, "one line"),
+                ({"reply_to": q2["id"], "text": "x", "source": "x" * 201}, "at most 200"),
+                ({"reply_to": q2["id"], "text": "x", "source": "   "}, "one line"),
+            ):
+                with pytest.raises(AgentError, match=why):
+                    await wc.call("msg", **bad) if "to" in bad else await tc.call("msg", **bad)
+            with pytest.raises(AgentError, match="needs no source"):
+                await person.call("msg", reply_to=q2["id"], text="x", source="me")
+
+            # a full person inbox refuses the answer rather than let it steer unseen
+            monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 0)
+            q3 = (await wc.call("msg", to=tl, text="one more?", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match="person inbox"):
+                await tc.call("msg", reply_to=q3["id"], kind="reply", text="yes", source="design §4.9b")
+            assert not [e for e in agent.sessions[w].inbox if e.reply_to == q3["id"]]

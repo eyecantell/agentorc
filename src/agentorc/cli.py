@@ -250,6 +250,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
             if unread := s.get("unread"):
                 print(f"{'':<{w}}      mail:   {unread} unread")
+            # §4.9b (TD-075 step 4): open questions addressed to it — what fills an empty techlead seat
+            if waiting := s.get("asks_waiting"):
+                print(f"{'':<{w}}      asks waiting: {waiting}")
             # a doorbell that would not submit twice (§4.10): the sender learns its mail did not wake
             if bell := s.get("doorbell_failed"):
                 print(f"{'':<{w}}      doorbell failed {_age(bell['at'])}: {bell['error']}")
@@ -982,6 +985,10 @@ def cmd_msg(args: argparse.Namespace) -> int:
     likely answers on a question; `--pick <n>` answers one of them by the number `ao inbox` prints
     (from 1) and sends that answer's own text. Refusals print as the host agent words them."""
     words = list(args.words)
+    if args.pass_up:
+        return _pass_up(args, words)
+    if args.recommend:
+        return fail(args, '--recommend goes with --pass-up <id>: it is your line on a question you pass up', 2)
     answer: int | None = None
     if args.pick is not None:
         if words:
@@ -1021,6 +1028,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "outcome": args.outcome,
         "for_": args.for_,
         "thread": args.thread,
+        # design §4.9b (TD-075): where a reply's answer is written down; the person is told of it
+        "source": args.source,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
 
@@ -1038,6 +1047,10 @@ def cmd_msg(args: argparse.Namespace) -> int:
             print(f'answered {e["answer"] + 1}: "{e["text"]}"')
         if got.get("advice"):  # one line from the home, not a refusal (design §4.10)
             print(got["advice"])
+        if e.get("source"):
+            print(f"source: {e['source']}")
+        if got.get("answered_for_you"):  # design §4.9b: the person sees every answer given from the record
+            print(f"the person is told: answered for you ({got['answered_for_you']})")
         if got.get("closed"):
             print(f"closed {got['closed']}")
         if got.get("copies"):
@@ -1107,11 +1120,53 @@ def _inbox_status(e: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
+def _sent(args: argparse.Namespace) -> int:
+    """`ao inbox --sent` (design §4.9b, TD-075 step 4): this session's own outbox, oldest first —
+    what it asked and answered, so a techlead answers this batch the way it answered the last."""
+    if args.unread:
+        return fail(args, "--sent lists what you sent, which you have no reading of: leave out --unread", 2)
+    got = call_sync("inbox", sent=True)
+
+    def prose() -> None:
+        print(f"{got['id']}: {len(got['entries'])} sent")
+        for e in got["entries"]:
+            reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
+            about = f" about {e['about']}" if e.get("about") else ""
+            state = f" · {e['closed_reason']}" if e.get("closed_reason") else ""
+            print(f"\n→ {', '.join(e.get('to') or [])} · {e['id']} · {e['kind']}{reply} · {e['at']}{about}{state}")
+            for line in str(e["text"]).splitlines() or [""]:
+                print(f"  {line}")
+
+    return emit(args, got, prose)
+
+
+def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
+    """`ao msg --pass-up <id> --recommend "<line>" [--answer …]` (design §4.9b): a question you
+    were asked goes to the person as the asker's, with your recommendation first among its
+    answers. It carries no text of its own — the asker's words are the question."""
+    if words:
+        return fail(args, "--pass-up sends the asker's own question: leave the text out, say yours with --recommend", 2)
+    if extra := [f for f, v in (("--reply-to", args.reply_to), ("--kind", args.kind), ("--about", args.about)) if v]:
+        return fail(args, f"--pass-up keeps the asker's question as it was: {', '.join(extra)} does not apply", 2)
+    if not args.recommend:
+        return fail(args, '--pass-up needs your recommendation: --recommend "<one line>"', 2)
+    got = call_sync("pass_up", id=args.pass_up, recommend=args.recommend, answers=args.answer or None)
+
+    def prose() -> None:
+        print(f"{got['msg']} passed up → person, recommending: {got['recommend']['text']}")
+        for i, a in enumerate(got.get("answers") or [], 1):
+            print(f"  {i}. {a}")
+
+    return emit(args, got, prose)
+
+
 def cmd_inbox(args: argparse.Namespace) -> int:
     """`ao inbox [--unread]` (design §4.10): this session's own mailbox — reading it is what marks
     an entry read, and the host agent does that, never this command. With no `AGENTORC_SESSION`
     (a person at a terminal) it reads the org's person inbox, and a person's read sets nothing.
     Output opens with the fixed header, and every entry names its sender's role for the reader."""
+    if args.sent:
+        return _sent(args)
     got = call_sync("inbox", unread=args.unread)
 
     def prose() -> None:
@@ -1133,6 +1188,13 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  {line}")
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
+            if r := e.get("recommend"):  # passed up: the passer's line, labelled as its own (design §4.9b)
+                print(f"  passed up by {r.get('by')}, who recommends: {r.get('text')}")
+            if e.get("source"):  # answered from the record, and where (design §4.9b)
+                print(f"  source: {e['source']}")
+            if a := e.get("answered"):  # the person's FYI for such an answer (design §4.9b)
+                print(f"  answered for you — {a.get('asker')} asked: {str(a.get('question') or '')[:200]}")
+                print(f"  answered by {a.get('answerer')} from {a.get('source')}; a reply here goes to the asker")
             # design §4.10 *Suggested answers* (TD-070): an open question's answers, **numbered
             # from 1**, which is the number `ao msg --reply-to <id> --pick <n>` takes. The one that
             # is a `steer`'s default word for word is marked, since doing nothing takes it anyway.
@@ -1581,15 +1643,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="report what became of an answered question: one line, with --for <its id>",
     )
     p.add_argument("--for", dest="for_", metavar="ID", help="the question an --outcome settles (its own id)")
+    # design §4.9b (TD-075 step 3): a question you cannot answer from the record goes up, once
+    p.add_argument(
+        "--pass-up",
+        metavar="ID",
+        help="pass a question you were asked to the person, as the asker's, with --recommend (once)",
+    )
+    p.add_argument("--recommend", metavar="LINE", help="with --pass-up: your one-line recommendation")
     p.add_argument(
         "--thread",
         metavar="ID",
         help="ask again on an answered question's thread: it lands with the thread above it and settles the first",
     )
+    p.add_argument(
+        "--source",
+        metavar="WHERE",
+        help="a reply answered from the record: where it is written down (one line); the person is told (§4.9b)",
+    )
     p.set_defaults(fn=cmd_msg)
 
     p = add("inbox", help="read your inbox; with no session, the person inbox (design §4.10)")
     p.add_argument("--unread", action="store_true", help="only entries not yet read")
+    p.add_argument("--sent", action="store_true", help="your own sent mail instead (design §4.9b)")
     p.set_defaults(fn=cmd_inbox)
 
     p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")

@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+from sessionorc import naming
+
 State = Literal["working", "needs-you", "limited", "stalled?", "idle", "exited", "closed", "unreachable"]
 Kind = Literal["interactive", "command"]
 Confidence = Literal["hook", "scraped"]
@@ -283,6 +285,22 @@ class MailEntry:
     # asker's outbox — so work that travels the other way had no debt at all. `identity_log` is
     # its first and only writer; nothing else sets it until a design says so.
     handed: bool = False
+    # Passed up (design §4.9b *Passing up keeps the thread and the asker*, TD-075 step 3): when the
+    # addressee of an open `ask` or `steer` handed it to the person — once — with its own
+    # recommendation. `passed_up` is the time, written on every copy; `recommend` is `{by, text}`,
+    # the passer's one line, drawn as text and labelled as the passer's, never the asker's. The
+    # person-inbox copy carries the passer's suggested answers as its `answers`, the recommendation
+    # first; the asker's and the passer's copies keep their own.
+    passed_up: str | None = None
+    recommend: dict[str, str] | None = None
+    # Answered from the record (design §4.9b, TD-075 step 2). `source` is on a **reply**: one line
+    # saying where its answer is written down (a file and section, a dated decision), at most
+    # `mail.SOURCE_CAP` characters, only ever drawn as text. `answered` is on the **FYI** the home
+    # files to the person for such a reply — `{question, asker, answerer, source}` — and a reply to
+    # an entry carrying it goes to the asker with a copy to the answerer (the Overrule path). Both
+    # key on these fields, never on the role of whoever answered (§9 invariant 9).
+    source: str | None = None
+    answered: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
@@ -306,11 +324,20 @@ class MailEntry:
         if self.handed:
             return self.from_ == PERSON and not self.outcome
         return (
-            PERSON in self.to
+            (PERSON in self.to or bool(self.passed_up))  # a question passed up is the person's to answer (§4.9b)
             and self.kind in ASK_KINDS
             and self.closed_reason in ("replied", "go_with_it")
             and not self.outcome
         )
+
+    def owes_for(self, *, session_inbox: bool) -> bool:
+        """`owes`, asked of one copy where it is held. A copy in a **session's inbox** owes only
+        when it is `handed` — work the person handed that session. Every other debt belongs to the
+        asker, on its outbox copy, and to the person inbox's copy it is listed under. Without this,
+        a question passed up (§4.9b) would owe on the passer's copy too, and on any copy recipient's,
+        and those could then neither be deleted nor pruned (review of PR #347). `Session.owed()`,
+        `inbox_delete` and the retention sweep all ask it this way."""
+        return self.owes and (self.handed or not session_inbox)
 
     @property
     def open(self) -> bool:
@@ -425,6 +452,9 @@ def wake_digest(session: dict[str, Any]) -> str:
     # closes the member and starts it again — so it is exactly the kind of change a wait is for
     rw = session.get("restart_wanted") or {}
     parts.append(f"restart_wanted={(rw.get('at'), rw.get('why'), rw.get('early'))!r}")
+    # a question landing on an empty techlead seat (§4.9b, TD-075 step 4): the manager fills it, so
+    # a manager blocked in `ao wait` returns on it — the count, never the text
+    parts.append(f"asks_waiting={session.get('asks_waiting')!r}")
     return "\n".join(parts)
 
 
@@ -654,11 +684,33 @@ class Session:
             d.pop("threads")
             d.pop("wakes")
         d["unread"] = self.unread()
+        d["asks_waiting"] = self.asks_waiting()
         d["mail"] = self.mail_marks()
         return d
 
     def unread(self) -> int:
         return sum(1 for e in self.inbox if not e.read_at)
+
+    def asks_waiting(self, *, home: str | None = None) -> int:
+        """Design §4.9b (TD-075 step 4): the open `ask`s and `steer`s **addressed** to this record —
+        a copy is not addressed to it — as a number and never their text, since nobody reads
+        another session's inbox. What a manager reads to fill an empty techlead seat; computed
+        here like `unread`, so every reader sees the same count.
+
+        An address is compared whole, host included (§4.4a): names are unique per host, not per
+        org, so `tl@laptop` is not this record's address merely because its id is `tl`. A bare
+        address names a session on the host whose store holds the entry — `home` when the reader
+        says which, else the record's own host, which is the same thing for a record of this host."""
+        storing = home or self.host
+        mine = (self.id, self.host or storing)
+
+        def where(address: str) -> tuple[str, str]:
+            sid, host = naming.split_address(address)
+            return sid, host or storing
+
+        return sum(
+            1 for e in self.inbox if e.open and e.kind in ("ask", "steer") and any(where(x) == mine for x in e.to)
+        )
 
     def mail_marks(self) -> dict[str, Any]:
         """What a card and an `ao` reply say about this session's mail without a body: open `ask`s
@@ -680,7 +732,11 @@ class Session:
         lives in its **inbox**. One number, because `ao progress none`, `ao progress restart`,
         `mail.owed` and *Ready to close* all read this and none of them cares which direction the
         work came from."""
-        return [e.id for e in self.outbox if e.owes] + [e.id for e in self.inbox if e.owes]
+        # the inbox half is handed work alone: a question passed up owes on the **asker's** outbox
+        # copy, never on the copy the passer holds (§4.9b)
+        return [e.id for e in self.outbox if e.owes_for(session_inbox=False)] + [
+            e.id for e in self.inbox if e.owes_for(session_inbox=True)
+        ]
 
     def wake_budget_spent(self) -> bool:
         """Exhaustion is visible (design §4.10): on the record, and so on the card and every `ao`
