@@ -84,3 +84,10 @@
 11:38  grinder-ao-1: merged #370 (TD-075 step 1b, techlead context) → cadence pass
 11:39–11:51 quiet; grinder-ao-1 claimed TD-057, opened #371 (src/sessionorc, anchor's queue); #372 td-095-card-layout is not a member's
 11:52–12:08 quiet; grinder-ao-1 opened #373 (TD-077, src/sessionorc, 17:56Z); queue: #361–#364 (asked 17:15Z), #371 (17:47Z → 2 h at 19:47Z), #373 (→ 19:56Z)
+11:52–12:28 quiet; the anchor merged #361–#364 at 17:49Z–17:55Z (and its own #372)
+12:28  grinder-ao-1: idle 18:28Z, TD-057 (#371) and TD-077 (#373) claimed, both waiting on the anchor; no declaration
+12:48  grinder-ao-1: idle 20 min → one ao send --wait (continue, or drop / none / restart) → declared out_of_work 18:48Z (claims left on #371/#373) → finished; grinder-ao-2 finished since 14:53Z → every member finished
+12:50  final sweep check_cadence --since 12h: 26 PRs (#346–#372), all pass; review rows recorded, not verified. samscrape: none in scope
+12:50  ao team stop ao-grind --close --timeout 90 → both members finished, nothing sent, closed
+12:52  wind-down board line (#371/#373 hold the team) + #361–#364 line marked done → branch orch-ao-grind-wound-down-0921b, PR #374, Sonnet fact-check running
+12:53  ao progress none --why (each member and the why on its record)
