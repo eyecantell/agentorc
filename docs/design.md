@@ -2087,7 +2087,7 @@ answer to the alarm.
   clears the list, and the trail says *dismissed by you* where it said *acknowledged by you*.
   **Built 2026-09-20** (the trail word, at the home and on a node's routed act alike; the
   control's label is the page's own half).
-- **Log TD** files the alarm where work is picked up. The host agent does not write a repo's
+- **Log TD** files the alarm where work is picked up (**built 2026-09-21, TD-077 b**; the control is the page's half). The host agent does not write a repo's
   ledger — it never commits on a session's behalf (§4.10 *A bounded exchange*), and board
   write-back (§4.4) is unbuilt — so *filing* is handing it to the session that answers for this
   one. **Which session is read from the control graph, never from a badge** (§9 invariant 9:
