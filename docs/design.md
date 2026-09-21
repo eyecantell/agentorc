@@ -1190,11 +1190,8 @@ agent there.
 Screens:
 
 1. **Org** (home; named Herd, then Team, until the team definitions of §4.9 landed): a **card grid** (decision 2026-09-04, over a table — keeps each session's
-   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). Each card: host/repo (or host/directory), name, age,
-   state pill, profile line (`shell` for a shell), where (checkout, worktree → branch, or
-   directory), dirty/unpushed flag, then either the pending permission with Allow / Deny (hook
-   channel, §4.2), a pending question with Focus, the reset time with Switch profile / Wait, or
-   the last output lines; buttons Focus / VS Code / more. The **more** menu holds Wrap up, Kill
+   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). What a card carries, and where, is *The card's anatomy*, below (until it is built the page draws the 2026-09-04 card: host/repo, name, age, state pill, profile line, where, the dirty / unpushed flag, a slot, and Focus / VS Code / more).
+   The **more** menu holds Wrap up, Kill
    (confirms), Close (enabled only when Ready to close passes; a card that passes also shows it
    inline, see §4.2), Open shell here, Copy tmux command. A scraped state shows as a dashed pill outline.
    **The card's anatomy (2026-09-21, TD-095; decided with Paul from a screenshot of the live page,
@@ -1209,17 +1206,38 @@ Screens:
    (*unattended* / *interactive* — not a chip and not pressable; its toggle is in **more** and on
    the Focus header), the marks (unread, identity, suspended), and at the right **the one clock on
    a card**: how long it has been in this state — the record's `since`, counted in the browser,
-   which costs nothing to know. (3) **the branch**, alone and at full width, shortened in the
-   middle so both ends read, whole on hover; the worktree is named only when it is not the
-   session's own, and the dirty / unpushed flag sits at the right. (4) **what runs it, and what it
+   which costs nothing to know. (3) **where**, alone and at full width: `branch <name>`, the name shortened in the middle so
+   both ends read and whole on hover; `detached at <short sha>` for a detached HEAD; the directory
+   for a session with no repo (a shell, a plain directory); `wt/<name> ·` in front **only when the
+   worktree is not the session's own name**; and, **outside a team's own group, `host / repo ·`
+   (or `host / directory`) in front of all of it** — inside one the header says it. The dirty /
+   unpushed flag sits at the right. (4) **what runs it, and what it
    reports**: tool · account · model at the left — on every card, since a team's members commonly
    differ — and the report line at the right, **a reference shown once** (`#359 · 1/2 done`, never
    `#359 → #359`). (5) **the slot**, always two lines and a caption, a longer text clamped with
-   the whole of it on hover and in Focus: what needs a person, else what the session says it is
-   doing, else how it ended and what is next. (6) **the foot**, whose **first button is the next
-   act** — Allow, Close session, Forget, else Focus. **An ending is said once per place**: the pill
-   says the state; the slot says *out of work* and the first line of its reason, or *exited · code
-   1*, with *ready to close ✓* as its caption; the button does it. Nothing on a card carries a
+   the whole of it on hover and in Focus. **One text, the first that applies** — the order §4.5a's
+   **doing** row already has, with the endings named: (a) **what needs a person or explains a
+   stop** — the pending permission or question, a `limited` session's reset text, a `stalled?`
+   rule's note, an unreachable host's reason (today's `host_note` row); (b) **an ending** —
+   `exited · code N`, `closed by you`, or a declaration, *out of work* or *restart wanted* (an
+   early one says *early — for a person*), the fixed words and then the first line of its reason;
+   (c) **what the session says it is doing**, working or idle; (d) the last output line, or *at
+   prompt*. **The caption, the first that applies**: the time a pending answer has left (*via hook
+   · 4m left*); ***ready to close ✓*** whenever the checklist passes — which is where that fact
+   now lives, whatever the text above it, so an idle session that passes keeps its last word in
+   the slot and gains the caption and the button; *says · `<age>`* under a `doing` line; else
+   empty. The **stops** note (§6) joins row 2, as plain text after the mode. (6) **the foot**,
+   whose **first button is the next act, by state** — this moves Allow / Deny, Close session,
+   Forget and Switch profile / Wait **out of the slot, where the 2026-09-04 card drew them, into
+   the foot**, which is new work for the page: `needs-you` with a hook permission → **Allow**,
+   **Deny**; `limited` → **Switch profile…**, **Wait**; *ready to close ✓* → **Close session**;
+   `exited` → **Forget**; `closed`, or a pane that is gone → **Details**; everything else —
+   `working`, `idle`, `stalled?`, a question to answer in the terminal — → **Focus**. Then Focus
+   (or Details) as a quiet button where it was not first, **VS Code**, and **more** at the right. **An ending is said once per place**: the pill
+   says the **state and nothing else** — a session that declared itself out of work is still
+   `idle` (*finished · unseen* until a person has looked, §4.2), since a declaration is not a state
+   (§4.9a), and the first sketch's grey *finished* pill was the sketch's mistake; the slot says how
+   it ended; the caption says *ready to close ✓*; the button does it. Nothing on a card carries a
    second age. **Inside a team's own group a card drops what the group says**: its `team` badge,
    and *under `<manager>`* when that is its only controller; outside one — *No team*, a filtered
    or flat grid — both are drawn, and host / repo leads row 3. **The team's header** carries the
@@ -1227,11 +1245,17 @@ Screens:
    team's marks and its controls — and **not** its manager's name, state or report, which are on
    the manager's card, the first in the group. The *No team* group is headed by its count and by
    nothing else. **Colour (tokens, both themes, contrast checked):** *working* is **green** —
-   alive; *idle* is **blue** — alive, at rest, and may be spoken to; everything that has ended
-   (*finished*, *exited*, *closed*) is one grey, and *ready to close ✓* is no longer green, so
-   green means one thing; amber *needs you* (ringed) and red *stalled?* stay the loudest things
+   alive; *idle* is **blue** — alive, at rest, and may be spoken to; *finished · unseen* is idle's blue with its own glyph and words, as today — it is `idle` in
+   every payload (§4.2); everything that is over or out of reach (*exited*, *closed*,
+   *unreachable*, which keeps its dimmed card) is one grey, so the stylesheet's shared rule for
+   idle / exited / unreachable is split; *ready to close ✓* and *closed by you* are drawn in the
+   neutral text colour with a grey rule, no longer green, so **on a card green means working and
+   nothing else** (Focus's checklist keeps its green ticks — a different thing on a different
+   page); the `--done` token goes from the card; amber *needs you* (ringed) and red *stalled?* stay the loudest things
    on the page, and *limited* keeps its violet. Blue stays the accent for what is new (unread,
-   *new* mail). **One order, no control**
+   *new* mail) — an idle card with unread mail is blue twice, which reads rightly: it is at rest
+   and has been spoken to. The legend (`docs/mockups/gen.py`, *States & badges*) changes with the
+   tokens. **One order, no control**
    (2026-09-18): inside a group the manager's card, then by urgency (`needs-you` → `limited` →
    `stalled?` → `unreachable` on a non-volatile host → `working` → unseen `idle` (§4.2) → `idle` /
    `unreachable` on a volatile host → `exited` → `closed`); between groups, a live team with a
@@ -1468,7 +1492,7 @@ noted). If a control is not in this table it does not exist.
 | card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the host agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026) — landed 2026-09-13. On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the host agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the host agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *no stop time* rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs. Setting a **different** time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill — landed 2026-09-14 |
 | New session | **Until** field | the stop time the session starts with: `06:00` (the next one, in your clock), `+8h`, or an ISO time. Refused on a session that is not **Unattended**, since policies leave interactive sessions alone (§4.2); empty means nothing stops it, which is what every session was before (§6, TD-026) — landed 2026-09-13 |
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line. **On a card it moves into the slot** (design 2026-09-21, TD-095, not built): the fixed words, then the first line of the reason as text, clamped, the whole of it and the time of the declaration on hover — and **no age of its own**, since a card has one clock; the Focus header keeps the chip. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a) — design 2026-09-14, built 2026-09-17, TD-053 step 6. The words are fixed and the reason is the hover: a `why` names every entry the session looked at and what gates each, which a card cannot hold. The row is drawn for a declaration even when neither report channel has anything in it |
-| card / Focus header | **restart wanted** chip | design 2026-09-20, TD-083; the field it draws from is **built** (step 1, 2026-09-21) and **the chip is built 2026-09-20** (step 2) — when the record carries `restart_wanted`: fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a **mark**, never pressable, and not a state — the session still reads `idle` or `exited`. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). **An `early` one says so on the chip and in its hover** (2026-09-20, the build): the home marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller **does not act on one** — so an early chip that read like an ordinary one would promise a restart that is not coming, and it is drawn as wanting a person instead |
+| card / Focus header | **restart wanted** chip | **on a card it moves into the slot with *out of work*, as an ending (design 2026-09-21, TD-095, not built; §4.5 *The card's anatomy*) — the Focus header keeps the chip.** Design 2026-09-20, TD-083; the field it draws from is **built** (step 1, 2026-09-21) and **the chip is built 2026-09-20** (step 2) — when the record carries `restart_wanted`: fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a **mark**, never pressable, and not a state — the session still reads `idle` or `exited`. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). **An `early` one says so on the chip and in its hover** (2026-09-20, the build): the home marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller **does not act on one** — so an early chip that read like an ordinary one would promise a restart that is not coming, and it is drawn as wanting a person instead |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a) — design 2026-09-14, built 2026-09-17, TD-053 step 6; on the team's card since 2026-09-18, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team — landed 2026-09-13. **Not drawn inside that team's own group** (design 2026-09-21, TD-095, not built); drawn in *No team*, and in a filtered or flat grid |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
@@ -3901,8 +3925,8 @@ a schedule, and a grant never carries one either. A directory session (no repo) 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
 Each runs on the host agent's tick, per repo, only for sessions whose record says
-`unattended: true` (set at start by the New session switch, or flipped later by the badge
-toggle on the card or Focus header; interactive sessions are exempt from gates). Mode is a
+`unattended: true` (set at start by the New session switch, or flipped later by the mode
+toggle — on the Focus header, and in a card's *more* (on the card's badge until TD-095 is built); interactive sessions are exempt from gates). Mode is a
 field on the session record, never re-derived from the brief or the name, and a flip takes
 effect on the next tick without restarting the session. The brief file is required only when
 a *policy* starts a worker; a session flipped to unattended keeps whatever it was doing.
