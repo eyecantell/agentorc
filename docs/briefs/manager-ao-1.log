@@ -37,4 +37,4 @@
 01:14–01:17 quiet
 01:18  grinder-ao-1: merged #351 (ledger, TD-075 where it stands; cadence pass) then idle + restart_wanted (07:18:31Z; not early, not suspended, 0 dirty / 0 unpushed, owes nothing; rest of TD-075 step 4 waits on #346–#349) → ao close + ao new same name/worktree/profile/brief, restart 1 of 3 in the window from 01:18 (22:31 is outside 2h); new record 07:18:51Z working
 01:20  escalation: the anchor's merge queue now holds grinder-ao-1 (#346–#349, oldest 05:40Z) → board line on branch orch-td075-merge-queue, PR #352, Sonnet fact-check running
-01:31  board PR #352 (retitled without TD-075: board-only, ledger row) fact-checked READY by Sonnet, cadence-review posted, check pass, squash-merged 6deb255; grinder-ao-1: working (TD-076) → ok
+01:23  board PR #352 (retitled without TD-075: board-only, ledger row) fact-checked READY by Sonnet, cadence-review posted, check pass, squash-merged 6deb255; grinder-ao-1: working (TD-076) → ok
