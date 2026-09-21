@@ -121,3 +121,31 @@ def test_send_with_wait_is_given_its_own_bound_plus_slack(monkeypatch):
     assert seen["_timeout"] is None  # no timeout of its own: the caller means to wait
     clientmod.call_sync("send", id="ao-x", text="go")
     assert seen["_timeout"] == clientmod.CALL_TIMEOUT  # without --wait it is an ordinary call
+
+
+async def test_a_wait_tells_a_wedged_agent_from_a_restarted_one(tmp_path, monkeypatch):
+    """TD-063 (review of PR #315): `wait_rpc` remakes a connection that **dropped**, because that
+    is a promote. A call that **timed out on a connection that never dropped** is a different
+    thing — the agent is there and is not answering — and remaking it would spend the caller's
+    whole timeout and then return *nothing changed*, which is a wrong answer where the old
+    behaviour was merely a hang. It is raised, not retried."""
+    import asyncio
+
+    from sessionorc import client as clientmod
+
+    sock = tmp_path / "wedged.sock"
+
+    async def never_answers(reader, writer):
+        await reader.readline()
+        with contextlib.suppress(Exception):
+            await asyncio.sleep(5)
+
+    server = await asyncio.start_unix_server(never_answers, path=str(sock))
+    monkeypatch.setattr(clientmod, "CALL_TIMEOUT", 0.2)
+    try:
+        with pytest.raises(clientmod.AgentStuck, match="did not answer 'wait'"):
+            await clientmod.wait_rpc(caller="ao-lead", timeout=1.0, sock=sock)
+        # and it is still an AgentUnavailable, so every handler that had one keeps working
+        assert issubclass(clientmod.AgentStuck, clientmod.AgentUnavailable)
+    finally:
+        server.close()
