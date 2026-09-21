@@ -20,3 +20,5 @@
 22:31  grinder-ao-1: idle + restart_wanted (04:30Z, not early, not suspended, 0 dirty / 0 unpushed; wants a fresh run for TD-052 step 7) → ao close + ao new same name/worktree/profile/brief, restart 1 of 3 (2h window from 22:31); new record 04:31:26Z working, controllers = me
 22:32–22:45 quiet
 22:46  grinder-ao-1: working → ok (TD-052 step 7, #343 in review; src/sessionorc so the anchor merges — watching for a merge-queue hold)
+22:47–22:49 quiet
+22:50  inbox: ask m-43df400ff557 from person (anchor as director): restart finished grinder-ao-2 once, new ledger work (TD-076 heading sweep, TD-075 page halves) → grinder-ao-2: idle, finished, 0 dirty / 0 unpushed, owes nothing → ao close + ao new same name/worktree/profile/brief (restart 1 of 3, window from 22:50), new record 04:50:27Z working; replied
