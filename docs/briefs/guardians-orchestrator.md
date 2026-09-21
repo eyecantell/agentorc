@@ -44,7 +44,7 @@ work, you never do worker-shaped work, and you act only on sessions whose `contr
 
 ## When it can run
 
-Everything in `docs/briefs/orchestrator-ao-1.md` applies — the round, the cadence check, the
+Everything in `docs/briefs/manager-ao-1.md` applies — the round, the cadence check, the
 relay, the escalation shape, the restart ceiling (3 restarts of one session in 2 hours, then
 escalate; `one_for_one` scope), and "leads only lead". The differences are only these:
 

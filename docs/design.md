@@ -101,6 +101,7 @@ on 2026-09-12 for the orchestrator-membership question (§10):
 | herdr (Apache-2.0, https://herdr.dev) — surveyed 2026-09-09, corrected 2026-09-10, measured 2026-09-10 ([ADR](decisions/2026-09-10-herdr-spike.md)); not in the 2026-09-04 survey | "the runtime coding agents run on": a Rust daemon per machine keeping agent sessions alive in persistent panes, one layout across local and ssh-added machines, restored after a restart; single binary (macOS, Linux, Windows); 21 agent CLIs; 17 *integrations*, of which six (Pi, OMP, Kimi, OpenCode, Kilo, MastraCode) push `idle`/`working`/`blocked` from hooks and the rest — Claude Code, Codex, Copilot, Cursor among them — only report a session id for restore, their state coming from screen-matching manifests; socket API with `events.subscribe`, `agent.*`, `worktree.*`, `plugin.*`; Claude rate-limit and context bars; ~1k community plugins found by a GitHub topic, no review; 36.5k stars, ~770k installs. Herdr, Inc.: $6M seed (Bessemer, YC) announced 2026-09-09; "Herdr Cloud" (no-ssh machines) next; releases 0.5.1 (2026-04) → 0.9.0 (2026-09). **Does not accept unsolicited pull requests** — an allow-list of approved contributors, bugs fixed by the maintainers' own agent, features via Discussions | the closest tool to agentorc found so far; the worktree API shape; a screen-rule fallback for prompts no hook reports (its detector catches the trust dialog); measured as a substrate 2026-09-10 and not taken (§10, ADR) | states are working / blocked / idle / done / unknown — one `blocked`, and the `pane.agent_status_changed` event carries only the state (the `--message` of a report is stored nowhere), so a permission, a question and the trust dialog look alike to anything above it and a usage-limit screen reads as `idle`; an outside source cannot take a Claude pane's state from the screen detector; a server restart ends every pane process (restore = layout + `claude --resume`); panes start through the person's interactive shell (rc files move the cwd); no run log, no exit code, no state for plain shells; the socket API is per machine (multi-host is the TUI over ssh); no `limited` with a reset time, no `stalled?`/`unreachable`; no run windows, usage gates, wrap-up-then-kill or credential-lapse detection found; no anchor rule, Ready to close, per-repo command buttons, VS Code links or first-party phone UI (the TUI over ssh is the mobile story; community mobile apps exist); runtime only, no notion of when work is done |
 | OpenAI **Agents API** (public beta 2026-09-10) — surveyed 2026-09-13 ([ADR](decisions/2026-09-13-openai-agents-api.md)) | OpenAI's managed Codex harness as a service: **Agent** (model, instructions, tools, MCP) · **Environment** (optional sandbox: OpenAI-hosted, your own, or Cloudflare / Vercel / Oracle / E2B / Modal / Daytona / DigitalOcean / Blaxel / Runloop) · **Session** (durable, resumable, carries conversation and saved work) · **events and items**. A *turn* is one cycle: a message to an idle session starts one, a message during an active turn **steers** it. Progress by streaming or webhooks; terminal events `agent.session.turn.completed`/`.failed`/`.cancelled`, `agent.session.failed`, `agent.session.environment.failed`, `error`; a completed turn may carry structured `required_actions`. Managed context compaction, subagent delegation. Token billing, no infrastructure fee. **US-only data residency and no ZDR, even on a self-hosted sandbox.** The Assistants API, its stateful predecessor, sunset 2026-08-26 | the session/turn split and *steer* as the verb for a message into a running turn; `required_actions` as a **structured** needs-you payload rather than a state flag; splitting `session.failed` from `session.environment.failed`; "streams do not replay — retrieve the session and its items", the same rule as §4.6's reconnect contract; item-level rather than token-level stream events | not a substrate and not an adapter: no pty, no pane, no local checkout, OpenAI models only, so it cannot host the Claude Code session phase 1 supervises; §4.3's adapter protocol is built on argv, `classify_pane` and `composer` and none apply; no VS Code link, no `Open shell here`, no tmux scrollback; residency and ZDR limits are disqualifying for the relay direction (§4.5b); a vendor-hosted session object is the least durable place to keep state — see the Assistants sunset |
 | Agent messaging — Claude Code cross-session messaging and agent teams, mcp_agent_mail, muster / agent-mux / muxcode — surveyed 2026-09-16 ([ADR](decisions/2026-09-16-agent-messaging-prior-art.md)) | session-to-session mail: Claude Code's built-in socket delivery with idle wake and loop damping; agent teams' per-agent inbox files and shared task list; mcp_agent_mail's MCP inboxes, threads and advisory file leases | loop damping at delivery, provenance framing where mail is read, claims as leases (TD-056) | Claude-Code-only or poll-only; none reads a supervision graph; agentorc stays tool-neutral and builds §4.10 itself |
+| Session desks and supervisors — tallu-wonder/agentboss, gabemahoney/agent-director, multi-agent-shogun, trillion-labs/claude-code-orchestrator, tmux_claude_codex_dashboard, orchardist — surveyed 2026-09-20 ([ADR](decisions/2026-09-20-session-desk-neighbours.md), TD-059) | one person's desk over tmux sessions (TUI or browser), a headless supervisor over MCP, fixed tmux teams with a file inbox, a stream-json dashboard over ssh, federated daemons | a context gauge reset at compaction (TD-091), a notification when the page is closed (TD-092), a Stop hook that refuses to stop with unread mail (TD-072); agent-director had the `/compact` bug too (TD-090) | none has a rule of who may act on whom, and none supervises unattended workers under a lead |
 
 ## 4. Architecture
 
@@ -470,14 +471,38 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
-- Usage: each live agent session's profile is asked its adapter's `usage_for` once a minute in
-  a thread (never per tick); the last answer is cached, served by `usage`, streamed as a `usage`
+- Usage: each live agent session's profile is asked its adapter's `usage_for` **every five
+  minutes** in a thread (never per tick — and a minute, which it was until 2026-09-20, buys
+  nothing against a five-hour window while spending an allowance the tool itself shares, TD-087).
+  **What it costs, said plainly**: `limited` is read from the same poll, so a session that hits
+  its cap now shows it up to five minutes later rather than up to one. That is the right trade
+  because the screen is the other half of the same rule (§4.2: the tool's own limit message marks
+  it too, from the pane, within a tick) and because the five minutes are only ever *added* to a
+  cap that lasts hours. The last answer is cached, served by `usage`, streamed as a `usage`
   event for the top bar's per-profile figure, and drives the `limited` rule of §4.2 (an
   interactive session on a profile with **any** reported window at 100% shows `limited` with that
   window's label and reset time, `working` again once the window resets — the core iterates the
   adapter's list and names no window of any tool, TD-073). A fetch failure keeps the last answer
   (TD-001). A profile no live session runs under is dropped from the cache and a `usage` event
   with `usage: null` takes its chip off the top bar, so one tool in use is one chip.
+  **A failure says why** (2026-09-20, TD-087): the adapter answers `ok` with the windows, or
+  `rate_limited` (with the endpoint's `Retry-After` when it sends a number — the HTTP date form is
+  legal and is not parsed, and an unreadable one doubles instead of guessing), `no_credentials`,
+  `no_profile` or `error` — a word the core keys on, never prose, because *rate-limited*, *no
+  credentials*, *no network* and *no profile* were one silence, and a silence cost more than a
+  missing chip: `limited` is read from the same reading, so a session at its cap was not marked
+  while the endpoint refused us. The core does three things with it and no more. It **logs a
+  change of reason once**, not a line per poll. It **backs off on `rate_limited` alone** — the
+  `Retry-After`, floored at the ordinary cadence and **not** capped, since a server saying *an
+  hour and a half* knows something our ceiling is guessing at; else our own doubling, which has no
+  such word behind it and so stops at an hour — and any other answer returns to the cadence,
+  since only a 429 is the endpoint asking to be asked less often. And it **keeps the last good
+  reading**, with the reason beside it, so the chip goes stale rather than going out: a window
+  does not change while we are refused, and *the chip went out* and *the allowance is spent* are
+  different things to a person. The reading is **held across a restart** (`usage.json`) — it lived
+  in memory, so each promote forgot it and polled at once, eight times in one day — and so is
+  the allowance: the first poll after a restart waits until the held reading's `fetched` plus the
+  cadence, never sooner. The reason is not held, being the running agent's own business.
 - Attachment drop: accept an uploaded file (the UI copies it over ssh) into
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file
