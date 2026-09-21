@@ -15,14 +15,18 @@
   .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
   .pill .dot { display: none; } .pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-  .s-working { background: #dbeafe; color: #1e40af; }
+  /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
+     alive, at rest, may be spoken to (finished · unseen is idle's blue); everything over or out of
+     reach one grey (--ended). On a card green means working and nothing else. */
+  .s-working { background: #dcfce7; color: #166534; }
   .s-needs { background: #fde68a; color: #7c3d00; }
-  .s-idle { background: #e5e7eb; color: #4b5563; }
+  .s-idle { background: #dbeafe; color: #1e40af; }
+  .s-ended { background: #e5e7eb; color: #4b5563; }
   .s-stalled { background: #fecaca; color: #991b1b; }
-  .s-exited { background: #e5e7eb; color: #6b7280; }
-  .s-done { background: #d1fae5; color: #065f46; }
+  .s-exited, .s-closed { background: #e5e7eb; color: #4b5563; }
+  .s-done { background: #d1fae5; color: #065f46; } /* Focus's reports and checklist only — --done leaves the card */
   .s-limited { background: #ede9fe; color: #5b21b6; }
-  .s-unreachable { background: #e5e7eb; color: #6b7280; }
+  .s-unreachable { background: #e5e7eb; color: #4b5563; }
   .card.off { opacity: .55; }
   .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
   .due + .due { border-top: 1px solid #eceef1; }
@@ -39,7 +43,7 @@
   .btn.ghost { border-color: transparent; background: transparent; color: #4b5563; }
   .btn.ghost:hover { background: #eef0f3; }
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .status.ok { border-color: #059669; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
+  .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #374151; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
   .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
   /* the role badge's picture, sized to sit on the badge's baseline (src/agentorc/ui/static/app.css) */
@@ -55,6 +59,30 @@
      row and stacked the stalled note on top of it (TD-074 step 6) */
   .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-start; }
   .sc-foot { display: flex; gap: 6px; align-items: center; }
+  /* the card's anatomy (design §4.5, TD-095): six rows, the same six on every card, at one height —
+     a row with nothing to say stays, empty, rather than moving what is below it */
+  .ac { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: 26px 22px 20px 20px 62px 32px; row-gap: 6px; padding: 12px 14px 10px 17px; position: relative; overflow: hidden; }
+  .ac .r { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .ac .r > * { flex-shrink: 0; } .ac .r > .fill { flex: 0 1 auto; min-width: 0; } .ac .r .grow { flex: 1; }
+  .ac .name { font-family: "JetBrains Mono", monospace; font-size: 15px; font-weight: 600; color: #111418; }
+  .ac .meta b { color: #374151; font-weight: 500; }
+  .mode { font-size: 11.5px; color: #6b7280; white-space: nowrap; }
+  .mode.mine { color: #1c2128; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
+  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10.5px; border: 1px solid #d9a441; color: #7c3d00; }
+  .aslot { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 2px 0 2px 10px; border-left: 2px solid #cbd0d6; font-size: 12px; color: #1c2128; overflow: hidden; }
+  .aslot .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
+  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 11px; color: #6b7280; white-space: nowrap; }
+  .aslot.need { border-color: #f59e0b; } .aslot.need .t { color: #7c3d00; } .aslot.bad { border-color: #dc2626; } .aslot.lim { border-color: #7c3aed; }
+  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; }
+  /* the quiet foot (second pass, 2026-09-21): the next act outlined at the text's strength, the rest
+     plain links at normal strength; dimmed means disabled and nothing else; the only filled button a
+     card carries is Allow */
+  .ac .foot { display: flex; align-items: center; gap: 10px; min-width: 0; overflow: hidden; }
+  .ac .foot .next { white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; height: 26px; padding: 0 10px; border: 1px solid #6b7280; border-radius: 4px; color: #1c2128; font-size: 12px; font-weight: 500; }
+  .ac .foot .next.fill { background: #b45309; border-color: #b45309; color: #fff; }
+  .ac .foot .lk { white-space: nowrap; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; gap: 4px; color: #1c2128; font-size: 12px; }
+  .ac .foot svg { width: 13px; height: 13px; }
+  .ac.ring { box-shadow: 0 0 0 2px #f59e0b; border-color: #f59e0b; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
   .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
@@ -112,7 +140,7 @@
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 1440px; min-height: 1640px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
   <span class="wordmark">agent<b>orc</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Org</span><span class="tab">Inbox 4 · 2</span><span class="tab">Resumable</span><span class="tab">Commands</span><span class="tab">Attention</span></div>
@@ -123,12 +151,10 @@
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   <div style="display: flex; align-items: center; gap: 10px;">
     <span style="font-size: 16px; font-weight: 600;">Org</span>
-    <span class="muted">13 sessions · 1 team · </span><span class="pill s-needs"><span class="dot"></span>1 needs you</span><span class="pill s-limited"><span class="dot"></span>1 limited</span><span class="pill s-stalled"><span class="dot"></span>1 stalled</span>
+    <span class="muted">14 sessions · 1 team · </span><span class="pill s-needs"><span class="dot"></span>1 needs you</span><span class="pill s-limited"><span class="dot"></span>1 limited</span><span class="pill s-stalled"><span class="dot"></span>1 stalled</span>
     <span style="flex-grow: 1;"></span>
     <span class="input" style="width: 200px; height: 28px; color: #9ca3af;">filter…</span>
     <span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">profile: all ▾</span><span class="btn ghost" style="color: #9ca3af;">☐ show command runs (2)</span>
-    <span style="width: 1px; height: 20px; background: #cbd0d6; margin: 0 8px;"></span>
-    <span style="display: inline-flex; border: 1px solid #cbd0d6; border-radius: 4px; overflow: hidden;"><span class="btn" style="border: 0; border-radius: 0; background: #e5e7eb; color: #111418;">Urgent first</span><span class="btn" style="border: 0; border-radius: 0;">Pinned</span></span>
   </div>
   <div class="card" style="display: flex; flex-direction: column;">
     <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Due</span><span class="muted">4 overdue · 2 today · from the dev-cadence boards</span><span style="flex-grow: 1;"></span><a href="#" style="font-size: 12px;">full board →</a><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
@@ -136,171 +162,123 @@
   </div>
   <div class="card" style="display: flex; flex-direction: column;">
     <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Teams</span><span class="muted">3 defined · 2 not running · from ~/.agentorc/org.yml and the repos</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
-    <div class="due"><span style="font-weight: 600; font-size: 12.5px; width: 150px;">ao-grind</span><span class="pill s-idle">not running</span><span class="meta">lead orchestrator-ao-1 · agentorc · org.yml</span><span style="flex-grow: 1;"></span><span class="btn sm primary">Start</span></div><div class="due"><span style="font-weight: 600; font-size: 12.5px; width: 150px;">cadence-sweep</span><span class="pill s-idle">not running</span><span class="meta">lead sweeper · dev-cadence · dev-cadence/.agentorc.yml</span><span style="flex-grow: 1;"></span><span class="btn sm primary">Start</span></div>
+    <div class="due"><span style="font-weight: 600; font-size: 12.5px; width: 150px;">ao-grind</span><span class="pill s-ended">not running</span><span class="meta">lead orchestrator-ao-1 · agentorc · org.yml</span><span style="flex-grow: 1;"></span><span class="btn sm primary">Start</span></div><div class="due"><span style="font-weight: 600; font-size: 12.5px; width: 150px;">cadence-sweep</span><span class="pill s-ended">not running</span><span class="meta">lead sweeper · dev-cadence · dev-cadence/.agentorc.yml</span><span style="flex-grow: 1;"></span><span class="btn sm primary">Start</span></div>
   </div>
   <div class="warn" style="background: #f3f4f6; border-color: #cbd0d6; color: #374151; align-items: center;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg><span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
-  <div style="display: flex; flex-direction: column; gap: 22px;"><div style="display: flex; flex-direction: column; gap: 12px; border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;"><div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 13.5px;">samscrape-grind</span><span class="meta">lead orc-1 (idle) · project samscrape · 4 sessions · org.yml</span><span style="flex-grow: 1;"></span><span class="btn sm">Stop</span><span class="btn sm danger">Stop now</span></div><div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"><div class="card sc" style="border-color: #dfe3e8;">
-  <div class="sbar" style="background: #9ca3af;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">orc-1</span><span class="badge toggle on" title="click: switch to interactive">unattended</span><span class="badge" title="click: filter the grid to this team">samscrape-grind</span><span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>lead</span><span style="flex-grow: 1;"></span><span class="pill s-idle"><span class="dot"></span>idle</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">4m</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/orc-1</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">claude-code · grind (pro) · opus</div>
-    
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="">last round 20:10 · 2 wrapped up</span><span style="flex-grow: 1;"></span></div>
-  </div>
-  <div class="sc-slot"><div class="status doing" title="what this session says it is doing (design §4.8): its own words">round 41: reading four members, two claims to re-check</div><div><span class="meta">says · 2m ago</span></div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
+  <div style="display: flex; flex-direction: column; gap: 22px;"><div style="display: flex; flex-direction: column; gap: 12px; border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;"><div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 13.5px;">samscrape-grind</span><span class="meta">kmaster / samscrape · 1 limited · 1 stalled? · 1 working · 1 unseen · 1 idle</span><span style="flex-grow: 1;"></span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span></div><div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"><div class="card ac">
+  <div class="sbar" style="background: #2563eb;"></div>
+  <div class="r"><span class="name">orc-1</span><span class="grow"></span><span class="pill s-idle"><span class="dot"></span>idle</span></div>
+  <div class="r"><span class="badge" title="the role preset it was started under (design §4.8)"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"></path></svg>manager</span><span class="mode">unattended</span><span class="grow"></span><span class="meta" title="in this state since">4m</span></div>
+  <div class="r"><span class="meta fill">branch <b>orc-1</b></span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">claude-code · grind · opus</span><span class="grow"></span><span class="meta">round 41 · 2 wrapped up</span></div>
+  <div class="aslot "><div class="t">round 41: reading four members, two claims to re-check</div><div class="cap">says · 2m ago</div></div>
+  <div class="foot"><span class="next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
   <div class="sbar" style="background: #7c3aed;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">tdgrind-3</span><span class="badge toggle on" title="click: switch to interactive">unattended</span><span class="badge" title="click: filter the grid to this team">samscrape-grind</span><span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>grinder</span><span style="flex-grow: 1;"></span><span class="pill s-limited"><span class="dot"></span>limited</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">9m</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/tdgrind-3 → td-290</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">claude-code · grind (pro) · sonnet</div>
-    <div><span class="meta">under <span class="badge" title="may act on this session (design §4.8)">orc-1</span></span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="">TD-290 · 0/2 done</span><span style="flex-grow: 1;"></span><span class="meta">1 filed</span></div>
-  </div>
-  <div class="sc-slot"><div class="status lim">5h window at 100% · resets 02:00 MDT (1h 51m)</div><div style="display: flex; gap: 6px;"><span class="btn sm">Switch profile…</span><span class="btn sm ghost">Wait</span></div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
+  <div class="r"><span class="name">tdgrind-3</span><span class="grow"></span><span class="pill s-limited"><span class="dot"></span>limited</span></div>
+  <div class="r"><span class="badge" title="the role preset it was started under (design §4.8)"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>grinder</span><span class="mode">unattended</span><span class="mark" title="unread mail">✉ 2</span><span class="grow"></span><span class="meta" title="in this state since">9m</span></div>
+  <div class="r"><span class="meta fill">branch <b>td-290</b></span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">claude-code · grind · sonnet</span><span class="grow"></span><span class="meta">TD-290 · 0/2 done</span><span class="meta">1 filed</span></div>
+  <div class="aslot lim"><div class="t">5h window at 100% · resets 02:00 MDT (1h 51m)</div></div>
+  <div class="foot"><span class="next">Switch profile…</span><span class="lk">Wait</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
   <div class="sbar" style="background: #dc2626;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">tdgrind-2</span><span class="badge toggle on" title="click: switch to interactive">unattended</span><span class="badge" title="click: filter the grid to this team">samscrape-grind</span><span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>grinder</span><span style="flex-grow: 1;"></span><span class="pill s-stalled"><span class="dot"></span>stalled?</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">47m</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/tdgrind-2 → td-296</span><span style="flex-grow: 1;"></span><span class="flag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>3 unpushed</span></div>
-    <div class="meta">claude-code · grind (pro) · sonnet</div>
-    <div><span class="meta">under <span class="badge" title="may act on this session (design §4.8)">orc-1</span></span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta scraped" style="border-bottom: 1px dashed #d9a441;">TD-296 → #437 · 2/2 done</span><span style="flex-grow: 1;"></span></div>
-  </div>
-  <div class="sc-slot"><div class="status needs">no output 47m · creds expire in 0.2h</div><div class="status doing" title="what this session says it is doing (design §4.8): its own words">TD-296: waiting on CI for #437</div><div><span class="meta">says · 39m ago</span></div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
+  <div class="r"><span class="name">tdgrind-2</span><span class="grow"></span><span class="pill s-stalled"><span class="dot"></span>stalled?</span></div>
+  <div class="r"><span class="badge" title="the role preset it was started under (design §4.8)"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>grinder</span><span class="mode">unattended</span><span class="grow"></span><span class="meta" title="in this state since">47m</span></div>
+  <div class="r"><span class="meta fill">branch <b>td-296</b></span><span class="grow"></span><span class="flag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>3 unpushed</span></div>
+  <div class="r"><span class="meta fill">claude-code · grind · sonnet</span><span class="grow"></span><span class="meta" style="border-bottom: 1px dashed #d9a441;">TD-296 → #437 · 2/2 done</span></div>
+  <div class="aslot bad"><div class="t">no output 47m · creds expire in 0.2h</div></div>
+  <div class="foot"><span class="next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
+  <div class="sbar" style="background: #16a34a;"></div>
+  <div class="r"><span class="name">tdgrind-1</span><span class="meta fill" title="the session's name as its tool holds it">DIU fetcher</span><span class="grow"></span><span class="pill s-working"><span class="dot"></span>working</span></div>
+  <div class="r"><span class="badge" title="the role preset it was started under (design §4.8)"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>grinder</span><span class="mode">unattended</span><span class="mode">· stops 06:00</span><span class="grow"></span><span class="meta" title="in this state since">14s</span></div>
+  <div class="r"><span class="meta fill">branch <b>td-301</b></span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">claude-code · grind · sonnet</span><span class="grow"></span><span class="meta">TD-301 → #811 · 1/3 done</span><span class="meta">2 filed</span></div>
+  <div class="aslot "><div class="t">TD-301: pushing the branch for review</div><div class="cap">says · 14s ago</div></div>
+  <div class="foot"><span class="next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
   <div class="sbar" style="background: #2563eb;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">tdgrind-1</span><span class="meta" title="the session's name as its tool holds it — set in the tool, not in agentorc">DIU fetcher</span><span class="badge toggle on" title="click: switch to interactive">unattended</span><span class="badge" title="click: filter the grid to this team">samscrape-grind</span><span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>grinder</span><span style="flex-grow: 1;"></span><span class="pill s-working"><span class="dot"></span>working</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">14s</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/tdgrind-1 → td-301</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">claude-code · grind (pro) · sonnet</div>
-    <div><span class="meta">under <span class="badge" title="may act on this session (design §4.8)">orc-1</span></span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="">TD-301 → #811 · 1/3 done</span><span style="flex-grow: 1;"></span><span class="meta">2 filed</span></div>
-  </div>
-  <div class="sc-slot"><div class="status doing" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review</div><div><span class="meta">says · 14s ago</span></div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div></div></div><div style="display: flex; flex-direction: column; gap: 12px; "><div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 13.5px;">No team</span><span class="meta">9 sessions started on their own</span></div><div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"><div class="card sc" style="border-color: #f59e0b;">
+  <div class="r"><span class="name">tdgrind-4</span><span class="grow"></span><span class="pill s-idle"><span class="dot"></span>● finished · unseen</span></div>
+  <div class="r"><span class="badge" title="the role preset it was started under (design §4.8)"><svg class="ricon" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3a5 5 0 0 0-4.6 7L3 17.4 6.6 21l7.4-7.4A5 5 0 1 0 15 3z"></path></svg>grinder</span><span class="mode">unattended</span><span class="grow"></span><span class="meta" title="in this state since">1h 12m</span></div>
+  <div class="r"><span class="meta fill">branch <b>td-299-summaries-fallback</b></span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">claude-code · grind · sonnet</span><span class="grow"></span><span class="meta">#809 · 2/2 done</span></div>
+  <div class="aslot end"><div class="t">out of work — nothing open on the ledger that my brief lets me take</div><div class="cap">ready to close ✓</div></div>
+  <div class="foot"><span class="next">Close session</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div></div></div><div style="display: flex; flex-direction: column; gap: 12px; "><div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 13.5px;">No team</span><span class="meta">9 sessions</span></div><div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"><div class="card ac ring">
   <div class="sbar" style="background: #f59e0b;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">main</span><span style="flex-grow: 1;"></span><span class="pill s-needs"><span class="dot"></span>needs you</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">2m</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">main</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">claude-code · paul (max) · opus</div>
-    
-    <div style="display: flex; align-items: center; gap: 8px;"><span style="flex-grow: 1;"></span><span class="meta">1 filed</span></div>
-  </div>
-  <div class="sc-slot"><div class="status" style="border-color: #f59e0b; color: #7c3d00;">Permission: Bash · git push origin td301-fix</div><div style="display: flex; gap: 6px;"><span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta" style="align-self: center;">via hook · 9m 12s left</span></div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
+  <div class="r"><span class="name">main</span><span class="grow"></span><span class="pill s-needs"><span class="dot"></span>needs you</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">2m</span></div>
+  <div class="r"><span class="meta fill"><b>kmaster</b> / samscrape · branch <b>main</b></span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">claude-code · paul (max) · opus</span><span class="grow"></span><span class="meta">1 filed</span></div>
+  <div class="aslot need"><div class="t">Permission: Bash · git push origin td301-fix</div><div class="cap">via hook · 9m 12s left</div></div>
+  <div class="foot"><span class="next fill">Allow</span><span class="lk">Deny</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
+  <div class="sbar" style="background: #16a34a;"></div>
+  <div class="r"><span class="name">attention-fix</span><span class="grow"></span><span class="pill s-working"><span class="dot"></span>working</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">1m</span></div>
+  <div class="r"><span class="meta fill"><b>vps</b> / dev-cadence · branch <b>attention-fix</b></span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">gemini-cli · paul · 2.5-pro</span><span class="grow"></span></div>
+  <div class="aslot mono"><div class="t">last: ⏺ Edit(scripts/recover_stuck_notices.py)</div></div>
+  <div class="foot"><span class="next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
+  <div class="sbar" style="background: #16a34a;"></div>
+  <div class="r"><span class="name">pve</span><span class="grow"></span><span class="pill s-working scraped"><span class="dot"></span>working</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">3m</span></div>
+  <div class="r"><span class="meta fill"><b>host1</b> / ~/proxmox</span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">shell</span><span class="grow"></span></div>
+  <div class="aslot mono"><div class="t">100  kmaster  running</div></div>
+  <div class="foot"><span class="next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
   <div class="sbar" style="background: #2563eb;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">pve</span><span style="flex-grow: 1;"></span><span class="pill s-working scraped"><span class="dot"></span>working</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">host1 / ~/proxmox</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">3m</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">~/proxmox</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">shell</div>
-    
-    
-  </div>
-  <div class="sc-slot"><div class="term tail">$ qm list
- VMID NAME     STATUS
- 100  kmaster  running
-▌</div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
+  <div class="r"><span class="name">errors-alerts</span><span class="meta fill" title="the session's name as its tool holds it">Error Checker</span><span class="grow"></span><span class="pill s-idle"><span class="dot"></span>idle</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">3h</span></div>
+  <div class="r"><span class="meta fill"><b>kmaster</b> / samscrape · branch <b>errors-alerts</b></span><span class="grow"></span><span class="flag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>dirty · 2 unpushed</span></div>
+  <div class="r"><span class="meta fill">claude-code · paul (max) · opus</span><span class="grow"></span></div>
+  <div class="aslot mono"><div class="t">last: ⏺ Edit(scripts/recover_stuck_notices.py)</div></div>
+  <div class="foot"><span class="next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac off">
+  <div class="sbar" style="background: #9ca3af;"></div>
+  <div class="r"><span class="name">journal</span><span class="grow"></span><span class="pill s-unreachable"><span class="dot"></span>unreachable</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">40m</span></div>
+  <div class="r"><span class="meta fill"><b>laptop</b> / notes · branch <b>main</b></span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">claude-code · paul (max) · sonnet</span><span class="grow"></span></div>
+  <div class="aslot "><div class="t">laptop asleep since 14:02 · last state: idle</div></div>
+  <div class="foot"><span class="next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
   <div class="sbar" style="background: #2563eb;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">attention-fix</span><span style="flex-grow: 1;"></span><span class="pill s-working"><span class="dot"></span>working</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">vps / dev-cadence</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">1m</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/attention-fix</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">gemini-cli · paul · 2.5-pro</div>
-    
-    
-  </div>
-  <div class="sc-slot"><div class="term tail">⏺ Edit(scripts/recover_stuck_notices.py)
-▌</div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
+  <div class="r"><span class="name">main</span><span class="grow"></span><span class="pill s-idle"><span class="dot"></span>idle</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">22m</span></div>
+  <div class="r"><span class="meta fill"><b>kmaster</b> / contractmatch · branch <b>main</b></span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">claude-code · paul (max) · opus</span><span class="grow"></span><span class="meta">1 filed</span></div>
+  <div class="aslot mono"><div class="t">last: ⏺ Bash(git status) — nothing to commit</div><div class="cap">ready to close ✓</div></div>
+  <div class="foot"><span class="next">Close session</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
+  <div class="sbar" style="background: #2563eb;"></div>
+  <div class="r"><span class="name">wg</span><span class="grow"></span><span class="pill s-idle scraped"><span class="dot"></span>idle</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">1h</span></div>
+  <div class="r"><span class="meta fill"><b>vpnmaster</b> / /etc/wireguard</span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">shell</span><span class="grow"></span></div>
+  <div class="aslot mono"><div class="t">$ wg show wg0 · at prompt</div></div>
+  <div class="foot"><span class="next"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
   <div class="sbar" style="background: #9ca3af;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">errors-alerts</span><span class="meta" title="the session's name as its tool holds it — set in the tool, not in agentorc">Error Checker</span><span style="flex-grow: 1;"></span><span class="pill s-idle"><span class="dot"></span>idle</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / samscrape</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">3h</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/errors-alerts</span><span style="flex-grow: 1;"></span><span class="flag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>dirty · 2 unpushed</span></div>
-    <div class="meta">claude-code · paul (max) · opus</div>
-    
-    
-  </div>
-  <div class="sc-slot"><div class="status">last: ⏺ Edit(scripts/recover_stuck_notices.py)</div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
+  <div class="r"><span class="name">td-7</span><span class="grow"></span><span class="pill s-exited"><span class="dot"></span>exited</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">2d</span></div>
+  <div class="r"><span class="meta fill"><b>vps</b> / dev-cadence · branch <b>td-7-hook-fetch</b></span><span class="grow"></span><span class="flag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>PR #12 open</span></div>
+  <div class="r"><span class="meta fill">claude-code · paul (max) · opus</span><span class="grow"></span></div>
+  <div class="aslot end"><div class="t">exited · code 0</div></div>
+  <div class="foot"><span class="next">Forget</span><span class="lk">Details</span><span class="lk"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+</div><div class="card ac">
   <div class="sbar" style="background: #9ca3af;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">main</span><span style="flex-grow: 1;"></span><span class="pill s-idle"><span class="dot"></span>idle</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">kmaster / contractmatch</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">22m</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">main</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">claude-code · paul (max) · opus</div>
-    
-    <div style="display: flex; align-items: center; gap: 8px;"><span style="flex-grow: 1;"></span><span class="meta">1 filed</span></div>
-  </div>
-  <div class="sc-slot"><div class="status ok">ready to close ✓ · tree clean, nothing open</div><div style="display: flex; gap: 6px;"><span class="btn sm">Close session</span></div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
-  <div class="sbar" style="background: #9ca3af;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">wg</span><span style="flex-grow: 1;"></span><span class="pill s-idle scraped"><span class="dot"></span>idle</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">vpnmaster / /etc/wireguard</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">1h</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">/etc/wireguard</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">shell</div>
-    
-    
-  </div>
-  <div class="sc-slot"><div class="status">last: $ wg show wg0 · at prompt</div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc off" style="border-color: #dfe3e8;">
-  <div class="sbar" style="background: #9ca3af;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">journal</span><span style="flex-grow: 1;"></span><span class="pill s-unreachable"><span class="dot"></span>unreachable</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">laptop / notes</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">40m</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">main</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">claude-code · paul (max) · sonnet</div>
-    
-    
-  </div>
-  <div class="sc-slot"><div class="status">laptop asleep since 14:02 · last state: idle</div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
-  <div class="sbar" style="background: #9ca3af;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">td-7</span><span style="flex-grow: 1;"></span><span class="pill s-exited"><span class="dot"></span>exited</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">vps / dev-cadence</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">2d</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/td-7 → td-7-hook-fetch</span><span style="flex-grow: 1;"></span><span class="flag"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg>PR #12 open</span></div>
-    <div class="meta">claude-code · paul (max) · opus</div>
-    
-    
-  </div>
-  <div class="sc-slot"><div class="status bad">not done: PR not merged</div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
-</div><div class="card sc" style="border-color: #dfe3e8;">
-  <div class="sbar" style="background: #059669;"></div>
-  <div class="sc-body">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;"><span class="name">td-5</span><span style="flex-grow: 1;"></span><span class="pill s-done"><span class="dot"></span>closed</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">vps / dev-cadence</span><span style="flex-grow: 1;"></span><span class="meta" style="flex-shrink: 0;">20h</span></div>
-    <div style="display: flex; align-items: center; gap: 8px;"><span class="meta" style="color: #374151;">wt/td-5 (reaped)</span><span style="flex-grow: 1;"></span></div>
-    <div class="meta">claude-code · paul (max) · opus</div>
-    
-    
-  </div>
-  <div class="sc-slot"><div class="status ok">closed by you · PR #11 merged · filed under Resumable in 4h</div></div>
-  <div class="sc-foot"><span class="btn sm primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
+  <div class="r"><span class="name">td-5</span><span class="grow"></span><span class="pill s-closed"><span class="dot"></span>closed</span></div>
+  <div class="r"><span class="mode mine" title="interactive: yours — never paused, nudged or killed by a policy"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"></path></svg>interactive</span><span class="grow"></span><span class="meta" title="in this state since">20h</span></div>
+  <div class="r"><span class="meta fill"><b>vps</b> / dev-cadence · branch <b>td-5</b> · worktree reaped</span><span class="grow"></span></div>
+  <div class="r"><span class="meta fill">claude-code · paul (max) · opus</span><span class="grow"></span></div>
+  <div class="aslot end"><div class="t">closed by you · PR #11 merged · filed under Resumable in 4h</div></div>
+  <div class="foot"><span class="next">Details</span><span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;"><svg viewBox="0 0 16 16" fill="currentColor"><circle cx="3.5" cy="8" r="1.3"></circle><circle cx="8" cy="8" r="1.3"></circle><circle cx="12.5" cy="8" r="1.3"></circle></svg></span></div>
 </div></div></div></div>
-  <div class="note"><b>Teams</b> lists every team defined in <span class="mono">~/.agentorc/org.yml</span> and in the repos' <span class="mono">.agentorc.yml</span>: <b>Start</b> runs the same sequence as <span class="mono">ao team start</span> (every check before any session is created), a running team is not listed — its card below carries <b>Stop</b> (wraps the members up, then the lead) and <b>Stop now</b> (kills). The grid groups by the <b>team</b> badge whenever a live session carries one — lead first, members after, everything else under <i>No team</i> — and each card shows who may act on it (<b>under</b>) and what it has reported. <b>Urgent first</b>: needs you → limited → stalled? → working → idle → exited → closed; an unreachable host sorts with idle when it is volatile, after stalled? when it is not. <b>Pinned</b> keeps every card where you dragged it and highlights the ones that need you instead. A dashed outline on a state pill means the state was guessed from the screen (shells, tools without hooks). Allow / Deny answer the permission through the tool's hook, so the dialog never reaches the terminal unless the hook times out. Command runs (kind: command) are on the Commands tab and hidden here by default.</div>
+  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (finished · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>: the manager's card first, then needs you → limited → stalled? → unreachable (non-volatile) → working → unseen idle → idle → exited → closed, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab.</div>
 </div>
 </div>
 </x-dc>

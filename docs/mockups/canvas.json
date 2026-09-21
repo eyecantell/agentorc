@@ -6,13 +6,13 @@
       "x": 0,
       "y": 0,
       "w": 1440,
-      "h": 1640
+      "h": 1560
     },
     {
       "file": "Inbox.dc.html",
       "title": "Inbox",
       "x": 0,
-      "y": 1740,
+      "y": 1660,
       "w": 1440,
       "h": 1640
     },
@@ -20,7 +20,7 @@
       "file": "Focus.dc.html",
       "title": "Focus \u2014 member",
       "x": 0,
-      "y": 3480,
+      "y": 3400,
       "w": 1440,
       "h": 1280
     },
@@ -28,7 +28,7 @@
       "file": "FocusOrc.dc.html",
       "title": "Focus \u2014 orchestrator",
       "x": 0,
-      "y": 4860,
+      "y": 4780,
       "w": 1440,
       "h": 980
     },
@@ -36,15 +36,15 @@
       "file": "Legend.dc.html",
       "title": "States & badges",
       "x": 0,
-      "y": 5940,
-      "w": 760,
-      "h": 820
+      "y": 5860,
+      "w": 900,
+      "h": 1180
     },
     {
       "file": "Resumable.dc.html",
       "title": "Resumable",
       "x": 0,
-      "y": 6860,
+      "y": 7140,
       "w": 1440,
       "h": 700
     },
@@ -52,7 +52,7 @@
       "file": "Attention.dc.html",
       "title": "Attention",
       "x": 0,
-      "y": 7660,
+      "y": 7940,
       "w": 1440,
       "h": 860
     },
@@ -86,7 +86,7 @@
       "x": 3120,
       "y": 0,
       "w": 1440,
-      "h": 1640
+      "h": 1560
     }
   ],
   "annotations": [
@@ -95,7 +95,7 @@
       "x": 0,
       "y": -150,
       "w": 520,
-      "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' \u2192 'Ready to close' + user-driven Close \u2192 closed state; dark artboard added; laptop shown as a volatile host (\u25d0).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass \u2014 renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI \u2014 the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form \u2014 the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."
+      "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool \u00b7 account \u00b7 model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' \u2192 'Ready to close' + user-driven Close \u2192 closed state; dark artboard added; laptop shown as a volatile host (\u25d0).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass \u2014 renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to \u00a74.5 *The card's anatomy* \u2014 six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close \u2713* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI \u2014 the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form \u2014 the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."
     }
   ],
   "launch": {
