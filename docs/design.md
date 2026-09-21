@@ -470,14 +470,30 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
-- Usage: each live agent session's profile is asked its adapter's `usage_for` once a minute in
-  a thread (never per tick); the last answer is cached, served by `usage`, streamed as a `usage`
+- Usage: each live agent session's profile is asked its adapter's `usage_for` **every five
+  minutes** in a thread (never per tick — and a minute, which it was until 2026-09-20, buys
+  nothing against a five-hour window while spending an allowance the tool itself shares, TD-087);
+  the last answer is cached, served by `usage`, streamed as a `usage`
   event for the top bar's per-profile figure, and drives the `limited` rule of §4.2 (an
   interactive session on a profile with **any** reported window at 100% shows `limited` with that
   window's label and reset time, `working` again once the window resets — the core iterates the
   adapter's list and names no window of any tool, TD-073). A fetch failure keeps the last answer
   (TD-001). A profile no live session runs under is dropped from the cache and a `usage` event
   with `usage: null` takes its chip off the top bar, so one tool in use is one chip.
+  **A failure says why** (2026-09-20, TD-087): the adapter answers `ok` with the windows, or
+  `rate_limited` (with the endpoint's `Retry-After` when it sends one), `no_credentials`,
+  `no_profile` or `error` — a word the core keys on, never prose, because *rate-limited*, *no
+  credentials*, *no network* and *no profile* were one silence, and a silence cost more than a
+  missing chip: `limited` is read from the same reading, so a session at its cap was not marked
+  while the endpoint refused us. The core does three things with it and no more. It **logs a
+  change of reason once**, not a line per poll. It **backs off on `rate_limited` alone** — the
+  `Retry-After`, else double to an hour — and any other answer returns to the ordinary cadence,
+  since only a 429 is the endpoint asking to be asked less often. And it **keeps the last good
+  reading**, with the reason beside it, so the chip goes stale rather than going out: a window
+  does not change while we are refused, and *the chip went out* and *the allowance is spent* are
+  different things to a person. The reading is **held across a restart** (`usage.json`) — it lived
+  in memory, so each promote forgot it and polled at once, eight times in one day — while the
+  reason is not, being the running agent's own business.
 - Attachment drop: accept an uploaded file (the UI copies it over ssh) into
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file

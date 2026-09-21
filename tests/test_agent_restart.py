@@ -300,3 +300,25 @@ async def test_a_wait_against_no_agent_at_all_is_still_an_error(tmp_path, monkey
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     with pytest.raises(AgentUnavailable, match="not reachable"):
         await client.wait_rpc(caller="ao-nobody", timeout=30.0)
+
+
+async def test_the_last_usage_reading_survives_a_restart(tmp_path, monkeypatch):
+    """TD-087 item 3: the readings lived in memory, so **every promote forgot them** — eight in
+    one day — and the agent polled at once against an endpoint that answers 429, while the chip
+    vanished rather than going stale. The last good reading is now on disk with its `fetched`
+    time, so a restarted agent has something to show and nothing to ask for."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    tmux = Tmux(socket_name=private_socket_name())
+    reading = {"windows": [{"label": "5h", "pct": 61, "resets": None}], "fetched": "t1", "reason": "ok"}
+    a = HostAgent(tmux=tmux)
+    a._usage["p1"] = reading
+    a.usage_store.save(a._usage)
+    # a second agent, as a promote makes one — built, not served, so the assertion is about the
+    # load and not about when the first tick runs
+    a2 = HostAgent(tmux=tmux)
+    # the reading is back — and the **reason** is not, because why the last poll failed is the
+    # running agent's business and means nothing after a restart
+    assert a2._usage == {"p1": {"windows": [{"label": "5h", "pct": 61, "resets": None}], "fetched": "t1"}}
+    # what does *not* survive is a profile no live session runs under: the tick prunes it, which
+    # is TD-073's rule (one tool in use is one chip) and is why the file is not an archive
+    assert a2.usage_store.load() == a2._usage

@@ -104,6 +104,31 @@ class AttentionStore:
         _atomic_write(self.path, json.dumps({"trail": trail, "snoozed": snoozed}, indent=1))
 
 
+class UsageStore:
+    """The last good usage reading per profile (TD-087), `{profile: {windows, fetched}}`.
+
+    In memory it was forgotten by every promote, and the agent then polled at once — eight
+    promotes in one day against an endpoint that answers 429 — and the chip vanished each time
+    rather than going stale. Only a **reading** is kept: why the last poll failed is the running
+    agent's business and means nothing after a restart. A missing or unreadable file is no
+    readings, never a crash."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = path or paths.usage_file()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def load(self) -> dict[str, dict[str, Any]]:
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            return {str(k): v for k, v in raw.items() if isinstance(v, dict) and v.get("windows") is not None}
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            return {}
+
+    def save(self, readings: dict[str, dict[str, Any]]) -> None:
+        keep = {k: {"windows": v.get("windows"), "fetched": v.get("fetched")} for k, v in readings.items()}
+        _atomic_write(self.path, json.dumps(keep, indent=1))
+
+
 class IdentityAlarmStore:
     """The host's **own** identity alarms (design §4.8a, TD-077 step 2): the ones about no record —
     a claim from outside every pane, an unreadable peer — which have nowhere else to live, since a

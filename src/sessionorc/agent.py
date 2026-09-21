@@ -64,7 +64,14 @@ from sessionorc.models import (
     normalize_ref,
     now_iso,
 )
-from sessionorc.store import AttentionStore, EventQueue, IdentityAlarmStore, PersonInboxStore, SessionStore
+from sessionorc.store import (
+    AttentionStore,
+    EventQueue,
+    IdentityAlarmStore,
+    PersonInboxStore,
+    SessionStore,
+    UsageStore,
+)
 from sessionorc.tmux import ARG_LIMIT, DuplicateSession, PaneInfo, Tmux
 
 log = logging.getLogger("agentorc.agent")
@@ -156,7 +163,11 @@ FILE_CAP = 256 * 1024
 BACKUP_KEEP = 7
 BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml")
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
-USAGE_EVERY = 60.0  # seconds between usage polls per profile (TD-001): a slow cadence, never per tick
+# Seconds between usage polls per profile (TD-001): a slow cadence, never per tick. **Five
+# minutes, not one** (TD-087): the shortest window the endpoint reports is five hours, so a
+# minute buys nothing and spends an allowance shared with the tool itself.
+USAGE_EVERY = 300.0
+USAGE_BACKOFF_MAX = 3600.0  # the ceiling a 429 doubles up to, when the endpoint sends no Retry-After
 REMOVED_GUARD_SECONDS = 60.0  # how long a removed session's name is checked against re-adoption
 
 
@@ -378,8 +389,13 @@ class HostAgent:
             sid: datetime.now(UTC) for sid, s in self.sessions.items() if s.confidence == "hook"
         }
         # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
-        self._usage: dict[str, dict[str, Any]] = {}
+        # The last good reading per profile, kept across a restart (TD-087) — with, beside the
+        # windows, why the *last poll* failed, which the page draws as a stale chip rather than
+        # as nothing at all. `_usage_wait` is the backoff a 429 sets and a success clears.
+        self.usage_store = UsageStore()
+        self._usage: dict[str, dict[str, Any]] = self.usage_store.load()
         self._usage_checked: dict[str, float] = {}
+        self._usage_wait: dict[str, float] = {}
         self._usage_task: asyncio.Task[None] | None = None
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
         # Sessions removed recently: name → (the removed pane's tmux creation time, a monotonic
@@ -760,7 +776,8 @@ class HostAgent:
         due: dict[str, Any] = {}
         for s in live:
             fn = getattr(adapters.get(s.adapter), "usage_for", None)
-            if fn and s.profile not in due and mono - self._usage_checked.get(s.profile, -USAGE_EVERY) >= USAGE_EVERY:
+            wait = self._usage_wait.get(s.profile, USAGE_EVERY)
+            if fn and s.profile not in due and mono - self._usage_checked.get(s.profile, -wait) >= wait:
                 due[s.profile] = fn
         if due:
             results = await asyncio.gather(
@@ -768,14 +785,17 @@ class HostAgent:
             )
             for prof, r in zip(due, results, strict=True):
                 self._usage_checked[prof] = mono
-                if isinstance(r, dict) and r != self._usage.get(prof):
-                    self._usage[prof] = r
-                    await self._broadcast({"event": "usage", "profile": prof, "usage": r})
+                if (merged := self._usage_reading(prof, r)) is not None:
+                    self._usage[prof] = merged
+                    self.usage_store.save(self._usage)
+                    await self._broadcast({"event": "usage", "profile": prof, "usage": merged})
         # Only profiles a live session is running under are shown (TD-073, Paul 2026-09-19): one
         # tool in use is one chip, and last night's profile does not sit in the top bar all day.
         for prof in [p for p in self._usage if p not in {s.profile for s in live}]:
             self._usage.pop(prof, None)
             self._usage_checked.pop(prof, None)
+            self._usage_wait.pop(prof, None)
+            self.usage_store.save(self._usage)
             await self._broadcast({"event": "usage", "profile": prof, "usage": None})
         for s in live:
             cap = _cap(self._usage.get(s.profile))
@@ -788,6 +808,41 @@ class HostAgent:
                 # back to what it was (idle stays idle: no hook will come to correct a wrong `working`)
                 s.set_state(self._pre_limited.pop(s.id, "working"), confidence="hook")
                 self.store.save(s)
+
+    def _usage_reading(self, prof: str, r: Any) -> dict[str, Any] | None:
+        """One poll's answer folded into what this profile already had (TD-087), or None when
+        nothing changed and nothing need be said.
+
+        An adapter now answers with a **reason** rather than a silence: `ok` with the windows,
+        or `rate_limited` / `no_credentials` / `no_profile` / `error` with none. A reading is
+        replaced only by a newer reading — a failure **keeps the last one**, with the reason
+        beside it, because *the chip went out* and *the allowance is spent* are different things
+        to a person and a five-hour window does not change while we are refused. The backoff is
+        set here too: a 429 waits the endpoint's own `Retry-After`, or doubles to a ceiling; any
+        other answer, good or bad, goes back to the ordinary cadence, since only a 429 is the
+        endpoint telling us to ask less often."""
+        if isinstance(r, BaseException) or not isinstance(r, dict):
+            r = {"reason": "error"}
+        reason = str(r.get("reason") or ("ok" if r.get("windows") is not None else "error"))
+        if reason == "rate_limited":
+            after = r.get("retry_after")
+            prev = self._usage_wait.get(prof, USAGE_EVERY)
+            self._usage_wait[prof] = (
+                max(float(after), USAGE_EVERY) if isinstance(after, int | float) else min(prev * 2, USAGE_BACKOFF_MAX)
+            )
+        else:
+            self._usage_wait.pop(prof, None)
+        was = self._usage.get(prof) or {}
+        if was.get("reason") != reason:
+            # once per change of reason, never per poll: a 429 every five minutes is one line
+            log.info("usage for profile %s: %s (was %s)", prof, reason, was.get("reason") or "no reading yet")
+        if reason == "ok":
+            out = {"windows": r.get("windows"), "fetched": r.get("fetched"), "reason": "ok"}
+        else:
+            out = {**{k: v for k, v in was.items() if k in ("windows", "fetched")}, "reason": reason}
+            if isinstance(r.get("retry_after"), int | float):
+                out["retry_after"] = r["retry_after"]
+        return out if out != was else None
 
     def _reconcile(self, panes: dict[str, PaneInfo], tails: dict[str, list[str]], snapshot_at: datetime) -> None:
         for sid, event in self.events.drain():

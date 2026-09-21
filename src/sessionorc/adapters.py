@@ -59,12 +59,17 @@ class Adapter(Protocol):
     #                                                      the profile *name*, like `usage_for`
     #   short_model(model: str) -> str                     that name as a display shortens it
     #   usage_for(profile: str) -> dict | None            {"windows": [{"label", "pct", "resets"}, ...],
-    #                                                      "fetched"} — every quota window this account has, the
-    #                                                      labels the adapter's and printed by nothing but the
-    #                                                      chip (TD-073); one window, three or none are all
-    #                                                      legal. None = unknown, never gates anything (design
-    #                                                      §4.3 `usage()`, keyed by the profile *name* because
-    #                                                      this package cannot build a Profile)
+    #                                                      "fetched", "reason": "ok"} — every quota window this
+    #                                                      account has, the labels the adapter's and printed by
+    #                                                      nothing but the chip (TD-073); one window, three or
+    #                                                      none are all legal. **Or why there is no reading**
+    #                                                      (TD-087): {"reason": "rate_limited", "retry_after":
+    #                                                      <seconds or None>} / {"reason": "no_credentials"} /
+    #                                                      {"reason": "no_profile"} / {"reason": "error"} — a
+    #                                                      word the core keys on, never prose. None is still
+    #                                                      legal and means the same as "error". Never gates
+    #                                                      anything (design §4.3 `usage()`, keyed by the profile
+    #                                                      *name* because this package cannot build a Profile)
 
 
 def short_model(adapter: str, model: str | None) -> str:
