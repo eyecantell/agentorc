@@ -386,7 +386,7 @@
       the same answer, so the button is here exactly when the press can succeed; a controller that
       goes between the draw and the press is refused in words, which comes back as the toast. -#}
   {%- if e.row != 'alarm_host' and e.sid and e.alarm_to %}
-  <button class="btn sm" data-act="identity_log" data-id="person" data-who="{{ e.sid }}" data-to="{{ e.alarm_to }}" data-confirm="Hand these alarms to {{ e.alarm_to }}? It gets them as mail from you, owes you an outcome on them (done, blocked or dropped), and the list is cleared here; the host agent's log keeps every one.">Log TD</button>
+  <button class="btn sm" data-act="identity_log" data-id="person" data-who="{{ e.sid }}" data-to="{{ e.alarm_to.name }}" title="hand them to {{ e.alarm_to.name }} ({{ e.alarm_to.id }})" data-confirm="Hand these alarms to {{ e.alarm_to.name }} ({{ e.alarm_to.id }})? It gets them as mail from you, owes you an outcome on them (done, blocked or dropped), and the list is cleared here; the host agent's log keeps every one.">Log TD</button>
   {%- else %}
   <span class="st">no session answers for {% if e.row == 'alarm_host' %}the host's own list{% else %}this one{% endif %}: nothing to hand it to</span>
   {%- endif %}

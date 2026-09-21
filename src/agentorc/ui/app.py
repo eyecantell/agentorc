@@ -472,6 +472,17 @@ def alarm_view(raw: Any) -> list[dict[str, Any]]:
     return out
 
 
+def alarm_to_view(raw: Any) -> dict[str, str] | None:
+    """Who **Log TD** would hand a record's alarms to (design §4.8a *An alarm's answers*, TD-077 b),
+    as the home's `alarm_to` gives it — `{"id", "name"}`, its first live controller — or None for
+    *nobody*. A shape another build wrote (a bare string, a dict with no id) is *nobody* too: the
+    row then says so in words, and costs nothing but the button."""
+    if not isinstance(raw, dict) or not isinstance(raw.get("id"), str) or not raw["id"].strip():
+        return None
+    name = raw.get("name")
+    return {"id": raw["id"], "name": name if isinstance(name, str) and name.strip() else raw["id"]}
+
+
 def suspended_note(raw: Any) -> str:
     """The **suspended** mark's words, or "" (design §4.8a *An alarm's answers*, TD-077 a2).
 
@@ -963,8 +974,8 @@ def state_rows(
                     # §4.8a *An alarm's answers* (TD-077 b): who **Log TD** would hand these to — the
                     # home's own answer (`alarm_to`, the record's first live controller from the
                     # control graph), never worked out here, so drawn-or-not and the RPC's
-                    # refused-or-not cannot disagree. Anything but a non-empty string is *nobody*.
-                    "alarm_to": to if isinstance(to := v.get("alarm_to"), str) and to.strip() else None,
+                    # refused-or-not cannot disagree.
+                    "alarm_to": alarm_to_view(v.get("alarm_to")),
                     "mode": identity_mode,
                     "find": _find_text(row["find"], *(a["words"] for a in alarms)),
                 }

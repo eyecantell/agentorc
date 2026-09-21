@@ -867,6 +867,9 @@ def test_log_td_is_a_persons_own_route_and_a_controller_gone_since_the_draw_is_t
     assert bad.status_code == 400 and "no session ao-nope" in bad.json()["detail"]
 
 
+MANAGER = {"id": "ao-agentorc-manager-ao-1", "name": "manager-ao-1"}
+
+
 @pytest.mark.unit
 def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_record(tmp_path, monkeypatch):
     """§4.8a *An alarm's answers*: **Log TD** hands the alarms to the record's first live
@@ -875,16 +878,17 @@ def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_r
     the button is here exactly when a press can succeed, and the row says so in words where not."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     states = state_rows_of(
-        [rec("ao-x", "working", identity_alarms=[ALARM], alarm_to="ao-agentorc-manager-ao-1")],
+        # the home's own shape, `_answers_for`: `{"id", "name"}` (tests/test_identity.py holds it)
+        [rec("ao-x", "working", identity_alarms=[ALARM], alarm_to=MANAGER)],
         host="kmaster", identity_mode="enforce",
     )  # fmt: skip
-    assert states[0]["alarm_to"] == "ao-agentorc-manager-ao-1"  # carried from the record's view
+    assert states[0]["alarm_to"] == {"id": "ao-agentorc-manager-ao-1", "name": "manager-ao-1"}
     html = rows("needs", states)
-    assert 'data-act="identity_log" data-id="person" data-who="ao-x" data-to="ao-agentorc-manager-ao-1"' in html
-    assert ">Log TD</button>" in html and "Hand these alarms to ao-agentorc-manager-ao-1?" in html
+    assert 'data-act="identity_log" data-id="person" data-who="ao-x" data-to="manager-ao-1"' in html
+    assert ">Log TD</button>" in html and "Hand these alarms to manager-ao-1 (ao-agentorc-manager-ao-1)?" in html
     assert "owes you an outcome" in html and "no session answers" not in html
     # nobody answers — null, empty, or a shape another build wrote: words, never a control
-    for odd in (None, "", "  ", 7, ["ao-m"]):
+    for odd in (None, "", "ao-m", 7, ["ao-m"], {}, {"id": "  "}, {"name": "m"}):
         st = state_rows_of([rec("ao-x", "working", identity_alarms=[ALARM], alarm_to=odd)], host="kmaster")
         assert st[0]["alarm_to"] is None, odd
         out = rows("needs", st)
@@ -893,8 +897,13 @@ def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_r
     host_row = {**states[0], "row": "alarm_host", "sid": "", "name": "kmaster"}
     assert 'data-act="identity_log"' not in rows("needs", [host_row])
 
+    # a name missing from the home's answer falls back to the id, never to nothing
+    bare = state_rows_of([rec("ao-x", "working", identity_alarms=[ALARM], alarm_to={"id": "ao-m"})], host="kmaster")
+    assert bare[0]["alarm_to"] == {"id": "ao-m", "name": "ao-m"}
+
     js = (UI / "static" / "app.js").read_text()
     assert 'if (action === "identity_log") body = { id: b.dataset.who || "" };' in js
+    assert "res.to.name || res.to.id" in js  # the RPC answers `to` as {id, name}, never a bare string
     # an answer, so the row goes (only Suspend leaves it standing), and a refusal names the control
     assert 'if (staterow && action !== "suspend") staterow.remove();' in js
     assert '${action === "identity_log" ? "Log TD" : action} failed' in js

@@ -212,7 +212,7 @@
       if (action === "gowithit") AO.toast("go with it — the sender takes its default now", true);
       // the wire name stays `identity_ack`; the control is **Dismiss** (§4.5a, renamed 2026-09-20)
       if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
-      if (action === "identity_log") AO.toast(`logged → ${res.to || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);
+      if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
