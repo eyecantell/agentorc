@@ -45,7 +45,7 @@ def test_a_team_with_nothing_live_keeps_its_card_below_the_live_ones_and_no_team
     groups = team_groups(views, rows)
     assert [g["team"] for g in groups] == ["live", "", "ao-grind", "zz-idle"]  # live, No team, stopped
     idle = groups[-1]
-    assert idle["defined"] and idle["ids"] == [] and idle["def_lead"] == "orc" and idle["projects"] == ["p"]
+    assert idle["defined"] and idle["ids"] == [] and idle["def_manager"] == "orc" and idle["projects"] == ["p"]
     # a definition alone turns grouping on: a stopped team is a card, not a line above a flat grid
     assert [g["team"] for g in team_groups([sess("ao-b", "b")], rows)] == ["", "zz-idle"]
 
@@ -61,10 +61,10 @@ def test_two_teams_each_with_a_lead():
     groups = team_groups(views)
     assert [g["team"] for g in groups] == ["ao-grind", "guardians"]
     ao, gu = groups
-    assert ao["lead"]["name"] == "orchestrator-ao-1" and ao["ids"][0] == "ao-orc"  # the lead's card first
+    assert ao["manager"]["name"] == "orchestrator-ao-1" and ao["ids"][0] == "ao-orc"  # the lead's card first
     assert ao["projects"] == ["agentorc"]
     assert gu["projects"] == ["guardians", "guardians-api"]  # deduplicated across the members
-    assert gu["lead"]["id"] == "gu-orc"
+    assert gu["manager"]["id"] == "gu-orc"
 
 
 def test_a_team_with_no_lead_and_the_needs_you_count():
@@ -76,7 +76,7 @@ def test_a_team_with_no_lead_and_the_needs_you_count():
         sess("ao-d", "d", team="solo", caps=["control"]),
     ]
     (g,) = team_groups(views)
-    assert g["lead"] is None  # the header says "led by you"
+    assert g["manager"] is None  # the header says "managed by you"
     assert g["needs"] == 2
     assert g["live"] == 3
 
@@ -85,7 +85,7 @@ def test_unbadged_sessions_form_the_no_team_group_last():
     views = [sess("ao-x", "x"), sess("ao-orc", "orc", team="t", caps=["control"])]
     groups = team_groups(views)
     assert [g["label"] for g in groups] == ["t", "No team"]
-    assert groups[-1]["team"] == "" and groups[-1]["lead"] is None
+    assert groups[-1]["team"] == "" and groups[-1]["manager"] is None
 
 
 def test_members_sort_urgent_first_within_a_group():
@@ -156,9 +156,9 @@ def test_a_lead_whose_own_badge_differs_is_still_found_but_keeps_its_card():
     w1 = sess("w1", "w1", team="t", controllers=["o"])
     w2 = sess("w2", "w2", team="t", controllers=["o"])
     groups = {g["team"]: g for g in team_groups([orc, w1, w2])}
-    assert groups["t"]["lead"]["name"] == "orc" and groups["t"]["lead_elsewhere"] is True
+    assert groups["t"]["manager"]["name"] == "orc" and groups["t"]["manager_elsewhere"] is True
     assert groups["t"]["ids"] == ["w1", "w2"]  # the lead's card is not moved into this group
-    assert groups["other"]["ids"] == ["o"] and groups["other"]["lead"] is None
+    assert groups["other"]["ids"] == ["o"] and groups["other"]["manager"] is None
 
 
 def test_the_top_bar_inbox_opens_the_page_and_shows_its_count_only_above_zero(monkeypatch, tmp_path):

@@ -241,7 +241,7 @@ def test_a_stopped_team_is_a_card_with_start_and_none_defined_is_a_line(world, c
     html = client.get("/").text
     # Nothing is live: the definition is a card with Start, no sessions in it, and no Stop.
     assert 'data-team-act="start"' in html and 'data-team-act="stop' not in html
-    assert '<section class="tgroup" data-team="ao-grind"' in html and "lead orc-ao · 2 members" in html
+    assert '<section class="tgroup" data-team="ao-grind"' in html and "Manager orc-ao · 2 members" in html
     assert "team-row" not in html  # the strip's rows are retired (design §4.5a, 2026-09-18)
     (tmp_path / "home" / "org.yml").unlink()
     html = client.get("/").text
@@ -355,7 +355,7 @@ def test_stop_now_kills_every_badged_session_in_one_call(world, client):
     assert r.status_code == 200
     body = r.json()
     assert sorted(fleet.sent("kill")) == ["grind-1", "orc-ao"] and not fleet.sent("send")
-    assert body["lead"] is None and "killed 2 sessions" in body["text"]
+    assert body["manager"] is None and "killed 2 sessions" in body["text"]
 
 
 def test_stop_sends_the_wrap_up_to_the_members_and_leaves_the_lead_to_the_background(world, client, monkeypatch):
@@ -367,7 +367,7 @@ def test_stop_sends_the_wrap_up_to_the_members_and_leaves_the_lead_to_the_backgr
     # only the member was sent to in the request: the lead follows once they settle (§4.9)
     assert fleet.sent("send") == ["grind-1"] and not fleet.sent("kill")
     assert [e["name"] for e in body["sessions"]] == ["grind-1"]
-    assert body["lead"] == "orc-ao" and "orc-ao follows when they settle" in body["text"]
+    assert body["manager"] == "orc-ao" and "orc-ao follows when they settle" in body["text"]
     for _ in range(40):  # the second half runs behind the response; another request lets the loop turn
         if later:
             break
@@ -443,7 +443,7 @@ def test_a_background_lead_stop_that_fails_is_reported_rather_than_dropped(world
 
     monkeypatch.setattr(teamrun, "stop_lead", boom)
     fleet.sessions += [badged("orc-ao", "ao-grind"), badged("grind-1", "ao-grind")]
-    assert client.post("/api/teams/ao-grind/stop", json={}).json()["lead"] == "orc-ao"
+    assert client.post("/api/teams/ao-grind/stop", json={}).json()["manager"] == "orc-ao"
     row = None
     for _ in range(40):  # the failure lands behind the response; each request lets the loop turn
         row = next(t for t in client.get("/api/teams").json()["teams"] if t["name"] == "ao-grind")
@@ -470,8 +470,8 @@ def test_two_stop_presses_do_not_start_two_lead_stops(world, client, monkeypatch
     fleet.sessions += [badged("orc-ao", "ao-grind"), badged("grind-1", "ao-grind")]
     first = client.post("/api/teams/ao-grind/stop", json={}).json()
     second = client.post("/api/teams/ao-grind/stop", json={}).json()
-    assert first["lead"] == "orc-ao"
-    assert second["lead"] is None and "already stopping" in second["text"]
+    assert first["manager"] == "orc-ao"
+    assert second["manager"] is None and "already stopping" in second["text"]
     assert started == ["orc-ao"]  # one task, not two
 
 

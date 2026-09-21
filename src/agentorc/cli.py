@@ -491,6 +491,7 @@ def cmd_roles(args: argparse.Namespace) -> int:
                 f"profile: {r.profile or 'default'}",
                 f"controllers: {', '.join(r.controllers or cfg.controllers) or 'nobody'}",
                 f"brief: {r.brief or '-'}",
+                f"label: {r.display}",  # what the page shows for it (design §4.8 *The names*)
             ]
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
 

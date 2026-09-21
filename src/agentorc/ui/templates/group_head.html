@@ -1,18 +1,19 @@
-{# One team group's header (design §4.5a Org **team groups**, §4.9): team name, the lead's name and
-   state pill (or "led by you" when no member is the lead), the projects the members carry, and the
+{# One team group's header (design §4.5a Org **team groups**, §4.9): team name, the manager's name
+   and state pill under its role's label (§4.8 *The names*, TD-076: *Manager* unless its role says
+   otherwise), or "managed by you" when no member is the manager, the projects the members carry, and the
    needs-you count across them. Rendered on page load and re-rendered per delta on /events — the
    client swaps the header's contents, never composes them. A team with nothing live keeps its card
    (2026-09-18): the header then reads *stopped* / *wound down*, carries Start, and folds the cards. #}
 <span class="h2"{% if g.source %} title="defined in {{ g.source }}"{% endif %}>{{ g.label }}</span>
-{% if g.lead %}<span class="meta">lead</span> <a class="name" href="/focus/{{ g.lead.id }}">{{ g.lead.name }}</a>
-<span class="pill s-{{ g.lead.state_class }}{% if g.lead.scraped %} scraped{% endif %}"><span class="dot"></span>{{ g.lead.state_label }}</span>{% if g.lead_elsewhere %} <span class="meta" title="the lead carries a different team badge, so its card is in that group (design §4.9)">elsewhere</span>{% endif %}
-{% elif g.team and g.members %}<span class="meta" title="no member of this team holds control over the others (design §4.8)">led by you</span>
-{% elif g.team and g.def_lead %}<span class="meta">lead {{ g.def_lead }} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
+{% if g.manager %}<span class="meta">{{ g.manager.role_label or 'Manager' }}</span> <a class="name" href="/focus/{{ g.manager.id }}">{{ g.manager.name }}</a>
+<span class="pill s-{{ g.manager.state_class }}{% if g.manager.scraped %} scraped{% endif %}"><span class="dot"></span>{{ g.manager.state_label }}</span>{% if g.manager_elsewhere %} <span class="meta" title="the manager carries a different team badge, so its card is in that group (design §4.9)">elsewhere</span>{% endif %}
+{% elif g.team and g.members %}<span class="meta" title="no member of this team holds control over the others (design §4.8)">managed by you</span>
+{% elif g.team and g.def_manager %}<span class="meta">Manager {{ g.def_manager }} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
 {% if g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
-{# design §4.5a **team groups** (§4.8 `doing`, TD-074): the lead's own line, with its age exactly as
-   a card draws it — the lead reporting on the team without being asked to narrate each member. #}
-{% if g.lead and g.lead.doing %}<span class="meta doing" title="what the lead says it is doing (design §4.8): its own words">· {{ g.lead.doing.text }}</span>
-<span class="meta">says{% if g.lead.doing.age %} · {{ g.lead.doing.age }} ago{% endif %}</span>{% endif %}
+{# design §4.5a **team groups** (§4.8 `doing`, TD-074): the manager's own line, with its age exactly
+   as a card draws it — the manager reporting on the team without being asked to narrate each member. #}
+{% if g.manager and g.manager.doing %}<span class="meta doing" title="what the manager says it is doing (design §4.8): its own words">· {{ g.manager.doing.text }}</span>
+<span class="meta">says{% if g.manager.doing.age %} · {{ g.manager.doing.age }} ago{% endif %}</span>{% endif %}
 {# the fold (design §4.5a **team groups**): only a team with nothing live folds; the client keeps
    the choice per team and sets the word #}
 {% if g.team and not g.live and g.members %}<button class="btn sm ghost fold" data-fold="{{ g.team }}" data-n="{{ g.members | length }}" title="a stopped team's cards are folded away: its sessions have exited and are waiting for Forget">{{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</button>{% endif %}
@@ -22,7 +23,7 @@
 {% else %}<span class="meta">stopped</span>{% endif %}
 {# Start, or Wind down / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the
    control sits on the thing it acts on, and only a team with a definition has either. #}
-{% if g.team and g.defined %}{% if g.live %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="each member finishes what it holds and exits, then the lead (`ao team stop`)">Wind down</button>
+{% if g.team and g.defined %}{% if g.live %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="each member finishes what it holds and exits, then the manager (`ao team stop`)">Wind down</button>
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="kill every session carrying this badge (`ao team stop --now`)">Stop now</button>
 {% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="the same sequence as `ao team start`: every check before any session is created">Start</button>{% endif %}{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}

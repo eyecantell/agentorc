@@ -178,6 +178,7 @@ def test_ao_roles_lists_built_ins_and_the_repo_overrides_marking_the_source(repo
     assert out.splitlines()[0] == f"roles from {root / '.agentorc.yml'}"
     assert "grinder   [built-in + repo]  lane: free-pick  grants: none  profile: grind  controllers: orc" in out
     assert "brief: docs/briefs/g.md" in out and "reviewer  [repo]  lane: ui" in out
+    assert "label: Grinder" in out and "label: Reviewer" in out  # what the page shows (design §4.8 *The names*)
     assert cli.main(["roles", "--json", "-d", str(root)]) == 0
     data = json.loads(capsys.readouterr().out)
     assert data["controllers"] == ["orc"] and [r["name"] for r in data["roles"]][-1] == "reviewer"

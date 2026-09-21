@@ -188,6 +188,32 @@ def test_grants_orchestrate_in_a_role_is_read_as_control(tmp_path, capsys, monke
     assert "grant `orchestrate` is now `control`" in capsys.readouterr().err
 
 
+def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path):
+    """design §4.8 *The names* (TD-076 step 3): a preset or a `roles:` entry may carry `label:` —
+    what the role badge, a team header and an Inbox row **show** in place of the key; the key is
+    what everything else reads. The built-ins' are *Manager*, *Grinder*, *Hunter*; the default is
+    the role's name with its first letter raised, and an old name is read through the renamed-roles
+    table, so a record badged `orchestrator` or `lead` reads *Manager*."""
+    builtin = {r.name: r.display for r in repoconfig.roles(repoconfig.RepoConfig())}
+    assert builtin == {"grinder": "Grinder", "hunter": "Hunter", "manager": "Manager", "plain": "Plain"}
+    assert "label" in repoconfig.ROLE_KEYS
+    assert repoconfig.default_label("orchestrator") == repoconfig.default_label("lead") == "Manager"
+    assert repoconfig.default_label("reviewer") == "Reviewer" and repoconfig.default_label("") == ""
+    # a layer's label wins per key, as every other key does, and to_dict says what the page shows
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {label: TD grinder}\n  reviewer: {icon: eye}\n")
+    cfg = repoconfig.load(tmp_path)
+    grinder = repoconfig.resolve_role(cfg, "grinder")
+    assert grinder.display == "TD grinder" and grinder.icon == "wrench" and grinder.to_dict()["label"] == "TD grinder"
+    assert repoconfig.resolve_role(cfg, "reviewer").display == "Reviewer"  # no label: the default
+    assert repoconfig.resolve_role(cfg, "hunter", {"hunter": {"label": "Bug hunter"}}).display == "Bug hunter"
+    # a label is one short line of text, checked when the file is read
+    for bad, why in (("label: ''", "one line"), ("label: 7", "one line"), ("label: [a]", "one line"),
+                     ("label: \"a\\nb\"", "one line"), ("label: " + "x" * 41, "longer than 40")):  # fmt: skip
+        (tmp_path / ".agentorc.yml").write_text(f"roles:\n  grinder: {{{bad}}}\n")
+        with pytest.raises(ValueError, match=why):
+            repoconfig.load(tmp_path)
+
+
 def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     """TD-074 step 4, design §4.8 *Role presets*: a preset may carry an `icon:` — one name from the
     set the UI ships, never markup from a config file. The built-ins carry `manager: flag`,

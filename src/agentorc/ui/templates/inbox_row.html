@@ -261,7 +261,7 @@
   {#- §4.5 screen 6 *Layout*: a session's name is printed **once** — the tool's own title is left
       out when it only repeats it (`push  push` on Paul's screenshot, TD-082 finding 4). -#}
   {%- if e.title and e.title != e.name %} <span class="meta tool-title" title="the session's name as its tool holds it (design §4.5a): {{ e.title }}">{{ e.title }}</span>{% endif %}
-  {%- if e.role %} <span class="badge" title="the role preset it was started under (design §4.8): a label, nothing keys on it">{{ role_svg(e.role_icon) }}{{ e.role }}</span>{% endif %}
+  {%- if e.role %} <span class="badge" title="the role preset it was started under — {{ e.role }} (design §4.8): a label, nothing keys on it">{{ role_svg(e.role_icon) }}{{ e.role_label or e.role }}</span>{% endif %}
   {#- the host's own alarm list is about **no record** (§4.8a), so it has no team to carry and no
       team to be filtered by: *No team* on that row said nothing (the anchor, from the live page,
       2026-09-20). Every other state row keeps the badge, which is also its team filter. -#}
