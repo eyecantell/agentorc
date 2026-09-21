@@ -22,3 +22,7 @@
 22:46  grinder-ao-1: working → ok (TD-052 step 7, #343 in review; src/sessionorc so the anchor merges — watching for a merge-queue hold)
 22:47–22:49 quiet
 22:50  inbox: ask m-43df400ff557 from person (anchor as director): restart finished grinder-ao-2 once, new ledger work (TD-076 heading sweep, TD-075 page halves) → grinder-ao-2: idle, finished, 0 dirty / 0 unpushed, owes nothing → ao close + ao new same name/worktree/profile/brief (restart 1 of 3, window from 22:50), new record 04:50:27Z working; replied
+22:51–23:06 quiet
+23:07  grinder-ao-1: working → cadence #343 (TD-052 step 7, merged by the anchor 05:07:08Z) review=fail (comment opened "VERDICT: READY") → one send --wait naming PR + row
+23:17  grinder-ao-1: posted cadence-review: FIXED at 05:07:46Z, 38 s after the merge → row still fails (posted after merge), not the worker's to fix; recorded, no escalation; note m-3886780da9fe to the person (director) on merging before the evidence comment
+23:18  grinder-ao-2: idle 25 min with TD-076 open (#344 CI green, its CI watcher never returned) → one send --wait (the three words); 23:19 it merged #344 (cadence pass, review recorded) and declared out_of_work → finished
