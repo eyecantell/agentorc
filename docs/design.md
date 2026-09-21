@@ -1395,6 +1395,9 @@ noted). If a control is not in this table it does not exist.
 | Inbox row: identity alarm | **Suspend**, **Log TD**, **Open**, **Dismiss** | design 2026-09-19, TD-077 step 2; **the answers redesigned 2026-09-20 on Paul's direction** (*"Acknowledge" seems like a dismiss*, and an alarm is the one row where dismissing is the least useful thing on offer) — §4.8a *An alarm's answers* is the full text; **built so far: the row, and **Dismiss** — the rename landed 2026-09-20 (the wire name `identity_ack` unchanged); **Suspend** is built 2026-09-20 with `rpc_suspend`, and **Log TD** is built 2026-09-20 with `identity_log` (TD-077 b): drawn only where the record's view names who answers for it (`alarm_to`, the home's own answer, which the RPC reads too), its confirm naming that session and the outcome it will owe; elsewhere the row reads *no session answers for this one* (or *for the host's own list*); a controller gone between the draw and the press is the agent's refusal, in words, as the toast, and the refreshed row then says nobody answers**. One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and **counted** (under *Steering*, uncounted, only while a techlead holds it — §4.8a *Who answers first*, not buildable yet): an alarm is either a bug of ours or a session misbehaving, and a person should know which. The row lists the alarms in words — channel, what was claimed, the rpc, the count, and first–last in the person's own clock, with *(others)* read as *and n more distinct claims* — and says which identity mode the host is in, since *observe* records what *enforce* would refuse. **Two of the four are answers, and only an answer ends the row** (§4.10 *The Inbox is a queue*): **Dismiss** — the control first built as *Acknowledge*, renamed; the wire name `identity_ack` stays, since a wire name is not a control — clears that list (the record's, or the host's), and the trail says *dismissed by you*; **Log TD** hands the alarm, in words the home composes from the alarm's own fields, to the session that answers for this one — **the record's first live controller**, read from the control graph and never from a badge — as mail from the person that owes an outcome (an extension of TD-079's debt, §4.8a), clears the list, and the trail says *logged by you → `<controller>`*; it is **offered only where there is such a session**: not on the host's own row and not on a record with no live controller, which a manager's own record is — the row says so, in words, where it is missing. **The other two act on the session and leave the row standing**: **Open** focuses it while its record is here; **Suspend** stops it at once — no wrap-up, a session under suspicion is not asked to tidy — keeps its worktree and conversation, and marks the record *suspended*, which only a person lifts and which refuses every session's `create` under that name, a whole `ao team start` included (§4.8a); it is offered only on a record's row and only while that session is live — **built 2026-09-20 (TD-077 a2, the page side): not on the host's own row, not on a record already suspended, and not on one already `exited` or `closed`, where the mark would have no act behind it; its confirm says what it does, and it is the one control on this row that does not take the row away** — and a suspended record's row says so in a flat mark — its only record, since a suspension ends no row and so writes no trail. **The mark is built 2026-09-20 (TD-077 a2, the page side):** drawn wherever the record is — the card, the Focus header and the Inbox's state row — flat and never pressable, with the when, the who and the why on hover, and tolerant of a record another build wrote (it costs that card its mark, never the grid). There is **no Unsuspend control anywhere**, by design: the two acts that lift it are a person's **Resume** and **Forget**, which exist. The New session form's `suspended` verdict is built with it: **Start stays enabled**, because a person's create *is* the lift, and the form prints the agent's own sentence and adds only what pressing Start does. All four are a person's own acts, called caller-less and refused to every session exactly as `inbox_delete` is (**one exception, not buildable yet and never on a host that carries a person**: a techlead's `identity_ack` and `suspend` for a record it controls, §4.8a *Who answers first*), and none is among §4.8a's never-gated reads — a session that could clear the list could erase the evidence of its own forgery, and one that could suspend could stop its rival. Nothing is lost by any of them: the host agent's log keeps every alarm, a line each. On the card the alarm is a **mark** and nothing more, and so is *suspended*. **A node's record is answered at that node**: alarms are node-owned, so an `id` naming another host is routed there like any other act (§4.4a step 4a), the node clears its own list and the home takes the cleared record from the reply — a home that cleared its replica would have the alarms back on the node's next report. (**Suspend** is the home's act — `suspended` is the home's field — and only its `kill` is routed.) The host's own list is whichever host was asked, and never travels |
 | Inbox row: `ask` | **Reply**, **Delete**, **Snooze** | the whole text, sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms, closes it as `declined` and the asker is told by a `system` note (§4.10); **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of — the snoozed entry is listed behind *n snoozed — show* with **Unsnooze**, which clears it. Suggested answers, when the envelope carries them, are the row below. Built 2026-09-19, step 1 |
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*; up to four, 80 characters each, format characters stripped). **Drawn apart from the row's own controls** — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm — design 2026-09-20, TD-070; built 2026-09-20 (step 2), on the `ask` and `steer` rows, which is where **Reply** is drawn |
+| Inbox row: answered for you | **Overrule**, **Dismiss** | design 2026-09-20, TD-075, **not built** (§4.9b). An FYI the home files when a reply carries a `source`: the question, the answer, the source, who asked and who answered — all text. Under *Answered for you*, uncounted, newest first. **Overrule** opens a reply **to the asker** on the question's own thread (a copy to the answerer), marked `[person]`; **Dismiss** ends the row. Neither is offered on anything but this kind: it keys on the entry's structured `source`, never on who sent it |
+| Inbox row: passed up | the row's own kind's controls (**Reply** and **suggested answers**; a `steer`'s **Pause** and ***Go with it***) | design 2026-09-20, TD-075, **not built** (§4.9b). The asker's question, from the asker, under its own heading — an `ask` in *Needs you*, a `steer` in *Steering* with the time it has left — with one addition: *`<techlead>` recommends: `<line>`*, **labelled and drawn as text**, and the techlead's suggested answers as the row's answer buttons, its recommendation first. A reply goes to the asker |
+| team header | **answered for you** count | design 2026-09-20, TD-075, **not built**: the number of *answered for you* entries from this team's sessions since the person last opened that group — a **mark**, never pressable; the group is reached from the Inbox |
 | Inbox row: `steer` | **Reply**, **Go with it**, **Pause / Resume** | the text, **the default it will take, and the time left**; **Reply** says otherwise; **Go with it** closes it now — `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh, told to it by a `system` note that wakes it as a person's reply does — so it need not wait out the bound; doing nothing lets it lapse to the same end. **Pause** stops the clock and tells the sender not to take its default yet; the row moves to *Needs you* and **is counted while paused** — a session is now held on the person; **Resume** gives back the time that was left (§4.10 *Pause*). No Snooze on a `steer`. Not counted unless paused. Built 2026-09-19, step 1 |
 | Inbox section: **Waiting on them** | **Dismiss** | **built 2026-09-20 (TD-079 step 2)**. Answered questions that owe an outcome (§4.10 *Outcomes*) and whose asker is still live: the question, the answer given, how long ago, the asker's name and `doing` line. Never counted — it waits on a session, not on the person. **Dismiss** says *I do not need to hear back*, ends the debt and tells the asker by a `system` note (`inbox_dismiss`, person-only). When the asker has **exited without reporting**, or reported **`blocked`**, the row is under *Needs you* instead, counted, with **Open** / **Reply** and **Dismiss** — design 2026-09-20, TD-079. **The answer given** is what the person inbox still holds: a pressed suggested answer is in the entry itself (§4.10 *Suggested answers*), and a typed reply is not — it went to the asker's inbox, not to this one — so the row says *you answered* or *you let it go with its default* rather than inventing words the person did not write (2026-09-20, the build) |
 | Inbox: the FYI count, **Dismiss all** | the top bar's second number; one button | **built 2026-09-20 (TD-079 step 2)**. *Inbox 1 · 5*: the second number is FYI's entries, never added to the first (§4.10 *The Inbox is a queue*). The FYI section opens itself when its count is higher than this browser last saw. **Dismiss all** confirms once and dismisses **the ids this browser has on screen** — the trail and closed questions included, never an open question, never mail that arrived after the page was drawn — design 2026-09-20, TD-079 |
@@ -1877,6 +1880,7 @@ deliberately not warned about: briefs cite dated ADRs and state what was true on
 | `grinder` | resolve each lane item to a merged PR: verify, fix, test, independent review, merge, archive the entry; never free-pick when given a list; never touch another session's worktree | references or `free-pick` | none | `progress`, and `findings` for what it meets on the way |
 | `hunter` | look for problems and file them with evidence — probes, measurements, logs — and never fix them (a hunter has no reason to under-report what it would otherwise have to fix) | an area (`tests`, `ui`, a path) or `free` | none | `findings` |
 | `manager` | read `ao --json status` on a cadence — **ending each round in `ao wait`** rather than a sleep (below), so the cadence is a ceiling on how long it can be stale rather than how often it looks; wrap up unattended sessions past their stop, resend a stalled prompt with `--wait`, restart a worker whose tool exited, forget exited records, escalate to the attention board when a person is needed; **run the cadence check** (`scripts/check_cadence.py`, cadence §4) on every `progress` entry a worker marks `done` and on every merged PR from a worker's branch — a failing row is resent to the worker with `--wait`, naming the row; a second failure on the same PR goes to the attention board; **relay convention changes**: each new entry in `docs/cadence-changes.md` on the repo's `origin/<default>` (cadence §3) is sent once, with `--wait`, to every unattended session in that repo that started before the entry landed — sessions started after it hear it from their SessionStart hook (their own settings' or this layer's, §4.2); never create work | the host, or a list of sessions | `control` | `progress` per round: sessions acted on and what was done |
+| `techlead` (**designed 2026-09-20, TD-075 — not built, the word still reserved**, §4.9b) | answer a teammate's `steer`, and an `ask` only where the answer is written down, saying where (`--source`); check the asker's claims in the repo; pass everything else up with a recommendation and suggested answers; never anything destructive, outward-facing, spending, credentials, scope or a permission; read your own sent mail first; end when the inbox is empty | — | none (`alarms` only from a person's own team start, §4.9b) | mail, and nothing else |
 | `plain` | — (no template) | — | none | whatever it declares |
 
 The manager preset was called `orchestrator` until 2026-09-17 (TD-055 step 2, `docs/glossary.md`)
@@ -2672,6 +2676,141 @@ it alone rather than restarting it, and — once every member has done the same 
 same stop sequence `ao team stop` runs, leaves one board line naming what each member searched,
 and exits; `ao team start ao-grind` then brings the team back.
 
+### 4.9b The techlead: a go-between for what would reach the person (2026-09-20, TD-075; shape decided by Paul 2026-09-19)
+
+Paul: *an executive with a technical lead as the go-between, filtering the items that need my
+attention, answering those it believes are obvious* — a role of its own on a high-trust model,
+because *handling the lifecycle of an agent is something Sonnet could handle* and the go-between's
+tokens should not be spent on it. **It is a ladder, not a new mechanism**: a worker's question
+goes to the techlead where its team has one, the techlead answers it or passes it up, and the
+person is the top. Nothing here is built; the word `techlead` stays reserved (§4.8 *The names*)
+until step 1 below lands.
+
+- **The seat.** A team definition may carry **`techlead: {name, profile, brief, home}`** beside
+  `manager:` — optional, one per team, a session and never `person`. The preset **`techlead`**:
+  brief `techlead.md`, no lane, **no grants**, icon `book`, label *Tech lead*. It carries the
+  `team` badge, so every member may already message it and it them (§4.10 *sideways*) — no new
+  mail edge. A member's and a manager's brief take **`{techlead}`** — the seat's session id,
+  filled at launch as `{lane}` is, empty where the team has none — and say: *a `steer`, and an
+  `ask` that is about the work, go to `{techlead}`; with no techlead, to the person as now.*
+- **It answers cold, and is filled on demand.** A techlead is **started per batch of questions
+  and ends when it has answered them**: no context piles up over a night, an idle team costs
+  nothing, and — Paul's second reason — *composing the message forces the worker to pull the
+  needed context*, while the reader is not anchored by the worker's whole narrative. So a
+  question to it **stands on its own**: the question, what was tried, where the asker looked, the
+  default (a `steer` has one by construction) and up to four suggested answers (§4.10). The
+  mechanics are mostly ones the design already has, **and two are new**. `ao team start` starts
+  the seat with the rest of the team; it finds its inbox empty and stops. Mail to an exited or
+  closed record is delivered and waits (§4.10: an `ask` stays *pending*; a `steer`'s bound runs
+  on and the asker goes with its default — which is the right failure).
+  **A seat is empty or filled — never *finished*.** The techlead is its manager's member in the
+  graph (the manager creates it) but it holds no lane, so §4.9a does not count it: it is never
+  *out of work*, it makes no ending declaration, it is not among *every member is finished*,
+  and §4.9a's *never sent to and never restarted* is about members that declared, which a seat
+  never does. What its manager reads instead is one structured field, **`asks_waiting`** — new:
+  the count of open `ask`s and `steer`s addressed to the record, computed by the home like
+  `unread`, **a number and never their text** (nobody reads another session's inbox), printed by
+  `ao status -v`, and **added to the wake digest** (`wake_digest` gains a line for it, as it did
+  for `out_of_work` and `restart_wanted` — it is not there today), so a manager blocked in `ao wait` returns when a
+  question lands on an empty seat. **The manager's rule for the seat**: `idle` with
+  `asks_waiting` 0 → `ao close` it (it writes no code; anything dirty or unpushed in its
+  worktree is the board's, and it is left open); `idle` with `asks_waiting` > 0 for twenty
+  minutes → the one send any idle member gets, naming the number; **`exited` or `closed` with
+  `asks_waiting` > 0 → fill it**: `ao new --keep-mail`, same name, directory, worktree, profile
+  and brief. **`--keep-mail` is the second new thing** (`create(keep_mail=true)`): a fresh start
+  under a name forgets the old record's mail (§4.1 — *the name now belongs to the new session*),
+  which is right everywhere but here, where the mail was addressed to the seat and the new
+  session **is** the seat's next holder; so this one start moves the old record's mail to the
+  new one exactly as a resume does (`_move_mail`, built for §4.1's resume) and resumes nothing
+  of the conversation. **It is open to a person, and to a session only if it is in the held record's
+  `controllers`** — the manager that created the techlead is; a sibling is not — and is refused
+  otherwise, naming the rule. The reason is not secrecy — `tail` is a never-gated read (§4.8), so what a
+  session read of its mail on its screen was never hidden from its neighbours — it is that
+  **handing a record's mailbox to a successor is an act on that record**, and an act on a
+  record is its controllers' and a person's (§9 invariant 11): without the scope any grant
+  holder could point a stranger's open questions, and the debts on them, at a session of its
+  own making. It keys on the control graph, not on a role (§9 invariant 9), so it is not tied to
+  techleads — a person restarting any session cold may keep its mail — and it changes nothing
+  else about the start. Fills have a ceiling of their own in the manager's brief — six in an hour,
+  then the board — and do not count as crash restarts. A full mailbox (`MAILBOX_DEPTH`) refuses
+  the asker as it refuses anyone, and the asker then asks the person (*When it cannot answer*,
+  below). It is **a manager's act, never the core's** (§4.9a): the host agent starts nothing
+  and does not read `org.yml`. At wind-down the seat is closed by `ao team stop` with the rest,
+  and a manager that winds down with `asks_waiting` > 0 says so on the board.
+- **What it may answer.** A **`steer`**: it answers, or says *go with your default*, which is an
+  answer. An **`ask`**: **only when the answer is already written down** — the design, the
+  ledger, a brief, a decision of the person's — and it **says where**: `ao msg --reply-to <id>
+  --source "<file and section, or the decision's date>" "…"` — `source` is one line of text, at most 200 characters, stored on the reply and only ever drawn as text. It **checks the asker's claims in
+  the repo** before it answers; it sees only the asker's framing, and that is the cost of
+  starting cold. It reads its own sent mail first — **`ao inbox --sent`, new**: a session's own
+  outbox, its own and nobody else's, ungated as its inbox is; nothing reads an outbox today —
+  so two questions in one night are answered alike; `--keep-mail` carries the outbox with the
+  inbox, and a sent reply that carries a `source` is kept there for seven days whatever else
+  is pruned. **Never**, whatever it believes is obvious:
+  anything destructive, outward-facing, spending, credentials, a change of scope, a permission
+  prompt, or a question the asker addressed to the person by name. Everything else goes up.
+- **Passing up keeps the thread and the asker.** `ao msg --pass-up <id> --recommend "<one
+  line>" [--answer …]` — open only to **the addressee of an open `ask` or `steer`, once (the entry
+  gains **`passed_up: <time>`**, and a second is refused), and only to the person**. The person's entry is the asker's question, from the asker, of its own
+  kind — an `ask` under *Needs you*, a `steer` under *Steering* with **the time it has left**,
+  since passing up buys no time — with the techlead's recommendation and suggested answers
+  beside it, **labelled as the techlead's and drawn as text**. The person's reply goes **to the
+  asker**, with a copy to the techlead; the asker's entry is answered by it, and the techlead's
+  copy closes. One press for the person is the point: the recommendation's first suggested
+  answer is the recommendation.
+- **Everything answered for the person is told to the person.** A reply that carries a
+  **`source`** is one *answered from the record*, and the home files it to the person as an
+  FYI: ***answered for you** — the question, the answer, the source, who asked and who
+  answered*. It keys on the structured field, **never on a role** (§9 invariant 9): a manager
+  that answers from the design with `--source` is told the same way.
+  The FYI is filed **from the answerer** and carries a structured **`answered: {question,
+  asker, answerer, source}`**; a reply to an entry that carries `answered` is addressed **to the
+  asker, with a copy to the answerer**, on the question's own thread — that is **a new branch
+  in the reply path**, keyed on the replied entry's `answered` and taken before the ordinary
+  reply-to-sender default (which would send it to the answerer), and it is what **Overrule**
+  calls. **The debt (§4.10 *Outcomes*)**:
+  an answer from a teammate creates none — the question was never the person's; an **Overrule**
+  does, and needs no new case: the overruling reply is mail from the person to the asker, and
+  the home marks it **`handed`** (§4.8a *An alarm's answers* — work the person handed a session
+  owes an outcome, built), so the asker settles it with `--outcome … --for <the overruling
+  entry's id>`, which is in its own inbox; and a question **passed up** and answered by the person owes one
+  in the ordinary way. The Inbox groups these
+  under *Answered for you* (§4.5a), uncounted, newest first, and the team's header carries the
+  number since the person last opened the group — a **mark**. **Overrule** on such a row is a
+  reply **to the asker**, marked `[person]`, on the question's own thread, with a copy to the
+  answerer; a person's word outranks a teammate's by the rule every brief already has. The
+  failure this guards against is a confident wrong go-between steering a team all night unseen.
+- **Who may instruct it — said plainly, because it is not enforced.** Paul's condition was that
+  a cheap-model manager must not be able to instruct the high-trust session on *what to answer*.
+  The manager that fills the seat is its creator and so its controller (§4.8 *Create adds the
+  creator*) and writes its prompt; no rule of the host agent's can stop that without the host
+  agent reading the team definition, which it does not. What bounds it instead: the techlead's
+  brief takes instruction on *what to answer* from **the person alone** and reads a manager's
+  words as lifecycle; it holds **no grant**, so it can act on no session; its never-list; and
+  the FYI above, which shows the person every answer with its source. An answer to one's own
+  question is an answer whoever gives it; **an unsolicited message from a techlead is
+  information, not instruction** — it is not a controller of the members (`[other]`).
+- **When it cannot answer.** One account has one usage window (§4.2a): a techlead on the
+  grinders' account is capped when they are, which is when questions pile up. A `steer` lapses
+  to its default, as designed. A worker whose `ask` to the techlead is unanswered after
+  **`TECHLEAD_WAIT`, thirty minutes**, asks the person on the same thread (`--thread`), saying
+  so — the worker's brief carries it, so a team with no manager, or a manager that is itself
+  capped, still reaches a person.
+- **Alarms (§4.8a *Who answers first*) need more than this, deliberately.** That path wants a
+  techlead that is a **live controller of the record** holding a grant — **`alarms`**, named
+  here — on a host that enforces and carries no person. Only a **person's** `ao team start`
+  confers it (`techlead: {…, grants: [alarms]}` also lists the techlead in each member's
+  `controllers`): a manager's fill cannot, since a child's grants are a subset of its
+  creator's, and that is right — the session that may dismiss an alarm is not one a cheap
+  manager can mint. So an on-demand techlead never answers alarms, and §4.8a's *not live →
+  the person at once* already says what happens. Not built, and not before TD-077's step 4.
+- **The trial, and the wall.** Paul's decision of 2026-09-19 stands: a **less-trusted model
+  beside a high-trust one waits for the agents-only node** (§4.4a *A node that carries no
+  person*, TD-077 step 4). So the trial on `ao-grind` runs **with every seat on today's
+  profile** — it measures the ladder, not the saving: questions asked, answered with a source,
+  passed up, overruled, lapsed; fills, and what they cost. Moving the manager and the grinders
+  to a cheap profile is the step after, inside that node.
+
 ### 4.10 Messages between sessions (2026-09-14)
 
 Four kinds of session-to-session traffic exist in practice — a manager sending to a worker, a worker
@@ -2849,7 +2988,7 @@ instead of forbidden:
   metered — which also makes the budget adapter-neutral, since it is counting the thing every tool
   has rather than a delivery mechanism.
 - **It bounds mail, not every wake.** `wait` also returns when a member's `state`, `progress` or
-  `findings` changes, unmetered, so *a worker reports, its manager wakes and sends, the worker
+  `findings` changes (and, designed with §4.9b and not built, when its `asks_waiting` leaves zero — a question on an empty techlead seat), unmetered, so *a worker reports, its manager wakes and sends, the worker
   reports again* is the same loop without a message in it. The wake budget does not claim to catch
   that one: a manager's rounds, the restart ceiling (§4.8) and the usage gate (§6) are what bound it.
   Stated so the budget is not credited with a guarantee it does not give.
