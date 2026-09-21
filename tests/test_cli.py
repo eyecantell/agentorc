@@ -675,6 +675,10 @@ def test_the_wake_vocabulary_ignores_what_moves_every_tick_and_notices_what_a_le
     assert wake_digest({**base, "progress": [{"ref": "TD-1", "status": "done", "pr": 7}]}) != same
     assert wake_digest({**base, "findings": [{"ref": "TD-2", "priority": "high"}]}) != same
     assert wake_digest({**base, "controllers": []}) != same
+    # a techlead seat's questions (§4.9b): the count leaving zero wakes its manager, 1→2 does not
+    assert wake_digest({**base, "asks_waiting": 0}) == same
+    assert wake_digest({**base, "asks_waiting": 1}) != same
+    assert wake_digest({**base, "asks_waiting": 1}) == wake_digest({**base, "asks_waiting": 2})
 
 
 def test_a_lead_waits_on_what_it_controls_and_a_person_sees_everything():
