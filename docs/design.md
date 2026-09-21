@@ -1370,6 +1370,7 @@ noted). If a control is not in this table it does not exist.
 | card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the host agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026) — landed 2026-09-13. On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the host agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the host agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *no stop time* rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs. Setting a **different** time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill — landed 2026-09-14 |
 | New session | **Until** field | the stop time the session starts with: `06:00` (the next one, in your clock), `+8h`, or an ISO time. Refused on a session that is not **Unattended**, since policies leave interactive sessions alone (§4.2); empty means nothing stops it, which is what every session was before (§6, TD-026) — landed 2026-09-13 |
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a) — design 2026-09-14, built 2026-09-17, TD-053 step 6. The words are fixed and the reason is the hover: a `why` names every entry the session looked at and what gates each, which a card cannot hold. The row is drawn for a declaration even when neither report channel has anything in it |
+| card / Focus header | **restart wanted** chip | design 2026-09-20, TD-083, not built — when the record carries `restart_wanted`: fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a **mark**, never pressable, and not a state — the session still reads `idle` or `exited`. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*) |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a) — design 2026-09-14, built 2026-09-17, TD-053 step 6; on the team's card since 2026-09-18, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team — landed 2026-09-13 |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
@@ -1518,7 +1519,8 @@ name and resolves it within the current repo or directory (TD-030), so the hint 
 `ao focus aotest`.
 Sessions report through the channels in §4.8: `ao progress claim TD-027`, `ao progress done
 TD-027 --pr 59`, `ao progress drop TD-027 --why "..."`, `ao progress none --why "..."` (the
-session found no work it may pick — §4.9a, design 2026-09-14, not built), and `ao finding TD-029 --priority low`
+session found no work it may pick — §4.9a, design 2026-09-14, built since — TD-053), `ao progress restart --why "..."` (the
+session's run is over and its lane is not — §4.9a *A run that ends with work left*, design 2026-09-20, TD-083, not built), and `ao finding TD-029 --priority low`
 (each a small RPC on the calling session's own record — `--id` for another's, since the channels
 are ungated; `ao status -v` prints the same report line the card will, and `--json` the entries). Presets are picked at start, `ao new
 --role grinder --lane TD-027,TD-019` (`--lane` landed with TD-028 step 2; `--role` and `ao roles`
@@ -1568,7 +1570,9 @@ says what it is doing now:
   `ao progress drop`'s reason and is empty otherwise. One RPC on this channel writes no entry at
   all: `ao progress none --why` sets `out_of_work: {at, why}` as its own field on the record, beside
   the entry list rather than in it — so the upsert-by-reference rule below is untouched, and a
-  session with no work and no references still has somewhere to say so. It is the session's own word
+  session with no work and no references still has somewhere to say so. (A second such RPC,
+  designed 2026-09-20 and not built: `ao progress restart --why` sets `restart_wanted: {at, why}`
+  the same way — §4.9a *A run that ends with work left*, TD-083.) It is the session's own word
   that it searched and found nothing it may pick, which is what tells its lead an exit was an ending
   rather than a crash (§4.9a, design 2026-09-14; the declaration landed 2026-09-17, TD-053 step 1).
   Only the session itself may write it (a person or another session is refused, §9 invariant 14),
@@ -1721,7 +1725,7 @@ lead controls.** The prior-art survey behind the rules below is
 `ao wait [--timeout N]` is a blocking command over that stream (built in the CLI 2026-09-14; since TD-052 step 3 a thin call to the host agent's `wait` RPC, which compares its own complete records against the same cursor, so the host agent can decide mail wakes — §4.10): a lead's round **ends** with it instead of sleeping. An event returns in about a second, a quiet window returns at the timeout, and **that timeout is the fallback poll** — one mechanism, not two that can disagree. Four things make it trustworthy rather than merely quick:
 
 - **Scope is the authority rule.** By default a lead waits on exactly the sessions it may act on — those whose `controllers` name it — so the wake and the authority cannot drift apart. A person at a terminal has no caller and sees everything, which is what `ao status` gives them anyway.
-- **The vocabulary is short, and the exclusions are the point.** A wake is a change to a session's `state`, its `exit_code`, the pending thing it is asking (the question, never the permission's countdown), what it has claimed or marked `done` and with which PR, what it has filed, who controls it, or its declaration that it is out of work (§4.9a). Explicitly **not** `last_output`, `tail`, `since`, `seen_at` or `git`: those move on almost every tick of a healthy session, and a lead woken continuously is worth less than the poll it replaces.
+- **The vocabulary is short, and the exclusions are the point.** A wake is a change to a session's `state`, its `exit_code`, the pending thing it is asking (the question, never the permission's countdown), what it has claimed or marked `done` and with which PR, what it has filed, who controls it, or its declaration that it is out of work or (designed 2026-09-20, TD-083) that it wants a restart (§4.9a). Explicitly **not** `last_output`, `tail`, `since`, `seen_at` or `git`: those move on almost every tick of a healthy session, and a lead woken continuously is worth less than the poll it replaces.
 - **A lead that was busy still sees it.** Mid-turn a lead is not blocked on anything, and a lead that misses the one event it existed for is worse than a poll. So the first thing `ao wait` does is take a **complete** snapshot — an ordinary `list`, which has a definite answer — and compare it against what this caller last *saw*, a cursor it keeps per caller, returning at once if anything moved while it was away. Only then does it listen. The snapshot is not `subscribe`'s opening burst: a burst has no end marker, so the only way to judge it complete is to time it, and a gap in a slow or large one would be read as *that is all* — reporting every record not yet received as gone. A cursor that exists and cannot be read means *unknown*, and unknown wakes on everything in scope: a redundant wake, never a missed one, which is the trade the whole mechanism is built on. A first wait records where it is and wakes on nothing, so no lead's first call returns every session it controls.
 - **Nothing is sent into the lead's pane.** The obvious reading — a worker *sending* to its lead — is the wrong one and is recorded here so it is not re-proposed: an acting RPC is gated on the *target's* `controllers`, so a worker acting on its lead would need the edge the design deliberately leaves empty (§4.9), and `send` is keys into a pane, which for a lead mid-turn is an interruption rather than a message. (What was wrong with it was the *delivery*, not the direction: since 2026-09-14 a worker may **message** its lead, into a mailbox that types nothing and whose read is mediated by the worker's own judgement rather than supplied as its next turn — §4.10, which is where that conclusion led once the same gap was found in three more places. `ao wait` returns on mail as well, so a lead needs one wait, not two.) The worker already declares what matters through `ao progress` and `ao finding`; the host agent, the one process that sees every record, is what turns a declaration into a wake.
 
@@ -2398,6 +2402,71 @@ what each member looked for and did not find, taken from the `why` on each recor
 the point of the whole mechanism — the org has finished the work a person defined, and the next
 move is a person's.
 
+**A run that ends with work left (2026-09-20, TD-083; designed, not built).** There is a third
+ending this section did not have a word for. On 2026-09-20 a grinder ended its run *on purpose*
+after ten merged PRs — its context was long, the ledger still held entries it could pick, and it
+said, rightly, that a fresh start would do them better. It could say so only in prose. It was not
+out of work, so `ao progress none` would have been a lie and it did not tell it; its `/exit` did
+not leave, so it was never `exited` and the restart rule never fired; and its lead's brief said a
+worker with a written summary *is not idle-with-open-work*. So the lead asked the person, the
+question lapsed to its default, and a team with work on the ledger sat parked for ninety minutes
+until a person restarted it by hand. Both of this section's rules were obeyed and the result was
+wrong, because the rules had two endings — *finished* and *crashed* — and this was neither.
+
+- **The third declaration.** `ao progress restart --why "<why this run is over>"`, one more verb
+  on the ungated `progress` channel, sets **`restart_wanted: {at, why}`** on the session's own
+  record — a fact, not a state, written only by the session it is about (§9 invariant 14), home-
+  owned like `out_of_work`, and cleared the same way: a later declared claim means the session
+  went on after all. It says *my run is over and my lane is not*: start me again, under this
+  name and this brief, with nothing of this conversation. It is refused without a reason; it is
+  refused **while the session owes an outcome** (§4.10 *Outcomes*), naming them, exactly as
+  `none` is — a fresh start does not carry the conversation the debt was made in, so the debt
+  is settled (`blocked` is an outcome) before the run ends; and it and `none` refuse each
+  other: a session is out of work or it wants another run at it, never both.
+- **What a controller does with it.** A member carrying `restart_wanted` that is `idle`,
+  `exited` or `closed`, **with nothing uncommitted and nothing unpushed** on its record's git
+  fields, is restarted by its controller: `ao close` on it if it is still there — this is the
+  one close a lead makes outside a wrap-up, and it is safe for the reason a wrap-up's is: the
+  work is pushed — then the same `ao new` the crash rule already uses, under the same name,
+  directory, worktree, profile and brief, which supersedes the record in place (§4.1). With
+  work still uncommitted or unpushed it is **not** restarted: one send naming what is left,
+  and after that the board, as for any member a stop leaves open. **A suspended record is
+  never restarted** (§4.8a *An alarm's answers*): every session's `create` under its name is
+  refused anyway, so its controller leaves it alone and says so in its log — its
+  `restart_wanted` stands for the person who lifts the suspension. **It is a controller's act, or a
+  person's own — never the core's**: the host agent starts nothing by itself (*It does not replace the clock*,
+  below, and TD-026) — and it reads a structured field: the `why` is for the log and the
+  person, and nothing is decided from its words.
+- **Inside the ceiling.** A wanted restart and a crash restart are **one count**: three
+  restarts of one session in two hours (§4.8), then the board. A worker that asks again and
+  again is a loop with better manners. And the mirror of false exhaustion, below: a
+  `restart` declared inside **`RESTART_EARLY`, thirty minutes, of the record's own start** is
+  written as any other — the word is the session's — but the reply says so and the record
+  carries `restart_wanted.early: true`, and **a controller does not act on an early one**: it
+  puts it on the board instead. The host agent applies the bound, since it holds the start
+  time, and the controller reads a field, not a clock. (False exhaustion's own early bound,
+  below, is still unset and unbuilt — TD-053; this one does not wait for it, and TD-053 may
+  take the same constant when it lands.) A run that is over before it began did not run out
+  of context.
+- **Not finished, so the team does not wind down.** A member that wants a restart is by its
+  own word not out of work, so it never counts toward *every member is finished*; and a lead
+  that wants one says so to the person — a lead has no controller, and nothing restarts it
+  but a person or `ao team start`.
+- **A summary is not a declaration.** The other half of the fix is in the briefs, and it is
+  the rule this section already had: *declared, never inferred*. A worker's brief ends a run
+  with **one of the three words** — `done` on what it finished and then `none` or `restart`
+  — and only then the summary; a lead's brief treats a member that is `idle` with **no**
+  declaration as merely idle whatever is on its screen, so the twenty-minute rule applies and
+  its one send names the three words. The exemption for *a written end-of-run summary* goes:
+  it asked a lead to read a screen for meaning, which is the inference this section exists to
+  forbid.
+- **What was not chosen: making a submitted `/exit` an exit.** It would have the adapter
+  decide that a tool *has plainly been told to leave* — from its screen or its prompt, which
+  is reading what a session typed — and then close a session on that reading. *Finished means
+  declared, not gone* already answers it: whether the process went is the tool's business,
+  and the declaration is the fact. A session that declares and stays is restarted or left
+  alone correctly either way.
+
 **False exhaustion is the failure mode to guard.** The dangerous case is not a team that runs on
 too long; it is one that stands down because it looked wrong — a `gh` outage, a moved ledger file,
 a grep that matched nothing because the path changed. Three bounds, with their numbers deliberately
@@ -2419,7 +2488,7 @@ work well inside its window; the two stoppers are orthogonal and neither implies
 is this a scheduler: nothing here restarts a team when work reappears. An org that starts itself
 is TD-026's question, and a different one.
 
-**Surface.** `ao progress none --why` on the CLI (§4.7). On the card and the Focus header, an
+**Surface.** `ao progress none --why` — and, designed 2026-09-20, `ao progress restart --why` with its own chip (§4.5a) and its own line in `ao status -v` — on the CLI (§4.7). On the card and the Focus header, an
 **out of work** chip with the reason on hover, beside the report line; on the Org page's Teams
 strip, a definition whose sessions have all wound down reads *wound down <t>* rather than a bare
 zero live count, since *nothing running* and *nothing left to run* are different facts about a
@@ -3543,7 +3612,8 @@ the block. A policy is agent code and needs no grant; a session doing the same w
     `out_of_work` is written only by the session it is about, through the ungated `progress`
     channel, and is never derived — alone among what the channels carry, it has no derived form, because every
     clause of the test is a judgement over prose the core cannot read. A worker that exits without
-    declaring it is a crash and is restarted.
+    declaring it is a crash and is restarted. `restart_wanted` (designed 2026-09-20, TD-083, §4.9a) is the same kind of word
+    under the same rule: the session's own, never derived, and acted on by its controller, never by the core.
 
 15. The org's **graph, intent and mail have one writer, the home host agent**; a session's
     **observed state has one writer, its node** (§4.4a, 2026-09-16). `controllers`, grants, team,
