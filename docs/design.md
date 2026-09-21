@@ -2724,10 +2724,12 @@ until step 1 below lands.
   new one exactly as a resume does (`_move_mail`, built for §4.1's resume) and resumes nothing
   of the conversation. **It is open to a person, and to a session only if it is in the held record's
   `controllers`** — the manager that created the techlead is; a sibling is not — and is refused
-  otherwise, naming the rule. That is the whole scope, and it is enough: the new session
-  inherits a mailbox, and the only sessions that can cause that are ones that could already
-  read the old holder's screen, where its mail was read (`ao tail`, an acting controller's
-  right). It keys on the control graph, not on a role (§9 invariant 9), so it is not tied to
+  otherwise, naming the rule. The reason is not secrecy — `tail` is a never-gated read (§4.8), so what a
+  session read of its mail on its screen was never hidden from its neighbours — it is that
+  **handing a record's mailbox to a successor is an act on that record**, and an act on a
+  record is its controllers' and a person's (§9 invariant 11): without the scope any grant
+  holder could point a stranger's open questions, and the debts on them, at a session of its
+  own making. It keys on the control graph, not on a role (§9 invariant 9), so it is not tied to
   techleads — a person restarting any session cold may keep its mail — and it changes nothing
   else about the start. Fills have a ceiling of their own in the manager's brief — six in an hour,
   then the board — and do not count as crash restarts. A full mailbox (`MAILBOX_DEPTH`) refuses
@@ -2763,8 +2765,10 @@ until step 1 below lands.
   that answers from the design with `--source` is told the same way. The Inbox groups these
   The FYI is filed **from the answerer** and carries a structured **`answered: {question,
   asker, answerer, source}`**; a reply to an entry that carries `answered` is addressed **to the
-  asker, with a copy to the answerer**, on the question's own thread — that, and not the
-  ordinary reply-to-sender default, is what **Overrule** calls. **The debt (§4.10 *Outcomes*)**:
+  asker, with a copy to the answerer**, on the question's own thread — that is **a new branch
+  in the reply path**, keyed on the replied entry's `answered` and taken before the ordinary
+  reply-to-sender default (which would send it to the answerer), and it is what **Overrule**
+  calls. **The debt (§4.10 *Outcomes*)**:
   an answer from a teammate creates none — the question was never the person's; an **Overrule**
   does, and needs no new case: the overruling reply is mail from the person to the asker, and
   the home marks it **`handed`** (§4.8a *An alarm's answers* — work the person handed a session
