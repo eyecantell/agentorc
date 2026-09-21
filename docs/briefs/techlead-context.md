@@ -1,7 +1,8 @@
 # The techlead's primer for agentorc
 
 **What this is.** You are a techlead (design §4.9b): you start cold, for one batch of questions, and
-this page is your first read after your brief — the project in a few thousand words, so that an
+this page is meant to be your first read after your brief, once your brief names it — the project
+in a few thousand words, so that an
 answer is given with the whole shape in mind and not only the asker's framing.
 
 **What this is not.** It is **an index, never a source.** Nothing here is cited as an answer:
@@ -41,7 +42,7 @@ person is `docs/user_attention.md`.
   (§9 invariant 15); other hosts — a laptop, a devcontainer — are **nodes** that own what they
   observe (state, tail, alarms) and forward the rest over a link. Which RPC is served where is
   `src/sessionorc/modes.py`; a new RPC that writes a home-owned thing and is missing from those
-  tables is a bug that has been made three times.
+  tables is a bug that has been made twice (`suspend`, `identity_log`; both are named in that file).
 - **State** (§4.2): hooks first, screen-scraping as a labelled fallback; a state shown as `hook`
   came from a hook (§9 invariant 4). Adapters (`src/agentorc/adapters/`) hold everything that
   knows a tool: its hooks, its composer, its usage endpoint, its transcript.
@@ -51,7 +52,8 @@ person is `docs/user_attention.md`.
   *Steering*, *Waiting on them*, FYI; §4.10 *The Inbox is a queue*). **State and alarm marks are
   never pressable, colours are tokens, and nothing on a page is a control built from what a
   session wrote** — text a session wrote is only ever text; a control comes from a structured
-  field. The person's standing rule: *we are not trying to parse prompts given by agents.*
+  field. The ledger records the person's constraint in these words: *nothing on a page is a
+  control that parses what an agent printed* (TD-071).
 - **The CLI** (§4.7, `src/agentorc/cli.py`): `ao`. What a session may run is in `ao --skill`
   (`src/agentorc/skill.md`); standing a team up is `ao team --skill`
   (`src/agentorc/team_skill.md`).
@@ -142,8 +144,11 @@ date. §7 is the phase plan — what is in phase 1 and what is deliberately late
 
 ## 8. What always goes up
 
-Whatever this page or the design seems to say: anything **destructive** (deleting data, force
-pushes, history rewrites), **outward-facing** (publishing, messaging anyone outside the org),
-**spending**, **credentials**, **a change of scope** or of a decided design, a **permission
-prompt**, a question the asker **addressed to the person by name**, and anything about the
-**live system**. Pass it up with a recommendation; that is a good answer, not a failure.
+§4.9b's list, whatever else this page or the design seems to say: anything **destructive**
+(deleting data, force pushes, history rewrites), **outward-facing** (publishing, messaging anyone
+outside the org), **spending**, **credentials**, **a change of scope**, a **permission prompt**,
+and a question the asker **addressed to the person by name**. Two more that are this repo's own
+and not that list's: anything that would touch **the live system** (CLAUDE.md: it is promoted by
+the anchor, never edited), and a wish to **change something the design has decided** — that is a
+design PR with its review, not an answer. Pass it up with a recommendation; that is a good answer,
+not a failure.
