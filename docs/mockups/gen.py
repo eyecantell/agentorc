@@ -14,7 +14,7 @@ CSS = """
   .pill .dot { display: none; } .pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
-     alive, at rest, may be spoken to (finished · unseen is idle's blue); everything over or out of
+     alive, at rest, may be spoken to (idle · unseen is idle's blue); everything over or out of
      reach one grey (--ended). On a card green means working and nothing else. */
   .s-working { background: #dcfce7; color: #166534; }
   .s-needs { background: #fde68a; color: #7c3d00; }
@@ -292,7 +292,7 @@ EXTRA = {
     # a person comes first (§4.5a), so a line here would be data no branch draws (review of PR #288)
     "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed", "mail": 2},
     # declared itself out of work and nobody has looked yet: `idle` in every payload, drawn as
-    # *finished · unseen*; the ending is said once, in the slot, and *ready to close ✓* is its caption
+    # *idle · unseen*; the ending is said once, in the slot, and *ready to close ✓* is its caption
     "tdgrind-4": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "#809 · 2/2 done",
                   "unseen": True, "ready": True, "ending": "out of work — nothing open on the ledger that my brief lets me take"},
     "main":      {"findings": "1 filed"},
@@ -366,7 +366,7 @@ def team_desktop():
         title = e.get("title")
         title_html = (f'<span class="meta fill" title="the session\'s name as its tool holds it">{title}</span>'
                       if title and title != name else "")
-        state_pill = pill("idle", "● finished · unseen") if unseen else pill(state, scraped=(conf == "scraped"))
+        state_pill = pill("idle", "● idle · unseen") if unseen else pill(state, scraped=(conf == "scraped"))
         # (2) what it is: role, mode (a word, never pressable), marks, the stops note, the one clock
         role = (f'<span class="badge" title="the role preset it was started under (design §4.8)">'
                 f'{role_icon(e["role"])}{e["role"]}</span>') if e.get("role") else ""
@@ -510,7 +510,7 @@ def team_desktop():
   {teams_strip()}
   <div class="warn" style="background: #f3f4f6; border-color: #cbd0d6; color: #374151; align-items: center;">{ICON["warn"]}<span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
   <div style="display: flex; flex-direction: column; gap: 22px;">{cards}</div>
-  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (finished · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>: the manager's card first, then needs you → limited → stalled? → unreachable (non-volatile) → working → unseen idle → idle → exited → closed, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab.</div>
+  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (idle · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>: the manager's card first, then needs you → limited → stalled? → unreachable (non-volatile) → working → unseen idle → idle → exited → closed, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab.</div>
 </div>
 </div>
 ''' + TAIL
@@ -756,12 +756,12 @@ def legend():
         ("unreachable", "Grey, and the card is dimmed. The host stopped answering, so every card on it flips at once and keeps its last known state. Sorts with idle on a volatile host (asleep laptop), after stalled? on one that should be up."),
     ]
     def lpill(s):
-        return pill("idle", "● finished · unseen") if s == "unseen" else pill(s)
+        return pill("idle", "● idle · unseen") if s == "unseen" else pill(s)
     body = "".join(f'<tr><td style="width: 150px;">{lpill(s)}</td><td>{d}</td></tr>' for s, d in rows)
     # the state tokens the page's stylesheet carries (design §4.5 *The card's anatomy*, TD-095)
     tokens = [
         ("--working", "#16a34a", "working", "green — alive"),
-        ("--idle", "#2563eb", "idle, finished · unseen", "blue — alive, at rest, may be spoken to"),
+        ("--idle", "#2563eb", "idle, idle · unseen", "blue — alive, at rest, may be spoken to"),
         ("--new", "#2563eb", "unread, <i>new</i> mail", "blue, idle's values under its own name, so the accent for what is new survives <i>working</i> turning green; an idle card with unread mail is blue twice, which reads rightly"),
         ("--ended", "#9ca3af", "exited, closed, unreachable", "one grey for everything over or out of reach"),
         ("--needs", "#f59e0b", "needs you", "amber, and the card is ringed — with red, the loudest on the page"),
