@@ -2030,7 +2030,12 @@ answer to the alarm.
   and whatever is unpushed shows under *Ready to close* as it would after any kill.
   **`suspended` is the home's field** (§9 invariant 15 — intent, like `controllers`; a `create`
   is gated at the home, which is where the mark is read), so for a node's record the home sets
-  it and routes only the `kill`; the alarms stay the node's. **What it does not reach**: a
+  it and routes only the `kill`; the alarms stay the node's. **And wherever it is pressed the
+  mark is written at the home**: `suspend` is a `HOME_EDITS` call for a node, so a person at one
+  has it forwarded rather than served there — a node that wrote the mark itself would kill the
+  session and have the home's next copy wipe the mark, leaving it stopped, unmarked and free for
+  any session to take its name again (review of PR #301). While the link is down it is refused
+  naming the home, as every home-owned edit is. **What it does not reach**: a
   person's own create at a node whose link is down (§4.4a) never passes the home's gate — but
   that is a person, who may lift a suspension anyway; no *session* there can create at all
   without the home, so the mark holds against everything it is meant to stop. **A suspension is lifted only by a

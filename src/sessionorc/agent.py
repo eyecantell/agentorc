@@ -119,6 +119,11 @@ NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "decide", "cre
 # What the home owns and edits on its own copy (§4.4a "Each field has one owner"), and pushes to
 # the node's replica in the same call so its stopping policies read the same intent. 4b generalises
 # the push to every home-owned field on reconnect.
+# `suspend` is deliberately **not** here (§4.8a, TD-077 a2): this set is what the home *forwards*
+# to a node and then mirrors on its own copy, and a suspend forwarded that way would kill twice.
+# The home does it the other way round — it marks its own record, which owns the field, and routes
+# only the `kill`. `modes.HOME_EDITS` is the other table, and `suspend` **is** in that one: a node
+# asked to suspend forwards the whole act here, or its mark would be wiped by the home's next copy.
 HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"})
 # What the home reads from the node whose name is the record's `host` (§4.4a, step 4b.1): a pane's
 # screen, which only that node's tmux holds. Reads are never gated (§9 invariant 11), so these are
@@ -4286,7 +4291,11 @@ class HostAgent:
                 f"{caller} cannot suspend a session: it is a person's own act, in the Inbox "
                 "(design §4.8a) — a session that could suspend could stop its rival"
             )
-        s = self._get(self._addr(id))
+        # the graph, not `self.sessions`: a node's record is marked **here**, since the field is
+        # the home's, and `_get` refuses an address that names another host (§4.4a)
+        s = self._graph().get(self._addr(id))
+        if s is None:
+            raise RpcError(f"no session {self._addr(id)}")
         if s.suspended:
             raise RpcError(f"{s.id} is already suspended (since {s.suspended.get('at')}): only a person lifts it")
         if s.state in ("exited", "closed"):
@@ -4317,7 +4326,7 @@ class HostAgent:
                 f"stop it there."
             ) from None
         await self._push_changes()
-        return self._view(self._get(self._addr(id)))
+        return self._view(self._graph()[self._addr(id)])
 
     async def rpc_identity(self) -> dict[str, Any]:
         """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,
