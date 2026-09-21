@@ -102,3 +102,7 @@
 - Escalations: board #369 (#361–#364 past 2 h in the anchor's queue) with the ask the anchor asked for (17:15Z; they merged 17:49Z–17:55Z); board #374 (wind-down; #371/#373 hold the team). Two identity alarms from the anchor's Log TD live test settled `dropped` as instructed.
 - Mechanical enough for a §6 policy: "a src/sessionorc PR waiting > 2 h → ask the anchor + board line" is a pure timer on createdAt and a path glob — the host agent could raise it itself, which is what TD-093's "as configuration" asks for. The restart rule again needed no judgement.
 - Tool friction: the `ao --skill` form `ao msg person --outcome dropped "<line>" --for <id>` fails (argparse: unrecognized arguments); `ao msg --outcome dropped --for <id> person "<line>"` works. And a lease on a whole TD blocks two members the anchor split by file (TD-075's mail/page halves) — the path-reservation case §4.8 said it would wait for.
+
+## Run started 2026-09-21 22:56Z (ao team start ao-grind)
+
+16:58  grinder-ao-1, grinder-ao-2, techlead-ao-1: working (created 22:56Z) → ok; cadence-changes: last entry landed 09-12, no relays; #375–#378 merged since last run are not members' branches
