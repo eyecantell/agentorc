@@ -817,6 +817,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 "source": row.get("source"),
                 "def_manager": row.get("manager"),  # the definition's word, for a card with no sessions yet
                 "def_members": row.get("members"),
+                "def_techlead": row.get("techlead"),  # the seat's name (§4.9b), when the definition has one
                 # *nothing running* and *nothing left to run* are different facts (§4.9a)
                 "wound_down": row.get("wound_down"),
                 "wound_down_age": row.get("wound_down_age"),

@@ -8,7 +8,7 @@
 {% if g.manager %}<span class="meta">{{ g.manager.role_label or 'Manager' }}</span> <a class="name" href="/focus/{{ g.manager.id }}">{{ g.manager.name }}</a>
 <span class="pill s-{{ g.manager.state_class }}{% if g.manager.scraped %} scraped{% endif %}"><span class="dot"></span>{{ g.manager.state_label }}</span>{% if g.manager_elsewhere %} <span class="meta" title="the manager carries a different team badge, so its card is in that group (design §4.9)">elsewhere</span>{% endif %}
 {% elif g.team and g.members %}<span class="meta" title="no member of this team holds control over the others (design §4.8)">managed by you</span>
-{% elif g.team and g.def_manager %}<span class="meta">Manager {{ g.def_manager }} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
+{% elif g.team and g.def_manager %}<span class="meta">Manager {{ g.def_manager }}{% if g.def_techlead %} · Tech lead {{ g.def_techlead }}{% endif %} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
 {% if g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
 {# design §4.5a **team groups** (§4.8 `doing`, TD-074): the manager's own line, with its age exactly
    as a card draws it — the manager reporting on the team without being asked to narrate each member. #}
