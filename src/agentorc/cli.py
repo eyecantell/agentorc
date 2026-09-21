@@ -1653,7 +1653,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--thread",
         metavar="ID",
-        help="ask again on an answered question's thread: it lands with the thread above it and settles the first",
+        help="ask the person again on a question's thread: an answered one of yours to the person (settled as asked "
+        "again), or your own open ask to a session that has not answered (closed there, design §4.9b)",
     )
     p.add_argument(
         "--source",
