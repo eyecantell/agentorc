@@ -43,4 +43,4 @@
 01:28  final sweep check_cadence --since 12h: this run only #343 fails (review, recorded); #324, #320, #309 fail from the previous run (orchestrator-ao-1), reported only
 01:29  ao team stop ao-grind --close --timeout 90 → both members finished, nothing sent, closed
 01:31  ao progress none --why (each member and the why on its record)
-01:33  wind-down board line + #353 on the merge-queue line → branch orch-ao-grind-wound-down, PR #355, Sonnet fact-check running
+01:31  wind-down board line + #353 on the merge-queue line → branch orch-ao-grind-wound-down, PR #355, Sonnet fact-check running
