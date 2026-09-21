@@ -1856,6 +1856,55 @@ definition's `role:`, a `roles:` key in `org.yml` or `.agentorc.yml` — to `lea
 prints one line per process naming the new word; the record is written with `lead`. Records
 started before the rename keep `role: orchestrator` as a badge, which nothing keys on.
 
+**The names, 2026-09-20 (TD-076; decided by Paul 2026-09-19, confirmed 2026-09-20 with the project's
+name).** The session that runs a team's lifecycle — starts its members, nudges them, wraps them
+up — is the **`manager`**; the technical go-between of TD-075 is the **`techlead`**; and **the bare
+word `lead` is retired and never given a new meaning**. It is a rename, not a re-assignment: `lead`
+is a role name, a structural key of every team definition, a word `ao team` prints and the `role`
+badge on every record started since 2026-09-17, and a word that silently came to mean the *other*
+session would make every one of those lie. So:
+
+- **The role.** The preset `lead` becomes `manager` — same brief (`manager.md`), same lane, same
+  `control` grant, same icon. `lead` and `orchestrator` both join the renamed-roles table and
+  resolve to `manager` wherever a role is named (`--role`, a definition's `role:`, a `roles:` key),
+  with the one line per process naming the new word, exactly as `orchestrator → lead` did; a new
+  record is written with `manager`. A record already badged `lead` or `orchestrator` keeps its
+  badge as written — nothing keys on it (§9 invariant 9) — and the page draws it under the new
+  label (below), so an old card and a new one read the same.
+- **The team key.** A team definition's `lead:` block becomes **`manager:`**, and `lead: person`
+  becomes **`manager: person`**. `lead:` is still read, as the same thing, with the same one line;
+  **a definition that carries both is refused by name**, since which one was meant is not ours to
+  guess. What `ao team` prints, the Org's team header and `--json` say `manager`; `--json` keeps a
+  `lead` key beside it, equal to it, for the one release, because a manager's brief written
+  before the rename reads it.
+- **After the one release** the two old words stop resolving and are **refused by name** — *`lead`
+  was renamed `manager` (TD-076)* — and that refusal stays: the word is never free to be taken.
+- **`techlead` is reserved, not built.** TD-075 designs what it holds and may do; until then it
+  is not a preset, and a repo or an org that defines a role of that name is refused with a line
+  saying why, so the word cannot arrive in live data meaning something TD-075 then has to read
+  around.
+- **A role has a display label.** A preset or a `roles:` entry may carry **`label:`** — *Manager*,
+  *Tech lead*, *Grinder*, *Hunter* are the built-ins'; the default is the role's name with its
+  first letter raised; `plain` has none and draws no badge, as today. The label is what the role
+  badge, the team header and an Inbox row **show**; the key is what everything else reads —
+  `--role`, `--json`, the record's `role` field — and nothing keys on a label. It is a person's
+  text from a config file and is drawn as text, escaped, like a role's icon name (above). An old
+  badge is labelled through the renamed-roles table: `role: orchestrator` draws *Manager*.
+- **Session names stop carrying history.** In the team definitions `orchestrator-ao-1` becomes
+  `manager-ao-1` and `tdgrind-ao-N` becomes `grinder-ao-N`, and their brief files are renamed with
+  them. A name is what a record, a worktree, a launch branch and a run log are keyed by (§4.1),
+  so this is **new sessions, not renamed ones**: the team is stopped under its old names and
+  started under the new; the old records stay `exited` until a person forgets them, their run
+  logs stay on disk (invariant 3), and the manager's round log starts again on the launch branch
+  `manager-ao-1` while the old one keeps its history where it is. That restart is a person's word
+  to give, and the rename is not live in `org.yml` until it is given.
+- **`director` keeps its name**: its members are managers, and *director > manager > worker*
+  reads as the old line did. (*Proposed* — the glossary round was to settle it, and nothing
+  argues for a change.)
+- **In this document**, until the sweep that follows this paragraph lands, *lead* in running
+  text means the manager. Dated history keeps the word of its day: a line that says what a
+  *lead* did on 2026-09-17 is not rewritten, as the lines about `orchestrator` were not.
+
 Each preset also carries the test for when it has **run out of work**, which is the role's and
 never the core's; the tests and what a lead does with them are §4.9a (design 2026-09-14).
 
