@@ -13,6 +13,9 @@
       {% if s.title %}<span class="meta tool-title"
             title="the session's name as its tool holds it (design §4.5a) — set in the tool, not in agentorc">{{ s.title }}</span>{% endif %}
       <span id="fstate"></span>
+      {# §4.8a (TD-077 a2): the **suspended** mark, beside the state and never inside it — a
+         suspension is not a state, and only a person's Resume or Forget lifts it. #}
+      <span class="badge suspendedmark{% if not s.suspended_note %} hidden{% endif %}" id="fsuspended" title="{{ s.suspended_note }}">suspended</span>
       {# design §6 / §4.5a (TD-026): when this session stops, and the control that edits it. Drawn
          only for an unattended session, because a stop time is a policy and policies leave an
          interactive session alone (§4.2) — the agent refuses one either way, and offering a

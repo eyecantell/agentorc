@@ -173,6 +173,10 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* design §4.8a: the card's identity mark — a warning, not the amber needs-you ring, and never
    pressable: the Inbox row is where anything is done about it (TD-077 step 2). */
 .badge.alarmmark { cursor: default; color: var(--alarm-fg); background: var(--alarm-bg); border-color: var(--alarm); }
+/* design §4.8a *An alarm's answers* (TD-077 a2): **suspended** — flat and never pressable, like
+   every mark. It is the suspension's only record on a page (a suspension ends no row, so it writes
+   no trail), so it is quiet but not faint: a person must be able to see that it is there. */
+.badge.suspendedmark { cursor: default; color: var(--alarm-fg); background: transparent; border-color: var(--alarm); text-transform: uppercase; letter-spacing: .04em; font-size: 9.5px; }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }

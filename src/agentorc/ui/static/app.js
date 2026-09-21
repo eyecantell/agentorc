@@ -865,6 +865,14 @@
         if (o.verdict === "live") {
           const to = o.holder_state === "unrecorded" ? "" : ` <a class="btn sm primary" href="/focus/${encodeURIComponent(o.holder)}">Switch to</a>`;
           nnote.innerHTML = `⚠ <b>${esc(o.message)}</b>${to}`;
+        } else if (o.verdict === "suspended") {
+          // design §4.8a *An alarm's answers* (TD-077 a2): **a person's create is the lift**, which
+          // is why Start stays enabled here where a `live` holder disables it. The agent's own
+          // sentence is printed as it wrote it — the why, the when and the two ways out are all in
+          // it, and a page that recomposed them from parts is how two surfaces come to say
+          // different things about one record. The frame is all this adds: what pressing Start does.
+          nnote.innerHTML = `⚠ <b>${esc(o.message)}</b><br>Starting it here <b>lifts the suspension</b>`
+            + ` — that is a person's act, and yours.${o.holder ? ` <a class="btn sm" href="/focus/${encodeURIComponent(o.holder)}">Look at it first</a>` : ""}`;
         } else nnote.innerHTML = o.verdict === "supersede" ? esc(o.message) : "";
       } catch (e) { nnote.textContent = ""; start.disabled = false; }
     }
@@ -1028,6 +1036,16 @@
           : "starts a new turn";
       }
       $("#fstate").innerHTML = head;
+      // §4.8a (TD-077 a2): the **suspended** mark rides the pushed delta like the state does. It
+      // is drawn server-side at load and lives *outside* `#fstate` — a suspension is not a state —
+      // so without this a person watching the very session that is suspended from somewhere else
+      // would see the state change and not the mark, and the mark is the suspension's only record
+      // (review of PR #306). Always in the page, hidden until it is true, as the banners are.
+      const susp = $("#fsuspended");
+      if (susp) {
+        susp.classList.toggle("hidden", !v.suspended_note);
+        susp.title = v.suspended_note || "";
+      }
       // An exited session keeps its dead pane on purpose (exit code, last lines, run log); say so
       // and offer the two useful next steps instead of leaving tmux's "Pane is dead" to explain it.
       const ex = $("#fexited");

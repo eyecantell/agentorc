@@ -28,6 +28,10 @@
          **mark**, not a control — it is never pressable, and what to do about it is a row in the
          Inbox, where its answers live. The newest alarm is the hover. #}
       {% if s.alarm_note %}<span class="badge alarmmark" title="{{ s.alarm_note }} — it is either a bug of ours or a session misbehaving; the Inbox has the list and what can be done about it (design §4.8a)">⚠ identity</span>{% endif %}
+      {# design §4.8a *An alarm's answers* (TD-077 a2): **suspended** — flat, never pressable, and
+         the suspension's only record on a page, since a suspension ends no row and writes no
+         trail. The two ways out are a person's Resume and Forget, which exist already. #}
+      {% if s.suspended_note %}<span class="badge suspendedmark" title="{{ s.suspended_note }}">suspended</span>{% endif %}
       <span class="grow"></span>
       <span class="pill s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
             title="{{ s.host_note or ('guessed from the screen' if s.scraped else 'reported by the tool') }}"><span class="dot"></span>{{ s.state_label }}</span>
