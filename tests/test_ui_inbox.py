@@ -727,9 +727,10 @@ def test_the_inbox_has_a_row_per_record_with_alarms_and_one_for_the_hosts_own_li
     # control is **Dismiss**, as it is on every other row, and the **wire name stays** — a wire
     # name is not a control, and `identity_ack` is what the agent's own tests drive
     assert ">Dismiss</button>" in html and "Acknowledge" not in html
-    # …and the two that §4.5a gives the row but no RPC yet answers are not drawn: a control against
-    # a method that is not there is what §4.2 forbids (they arrive with `suspend` and `log_td`)
-    assert "Suspend" not in html and "Log TD" not in html
+    # …and of the two §4.5a gives the row beside it, **Suspend** arrived with `rpc_suspend`
+    # (TD-077 a2) and **Log TD** has not: a control against a method that is not there is what
+    # §4.2 forbids, so it is still not drawn and arrives with `identity_log`
+    assert ">Suspend</button>" in html and "Log TD" not in html
     # every instant is handed to the browser to put in the person's own clock, as the snoozed row is
     assert 'class="localtime" data-at="2026-09-19T10:30:00Z"' in html
     assert ">2026-09-19T10:30:00Z<" not in html
@@ -1662,3 +1663,39 @@ def test_the_new_session_form_says_a_suspended_name_is_a_lift_and_leaves_start_e
     assert "lifts the suspension" in block and "Look at it first" in block
     assert "start.disabled" not in block  # only `live` disables Start; this one is a person's act
     assert 'start.disabled = o.verdict === "live";' in js  # …and that rule is untouched
+
+
+@pytest.mark.unit
+def test_suspend_is_offered_only_where_there_is_something_to_stop_and_leaves_the_row_standing():
+    """§4.8a *An alarm's answers*: **Suspend** stops the session at once — no wrap-up, because a
+    session under suspicion is not asked to tidy — and is *a person's own act*, refused to every
+    session by the agent for `identity_ack`'s reason turned around: one that could suspend could
+    stop its rival.
+
+    Three rules the row has to get right, and each is a case below: it is **not** on the host's own
+    list, which is about no record; it is **not** on a record that is already suspended or already
+    stopped, where the mark would have no act behind it; and it **leaves the row standing**,
+    because it acts on the session and does not answer the alarm."""
+    live = {"row": "alarm", "id": "ao-x:alarm", "sid": "ao-x", "name": "x", "state": "working",
+            "alarms": [{"words": "a claim", "at": "2026-09-19T10:00:00Z", "count": 1}],
+            "mode": "enforce", "at": "2026-09-19T10:00:00Z"}  # fmt: skip
+    html = rows("needs", [live])
+    assert 'data-act="suspend" data-id="person" data-who="ao-x"' in html
+    assert "It is stopped at once, with no wrap-up" in html and "only you lift it" in html
+    assert "data-confirm=" in html  # a person's act, and not one to mis-press
+
+    ctl = 'data-act="suspend"'  # the control itself — `suspended`, the mark, is a different word
+    # the host's own list is about no record: nothing to stop
+    assert ctl not in rows("needs", [{**live, "row": "alarm_host", "sid": "", "name": "kmaster"}])
+    # already suspended: the mark is there, and a second suspend would be a mark with no act
+    marked = rows("needs", [{**live, "suspended_note": "suspended by a person"}])
+    assert ctl not in marked and "badge suspendedmark" in marked  # the mark, not the control
+    # already stopped: §4.8a — Forget it, or resume it, which is what lifts a suspension anyway
+    for dead in ("exited", "closed"):
+        assert ctl not in rows("needs", [{**live, "state": dead}]), dead
+
+    js = (UI / "static" / "app.js").read_text()
+    # it is the one act on this page that does **not** take its row away
+    assert 'if (staterow && action !== "suspend") staterow.remove();' in js
+    assert 'if (action === "suspend") body = { id: b.dataset.who || "" };' in js
+    assert "why:" not in js.split('action === "suspend"')[1][:200]  # the agent composes the reason
