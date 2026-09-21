@@ -250,6 +250,9 @@ def cmd_status(args: argparse.Namespace) -> int:
             # fetches — and the last few `sends`, by id, so a `conflict` can cite who typed what.
             if unread := s.get("unread"):
                 print(f"{'':<{w}}      mail:   {unread} unread")
+            # §4.9b (TD-075 step 4): open questions addressed to it — what fills an empty techlead seat
+            if waiting := s.get("asks_waiting"):
+                print(f"{'':<{w}}      asks waiting: {waiting}")
             # a doorbell that would not submit twice (§4.10): the sender learns its mail did not wake
             if bell := s.get("doorbell_failed"):
                 print(f"{'':<{w}}      doorbell failed {_age(bell['at'])}: {bell['error']}")
@@ -1116,6 +1119,26 @@ def _inbox_status(e: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
+def _sent(args: argparse.Namespace) -> int:
+    """`ao inbox --sent` (design §4.9b, TD-075 step 4): this session's own outbox, oldest first —
+    what it asked and answered, so a techlead answers this batch the way it answered the last."""
+    if args.unread:
+        return fail(args, "--sent lists what you sent, which you have no reading of: leave out --unread", 2)
+    got = call_sync("inbox", sent=True)
+
+    def prose() -> None:
+        print(f"{got['id']}: {len(got['entries'])} sent")
+        for e in got["entries"]:
+            reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
+            about = f" about {e['about']}" if e.get("about") else ""
+            state = f" · {e['closed_reason']}" if e.get("closed_reason") else ""
+            print(f"\n→ {', '.join(e.get('to') or [])} · {e['id']} · {e['kind']}{reply} · {e['at']}{about}{state}")
+            for line in str(e["text"]).splitlines() or [""]:
+                print(f"  {line}")
+
+    return emit(args, got, prose)
+
+
 def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
     """`ao msg --pass-up <id> --recommend "<line>" [--answer …]` (design §4.9b): a question you
     were asked goes to the person as the asker's, with your recommendation first among its
@@ -1141,6 +1164,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
     an entry read, and the host agent does that, never this command. With no `AGENTORC_SESSION`
     (a person at a terminal) it reads the org's person inbox, and a person's read sets nothing.
     Output opens with the fixed header, and every entry names its sender's role for the reader."""
+    if args.sent:
+        return _sent(args)
     got = call_sync("inbox", unread=args.unread)
 
     def prose() -> None:
@@ -1633,6 +1658,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("inbox", help="read your inbox; with no session, the person inbox (design §4.10)")
     p.add_argument("--unread", action="store_true", help="only entries not yet read")
+    p.add_argument("--sent", action="store_true", help="your own sent mail instead (design §4.9b)")
     p.set_defaults(fn=cmd_inbox)
 
     p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")

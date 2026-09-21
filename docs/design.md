@@ -2728,7 +2728,9 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   `unread`, **a number and never their text** (nobody reads another session's inbox), printed by
   `ao status -v`, and **added to the wake digest** (`wake_digest` gains a line for it, as it did
   for `out_of_work` and `restart_wanted` — it is not there today), so a manager blocked in `ao wait` returns when a
-  question lands on an empty seat. **The manager's rule for the seat**: `idle` with
+  question lands on an empty seat. **As built (TD-075 step 4, 2026-09-20):** `asks_waiting` is on
+  every view and in `wake_digest`; `ao status -v` prints *asks waiting: N*; an entry counts when it
+  is open, an `ask` or a `steer`, and names the record in `to` — compared whole, host included, since names are unique per host (§4.4a); a copy does not. A node holds no inbox, so the home pushes it the count with the unread hint and a node's own view shows that. **The manager's rule for the seat**: `idle` with
   `asks_waiting` 0 → `ao close` it (it writes no code; anything dirty or unpushed in its
   worktree is the board's, and it is left open); `idle` with `asks_waiting` > 0 for twenty
   minutes → the one send any idle member gets, naming the number; **`exited` or `closed` with
@@ -2759,7 +2761,8 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   --source "<file and section, or the decision's date>" "…"` — `source` is one line of text, at most 200 characters, stored on the reply and only ever drawn as text. It **checks the asker's claims in
   the repo** before it answers; it sees only the asker's framing, and that is the cost of
   starting cold. It reads its own sent mail first — **`ao inbox --sent`, new**: a session's own
-  outbox, its own and nobody else's, ungated as its inbox is; nothing reads an outbox today —
+  outbox, its own and nobody else's, ungated as its inbox is (built 2026-09-20: `inbox` with
+  `sent`, marking nothing; a person may read any session's, as an inbox) —
   so two questions in one night are answered alike; `--keep-mail` carries the outbox with the
   inbox, and a sent reply that carries a `source` is kept there for seven days whatever else
   is pruned. **Never**, whatever it believes is obvious:

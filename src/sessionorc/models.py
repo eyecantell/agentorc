@@ -11,6 +11,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Literal
 
+from sessionorc import naming
+
 State = Literal["working", "needs-you", "limited", "stalled?", "idle", "exited", "closed", "unreachable"]
 Kind = Literal["interactive", "command"]
 Confidence = Literal["hook", "scraped"]
@@ -450,6 +452,9 @@ def wake_digest(session: dict[str, Any]) -> str:
     # closes the member and starts it again — so it is exactly the kind of change a wait is for
     rw = session.get("restart_wanted") or {}
     parts.append(f"restart_wanted={(rw.get('at'), rw.get('why'), rw.get('early'))!r}")
+    # a question landing on an empty techlead seat (§4.9b, TD-075 step 4): the manager fills it, so
+    # a manager blocked in `ao wait` returns on it — the count, never the text
+    parts.append(f"asks_waiting={session.get('asks_waiting')!r}")
     return "\n".join(parts)
 
 
@@ -679,11 +684,33 @@ class Session:
             d.pop("threads")
             d.pop("wakes")
         d["unread"] = self.unread()
+        d["asks_waiting"] = self.asks_waiting()
         d["mail"] = self.mail_marks()
         return d
 
     def unread(self) -> int:
         return sum(1 for e in self.inbox if not e.read_at)
+
+    def asks_waiting(self, *, home: str | None = None) -> int:
+        """Design §4.9b (TD-075 step 4): the open `ask`s and `steer`s **addressed** to this record —
+        a copy is not addressed to it — as a number and never their text, since nobody reads
+        another session's inbox. What a manager reads to fill an empty techlead seat; computed
+        here like `unread`, so every reader sees the same count.
+
+        An address is compared whole, host included (§4.4a): names are unique per host, not per
+        org, so `tl@laptop` is not this record's address merely because its id is `tl`. A bare
+        address names a session on the host whose store holds the entry — `home` when the reader
+        says which, else the record's own host, which is the same thing for a record of this host."""
+        storing = home or self.host
+        mine = (self.id, self.host or storing)
+
+        def where(address: str) -> tuple[str, str]:
+            sid, host = naming.split_address(address)
+            return sid, host or storing
+
+        return sum(
+            1 for e in self.inbox if e.open and e.kind in ("ask", "steer") and any(where(x) == mine for x in e.to)
+        )
 
     def mail_marks(self) -> dict[str, Any]:
         """What a card and an `ao` reply say about this session's mail without a body: open `ask`s

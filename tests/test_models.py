@@ -232,3 +232,28 @@ def test_an_entry_written_before_suggested_answers_loads_with_none_of_them():
     a, b = MailEntry.from_dict(old), MailEntry.from_dict(old)
     a.answers.append("x")
     assert b.answers == []
+
+
+def test_asks_waiting_compares_whole_addresses_host_included():
+    """Design §4.9b / §4.4a (TD-075 step 4, review of PR #348): names are unique per host, not per
+    org, so an ask to `tl@laptop` is not waiting on this host's `tl`. A bare address names a
+    session on the storing host — the record's own, or `home` when a home reads another host's
+    record — and a copy, a note or a closed entry never counts."""
+    from sessionorc.models import MailEntry
+
+    def ask(mid: str, to: str, kind: str = "ask", **kw) -> MailEntry:
+        return MailEntry(id=mid, from_="ao-w", to=[to], at="2026-09-21T06:00:00Z", kind=kind, text="?", **kw)
+
+    here = Session(id="ao-tl", name="tl", kind="interactive", adapter="shell", dir="/", host="kmaster")
+    here.inbox = [
+        ask("m-1", "ao-tl"),
+        ask("m-2", "ao-tl@laptop"),  # a copy of mail to laptop's own `ao-tl`
+        ask("m-3", "ao-tl@kmaster"),
+        ask("m-4", "ao-tl", kind="note"),
+        ask("m-5", "ao-tl", closed_reason="replied"),
+        ask("m-6", "ao-other"),
+    ]
+    assert here.asks_waiting() == 2 and here.view()["asks_waiting"] == 2
+    there = Session(id="ao-tl", name="tl", kind="interactive", adapter="shell", dir="/", host="laptop")
+    there.inbox = [ask("m-7", "ao-tl@laptop"), ask("m-8", "ao-tl")]  # as the home on kmaster stores them
+    assert there.asks_waiting(home="kmaster") == 1
