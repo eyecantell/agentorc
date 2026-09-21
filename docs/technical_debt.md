@@ -54,7 +54,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-091 | Nothing says how much context a session has left, or that it has just compacted | Low | Open |
 | TD-092 | Nothing reaches a person who is not looking at the page when a session needs them | Low | Open |
 | TD-093 | Who must look at a PR before it merges is a sentence in a brief and a message in an inbox, not something a team is configured with | Medium | Open |
-| TD-095 | The Org's cards say the same thing several times, are uneven, and *working* does not stand apart | Medium | Open |
+| TD-095 | The Org's cards say the same thing several times, are uneven, and *working* does not stand apart | Medium | Partly done |
 
 ---
 
@@ -893,7 +893,7 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Priority:** Medium
 **Added:** 2026-09-21 (the anchor session; asked for by Paul from a screenshot of the live Org page, kept as `docs/mockups/reviews/2026-09-21-org-cards.png`)
-**Status:** Open — **a design session is owed, the anchor's, with Paul**: §4.5 and §4.5a first (a card's fields and their order are the design's), then the mockups (`docs/mockups/gen.py`), then the page (grinder-ao-2's lane). Not a free-pick until the design lands.
+**Status:** Partly done — **designed 2026-09-21 with Paul** (design §4.5 *The card's anatomy* and the §4.5a rows it changes; the sketch he chose from is `docs/mockups/reviews/2026-09-21-card-proposal.png`): six fixed rows at one height; a name once; the branch on a row of its own, tool · account · model on every card; one clock; an ending said once per place; the mode as a plain word with its toggle in *more*; the team's header without its manager's card in it; *working* green, *idle* blue, everything ended one grey. **His decisions**: the manager's card stays a card; blue for idle; the slot is two lines for now; a team's profiles are commonly mixed, so the profile line stays on the card; *unattended* is a word, not a chip. **Build order**: (1) the mockups (`docs/mockups/gen.py`) — the anchor or grinder-ao-2; (2) the page: `card.html`, `group_head.html`, the state tokens in both themes with contrast checked, the *more* entry for the mode — grinder-ao-2; (3) Paul looks at the live page. One thing left for a later look, noted during the Suspend test: what the suspended mark's `why` should say. As first written: a design session is owed, the anchor's, with Paul: §4.5 and §4.5a first (a card's fields and their order are the design's), then the mockups (`docs/mockups/gen.py`), then the page (grinder-ao-2's lane). Not a free-pick until the design lands.
 **Location:** design §4.5 (the card), §4.5a (its rows), `docs/mockups/gen.py`, `src/agentorc/ui/templates/card.html`, `group_head.html`, the state tokens in the stylesheet
 
 **Why:** Paul, 2026-09-21: *manager-ao-1 is listed multiple times on the same card (there are other redundancies as well). "Working" should probably be green to be more contrasted with the finished/exit states, and we should probably make the card sizes congruent.* What the screenshot shows, as the agenda:
