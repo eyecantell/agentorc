@@ -382,6 +382,29 @@ def test_the_terminal_palette_is_complete_and_dark(tmp_path):
     assert js.count("new Terminal(") == 1 and "AO.TERM_OPTS" in js[js.index("new Terminal(") :]
 
 
+def test_the_terminal_font_and_renderer_are_bundled_and_served(client):
+    """TD-038 (a) and (c): the monospace face ships under `static/vendor/fonts/` with its licence and
+    an `@font-face` for every file, the WebGL addon loads after xterm.js on the Focus page with the
+    DOM renderer as its fallback, and every vendored file is named with its version in the vendor
+    README — the files carry none, which is what held (c) up. Served, the font is `font/woff2`."""
+    static = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static"
+    css = (static / "app.css").read_text()
+    faces = re.findall(r'@font-face \{[^}]*url\("/static/vendor/(fonts/[^"]+)"\)', css)
+    assert faces and all((static / "vendor" / f).is_file() for f in faces)
+    assert (static / "vendor" / "fonts" / "OFL.txt").is_file()
+    assert '"calt" 0' in css  # no ligatures in a pane you type into
+    html = (static.parent / "templates" / "focus.html").read_text()
+    assert html.index("vendor/xterm.js") < html.index("vendor/addon-webgl.js")
+    js = (static / "app.js").read_text()
+    assert "onContextLoss" in js and "AO.termRenderer(term)" in js and "AO.termFont(term, fit)" in js
+    readme = (static / "vendor" / "README.md").read_text()
+    for f in (static / "vendor").rglob("*"):
+        if f.suffix in (".js", ".css", ".woff2"):
+            assert f.name.split("-latin")[0] in readme or f.name in readme, f.name
+    r = client.get("/static/" + "vendor/" + faces[0])
+    assert r.status_code == 200 and r.headers["content-type"] == "font/woff2"
+
+
 def test_a_card_says_when_the_session_stops_and_only_then(tmp_path, monkeypatch):
     """design §4.5a **stops** note (§6, TD-026): a session with a stop time says so on its card and
     in its Focus header, in the host's local clock; every session without one says nothing, which is

@@ -32,6 +32,31 @@
     brightBlue: "#3b8eea", brightMagenta: "#d670d6", brightCyan: "#29b8db", brightWhite: "#e5e5e5",
   };
 
+  // The WebGL renderer (TD-038 (c)): crisper and lighter than the DOM renderer's element per cell,
+  // and what VS Code's terminal uses. Without WebGL, or when the GPU takes the context back, the
+  // DOM renderer simply stays or returns, so this can only ever improve the pane.
+  AO.termRenderer = function (term) {
+    if (typeof WebglAddon === "undefined") return;
+    try {
+      const gl = new WebglAddon.WebglAddon();
+      gl.onContextLoss(() => gl.dispose());
+      term.loadAddon(gl);
+    } catch (e) { /* no WebGL here: the DOM renderer draws the pane */ }
+  };
+  // xterm.js measures a cell once, at open; the bundled face (app.css) may still be on its way, and
+  // a cell measured on the fallback font leaves every glyph misplaced once it lands. So when the
+  // face was not ready at open, measure again when it is. Two sets, because xterm.js ignores an
+  // option set to the value it already has.
+  AO.termFont = function (term, fit) {
+    const spec = `${AO.TERM_OPTS.fontSize}px "JetBrains Mono"`;
+    if (!document.fonts || document.fonts.check(spec)) return;
+    document.fonts.load(spec).then(() => {
+      term.options.fontFamily = "monospace";
+      term.options.fontFamily = AO.TERM_OPTS.fontFamily;
+      fit.fit();
+    }).catch(() => { /* the fallback stack stays: still a monospace pane */ });
+  };
+
   // ---- toasts: the one error surface (design §4.5) ----
   AO.toast = function (text, ok) {
     const el = document.createElement("div");
@@ -991,6 +1016,8 @@
     const term = new Terminal({ ...AO.TERM_OPTS, theme: { ...AO.TERM_THEME }, scrollback: 0 });
     const fit = new FitAddon.FitAddon(); term.loadAddon(fit);
     term.open($("#term")); fit.fit();
+    AO.termRenderer(term);
+    AO.termFont(term, fit);
     let ws, delay = 500, paneGone = false;
     // The pane is gone for good: end the terminal and stop reconnecting. The events push says so
     // before any reconnect could, and the server's 4404 says so too (TD-029).

@@ -1,3 +1,11 @@
+/* The one monospace face (TD-038 (a)): bundled, so the terminal and every `.mono` label look the
+   same on a phone or a fresh laptop as on a machine that happens to have it installed. Latin
+   subset, 400 and 700; the licence is `vendor/fonts/OFL.txt`. */
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/static/vendor/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 700; font-display: swap; src: url("/static/vendor/fonts/jetbrains-mono-latin-700-normal.woff2") format("woff2"); }
+/* No ligatures in the terminal: `=>` is two keystrokes in a pane you type into, not an arrow — VS
+   Code's terminal leaves them off by default too. JetBrains Mono draws its ligatures through `calt`. */
+.xterm .xterm-rows { font-variant-ligatures: none; font-feature-settings: "liga" 0, "calt" 0; }
 /* agentorc — tokens seeded from docs/mockups/gen.py; dark mode is a token swap (design §2.12). */
 :root {
   --bg: #f4f5f7; --fg: #1c2128; --muted: #6b7280; --strong: #374151; --line: #dfe3e8; --line2: #eceef1;

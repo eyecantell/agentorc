@@ -65,7 +65,10 @@ died means cycling through VS Code windows and tmux panes by hand. Lessons from 
     pane carries VS Code's Dark Modern terminal palette (the sixteen ANSI colours, foreground,
     cursor and selection), so the same output is the same colour in Focus as in the editor's
     terminal beside it — literals, not tokens, because the pane must not follow the page
-    (landed 2026-09-13, TD-038).
+    (landed 2026-09-13, TD-038). Its face is bundled (JetBrains Mono, OFL), so a phone or a fresh
+    laptop reads the same pane, with ligatures off because it is a pane you type into; and it draws
+    through xterm.js's WebGL renderer where the browser has WebGL, the DOM renderer otherwise
+    (2026-09-20, TD-038).
 13. **Local and volatile hosts**: the person's own laptop is a host too (transport `local`,
     no ssh). A host marked `volatile: true` sleeps with the lid; its sessions show
     `unreachable` (not `stalled?`) when the host agent stops answering, its VS Code links use the
