@@ -74,3 +74,4 @@
 10:17  inbox: identity alarm m-dffe0475a488 on alarm-probe (the announced test) → ao msg --outcome dropped "the anchor's live test of Log TD" --for it; settled 16:16:53Z. The skill's form ao msg person --outcome … "<line>" --for … fails (argparse: unrecognized arguments); options before the positionals works
 10:21  inbox: person (via the anchor) m-c424fa687bb9 — second Log TD round follows, settle dropped again → noted; grinder-ao-1 claimed TD-057 (#365)
 10:23  anchor merged #357 (TD-094) and #360 (TD-075) → cadence check pass on both (review recorded); before 2 h, so no ask. Still queued: #361–#365
+10:27  #365 (TD-057) merged by the anchor → cadence pass
