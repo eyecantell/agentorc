@@ -105,10 +105,12 @@ def test_built_in_briefs_fill_the_lane_and_plain_has_none(tmp_path):
     assert "## Lane: TD-027, TD-019" in text and "{lane}" not in text
     assert "## Lane: free-pick" in repoconfig.resolve_role(cfg, "grinder").brief_text()  # the role's default
     assert "## Area: free" in repoconfig.resolve_role(cfg, "hunter").brief_text()
-    orc = repoconfig.resolve_role(cfg, "lead").brief_text()
+    orc = repoconfig.resolve_role(cfg, "manager").brief_text()
     assert "## Members: (none given)" in orc and "control" in orc
+    # design §4.9a *A wind-down is announced* (TD-053 step 5): the board line comes before the close
+    assert orc.index("the team ran out of work at") < orc.index("ao close $AGENTORC_SESSION")
     assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
-    for name in ("grinder", "hunter", "lead"):  # one screen each
+    for name in ("grinder", "hunter", "manager"):  # one screen each
         assert len(repoconfig.resolve_role(cfg, name).brief_text().splitlines()) < 40
 
 
