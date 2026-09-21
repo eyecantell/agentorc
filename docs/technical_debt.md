@@ -54,7 +54,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-091 | Nothing says how much context a session has left, or that it has just compacted | Low | Open |
 | TD-092 | Nothing reaches a person who is not looking at the page when a session needs them | Low | Open |
 | TD-093 | Who must look at a PR before it merges is a sentence in a brief and a message in an inbox, not something a team is configured with | Medium | Open |
-| TD-094 | `test_the_doorbell_rings_only_where_it_may` fails now and then on CI (3.13), on a six-second wait | Low | Open |
 
 ---
 
@@ -880,16 +879,3 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the design says where the rule lives and what agentorc does and does not enforce, a team can be configured with it, the waiting PRs and their age are on the page, and a PR past its bound reaches the person.
 
 **Related:** TD-075 (the techlead — the natural reader), TD-083 (the ending that made the overnight stall a clean wind-down rather than a parked team), docs/cadence.md §4 (the independent review), the memory note *read-inbox-before-merging*.
-
-## TD-094: `test_the_doorbell_rings_only_where_it_may` fails now and then on CI
-
-**Priority:** Low
-**Added:** 2026-09-21 (the anchor session)
-**Status:** Open — seen three times on 2026-09-21, each on Python 3.13: on `main` at the merge of #346 and again at the merge of #353 (neither re-run), and on PR #348's branch after a merge of `main`, where the anchor re-ran the failed job and it passed — so that run now reads green in the history. It fails at `tests/test_doorbell.py:127`, `assert await wait_for(lambda: _has(agent, w, "SUBMITTED " + mail.unread_line(2)), timeout=6)` — a six-second wait for the second ring after the wrap-up flag clears. Not investigated: whether six seconds is simply too short on a loaded runner (the ring rides the tick and a quiet period) or the ring can be lost. The doorbell itself (PR #343, `src/sessionorc`) was merged by its author before the anchor read it and before its review comment was posted, so **the anchor's read of #343 is owed as well** — the same sitting as this flake.
-**Location:** `tests/test_doorbell.py`, the doorbell pass in `src/sessionorc/agent.py` (TD-052 step 7)
-
-**Why:** a test that fails one run in some number makes every red CI a question, and this one guards a thing that types into a session's pane.
-
-**Done when** the cause is known and either the wait is made to follow the mechanism (as TD-088 did for the trail tests, by driving the tick) or the lost ring is fixed; and #343 has had its read.
-
-**Related:** TD-052 (step 7), TD-078, TD-088 (the last two timing flakes and how they were fixed), TD-093.
