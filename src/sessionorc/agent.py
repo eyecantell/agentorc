@@ -3747,7 +3747,10 @@ class HostAgent:
             pressed = "allowed by you" if params.get("behavior") == "allow" else "denied by you"
             self._attention_ended(f"{rid}@{host}", pressed)
         elif method == "identity_ack" and rid:
-            self._attention_ended(f"{rid}@{host}", "acknowledged by you", "alarm")
+            # the control is **Dismiss**; `identity_ack` is only its wire name, which stays because
+            # it is in `NODE_ACTS` and renaming it there is a protocol change that buys a person
+            # nothing (§4.8a *An alarm's answers*, TD-077 a1)
+            self._attention_ended(f"{rid}@{host}", "dismissed by you", "alarm")
         reply = reply if isinstance(reply, dict) else {}
         if reply.get("record"):
             self._take_records(host, [reply["record"]], whole=False)
@@ -4194,7 +4197,9 @@ class HostAgent:
             self.identity_store.save(self.identity_alarms)
             return {"id": PERSON, "cleared": True, "alarms": []}
         s = self._get(self._addr(id))
-        self._attention_ended(s.id, "acknowledged by you", "alarm")  # the trail says who ended it (§4.10)
+        # the trail says who ended it (§4.10), in the control's own word: **Dismiss**, not the wire
+        # name this RPC keeps (§4.8a *An alarm's answers*, TD-077 a1)
+        self._attention_ended(s.id, "dismissed by you", "alarm")
         s.identity_alarms = []
         self._id_dirty.discard(s.id)
         self._save(s)

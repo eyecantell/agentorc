@@ -1992,6 +1992,8 @@ answer to the alarm.
 - **Dismiss** is *Acknowledge* renamed and nothing else: `identity_ack` (the wire name stays —
   it is in `NODE_ACTS`, and a rename there is a protocol change that buys a person nothing)
   clears the list, and the trail says *dismissed by you* where it said *acknowledged by you*.
+  **Built 2026-09-20** (the trail word, at the home and on a node's routed act alike; the
+  control's label is the page's own half).
 - **Log TD** files the alarm where work is picked up. The host agent does not write a repo's
   ledger — it never commits on a session's behalf (§4.10 *A bounded exchange*), and board
   write-back (§4.4) is unbuilt — so *filing* is handing it to the session that answers for this
@@ -2927,7 +2929,7 @@ state alike:
    of its own (persisted beside the person inbox, the newest 100, each kept for `MAIL_RETENTION`),
    where `how` is what the home can tell — *allowed by you*, *denied by you* (the `decide` RPC from
    a person), *answered in the terminal* (the pending thing cleared with no `decide`), *resumed*,
-   *pushed*, *forgotten*, *the limit reset*, *acknowledged by you* (an identity alarm, §4.8a — *dismissed by you* once the control is renamed, beside *logged by you → `<controller>`*; a suspension ends no row and writes nothing here), and
+   *pushed*, *forgotten*, *the limit reset*, *dismissed by you* (an identity alarm, §4.8a — the word since 2026-09-20, when the control was renamed from *Acknowledge*; beside *logged by you → `<controller>`*, not yet built; a suspension ends no row and writes nothing here), and
    plain *resolved* when it cannot tell (for a node's session the home sees the replica change and
    knows its own `decide`s, so *by you* is always known and the rest is as good as the node's
    report). `text` is cleaned and capped as a `doing` line is. FYI lists the trail; **Dismiss**
