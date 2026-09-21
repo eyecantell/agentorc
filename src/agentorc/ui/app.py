@@ -1682,7 +1682,7 @@ def create_app() -> FastAPI:
         elif action == "send":
             await call("send", id=sid, text=body.get("text", ""))
         elif action == "wrapup":
-            await call("send", id=sid, text=WRAPUP_PROMPT)
+            await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True)
         elif action == "mode":
             await call("set_mode", id=sid, unattended=bool(body.get("unattended")))
         elif action == "keys":

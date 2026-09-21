@@ -104,6 +104,7 @@ SEND_STALL_SECONDS = 5.0  # `send(wait=True)`: no sign of the prompt being taken
 PASTE_SHOW_SECONDS = 1.0  # `send`: how long the pasted text gets to appear in the composer before Enter (TD-027)
 SUBMIT_SECONDS = 1.5  # `send`: how long the composer gets to empty after Enter, per try (TD-027)
 COMPOSER_LINES = 12  # raw rows an adapter's `composer` reads (the composer sits above a status line or two)
+DOORBELL_TRIES = 2  # a doorbell that fails to submit is tried once more, then recorded (design §4.10)
 TITLE_CAP = 80  # characters of the tool's own title kept (design §4.5a **title**, TD-074): a name, not a line
 SETTLED = ("idle", "needs-you", "exited", "closed", "limited", "stalled?")  # where a `send(wait=True)` ends
 # `ACTING_RPCS` lives in `sessionorc.mail` beside the gates, and is re-exported here for the
@@ -367,6 +368,11 @@ class HostAgent:
         self._subscribers: dict[asyncio.StreamWriter, dict[str, str]] = {}
         self._gone: list[str] = []  # forgotten ids not yet announced (`_forget` → `_push_changes`)
         self._waits: set[_Wait] = set()  # every `wait` blocked right now, each on its own connection
+        # The doorbell (design §4.10, TD-052 step 7): per session, the idle stretch it last rang in —
+        # `{rev, rung, failures}`, `rev` being the record's state counter, so a new stretch is a new
+        # entry — and the rings in flight, one per session.
+        self._bells: dict[str, dict[str, Any]] = {}
+        self._ringing: dict[str, asyncio.Task[None]] = {}
         # every open client connection: a stop closes them, or `Server.wait_closed()` waits on the
         # UI's subscription and each blocked `wait` forever (TD-058)
         self._conns: set[asyncio.StreamWriter] = set()
@@ -544,6 +550,7 @@ class HostAgent:
         await self._enforce_stop_times(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
+        self._ring_doorbells()
 
     async def _enforce_stop_times(self, now: datetime) -> None:
         """Stop the unattended sessions whose time is up (design §6, TD-026 gap 1).
@@ -995,6 +1002,7 @@ class HostAgent:
             self._last_hook,
             self._killed_at,
             self._mail_hints,
+            self._bells,
         ):
             side.pop(sid, None)
         for key in [k for k in self._attention_how if k.split("|", 1)[0] == sid]:
@@ -1680,7 +1688,13 @@ class HostAgent:
         await self._push_changes()
 
     async def rpc_send(
-        self, id: str, text: str, wait: bool = False, timeout: float | None = None, caller: Any = None
+        self,
+        id: str,
+        text: str,
+        wait: bool = False,
+        timeout: float | None = None,
+        caller: Any = None,
+        wrapup: bool = False,
     ) -> dict | None:
         """Type a prompt. With `wait` (TD-016, design §4.2): return the record once the session has
         started on *this* prompt and settled again (`SETTLED`). A session that is busy queues the
@@ -1689,11 +1703,14 @@ class HostAgent:
         of the moment it could, `timeout` after `timeout` seconds in total, `removed` if the record
         goes away. Nothing is ever re-sent on a guess (design §4.2). `caller` is the envelope's,
         injected by the dispatcher: every send that reaches the pane is recorded on the record as
-        `sends`, with who typed it (design §4.10)."""
+        `sends`, with who typed it (design §4.10). `wrapup` says this text is the wrap-up prompt
+        (the card's Wrap up, `ao team stop`): it is stamped on the record as `wrapup_at`, which holds
+        the doorbell off, and a send without it clears the stamp (§4.10 "A pending stop beats mail")."""
         s = self._get(id)
         self._refuse_gone(s)
         if s.pending and s.pending.kind in ("permission", "question"):
             raise RpcError(f"{id} has a pending {s.pending.kind}; answer it in the terminal")
+        s.wrapup_at = now_iso() if wrapup else None
         entry = self._record_send(s, caller, text)
         if mail.is_person(caller):
             self._refill(s)
@@ -3192,7 +3209,102 @@ class HostAgent:
         """Reachable in step 3's sense: some connection holds a `wait` for this session now."""
         return any(w.caller == sid for w in self._waits)
 
-    def _decide_wake(self, s: Session, *, member_change: bool) -> dict[str, Any] | None:
+    # -- the doorbell (design §4.10 "How a Claude Code session is told it has mail") -------------
+
+    def _bell_blocked(self, s: Session, now: datetime) -> str | None:
+        """Why the doorbell may not ring for `s` now, or None when it may. The order is the
+        design's: a session that cannot be rung at all, then a pending stop, then — in `_ring`, the
+        wake decision — the budget and new mail."""
+        if s.state != "idle" or s.confidence != "hook":
+            return "not hook-confirmed idle"  # never a scraped idle or `stalled?` (a takeover)
+        if not mail.mail_wakes(s):
+            return "a person's session"  # invariant 5: the chip and the line, nothing typed
+        if getattr(adapters.get(s.adapter), "composer", None) is None:
+            return "no composer"  # without a submit confirmation a ring could land on a half-typed line
+        if s.wrapup_sent_at or s.wrapup_at or (s.run_until and now >= _parse(s.run_until)):
+            return "a wrap-up under way"  # mail never pushes a session past its stop
+        if self.blocked_in_wait(s.id):
+            return "blocked in wait"  # reachable already: the wait takes the decision
+        return None
+
+    def _ring_doorbells(self) -> None:
+        """Each tick: start a ring for every session the doorbell may ring. A ring is its own task,
+        since a submit takes seconds and the tick must not wait on it; one per session at a time.
+        One ring per idle stretch; a failed one is tried once more in the same stretch, then
+        recorded, and nothing more is typed until the session's state next changes."""
+        if self.mode == "node":
+            return  # the mailbox is the home's; a node's doorbell is the forwarded `wait` (§4.4a)
+        now = datetime.now(UTC)
+        for s in list(self.sessions.values()):
+            if s.id in self._ringing:
+                continue
+            bell = self._bells.get(s.id)
+            if bell is not None and bell["rev"] != s.rev:
+                del self._bells[s.id]  # its state changed: a new stretch
+                bell = None
+            if not s.unread() or self._bell_blocked(s, now):
+                continue
+            if bell is not None and (bell["rung"] or bell["failures"] >= DOORBELL_TRIES):
+                continue
+            self._ringing[s.id] = asyncio.create_task(self._ring(s.id, retry=bell is not None))
+
+    async def _ring(self, sid: str, *, retry: bool) -> None:
+        try:
+            await self._ring_once(sid, retry=retry)
+        except Exception:  # noqa: BLE001 — a detached task: a ring that breaks is a log line
+            log.exception("doorbell for %s failed", sid)
+        finally:
+            self._ringing.pop(sid, None)
+
+    async def _ring_once(self, sid: str, *, retry: bool) -> None:
+        """One ring: the composer must read empty — a person's half-typed words would otherwise be
+        submitted with the line appended — then the wake decision (the budget, and mail no wake has
+        covered: *rung only when the count has risen*), then the fixed line through `_submit`. A
+        retry was decided and charged by the first try, so it takes no second decision; it rings
+        only into an empty composer, since a stuck first try may have left the line there."""
+        s = self.sessions.get(sid)
+        if s is None:
+            return
+        adapter = adapters.get(s.adapter)
+        rev = s.rev
+        tail = await asyncio.to_thread(self.tmux.capture_tail, sid, COMPOSER_LINES, raw=True)
+        s = self.sessions.get(sid)
+        if s is None or s.rev != rev or self._bell_blocked(s, datetime.now(UTC)):
+            return  # it moved while the screen was read: the next tick looks again
+        composer = adapter.composer(tail)
+        if composer is None or (composer and not retry):
+            return  # a dialog, or someone's words: wait for the next tick
+        if retry:
+            bell = self._bells[sid]
+            if composer:  # the first try's own line is still there: nothing more is typed
+                self._bell_failed(s, bell, "prompt-stuck: the line is still in the composer")
+                return
+        elif self._decide_wake(s, member_change=False, via="doorbell") is None:
+            return  # nothing new since the last wake, or the budget is spent: the mail waits
+        else:
+            # only a decided ring has a stretch to keep: an undecided tick is taken again next tick,
+            # which is how a refilled budget rings for mail that landed while it was spent
+            bell = self._bells[sid] = {"rev": rev, "rung": False, "failures": 0}
+        try:
+            await self._submit(sid, adapter, mail.unread_line(s.unread()))
+        except Exception as e:  # noqa: BLE001 — `prompt-stuck`, or tmux refusing the paste: both a failed ring
+            if s.id in self.sessions:
+                self._bell_failed(s, bell, str(e) or type(e).__name__)
+            return
+        bell["rung"] = True
+        if s.doorbell_failed:
+            s.doorbell_failed = None
+            self._save(s)
+        await self._push_changes()
+
+    def _bell_failed(self, s: Session, bell: dict[str, Any], error: str) -> None:
+        bell["failures"] += 1
+        log.warning("doorbell for %s did not submit (%d of %d): %s", s.id, bell["failures"], DOORBELL_TRIES, error)
+        if bell["failures"] >= DOORBELL_TRIES:
+            s.doorbell_failed = {"at": now_iso(), "error": error}
+            self._save(s)
+
+    def _decide_wake(self, s: Session, *, member_change: bool, via: str = "wait") -> dict[str, Any] | None:
         """The one wake decision (design §4.10), taken when `s` is reachable — blocked in `wait`
         here; step 7's doorbell calls it at a hook-confirmed `idle`. Looks at the unread mail past
         the `mail_decided` watermark:
@@ -3225,6 +3337,7 @@ class HostAgent:
             "cause": "member" if member_change else "mail",
             "charged": not free,
             "covered": len(fresh),
+            "via": via,
         }
         s.wakes = (s.wakes + [decision])[-mail.WAKES_KEEP :]
         s.mail_decided = {"id": fresh[-1].id, "at": fresh[-1].at}

@@ -78,6 +78,8 @@ NODE_OWNED = frozenset(
         "model",
         "subagents",
         "wrapup_sent_at",
+        "wrapup_at",
+        "doorbell_failed",
         "run_log",
         "previous_run",
         "closed_at",
@@ -587,6 +589,15 @@ class Session:
     run_until: str | None = None
     wrapup_prompt: str | None = None
     wrapup_sent_at: str | None = None
+    # The other wrap-up (design §4.10 "A pending stop beats mail", TD-052 step 7): when a `send`
+    # marked `wrapup` typed the wrap-up prompt — the card's Wrap up, `ao team stop` and a
+    # manager's wind-down (§4.9a) — which this package cannot tell from any other send by its
+    # text. The doorbell never rings while it is set; the next plain send clears it, since a new
+    # instruction is a run carrying on.
+    wrapup_at: str | None = None
+    # A doorbell that failed to submit twice (design §4.10): `{at, error}`, so the sender and the
+    # page can see that the ring did not land; cleared by the next ring that does.
+    doorbell_failed: dict[str, str] | None = None
     # The host this record's tmux session runs on (design §4.4a, TD-057 step 1). Ids naming a
     # session on this same host are stored bare; only another host's are stored `id@host`
     # (`naming.qualify`). The host agent fills it at create and backfills it on load.
@@ -608,8 +619,9 @@ class Session:
     # The wake decision (design §4.10, TD-052 step 3). `mail_decided` is the one watermark per
     # session — `{id, at}` of the newest inbox entry any wake has covered; a decision not to wake
     # leaves it where it was. `wakes` is every decision that woke the session, bounded
-    # (`mail.WAKES_KEEP`): `{at, cause: "mail" | "member", charged, covered}` — the record step 5
-    # measures, a charged mail wake apart from a free one that rode a member's change.
+    # (`mail.WAKES_KEEP`): `{at, cause: "mail" | "member", charged, covered, via}` — the record step 5
+    # measures, a charged mail wake apart from a free one that rode a member's change; `via` is
+    # `wait` or `doorbell` (step 7), which is how the wake reached the session.
     # `wake_refilled_at` is the last person's act toward the session: charged wakes before it no
     # longer count against the budget.
     mail_decided: dict[str, str] | None = None

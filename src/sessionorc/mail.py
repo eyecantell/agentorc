@@ -249,3 +249,11 @@ def mail_wakes(s: Session) -> bool:
     """A person's session is never woken by mail (§9 invariant 5, §4.10 *Done when*): it gets the
     unread line and the chip, and nothing returns or rings for it."""
     return not (s.kind == "interactive" and not s.unattended)
+
+
+def unread_line(n: int) -> str:
+    """The one line a session is told it has mail with (design §4.10): the doorbell typed into an
+    idle pane and the line on every `ao` reply are this text. A count and nothing a sender wrote —
+    no `from`, no `kind`, no `about`, no body — which is what keeps a ring a message and not a
+    laundered `send`: whatever is pasted and followed by Enter is the recipient's next prompt."""
+    return f"[agentorc] you have {int(n)} unread messages — run ao inbox"
