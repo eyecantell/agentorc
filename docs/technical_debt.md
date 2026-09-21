@@ -35,7 +35,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-055 | Rename to the glossary's decided words: the `orchestrator` role becomes `lead`, the `orchestrate` grant `control`, orc-of-orcs director, a lead's tick a round, the daemon always *host agent*; nudge, supervisor and fleet retired | Medium | Partly done |
 | TD-057 | Sessions on different hosts cannot talk: build the home and node split — one home host agent holds the org's graph and mail, other hosts dial it (design §4.4a); a container node (contractmatch's devcontainer) is brought up, provisioned at the home's version and supervised by the home, with the checkout at the same absolute path inside and a per-node link socket — design §4.4a *A container node*, step 3c, 2026-09-17 | Medium | Partly done |
 | TD-058 | `systemctl restart agentorc-agent` hangs for the 90 s stop timeout and ends in SIGKILL: the serve loop waits for every open connection to close | Medium | Partly done — fixed, live check pending |
-| TD-059 | The rename search turned up neighbours building the same thing and nobody has read them: survey `agentboss` and the projects holding the names we wanted, and record what to take, what to skip and where this project differs | Medium | Open |
 | TD-060 | The name `agentorc` is taken: rename the project — `shiftlead` leads, undecided; two packages, seven env vars, a state directory, two systemd units and a per-repo config file carry the name onto machines, so it is a migration and not a text sweep | Medium | Open — awaiting Paul's decision |
 | TD-061 | A worktree session's memory write lands uncommitted in the main checkout, where the anchor's next `git commit -a` sweeps it into an unrelated PR | Medium | Open |
 | TD-062 | A merge that changes an RPC's parameters breaks the `ao` CLI on the live system until the host agent restarts: the install is editable, so the client is new at once and the agent is not | Medium | Partly done |
@@ -55,6 +54,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-087 | The usage chip is empty: the usage endpoint answers 429, the adapter turns every failure into silence, the poll never backs off, and a capped session is not marked `limited` meanwhile | Medium | Open |
 | TD-088 | A row that ends because its session exited is trailed as *resolved*, and two trail tests raced the tick for it | Low | Partly done |
 | TD-089 | A session whose `AGENTORC_SESSION` is unset is told to start a host agent when none answers | Low | Open |
+| TD-091 | Nothing says how much context a session has left, or that it has just compacted | Low | Open |
+| TD-092 | Nothing reaches a person who is not looking at the page when a session needs them | Low | Open |
 
 ---
 
@@ -497,30 +498,6 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Related:** TD-024 (archived: the pending-task traceback on SIGTERM, which made the cancel path clean but did not meet this), TD-052 step 3 (the `wait` RPC's long-lived connections), design §4.4, §4.6.
 
-## TD-059: The rename search found neighbours building the same thing — read them
-
-**Priority:** Medium
-**Added:** 2026-09-16 (Paul, during the rename discussion held in samscrape session 746e1973 on kmaster)
-
-**Status:** Open — nothing surveyed yet. Only `tallu-wonder/agentboss`'s README and top-level tree have been read (2026-09-16); every other project below is known by its name and one-line description alone.
-
-**Location:** no code. The output is an ADR under `docs/decisions/` beside the existing `2026-09-12-orchestrator-membership-prior-art.md`, plus whatever TD entries the survey produces.
-
-**Why:** the name `agentorc` turned out to be in use, and checking replacement names against PyPI, npm, crates.io and GitHub kept landing on projects in this exact niche — which is a finding about the field, not only about names. Two unrelated people took `agentboss` for agent-session tooling within three months of each other. None of these has been read for what it *does*, and at least one has solved problems that are open entries in this ledger. The projects, with how each was found:
-
-- **`tallu-wonder/agentboss`** (Go, MIT, created 2026-07-30, pushed 2026-09-10, 0 stars) — *"One screen for every coding-agent session you have running — a persistent tmux-backed desk for Claude Code and Codex."* The closest neighbour: one tmux session per agent session, status from Claude Code hooks, everything needed to revive a session kept on disk. From its README alone it has things this project lacks or has open: **Codex as a second first-class agent** (status from transcript events plus the `notify` hook; the conversation id adopted by folder + start time because Codex reveals it only at turn end), a five-state status vocabulary (`working` / `needs you` / `finished since you looked` / `idle` / `stopped`) — *finished since you looked* is a state this project does not have, and bears on TD-032 and TD-049 — desktop notifications that jump to the session, per-session model / context / estimated cost, context that drops on a compaction record (**the 2026-09-14 board item: a `/compact` leaves a healthy session reading `stalled?`**), colored groups with an Archived shelf, `opt+W` to start a session in a fresh worktree, and fork-the-conversation (`claude --resume --fork-session`). What it does **not** appear to have is anything above the single person at one terminal: no lead/worker/director, no grants or controllers, no mail between sessions, no unattended teams, no multi-host, no browser UI. That gap is this project's claim to exist, and the survey should confirm it from the code rather than from a README's silence.
-- **npm `agentboss`** (`2026hackathon/AgentBoss`, v0.1.4, 2026-06) — *"AI Agent collaboration analytics — become your AI agent's boss, not its babysitter."* Analytics over agent sessions, not control of them. Worth a look for what it measures: this project records progress and findings (TD-028) but reports nothing about them over time.
-- **the project holding `agentorc`**, and **`agentdirector`** — Paul found both taken; neither has been identified in this ledger. Step one of the survey is to name them (registry, URL, what they are), since a project that chose the same name probably chose it for the same reason.
-- Not in scope: `18682402476-svg/AgentBoss` (a Sui-blockchain agent arena), `ntnusky/shiftleader` (a dormant Puppet management dashboard — relevant only as the nearest name to `shiftlead`), the npm `directr` directive processor.
-
-**Fix:** read each in-scope project's code, not its README — the README above is a claim about agentboss, and this entry's bullets restate it unverified. For each, record in one ADR: (a) what it does that this project does not, and whether that is wanted — each wanted item becomes its own TD entry, or a line on an existing one (TD-032, TD-049, the `/compact` stall item); (b) how it solved a problem this project also has, where the mechanism differs — status detection, session revival, the conversation-id handshake, compaction; (c) what this project does that it does not, stated as the sentence the README's first screen should say once the rename lands. Start from design §3, which already surveys ttyd, ccmanager, claude-squad, Vibe Kanban, agent-dashboard, herdr (measured, ADR 2026-09-10) and OpenAI's Agents API — none of the projects above is in it, so this entry adds to that table and does not redo it. Then widen the search past the names already tripped over: search GitHub for the *description* (tmux + Claude Code + sessions, agent orchestration, multi-agent desk), because the names found so far were found by accident and a survey scoped to them proves only that scope. State the search terms and the date in the ADR.
-
-**Done when** the ADR exists, names every project read and the commit each was read at, and each wanted capability has a TD number; and the rename's README positioning has a sentence drawn from (c).
-
-**Related:** TD-060 (the rename itself; [ADR 2026-09-16](decisions/2026-09-16-rename.md)), design §3 (the existing prior-art table), `docs/decisions/2026-09-10-herdr-spike.md`, TD-055 (the glossary rename: `lead` is already the decided word for the coordinating session, which is part of why `shiftlead` fits), TD-032, TD-049, TD-028, `docs/decisions/2026-09-12-orchestrator-membership-prior-art.md` (the earlier prior-art pass, scoped to membership).
-
----
-
 ## TD-060: The name `agentorc` is taken — rename the project
 
 **Priority:** Medium
@@ -540,7 +517,7 @@ There is a second, sharper edge: a merged PR's row cannot be repaired. Editing t
 
 **Done when** the installed distribution, both units, the state directory and the README carry the new name; a session started before the rename is either migrated or documented as needing a restart; `git grep -i agentorc` returns only dated records and the "was `agentorc`" lines; and the three dev-cadence files are synced.
 
-**Related:** TD-059 (the neighbours the name search found; its survey supplies the tagline), TD-055 (the glossary rename — `lead` is already the decided word, which is much of why `shiftlead` fits), design §4.1 (session ids), §4.3 (the two packages).
+**Related:** TD-059 (the neighbours the name search found; its survey supplies the tagline), TD-055 (the glossary rename — `lead` is already the decided word, which is much of why `shiftlead` fits), design §4.1 (session ids), §4.3 (the two packages). **README positioning (TD-059, 2026-09-20):** the first-screen sentence drawn from the neighbours survey is in [ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md) (c); it goes in with the rename.
 
 ## TD-061: A worker's memory write lands uncommitted in the anchor's checkout
 
@@ -731,6 +708,8 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Done when** a grinder that tries to wind down with unread mail is refused and told why, Ready to close shows the row, an exited session's card shows no unread `note`s, the briefs say when to read, and §4.10 / §4.9a / §4.2 say all of it.
 
+**A third road, from the neighbours survey (TD-059, 2026-09-20):** `multi-agent-shogun`'s Claude Code Stop hook refuses to end a turn while the agent has unread mail and feeds the mail back in — the refusal at the moment the turn ends rather than at `ao progress none`. It would live in the Claude Code adapter (§4.3), and it covers a session that never declares; weigh it in the design round beside part 2.
+
 **Related:** design §4.10 (lifecycle, *an unread entry never ages out*), §4.9a (`out_of_work`), §4.2 (Ready to close), TD-052 (mail), TD-053 (wind-down), TD-066 (the crash that hid that night's mail), TD-069 (the page this keeps clean), TD-071 item 2.
 
 
@@ -912,3 +891,33 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** an `ao` run from inside an agentorc session with `AGENTORC_SESSION` unset, against no host agent, is told to stop rather than to start one.
 
 **Related:** TD-086 (archive), design §4.8a, TD-077 (the same classification).
+
+## TD-091: Nothing says how much context a session has left, or that it has just compacted
+
+**Priority:** Low
+**Added:** 2026-09-20 (`tdgrind-ao-1`, from the neighbours survey, TD-059)
+**Status:** Open — recommended by the survey, not approved; design first (§4.5a: a card and Focus field)
+**Location:** `src/agentorc/adapters/claude_code/` (the transcript under `~/.claude/projects/`, which the adapter already reads for the model), the record, the card and Focus header; design §4.2, §4.3 (an optional adapter capability), §4.5a
+
+**Why:** a session near its context limit is about to compact, and one that has just compacted has lost most of what it knew — the two moments a lead reading a quiet worker, or a person deciding whether to trust a long-running session's next step, most wants to know about. agentorc shows a model and each profile's usage windows and nothing about context. `tallu-wonder/agentboss` reads it from the transcript: the context in use is the last non-sidechain usage record's input + cache-creation + cache-read + output tokens, and a `type: "system", subtype: "compact_boundary"` record's `compactMetadata.postTokens` resets it until the next turn ([ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md)). The window size is the weak part: Claude Code's transcript does not state it, so agentboss guesses by model name.
+
+**Fix:** an optional adapter capability, `context()` → `{used, window?, compacted_at?}`, read on the tick by modification time as the model is; the record carries it; the card and Focus show a small gauge (or `compacted 4m ago`), §4.5a row first. A tool that cannot say it shows nothing.
+
+**Done when** a Claude Code session's card shows its context in use, and a compaction is visible on it within a tick.
+
+**Related:** TD-090 (a compaction's `SessionStart`), TD-087 (the usage windows, the other budget), design §4.3.
+
+## TD-092: Nothing reaches a person who is not looking at the page when a session needs them
+
+**Priority:** Low
+**Added:** 2026-09-20 (`tdgrind-ao-1`, from the neighbours survey, TD-059)
+**Status:** Open — recommended by the survey, not approved; the channel is Paul's choice
+**Location:** `src/agentorc/ui/` (the Inbox, the top bar's count), design §4.5, §4.5a
+
+**Why:** the Inbox is where a person works from, and a `needs-you` session or an `ask` sits there until somebody opens the page. Three of the neighbours read in TD-059 push instead: agentboss sends a desktop notification on a transition into *needs you* that jumps to the session; `multi-agent-shogun` and another dashboard send to ntfy / Pushover, and the latter only when the person is not looking at the dashboard. An unattended team whose only question is waiting on a closed browser tab is a team that waits ([ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md)).
+
+**Fix:** decide the channel — web push from the UI (a service worker; no second service, works on a phone), or an ntfy topic in the home's config — and the rule: only for what the Inbox counts under *Needs you*, only on a transition into it, never twice for one row, and not while the person has the page focused. §4.5a gains the opt-in control first.
+
+**Done when** a session going `needs-you` while no page is open reaches the person once, and opening it lands on that row.
+
+**Related:** TD-069 (the Inbox), TD-003 (the phone layout), design §4.5.
