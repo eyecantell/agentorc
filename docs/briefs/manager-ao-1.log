@@ -91,3 +91,14 @@
 12:50  ao team stop ao-grind --close --timeout 90 → both members finished, nothing sent, closed
 12:52  wind-down board line (#371/#373 hold the team) + #361–#364 line marked done → branch orch-ao-grind-wound-down-0921b, PR #374, Sonnet fact-check running
 12:53  ao progress none --why (each member and the why on its record)
+12:58  board PR #374: Sonnet fact-check READY, 0 findings → cadence-review SHIP posted, CI green, check pass, squash-merged d64ead0
+12:59  run over: log pushed, then ao close on myself
+
+## End-of-run summary (2026-09-21)
+
+- grinder-ao-1 — finished, closed clean by ao team stop (2 runs: started 14:21:59Z; restarted 17:06Z on its own `restart` word, long context, 1 of 3 in the window). Merged #357 (TD-094), #360–#364 (TD-075 step 4, mail half), #365, #368 (ledger), #370 (TD-075 step 1b). Sends: 1 (idle 20 min at 18:48Z with TD-057/TD-077 open) → it declared out of work. Replies: 1 (m-5cc0225c5c9d, lease conflict on TD-075: told it to force; grinder-ao-2 released instead). Out of work because #371 (TD-057) and #373 (TD-077) wait on the anchor's src/sessionorc merge.
+- grinder-ao-2 — finished, closed clean (1 run: out of work 14:53Z after TD-075's page half, #358 #359). Sends: 0.
+- Cadence: every team PR passes (26 PRs over 12 h incl. the anchor's); review rows self-attested (recorded, not verified). No fails, no cadence-change relays (all entries landed before both members started).
+- Escalations: board #369 (#361–#364 past 2 h in the anchor's queue) with the ask the anchor asked for (17:15Z; they merged 17:49Z–17:55Z); board #374 (wind-down; #371/#373 hold the team). Two identity alarms from the anchor's Log TD live test settled `dropped` as instructed.
+- Mechanical enough for a §6 policy: "a src/sessionorc PR waiting > 2 h → ask the anchor + board line" is a pure timer on createdAt and a path glob — the host agent could raise it itself, which is what TD-093's "as configuration" asks for. The restart rule again needed no judgement.
+- Tool friction: the `ao --skill` form `ao msg person --outcome dropped "<line>" --for <id>` fails (argparse: unrecognized arguments); `ao msg --outcome dropped --for <id> person "<line>"` works. And a lease on a whole TD blocks two members the anchor split by file (TD-075's mail/page halves) — the path-reservation case §4.8 said it would wait for.
