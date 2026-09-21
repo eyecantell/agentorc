@@ -1941,13 +1941,13 @@ class HostAgent:
         s.seen_at = now_iso()
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_set_mode(self, id: str, unattended: bool) -> dict[str, Any]:
         s = self._find(id)  # the home's own copy of another host's record too (4a)
         s.unattended = bool(unattended)
         self._save(s)
-        return s.view()
+        return self._view(s)
 
     async def rpc_set_stop(
         self, id: str, run_until: str | None = None, wrapup_prompt: str | None = None
@@ -1977,7 +1977,7 @@ class HostAgent:
             s.wrapup_prompt = str(wrapup_prompt).strip() or None
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_set_grants(
         self, id: str, add: list[str] | None = None, remove: list[str] | None = None
@@ -1989,7 +1989,7 @@ class HostAgent:
         s.capabilities = [g for g in GRANTS if (g in s.capabilities or g in adding) and g not in removing]
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_set_controllers(
         self, id: str, add: list[str] | None = None, remove: list[str] | None = None
@@ -2015,7 +2015,7 @@ class HostAgent:
         s.controllers = _controllers([c for c in s.controllers + adding if c not in removing])
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_progress(
         self,
@@ -2171,7 +2171,7 @@ class HostAgent:
             s.doing = {"text": line, "at": now_iso()}
         self._save(s)
         await self._push_changes()
-        return s.view()
+        return self._view(s)
 
     async def rpc_finding(
         self, id: str, ref: str, priority: str | None = None, source: str = "declared"
@@ -2189,7 +2189,7 @@ class HostAgent:
         if applied:
             self._save(s)
             await self._push_changes()
-        out = s.view()
+        out = self._view(s)
         if not applied:
             out["refused"] = entry.to_dict()
         return out
