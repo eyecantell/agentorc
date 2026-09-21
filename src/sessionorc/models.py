@@ -97,6 +97,7 @@ HOME_OWNED = frozenset(
         "progress",
         "findings",
         "out_of_work",
+        "suspended",
         "doing",
         "ledger",
         "seen_at",
@@ -524,6 +525,14 @@ class Session:
     # session itself writes it and nothing derives it (§9 invariant 14); a later declared claim
     # clears it, since the session has work again.
     out_of_work: dict[str, str] | None = None
+    # `{at, by, why}` once a **person** has suspended this session over an identity alarm
+    # (design §4.8a *An alarm's answers*, TD-077 a2), `None` otherwise. **The home's field**
+    # (§9 invariant 15 — intent, like `controllers`): a node's record is marked at the home and
+    # only its `kill` is routed, because a `create` is gated at the home and that is where the
+    # mark is read. It refuses every session's `create` under that name and `create --resume` of
+    # that conversation — the one exception to §4.1's rule that an exited holder is superseded —
+    # and it is lifted only by a person: their own resume of the conversation, or Forget.
+    suspended: dict[str, str] | None = None
     # `{text, at}`: the session's own word for what it is doing now (`ao doing`, design §4.8, the
     # third report channel, 2026-09-19). A value, not a log — the last line replaces the one before,
     # as `out_of_work` does — and only the session itself writes it (§9 invariant 14). Never

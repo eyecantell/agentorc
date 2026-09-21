@@ -1499,3 +1499,41 @@ async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_p
         # the person's ack and the session's refused one: both crossed, because the node is the
         # authority on its own list — and nothing else went over the link on this account
         assert [a["rpc"] for a in acts.taken].count("identity_ack") == 2
+
+
+async def test_a_suspend_is_the_homes_act_wherever_it_is_asked(home, hookstub, tmp_path, monkeypatch):
+    """§4.8a *An alarm's answers* → **Suspend** (TD-077 a2, review of PR #301). `suspended` is a
+    **home-owned** field, so wherever the person presses it the mark has to be written at the
+    home: a node that served the call itself would kill the session and write a mark the home's
+    next copy wipes — a session stopped, unmarked, and free for any session to take its name
+    again. So `suspend` is in `modes.HOME_EDITS`: asked at a node it is **forwarded** to the
+    home, which marks its own record and routes only the `kill` back.
+
+    Asked at the home for a node's record, the same thing happens from the other side, and only
+    the `kill` crosses the link — `suspend` is in no `NODE_ACTS`, so nothing forwards it there."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        acts = Acts(node, monkeypatch)
+        async with LocalClient() as c:
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address = f"{w['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+
+        # asked **at the home**, for the node's record: marked here, only the kill routed
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            got = await person.call("suspend", id=address, why="claimed another session's id")
+        assert got["suspended"]["why"] == "claimed another session's id"
+        assert [a["rpc"] for a in acts.taken] == ["kill"]  # never a `suspend` over the link
+        assert (await at_home(home, address))["suspended"]
+        await until(home, address, lambda v: v and v["state"] in ("exited", "closed"))
+        # and the node's own copy carries the home's field, so its create gate reads the mark too
+        assert await wait_for(lambda: bool(node.sessions[w["id"]].suspended), timeout=10.0, step=0.1)
+
+        # asked **at the node**: forwarded, not served there — the mark is still the home's
+        async with LocalClient() as c:
+            w2 = await c.call("create", name="w2", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        addr2 = f"{w2['id']}@laptop"
+        await until(home, addr2, lambda v: v is not None and v["state"] != "unreachable")
+        async with LocalClient() as at_node:  # a person at the node
+            back = await at_node.call("suspend", id=w2["id"])
+        assert back["suspended"] and (await at_home(home, addr2))["suspended"]
+        await until(home, addr2, lambda v: v and v["state"] in ("exited", "closed"))

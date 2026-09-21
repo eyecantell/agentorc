@@ -16,8 +16,11 @@ from collections.abc import Mapping
 from typing import Any
 
 # The home's, written at the home: a node's replica is overridden by the home's copy on reconnect,
-# so an edit made here would be lost, and said to have worked.
-HOME_EDITS = frozenset({"set_controllers", "set_grants", "set_stop", "set_mode"})
+# so an edit made here would be lost, and said to have worked. **`suspend` is here for exactly
+# that reason** (§4.8a, TD-077 a2, review of PR #301): served at the node it would kill the
+# session and mark the node's replica, and the home's next copy would wipe the mark — leaving a
+# session stopped, unmarked, and free for any session to start again under its name.
+HOME_EDITS = frozenset({"set_controllers", "set_grants", "set_stop", "set_mode", "suspend"})
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the
 # writes: an empty inbox would say *no mail*, and the truth is *not known from here*.
 # The person's own bookkeeping on that mailbox travels with it (§4.10, TD-069): the org's person
