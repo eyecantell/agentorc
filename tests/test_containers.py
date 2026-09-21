@@ -10,6 +10,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 from conftest import wait_for_sync
 
 from sessionorc import containers, paths
@@ -724,6 +725,34 @@ async def test_a_runner_can_be_cancelled_mid_action_and_shutdown_and_forget_do_i
 
 
 # -- a promote leaves a node behind: the build, said in the hello (found live 2026-09-18) -----------------
+
+
+def test_the_nodes_identity_mode_is_said_at_the_home_and_a_change_restarts_the_agent(home):
+    """The node's `hosts.yml` is rewritten from the home on every provision, so a mode set by hand
+    inside lasts until the next promote. `nodes.<name>.identity` is where it is said (§4.8a), and
+    the agent reads it once at start — so a changed entry restarts an agent that is otherwise current."""
+    n = containers.node("contractmatch")
+    ours = containers.home_build()
+    (n.node_dir / "home").mkdir(parents=True)
+    (n.node_dir / "home" / "agent.build").write_text(ours + "\n")
+    out = containers.host_up("contractmatch", Fake(pid="4242\n"))
+    node_hosts = n.node_dir / "home" / "hosts.yml"
+    assert out["restarted"] is False and "identity" not in node_hosts.read_text()  # unsaid: the node's default
+    hosts_yml = paths.home() / "hosts.yml"
+    said = hosts_yml.read_text()
+
+    hosts_yml.write_text(said.replace("    container:", "    identity: enforce\n    container:"))
+    r = Fake(pid="4242\n")
+    out = containers.host_up("contractmatch", r)
+    assert yaml.safe_load(node_hosts.read_text())["local"]["identity"] == "enforce"
+    assert out["restarted"] is True and r.execs("kill $p") and len(r.execs("agentorc-agent serve")) == 1
+    r = Fake(pid="4242\n")
+    assert containers.host_up("contractmatch", r)["restarted"] is False and not r.execs("kill $p")  # said once
+
+    # a word that is no mode is left out, so the node reads its default — never silently `off`
+    hosts_yml.write_text(said.replace("    container:", "    identity: enforced\n    container:"))
+    containers.host_up("contractmatch", Fake(pid="4242\n"))
+    assert "identity" not in node_hosts.read_text()
 
 
 def test_a_build_is_the_wheels_content_and_an_agent_on_an_older_one_is_restarted(home):
