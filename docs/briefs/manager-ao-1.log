@@ -60,3 +60,5 @@
 
 08:22  inbox: note from the person (via the anchor) — #346–#349/#353 merged and promoted, TD-093 keeps the anchor's src/sessionorc review; a sessionorc PR waiting >2h gets an ask to the anchor as well as the board line → noted
 08:22  grinder-ao-1: working (created 14:21:59Z) → ok; grinder-ao-2: working (created 14:22:00Z) → ok; no open PRs; cadence changes all landed before both started → no relay
+08:22–08:29 quiet (grinder-ao-1 claimed TD-094, grinder-ao-2 claimed TD-075)
+08:31  grinder-ao-1: note m-5cc0225c5c9d — its claim on the mail half of TD-075 (from the anchor) refused by grinder-ao-2's lease on the page half; files disjoint → reply: claim with --force, stay out of src/agentorc/ui (a lease is advisory, §4.8). PR #357 (TD-094, src/sessionorc) opened 14:28Z, in the anchor's queue — ask at 16:28Z if still open
