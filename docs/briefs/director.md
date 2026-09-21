@@ -29,7 +29,7 @@ question, TD-039).
      workers underneath it — a lead coming back finds its members where it left them,
      because membership lives on the target and survives the restart (§4.8).
    - `stalled?`, `needs-you`, `limited` → the same rules a lead applies to a worker
-     (`docs/briefs/orchestrator-ao-1.md`), applied one level up.
+     (`docs/briefs/manager-ao-1.md`), applied one level up.
 2. **Aggregate, do not duplicate.** Each member already writes its own log and files its own
    escalations. Your report is the roll-up: which leads are alive, what each said it did
    last round, and what is on the board unanswered. Never re-file a member's escalation.
