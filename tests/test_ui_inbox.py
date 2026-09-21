@@ -1629,9 +1629,20 @@ def test_the_suspended_mark_is_drawn_wherever_the_record_is_and_is_never_a_contr
     row = rows("needs", [{"row": "alarm", "id": "ao-x:alarm", "sid": "ao-x", "name": "w", "alarms": [],
                           "mode": "enforce", "at": "", "suspended_note": v["suspended_note"]}])  # fmt: skip
     for where, html in (("card", card), ("focus", focus), ("inbox row", row)):
-        assert 'class="badge suspendedmark"' in html, where
+        assert "badge suspendedmark" in html, where
         assert ">suspended<" in html, where
         assert "data-act" not in html.split("suspendedmark")[1].split("</span>")[0], where  # never a control
+    # …and on Focus it **rides the pushed delta**, because that page re-renders its header in place
+    # rather than being replaced whole like a card: a person watching the very session that is
+    # suspended from somewhere else would otherwise see the state change and not the mark, and the
+    # mark is the suspension's only record (review of PR #306). Always drawn, hidden until true.
+    assert 'id="fsuspended"' in focus and "hidden" not in focus.split('id="fsuspended"')[0][-60:]
+    plain = templates.get_template("focus.html").render(
+        s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org"
+    )
+    assert 'id="fsuspended"' in plain and "suspendedmark hidden" in plain  # in the page, not shown
+    js = (UI / "static" / "app.js").read_text()
+    assert 'susp.classList.toggle("hidden", !v.suspended_note)' in js
     css = (UI / "static" / "app.css").read_text()
     mark = next(ln for ln in css.splitlines() if ln.startswith(".badge.suspendedmark"))
     assert "cursor: default" in mark  # flat: nothing to press, and nothing that looks pressable

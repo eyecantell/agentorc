@@ -1036,6 +1036,16 @@
           : "starts a new turn";
       }
       $("#fstate").innerHTML = head;
+      // §4.8a (TD-077 a2): the **suspended** mark rides the pushed delta like the state does. It
+      // is drawn server-side at load and lives *outside* `#fstate` — a suspension is not a state —
+      // so without this a person watching the very session that is suspended from somewhere else
+      // would see the state change and not the mark, and the mark is the suspension's only record
+      // (review of PR #306). Always in the page, hidden until it is true, as the banners are.
+      const susp = $("#fsuspended");
+      if (susp) {
+        susp.classList.toggle("hidden", !v.suspended_note);
+        susp.title = v.suspended_note || "";
+      }
       // An exited session keeps its dead pane on purpose (exit code, last lines, run log); say so
       // and offer the two useful next steps instead of leaving tmux's "Pane is dead" to explain it.
       const ex = $("#fexited");
