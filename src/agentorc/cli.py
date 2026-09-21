@@ -1116,6 +1116,8 @@ def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
     answers. It carries no text of its own — the asker's words are the question."""
     if words:
         return fail(args, "--pass-up sends the asker's own question: leave the text out, say yours with --recommend", 2)
+    if extra := [f for f, v in (("--reply-to", args.reply_to), ("--kind", args.kind), ("--about", args.about)) if v]:
+        return fail(args, f"--pass-up keeps the asker's question as it was: {', '.join(extra)} does not apply", 2)
     if not args.recommend:
         return fail(args, '--pass-up needs your recommendation: --recommend "<one line>"', 2)
     got = call_sync("pass_up", id=args.pass_up, recommend=args.recommend, answers=args.answer or None)

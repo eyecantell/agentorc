@@ -2956,8 +2956,9 @@ class HostAgent:
         # ordinary session's **inbox** rather than in the asker's outbox, so it is the first that
         # this delete could reach — and it computes `owes` from the entry, so deleting the object
         # would discharge the debt with no outcome, no trail and nobody told. Dismiss it from the
-        # person's Inbox instead, which ends it *and* tells the session, or let it report one.
-        if owing := [e for e in s.inbox if e.id == msg and e.owes]:
+        # person's Inbox instead, which ends it *and* tells the session, or let it report one. (A
+        # question passed up owes on its asker's outbox, never on a copy here: `owes_for`.)
+        if owing := [e for e in s.inbox if e.id == msg and e.owes_for(session_inbox=True)]:
             raise RpcError(
                 f"{msg} is work the person handed {s.id} and it still owes an outcome: deleting it would "
                 "settle nothing and tell nobody. Let it report one — ao msg person --outcome "
@@ -3160,7 +3161,7 @@ class HostAgent:
         if len(trail) != len(self.trail):
             self.trail = trail
             self.attention_store.save(self.trail, self.attention_snoozed)
-        kept = [e for e in self.person_inbox if self._keep(e, now, inbox=True)]
+        kept = [e for e in self.person_inbox if self._keep(e, now, inbox=True, person=True)]
         if len(kept) != len(self.person_inbox):
             self.person_inbox = kept
             self.person_store.save(kept)
@@ -3184,11 +3185,12 @@ class HostAgent:
             self._close_entry(e.id, "expired", stamp)
 
     @staticmethod
-    def _keep(e: MailEntry, now: datetime, *, inbox: bool) -> bool:
+    def _keep(e: MailEntry, now: datetime, *, inbox: bool, person: bool = False) -> bool:
         """Lifecycle stage 3 (design §4.10): a read entry is kept for the retention window from
         `read_at` — or, for an `ask`, from when it closed or expired — and an open `ask` is never
-        pruned. An unread inbox entry never ages out. The sender's copy runs from `at`."""
-        if e.open or e.owes or mail.MAIL_RETENTION is None:
+        pruned. An unread inbox entry never ages out. The sender's copy runs from `at`. `person`:
+        the copy is the person inbox's, where a question the person answered is listed as owed."""
+        if e.open or e.owes_for(session_inbox=inbox and not person) or mail.MAIL_RETENTION is None:
             # `owes`: a question that was answered and not reported back is kept until it is
             # (design §4.10 *Outcomes*) — the follow-up `--thread` names it, and the person's
             # Inbox lists it under *Waiting on them*, so pruning it would strand both.

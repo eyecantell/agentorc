@@ -320,6 +320,15 @@ class MailEntry:
             and not self.outcome
         )
 
+    def owes_for(self, *, session_inbox: bool) -> bool:
+        """`owes`, asked of one copy where it is held. A copy in a **session's inbox** owes only
+        when it is `handed` — work the person handed that session. Every other debt belongs to the
+        asker, on its outbox copy, and to the person inbox's copy it is listed under. Without this,
+        a question passed up (§4.9b) would owe on the passer's copy too, and on any copy recipient's,
+        and those could then neither be deleted nor pruned (review of PR #347). `Session.owed()`,
+        `inbox_delete` and the retention sweep all ask it this way."""
+        return self.owes and (self.handed or not session_inbox)
+
     @property
     def open(self) -> bool:
         """Design §4.10 "One way of being closed": an entry is open exactly when it is an `ask`,
@@ -690,7 +699,9 @@ class Session:
         work came from."""
         # the inbox half is handed work alone: a question passed up owes on the **asker's** outbox
         # copy, never on the copy the passer holds (§4.9b)
-        return [e.id for e in self.outbox if e.owes] + [e.id for e in self.inbox if e.handed and e.owes]
+        return [e.id for e in self.outbox if e.owes_for(session_inbox=False)] + [
+            e.id for e in self.inbox if e.owes_for(session_inbox=True)
+        ]
 
     def wake_budget_spent(self) -> bool:
         """Exhaustion is visible (design §4.10): on the record, and so on the card and every `ao`

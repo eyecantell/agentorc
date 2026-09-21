@@ -2777,7 +2777,7 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   copy. That copy's `answers` are the passer's, the recommendation first and no more than four in
   all; the asker's and the passer's copies keep their own, and every copy gets `passed_up` and
   `recommend: {by, text}`. A question passed up and answered **owes** on the asker's outbox copy
-  (`owes` reads `passed_up` as it reads the person in `to`), never on the passer's. Refused: a
+  (`owes` reads `passed_up` as it reads the person in `to`), never on the passer's or a copy recipient's — a copy in a session's inbox owes only when `handed` (`owes_for`), so those copies delete and age out like any closed entry. Refused: a
   copy recipient, a `note`, a closed entry, a second pass, the person's own question, a person
   passing up, and a full person inbox (counted against the asker, whose question it is).
   `ao inbox` prints *passed up by `<passer>`, who recommends: …*.

@@ -1838,7 +1838,9 @@ async def test_the_debt_has_a_bound_of_its_own_and_is_never_pruned(agent, tmp_pa
         assert left[owed[1]]["outcome"]["state"] == "asker_gone"
 
 
-async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_answer_goes_back(agent, tmp_path):
+async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_answer_goes_back(
+    agent, tmp_path, monkeypatch
+):
     """Design §4.9b *Passing up keeps the thread and the asker* (TD-075 step 3). The addressee of an
     open `ask` or `steer` passes it up once, with a recommendation: the person inbox holds the
     asker's own entry — same id, sender, kind, default and bound — with the passer's answers, the
@@ -1894,6 +1896,20 @@ async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_ans
             assert r["delivered"] == [w] and r["copies"] == [tl] and r["closed"] == q["id"]
             assert [e.closed_reason for e in agent.sessions[tl].inbox if e.id == q["id"]] == ["replied"]
             assert q["id"] in agent.sessions[w].owed() and q["id"] not in agent.sessions[tl].owed()
+            # the passer's closed copy is an ordinary closed entry: it deletes, and it ages out —
+            # only the asker's outbox copy and the person's are kept for the debt (review of PR #347)
+            monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(seconds=0))
+            await agent.rpc_inbox(caller=tl)  # read, so retention runs from now
+            await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
+            assert q["id"] not in [e.id for e in agent.sessions[tl].inbox]
+            assert q["id"] in [e.id for e in agent.sessions[w].outbox]  # still owed: kept
+            assert q["id"] in [e.id for e in agent.person_inbox]
+            monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(hours=12))
+            ask3 = (await wc.call("msg", to=tl, text="and this?", kind="ask"))["entry"]
+            await tc.call("pass_up", id=ask3["id"], recommend="yes")
+            await person.call("msg", reply_to=ask3["id"], kind="reply", text="yes")
+            await person.call("inbox_delete", id=tl, msg=ask3["id"])  # nothing owed on the passer's copy
+            assert ask3["id"] not in [e.id for e in agent.sessions[tl].inbox]
             # the asker settles it the ordinary way
             await wc.call("msg", to="person", text="renamed, PR 1", outcome="done", for_=q["id"])
             assert q["id"] not in agent.sessions[w].owed()
