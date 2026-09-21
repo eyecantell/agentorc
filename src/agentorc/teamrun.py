@@ -220,7 +220,7 @@ def start(
     if held:
         raise NamesHeld(name, held)
     created: list[dict[str, Any]] = []
-    notes: list[str] = []
+    notes: list[str] = list(plan.notes)  # said, and the start goes ahead (a seat without its primer, §4.9b)
     lead_id = ""
     try:
         if plan.lead:

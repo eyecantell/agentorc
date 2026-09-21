@@ -648,6 +648,9 @@
         AO.toast(`${name}: ${who} is interactive, so its manager cannot act on it — §9 invariant 5`));
       // TD-042: a brief written for one night cannot start the next. The team started; this is a note.
       (o.unrepeatable || []).forEach((w) => AO.toast(`${name}: ${w}`));
+      // What `ao team start` prints to stderr and the team still started on: a techlead seat without
+      // its primer, or one that came up under another id (design §4.9b).
+      (o.notes || []).forEach((w) => AO.toast(`${name}: ${w}`));
       if (o.manager) watchStop(name, o.manager);
     } catch (e) {
       AO.toast(`${name}: ${e.message}`);

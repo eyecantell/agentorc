@@ -149,6 +149,8 @@ class Plan:
     host: str = ""  # where the team lands when that is not the host the start runs on (§4.4a)
     warnings: list[str] = field(default_factory=list)
     """Briefs that name one run (TD-042). Said out loud, like `out_of_reach`; never a refusal."""
+    notes: list[str] = field(default_factory=list)
+    """Other things the start says and starts anyway: a techlead seat without its primer (§4.9b)."""
 
     @property
     def launches(self) -> list[Launch]:
@@ -254,14 +256,15 @@ def _brief(
     lane: list[str],
     read: repoconfig.Reader | None = None,
     techlead: str = "",
+    context: str = "",
 ) -> str | None:
-    """The role's template with `{lane}` and `{techlead}` filled, or the member's `brief:` override
-    read from its home checkout. A lead may override its brief too — a lead's is the one a repo
-    most often keeps its own copy of (2026-09-13)."""
+    """The role's template with `{lane}`, `{techlead}` and `{context}` filled, or the member's
+    `brief:` override read from its home checkout. A lead may override its brief too — a lead's is
+    the one a repo most often keeps its own copy of (2026-09-13)."""
     if member is not None and member.brief:
         override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
-        return override.brief_text(lane, read=read, techlead=techlead)
-    return role.brief_text(lane, read=read, techlead=techlead)
+        return override.brief_text(lane, read=read, techlead=techlead, context=context)
+    return role.brief_text(lane, read=read, techlead=techlead, context=context)
 
 
 def seat_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
@@ -280,6 +283,31 @@ def seat_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
     return sid if host == here else f"{sid}@{host}"
 
 
+def _primer_missing(seat: orgmod.TechleadDef, checkout: Path, host: str, here: str, files: Files | None) -> str:
+    """Design §4.9b *Its standing context*: a techlead seat with no `context:`, or one naming a
+    file its home checkout does not hold, starts cold and answers narrowly — said at the start,
+    which goes ahead (a primer helps; it is never what an answer rests on). "" when it is there,
+    and when it cannot be looked for (another host with nothing here to read it)."""
+    if not seat.context:
+        return (
+            f"{seat.name}: the techlead seat has no `context:` — it will start from the repo's own map "
+            "(CLAUDE.md, the design's headings); write the repo's primer and name it (design §4.9b, `ao team --skill`)"
+        )
+    path = Path(seat.context).expanduser()
+    if checkout.is_dir():
+        found = (path if path.is_absolute() else checkout / path).is_file()
+    elif files is not None and host != here and not path.is_absolute():
+        try:
+            found = _reader_on(files, host, checkout)(checkout / path) is not None
+        except OSError:
+            return ""  # the seat's own brief read the same checkout; a failure here is not the primer's
+    else:
+        return ""
+    if found:
+        return ""
+    return f"{seat.name}: its `context:` {seat.context} is not in {checkout} — the seat will start without its primer"
+
+
 def _launch(  # noqa: PLR0913 — every argument is a distinct part of one definition; one call site
     *,
     org: orgmod.Org,
@@ -295,6 +323,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     block: str,
     files: Files | None = None,
     techlead: str = "",
+    context: str = "",
     seat: bool = False,
 ) -> Launch:
     where = f"team {team.name}: {name}"
@@ -336,7 +365,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     try:
-        prompt = _brief(role, member, checkout, lane, read, techlead)
+        prompt = _brief(role, member, checkout, lane, read, techlead, context)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
@@ -371,6 +400,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
     p = Plan(team=team.name, source=team.source, host=host if host != here else "")
     reach = bool(project_block(org, team.projects, host))
     p.techlead_id = tid = seat_id(org, team, host, here)
+    ctx = (team.techlead.context or "") if team.techlead is not None else ""  # the primer (§4.9b)
     if team.manager.role != orgmod.PERSON:
         p.lead = _launch(
             org=org,
@@ -386,6 +416,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             block=project_block(org, team.projects, host, team.manager.home) if reach else "",
             files=files,
             techlead=tid,
+            context=ctx,
         )
     seen: set[str] = {p.lead.name} if p.lead else set()
     if team.techlead is not None:
@@ -407,8 +438,12 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             block=project_block(org, team.projects, host, seat.home) if reach else "",
             files=files,
             techlead=tid,
+            context=ctx,
             seat=True,
         )
+        missing = _primer_missing(seat, p.techlead.dir, host, here, files)
+        if missing:
+            p.notes.append(missing)
     for member in team.members:
         if member.team is not None:
             raise TeamError(
@@ -435,6 +470,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                     block=block,
                     files=files,
                     techlead=tid,
+                    context=ctx,
                 )
             )
     # One line per finding, not per session: a team's members share a brief, and four copies of
