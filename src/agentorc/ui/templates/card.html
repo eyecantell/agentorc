@@ -70,31 +70,35 @@
     <div class="caption meta {{ s.slot.ccls }}"{% if s.slot.ccls == 'countdown' %} data-deadline="{{ s.deadline }}"{% endif %}>{{ s.slot.caption }}</div>
   </div>
   {# (6) the foot: the next act first, by state (`next_act`), then Focus or Details where it was
-     not first, the editor button, and more #}
+     not first, the editor button, and more. **Quiet, and quiet never looks disabled** (TD-095,
+     second pass): the next act is an outlined button at the text's normal strength, the rest are
+     plain links at normal strength, *dimmed* means disabled and nothing else, and the one filled
+     button a card ever carries is Allow. #}
   <div class="sc-foot">
     {% set nopane = s.state == 'closed' or s.pane is sameas false %}
     {% if s.next_act == 'allow' %}
       {# Allow / Deny only when the hook gave something to answer (`tool_use_id`): the route 409s
          without it (review of PR #251) #}
       <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>
-      <button class="btn sm" data-act="deny" data-id="{{ s.id }}">Deny</button>
+      <button class="btn sm next" data-act="deny" data-id="{{ s.id }}">Deny</button>
     {% elif s.next_act == 'forget' %}
-      <button class="btn sm" data-act="remove" data-id="{{ s.id }}">Forget</button>
+      <button class="btn sm next" data-act="remove" data-id="{{ s.id }}">Forget</button>
     {% elif s.next_act == 'close' %}
-      <button class="btn sm" data-act="close" data-id="{{ s.id }}">Close session</button>
+      <button class="btn sm next" data-act="close" data-id="{{ s.id }}">Close session</button>
     {% endif %}
-    <a class="btn sm {{ 'primary' if s.next_act == 'focus' else 'ghost' }}" href="/focus/{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
-    {% if s.vscode %}<a class="btn sm ghost" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
+    <a class="btn sm {{ 'next' if s.next_act in ('focus', 'details') else 'link' }}" href="/focus/{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
+    {% if s.vscode %}<a class="btn sm link" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
     <span class="grow"></span>
     <details class="more">
-      <summary class="btn sm ghost" title="more">⋯</summary>
+      <summary class="btn sm link" title="more">⋯</summary>
       <div class="menu">
         <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail into its inbox — lands, types nothing">Message…</button>
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
         <button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>
         <button data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
         <button data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">Kill</button>
-        <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?">Close</button>
+        {# enabled only when Ready to close passes (§4.5): dimmed here means disabled, and says why #}
+        <button data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}?"{% if not s.ready_ok %} disabled title="not ready to close — {{ s.not_ready | join(', ') }}: Focus has the checklist; Kill keeps the worktree"{% endif %}>Close</button>
         <button data-act="shell-here" data-id="{{ s.id }}">Open shell here</button>
         <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
       </div>

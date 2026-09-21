@@ -572,3 +572,29 @@ def test_the_mode_is_a_word_on_the_card_and_its_toggle_is_in_more(tmp_path, monk
     assert '<button data-act="mode" data-id="ao-w" class="on">Switch to interactive</button>' in worker
     assert ICON_PATHS["person"] in mine.split('class="meta mode mine"')[1].split("</span>")[0]
     assert ">Switch to unattended</button>" in mine
+
+
+def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
+    """Design §4.5 *The card's anatomy*, row 6 (TD-095, second pass): the next act is outlined, the
+    rest are plain links, and the one filled button a card carries is Allow on a *needs you* card.
+    *more ▾ → Close* is enabled only when Ready to close passes (§4.5) — dimmed means disabled, and
+    its hover says what it waits on."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    card = templates.get_template("card.html")
+
+    def foot(rec):
+        return card.render(s=view(rec)).split('class="sc-foot"')[1]
+
+    working = foot(_card(state="working"))
+    assert "primary" not in working and 'class="btn sm next" href="/focus/ao-w"' in working
+    assert 'class="btn sm link"' in working  # the editor button and more are plain links
+    perm = {"kind": "permission", "text": "Bash: ls", "tool_use_id": "tu"}
+    asking = foot(_card(state="needs-you", pending=perm))
+    assert asking.count("primary") == 1 and 'class="btn sm primary" data-act="allow"' in asking
+    assert 'class="btn sm link" href="/focus/ao-w"' in asking  # Focus is not the next act here
+    # the default card is dirty: Close in more is disabled, and says why
+    assert 'data-confirm="Close w?" disabled title="not ready to close — tree clean' in working
+    clean = {"branch": "w", "dirty": 0, "unpushed": 0}
+    assert 'data-confirm="Close w?">Close</button>' in foot(_card(git=clean))

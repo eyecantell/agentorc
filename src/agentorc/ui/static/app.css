@@ -256,6 +256,12 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .sc-slot > .status { height: calc(2 * 1.55em); padding: 0 0 0 10px; line-height: 1.55; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .sc-slot > .status.tail { white-space: pre-line; color: var(--muted); }
 .sc-slot > .caption { height: 16px; } .sc-slot > .caption.ready { color: var(--fg); }
+/* the foot (TD-095, second pass): the next act outlined at normal strength, the rest plain links at
+   normal strength — never the dimmed grey a disabled control wears — and Allow the one filled button */
+.sc-foot .btn.next { background: transparent; color: var(--fg); border-color: var(--muted); }
+.sc-foot .btn.next:hover, .sc-foot .btn.link:hover { background: var(--hover); }
+.sc-foot .btn.link { background: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
+details.more .menu button:disabled { opacity: .45; cursor: default; } details.more .menu button:disabled:hover { background: none; }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }
 .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ended); }
 .sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); } .sc.s-idle .sbar { background: var(--idle); }

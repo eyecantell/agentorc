@@ -729,6 +729,7 @@ def view(
     # then means *unknown*, and Ready to close must not read it as *none* (review of PR #195).
     d["ready"] = ready_to_close(s, d["members"] if fleet_known else None)
     d["ready_ok"] = bool(d["ready"]) and all(ok for _, ok in d["ready"])
+    d["not_ready"] = [name for name, ok in d["ready"] if not ok]  # what *more ▾ → Close* says it waits on
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
     return d
