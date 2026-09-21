@@ -18,3 +18,5 @@
 22:22–22:29 quiet
 22:30  grinder-ao-1: working → cadence #340 (TD-053) pass, review recorded
 22:31  grinder-ao-1: idle + restart_wanted (04:30Z, not early, not suspended, 0 dirty / 0 unpushed; wants a fresh run for TD-052 step 7) → ao close + ao new same name/worktree/profile/brief, restart 1 of 3 (2h window from 22:31); new record 04:31:26Z working, controllers = me
+22:32–22:45 quiet
+22:46  grinder-ao-1: working → ok (TD-052 step 7, #343 in review; src/sessionorc so the anchor merges — watching for a merge-queue hold)
