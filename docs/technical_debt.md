@@ -51,11 +51,10 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
 | TD-078 | Two timing flakes in the suite: the restart test's migration assertion (fixed, PR #264) and a `send` to a pane that was gone in `test_send_wait_three_outcomes` (diagnosed and refused in words, PR #286; watching until 2026-09-27) | Low | Partly done |
 | TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Partly done |
-| TD-081 | Resuming a session makes the person type a name, when the one it had is free to take back; the Inbox row for unpushed work should offer *Reopen and push* | Medium | Partly done |
 | TD-083 | A worker that ends its run on purpose, with work still on the ledger, is neither *finished* nor *exited*: no rule of its manager's fires, and the team sits parked until a person restarts it | Medium | Partly done |
-| TD-086 | A promote restarts the host agent, which ends every lead's blocked `ao wait` — and the CLI then tells the session to start a host agent, the one thing it must never do | Medium | Partly done |
 | TD-087 | The usage chip is empty: the usage endpoint answers 429, the adapter turns every failure into silence, the poll never backs off, and a capped session is not marked `limited` meanwhile | Medium | Open |
 | TD-088 | A row that ends because its session exited is trailed as *resolved*, and two trail tests raced the tick for it | Low | Partly done |
+| TD-089 | A session whose `AGENTORC_SESSION` is unset is told to start a host agent when none answers | Low | Open |
 
 ---
 
@@ -851,23 +850,6 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Related:** TD-069 (the *unpushed* row), TD-079 (a row that cannot be answered is a row to fix), design §4.2 (Ready to close), TD-076 (the manager's brief is rewritten there anyway).
 
-## TD-081: Resuming a session should take its own name back — and the unpushed-work row should offer *Reopen and push*
-
-**Priority:** Medium
-**Added:** 2026-09-20 (the anchor session; Paul: *I should not have to rename the session to reopen it — it should just pull its previous name*; and *let's add options on the message like "reopen session and push"*)
-**Status:** Partly done — designed 2026-09-20 (§4.5a *Focus (exited / closed)*, *Inbox row: state*, *Resumable*). **Step 1 landed 2026-09-20 (PR #282, `tdgrind-ao-1`):** a create that both supersedes a holder by name and resumes that holder's conversation keeps its mail — `_supersede` takes the record the name rule replaced in place and moves the entries, tallies, `sends` and wake state from it, since the id did not change and there is no second record to find. A test holds it (`tests/test_mail.py::test_a_resume_under_the_same_name_keeps_its_mail`), and it fails on the parent commit with an empty inbox. **Step 2 landed 2026-09-20 (`tdgrind-ao-2`, PR below):** the page's **Resume** (one press, no form: a caller-less `create` carrying the record's own name, dir, adapter, profile, role, team, project, lane and controllers, `resume` = its tool session id, **never `unattended`** and never the old `run_until`, `wrapup_prompt` or prompt; the grants come from the role preset, as the form's do), **Resume with changes…** (that same create as a filled-in form), and **Reopen and push** on the unpushed row, whose first prompt is the page's own fixed sentence and whose result returns as an outcome (§4.10). *When it cannot be silent it is not a guess*: what the record settles is answered before anything is created, everything else is the agent's own refusal, and either way the press lands on the filled-in form with the reason on it. **Nothing remains of this entry.**
-**Location:** `src/agentorc/ui/static/app.js` (the Details banner: *Resume this conversation* links to `/new?…&resume=<adapter id>` and carries the directory and the adapter but **not the name**), `src/agentorc/ui/app.py` (`/new`'s prefill), `src/sessionorc/agent.py` (`name_check`, `_supersede`), `src/agentorc/ui/templates/inbox_row.html` (the *unpushed* row: **Details** only)
-
-**Why:** to resume `orchestrator-ao-1` on 2026-09-20 Paul had to **type a name**: the banner's link carries the directory and the adapter and no name, the form's name box arrives empty, and what he typed (`push`) became the new session — `ao-orchestrator-ao-1-push` — beside the exited record it was a resume *of*. Nothing refused the old name: the name check already answers `supersede` for a name an exited record holds, and a create under it replaces that record in place (`_name_verdict`, `_take_name`). The page simply never offers it. **Fix:** *Resume* prefills the old record's name, so the ordinary path is the superseding one — the resumed session takes the bare name, the old record is closed and its mail moves (§4.10 *Resume carries mail forward*) — and the form says that is what will happen. **And the row:** *exited with unpushed work* offers only **Details** today. Paul's *Reopen session and push*: one control that resumes the session under its own name with a fixed, page-written first prompt — *push your branch and open or update its PR; then report the outcome* — never text a session wrote; it is a person's act (a `create` with `resume`), and its result comes back as an outcome (TD-079).
-
-**Paul, later on 2026-09-20 — two controls, not a prefilled form:** *when a session needs to be resumed, I should have a resume option that requires no input from me, and a "resume with changes" (or similar) that goes to the normal resume screen where name etc. can be changed if desired.* So: **Resume** is one press — same name, directory, adapter, profile, role and team as the record it resumes, no form — and **Resume with changes…** opens the New session form with all of those filled in. The design round settles what the one-press path does when it cannot be silent (the name is held by a *live* record; the directory is gone; the profile no longer exists): it falls through to the form with the reason shown, never a guess.
-
-**Found by the design review, 2026-09-20 — build this first:** a create that takes the old name *and* resumes the old conversation replaces the record under the same id with an **empty** mailbox (`_take_name`), and `_supersede` — the only caller of `_move_mail` — looks for a *different*, `exited` record and finds none. So the fix Paul asked for would have silently dropped the resumed session's mail; §4.10 *a resume under the same name* is the rule, and it has a test before any button exists.
-
-**Done when** resuming from the page needs no typing, the resumed session has its old name, *Resume with changes…* reaches the filled-in form, and the unpushed-work row can be answered from the row.
-
-**Related:** design §4.5a (*Focus (exited / closed)*: the exited banner), TD-079 (outcomes; every row needs an answer it can be given), TD-080 (why this particular row was a false alarm), design §4.10 (*Resume carries mail forward*), §9 invariant 12 (names).
-
 ## TD-083: A worker that ends its run on purpose parks its team
 
 **Priority:** Medium
@@ -884,20 +866,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a worker that ends its run with work left is back at work, with fresh context, without a person — and one that is truly finished still is never restarted.
 
 **Related:** TD-053 (out of work, §4.9a — the declared case), TD-081 (a same-name start keeps the record's mail: a restart here must too), TD-026 (schedules), TD-076 (the manager's brief is rewritten by the rename).
-
-
-## TD-086: A promote ends every lead's `ao wait`, and the CLI then tells a session to start a host agent
-
-**Priority:** Medium
-**Added:** 2026-09-20 (the anchor session, from `orchestrator-ao-1`'s board item of the same day, which asked for the entry — a lead creates no work)
-**Status:** Partly done — **item (1) built 2026-09-20 (PR #303, `tdgrind-ao-1`)**: `client.wait_rpc` carries a `wait` across a restart — a drop on a connection that was *made* is remade, with the time that is left of the caller's own timeout, within a 30 s grace; a first connection that nothing answers is still an error at once, so an agent that is down is told apart from one that restarted. Nothing is missed across the gap (the cursor holds only what the last wait found unchanged) and a reconnect decides no wake. `ao wait` says in one line when it had to remake the wait, so a lead's log records the promote without the round being lost — **and that line counts connections remade, not attempts at them** (PR #309, the anchor's finding on #303: the counter went up on every quarter-second retry, so one promote read as *remade (4×)*; the restart test now asserts exactly one). Design §4.8 *Waking a lead* says it, and `tests/test_agent_restart.py` restarts an agent under a blocked wait, changes something while it is down, and sees the wait return it. **item (2) built 2026-09-20 (`tdgrind-ao-2`, PR #299):** the CLI **asks again** on `AgentUnavailable` rather than reading the exception's words — one `ping`, now — and an agent that answers gets *the host agent restarted under this command — run it again*, which is the state a person acts on rather than the one a call failed in. The *start it with: agentorc-agent serve* hint is printed **only** when nothing answers **and** the caller is not a session; a session is told to stop, in `ao --skill`'s own words, which is what its Never list says. Exit 3 in all three, and `--json` carries `restarted` so a caller that parses can tell them apart. `skill.md` says it too, and the probe is **bounded** (`PROBE_TIMEOUT`, 1.5 s): nothing in `sessionorc.client` times a read out, so a process accepting connections but not yet serving — a restarting unit, for a moment, which is this entry's own state — would otherwise leave the probe in `readline()` for ever and turn a deterministic exit 3 into a command that never returns (review of #300). **One half of (2) is not built and cannot be, from here:** its wording names two signals, *`AGENTORC_SESSION` set, **or a session channel***, and the channel is the agent's own classification (§4.8a, by peer credentials and ancestry) — which is unavailable in the one branch that prints the hint, because nothing is answering to be asked. So a session whose `AGENTORC_SESSION` is unset — a reparented background `ao`, a hook — still gets the person's hint when the agent is truly down. Closing that needs the signal to come from somewhere other than the agent, which is a design question, not a line of CLI. **Items (1) and (3) remain**, and are the host-agent side: tdgrind-ao-1's lane, after TD-078. Item (2) needed none of it — a hint that tells a session to start an agent is wrong whatever closed the socket.
-**Location:** `src/sessionorc/client.py` (`AgentUnavailable("host agent closed the connection")`, raised when a call's reply line is empty), `src/agentorc/cli.py` (the one `fail(..., 3, hint="start it with: agentorc-agent serve")`), `cmd_wait`; `src/agentorc/skill.md` (*exit 3: the host agent is down — stop, do not start one*)
-
-**Why:** A promote restarts `agentorc-agent` (TD-062), and the anchor promoted eight times on 2026-09-20. Each restart closed the socket under every blocked `ao wait`; the lead's round saw `error: host agent closed the connection` and the hint *start it with: agentorc-agent serve* — three times that evening (20:34, 21:01, 21:05 UTC, each within seconds of a promote; the agent was `active` again at once, `NRestarts=0`). Two defects in one line. **The wait is lost**: a lead's wake channel is gone until its next round, by a routine act of the anchor's, and the more the team merges the more often. **The hint is wrong for a session and wrong in fact**: the agent was restarting, not down, and the `ao` skill forbids a session to start one — the CLI tells it to do the one thing its Never list rules out. The briefs' fallback (the `loop` skill) is what kept the cost to the tail of a round.
-
-**Done when** (1) a connection that closes **mid-call** is told apart from an agent that cannot be reached at all: `ao wait` reconnects and re-subscribes for a bounded time (the unit is back in seconds) and returns what it would have — a lead does not see a promote; (2) where a call cannot be retried, the message says *the host agent restarted — run it again*, and the *start it with…* hint is printed only when no agent answers and **never to a session** (`AGENTORC_SESSION` set, or a session channel): a session is told to stop, as its skill says; (3) a test restarts a private agent under a blocked `wait` and sees it return on the next event. Design first if (1) changes what `wait` promises (§4.10 *wake budget*: a reconnect must not count as a wake).
-
-**Related:** TD-062 (why promotes restart the unit), TD-058 (the agent stops in a second with a `wait` blocked — the other half of the same restart), TD-052 (`wait` as an RPC).
 
 
 ## TD-087: The usage chip is empty because the usage endpoint rate-limits us, and the adapter says nothing
@@ -929,3 +897,18 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the trail says why a row ended for every ending the home can name, and *resolved* means only what the design says it means.
 
 **Related:** TD-079 (the trail), TD-078 (the same family of test: a wait bounded on something other than the thing waited for), design §4.10 rule 2.
+
+## TD-089: A session whose `AGENTORC_SESSION` is unset is told to start a host agent when none answers
+
+**Priority:** Low
+**Added:** 2026-09-20 (`tdgrind-ao-1`, the half of TD-086 item (2) that entry could not build)
+**Status:** Open — a design question, not a line of CLI
+**Location:** `src/agentorc/cli.py` (the exit-3 path and its *start it with: agentorc-agent serve* hint), design §4.8a (the session channel), `src/agentorc/skill.md`
+
+**Why:** TD-086 item (2) asked that the hint be printed **never to a session**, recognised by *`AGENTORC_SESSION` set, or a session channel*. The first signal is built (#300). The second is the host agent's own classification (§4.8a, by peer credentials and process ancestry), and it is unavailable in the one branch that prints the hint, because that branch is reached only when nothing is answering to be asked. So an `ao` run by a session with the variable unset — a reparented background job, a hook — still reads *start it with: agentorc-agent serve*, the one thing a session's skill forbids.
+
+**Fix:** give the CLI a signal that does not need the agent: e.g. the CLI walks its own ancestry for a tmux pane on an `ao-*` session, or the launch layer leaves a marker the CLI can read without a socket. Decide which in §4.8a; until then the skill's Never list is the guard.
+
+**Done when** an `ao` run from inside an agentorc session with `AGENTORC_SESSION` unset, against no host agent, is told to stop rather than to start one.
+
+**Related:** TD-086 (archive), design §4.8a, TD-077 (the same classification).
