@@ -2762,7 +2762,7 @@ until step 1 below lands.
   **`source`** is one *answered from the record*, and the home files it to the person as an
   FYI: ***answered for you** — the question, the answer, the source, who asked and who
   answered*. It keys on the structured field, **never on a role** (§9 invariant 9): a manager
-  that answers from the design with `--source` is told the same way. The Inbox groups these
+  that answers from the design with `--source` is told the same way.
   The FYI is filed **from the answerer** and carries a structured **`answered: {question,
   asker, answerer, source}`**; a reply to an entry that carries `answered` is addressed **to the
   asker, with a copy to the answerer**, on the question's own thread — that is **a new branch
