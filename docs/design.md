@@ -2760,6 +2760,29 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   below). It is **a manager's act, never the core's** (§4.9a): the host agent starts nothing
   and does not read `org.yml`. At wind-down the seat is closed by `ao team stop` with the rest,
   and a manager that winds down with `asks_waiting` > 0 says so on the board.
+- **Its standing context: a primer (2026-09-21, asked for by Paul; this repo's is built, the key
+  and the warning are not).** A techlead starts cold and sees only the asker's framing, and a
+  design of this size cannot be read per fill — so without something standing it answers
+  narrowly. The seat takes **`context: <path>`**, a file in the team's home checkout that the
+  techlead's brief names as its **first read** (`{context}`, filled at launch as `{lane}` is;
+  empty where there is none, and the brief then says to read the repo's own map — `CLAUDE.md`,
+  the design's headings — instead). `ao team start` **warns, and starts anyway**, when a
+  techlead seat has no `context:` or the file is missing. **It is an index, never a source**:
+  an answer's `--source` is the document the primer pointed to, read there; a primer is never
+  cited, so a stale one can misdirect a search and cannot become an authority. What goes in:
+  what the project is in a page; its parts and which depends on which; who may do what; how a
+  change lands (review, merge rights, what is never touched); the questions already decided,
+  each with **where it is written**; and what always goes up. What stays out: anything that
+  would be quoted as the answer itself, anything that changes weekly (the ledger's contents,
+  who is working on what), and secrets. Two to three thousand words — it is read on every fill.
+  **When**: before the first `ao team start` with a techlead seat; and again **in the PR that
+  changes** the architecture, a standing decision or the merge rules — that PR updates the
+  primer, and its fact-check reads the primer against the change. **Who**: a session of that
+  repo with its design in front of it, or the person — never a session reaching across from
+  another repo, which knows neither its decisions nor its never-list. **Held to its pointers
+  by a test** where the repo can: every section, path and ledger id it names must exist
+  (`tests/test_primer.py` here). `ao team --skill` and the `techlead.md` preset carry the same
+  guidance in their own words, for the person or agent standing a team up elsewhere.
 - **What it may answer.** A **`steer`**: it answers, or says *go with your default*, which is an
   answer. An **`ask`**: **only when the answer is already written down** — the design, the
   ledger, a brief, a decision of the person's — and it **says where**: `ao msg --reply-to <id>
