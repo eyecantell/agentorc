@@ -119,3 +119,4 @@
 17:33  grinder-ao-1: dropped #383 (anchor's merge) and declared out_of_work 23:33Z (why on its record); grinder-ao-2: working TD-095 page → ok
 17:33  cadence: #379 #381 #382 #384 #387 merged since 23:00Z — all pass; review rows recorded, not verified
 17:47  techlead-ao-1: exited with asks_waiting 1 → FILL #2 at 23:47Z (same form as #1)
+17:47  techlead-ao-1: fill #2 idle at 23:47:48Z (<1 min), 0 waiting → ao close. Batch: 1 steer from grinder-ao-2 (TD-095 Cursor editor preset) answered with a source (design §5 The person's own), default taken, 0 passed up, 0 lapsed
