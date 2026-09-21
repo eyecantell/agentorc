@@ -374,7 +374,11 @@ async def test_another_hosts_record_is_addressed_unreachable_until_its_node_dial
         assert agent.remote["laptop"]["ao-x-w"].state == "working"  # an overlay on the view, never the record
         agent.links["laptop"] = {"up": True, "since": "t", "why": "linked"}
         assert (await c.call("get", id="ao-x-w@laptop"))["state"] == "working"
-        assert (await c.call("seen", id="ao-x-w@laptop"))["seen_at"]  # a look is the home's to record
+        seen = await c.call("seen", id="ao-x-w@laptop")
+        assert seen["seen_at"]  # a look is the home's to record
+        # …and the reply frames the record as the home addresses it, as `get` does (TD-075's review
+        # of #348): the node's own `id` came back before, until the next push corrected it
+        assert seen["id"] == "ao-x-w@laptop" and "asks_waiting" in seen and "alarm_to" in seen
         agent.links["laptop"] = {"up": False, "since": "t", "why": "the lid closed"}
         with pytest.raises(AgentError, match="runs on laptop: unreachable since t — the lid closed; refused, not"):
             await c.call("kill", id="ao-x-w@laptop")
