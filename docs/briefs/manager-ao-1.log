@@ -34,3 +34,6 @@
 00:13–00:35 quiet (grinder-ao-1 on #348 TD-075 step 4, third review round; #346 #347 #348 all wait on the anchor, nothing merged since 05:07Z)
 00:36–00:58 quiet (grinder-ao-1: #349 TD-075 step 4 --keep-mail green, now #350; #346–#349 wait on the anchor, oldest since 05:46Z)
 01:13  grinder-ao-1: working → cadence #350 (TD-075 step 4, wind-down seat) pass, review recorded; #346–#349 still wait on the anchor
+01:14–01:17 quiet
+01:18  grinder-ao-1: merged #351 (ledger, TD-075 where it stands; cadence pass) then idle + restart_wanted (07:18:31Z; not early, not suspended, 0 dirty / 0 unpushed, owes nothing; rest of TD-075 step 4 waits on #346–#349) → ao close + ao new same name/worktree/profile/brief, restart 1 of 3 in the window from 01:18 (22:31 is outside 2h); new record 07:18:51Z working
+01:20  escalation: the anchor's merge queue now holds grinder-ao-1 (#346–#349, oldest 05:40Z) → board line on branch orch-td075-merge-queue, PR #352, Sonnet fact-check running
