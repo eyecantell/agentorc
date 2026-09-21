@@ -8,6 +8,7 @@ The person's part is one `nodes:` entry in the home's `hosts.yml`:
 nodes:
   contractmatch:
     container: {devcontainer: ~/contractmatch}   # the checkout whose .devcontainer defines the image
+    identity: enforce                            # optional: the node's identity mode (design §4.8a)
 ```
 
 Everything else is derived, under `~/.agentorc/nodes/<name>/.devcontainer/`. Two generated
@@ -47,7 +48,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc import hosts, paths
+from sessionorc import hosts, identity, paths
 from sessionorc.tmux import attach_argv as tmux_attach_argv
 
 INSIDE = "/agentorc"  # the node's volume, inside
@@ -97,6 +98,9 @@ class ContainerNode:
     name: str
     devcontainer: Path  # the checkout whose `.devcontainer/devcontainer.json` defines the image
     volatile: bool = False  # `volatile: true`: one the person stops — a stopped container is left alone (3c.4)
+    # `identity: off|observe|enforce` (§4.8a): the node's mode, said at the home because the node's
+    # `hosts.yml` is rewritten from here on every provision. '' or a word that is no mode = the default.
+    identity: str = ""
 
     @property
     def repo_config(self) -> Path:
@@ -145,6 +149,7 @@ def container_nodes() -> dict[str, ContainerNode]:
                 name,
                 Path(c["devcontainer"].strip()).expanduser().resolve(),
                 volatile=hosts._flag(flags.get("volatile")),
+                identity=str(flags.get("identity") or "").strip().lower(),
             )
     return out
 
@@ -590,10 +595,13 @@ def write_node_config(n: ContainerNode) -> None:
     `/agentorc/profiles/<profile>/` — logged in once by hand inside, and kept."""
     home_dir = n.node_dir / "home"
     home_dir.mkdir(parents=True, exist_ok=True)
+    local = {"name": n.name, "vscode_host": n.name}
+    if n.identity in identity.MODES:  # a word that is no mode is left out: the node reads its default, never `off`
+        local["identity"] = n.identity
     (home_dir / "hosts.yml").write_text(
         yaml.safe_dump(
             {
-                "local": {"name": n.name, "vscode_host": n.name},
+                "local": local,
                 "home": hosts.local_host().name,
                 "link": {"socket": f"{INSIDE_LINK}/link.sock"},
             },
@@ -682,7 +690,10 @@ def host_up(name: str, r: Runner | None = None, *, rebuild: bool = False) -> dic
         raise ContainerError(f"devcontainer up reported success but no container carries {ID_LABEL}={name}")
     user = str(result.get("remoteUser") or "root")
     check_image(n, r, cid, user)
+    node_hosts = n.node_dir / "home" / "hosts.yml"
+    config_was = node_hosts.read_text(encoding="utf-8") if node_hosts.is_file() else None
     wheel = provision(n, r, cid, user)
+    reconfigured = config_was is not None and node_hosts.read_text(encoding="utf-8") != config_was
     pid = agent_pid(r, cid, user)
     restarted = False
     if pid is None:
@@ -692,6 +703,12 @@ def host_up(name: str, r: Runner | None = None, *, rebuild: bool = False) -> dic
         # provisioned past what is running: a process keeps the code it loaded, so it is restarted
         was = running_build(n) or "unknown"
         r.log(f"agent in {name} (pid {pid}) runs build {was}; restarting it on {build_id(wheel)}")
+        restart_agent(n, r, cid, user)
+        restarted = True
+    elif reconfigured:
+        # the agent reads its `hosts.yml` once, at start: a changed entry at the home (the identity
+        # mode) is not in force until it is restarted
+        r.log(f"agent in {name} (pid {pid}) runs on a configuration that has changed; restarting it")
         restart_agent(n, r, cid, user)
         restarted = True
     else:

@@ -783,7 +783,7 @@ decided here so both ends are written from one text.
   `ssh -T <target> agentorc-agent link` (the forced command replaces whatever it asks for), speaks
   on that process's stdin and stdout, and starts it again when it ends.
 - **Who may connect.** The home's `hosts.yml` carries `nodes:` — a list of names, or a mapping
-  `name: {volatile: true}` (an entry may also carry `container:` and, from 2026-09-19, `person:` — below) — and a link naming a host that is not in it is answered *not an
+  `name: {volatile: true}` (an entry may also carry `container:`, from 2026-09-19 `person:` — below — and, for a container node, `identity:`, the node's mode, §4.8a) — and a link naming a host that is not in it is answered *not an
   authorised node* and closed. An agent that is itself a node refuses every link: there is one
   home. A second link for a host that already has one **replaces** it (the node reconnected before
   the home noticed the first had died), and the old one is closed.
@@ -2119,7 +2119,7 @@ carries **`identity: off | observe | enforce`** — `local: {identity: observe}`
 beside `volatile:`; default `observe` for the release that introduces it; `off` classifies
 nothing and is today's behaviour, for an emergency and for the test suite (below), and the page
 says *identity: off* as loudly as it says *observe*: in `observe` it classifies, records alarms and serves every
-request exactly as before; `enforce` applies the table. **A check that itself fails** — a bug of ours, tmux not answering — is logged, and the request is served exactly as before under `observe` (the promise that nothing a caller sees changes covers our own mistakes), while under `enforce` everything but a read is refused, since a check that can be made to fail would otherwise be a way round it; a person recovers with `identity: observe` in `hosts.yml`, which needs no RPC. The anchor turns a host to `enforce`
+request exactly as before; `enforce` applies the table. **A check that itself fails** — a bug of ours, tmux not answering — is logged, and the request is served exactly as before under `observe` (the promise that nothing a caller sees changes covers our own mistakes), while under `enforce` everything but a read is refused, since a check that can be made to fail would otherwise be a way round it; a person recovers with `identity: observe` in `hosts.yml`, which needs no RPC. **A container node's mode is said at the home**, as `identity:` in its `nodes:` entry (§4.4a): the node's own `hosts.yml` is written from the home on every provision — every promote — so a mode set by hand inside would last until the next one; `ao host up` carries the word into the node's `local:`, leaves out a word that is no mode (the node then reads its default, never `off`), and restarts the node's agent when what it wrote has changed, since an agent reads its mode once, at start (**built 2026-09-21**). The anchor turns a host to `enforce`
 after a day of `observe` there with no alarm that was not a real forgery — sessions, hooks, the
 UI, the systemd units, a person's terminal, VS Code's terminal, the SessionStart hook and a
 node's forwarded calls having all been seen. **`ao identity`** is what makes that checkable: the
