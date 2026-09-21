@@ -109,7 +109,8 @@ def cmd_wait(args: argparse.Namespace) -> int:
         # time that is left, so a lead does not see a promote. The transport owns that, not this.
         got, remakes = await clientmod.wait_rpc(caller=caller, timeout=args.timeout, scope=args.scope)
         if remakes and not args.json:
-            print(f"[agentorc] the host agent restarted while waiting — the wait was remade ({remakes}×)")
+            times = "once" if remakes == 1 else f"{remakes} times"
+            print(f"[agentorc] the host agent restarted while waiting — the wait was remade {times}")
         return got
 
     try:
