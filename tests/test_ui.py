@@ -333,14 +333,14 @@ def test_closed_session_terminal_is_final_and_occupancy_endpoint(client, tmp_pat
 
 
 def test_unseen_idle_until_focused(client, tmp_path):
-    """TD-017: an idle session nobody has looked at renders "finished · unseen" and sorts just above
+    """TD-017: an idle session nobody has looked at renders "idle · unseen" and sorts just above
     plain idle; opening Focus (or acting on the card) marks it seen; a later finish is unseen again."""
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "unseen"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]  # the redirect to Focus is not followed: never seen
     s = wait_state(client, sid, "idle")
-    assert s["unseen"] is True and s["state_label"] == "finished · unseen" and s["rank"] == 4.5
+    assert s["unseen"] is True and s["state_label"] == "idle · unseen" and s["rank"] == 4.5
     r = client.get("/")
-    assert f'id="card-{sid}"' in r.text and "finished · unseen" in r.text and 'data-unseen="1"' in r.text
+    assert f'id="card-{sid}"' in r.text and "idle · unseen" in r.text and 'data-unseen="1"' in r.text
     assert client.get(f"/focus/{sid}").status_code == 200  # Focus = seen
     s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert s["unseen"] is False and s["state_label"] == "idle" and s["rank"] == 5 and s["seen_at"]
@@ -1518,3 +1518,11 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     # here, which nobody had seen, because the line never fitted (TD-085)
     # the age is measured against now, so the shape is what is pinned, not the number
     assert "rebasing #269 · says " in head_html and " ago" in head_html and "· says ·" not in head_html
+
+
+def test_the_focus_reports_panel_shows_a_reference_once():
+    """§4.5a **report line** (TD-095): an entry whose reference is its PR reads `#359`, never
+    `#359 → #359` — on the Focus Reports panel as on the card. The panel is drawn inside `AO.focus`'s
+    closure, which the node probe cannot reach, so the rule is pinned where it is written."""
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert "const pr = p.pr && String(p.ref) !== `#${p.pr}` ?" in js
