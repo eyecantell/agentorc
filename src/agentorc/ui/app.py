@@ -1847,7 +1847,7 @@ def create_app() -> FastAPI:
         if isinstance(e, teamrun.PartialStart):
             # The created sessions are running on the brief, so a stale-brief warning belongs on
             # this path most of all (review of PR #139). `detail` is what the toast renders.
-            warnings = " · ".join(e.plan.warnings)
+            warnings = " · ".join([*e.plan.warnings, *e.plan.notes])
             return HTTPException(409, f"{e}{' — ' + warnings if warnings else ''}")
         return HTTPException(400, str(e).strip('"'))
 

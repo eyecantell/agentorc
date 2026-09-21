@@ -728,6 +728,14 @@ def test_a_partial_start_still_says_the_brief_names_one_run(world, capsys, monke
     assert "already started" in err
     assert "TD-042" in err and "a clock time" in err
 
+    # a techlead seat without its primer (§4.9b) is said on this path too (review of PR #370)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
+    write_org(tmp_path, doc)
+    state["sessions"].clear()
+    calls["n"] = 0
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert "has no `context:`" in capsys.readouterr().err
+
 
 def test_on_a_node_the_org_lives_on_the_home_and_status_says_what_the_listing_is(world, capsys):
     """Design §4.4a, TD-057 step 2: `org.yml` lives on the home, so a node reads no local copy; and
@@ -1002,6 +1010,8 @@ def test_a_techlead_seat_reads_its_primer_first_and_the_start_warns_without_one(
         seat = next(p for p in creates(state) if p["role"] == "techlead")
         assert f"`{context or 'none'}`" in seat["prompt"]  # as written; `none` sends it to the repo's map
 
+
+def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
     """TD-075 step 4, design §4.9b *A seat is empty or filled — never finished*: a team whose members
     all declared reads *wound down* although its techlead never did — the seat is known by the name
     its definition gives it, not by a role badge (§9 invariant 9). Without a seat, one member that
