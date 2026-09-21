@@ -13,8 +13,9 @@ a terminal or a page — the callers do that from the returned records.
 
 from __future__ import annotations
 
+import re
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -106,7 +107,7 @@ def org_with_repo_teams(org: orgmod.Org, roots: list[Path | str]) -> tuple[orgmo
     return org, notes
 
 
-def wound_down(sessions: list[dict[str, Any]], seat: str | None = None) -> str | None:
+def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> str | None:
     """When a team's sessions all declared they were out of work, the latest of those instants
     (design §4.9a, §4.5a **Teams** strip, TD-053 step 6) — else None.
 
@@ -117,16 +118,27 @@ def wound_down(sessions: list[dict[str, Any]], seat: str | None = None) -> str |
     single session that never declared means the team stopped for some other reason. A team with no
     session carrying its badge has never run, or has been forgotten, and is neither.
 
-    `seat` is the team's techlead, by the name its definition gives it (design §4.9b, TD-075 step 4):
-    a seat is empty or filled, never finished, so it never declares and is not counted — read from
-    the definition, never from a role badge (§9 invariant 9).
+    `seats` are the names the team's techlead runs under (`seat_names`; design §4.9b, TD-075 step
+    4): a seat is empty or filled, never finished, so it never declares and is not counted — read
+    from the definition, never from a role badge (§9 invariant 9).
     """
-    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions if s.get("name") != seat]
+    seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions if s.get("name") not in seats]
     if not seen or not all(d.get("at") for d in seen):
         return None
     # `str` before `max`: two declarations of different types would otherwise be a TypeError, and
     # the strip is on the same page as every card (review of PR #203)
     return max(str(d["at"]) for d in seen)
+
+
+def seat_names(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> set[str]:
+    """The names among `sessions` that are the team's techlead seat: the definition's name, or that
+    name with the numeric suffix a session takes when a stale tmux session held its id (§4.1, the
+    note `ao team start` prints then) — and never a name the definition gives one of its members."""
+    if team.techlead is None:
+        return set()
+    members = {n for m in team.members if m.team is None for n in m.names()}
+    shape = re.compile(re.escape(team.techlead.name) + r"(-\d+)?")
+    return {n for s in sessions if (n := str(s.get("name") or "")) and shape.fullmatch(n) and n not in members}
 
 
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -150,7 +162,7 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "members": sum(len(m.names()) for m in t.members if m.team is None),
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
-                "wound_down": None if n_live else wound_down(mine, t.techlead.name if t.techlead else None),
+                "wound_down": None if n_live else wound_down(mine, seat_names(t, mine)),
             }
         )
     return rows_out

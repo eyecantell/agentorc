@@ -989,10 +989,18 @@ def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
         {"id": "b", "name": "techlead-ao", "team": "ao-grind", "state": "exited", "out_of_work": None},
     ]
     assert teamrun.wound_down(sessions) is None
-    assert teamrun.wound_down(sessions, "techlead-ao") == "2026-09-21T06:00:00Z"
+    assert teamrun.wound_down(sessions, {"techlead-ao"}) == "2026-09-21T06:00:00Z"
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     org = cli._org_here(tmp_path / "agentorc")
     (row,) = teamrun.rows(org, sessions)
     assert row["wound_down"] == "2026-09-21T06:00:00Z" and row["techlead"] == "techlead-ao"
+    # a seat that came up suffixed (a stale tmux session held its id) is still the seat; a member
+    # whose definition name only looks like one is never taken for it (review of PR #350)
+    sessions[1]["name"] = "techlead-ao-2"
+    assert teamrun.rows(org, sessions)[0]["wound_down"] == "2026-09-21T06:00:00Z"
+    doc["teams"]["ao-grind"]["members"].append({"role": "grinder", "name": "techlead-ao-3", "home": "agentorc"})
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    org = cli._org_here(tmp_path / "agentorc")
+    assert teamrun.seat_names(org.teams["ao-grind"], [*sessions, {"name": "techlead-ao-3"}]) == {"techlead-ao-2"}

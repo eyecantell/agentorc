@@ -2707,7 +2707,8 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   under another id (a stale tmux session holding it), the start says so. A hand-started session
   (`ao new --role grinder`) reads `none`. `ao team list` names the seat, and a team whose members
   all declared reads *wound down* without the seat's word (2026-09-21): the seat is known by the
-  name its definition gives it, never by a role badge.
+  name its definition gives it — or that name with the numeric suffix a stale tmux session forces,
+  unless a member is defined under it — never by a role badge.
 - **It answers cold, and is filled on demand.** A techlead is **started per batch of questions
   and ends when it has answered them**: no context piles up over a night, an idle team costs
   nothing, and — Paul's second reason — *composing the message forces the worker to pull the
