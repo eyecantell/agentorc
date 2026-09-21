@@ -118,3 +118,4 @@
 17:28–17:31 quiet; open TD-095 PRs #383 (src/sessionorc, 23:16Z → 01:16Z), #384, #385 (src/sessionorc/gitinfo.py, 23:22Z → 01:22Z), #386, #387
 17:33  grinder-ao-1: dropped #383 (anchor's merge) and declared out_of_work 23:33Z (why on its record); grinder-ao-2: working TD-095 page → ok
 17:33  cadence: #379 #381 #382 #384 #387 merged since 23:00Z — all pass; review rows recorded, not verified
+17:47  techlead-ao-1: exited with asks_waiting 1 → FILL #2 at 23:47Z (same form as #1)
