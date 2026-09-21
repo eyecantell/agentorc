@@ -389,21 +389,48 @@
   // tool with one daily window or three windows prints what it has. `usage: null` means that profile
   // has no live session any more (the core prunes it): its chip goes.
   const NEAR_CAP = 80;  // "at or near a cap": never collapsed into +n, whatever the room (Paul 2026-09-19)
+  // Why the last poll gave no reading: the adapter's `reason` word in words (§4.2, TD-087). Keyed on
+  // the word, never on text; a word this table does not know is printed as itself.
+  const USAGE_WHY = {
+    rate_limited: "rate-limited by the usage endpoint", no_credentials: "no credentials for this profile",
+    no_profile: "no such profile", error: "the usage endpoint could not be read",
+  };
+  // One profile's chip, or null for none — `usage_chip` in app.py is the same rule for the server's
+  // render, and the tests hold the two to the same cases. **A held reading goes stale, not out**
+  // (TD-087): a refused poll keeps the last good windows, drawn dimmed with *· stale* and, on hover,
+  // when they were read and why the poll since failed; a refusal with nothing ever held is
+  // `<profile> no reading`. An `ok` with no windows is a tool that reports no quota: no chip.
+  AO.usageChip = function (profile, u) {
+    if (!u || typeof u !== "object") return null;
+    const windows = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w.pct === "number");
+    const reason = String(u.reason || "ok"), stale = reason !== "ok";
+    if (!windows.length && !stale) return null;
+    let why = "";
+    if (stale) {
+      why = "the last poll was refused: " + (USAGE_WHY[reason] || reason);
+      if (typeof u.retry_after === "number") why += `, which asked to be left ${Math.max(1, Math.ceil(u.retry_after / 60))} min`;
+    }
+    if (!windows.length) return { text: `${profile} no reading`, title: `no usage reading for ${profile} yet — ${why}`, pct: 0, cls: "stale" };
+    const ws = windows.slice().sort((a, b) => b.pct - a.pct), worst = ws[0];
+    let title = ws.map((w) => `${w.label} ${w.pct}% (resets ${w.resets || "?"})`).join(" · ");
+    let cls = worst.pct >= 100 ? "cap" : worst.pct >= NEAR_CAP ? "near" : "";
+    let text = `${profile} ${worst.label} ${worst.pct}%`;  // the numbers say what they are (2026-09-18)
+    if (stale) { title = `held reading from ${u.fetched || "an unknown time"} — ${why}. ${title}`; text += " · stale"; cls = (cls + " stale").trim(); }
+    return { text, title, pct: worst.pct, cls };
+  };
   function onUsage(ev) {
     const chip = $("#usagechip"); if (!chip) return;
     let el = chip.querySelector(`[data-profile="${CSS.escape(ev.profile)}"]`);
-    const windows = (ev.usage && ev.usage.windows) || [];
+    const c = AO.usageChip(ev.profile, ev.usage);
     // The chip and the space after it were added together, so they go together: a profile that
     // comes and goes all day would otherwise leave a text node behind each time, and those widths
     // are what `fitUsage` measures against (review of PR #279).
-    if (!windows.length) { if (el) { const sep = el.nextSibling; if (sep && sep.nodeType === 3) sep.remove(); el.remove(); } fitUsage(); return; }
+    if (!c) { if (el) { const sep = el.nextSibling; if (sep && sep.nodeType === 3) sep.remove(); el.remove(); } fitUsage(); return; }
     if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.insertBefore(el, $("#usagemore")); chip.insertBefore(document.createTextNode(" "), $("#usagemore")); }
-    const sorted = windows.slice().sort((a, b) => (b.pct || 0) - (a.pct || 0)), worst = sorted[0];
-    el.dataset.pct = worst.pct;
-    el.textContent = `${ev.profile} ${worst.label} ${worst.pct}%`;  // the numbers say what they are (2026-09-18)
-    el.classList.toggle("cap", worst.pct >= 100);
-    el.classList.toggle("near", worst.pct < 100 && worst.pct >= NEAR_CAP);
-    el.title = sorted.map((w) => `${w.label} ${w.pct}% (resets ${w.resets || "?"})`).join(" · ");
+    el.dataset.pct = c.pct;
+    el.textContent = c.text;
+    el.className = c.cls;
+    el.title = c.title;
     fitUsage();
   }
   // Chips side by side while they fit; past that the worst profiles and `+n`, which shows the rest
