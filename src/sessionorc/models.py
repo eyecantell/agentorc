@@ -453,8 +453,9 @@ def wake_digest(session: dict[str, Any]) -> str:
     rw = session.get("restart_wanted") or {}
     parts.append(f"restart_wanted={(rw.get('at'), rw.get('why'), rw.get('early'))!r}")
     # a question landing on an empty techlead seat (§4.9b, TD-075 step 4): the manager fills it, so
-    # a manager blocked in `ao wait` returns on it — the count, never the text
-    parts.append(f"asks_waiting={session.get('asks_waiting')!r}")
+    # a manager blocked in `ao wait` returns on it — whether any wait, never how many, so it wakes
+    # on the count leaving zero and not on 1→2 (and never the text)
+    parts.append(f"asks_waiting={bool(session.get('asks_waiting'))!r}")
     return "\n".join(parts)
 
 
@@ -695,7 +696,9 @@ class Session:
         """Design §4.9b (TD-075 step 4): the open `ask`s and `steer`s **addressed** to this record —
         a copy is not addressed to it — as a number and never their text, since nobody reads
         another session's inbox. What a manager reads to fill an empty techlead seat; computed
-        here like `unread`, so every reader sees the same count.
+        here like `unread`, so every reader sees the same count. An entry the record passed up
+        (§4.9b) is left out: it waits on the person, and a seat filled for it would have nothing
+        to answer.
 
         An address is compared whole, host included (§4.4a): names are unique per host, not per
         org, so `tl@laptop` is not this record's address merely because its id is `tl`. A bare
@@ -709,7 +712,12 @@ class Session:
             return sid, host or storing
 
         return sum(
-            1 for e in self.inbox if e.open and e.kind in ("ask", "steer") and any(where(x) == mine for x in e.to)
+            1
+            for e in self.inbox
+            if e.open
+            and e.kind in ("ask", "steer")
+            and not e.passed_up  # the person's to answer now (§4.9b): no seat need be filled for it
+            and any(where(x) == mine for x in e.to)
         )
 
     def mail_marks(self) -> dict[str, Any]:

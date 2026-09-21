@@ -52,6 +52,10 @@ OPEN_ASK_ADVICE = 3  # open `ask`s to the person at which `ao msg` advises askin
 OUTCOMES_OWED_MAX: int | None = 10
 OUTCOME_STATES = ("done", "blocked", "dropped")  # what an asker may report; the home writes two more
 MAIL_RETENTION: timedelta | None = timedelta(hours=12)  # how long a read entry is kept; an open `ask` is exempt
+# A reply that carries a `source` (§4.9b) is kept in its sender's outbox this long from when it was
+# sent, whatever else is pruned: `ao inbox --sent` is how a techlead started cold answers two
+# questions in one night alike, and a seat filled by `--keep-mail` carries the outbox with it.
+SOURCED_RETENTION = timedelta(days=7)
 SENDS_KEEP = 20  # `sends` entries a record keeps
 NONCES_KEEP = 256  # verdicts remembered per host agent for a client's same-nonce retry
 WAKE_BUDGET: int | None = 30  # mail-caused wakes a session may take per WAKE_WINDOW; measured: a lead took 4 an hour
