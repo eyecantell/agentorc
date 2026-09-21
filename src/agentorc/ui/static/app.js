@@ -678,11 +678,19 @@
   // pane is gone, which is final and never retried. Everything else retries, with the delay
   // doubling to a ceiling. `opened` is whether the socket ever opened: a 1006 before it did is a
   // handshake that never reached the server, which is a different thing to say to a person.
-  AO.termClose = function (code, opened, delay) {
+  // `reason` is the close frame's, when there is one. It is **part of the sentence, so it is part
+  // of the rule**: the caller appending it separately is how the two came apart in review — the
+  // call site suppressed it for every 1006 where the original suppressed it only for a 1006 the
+  // socket never opened. Nothing can reach that difference today (a 1006 is client-synthesised and
+  // carries no reason, and this server sends none), which is exactly why it had to be closed here
+  // rather than left as a comment.
+  AO.termClose = function (code, opened, delay, reason) {
     if (code === 4404) return { retry: false, final: true, delay, why: "no terminal for this session" };
-    const why = code === 1006 && !opened
-      ? "websocket handshake failed (code 1006) — does your route to the UI pass websockets? ssh -L does"
-      : `closed (code ${code})`;
+    if (code === 1006 && !opened) {
+      const why = "websocket handshake failed (code 1006) — does your route to the UI pass websockets? ssh -L does";
+      return { retry: true, final: false, delay: Math.min(delay * 2, 10000), why };
+    }
+    const why = `closed (code ${code}${reason ? ", " + reason : ""})`;
     return { retry: true, final: false, delay: Math.min(delay * 2, 10000), why };
   };
 
@@ -978,10 +986,9 @@
       ws.onclose = (e) => {
         if (paneGone) return;  // the push already ended it
         // The rule is `AO.termClose` (above), so a test can reach it; this is what acts on it.
-        const v = AO.termClose(e.code, opened, delay);
+        const v = AO.termClose(e.code, opened, delay, e.reason);
         if (v.final) { endTerm(v.why); return; }
-        const why = v.why + (e.reason && e.code !== 1006 ? ` — ${e.reason}` : "");
-        term.write(`\r\n\x1b[90m[agentorc] terminal ${why} — retrying in ${Math.round(delay / 1000) || 1}s\x1b[0m\r\n`);
+        term.write(`\r\n\x1b[90m[agentorc] terminal ${v.why} — retrying in ${Math.round(delay / 1000) || 1}s\x1b[0m\r\n`);
         setTimeout(openTerm, delay); delay = v.delay;
       };
     }

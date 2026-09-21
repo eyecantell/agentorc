@@ -1733,6 +1733,10 @@ console.log(JSON.stringify({
   first_1006_before_open: close(1006, false, 500),
   first_1006_after_open: close(1006, true, 500),
   normal_1000: close(1000, true, 500),
+  reason_kept: close(1011, true, 500, "server went away"),
+  reason_absent: close(1011, true, 500, ""),
+  reason_on_1006_after_open: close(1006, true, 500, "odd but carried"),
+  reason_on_1006_before_open: close(1006, false, 500, "should not be shown"),
   backoff: [500, 1000, 2000, 4000, 8000, 16000].map((d) => close(1000, true, d).delay),
 }));
 """
@@ -1783,9 +1787,19 @@ def test_the_terminals_two_client_rules_are_reachable_and_right():
     before = got["first_1006_before_open"]["why"]
     assert "handshake failed" in before and "ssh -L" in before
     assert "handshake" not in got["first_1006_after_open"]["why"] and "1006" in got["first_1006_after_open"]["why"]
+    # the close frame's own `reason` is **part of the sentence, so part of the rule** — the caller
+    # appending it separately is how the two came apart in review: the call site suppressed it for
+    # every 1006 where the original suppressed it only for one the socket never opened. Nothing can
+    # reach that difference today (a 1006 is client-synthesised and carries none, and this server
+    # sends none), which is why it is closed here rather than left as a comment.
+    assert got["reason_kept"]["why"] == "closed (code 1011, server went away)"
+    assert got["reason_absent"]["why"] == "closed (code 1011)"
+    assert "odd but carried" in got["reason_on_1006_after_open"]["why"]  # as the original did
+    assert "should not be shown" not in got["reason_on_1006_before_open"]["why"]  # as it did not
 
     # …and the page really uses them, rather than keeping a second copy of the rule inline
     js = (UI / "static" / "app.js").read_text()
-    assert "AO.termClose(e.code, opened, delay)" in js and "AO.paneIsGone(ev.session)" in js
+    assert "AO.termClose(e.code, opened, delay, e.reason)" in js and "AO.paneIsGone(ev.session)" in js
+    assert "e.code !== 1006" not in js  # the reason rule lives in `termClose`, not beside it
     assert 'ws.onmessage = (m) => { delay = 500;' in js  # the one place the backoff resets
     assert "ws.onopen = () => { delay = 500; }" not in js.split("AO.focus")[-1]  # never on open
