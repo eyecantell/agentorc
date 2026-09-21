@@ -2172,6 +2172,7 @@ class HostAgent:
         thread: str | None = None,
         nonce: str | None = None,
         caller: Any = None,
+        source: str | None = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -2183,8 +2184,9 @@ class HostAgent:
         all (§4.10 *What a person is asked*, 2026-09-19): `default` is a `steer`'s, required on it.
         `answers` are the sender's likely answers on a question, and `answer` the zero-based index
         of the one a reply picked (§4.10 *Suggested answers*, 2026-09-20, TD-070). A retry carrying
-        the same `nonce` returns the first send's verdict. The reply names what landed, what was
-        copied, and what was forwarded to a resumed successor."""
+        the same `nonce` returns the first send's verdict. `source` is where a reply's answer is
+        written down (§4.9b): such a reply is filed to the person as *answered for you*. The reply
+        names what landed, what was copied, and what was forwarded to a resumed successor."""
         sender = PERSON if mail.is_person(caller) else str(caller)
         key = (sender, str(nonce)) if nonce else None
         if key and key in self._nonces:
@@ -2194,7 +2196,21 @@ class HostAgent:
             return dict(result or {})
         try:
             result = await self._msg(
-                sender, text, to, kind, about, reply_to, bound, cites, default, answers, answer, outcome, for_, thread
+                sender,
+                text,
+                to,
+                kind,
+                about,
+                reply_to,
+                bound,
+                cites,
+                default,
+                answers,
+                answer,
+                outcome,
+                for_,
+                thread,
+                source,
             )
         except RpcError as e:
             if key:
@@ -2266,6 +2282,7 @@ class HostAgent:
         outcome: str | None = None,
         for_: str | None = None,
         thread: str | None = None,
+        source: str | None = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -2305,6 +2322,22 @@ class HostAgent:
             )
         if kind != "steer" and line:
             raise RpcError(f"only a steer carries a default: {kind} says what it says (design §4.10)")
+        # -- where a reply's answer is written down (§4.9b): one line, checked, never parsed ------
+        src = None
+        if source is not None:
+            if not isinstance(source, str):
+                raise RpcError("a source is one line of text (design §4.9b)")
+            raw = source.strip()
+            src = _clean(raw).strip()
+            if not src or "\n" in raw or len(raw) > mail.SOURCE_CAP:
+                raise RpcError(
+                    f"a source is one line of at most {mail.SOURCE_CAP} characters: the file and section, or "
+                    "the decision's date (design §4.9b)"
+                )
+            if not reply_to:
+                raise RpcError("a source says where a reply's answer is written down: --reply-to <id> (design §4.9b)")
+            if sender == PERSON:
+                raise RpcError("a person's answer needs no source: it is the person's word (design §4.9b)")
         # -- the sender's likely answers: a field of its own, not counted toward `TEXT_CAP` --------
         # Design §4.10 *Suggested answers* (TD-070). Each is cleaned more strictly than displayed
         # text is (`_clean_answer`); one that cleans to nothing, or that repeats an earlier one
@@ -2331,6 +2364,7 @@ class HostAgent:
         # -- a reply belongs to its root's thread, and answers an entry the replier holds ----------
         replied: MailEntry | None = None
         copies: list[str] = []
+        overrule = ""  # the answerer, when this replies to an *answered for you* FYI (§4.9b)
         if kind == "reply" and not reply_to:
             raise RpcError("a reply names the entry it answers: --reply-to <id> (design §4.10)")
         if reply_to:
@@ -2346,6 +2380,12 @@ class HostAgent:
                     "a system note reports what happened to your own message; there is nobody to reply to "
                     "(design §4.10)"
                 )
+            if not named and replied.answered:
+                # A reply to an *answered for you* FYI (§4.9b) — the Overrule path — goes to the
+                # asker with a copy to the answerer, on the question's own thread: the ordinary
+                # default below would send it to the answerer, who filed the FYI.
+                named = [str(replied.answered.get("asker") or "")]
+                overrule = str(replied.answered.get("answerer") or "")
             if not named:
                 if replied.from_ == PERSON and sender == PERSON:
                     raise RpcError(f"{reply_to} is a person's own message: name the addressee")
@@ -2354,6 +2394,8 @@ class HostAgent:
             # copies — a copy that failed to land included, so the set is the one meant — and its
             # other addressees, so the other lead of a `conflict` sees how it was settled
             same_set = dict.fromkeys([*replied.copies, *replied.copies_failed, *replied.to, replied.from_])
+            if overrule:
+                same_set = {overrule: None}
             copies = [x for x in same_set if x not in (sender, PERSON, *named)]
         # -- a reply may *pick* one of the answers the entry it answers carries (§4.10, TD-070) ----
         # **The home checks it**: `answer` must index the `answers` of the entry `reply_to` names
@@ -2504,6 +2546,13 @@ class HostAgent:
                 held = sum(1 for e in self.person_inbox if e.from_ == sender and e.kind == "ask" and e.open)
                 if held >= mail.OPEN_ASK_ADVICE:
                     advice = f"you have {held} open asks to the person: is this one needed, or a steer?"
+        # -- answered from the record: the person is told (§4.9b *Everything answered for the person
+        # is told to the person*). A reply to the person needs no FYI — the person reads it. The FYI
+        # is a message to the person like any other, so a full person inbox refuses the reply rather
+        # than let an answer steer a team unseen.
+        fyi = bool(src) and replied is not None and PERSON not in named
+        if fyi:
+            self._check_person_depth(sender)
         if mail.MAILBOX_DEPTH is not None:
             for sid in named:
                 if sid != PERSON and records[sid].unread() >= mail.MAILBOX_DEPTH:
@@ -2520,6 +2569,7 @@ class HostAgent:
         )
         entry.cites = cited
         entry.default = line or None
+        entry.source = src
         entry.answers = list(picks)  # data the sender proposed, on the envelope (§4.10, TD-070)
         entry.answer = picked
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
@@ -2558,6 +2608,29 @@ class HostAgent:
                     for t in (self._pair(me, sid, now), self._pair(records[sid], sender, now)):
                         t.at.append(at)
                         t.count = len(t.at)  # the window's count, kept as a field so pruning cannot reset it
+        if overrule and sender == PERSON:
+            # An Overrule is work the person handed the asker (§4.9b, §4.8a *An alarm's answers*):
+            # it owes an outcome — on the asker's copy only, never the answerer's.
+            for e in records[named[0]].inbox if named[0] in records else []:
+                if e.id == mid:
+                    e.handed = True
+        fyi_id = None
+        if fyi and replied is not None:
+            fyi_id = "m-" + secrets.token_hex(6)
+            note = MailEntry(
+                id=fyi_id,
+                from_=sender,
+                to=[PERSON],
+                at=at,
+                kind="note",
+                text=text,
+                about=replied.about,
+                root=root,
+            )
+            note.team = entry.team
+            note.answered = {"question": replied.text, "asker": replied.from_, "answerer": sender, "source": src}
+            self.person_inbox.append(note)
+            self.person_store.save(self.person_inbox)
         if closes and replied is not None:
             self._mark(replied.id, closed_by=mid, closed_at=at, closed_reason="replied")
         if settle is not None:
@@ -2609,6 +2682,7 @@ class HostAgent:
             "copies_failed": failed,
             "forwarded": forwarded,
             "closed": replied.id if closes and replied is not None else None,
+            "answered_for_you": fyi_id,  # the FYI filed to the person for a reply with a source (§4.9b)
             # advice, not a refusal: the id comes back either way (design §4.10)
             "advice": advice,
         }

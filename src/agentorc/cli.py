@@ -1020,6 +1020,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "outcome": args.outcome,
         "for_": args.for_,
         "thread": args.thread,
+        # design §4.9b (TD-075): where a reply's answer is written down; the person is told of it
+        "source": args.source,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
 
@@ -1037,6 +1039,10 @@ def cmd_msg(args: argparse.Namespace) -> int:
             print(f'answered {e["answer"] + 1}: "{e["text"]}"')
         if got.get("advice"):  # one line from the home, not a refusal (design §4.10)
             print(got["advice"])
+        if e.get("source"):
+            print(f"source: {e['source']}")
+        if got.get("answered_for_you"):  # design §4.9b: the person sees every answer given from the record
+            print(f"the person is told: answered for you ({got['answered_for_you']})")
         if got.get("closed"):
             print(f"closed {got['closed']}")
         if got.get("copies"):
@@ -1132,6 +1138,11 @@ def cmd_inbox(args: argparse.Namespace) -> int:
                 print(f"  {line}")
             if e.get("default"):  # a steer says what it will do unless answered (design §4.10)
                 print(f"  default: {e['default']}")
+            if e.get("source"):  # answered from the record, and where (design §4.9b)
+                print(f"  source: {e['source']}")
+            if a := e.get("answered"):  # the person's FYI for such an answer (design §4.9b)
+                print(f"  answered for you — {a.get('asker')} asked: {str(a.get('question') or '')[:200]}")
+                print(f"  answered by {a.get('answerer')} from {a.get('source')}; a reply here goes to the asker")
             # design §4.10 *Suggested answers* (TD-070): an open question's answers, **numbered
             # from 1**, which is the number `ao msg --reply-to <id> --pick <n>` takes. The one that
             # is a `steer`'s default word for word is marked, since doing nothing takes it anyway.
@@ -1579,6 +1590,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--thread",
         metavar="ID",
         help="ask again on an answered question's thread: it lands with the thread above it and settles the first",
+    )
+    p.add_argument(
+        "--source",
+        metavar="WHERE",
+        help="a reply answered from the record: where it is written down (one line); the person is told (§4.9b)",
     )
     p.set_defaults(fn=cmd_msg)
 

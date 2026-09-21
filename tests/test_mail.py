@@ -1836,3 +1836,69 @@ async def test_the_debt_has_a_bound_of_its_own_and_is_never_pruned(agent, tmp_pa
         await person.call("close", id=worker)
         left = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
         assert left[owed[1]]["outcome"]["state"] == "asker_gone"
+
+
+async def test_an_answer_from_the_record_is_told_to_the_person_and_an_overrule_reaches_the_asker(
+    agent, tmp_path, monkeypatch
+):
+    """Design §4.9b (TD-075 step 2, the mail half). A reply with `--source` carries it, and the
+    home files the person an FYI **from the answerer** carrying `answered: {question, asker,
+    answerer, source}`. A person's reply to that FYI — Overrule — goes to the **asker** with a copy
+    to the answerer, on the question's own thread, and owes an outcome on the asker's copy only.
+    A reply to the person needs no FYI. `source` is one line on a reply by a session, and a full
+    person inbox refuses the reply rather than let the answer go unseen."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl")]
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, text="does step 3 wait for step 2?", kind="ask", about="TD-075"))["entry"]
+            got = await tc.call(
+                "msg", reply_to=q["id"], kind="reply", text="yes, it builds on it", source="TD-075 build order"
+            )
+            assert got["entry"]["source"] == "TD-075 build order" and got["delivered"] == [w]
+            fyi = [e for e in agent.person_inbox if e.id == got["answered_for_you"]]
+            assert fyi and fyi[0].from_ == tl and fyi[0].kind == "note" and fyi[0].text == "yes, it builds on it"
+            assert fyi[0].answered == {
+                "question": "does step 3 wait for step 2?",
+                "asker": w,
+                "answerer": tl,
+                "source": "TD-075 build order",
+            }
+            assert fyi[0].root == q["root"] and fyi[0].about == "TD-075"
+            assert (await wc.call("inbox"))["entries"][-1]["source"] == "TD-075 build order"
+
+            # Overrule: the person's reply to the FYI goes to the asker, copied to the answerer
+            over = await person.call("msg", reply_to=fyi[0].id, kind="reply", text="no — step 3 can start now")
+            assert over["delivered"] == [w] and over["copies"] == [tl]
+            assert over["entry"]["root"] == q["root"]
+            wrec, trec = agent.sessions[w], agent.sessions[tl]
+            assert [e.handed for e in wrec.inbox if e.id == over["entry"]["id"]] == [True]
+            assert [e.handed for e in trec.inbox if e.id == over["entry"]["id"]] == [False]
+            assert over["entry"]["id"] in wrec.owed() and over["entry"]["id"] not in trec.owed()
+
+            # a reply with no source files nothing; a reply *to the person* with one files nothing
+            q2 = (await wc.call("msg", to=tl, text="and step 4?", kind="ask"))["entry"]
+            assert (await tc.call("msg", reply_to=q2["id"], kind="reply", text="later"))["answered_for_you"] is None
+            ask = await person.call("msg", to=tl, text="which step are you on?", kind="ask")
+            n = len(agent.person_inbox)
+            r = await tc.call("msg", reply_to=ask["entry"]["id"], kind="reply", text="2", source="TD-075 status")
+            assert r["answered_for_you"] is None and len(agent.person_inbox) == n + 1  # just the reply itself
+
+            # `source` is one line, on a reply, by a session
+            for bad, why in (
+                ({"to": tl, "text": "x", "source": "design §4.9b"}, "--reply-to"),
+                ({"reply_to": q2["id"], "text": "x", "source": "a\nb"}, "one line"),
+                ({"reply_to": q2["id"], "text": "x", "source": "x" * 201}, "at most 200"),
+                ({"reply_to": q2["id"], "text": "x", "source": "   "}, "one line"),
+            ):
+                with pytest.raises(AgentError, match=why):
+                    await wc.call("msg", **bad) if "to" in bad else await tc.call("msg", **bad)
+            with pytest.raises(AgentError, match="needs no source"):
+                await person.call("msg", reply_to=q2["id"], text="x", source="me")
+
+            # a full person inbox refuses the answer rather than let it steer unseen
+            monkeypatch.setattr(mail, "PERSON_SENDER_DEPTH", 0)
+            q3 = (await wc.call("msg", to=tl, text="one more?", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match="person inbox"):
+                await tc.call("msg", reply_to=q3["id"], kind="reply", text="yes", source="design §4.9b")
+            assert not [e for e in agent.sessions[w].inbox if e.reply_to == q3["id"]]
