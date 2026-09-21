@@ -138,7 +138,7 @@ laptop browser ──https──▶ agentorc UI (one process on any host with `a
     and the line that switches to it (`ao focus ao-agentorc-tests-aotest`) as error data rather
     than prose to parse — the CLI prints that as its hint, the form draws a button from it. The New session form learns
     this as you type, like the directory occupancy check (§4.5a), and offers **Switch to**.
-  - the name is held by an **exited or closed** record → the new session **supersedes** it (**one exception, designed 2026-09-20 and not built: a holder a person *suspended* over an identity alarm refuses every session's `create` under its name, and only a person lifts it — §4.8a *An alarm's answers***): it
+  - the name is held by an **exited or closed** record → the new session **supersedes** it (**one exception, designed and built 2026-09-20, TD-077 a2: a holder a person *suspended* over an identity alarm refuses every session's `create` under its name, and only a person lifts it — §4.8a *An alarm's answers*. The name check answers `suspended` rather than `supersede`, so the form, `ao new` and `ao team start` all refuse without each knowing the rule**): it
     takes the id, the old record is **replaced in place** by it (so the card becomes the new
     session rather than going and coming back, and a start that fails leaves the old record
     standing), its run log is kept and linked from the new record as *previous run* (a new
@@ -2023,7 +2023,7 @@ answer to the alarm.
   the session is live, **Suspend**. **The host's own row has Dismiss and nothing else**: it is
   about no record, so there is no session to open, to stop, or to answer for it. The host
   agent's log keeps the alarm whatever is pressed.
-- **Suspend** stops the session now and keeps it stopped. `suspend` (a person's only) marks
+- **Suspend** stops the session now and keeps it stopped (**built 2026-09-20, TD-077 a2**; the control is the page's half). `suspend` (a person's only) marks
   the record `suspended: {at, by, why}` — `why` being the newest alarm in words — and then
   kills it as `ao kill` does: no wrap-up, because a session under suspicion is not asked to
   tidy, and nothing is lost by that — the worktree, the conversation and the run log are kept,
@@ -2034,8 +2034,19 @@ answer to the alarm.
   person's own create at a node whose link is down (§4.4a) never passes the home's gate — but
   that is a person, who may lift a suspension anyway; no *session* there can create at all
   without the home, so the mark holds against everything it is meant to stop. **A suspension is lifted only by a
-  person**: a person's own resume of that conversation, or a person's **Forget** of the record
-  (the log keeps the alarms either way). Until then every road a session has to bring it back
+  person**: a person's own resume of that conversation — under its old name or another, and
+  either way the mark is gone — or a person's **Forget** of the record (the log keeps the alarms
+  either way). **All three roads are a person's**: `create` under the name, `create --resume` of
+  the conversation, and **`remove`** — which the acting gate would otherwise let a controller
+  walk for an `unattended` member, freeing the name and letting the suspect be started again
+  unmarked (review of PR #301; §9 invariant 5 shields only a person's own interactive session).
+  **There is no `unsuspend`**, deliberately: the roads out already exist and each is refused to
+  every session while the mark stands, so a verb to clear it would be one more road and a weaker
+  one — the point of the mark is that only a person walks past it, by doing the thing they would
+  do anyway. **The mark is written before the kill and stays if the kill fails** — they are not
+  one act and cannot be, since the kill may be a call over a link that is down. *Marked but
+  running* is the safer half to be left holding, and the person is told in those words: no
+  session can restart it, and the suspension can be taken again when the host answers. Until then every road a session has to bring it back
   is closed: `create` under that name and `create --resume` of that conversation are refused
   to every session, naming the suspension — **the one exception to §4.1's rule that an exited
   holder is superseded**, and §4.1 says so — and **`ao team start` refuses the whole start and

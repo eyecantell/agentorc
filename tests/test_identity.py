@@ -12,10 +12,11 @@ import shlex
 import sys
 import textwrap
 
-from conftest import wait_for
+import pytest
+from conftest import wait_for, wait_state
 
 from sessionorc import identity, paths
-from sessionorc.client import LocalClient
+from sessionorc.client import AgentError, LocalClient
 from sessionorc.identity import Channel, Pane, Proc
 
 # -- a fabricated /proc ---------------------------------------------------------------------------
@@ -545,3 +546,103 @@ def test_a_nodes_session_alarms_reach_the_home_on_the_replica():
     here = Session(id="ao-x@node", name="x", kind="agent", adapter="shell", dir="/w", host="node")
     alarm = {"channel": "session ao-x", "claimed": "ao-y", "rpc": "msg", "count": 2, "at": "t0", "last": "t1"}
     assert apply_node(here, {"identity_alarms": [alarm]}).identity_alarms == [alarm]
+
+
+async def test_suspend_stops_a_session_and_keeps_it_stopped(agent, hookstub, tmp_path):
+    """§4.8a *An alarm's answers* → **Suspend** (TD-077 a2): a person stops a session under
+    suspicion at once — no wrap-up, a session under suspicion is not asked to tidy — and the
+    record wears `suspended: {at, by, why}`, the home's own field. Then every road a **session**
+    has to bring it back is closed: a create under its name and a resume of its conversation, the
+    one exception to §4.1's rule that an exited holder is superseded. A **person** walks either
+    road, and doing so is what lifts it."""
+    (tmp_path / "w").mkdir()
+    async with LocalClient() as person, LocalClient() as feeder:
+        # unattended, which is the class an identity alarm most often fires on — and the class
+        # invariant 5 does *not* shield from a controller's acts, so the suspension is what has
+        # to refuse them (review of PR #301)
+        s = await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True)
+        sid = s["id"]
+        await feeder.call("hook", session=sid, adapter_id="conv-77", state="idle")
+        await wait_state(person, sid, "idle")
+        agent._id_alarm({"channel": f"session {sid}", "claimed": "ao-b", "rpc": "msg"}, sid)
+
+        # a session cannot suspend — the mirror of `identity_ack`: one could stop its rival
+        async with LocalClient(caller="ao-somebody") as session:  # no grant is needed to be refused
+            with pytest.raises(AgentError, match="a person's own act"):
+                await session.call("suspend", id=sid)
+        assert (await person.call("get", id=sid))["suspended"] is None
+
+        got = await person.call("suspend", id=sid)
+        assert got["suspended"]["by"] == "person" and got["suspended"]["why"] == "ao-b"
+        assert got["state"] == "exited" and got["pane"] is False  # stopped as a kill stops it
+        assert (await person.call("get", id=sid))["identity_alarms"]  # the alarms stay: it is not an answer
+        assert (await person.call("inbox"))["trail"] == []  # a suspension ends no row, so it writes none
+
+        # both roads are refused to a session, by name and by conversation — under a caller that
+        # holds `control`, so the refusal it meets is the suspension's and not the create gate's
+        (tmp_path / "b").mkdir()
+        boss = (await person.call("create", name="b", dir=str(tmp_path / "b"), adapter="shell", argv=["bash"]))["id"]
+        await person.call("set_grants", id=boss, add=["control"])
+        async with LocalClient(caller=boss) as session:
+            with pytest.raises(AgentError, match="suspended by a person.*a create under that name"):
+                await session.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name)
+            with pytest.raises(AgentError, match="suspended by a person.*a resume of that conversation"):
+                await session.call("create", name="w2", dir=str(tmp_path), adapter=hookstub.name, resume="conv-77")
+        # and the name check says so in its own verdict, which is what `ao team start` reads
+        v = await person.call("name_check", dir=str(tmp_path / "w"), name="w")
+        assert v["verdict"] == "suspended" and "a person lifts it" in v["message"]
+
+        # twice is refused, and so is suspending what is already stopped
+        with pytest.raises(AgentError, match="already suspended"):
+            await person.call("suspend", id=sid)
+
+        # **Forget is the other road out, so it is a person's too** (review of PR #301): the
+        # acting gate would otherwise let a controller remove an unattended member's record,
+        # which frees the name and lets the suspect be started again, unmarked
+        await person.call("set_controllers", id=sid, add=[boss])
+        async with LocalClient(caller=boss) as session:
+            with pytest.raises(AgentError, match="suspended by a person.*forgetting it"):
+                await session.call("remove", id=sid)
+        assert (await person.call("get", id=sid))["suspended"]
+
+        # the person's own create under that name goes through, and takes the mark with it
+        again = await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name)
+        assert again["id"] == sid and again["suspended"] is None
+        for x in (sid, boss):
+            await person.call("kill", id=x)
+
+
+async def test_a_persons_resume_elsewhere_lifts_a_suspension_too(agent, hookstub, tmp_path):
+    """§4.8a: a suspension is lifted by *a person's own resume of that conversation* — under any
+    name, not only its old one. Resumed elsewhere the old record stays standing, so the mark has
+    to be cleared where the create is, or that name would read `suspended` for ever with nothing
+    left able to clear it (review of PR #301)."""
+    for d in ("a", "b"):
+        (tmp_path / d).mkdir()
+    async with LocalClient() as person, LocalClient() as feeder:
+        sid = (await person.call("create", name="a", dir=str(tmp_path / "a"), adapter=hookstub.name))["id"]
+        await feeder.call("hook", session=sid, adapter_id="conv-lift", state="idle")
+        await wait_state(person, sid, "idle")
+        await person.call("suspend", id=sid, why="claimed another session's id")
+        assert (await person.call("get", id=sid))["suspended"]
+        moved = await person.call(
+            "create", name="b", dir=str(tmp_path / "b"), adapter=hookstub.name, resume="conv-lift"
+        )
+        assert moved["id"] != sid and moved["suspended"] is None
+        # the old record is closed by the supersede, and its name is free again
+        old = await person.call("get", id=sid)
+        assert old["state"] == "closed" and old["suspended"] is None
+        assert (await person.call("name_check", dir=str(tmp_path / "a"), name="a"))["verdict"] == "supersede"
+        await person.call("kill", id=moved["id"])
+
+
+async def test_suspend_is_refused_on_a_record_that_is_already_stopped(agent, tmp_path):
+    """It is offered only while the session is live (§4.5a): a mark with no act to go with it
+    would say a person stopped something that had already stopped."""
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="q", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        await person.call("kill", id=sid)
+        await wait_state(person, sid, "exited")
+        with pytest.raises(AgentError, match="there is nothing to stop"):
+            await person.call("suspend", id=sid)
+        assert (await person.call("get", id=sid))["suspended"] is None

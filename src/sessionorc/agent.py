@@ -1172,7 +1172,17 @@ class HostAgent:
             # Refuse here; *take* the name below, once the launch has succeeded. Taking it kills a
             # pane, and a launch that then failed would have killed it for nothing (review).
             holder = await self._name_holder(directory, repo, name)
+            if isinstance(holder, Session):
+                self._refuse_suspended(holder, caller, "a create under that name")
             if resume:
+                for held in [r for r in self.sessions.values() if r.adapter_id == resume and r.suspended]:
+                    self._refuse_suspended(held, caller, "a resume of that conversation")
+                    # a person got past that line, which **is** the lift (§4.8a) — and it lifts
+                    # here rather than only in `_take_name`, because a resume under another name
+                    # leaves this record standing, and a mark nothing can clear would hold its
+                    # old name for ever (review of PR #301)
+                    held.suspended = None
+                    self._save(held)
                 for who in await asyncio.to_thread(self.conversation_holders, resume):
                     raise RpcError(f"conversation {resume} is still live in {who}; kill it first, or Switch to it")
             try:
@@ -1291,6 +1301,27 @@ class HostAgent:
                 "hint": f"switch to it with: ao focus {holder.id}",
             }
             return out, None
+        if holder.suspended:
+            # §4.8a *An alarm's answers*, TD-077 a2: **the one exception to §4.1's rule that an
+            # exited holder is superseded**. A verdict of its own rather than `supersede`, so the
+            # form, `ao new` and `ao team start` all refuse without each knowing the rule — which
+            # is what this function exists for. A person still may: `create` reads the caller, and
+            # their own resume is one of the two things that lift it (the other is Forget).
+            out |= {
+                "verdict": "suspended",
+                "holder": holder.id,
+                "holder_state": holder.state,
+                "message": (
+                    f"{name} was suspended by a person at {holder.suspended.get('at')} over an identity alarm "
+                    f"({holder.suspended.get('why') or 'no reason recorded'}) — no session may take that name; "
+                    "a person lifts it by resuming it themselves or forgetting it"
+                ),
+                "hint": f"look at it first: ao tail {holder.id}",
+            }
+            # the holder is returned all the same: a **person** may take this name, and `create`
+            # is where the caller is known — `_refuse_suspended` refuses a session there, and a
+            # person's create supersedes the record in place, which is what lifts the mark
+            return out, holder
         out |= {
             "verdict": "supersede",
             "holder": holder.id,
@@ -1298,6 +1329,22 @@ class HostAgent:
             "message": f"replaces the {holder.state} {name} — run log kept",
         }
         return out, holder
+
+    @staticmethod
+    def _refuse_suspended(s: Session, caller: Any, road: str) -> None:
+        """A suspended record is not brought back by a session (design §4.8a *An alarm's answers*,
+        TD-077 a2). Both roads are closed — `create` under its name, and `create --resume` of its
+        conversation — which is **the one exception to §4.1's rule that an exited holder is
+        superseded**, and §4.1 says so. A **person** walks either road freely: their own resume is
+        one of the two things that lift a suspension, the other being Forget."""
+        if not s.suspended or mail.is_person(caller):
+            return
+        mark = s.suspended
+        raise RpcError(
+            f"{s.name} was suspended by a person at {mark.get('at')} over an identity alarm "
+            f"({mark.get('why') or 'no reason recorded'}): {road} is refused to every session, and only a "
+            f"person lifts it — by resuming it themselves or forgetting it (design §4.8a)"
+        )
 
     async def _name_holder(self, directory: Path, repo: str | None, name: str) -> Session | str | None:
         """Raises for a **live** holder; otherwise returns what a new session would supersede — the
@@ -1531,10 +1578,15 @@ class HostAgent:
         await self._push_changes()  # the Focus terminal ends on this delta, not on a retry (TD-029)
         return s.view()
 
-    async def rpc_remove(self, id: str) -> None:
+    async def rpc_remove(self, id: str, caller: Any = None) -> None:
         s = self._get(id)
         if s.state not in ("exited", "closed"):
             raise RpcError(f"{id} is {s.state}; kill it first")
+        # **Forget is the other road out of a suspension** (design §4.8a, TD-077 a2), so it is a
+        # person's, as the resume is. The acting gate lets a controller remove an unattended
+        # member's record — which for a suspended one would free the name and let the very
+        # session under suspicion be started again, unmarked (review of PR #301).
+        self._refuse_suspended(s, caller, "forgetting it")
         # The dead pane is kept until now (exit code, last screen); without this it would be
         # re-adopted as a nameless shell on the next tick (first-use finding 2026-09-06).
         # one extra `list-panes -a` per remove, a person-driven action: accepted
@@ -4205,6 +4257,67 @@ class HostAgent:
         self._save(s)
         await self._push_changes()
         return {"id": s.id, "cleared": True, "alarms": []}
+
+    async def rpc_suspend(self, id: str, why: str | None = None, caller: Any = None) -> dict[str, Any]:
+        """**Suspend** a session over an identity alarm (design §4.8a *An alarm's answers*, §4.5a
+        **Inbox row: identity alarm**; TD-077 a2): stop it now and keep it stopped.
+
+        It marks the record `suspended: {at, by, why}` — `why` being the alarm in words unless the
+        person gives their own — and then kills it as `ao kill` does: **no wrap-up**, because a
+        session under suspicion is not asked to tidy, and nothing is lost by that — the worktree,
+        the conversation and the run log are kept, and whatever is unpushed shows under *Ready to
+        close* as it would after any kill.
+
+        **A person's only**, refused to every session exactly as `identity_ack` is and for the same
+        reason turned around: a session that could suspend could stop its rival. It is offered only
+        while the session is live; suspending what is already stopped would be a mark with no act.
+
+        **`suspended` is the home's field** (§9 invariant 15 — intent, like `controllers`), because
+        a `create` is gated at the home and that is where the mark is read. So a node's record is
+        marked *here* and only the `kill` is routed; the alarms stay the node's.
+
+        **There is no unsuspend.** §4.8a: a suspension is lifted only by a person's own resume of
+        that conversation or their **Forget** of the record — both of which already exist and both
+        of which are refused to every session while the mark stands (`_refuse_suspended`). A verb
+        to clear it would be a fourth road back, and the whole point of the mark is that there are
+        only the two a person walks themselves."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot suspend a session: it is a person's own act, in the Inbox "
+                "(design §4.8a) — a session that could suspend could stop its rival"
+            )
+        s = self._get(self._addr(id))
+        if s.suspended:
+            raise RpcError(f"{s.id} is already suspended (since {s.suspended.get('at')}): only a person lifts it")
+        if s.state in ("exited", "closed"):
+            raise RpcError(
+                f"{s.id} is {s.state} — there is nothing to stop; Forget it, or resume it, "
+                "which is what lifts a suspension anyway (design §4.8a)"
+            )
+        s.suspended = {"at": now_iso(), "by": PERSON, "why": str(why or _alarm_words(s))}
+        self._save(s)
+        # The mark is the home's and the kill is the pane's host's. A suspension ends no row, so
+        # nothing is written to the trail: the mark on the row and the card is its record (§4.8a).
+        #
+        # **The mark is written first, and it stays if the kill fails** (review of PR #301). The
+        # two are not one act and cannot be made one: the kill may be a call over a link that is
+        # down. Marked-but-running is the safer half to be left holding — no session can restart
+        # it, and the person is told in words that it is still running and why — where killed-but-
+        # unmarked would stop it and then let any session bring it straight back.
+        try:
+            if s.host != self.host:
+                await self._route_act("kill", {"id": self._address(s)}, None, s.host)
+            else:
+                await self.rpc_kill(s.id)
+        except RpcError as e:
+            await self._push_changes()
+            raise RpcError(
+                f"{s.id} is marked suspended — no session can take its name or resume it — but it could "
+                f"not be stopped: {e}. It is still running; suspend it again when {s.host} answers, or "
+                f"stop it there."
+            ) from None
+        await self._push_changes()
+        return self._view(self._get(self._addr(id)))
 
     async def rpc_identity(self) -> dict[str, Any]:
         """`ao identity` (design §4.8a): this host's mode, whether the detached-process check is on,

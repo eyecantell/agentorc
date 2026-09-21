@@ -31,12 +31,19 @@ STOP_TIMEOUT = 300.0  # the default wrap-up window (§4.9)
 
 
 class NamesHeld(teams.TeamError):
-    """§4.1's rule refused a start: one or more names are held by a live session. Nothing was
-    created — the whole start is off, so there is never half a team."""
+    """§4.1's rule refused a start: one or more names are held by a live session, or by a record a
+    person **suspended** over an identity alarm (§4.8a, TD-077 a2 — the same refusal, since the
+    answer is the same: that name is not this start's to take). Nothing was created — the whole
+    start is off, so there is never half a team."""
 
     def __init__(self, team: str, holders: list[dict[str, Any]]):
         self.team, self.holders = team, holders
-        names = "; ".join(f"{v['name']} is {v.get('holder_state', 'running')} as {v['holder']}" for v in holders)
+        names = "; ".join(
+            f"{v['name']} is suspended as {v['holder']} — a person lifts it"
+            if v.get("verdict") == "suspended"
+            else f"{v['name']} is {v.get('holder_state', 'running')} as {v['holder']}"
+            for v in holders
+        )
         super().__init__(f"team {team} was not started — {names}")
 
 
@@ -191,7 +198,7 @@ def start(
     held = [
         v
         for v in (call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on) for x in plan.launches)
-        if v.get("verdict") == "live"
+        if v.get("verdict") in ("live", "suspended")
     ]
     if held:
         raise NamesHeld(name, held)

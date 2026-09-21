@@ -132,6 +132,23 @@ def test_a_live_name_holder_aborts_the_whole_start_and_names_it(world, capsys):
     assert json.loads(capsys.readouterr().out)["holders"][0]["holder"] == "ao-agentorc-hunt"
 
 
+def test_a_suspended_holder_aborts_the_whole_start_too(world, capsys):
+    """§4.8a *An alarm's answers* (TD-077 a2): a record a person suspended over an identity alarm
+    refuses every session's create under its name — **the one exception to §4.1's rule that an
+    exited holder is superseded** — so `ao team start` refuses the **whole** start and names the
+    member, exactly as it does for a live holder (§4.9: there is never half a team). The person
+    who suspended it lifts it, forgets it, or takes it out of the team."""
+    tmp_path, state = world
+    state["verdicts"]["hunt"] = {
+        "name": "hunt", "verdict": "suspended", "holder": "ao-agentorc-hunt", "holder_state": "exited",
+        "message": "hunt was suspended by a person at 2026-09-20T23:00:00Z over an identity alarm",
+    }  # fmt: skip
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert not creates(state)  # not even the lead
+    err = capsys.readouterr().err
+    assert "was not started" in err and "hunt is suspended as ao-agentorc-hunt — a person lifts it" in err
+
+
 def test_an_exited_holder_is_superseded_and_the_start_goes_ahead(world):
     tmp_path, state = world
     state["verdicts"]["grind-1"] = {"name": "grind-1", "verdict": "supersede", "holder_state": "exited"}
