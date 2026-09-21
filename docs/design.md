@@ -2692,15 +2692,15 @@ and the four briefs; the word is no longer reserved (§4.8 *The names*). Nothing
 yet, and the preset brief says what to do when `ao` refuses a verb it names (`--source`,
 `--pass-up`, `ao inbox --sent`).
 
-- **The seat.** A team definition may carry **`techlead: {name, profile, brief, home}`** beside
+- **The seat.** A team definition may carry **`techlead: {name, profile, brief, home, context}`** beside
   `manager:` — optional, one per team, a session and never `person`. The preset **`techlead`**:
   brief `techlead.md`, no lane, **no grants**, icon `book`, label *Tech lead*. It carries the
   `team` badge, so every member may already message it and it them (§4.10 *sideways*) — no new
   mail edge. A member's and a manager's brief take **`{techlead}`** — the seat's session id,
   filled at launch as `{lane}` is, `none` where the team has none — and say: *a `steer`, and an
   `ask` that is about the work, go to `{techlead}`; with no techlead, to the person as now.*
-  As built: `techlead:` takes `name` (default `<team>-techlead`), `home`, `profile` and `brief`,
-  and nothing else — no `role:`, the seat is the role, and no `grants:`; `ao team start` creates
+  As built: `techlead:` takes `name` (default `<team>-techlead`), `home`, `profile`, `brief` and
+  `context` (the primer, below), and nothing else — no `role:`, the seat is the role, and no `grants:`; `ao team start` creates
   the manager, then the seat with `controllers: [manager]`, then the members, and fills
   `{techlead}` in every brief with the id the seat will take, worked out before anything starts
   (§4.1's `ao-<scope>-<name>`, `@<host>` for a team on another host) — should the seat come up
@@ -2760,14 +2760,16 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   below). It is **a manager's act, never the core's** (§4.9a): the host agent starts nothing
   and does not read `org.yml`. At wind-down the seat is closed by `ao team stop` with the rest,
   and a manager that winds down with `asks_waiting` > 0 says so on the board.
-- **Its standing context: a primer (2026-09-21, asked for by Paul; this repo's is built, the key
-  and the warning are not).** A techlead starts cold and sees only the asker's framing, and a
+- **Its standing context: a primer (2026-09-21, asked for by Paul; built 2026-09-21 — this
+  repo's primer, the key, `{context}` and the warning).** A techlead starts cold and sees only the asker's framing, and a
   design of this size cannot be read per fill — so without something standing it answers
   narrowly. The seat takes **`context: <path>`**, a file in the team's home checkout that the
-  techlead's brief names as its **first read** (`{context}`, filled at launch as `{lane}` is;
-  empty where there is none, and the brief then says to read the repo's own map — `CLAUDE.md`,
-  the design's headings — instead). `ao team start` **warns, and starts anyway**, when a
-  techlead seat has no `context:` or the file is missing. **It is an index, never a source**:
+  techlead's brief names as its **first read** (`{context}`, filled at launch as `{lane}` is and
+  as the path is written; `none` where there is none, and the brief then says to read the repo's
+  own map — `CLAUDE.md`, the design's headings — instead). `ao team start` **warns, and starts
+  anyway**, when a techlead seat has no `context:` or the file is not in its home checkout (not
+  looked for on another host when nothing here can read it); the Teams strip shows the same line
+  as a toast. **It is an index, never a source**:
   an answer's `--source` is the document the primer pointed to, read there; a primer is never
   cited, so a stale one can misdirect a search and cannot become an authority. What goes in:
   what the project is in a page; its parts and which depends on which; who may do what; how a

@@ -975,7 +975,33 @@ def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world
     assert all("techlead is `none`" in p["prompt"] for p in made)
 
 
-def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
+def test_a_techlead_seat_reads_its_primer_first_and_the_start_warns_without_one(world, capsys):
+    """TD-075 step 1b, design §4.9b *Its standing context*: `context:` on the seat is its primer —
+    a path in its home checkout, filled into the seat's brief as `{context}` — and `ao team start`
+    says so, and starts anyway, when the seat has none or the file is not there."""
+    tmp_path, state = world
+    primer = tmp_path / "agentorc" / "docs" / "primer.md"
+    primer.parent.mkdir(parents=True, exist_ok=True)
+    primer.write_text("# primer\n")
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", "context": "docs/primer.md"}
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    seat = next(p for p in creates(state) if p["role"] == "techlead")
+    assert "`docs/primer.md`" in seat["prompt"] and "{context}" not in seat["prompt"]
+    assert "primer" not in capsys.readouterr().err  # there, so nothing is said
+
+    for context, said in ((None, "has no `context:`"), ("docs/gone.md", "docs/gone.md is not in")):
+        doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao", **({"context": context} if context else {})}
+        (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+        state["sessions"].clear()
+        state["calls"].clear()
+        assert cli.main(["team", "start", "ao-grind"]) == 0  # said, and the team started
+        assert said in capsys.readouterr().err
+        assert [p["name"] for p in creates(state)] == ["orc-ao", "techlead-ao", "grind-1", "grind-2", "hunt"]
+        seat = next(p for p in creates(state) if p["role"] == "techlead")
+        assert f"`{context or 'none'}`" in seat["prompt"]  # as written; `none` sends it to the repo's map
+
     """TD-075 step 4, design §4.9b *A seat is empty or filled — never finished*: a team whose members
     all declared reads *wound down* although its techlead never did — the seat is known by the name
     its definition gives it, not by a role badge (§9 invariant 9). Without a seat, one member that
