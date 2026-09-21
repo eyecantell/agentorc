@@ -2789,6 +2789,71 @@ class HostAgent:
             self._save(r)
             self._poke_waits()
 
+    async def rpc_pass_up(
+        self, id: str, recommend: str, answers: list[str] | str | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """`ao msg --pass-up <id> --recommend "<line>" [--answer …]` (design §4.9b *Passing up
+        keeps the thread and the asker*, TD-075 step 3): the addressee of an open `ask` or `steer`
+        hands it to the person, once, with a recommendation.
+
+        The person inbox gets **the asker's own entry** — same id, same sender, kind, text, default
+        and bound (passing up buys no time) — so everything §4.10 already does with a reply follows
+        by itself: the person's reply goes to the asker, is copied to the passer (who is in the
+        entry's `to`), closes every copy, and the asker owes an outcome on it as on any question
+        the person answered. On that copy the passer's suggested answers are its `answers`, the
+        recommendation first, so the person's part is one press; the recommendation itself is
+        `recommend`, labelled as the passer's. Open to the entry's addressee only — a copy
+        recipient did not receive the question — and never to the person."""
+        if mail.is_person(caller):
+            raise RpcError("the person is the top of the ladder: there is nobody to pass a question up to (§4.9b)")
+        me = self._graph().get(self._addr(str(caller)))
+        if me is None:
+            raise RpcError(f"{caller} cannot pass anything up: this host agent has no record of it (design §4.10)")
+        held = [e for e in me.inbox if e.id == id]
+        if not held:
+            raise RpcError(f"{me.id} holds no entry {id}: pass up a question addressed to you (design §4.9b)")
+        e = held[0]
+        if e.kind not in ("ask", "steer"):
+            raise RpcError(f"{id} is a {e.kind}: only an ask or a steer is passed up (design §4.9b)")
+        if me.id not in e.to:
+            raise RpcError(f"{id} was copied to you, not addressed to you: its addressee passes it up (design §4.9b)")
+        if e.passed_up:
+            raise RpcError(f"{id} was passed up at {e.passed_up}: a question goes to the person once (design §4.9b)")
+        if not e.open:
+            raise RpcError(f"{id} is already closed ({e.closed_reason}): there is nothing to pass up (design §4.9b)")
+        if e.from_ == PERSON:
+            raise RpcError(f"{id} is the person's own question: answer it (design §4.9b)")
+        line = _clean(str(recommend or "").split("\n", 1)[0]).strip()[: mail.DEFAULT_CAP]
+        if not line:
+            raise RpcError('a question goes up with your recommendation: --recommend "<one line>" (design §4.9b)')
+        if answers is not None and not isinstance(answers, (str, list)):
+            raise RpcError("answers must be a list of lines (design §4.10)")
+        offered = [answers] if isinstance(answers, str) else list(answers or [])
+        if any(not isinstance(a, str) for a in offered) or len(offered) > mail.ANSWERS_MAX * 2:
+            raise RpcError("answers must be a list of at most four lines (design §4.10)")
+        picks: list[str] = []
+        for raw in [line, *offered]:  # the recommendation is the first suggested answer (§4.9b)
+            one = _clean_answer(raw)
+            if one and one not in picks:
+                picks.append(one)
+        if len(picks) > mail.ANSWERS_MAX:
+            raise RpcError(
+                f"a question carries at most four answers, the recommendation among them: {len(picks)} given "
+                "(design §4.10)"
+            )
+        self._check_person_depth(e.from_)  # it is the asker's question in the person inbox
+        at = now_iso()
+        rec = {"by": me.id, "text": line}
+        up = self._copy(e)
+        up.read_at = None
+        up.answers = picks
+        up.passed_up, up.recommend = at, rec
+        self._mark(id, passed_up=at, recommend=rec)  # every copy says it went up, and with what
+        self.person_inbox.append(up)
+        self.person_store.save(self.person_inbox)
+        await self._push_changes()
+        return {"id": PERSON, "msg": id, "passed_up": at, "recommend": rec, "answers": picks}
+
     async def rpc_inbox(self, id: str | None = None, unread: bool = False, caller: Any = None) -> dict[str, Any]:
         """`ao inbox [--unread]` (design §4.10): a session reads its own inbox and nobody else's;
         that read — and nothing else — sets `read_at` (lifecycle stage 2: delivered into a turn).

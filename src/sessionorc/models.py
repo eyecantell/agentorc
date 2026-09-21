@@ -283,6 +283,14 @@ class MailEntry:
     # asker's outbox — so work that travels the other way had no debt at all. `identity_log` is
     # its first and only writer; nothing else sets it until a design says so.
     handed: bool = False
+    # Passed up (design §4.9b *Passing up keeps the thread and the asker*, TD-075 step 3): when the
+    # addressee of an open `ask` or `steer` handed it to the person — once — with its own
+    # recommendation. `passed_up` is the time, written on every copy; `recommend` is `{by, text}`,
+    # the passer's one line, drawn as text and labelled as the passer's, never the asker's. The
+    # person-inbox copy carries the passer's suggested answers as its `answers`, the recommendation
+    # first; the asker's and the passer's copies keep their own.
+    passed_up: str | None = None
+    recommend: dict[str, str] | None = None
 
     def __post_init__(self) -> None:
         self.root = self.root or self.id  # a message replying to nothing is its own thread's root
@@ -306,7 +314,7 @@ class MailEntry:
         if self.handed:
             return self.from_ == PERSON and not self.outcome
         return (
-            PERSON in self.to
+            (PERSON in self.to or bool(self.passed_up))  # a question passed up is the person's to answer (§4.9b)
             and self.kind in ASK_KINDS
             and self.closed_reason in ("replied", "go_with_it")
             and not self.outcome
@@ -680,7 +688,9 @@ class Session:
         lives in its **inbox**. One number, because `ao progress none`, `ao progress restart`,
         `mail.owed` and *Ready to close* all read this and none of them cares which direction the
         work came from."""
-        return [e.id for e in self.outbox if e.owes] + [e.id for e in self.inbox if e.owes]
+        # the inbox half is handed work alone: a question passed up owes on the **asker's** outbox
+        # copy, never on the copy the passer holds (§4.9b)
+        return [e.id for e in self.outbox if e.owes] + [e.id for e in self.inbox if e.handed and e.owes]
 
     def wake_budget_spent(self) -> bool:
         """Exhaustion is visible (design §4.10): on the record, and so on the card and every `ao`

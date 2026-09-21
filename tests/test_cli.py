@@ -1481,3 +1481,32 @@ def test_progress_restart_is_the_third_ending(subprocess_agent, tmp_path, capsys
     except AgentError as e:
         assert "only" in str(e) and "own word" in str(e)
     call_sync("kill", id=sid)
+
+
+def test_msg_pass_up_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-075 step 3 (design §4.9b): `ao msg --pass-up <id> --recommend "<line>"` hands a question
+    to the person with the recommendation first among its answers; it takes no text and needs the
+    recommendation; the person's `ao inbox` shows the asker's question, labelled as passed up by
+    the passer with its recommendation, and numbers the answers for `--pick`."""
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    asker = call_sync("create", name="up-asker", dir=str(tmp_path / "a"), adapter="shell", team="up-t")["id"]
+    passer = call_sync("create", name="up-passer", dir=str(tmp_path / "b"), adapter="shell", team="up-t")["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", asker)
+    assert cli.main(["--json", "msg", passer, "delete the old branch?", "--kind", "ask"]) == 0
+    q = json.loads(capsys.readouterr().out)["entry"]
+    monkeypatch.setenv("AGENTORC_SESSION", passer)
+    assert cli.main(["msg", "--pass-up", q["id"], "some text"]) == 2
+    assert "leave the text out" in capsys.readouterr().err
+    assert cli.main(["msg", "--pass-up", q["id"]]) == 2
+    assert "--recommend" in capsys.readouterr().err
+    assert cli.main(["msg", "--pass-up", q["id"], "--recommend", "keep it", "--answer", "delete it"]) == 0
+    out = capsys.readouterr().out
+    assert f"{q['id']} passed up → person, recommending: keep it" in out and "  2. delete it" in out
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["inbox"]) == 0
+    out = capsys.readouterr().out
+    assert "delete the old branch?" in out and f"passed up by {passer}, who recommends: keep it" in out
+    assert "  1. keep it" in out and "  2. delete it" in out
+    for sid in (asker, passer):
+        call_sync("kill", id=sid)

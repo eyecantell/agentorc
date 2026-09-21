@@ -1836,3 +1836,64 @@ async def test_the_debt_has_a_bound_of_its_own_and_is_never_pruned(agent, tmp_pa
         await person.call("close", id=worker)
         left = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
         assert left[owed[1]]["outcome"]["state"] == "asker_gone"
+
+
+async def test_a_question_passed_up_reaches_the_person_as_the_askers_and_the_answer_goes_back(agent, tmp_path):
+    """Design §4.9b *Passing up keeps the thread and the asker* (TD-075 step 3). The addressee of an
+    open `ask` or `steer` passes it up once, with a recommendation: the person inbox holds the
+    asker's own entry — same id, sender, kind, default and bound — with the passer's answers, the
+    recommendation first, and `recommend` labelled as the passer's. The person's reply goes to the
+    asker, is copied to the passer, closes every copy, and the asker owes an outcome on it; the
+    passer owes nothing. Refused: a second time, a closed entry, a copy recipient, a note, a person."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        w, tl, mgr = [await mk(n, team="ao-grind", unattended=True) for n in ("w", "tl", "mgr")]
+        await person.call("set_controllers", id=w, add=[mgr])
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc, LocalClient(caller=mgr) as mc:
+            st = await wc.call(
+                "msg", to=tl, text="rename the flag?", kind="steer", default="keep --pass-up", answers=["keep it"]
+            )
+            q = st["entry"]
+            got = await tc.call("pass_up", id=q["id"], recommend="rename it --escalate", answers=["keep --pass-up"])
+            assert got["answers"] == ["rename it --escalate", "keep --pass-up"]
+            up = [e for e in agent.person_inbox if e.id == q["id"]]
+            assert len(up) == 1 and up[0].from_ == w and up[0].kind == "steer" and up[0].text == "rename the flag?"
+            assert up[0].default == "keep --pass-up" and up[0].bound == q["bound"]  # passing up buys no time
+            assert up[0].answers == ["rename it --escalate", "keep --pass-up"] and up[0].read_at is None
+            assert up[0].recommend == {"by": tl, "text": "rename it --escalate"} and up[0].passed_up
+            # every copy says it went up; the asker's keeps its own answers
+            mine = [e for e in agent.sessions[w].outbox if e.id == q["id"]][0]
+            assert mine.passed_up and mine.answers == ["keep it"]
+
+            # once, and only by the addressee
+            with pytest.raises(AgentError, match="once"):
+                await tc.call("pass_up", id=q["id"], recommend="again")
+            with pytest.raises(AgentError, match="holds no entry"):
+                await wc.call("pass_up", id=q["id"], recommend="mine")
+            note = (await wc.call("msg", to=tl, text="fyi"))["entry"]
+            with pytest.raises(AgentError, match="only an ask or a steer"):
+                await tc.call("pass_up", id=note["id"], recommend="x")
+            ask2 = (await wc.call("msg", to=tl, text="?", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match="recommendation"):
+                await tc.call("pass_up", id=ask2["id"], recommend="  ")
+            await tc.call("msg", reply_to=ask2["id"], kind="reply", text="answered")
+            with pytest.raises(AgentError, match="already closed"):
+                await tc.call("pass_up", id=ask2["id"], recommend="late")
+            with pytest.raises(AgentError, match="top of the ladder"):
+                await person.call("pass_up", id=q["id"], recommend="x")
+            # a copy recipient did not receive the question: a manager's mail about its member is
+            # copied to the member's other controllers, and none of them may pass it up
+            await person.call("set_controllers", id=w, add=[tl])
+            about = (await mc.call("msg", to=w, text="which step?", kind="ask", about=w))["entry"]
+            assert tl in about["copies"]
+            with pytest.raises(AgentError, match="copied to you"):
+                await tc.call("pass_up", id=about["id"], recommend="x")
+
+            # the person picks the recommendation: to the asker, copied to the passer, closing it
+            r = await person.call("msg", reply_to=q["id"], kind="reply", text="rename it --escalate", answer=0)
+            assert r["delivered"] == [w] and r["copies"] == [tl] and r["closed"] == q["id"]
+            assert [e.closed_reason for e in agent.sessions[tl].inbox if e.id == q["id"]] == ["replied"]
+            assert q["id"] in agent.sessions[w].owed() and q["id"] not in agent.sessions[tl].owed()
+            # the asker settles it the ordinary way
+            await wc.call("msg", to="person", text="renamed, PR 1", outcome="done", for_=q["id"])
+            assert q["id"] not in agent.sessions[w].owed()

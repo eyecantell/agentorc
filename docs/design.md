@@ -2770,7 +2770,17 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   beside it, **labelled as the techlead's and drawn as text**. The person's reply goes **to the
   asker**, with a copy to the techlead; the asker's entry is answered by it, and the techlead's
   copy closes. One press for the person is the point: the recommendation's first suggested
-  answer is the recommendation.
+  answer is the recommendation. **As built (TD-075 step 3, the mail half, 2026-09-20):** the
+  `pass_up` RPC (a mail call, routed with `msg`) puts **the asker's own entry** — the same id,
+  sender, kind, text, default and bound — in the person inbox, so the person's ordinary reply does
+  the rest: it goes to the asker, is copied to the passer (in the entry's `to`), and closes every
+  copy. That copy's `answers` are the passer's, the recommendation first and no more than four in
+  all; the asker's and the passer's copies keep their own, and every copy gets `passed_up` and
+  `recommend: {by, text}`. A question passed up and answered **owes** on the asker's outbox copy
+  (`owes` reads `passed_up` as it reads the person in `to`), never on the passer's. Refused: a
+  copy recipient, a `note`, a closed entry, a second pass, the person's own question, a person
+  passing up, and a full person inbox (counted against the asker, whose question it is).
+  `ao inbox` prints *passed up by `<passer>`, who recommends: …*.
 - **Everything answered for the person is told to the person.** A reply that carries a
   **`source`** is one *answered from the record*, and the home files it to the person as an
   FYI: ***answered for you** — the question, the answer, the source, who asked and who
