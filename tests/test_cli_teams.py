@@ -973,3 +973,34 @@ def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world
     made = creates(state)
     assert "techlead" not in [p["role"] for p in made]
     assert all("techlead is `none`" in p["prompt"] for p in made)
+
+
+def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
+    """TD-075 step 4, design §4.9b *A seat is empty or filled — never finished*: a team whose members
+    all declared reads *wound down* although its techlead never did — the seat is known by the name
+    its definition gives it, not by a role badge (§9 invariant 9). Without a seat, one member that
+    never declared still means the team stopped for another reason."""
+    from agentorc import teamrun
+
+    tmp_path, state = world
+    done = {"at": "2026-09-21T06:00:00Z", "why": "nothing left"}
+    sessions = [
+        {"id": "a", "name": "grind-1", "team": "ao-grind", "state": "exited", "out_of_work": done},
+        {"id": "b", "name": "techlead-ao", "team": "ao-grind", "state": "exited", "out_of_work": None},
+    ]
+    assert teamrun.wound_down(sessions) is None
+    assert teamrun.wound_down(sessions, {"techlead-ao"}) == "2026-09-21T06:00:00Z"
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    org = cli._org_here(tmp_path / "agentorc")
+    (row,) = teamrun.rows(org, sessions)
+    assert row["wound_down"] == "2026-09-21T06:00:00Z" and row["techlead"] == "techlead-ao"
+    # a seat that came up suffixed (a stale tmux session held its id) is still the seat; a member
+    # whose definition name only looks like one is never taken for it (review of PR #350)
+    sessions[1]["name"] = "techlead-ao-2"
+    assert teamrun.rows(org, sessions)[0]["wound_down"] == "2026-09-21T06:00:00Z"
+    doc["teams"]["ao-grind"]["members"].append({"role": "grinder", "name": "techlead-ao-3", "home": "agentorc"})
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    org = cli._org_here(tmp_path / "agentorc")
+    assert teamrun.seat_names(org.teams["ao-grind"], [*sessions, {"name": "techlead-ao-3"}]) == {"techlead-ao-2"}
