@@ -141,3 +141,17 @@ def test_ensure_worktree_from_inside_a_worktree_and_without_origin(tmp_path):
     wt3 = ensure_worktree(repo, "pre-made")
     head = subprocess.run(["git", "-C", str(wt3), "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True)
     assert head.stdout.strip() == "pre-made"
+
+
+def test_git_info_names_the_commit_so_a_detached_head_can_be_named(tmp_path):
+    """Design §4.5 *The card's anatomy*, row 3 (TD-095): *detached at <short sha>* needs the commit;
+    a repo with no commit yet has none to name."""
+    repo = tmp_path / "r"
+    repo.mkdir()
+    run("git", "init", "-q", "-b", "main", cwd=repo)
+    assert git_info(repo).oid == ""  # `# branch.oid (initial)`
+    run("git", "-c", "user.email=t@t", "-c", "user.name=t", "commit", "-q", "--allow-empty", "-m", "a", cwd=repo)
+    sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=repo, capture_output=True, text=True).stdout.strip()
+    run("git", "checkout", "-q", "--detach", cwd=repo)
+    info = git_info(repo)
+    assert info.branch == "(detached)" and info.oid == sha
