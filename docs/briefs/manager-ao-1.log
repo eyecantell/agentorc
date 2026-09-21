@@ -28,3 +28,4 @@
 23:18  grinder-ao-2: idle 25 min with TD-076 open (#344 CI green, its CI watcher never returned) → one send --wait (the three words); 23:19 it merged #344 (cadence pass, review recorded) and declared out_of_work → finished
 23:20–23:33 quiet
 23:34  grinder-ao-1: working → cadence #345 (TD-075 step 1) pass, review recorded; now TD-075 step 2 (src/sessionorc, the anchor merges); grinder-ao-2: finished → nothing
+23:35–23:55 quiet (grinder-ao-1 note m-58731b035bfd: #346 TD-075 step 2 green + reviewed, waiting on the anchor since 05:46Z; it went on to step 3, #347 — not held)
