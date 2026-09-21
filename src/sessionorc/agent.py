@@ -394,7 +394,12 @@ class HostAgent:
         # as nothing at all. `_usage_wait` is the backoff a 429 sets and a success clears.
         self.usage_store = UsageStore()
         self._usage: dict[str, dict[str, Any]] = self.usage_store.load()
-        self._usage_checked: dict[str, float] = {}
+        # …and the **allowance** survives with it (anchor's read of PR #307): a held reading is as
+        # good as a poll made at its `fetched`, so the first poll after a promote waits until
+        # `fetched + USAGE_EVERY`, never sooner. A reading with no readable time is polled at once.
+        self._usage_checked: dict[str, float] = {
+            prof: mono for prof, r in self._usage.items() if (mono := _usage_checked_at(r)) is not None
+        }
         self._usage_wait: dict[str, float] = {}
         self._usage_task: asyncio.Task[None] | None = None
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
@@ -5109,6 +5114,17 @@ def _stop_time(value: str | None) -> str | None:
 
 def _parse(iso: str) -> datetime:
     return datetime.fromisoformat(iso.replace("Z", "+00:00"))
+
+
+def _usage_checked_at(reading: dict[str, Any]) -> float | None:
+    """The monotonic clock's reading when `reading` was fetched, for seeding `_usage_checked`, or
+    None when its `fetched` is not a time. A `fetched` in the future counts as now: a clock that
+    stepped back may delay one poll by a period, never bring it forward."""
+    try:
+        age = (datetime.now(UTC) - _parse(str(reading.get("fetched")))).total_seconds()
+    except (ValueError, TypeError):
+        return None
+    return time.monotonic() - max(age, 0.0)
 
 
 async def serve_until_signal(agent: HostAgent, sock: Path | None = None) -> None:

@@ -109,7 +109,8 @@ class UsageStore:
 
     In memory it was forgotten by every promote, and the agent then polled at once — eight
     promotes in one day against an endpoint that answers 429 — and the chip vanished each time
-    rather than going stale. Only a **reading** is kept: why the last poll failed is the running
+    rather than going stale. The agent seeds its first poll from the kept `fetched`, so a promote
+    keeps the allowance as well as the chip. Only a **reading** is kept: why the last poll failed is the running
     agent's business and means nothing after a restart. A missing or unreadable file is no
     readings, never a crash."""
 

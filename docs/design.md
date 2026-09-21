@@ -499,8 +499,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   reading**, with the reason beside it, so the chip goes stale rather than going out: a window
   does not change while we are refused, and *the chip went out* and *the allowance is spent* are
   different things to a person. The reading is **held across a restart** (`usage.json`) — it lived
-  in memory, so each promote forgot it and polled at once, eight times in one day — while the
-  reason is not, being the running agent's own business.
+  in memory, so each promote forgot it and polled at once, eight times in one day — and so is
+  the allowance: the first poll after a restart waits until the held reading's `fetched` plus the
+  cadence, never sooner. The reason is not held, being the running agent's own business.
 - Attachment drop: accept an uploaded file (the UI copies it over ssh) into
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file
