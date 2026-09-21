@@ -1879,7 +1879,7 @@ session would make every one of those lie. So:
   no second key**: what reads it is the Org page, which ships in the same install, and a brief
   reads `ao`'s output as a model does, not as a parser.
 - **After the one release** the two old words stop resolving and are **refused by name** — *`lead`
-  was renamed `manager` (TD-076)* — and that refusal stays: the word is never free to be taken.
+  was renamed `manager` (TD-076)* — and that refusal stays: the word is never free to be taken. That is **a second, small table — retired words, each with the word that replaced it** — beside the renamed-roles one, and it is where this rename parts from TD-055's, whose aliases are simply deleted when their release is over: `orchestrator` falling back to *unknown role* costs nothing, since nobody wants the word, while `lead` is wanted, and a word that is merely unknown is one a repo's `roles:` may define tomorrow. Until then the warning line names the rename that retired the word it was given — TD-076 for both, since `orchestrator` now resolves to `manager` because of it.
 - **`techlead` is reserved, not built.** TD-075 designs what it holds and may do; until then it
   is not a preset, and a repo or an org that defines a role of that name — or an `ao new --role
   techlead` — is refused with a line saying why, not as an unknown role, so the word cannot arrive in live data meaning something TD-075 then has to read
