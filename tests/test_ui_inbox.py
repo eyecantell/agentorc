@@ -2068,3 +2068,90 @@ def test_a_question_passed_up_reaches_the_page_as_the_askers_with_the_passers_re
     assert r.status_code == 200 and r.json()["delivered"] == [w]
     picked = [e for e in asyncio.run(_inbox_of(w)) if e["kind"] == "reply"]
     assert [(e["text"], e["answer"]) for e in picked] == [("keep the old name", 0)]
+
+
+# -- design §4.5a **team header** → *answered for you* count (§4.9b; TD-075, the page half) --------
+
+ANSWERED_PROBE = (
+    TERM_PROBE.split("const gone = ")[0]
+    + """
+const count = window.AO.answeredCounts;
+const marks = [
+  {team: "ao-grind", at: "2026-09-21T10:00:00Z"},
+  {team: "ao-grind", at: "2026-09-21T12:00:00Z"},
+  {team: "", at: "2026-09-21T12:30:00Z"},
+  {team: "other", at: "2026-09-21T09:00:00Z"},
+];
+console.log(JSON.stringify({
+  never: count(marks, ""),
+  since: count(marks, "2026-09-21T11:00:00Z"),
+  all_seen: count(marks, "2026-09-21T13:00:00Z"),
+  none: count(null, ""),
+}));
+"""
+)
+
+
+@pytest.mark.unit
+def test_the_answered_count_is_what_arrived_since_the_group_was_last_opened_per_team():
+    """§4.5a **team header**: *the number of answered-for-you entries from this team's sessions
+    since the person last opened that group*. The rule is pure (`AO.answeredCounts`), for the
+    reason `termClose` is: a rule inside a closure is a rule no test can call. Never opened, every
+    row counts; opened, only what is newer; per team, and a row with no team under ``."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "answered_probe.js"
+    probe.write_text(ANSWERED_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    assert got["never"] == {"ao-grind": 2, "": 1, "other": 1}
+    assert got["since"] == {"ao-grind": 1, "": 1}
+    assert got["all_seen"] == {} and got["none"] == {}
+
+
+@pytest.mark.unit
+def test_the_team_header_carries_the_answered_mark_as_a_mark_and_the_pages_fill_it():
+    """The header renders an empty, hidden `<span>` per team — never a button or a link — and the
+    poll fills it; the Inbox page records *last opened* only while the group is open and in view,
+    and the Org reads the poll at load so the mark does not wait a whole interval."""
+    from agentorc.ui.app import templates
+
+    head = templates.get_template("group_head.html")
+    html = head.render(g={"team": "ao-grind", "label": "ao-grind", "members": [], "live": 1})
+    mark = re.search(r'<span class="meta answeredmark hidden" data-answered-team="ao-grind"[^>]*></span>', html)
+    assert mark and "<button" not in mark.group(0) and "href" not in mark.group(0)
+    assert "data-answered-team" not in head.render(g={"team": "", "label": "", "members": [], "live": 1})
+    js = (UI / "static" / "app.js").read_text()
+    assert "syncAnsweredMarks();" in js.split("function syncTeams()")[1].split("\n  }\n")[0]
+    seen = js.split("function markAnsweredSeen()")[1].split("\n  }\n")[0]
+    assert "!sec.open" in seen and 'document.visibilityState === "hidden"' in seen
+    assert 'if (location.pathname !== "/inbox") AO.refreshInboxCount();' in js
+
+
+@pytest.mark.integration
+def test_the_poll_carries_each_answered_rows_team_and_time_and_nothing_it_says(client, tmp_path):
+    """`/api/person/inbox` gives `answered_marks` — the team and time of each *Answered for you*
+    row, and not its text: the browser counts, and the home keeps no read state for it."""
+    from sessionorc.client import LocalClient
+
+    async def setup():
+        async with LocalClient() as person:
+            ids = []
+            for n in ("askr3", "answr3"):
+                got = await person.call(
+                    "create", name=n, dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"], team="ao-t3"
+                )
+                ids.append(got["id"])
+        w, tl = ids
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, text="is it written down?", kind="ask"))["entry"]
+            r = await tc.call("msg", reply_to=q["id"], kind="reply", text="yes", source="design §4.9b")
+        return r["answered_for_you"]
+
+    fyi = asyncio.run(setup())
+    got = client.get("/api/person/inbox").json()
+    at = [e["at"] for e in got["entries"] if e["id"] == fyi][0]
+    assert got["answered_marks"] == [{"team": "ao-t3", "at": at}]
+    assert 'data-answered-team="ao-t3"' in client.get("/").text  # the team's header carries the mark
