@@ -147,6 +147,21 @@ the session dict, the tail lines, `{"ok": true, "id": …}` for calls that retur
 of prose (design §4.7). `ao --skill` prints the rules an agent driving `ao` from inside a session must
 follow; `ao --skill > .claude/skills/ao/SKILL.md` installs them in a repo (TD-019).
 
+## Stand up a team
+
+One command is the whole of it, and it is the same text for a person and for an agent:
+
+```
+ao team --skill
+```
+
+It prints the recipe — the node (if the team runs on one), the project and the team definition in
+`~/.agentorc/org.yml` or a repo's own `.agentorc.yml`, the roles and their briefs, and
+`ao team list / start / status / stop` — each step a command and what it does. It needs no host
+agent and no checkout of this repo, so it works inside a container node too. That is the source;
+this section is the pointer (TD-067). `ao --skill` is the other document and answers the other
+question: how to behave *inside* a session, once one is running.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

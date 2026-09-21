@@ -1,5 +1,11 @@
 # Briefs for unattended agentorc sessions
 
+> **Standing a team up is not here — run `ao team --skill`** (TD-067). That recipe covers the
+> project and team definition, the roles, and `ao team list / start / status / stop`, which is how
+> a set of sessions is started now. **This file is the one case it does not cover: a *single*
+> worker launched by hand with `ao new` — and the membership pitfall that comes with it**, which
+> is real for that path and only that path, because `ao team start` attaches every member itself.
+
 A brief is the opening prompt of an unattended worker. Launch one from the main checkout (the
 session gets its own worktree and branch, per design §4.5a, New session "Where: new worktree"):
 
@@ -14,9 +20,10 @@ in the brief before relaunching. The samscrape workers still run under samscrape
 
 `orchestrator-ao-1.md` is the first lead (design §4.8): a session holding the
 `control` grant that keeps the unattended workers going and runs the cadence check
-(`scripts/check_cadence.py`, cadence §4) on what they call done. Launch it **after** the workers,
-then attach it to them in the same step — see Membership below, which is the part that is easy to
-forget and looks like a broken lead when it is:
+(`scripts/check_cadence.py`, cadence §4) on what they call done. **By hand** — which is what this
+file is about — launch it **after** the workers and attach it to them in the same step; see
+Membership below, which is the part that is easy to forget and looks like a broken lead when it
+is. (`ao team start` does both for you, in the right order, and is the ordinary way in.)
 
 ```
 pdm run ao new -d ~/agentorc -w orchestrator-ao-1 --unattended -p grind --grant control --prompt "$(cat docs/briefs/orchestrator-ao-1.md)" orchestrator-ao-1

@@ -1236,12 +1236,37 @@ def skill_text() -> str:
     return resources.files("agentorc").joinpath("skill.md").read_text(encoding="utf-8")
 
 
+def team_skill_text() -> str:
+    """`ao team --skill` (TD-067): the recipe for **standing a team up**, where `ao --skill` is the
+    rules for behaving **inside** one. Two documents because they answer two questions and are read
+    by different people at different moments — and one command each, so Paul's cadence is
+    `ao team --skill` and *stand up a grind team for repo X* rather than *go and read design.md*.
+
+    It lives in the package beside `skill.md` for the same reason that one does: it has to print
+    anywhere `ao` runs, including inside a container node with no checkout of this repo, and a copy
+    under `docs/` would drift from it. The README points here; this is the source."""
+    return resources.files("agentorc").joinpath("team_skill.md").read_text(encoding="utf-8")
+
+
 class _SkillAction(argparse.Action):
     def __init__(self, option_strings, dest, **kw):  # noqa: ANN001 — argparse's Action signature
         super().__init__(option_strings, dest, nargs=0, **kw)
 
     def __call__(self, parser, namespace, values, option_string=None):  # noqa: ANN001
         print(skill_text(), end="")
+        parser.exit(0)
+
+
+class _TeamSkillAction(argparse.Action):
+    """`ao team --skill` (TD-067). An `argparse.Action` like `--skill`, so it prints and exits
+    **during parsing** — before `team`'s required `action` subcommand is demanded, which is what
+    lets `ao team --skill` stand alone, and without a host agent, exactly as `ao --skill` does."""
+
+    def __init__(self, option_strings, dest, **kw):  # noqa: ANN001
+        super().__init__(option_strings, dest, nargs=0, **kw)
+
+    def __call__(self, parser, namespace, values, option_string=None):  # noqa: ANN001
+        print(team_skill_text(), end="")
         parser.exit(0)
 
 
@@ -1332,6 +1357,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_roles)
 
     p = add("team", help="start, stop, inspect and list the team definitions of §4.9")
+    p.add_argument(
+        "--skill",
+        action=_TeamSkillAction,
+        help="print the recipe for standing a team up (Markdown; TD-067) — and exit, without an agent",
+    )
     tsub = p.add_subparsers(dest="action", required=True)
 
     def add_team(name: str, **kw: Any) -> argparse.ArgumentParser:

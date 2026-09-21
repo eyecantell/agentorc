@@ -755,3 +755,151 @@ def test_focus_on_a_container_nodes_session_runs_docker_exec_and_a_machine_nodes
     assert argv[9] == "=ao-repo-w:"
     assert cli.main(["focus", "ao-repo-l@laptop"]) == 1
     assert "runs on laptop: no terminal reaches it from here" in capsys.readouterr().err
+
+
+# ── `ao team --skill`: the recipe for standing a team up (TD-067) ────────────────────────────────
+
+
+@pytest.mark.unit
+def test_ao_team_skill_prints_the_recipe_without_an_agent_and_exits(capsys):
+    """TD-067: Paul's most likely cadence is telling a Claude session *stand up a grind team for
+    repo X*, and until now that session had to read design.md and guess. `ao team --skill` prints
+    the recipe and exits **during parsing** — so it needs no host agent, and no `action`, even
+    though `team`'s subcommand is `required=True`. That last part is the whole reason it is an
+    `argparse.Action` rather than a subcommand of its own."""
+    from agentorc import cli as climod
+
+    with pytest.raises(SystemExit) as e:
+        climod.main(["team", "--skill"])
+    assert e.value.code == 0
+    out = capsys.readouterr().out
+    assert out.startswith("---\nname: ao-team\n")  # front matter, as `ao --skill` has
+    # every command the recipe tells someone to run, and every key it tells them to write
+    for must in (
+        "ao team start",
+        "ao team status",
+        "ao team stop",
+        "ao team list",
+        "ao roles",
+        "ao host up",
+        "ao status -v",
+        "org.yml",
+        ".agentorc.yml",
+        "projects:",
+        "members:",
+        "lead: {role: person}",  # the form the loader accepts — the bare string is refused
+        "--close",
+    ):
+        assert must in out, must
+    # it is the other half of the pair, and says so rather than repeating it
+    assert "ao --skill" in out and "design §4.9" in out
+
+
+@pytest.mark.unit
+def test_the_recipe_ships_in_the_package_so_it_prints_where_there_is_no_checkout():
+    """It has to print inside a container node, which has no checkout of this repo — so it lives
+    beside `skill.md` in the package (`includes` in pyproject covers `src/agentorc`), and there is
+    **no copy under docs/** to drift from it. The README points at it instead."""
+    import pathlib
+
+    from agentorc.cli import team_skill_text
+
+    root = pathlib.Path(__file__).parents[1]
+    assert (root / "src/agentorc/team_skill.md").is_file()
+    assert not list((root / "docs").rglob("stand-up-a-team.md"))
+    assert team_skill_text() == (root / "src/agentorc/team_skill.md").read_text(encoding="utf-8")
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    assert "ao team --skill" in readme and "## Stand up a team" in readme
+    # and the older document says which one case it still owns
+    briefs = (root / "docs/briefs/README.md").read_text(encoding="utf-8")
+    assert "ao team --skill" in briefs and "launched by hand" in briefs
+
+
+@pytest.mark.unit
+def test_every_yaml_block_in_the_recipe_is_read_by_the_loader_it_claims(tmp_path, monkeypatch):
+    """The failure a guide dies of is a key that was never real. The recipe's `org.yml` block is
+    fed to the loader it names, and its `.agentorc.yml` block to `repoconfig`, so a key either
+    round-trips or this test says which one did not."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    import importlib
+
+    import yaml
+
+    from agentorc import org as orgmod
+    from agentorc import repoconfig
+
+    importlib.reload(orgmod)
+    org_yml = {
+        "projects": {"contractmatch": {"repos": {"contractmatch": {"kmaster": "~/contractmatch"}}}},
+        "teams": {
+            "cm-grind": {
+                "projects": ["contractmatch"],
+                "host": "contractmatch",
+                "lead": {"role": "lead", "name": "orchestrator-cm"},
+                "members": [{"role": "grinder", "count": 2, "name": "tdgrind-cm", "lane": "free-pick"}],
+            }
+        },
+    }
+    (tmp_path / "org.yml").write_text(yaml.safe_dump(org_yml))
+    org = orgmod.load()
+    team = org.teams["cm-grind"]
+    assert team.host == "contractmatch" and team.lead.name == "orchestrator-cm"
+    assert team.members[0].names() == ["tdgrind-cm-1", "tdgrind-cm-2"]  # the prefix rule the recipe states
+    assert org.checkout("contractmatch", "contractmatch", "kmaster") is not None
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / ".agentorc.yml").write_text(
+        "roles:\n"
+        "  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind, icon: wrench}\n"
+        "  lead: {brief: docs/briefs/lead.md, grants: [control]}\n"
+        "controllers: [orchestrator-cm]\n"
+        "ledger: docs/technical_debt.md\n"
+    )
+    cfg = repoconfig.discover(repo)
+    assert cfg.controllers == ["orchestrator-cm"] and cfg.ledger == "docs/technical_debt.md"
+    got = {r.name: r for r in repoconfig.roles(cfg)}
+    assert got["grinder"].profile == "grind" and got["grinder"].icon == "wrench"
+    assert got["lead"].grants == ["control"]
+    # and the built-in roles the recipe's table names all resolve
+    for name in ("lead", "grinder", "hunter", "plain"):
+        assert name in got, name
+
+
+@pytest.mark.unit
+def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_path, monkeypatch):
+    """The failure a guide dies of, second kind: a shape the **loader** accepts and the **planner**
+    refuses. `{team: other-team}` parses — `org.py` carries it in its own docstring example — and
+    `ao team list` shows it, so it reads as built; `teams.plan()` raises *is a nested team, which
+    is not built yet*. The first draft of this file told people to use it (fact-check of PR #302).
+
+    So the recipe is held to the planner as well as to the loader: it may not present a shape as
+    working unless `plan()` accepts it, and where it names one that does not work it must say so."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    import importlib
+
+    import yaml
+
+    from agentorc import org as orgmod
+    from agentorc import teams
+    from agentorc.cli import team_skill_text
+
+    importlib.reload(orgmod)
+    (tmp_path / "org.yml").write_text(
+        yaml.safe_dump({
+            "projects": {"p": {"repos": {"r": {"h": str(tmp_path)}}}},
+            "teams": {
+                "outer": {"projects": ["p"], "lead": {"role": "lead"}, "members": [{"team": "inner"}]},
+                "inner": {"projects": ["p"], "lead": {"role": "lead"}, "members": [{"role": "grinder"}]},
+            },
+        })
+    )  # fmt: skip
+    org = orgmod.load()
+    assert org.teams["outer"].members[0].team == "inner"  # the loader takes it…
+    with pytest.raises(teams.TeamError, match="is a nested team, which is not built yet"):
+        teams.plan(org, "outer", host="h")  # …and the planner does not
+
+    # so the recipe says exactly that, rather than presenting it as a feature
+    text = team_skill_text()
+    assert "{team: other-team}" in text and "refused at `start`" in text
+    assert "not\n  built" in text  # the sentence wraps in the file; the claim is what matters
