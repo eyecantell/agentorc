@@ -1836,3 +1836,46 @@ async def test_the_debt_has_a_bound_of_its_own_and_is_never_pruned(agent, tmp_pa
         await person.call("close", id=worker)
         left = {e["id"]: e for e in (await person.call("inbox"))["entries"]}
         assert left[owed[1]]["outcome"]["state"] == "asker_gone"
+
+
+async def test_asks_waiting_counts_open_questions_addressed_to_a_record_and_wakes_its_manager(
+    agent, tmp_path, start_wait
+):
+    """Design §4.9b (TD-075 step 4): `asks_waiting` is the number of open `ask`s and `steer`s
+    addressed to a record — never a copy's, never a note, never a closed one — on every view, and
+    in the wake digest, so a manager blocked in `wait` returns when a question lands on its techlead
+    seat. `inbox --sent` is a session's own outbox, marks nothing, and is nobody else's to read."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        mgr = await mk("mgr", team="ao-grind", unattended=True)
+        w, tl = [await mk(n, team="ao-grind", unattended=True, controllers=[mgr]) for n in ("w", "tl")]
+        async with LocalClient(caller=mgr) as mc:
+            await mc.call("wait", timeout=0)  # the cursor, so a member's change is a change
+        client, task = await start_wait(mgr)
+        async with LocalClient(caller=w) as wc, LocalClient(caller=tl) as tc:
+            q = (await wc.call("msg", to=tl, text="rebase or merge?", kind="ask"))["entry"]
+            got = await asyncio.wait_for(task, 10)
+            assert tl in [s["id"] for s in got["changed"]]
+            assert (await person.call("get", id=tl))["asks_waiting"] == 1
+            await wc.call("msg", to=tl, text="which base?", kind="steer", default="main")
+            await wc.call("msg", to=tl, text="fyi only")  # a note waits for nothing
+            assert (await person.call("get", id=tl))["asks_waiting"] == 2
+            # a copy is not addressed to it: mgr's ask about w is copied to w's other controllers
+            await person.call("set_controllers", id=w, add=[tl])
+            async with LocalClient(caller=mgr) as mc:
+                about = (await mc.call("msg", to=w, text="status?", kind="ask", about=w))["entry"]
+            assert tl in about["copies"] and (await person.call("get", id=tl))["asks_waiting"] == 2
+            await tc.call("msg", reply_to=q["id"], kind="reply", text="rebase")
+            assert (await person.call("get", id=tl))["asks_waiting"] == 1
+            # its own sent mail: the reply it just sent, nothing marked, nobody else's
+            sent = await tc.call("inbox", sent=True)
+            assert sent["sent"] and [e["reply_to"] for e in sent["entries"]] == [q["id"]]
+            with pytest.raises(AgentError, match="nobody reads another session's mail"):
+                await tc.call("inbox", sent=True, id=w)
+            assert [e["text"] for e in (await person.call("inbox", sent=True, id=w))["entries"]][:2] == [
+                "rebase or merge?",
+                "which base?",
+            ]
+            with pytest.raises(AgentError, match="keeps no sent list"):
+                await person.call("inbox", sent=True)
+        await client.__aexit__()

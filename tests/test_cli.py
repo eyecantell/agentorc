@@ -1481,3 +1481,22 @@ def test_progress_restart_is_the_third_ending(subprocess_agent, tmp_path, capsys
     except AgentError as e:
         assert "only" in str(e) and "own word" in str(e)
     call_sync("kill", id=sid)
+
+
+def test_inbox_sent_and_the_asks_waiting_line(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-075 step 4 (design §4.9b): `ao inbox --sent` prints this session's own sent mail, and
+    `ao status -v` prints `asks waiting: N` under a record with open questions addressed to it."""
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    asker = call_sync("create", name="aw-asker", dir=str(tmp_path / "a"), adapter="shell", team="aw-t")["id"]
+    seat = call_sync("create", name="aw-seat", dir=str(tmp_path / "b"), adapter="shell", team="aw-t")["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", asker)
+    assert cli.main(["msg", seat, "squash or rebase?", "--kind", "ask"]) == 0
+    capsys.readouterr()
+    assert cli.main(["inbox", "--sent"]) == 0
+    out = capsys.readouterr().out
+    assert f"{asker}: 1 sent" in out and f"→ {seat}" in out and "squash or rebase?" in out
+    assert cli.main(["status", "-v"]) == 0
+    assert "asks waiting: 1" in capsys.readouterr().out
+    for sid in (asker, seat):
+        call_sync("kill", id=sid)

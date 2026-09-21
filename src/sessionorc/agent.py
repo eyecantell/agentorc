@@ -2789,13 +2789,21 @@ class HostAgent:
             self._save(r)
             self._poke_waits()
 
-    async def rpc_inbox(self, id: str | None = None, unread: bool = False, caller: Any = None) -> dict[str, Any]:
+    async def rpc_inbox(
+        self, id: str | None = None, unread: bool = False, caller: Any = None, sent: bool = False
+    ) -> dict[str, Any]:
         """`ao inbox [--unread]` (design §4.10): a session reads its own inbox and nobody else's;
         that read — and nothing else — sets `read_at` (lifecycle stage 2: delivered into a turn).
         A person (no caller) reads any session's inbox, as the Inbox panel does, and sets nothing:
         a person is not the session. A person naming no session reads the org's person inbox, and
         that read sets nothing either. Each entry says whether its sender is one of the reader's
-        controllers, a person, or neither — the rule stated where the mail is read."""
+        controllers, a person, or neither — the rule stated where the mail is read.
+
+        `sent` (design §4.9b, TD-075 step 4) reads the **outbox** instead — a session's own, and a
+        person any session's, exactly as the inbox is read — and marks nothing: it is what the
+        session itself sent, so there is nothing to have read. The person inbox keeps no outbox."""
+        if sent:
+            return self._sent(id, caller)
         if mail.is_person(caller):
             if not id or id == PERSON:
                 held = [e for e in self.person_inbox if not (unread and e.read_at)]
@@ -2842,6 +2850,23 @@ class HostAgent:
             ],
             "threads": {k: t.to_dict() for k, t in s.threads.items()},
             "sends": [e.to_dict() for e in s.sends[-3:]],
+            "unread": s.unread(),
+        }
+
+    def _sent(self, id: str | None, caller: Any) -> dict[str, Any]:
+        if mail.is_person(caller):
+            if not id or id == PERSON:
+                raise RpcError("the person inbox keeps no sent list: name the session whose sent mail to read")
+            s = self._find(self._addr(id))
+        else:
+            me = self._addr(caller)
+            if id and self._addr(id) != me:
+                raise RpcError(f"{me} cannot read {id}'s sent mail: nobody reads another session's mail (design §4.10)")
+            s = self._find(me)
+        return {
+            "id": self._address(s),
+            "sent": True,
+            "entries": [e.to_dict() for e in s.outbox],
             "unread": s.unread(),
         }
 

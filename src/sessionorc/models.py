@@ -425,6 +425,9 @@ def wake_digest(session: dict[str, Any]) -> str:
     # closes the member and starts it again — so it is exactly the kind of change a wait is for
     rw = session.get("restart_wanted") or {}
     parts.append(f"restart_wanted={(rw.get('at'), rw.get('why'), rw.get('early'))!r}")
+    # a question landing on an empty techlead seat (§4.9b, TD-075 step 4): the manager fills it, so
+    # a manager blocked in `ao wait` returns on it — the count, never the text
+    parts.append(f"asks_waiting={session.get('asks_waiting')!r}")
     return "\n".join(parts)
 
 
@@ -654,11 +657,23 @@ class Session:
             d.pop("threads")
             d.pop("wakes")
         d["unread"] = self.unread()
+        d["asks_waiting"] = self.asks_waiting()
         d["mail"] = self.mail_marks()
         return d
 
     def unread(self) -> int:
         return sum(1 for e in self.inbox if not e.read_at)
+
+    def asks_waiting(self) -> int:
+        """Design §4.9b (TD-075 step 4): the open `ask`s and `steer`s **addressed** to this record —
+        a copy is not addressed to it — as a number and never their text, since nobody reads
+        another session's inbox. What a manager reads to fill an empty techlead seat; computed
+        here like `unread`, so every reader sees the same count."""
+        return sum(
+            1
+            for e in self.inbox
+            if e.open and e.kind in ("ask", "steer") and any(x.split("@", 1)[0] == self.id for x in e.to)
+        )
 
     def mail_marks(self) -> dict[str, Any]:
         """What a card and an `ao` reply say about this session's mail without a body: open `ask`s
