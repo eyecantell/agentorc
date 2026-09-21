@@ -260,6 +260,7 @@ State transitions (Claude Code adapter):
 | Hook event | State |
 |---|---|
 | `SessionStart`, `UserPromptSubmit`, `PreToolUse` | `working` |
+| `SessionStart` with `source: compact` (a compaction ends by firing it; a manual `/compact` fires nothing after) | no state change — the session is what it was, idle after a `/compact`, working mid-turn (TD-090) |
 | `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert (first-use finding 2026-09-06) |
 | `Stop` | `idle` |
@@ -2857,8 +2858,8 @@ The rules that bound both:
   wake.
 - **Hook-confirmed idle only.** Never on a scraped `idle` or on `stalled?`: a Remote Control
   takeover reads `stalled?` (§4.2), and a doorbell there types into a pane someone else is
-  driving. The known miss runs the other way — a `/compact` can leave a healthy idle session
-  reading `stalled?` (attention board, 2026-09-14) — so that session gets no doorbell; the line on
+  driving. The known miss runs the other way — a healthy idle session misread as `stalled?`
+  (a `/compact` did this until TD-090) gets no doorbell; the line on
   its next `ao` reply and its controller's own timer (§4.8, *silence is not an event*) are what
   reach it. The doorbell reduces how much a lead must poll; it does not replace the fallback timer.
 - **Never into a pane a person drives, nor one whose composer cannot be read.** A person's

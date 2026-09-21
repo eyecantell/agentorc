@@ -29,6 +29,10 @@ STATE_EVENTS = {
 }
 # SessionEnd reasons after which the process is still alive in the pane (a SessionStart follows).
 SESSION_END_STILL_RUNNING = {"clear", "resume"}
+# SessionStart sources that are not a start: a compaction ends by firing SessionStart again, and a
+# manual `/compact` fires nothing after it, so reading it as `working` left an idle session reading
+# `stalled?` at STALL_AFTER (TD-090). An auto-compaction mid-turn is already `working`.
+SESSION_START_NOT_A_START = {"compact"}
 
 # idle_prompt (Claude idle for a minute) is deliberately absent: an idle session waiting for you is
 # `idle`, the normal state, not an alert (design §4.2, first-use finding 2026-09-06).
@@ -78,6 +82,8 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
         if reason in SESSION_END_STILL_RUNNING:
             return None  # /clear or an in-session /resume: same process, new transcript coming
         return {**out, "state": "exited", "pending": None}
+    if ev == "SessionStart" and payload.get("source") in SESSION_START_NOT_A_START:
+        return out or None  # the session id and model still count; the state is what it was
     if ev == "SubagentStart":
         return {**out, "subagent_delta": 1}
     if ev == "SubagentStop":

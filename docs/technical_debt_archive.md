@@ -831,3 +831,14 @@ What had happened, as far as the anchor could establish: nothing was deleted —
 **Related:** TD-062 (why promotes restart the unit), TD-058 (the agent stops in a second with a `wait` blocked — the other half of the same restart), TD-052 (`wait` as an RPC).
 
 **Resolved:** 2026-09-20 (PRs #300, #303, #309) — (1) `client.wait_rpc` remakes a `wait` whose connection was made and then dropped, within a 30 s grace and on the caller's remaining timeout, and a reconnect decides no wake (#303; the remade count fixed to count connections, #309); (2) exit 3 asks again with one bounded `ping` and says *the host agent restarted under this command — run it again* when one answers, and the *start it with…* hint is printed only when nothing answers and the caller is not a session (#300); (3) `tests/test_agent_restart.py::test_a_wait_rides_out_a_restart_and_returns_the_change` restarts a private agent under a blocked wait. The lasting content is design §4.8 *Waking a lead* and `src/agentorc/skill.md`. The one half of (2) no CLI change can build — a session whose `AGENTORC_SESSION` is unset still gets the person's hint when no agent answers — is TD-089.
+
+## TD-090: A `/compact` leaves a healthy session reading `stalled?`
+
+**Priority:** Medium
+**Added:** 2026-09-20 (`tdgrind-ao-1`, from the attention board item of 2026-09-14, which said no ledger entry held it)
+**Status:** Resolved
+**Location:** `src/agentorc/adapters/claude_code/hook.py` (`translate`, `STATE_EVENTS`), design §4.2 (the Claude Code state table)
+
+**Why:** `translate()` mapped every `SessionStart` to `working`. Claude Code ends a compaction by firing `SessionStart` again with `source: "compact"`, and a manual `/compact` fires no `Stop` after it — so a session that was `idle` read `working`, and the liveness cross-check turned it `stalled?` at `STALL_AFTER` while it sat healthy at an empty prompt (seen live on `ao-agentorc-tdgrind-ao-1`, 2026-09-14). Auto-compaction is routine for long-running unattended workers, so every one of them would eventually read `stalled?`, and a doorbell (§4.10) is never rung at a `stalled?` session.
+
+**Resolved:** 2026-09-20 (PR below) — `SESSION_START_NOT_A_START = {"compact"}`: that `SessionStart` reports its session id and model and no state, so the session stays what it was — `idle` after a manual `/compact`, `working` through an auto-compaction mid-turn. Design §4.2's table carries the row. `tests/test_claude_adapter.py::test_a_compaction_is_not_a_start`. Live check pending on docs/user_attention.md (the board item it came from).
