@@ -1,4 +1,4 @@
-"""The `wait` RPC's pure half (design §4.8 "Waking a lead", TD-049; moved into the host agent by
+"""The `wait` RPC's pure half (design §4.8 "Waking a manager", TD-049; moved into the host agent by
 TD-052 step 3): which sessions a waiter watches, its per-caller cursor under `waits/`, and the
 snapshot comparison. The agent owns the blocking and the wake decision; this module owns what a
 wait compares, so it can be tested without a socket."""

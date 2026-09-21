@@ -3331,7 +3331,7 @@ class HostAgent:
             return True
         return _parse(since) + mail.MAIL_RETENTION > now
 
-    # -- waking (design §4.8 "Waking a lead", §4.10 "The host agent decides each wake") ----------
+    # -- waking (design §4.8 "Waking a manager", §4.10 "The host agent decides each wake") ----------
 
     async def rpc_wait(
         self, timeout: float = 600.0, scope: str = "controlled", only_host: str | None = None, caller: Any = None

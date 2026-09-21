@@ -145,8 +145,8 @@ class LocalClient:
 
 
 # How long a `wait` keeps trying to reconnect after the socket goes under it (design §4.8
-# *Waking a lead*, TD-086). A promote restarts `agentorc-agent` and the unit is back in seconds
-# (TD-062); eight promotes in one evening cost a lead its wake channel three times. Long enough
+# *Waking a manager*, TD-086). A promote restarts `agentorc-agent` and the unit is back in seconds
+# (TD-062); eight promotes in one evening cost a manager its wake channel three times. Long enough
 # for a restart under load, short enough that a real outage is still an error a person sees.
 RECONNECT_GRACE = 30.0
 RECONNECT_STEP = 0.25  # between attempts, so a restart that takes a moment is not a busy loop
