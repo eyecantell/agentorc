@@ -1096,17 +1096,26 @@ def test_the_focus_header_carries_the_out_of_work_chip_from_the_record(client, t
 
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "oow"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]
-    assert "out of work" not in client.get(f"/focus/{sid}").text
+
+    # From PR #323 the chip is **always in the Focus page and hidden until true**, so the header's
+    # render can bring it and take it away on a pushed delta without a reload; what the record
+    # decides is therefore whether it is *shown*, and that is what is asserted — not whether the
+    # words are in the page source.
+    def shown(page: str) -> bool:
+        chip = page.split('id="foow"')[0].rsplit("<span", 1)[-1]
+        return "hidden" not in chip
+
+    assert not shown(client.get(f"/focus/{sid}").text)
 
     why = "nothing open that this brief does not exclude"
     call_sync("progress", id=sid, status="none", why=why, caller=sid)
     page = client.get(f"/focus/{sid}").text
-    assert "out of work" in page and why in page
+    assert shown(page) and why in page
     assert "out of work" in client.get("/").text  # and the card on the Org page
 
     # a claim means it has work again — the record clears the declaration, and so does the header
     call_sync("progress", id=sid, ref="TD-053", status="claimed", caller=sid)
-    assert "out of work" not in client.get(f"/focus/{sid}").text
+    assert not shown(client.get(f"/focus/{sid}").text)
     call_sync("kill", id=sid)
 
 

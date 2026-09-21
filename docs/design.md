@@ -2506,7 +2506,7 @@ what each member looked for and did not find, taken from the `why` on each recor
 the point of the whole mechanism — the org has finished the work a person defined, and the next
 move is a person's.
 
-**A run that ends with work left (2026-09-20, TD-083; the declaration built 2026-09-21 by step 1, the briefs the same day by step 3 — in force from the next team start — and the chip still to come).** There is a third
+**A run that ends with work left (2026-09-20, TD-083; the declaration built 2026-09-21 by step 1, the briefs the same day by step 3 — in force from the next team start — and the chip by step 2).** There is a third
 ending this section did not have a word for. On 2026-09-20 a grinder ended its run *on purpose*
 after ten merged PRs — its context was long, the ledger still held entries it could pick, and it
 said, rightly, that a fresh start would do them better. It could say so only in prose. It was not

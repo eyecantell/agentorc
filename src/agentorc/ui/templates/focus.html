@@ -24,13 +24,18 @@
               title="when the agent asks this session to wrap up and then stops it — click to change it, empty to clear">{{ s.stop_note or "no stop time" }}</button>{% endif %}
       {# design §4.5a Focus header **out of work** chip (§4.9a, TD-053 step 6): the words, the
          reason on hover. Not a state — the session still reads `idle` or `exited`. #}
-      {% if s.out_of_work %}<span class="badge oow"
-            title="{{ s.out_of_work.why or 'no reason recorded' }}">out of work{% if s.out_of_work.age %} {{ s.out_of_work.age }}{% endif %}</span>{% endif %}
+      <span class="badge oow{% if not s.out_of_work %} hidden{% endif %}" id="foow"
+            title="{{ (s.out_of_work or {}).why or 'no reason recorded' }}">out of work{% if s.out_of_work and s.out_of_work.age %} {{ s.out_of_work.age }}{% endif %}</span>
       {# design §4.5a **restart wanted** (§4.9a, TD-083): the third ending, wherever the record is
          drawn. A mark, never pressable, and an **early** one says so — a controller does not act
-         on those, so a chip that read the same would promise a restart that is not coming. #}
-      {% if s.restart_wanted %}<span class="badge rw{% if s.restart_wanted.early %} early{% endif %}"
-            title="{{ s.restart_wanted.why or 'no reason recorded' }}{% if s.restart_wanted.early %} — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a){% endif %}">restart wanted{% if s.restart_wanted.early %} · early{% endif %}{% if s.restart_wanted.age %} {{ s.restart_wanted.age }}{% endif %}</span>{% endif %}
+         on those, so a chip that read the same would promise a restart that is not coming.
+         Both this and *out of work* are **always in the page and hidden until true**, and the
+         header's render keeps them current from the pushed delta — the shape `#fsuspended` has,
+         for the reason it has it: Focus re-renders its header in place rather than being replaced
+         whole like a card, so a server-rendered chip would go stale the moment a watched session
+         declared or cleared one (review of PR #323). #}
+      <span class="badge rw{% if s.restart_wanted and s.restart_wanted.early %} early{% endif %}{% if not s.restart_wanted %} hidden{% endif %}" id="frw"
+            title="{{ (s.restart_wanted or {}).why or 'no reason recorded' }}{% if s.restart_wanted and s.restart_wanted.early %} — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a){% endif %}">restart wanted{% if s.restart_wanted and s.restart_wanted.early %} · early{% endif %}{% if s.restart_wanted and s.restart_wanted.age %} {{ s.restart_wanted.age }}{% endif %}</span>
       {# design §4.8 `doing` (TD-074): what the session says it is doing, beside the other things it
          said about itself, always with its age. Its own words: shown, never acted on. #}
       {% if s.doing %}<span class="meta doing"

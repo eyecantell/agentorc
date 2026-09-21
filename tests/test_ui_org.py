@@ -336,6 +336,17 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
     assert ".badge.rw.early" in css  # …and it does not look the same
 
+    # on Focus both report-line marks are **always in the page, hidden until true**, and the header's
+    # render keeps them current: Focus re-renders its header in place rather than being replaced
+    # whole like a card, so a chip drawn only at load would go stale the moment a watched session
+    # declared a restart or claimed again (review of PR #323) — the `#fsuspended` shape
+    plain = focus.render(s={**view(base), "grants_all": [], "ready": []}, host="h", active="Org")
+    assert 'id="frw"' in plain and 'id="foow"' in plain
+    assert "badge rw hidden" in plain and "badge oow hidden" in plain  # present, not shown
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert 'rw.classList.toggle("hidden", !r);' in js and 'rw.classList.toggle("early", early);' in js
+    assert 'oow.classList.toggle("hidden", !o);' in js
+
     # a malformed record costs that card its chip and never the grid — the rule every chip here has
     for junk in ("nonsense", 7, [], {"why": "no at, so nothing was said"}):
         assert view({**base, "restart_wanted": junk})["restart_wanted"] is None, junk
