@@ -661,6 +661,31 @@
     refreshInbox();
   };
 
+  // design §4.5 *no silent failure path* / TD-029: **the terminal's two client rules, kept pure**,
+  // for the reason `maySwapSection` below is — a rule that lives inside a closure is a rule no test
+  // can reach, and TD-029's entry said for nine days that its client half could not be tested
+  // "because it is JavaScript, which this repo has no harness for". The harness is the node probe
+  // in `tests/test_ui_inbox.py`; what was missing was something for it to call.
+  //
+  // **The pane is gone for good.** `closed` or `pane: false` — from the record the page was drawn
+  // with, or from a pushed delta, which is authoritative and arrives before any reconnect could.
+  AO.paneIsGone = function (s) {
+    return !!s && (s.state === "closed" || s.pane === false);
+  };
+  // **What a closed terminal socket means**, and it is the whole of TD-029's loop: a connection the
+  // server accepts and then ends is *not* a working terminal, so the backoff must not reset here —
+  // it resets on the first byte of pane output and nowhere else. `4404` is the server saying the
+  // pane is gone, which is final and never retried. Everything else retries, with the delay
+  // doubling to a ceiling. `opened` is whether the socket ever opened: a 1006 before it did is a
+  // handshake that never reached the server, which is a different thing to say to a person.
+  AO.termClose = function (code, opened, delay) {
+    if (code === 4404) return { retry: false, final: true, delay, why: "no terminal for this session" };
+    const why = code === 1006 && !opened
+      ? "websocket handshake failed (code 1006) — does your route to the UI pass websockets? ssh -L does"
+      : `closed (code ${code})`;
+    return { retry: true, final: false, delay: Math.min(delay * 2, 10000), why };
+  };
+
   // Whether the poll may replace this section's rows now. It may not while the person is inside
   // them: an open Snooze menu would close under the press, and a swap would take the focus of
   // someone tabbing through a row's controls. Neither is worth a few seconds' freshness — the next
@@ -952,16 +977,15 @@
       ws.addEventListener("open", () => { opened = true; });
       ws.onclose = (e) => {
         if (paneGone) return;  // the push already ended it
-        if (e.code === 4404) { endTerm("no terminal for this session"); return; }  // final, no retry
-        // Say what happened: 1006 before open = the handshake never reached the server (a proxy or
-        // port forward that drops websockets is the usual cause); after open = the server closed.
-        const why = e.code === 1006 && !opened ? "websocket handshake failed (code 1006) — does your route to the UI pass websockets? ssh -L does"
-          : `closed (code ${e.code}${e.reason ? ", " + e.reason : ""})`;
+        // The rule is `AO.termClose` (above), so a test can reach it; this is what acts on it.
+        const v = AO.termClose(e.code, opened, delay);
+        if (v.final) { endTerm(v.why); return; }
+        const why = v.why + (e.reason && e.code !== 1006 ? ` — ${e.reason}` : "");
         term.write(`\r\n\x1b[90m[agentorc] terminal ${why} — retrying in ${Math.round(delay / 1000) || 1}s\x1b[0m\r\n`);
-        setTimeout(openTerm, delay); delay = Math.min(delay * 2, 10000);
+        setTimeout(openTerm, delay); delay = v.delay;
       };
     }
-    if (s.state === "closed" || s.pane === false) { paneGone = true; term.write("\x1b[90m[agentorc] this session's pane is gone (killed, closed, or the tmux server restarted).\x1b[0m\r\n"); }
+    if (AO.paneIsGone(s)) { paneGone = true; term.write("\x1b[90m[agentorc] this session's pane is gone (killed, closed, or the tmux server restarted).\x1b[0m\r\n"); }
     else openTerm();
     term.onData((d) => ws && ws.readyState === 1 && ws.send(d));
     // Copy / paste: Ctrl+C with a selection copies (no ^C), Ctrl+Shift+C copies, Ctrl+Shift+V and
@@ -1205,7 +1229,7 @@
       if (ev.event === "session" && ev.id === id) {
         // The pushed delta is authoritative and arrives before any reconnect (TD-029): a closed or
         // pane-less session ends the terminal here, rather than letting it discover it by retrying.
-        if (!paneGone && (ev.session.state === "closed" || ev.session.pane === false)) {
+        if (!paneGone && AO.paneIsGone(ev.session)) {
           endTerm("this session's pane is gone (see the banner).");
         }
         render(ev.session);
