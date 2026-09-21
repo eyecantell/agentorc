@@ -2045,6 +2045,19 @@ the socket to a child and exits must not become whatever reuses its pid). A conn
 
 The classification is the connection's for its life, and is never asked again.
 
+**With no host agent to ask** (TD-089, decided and built 2026-09-20). The one place the CLI has
+to tell a session from a person with nothing answering is exit 3: a person is told *start it
+with: agentorc-agent serve*, and a session, whose skill forbids exactly that, is told to stop.
+`AGENTORC_SESSION` answers it until something between the pane and `ao` scrubs the variable.
+Then the CLI walks its own `ppid` chain (the same 64-hop bound) and reads each ancestor's
+start-up environment, `/proc/<pid>/environ`. The launch sets the variable on the pane's first
+process, so a process under a pane has an ancestor that was started with it. The walk stops at
+init, at a process it may not read, and at a broken chain, and each of those means *no session*.
+It is not the channel's signal: the channel reads the pane pid the tick lists, and the CLI has
+no tick to ask. It is used for the sentence only, never as an identity, since a process can put
+any environment into its child's. A detached job that also shed its chain reads as a person and
+gets the person's sentence, and the skill's Never list still covers it.
+
 **The rule: the channel decides, and a claim that disagrees is never innocent.**
 
 | channel | `caller` sent | the request runs as | and |

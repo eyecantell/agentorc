@@ -1648,7 +1648,7 @@ def _unavailable(args: argparse.Namespace, e: AgentUnavailable) -> int:
     only then is there anything to start. **The hint is never printed to a session** whichever it
     is: a session is told to stop, in its skill's own words. The exit code is 3 either way, because
     what the caller could not do, it could not do."""
-    session = os.environ.get("AGENTORC_SESSION")
+    session = os.environ.get("AGENTORC_SESSION") or _session_by_ancestry()
     if _agent_answers():
         prose = "error: the host agent restarted under this command — run it again"
         return fail(args, str(e), 3, prose=prose, restarted=True)
@@ -1656,6 +1656,41 @@ def _unavailable(args: argparse.Namespace, e: AgentUnavailable) -> int:
         # `ao --skill`'s Never list, in its own words: a session never starts a host agent
         return fail(args, str(e), 3, hint="the host agent is down — stop here; a session never starts one")
     return fail(args, str(e), 3, hint="start it with: agentorc-agent serve")
+
+
+ANCESTRY_HOPS = 64  # the host agent's own bound on a `ppid` walk (design §4.8a)
+PROC = pathlib.Path("/proc")  # a test suite run from inside a pane points it elsewhere
+
+
+def _session_by_ancestry(proc: pathlib.Path | None = None, pid: int | None = None) -> str | None:
+    """The agentorc session this process runs inside, when its own `AGENTORC_SESSION` is gone — a
+    hook, a job that scrubbed its environment (TD-089, design §4.8a *With no host agent to ask*).
+    The launch sets the variable on the pane's first process, so every ancestor under the pane was
+    started with it: walk the `ppid` chain and read each one's start-up environment. It needs no
+    socket, which is the point — it is asked exactly when nothing answers on one.
+
+    It **only chooses which sentence exit 3 prints**; it is never an identity (a process can write
+    any environment it likes into a child's), so nothing is sent on its word. Linux's `/proc` only:
+    anywhere else, or on any read that fails, the answer is *no session*, which prints what a
+    person's terminal has always been told."""
+    proc = PROC if proc is None else proc
+    try:
+        pid = os.getpid() if pid is None else pid
+        for _ in range(ANCESTRY_HOPS):
+            stat = (proc / str(pid) / "stat").read_text()
+            pid = int(stat[stat.rindex(")") + 2 :].split()[1])  # field 4, after a `comm` that may hold spaces
+            if pid <= 1:
+                return None
+            try:
+                environ = (proc / str(pid) / "environ").read_bytes()
+            except OSError:  # another user's process (the tmux server's parent, init): the chain is not ours
+                return None
+            for kv in environ.split(b"\0"):
+                if kv.startswith(b"AGENTORC_SESSION=") and len(kv) > len(b"AGENTORC_SESSION="):
+                    return kv.split(b"=", 1)[1].decode(errors="replace")
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
 
 
 PROBE_TIMEOUT = 1.5  # seconds: long enough for a unit that is up, short enough to be no wait at all
