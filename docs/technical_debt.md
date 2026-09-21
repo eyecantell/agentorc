@@ -868,21 +868,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Related:** TD-053 (out of work, §4.9a — the declared case), TD-081 (a same-name start keeps the record's mail: a restart here must too), TD-026 (schedules), TD-076 (the manager's brief is rewritten by the rename).
 
 
-## TD-089: A session whose `AGENTORC_SESSION` is unset is told to start a host agent when none answers
-
-**Priority:** Low
-**Added:** 2026-09-20 (`tdgrind-ao-1`, the half of TD-086 item (2) that entry could not build)
-**Status:** Open — a design question, not a line of CLI
-**Location:** `src/agentorc/cli.py` (the exit-3 path and its *start it with: agentorc-agent serve* hint), design §4.8a (the session channel), `src/agentorc/skill.md`
-
-**Why:** TD-086 item (2) asked that the hint be printed **never to a session**, recognised by *`AGENTORC_SESSION` set, or a session channel*. The first signal is built (#300). The second is the host agent's own classification (§4.8a, by peer credentials and process ancestry), and it is unavailable in the one branch that prints the hint, because that branch is reached only when nothing is answering to be asked. So an `ao` run by a session with the variable unset — a reparented background job, a hook — still reads *start it with: agentorc-agent serve*, the one thing a session's skill forbids.
-
-**Fix:** give the CLI a signal that does not need the agent: e.g. the CLI walks its own ancestry for a tmux pane on an `ao-*` session, or the launch layer leaves a marker the CLI can read without a socket. Decide which in §4.8a; until then the skill's Never list is the guard.
-
-**Done when** an `ao` run from inside an agentorc session with `AGENTORC_SESSION` unset, against no host agent, is told to stop rather than to start one.
-
-**Related:** TD-086 (archive), design §4.8a, TD-077 (the same classification).
-
 ## TD-087: The usage chip is empty because the usage endpoint rate-limits us, and the adapter says nothing
 
 **Priority:** Medium
@@ -912,3 +897,18 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the trail says why a row ended for every ending the home can name, and *resolved* means only what the design says it means.
 
 **Related:** TD-079 (the trail), TD-078 (the same family of test: a wait bounded on something other than the thing waited for), design §4.10 rule 2.
+
+## TD-089: A session whose `AGENTORC_SESSION` is unset is told to start a host agent when none answers
+
+**Priority:** Low
+**Added:** 2026-09-20 (`tdgrind-ao-1`, the half of TD-086 item (2) that entry could not build)
+**Status:** Open — a design question, not a line of CLI
+**Location:** `src/agentorc/cli.py` (the exit-3 path and its *start it with: agentorc-agent serve* hint), design §4.8a (the session channel), `src/agentorc/skill.md`
+
+**Why:** TD-086 item (2) asked that the hint be printed **never to a session**, recognised by *`AGENTORC_SESSION` set, or a session channel*. The first signal is built (#300). The second is the host agent's own classification (§4.8a, by peer credentials and process ancestry), and it is unavailable in the one branch that prints the hint, because that branch is reached only when nothing is answering to be asked. So an `ao` run by a session with the variable unset — a reparented background job, a hook — still reads *start it with: agentorc-agent serve*, the one thing a session's skill forbids.
+
+**Fix:** give the CLI a signal that does not need the agent: e.g. the CLI walks its own ancestry for a tmux pane on an `ao-*` session, or the launch layer leaves a marker the CLI can read without a socket. Decide which in §4.8a; until then the skill's Never list is the guard.
+
+**Done when** an `ao` run from inside an agentorc session with `AGENTORC_SESSION` unset, against no host agent, is told to stop rather than to start one.
+
+**Related:** TD-086 (archive), design §4.8a, TD-077 (the same classification).
