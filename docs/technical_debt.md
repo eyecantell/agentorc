@@ -53,6 +53,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-088 | A row that ends because its session exited is trailed as *resolved*, and two trail tests raced the tick for it | Low | Partly done |
 | TD-091 | Nothing says how much context a session has left, or that it has just compacted | Low | Open |
 | TD-092 | Nothing reaches a person who is not looking at the page when a session needs them | Low | Open |
+| TD-093 | Who must look at a PR before it merges is a sentence in a brief and a message in an inbox, not something a team is configured with | Medium | Open |
+| TD-094 | `test_the_doorbell_rings_only_where_it_may` fails now and then on CI (3.13), on a six-second wait | Low | Open |
 
 ---
 
@@ -863,3 +865,31 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a session going `needs-you` while no page is open reaches the person once, and opening it lands on that row.
 
 **Related:** TD-069 (the Inbox), TD-003 (the phone layout), design §4.5.
+
+## TD-093: Who must look at a PR before it merges is a sentence in a brief and a message in an inbox
+
+**Priority:** Medium
+**Added:** 2026-09-21 (the anchor session; asked for by Paul the same day)
+**Status:** Open — **the rule is decided and in force by hand; the configuration is not designed.** Paul, 2026-09-21: *we might want a configuration to be able to require "techlead merges", so that Fable gets a look at PRs before they merged. We can use that cadence here in the meantime.* **In the meantime, in this repo:** every PR that touches `src/sessionorc` — and the repo's own briefs and `org.yml` — is read and merged by the anchor (the high-trust model), after the author's own independent review; a worker's PR of that kind stops at green CI plus its `cadence-review:` comment. Everything else a worker merges itself on a passing `scripts/check_cadence.py`.
+**Location:** design §4.9b (the techlead), §4.8 (role presets, grants), `.agentorc.yml` / the team definition, the briefs; `scripts/check_cadence.py` is a SYNCED file (dev-cadence) and is not edited here
+
+**Why:** the rule earns its keep — of the PRs held for the anchor's read on 2026-09-20/21, #301 (a node served `suspend` itself) and #318 (three findings, one of them a false sentence about a host's identity mode) had each already passed the author's cheaper-model review, and #307's review, which came twelve minutes after the anchor's read, did not find what that read had (a restart still polled at once). And the way the rule is carried fails in both directions. It lives in mail and in a brief's prose, so a worker that did not read its inbox between claim and merge merged a `src/sessionorc` PR itself (#343, the doorbell — whose test is TD-094); and it has **no answer to the reviewer being away**: the five PRs of TD-075's mail half sat green for eight hours overnight, the grinder ran out of other work, and the whole team wound down correctly with its work blocked on one reader (the manager said so on the board, twice). A rule that matters this much should be something a team is configured with, shown on the page, and honest about its queue.
+
+**What the design round has to settle:** (a) **where it is said** — a repo's `.agentorc.yml` (it is the repo's policy: *paths* → *who merges*) or the team definition (it is the team's seat that does it), and by path, by label, or for every PR; (b) **who the reader is** — §4.9b's techlead is started per batch and holds no grants, which fits a reader woken by a PR as it is woken by a question, but merging is an act on the repo, not on a session, so agentorc can *record and show* it and cannot enforce it: GitHub's branch protection and CODEOWNERS are where enforcement lives, and the design should say which half is ours; (c) **the queue is a first-class thing** — a PR waiting for its reader is a row somewhere a person sees (the Inbox's *Waiting on them*, the team header), with its age, and **a bound**: past it the PR goes to the person rather than idling a team; (d) **the author is not idle meanwhile** — what a worker may pick while its PR waits, and how stacked PRs are handled (the five above conflicted with each other in `models.py`, the tests and one ledger line, and the reader resolved them after the authors had gone); (e) the cadence check's `review` row is self-attested by the author — a second, reader's line is a change to dev-cadence, not to this repo.
+
+**Done when** the design says where the rule lives and what agentorc does and does not enforce, a team can be configured with it, the waiting PRs and their age are on the page, and a PR past its bound reaches the person.
+
+**Related:** TD-075 (the techlead — the natural reader), TD-083 (the ending that made the overnight stall a clean wind-down rather than a parked team), docs/cadence.md §4 (the independent review), the memory note *read-inbox-before-merging*.
+
+## TD-094: `test_the_doorbell_rings_only_where_it_may` fails now and then on CI
+
+**Priority:** Low
+**Added:** 2026-09-21 (the anchor session)
+**Status:** Open — seen three times on 2026-09-21, each on Python 3.13: on `main` at the merge of #346 and again at the merge of #353 (neither re-run), and on PR #348's branch after a merge of `main`, where the anchor re-ran the failed job and it passed — so that run now reads green in the history. It fails at `tests/test_doorbell.py:127`, `assert await wait_for(lambda: _has(agent, w, "SUBMITTED " + mail.unread_line(2)), timeout=6)` — a six-second wait for the second ring after the wrap-up flag clears. Not investigated: whether six seconds is simply too short on a loaded runner (the ring rides the tick and a quiet period) or the ring can be lost. The doorbell itself (PR #343, `src/sessionorc`) was merged by its author before the anchor read it and before its review comment was posted, so **the anchor's read of #343 is owed as well** — the same sitting as this flake.
+**Location:** `tests/test_doorbell.py`, the doorbell pass in `src/sessionorc/agent.py` (TD-052 step 7)
+
+**Why:** a test that fails one run in some number makes every red CI a question, and this one guards a thing that types into a session's pane.
+
+**Done when** the cause is known and either the wait is made to follow the mechanism (as TD-088 did for the trail tests, by driving the tick) or the lost ring is fixed; and #343 has had its read.
+
+**Related:** TD-052 (step 7), TD-078, TD-088 (the last two timing flakes and how they were fixed), TD-093.
