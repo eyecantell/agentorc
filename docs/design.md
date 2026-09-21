@@ -1192,7 +1192,7 @@ agent there.
 Screens:
 
 1. **Org** (home; named Herd, then Team, until the team definitions of §4.9 landed): a **card grid** (decision 2026-09-04, over a table — keeps each session's
-   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). What a card carries, and where, is *The card's anatomy*, below (being built from 2026-09-21 in slices, TD-095 — its entry says which have landed: the state colours and the six rows with the slot's order and the next act in the foot are built; the foot's quiet styling, the team header, `open_in:` and *mine* are not yet).
+   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). What a card carries, and where, is *The card's anatomy*, below (being built from 2026-09-21 in slices, TD-095 — its entry says which have landed: the state colours, the six rows with the slot's order, and the foot — the next act first, quiet — are built; the team header, `open_in:` and *mine* are not yet).
    The **more** menu holds Wrap up, Kill
    (confirms), Close (enabled only when Ready to close passes; a card that passes also shows it
    inline, see §4.2), Open shell here, Copy tmux command. A scraped state shows as a dashed pill outline.
