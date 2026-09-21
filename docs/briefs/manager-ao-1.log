@@ -55,3 +55,8 @@
 - Escalations: board #352 (four, then five, sessionorc PRs held in the anchor's merge queue), updated by #355 with the wind-down line (design §4.9a, TD-053 step 5 — not yet in docs/briefs/manager-ao-1.md; followed from the design). Notes to the person: m-3886780da9fe (#343 merged before evidence), one early merge-queue note.
 - Mechanical enough for a §6 policy: the restart rule (restart_wanted + idle + not early + not suspended + git clean → close and re-create with the same name/worktree/profile/brief, ceiling 3 in 2h) needed no judgement in three uses; so did "a PR merged before its cadence-review comment" — the host agent could refuse or flag a merge whose PR has no `cadence-review:` comment yet, which is what #343 lacked.
 - Open question for §4.8: `ao new` for a restart needed `--role/--team/--project/--lane/--controller` spelled out to keep the record's badges; an `ao restart <id>` (or `ao new --like <id>`) would make the rule one command.
+
+## Run of 2026-09-21
+
+08:22  inbox: note from the person (via the anchor) — #346–#349/#353 merged and promoted, TD-093 keeps the anchor's src/sessionorc review; a sessionorc PR waiting >2h gets an ask to the anchor as well as the board line → noted
+08:22  grinder-ao-1: working (created 14:21:59Z) → ok; grinder-ao-2: working (created 14:22:00Z) → ok; no open PRs; cadence changes all landed before both started → no relay
