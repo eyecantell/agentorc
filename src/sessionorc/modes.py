@@ -20,7 +20,10 @@ from typing import Any
 # that reason** (§4.8a, TD-077 a2, review of PR #301): served at the node it would kill the
 # session and mark the node's replica, and the home's next copy would wipe the mark — leaving a
 # session stopped, unmarked, and free for any session to start again under its name.
-HOME_EDITS = frozenset({"set_controllers", "set_grants", "set_stop", "set_mode", "suspend"})
+# **`identity_log`** likewise (review of PR #318): the message it sends is mail *from the person*,
+# its `handed` debt and its trail entry are the home's, and the graph it reads a controller from
+# is the home's — served at a node, all four would be written to the node's own store.
+HOME_EDITS = frozenset({"set_controllers", "set_grants", "set_stop", "set_mode", "suspend", "identity_log"})
 # The mailbox lives at the home (§4.4a: mail goes to one place). Reading it is refused with the
 # writes: an empty inbox would say *no mail*, and the truth is *not known from here*.
 # The person's own bookkeeping on that mailbox travels with it (§4.10, TD-069): the org's person

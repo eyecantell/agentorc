@@ -691,7 +691,8 @@ async def test_log_td_hands_an_alarm_to_the_session_that_answers_for_it(agent, h
         body = landed[0]["text"]
         assert "claimed: ao-b" in body and "rpc: msg" in body and "seen 3×" in body
         assert 'it said it was doing: "TD-431: reproducing the race"' in body
-        assert "identity off" in body  # which mode the host is in: observe records what enforce refuses
+        # which mode the alarm was raised under: observe records what enforce refuses
+        assert f"in identity {agent.identity_mode}" in body
 
         # **and it owes an outcome** — the debt the person handed on
         assert (await person.call("get", id=lead))["mail"]["owed"] == [got["entry"]]

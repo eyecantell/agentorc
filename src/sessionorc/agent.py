@@ -4295,6 +4295,10 @@ class HostAgent:
     def _id_alarm(self, entry: dict[str, Any], about: str | None) -> None:
         at = now_iso()
         log.warning("identity alarm (%s): %s claimed %r on %s", self.identity_mode, *entry.values())
+        # Each alarm carries the mode it was raised under (review of PR #318): the list is the
+        # raising host's, and a report the home composes for a node's record must say the node's
+        # mode — *observe* records what *enforce* would have refused — never the home's.
+        entry = {**entry, "mode": self.identity_mode}
         s = self.sessions.get(about) if about else None
         if s is None:
             # The host's own list follows the record's rule (§4.8a): a *new* alarm is written at
@@ -4400,9 +4404,14 @@ class HostAgent:
                 "controller, and this one has none — dismiss it, or suspend the session, or open it "
                 "(design §4.8a *An alarm's answers*)"
             )
-        sent = await self._msg(
-            PERSON, _alarm_report(s, self.identity_mode), [to["id"]], "note", None, None, None, None
-        )
+        if s.host != self.host:
+            # the clearing below is routed to the node, so the node must be there **before**
+            # anything is sent: a send that then failed to clear would leave the row standing, and
+            # the person's second press would hand the controller a second copy and a second debt
+            # (review of PR #318). Refused in words, nothing sent — the `_node_mux` refusal.
+            self._node_mux(s.host)
+        mode = None if s.host != self.host else self.identity_mode  # a node's mode is on its alarms
+        sent = await self._msg(PERSON, _alarm_report(s, mode), [to["id"]], "note", None, None, None, None)
         entry = sent.get("entry") or {}
         if mid := entry.get("id"):
             self._mark(mid, handed=True)  # the debt: it is work the person handed on (§4.10)
@@ -4978,22 +4987,26 @@ def _alarm_since(s: Session) -> str:
     return str(first.get("at") or first.get("first") or "")
 
 
-def _alarm_report(s: Session, mode: str) -> str:
+def _alarm_report(s: Session, mode: str | None) -> str:
     """The words **Log TD** hands on (design §4.8a *An alarm's answers*, TD-077 b). Composed by
     the home from the alarm's own fields and the record's, so nothing here is a model's prose
     being passed off as a report: the two lines a session wrote — its `doing` and its report
     line — are quoted as text and labelled, and everything else is a field.
 
-    It says which identity mode the host is in, because *observe* records what *enforce* would
-    have refused and a reader needs to know which they are looking at."""
+    It says which identity mode the alarm was raised under, because *observe* records what
+    *enforce* would have refused and a reader needs to know which they are looking at. That is
+    the mode on the alarm itself — the raising host's — and `mode` (this host's) only for a record
+    of this host whose alarm predates the field; for a node's record without it the clause is left
+    out rather than said with the home's mode under the node's name (review of PR #318)."""
     a = (s.identity_alarms or [{}])[0]
     n = len(s.identity_alarms or [])
+    mode = a.get("mode") or mode
     lines = [
         f"Identity alarm on {s.name} ({s.id}) — a request named this session and did not come from it.",
         f"channel: {a.get('channel') or 'unknown'} · claimed: {a.get('claimed') or 'unknown'} "
         f"· rpc: {a.get('rpc') or 'unknown'} · seen {a.get('count') or 1}×",
         f"first {a.get('first') or a.get('at') or 'unknown'} · last {a.get('last') or a.get('at') or 'unknown'}"
-        f" · host {s.host} is in identity {mode}",
+        + (f" · raised on {s.host} in identity {mode}" if mode else ""),
     ]
     if n > 1:
         lines.append(f"and {n - 1} more distinct claim{'' if n == 2 else 's'} on the same record.")

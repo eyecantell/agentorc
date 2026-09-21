@@ -2096,8 +2096,14 @@ answer to the alarm.
   created it (§4.8 *Create adds the creator*), which for a team's member is its manager (§4.9). `identity_log` (a person's only, gated as `identity_ack`
   is) sends that controller one message from the person, its text composed by the home from the
   alarm's own fields and the record's — channel, claim, RPC, count, first and last time, the
-  host's mode, the session's `doing` line and last report; **never from anything the session
+  mode **the alarm was raised under** (each alarm carries its raising host's mode, so a node's
+  record never reads the home's mode under the node's name), the session's `doing` line and last report; **never from anything the session
   wrote beyond those two capped lines, which are quoted as text** — asking for a ledger entry.
+  **It is the home's act wherever it is asked**, as `suspend` is: the mail, the debt and the trail
+  live at the home, so a node forwards it (and refuses it in words while the home is unreachable),
+  and a node's record has its alarms cleared at the node — which must be reachable **before**
+  anything is sent, or a failed clearing would leave the row up for a second press and a second
+  debt.
   **It owes an outcome, and that is new**: TD-079's debt exists today only on a session's own
   question to the person (`_owing_question` looks in the person inbox for an entry *from the
   caller*), so a piece of work the *person* hands a session has no debt to settle. The

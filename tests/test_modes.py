@@ -85,7 +85,8 @@ def test_a_session_acts_on_itself_and_on_nobody_else_and_creates_nothing():
 def test_home_owned_edits_the_mailbox_and_reports_are_refused_to_a_person_too():
     # `suspend` is here with them (§4.8a, TD-077 a2): the mark is a home-owned field, so a node
     # that served it would kill the session and write a mark the home's next copy wipes
-    for m in ("set_controllers", "set_grants", "set_stop", "set_mode", "suspend"):
+    # and `identity_log` (review of PR #318): its mail, its debt and its trail are the home's
+    for m in ("set_controllers", "set_grants", "set_stop", "set_mode", "suspend", "identity_log"):
         assert "waits for the link" in refusal(m, id="ao-x-w"), m
     for m in ("msg", "inbox", "inbox_delete"):
         assert "the mailbox is at the home" in refusal(m), m

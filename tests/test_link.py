@@ -1571,3 +1571,63 @@ async def test_log_td_on_a_nodes_record_clears_the_alarm_where_it_lives(home, ho
         await asyncio.sleep(FAST_TICK * 3)
         assert (await at_home(home, address))["identity_alarms"] == []
         assert trail == [] or all(e["how"] != "dismissed by you" for e in trail)
+
+
+async def test_log_td_says_the_nodes_mode_is_the_homes_act_at_a_node_and_sends_nothing_unreachable(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """The anchor's three findings on PR #318. (1) The report names the mode **the alarm was
+    raised under**, which is the node's, never the home's under the node's name — they differed
+    until 2026-09-21, and that is when the sentence matters. (2) Asked at a node, **Log TD** is
+    forwarded to the home (`modes.HOME_EDITS`): the mail, the debt and the trail are the home's.
+    (3) With the node unreachable it is refused **before** anything is sent: a send whose clearing
+    then failed would leave the row up, and a second press would hand a second copy and debt."""
+    async with LocalClient(sock=home.dir / "agent.sock") as h:
+        home_mode = (await h.call("identity"))["mode"]  # the home runs in its own process
+    node_mode = "observe" if home_mode != "observe" else "off"
+
+    async def handed(person, lead_addr):
+        return [e for e in (await person.call("inbox", id=lead_addr))["entries"] if e["from"] == "person"]
+
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        node.identity_mode = node_mode
+        async with LocalClient() as c:
+            lead = await c.call("create", name="l", dir=str(tmp_path), adapter="shell", argv=["bash"])
+            w = await c.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True)
+        address, lead_addr = f"{w['id']}@laptop", f"{lead['id']}@laptop"
+        await until(home, address, lambda v: v is not None and v["state"] != "unreachable")
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            await person.call("set_controllers", id=address, add=[lead_addr])
+        await until(home, address, lambda v: bool((v or {}).get("controllers")))
+
+        def raise_alarm(claimed):
+            node._id_alarm({"channel": f"session {w['id']}", "claimed": claimed, "rpc": "msg"}, w["id"])
+
+        # (1) asked at the home: the node's mode, from the alarm itself
+        raise_alarm("ao-b")
+        await until(home, address, lambda v: bool((v or {}).get("identity_alarms")))
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            await person.call("identity_log", id=address)
+            body = (await handed(person, lead_addr))[-1]["text"]
+        assert f"raised on laptop in identity {node_mode}" in body
+        assert f"identity {home_mode}" not in body
+
+        # (2) asked **at the node**: forwarded, and the mail and its debt land at the home
+        raise_alarm("ao-c")
+        await until(home, address, lambda v: bool((v or {}).get("identity_alarms")))
+        async with LocalClient() as at_node:  # a person at the node
+            got = await at_node.call("identity_log", id=w["id"])
+        assert got["filed"] is True
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            assert len(await handed(person, lead_addr)) == 2
+            assert got["entry"] in (await person.call("get", id=lead_addr))["mail"]["owed"]
+        assert node.sessions[w["id"]].identity_alarms == []
+
+        # (3) one more alarm, on the home's replica before the node goes away
+        raise_alarm("ao-d")
+        await until(home, address, lambda v: bool((v or {}).get("identity_alarms")))
+    await until(home, address, lambda v: v is not None and v["state"] == "unreachable")
+    async with LocalClient(sock=home.dir / "agent.sock") as person:
+        with pytest.raises(AgentError, match="unreachable"):
+            await person.call("identity_log", id=address)
+        assert len(await handed(person, lead_addr)) == 2  # nothing sent, so nothing to press twice
