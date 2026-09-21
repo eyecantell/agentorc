@@ -77,15 +77,16 @@
   }
   AO.act = act;
 
-  // vscode:// links: hand the URL to the protocol handler without navigating this tab away
-  // (a plain click replaced the Org with a blank page when the handler declined — first-use finding).
+  // the editor button (vscode://, or the person's own `open_in:` scheme, design §5): hand the URL to
+  // the protocol handler without navigating this tab away (a plain click replaced the Org with a
+  // blank page when the handler declined — first-use finding).
   document.addEventListener("click", (ev) => {
-    const a = ev.target.closest('a[href^="vscode://"]');
+    const a = ev.target.closest("a.editor");
     if (!a) return;
     ev.preventDefault();
     const f = document.createElement("iframe"); f.style.display = "none"; f.src = a.href;
     document.body.appendChild(f); setTimeout(() => f.remove(), 3000);
-    AO.toast("opening in VS Code…", true);
+    AO.toast(`opening in ${a.dataset.label || "the editor"}…`, true);
   });
 
   // design §4.5a **Message** / Focus Inbox **Reply** (§4.10): one composer for both, a <dialog>.

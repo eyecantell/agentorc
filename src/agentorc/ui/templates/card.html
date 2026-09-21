@@ -87,7 +87,8 @@
       <button class="btn sm next" data-act="close" data-id="{{ s.id }}">Close session</button>
     {% endif %}
     <a class="btn sm {{ 'next' if s.next_act in ('focus', 'details') else 'link' }}" href="/focus/{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
-    {% if s.vscode %}<a class="btn sm link" href="{{ s.vscode }}">‹› VS Code</a>{% endif %}
+    {# the editor button: the person's `open_in:` (design §5 *The person's own*) — its label is the person's text, escaped #}
+    {% if s.editor %}<a class="btn sm link editor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}
     <span class="grow"></span>
     <details class="more">
       <summary class="btn sm link" title="more">⋯</summary>

@@ -16,7 +16,7 @@ from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -34,6 +34,7 @@ from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
 from sessionorc.models import GRANTS, STATE_RANK, canonical_grants, has_control, report_head, report_line, stop_note
 
+from . import uiconf
 from .icons import role_svg
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 
@@ -278,17 +279,16 @@ def teams_view(sessions: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def vscode_url(directory: str) -> str:
-    """`vscode://vscode-remote/ssh-remote+<alias><path>` — the alias must be in the person's own
-    ~/.ssh/config (design §4.5) — or `vscode://file/…` when the UI runs where the person sits."""
+    """The VS Code link for a directory on this host — the default editor button's (design §4.5)."""
     h = hosts.local_host()
-    # Percent-encode the path: a space or `?` in a directory name would otherwise produce a URI the
-    # browser silently drops (TD-011). `/` stays, so the path reads as a path.
-    path = quote(directory, safe="/")
-    if h.local:
-        return f"vscode://file{path}?windowId=_blank"
-    # windowId=_blank: a new VS Code window. Without it the handler reuses the current window and
-    # replaces whatever it was showing (first-use finding 2026-09-06).
-    return f"vscode://vscode-remote/ssh-remote+{h.vscode_host}{path}?windowId=_blank"
+    return uiconf.vscode_link(directory, local=h.local, remote=h.vscode_host)
+
+
+def editor_link(directory: str, reach: str = "") -> dict[str, str] | None:
+    """The editor button for a directory on this host, from the person's `open_in:` (design §5 *The
+    person's own*, TD-095): `{label, url}`, or None for no button."""
+    h = hosts.local_host()
+    return uiconf.editor_link(directory, local=h.local, remote=h.vscode_host, reach=reach)
 
 
 # -- view model ------------------------------------------------------------------------------------
@@ -553,9 +553,11 @@ def view(
     hl = s.get("host_link") or {}
     sup = hl.get("supervisor") or {}
     d["host_note"] = sup.get("doing") or (hl.get("why", "") if state == "unreachable" else "")
-    # A container node's record reaches VS Code by attaching to that container (§4.4a "Reach"),
-    # from what the home derived when the node dialed in; any other host's record has no link.
-    d["vscode"] = vscode_url(s["dir"]) if s.get("dir") and here else (hl.get("reach") or {}).get("vscode", "")
+    # The editor button (§4.5a, §5 *The person's own*, TD-095): the person's `open_in:`. A container
+    # node's record reaches VS Code by attaching to that container (§4.4a "Reach"), from what the
+    # home derived when the node dialed in; any other host's record has no link.
+    reach = "" if here else str((hl.get("reach") or {}).get("vscode") or "")
+    d["editor"] = editor_link(str(s.get("dir") or ""), reach) if here or reach else None
     d["place"] = f"{d['host']} / {Path(s['repo']).name}" if s.get("repo") else f"{d['host']} / {s.get('dir', '')}"
     git = s.get("git") or {}
     where = s.get("dir", "")
@@ -1616,6 +1618,7 @@ def create_app() -> FastAPI:
                 "person_fyi": person_fyi,
                 "node_banner": node_banner(info),
                 "identity_note": identity_note(id_info),
+                "editor_note": uiconf.open_in().error,
             },
         )
 
