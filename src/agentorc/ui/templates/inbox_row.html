@@ -269,6 +269,9 @@
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
   {%- endif %}
   <span class="grow"></span>
+  {#- §4.8a (TD-077 a2): the **suspended** mark rides with the record wherever it is drawn, and
+      the Inbox's alarm row is where a person is most likely to be looking when it matters. -#}
+  {%- if e.suspended_note %} <span class="badge suspendedmark" title="{{ e.suspended_note }}">suspended</span>{% endif %}
   {%- if e.state_label %}<span class="pill s-{{ e.state_class }}{% if e.scraped %} scraped{% endif %}" title="{{ 'guessed from the screen' if e.scraped else 'reported by the tool' }} — the state, not a control">{{ e.state_label }}</span>{% endif %}
   {%- if e.at %} <span class="st age" data-since="{{ e.at }}">{{ e.age or '' }}</span>{% endif %}
 </div>

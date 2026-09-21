@@ -1591,3 +1591,63 @@ def test_a_one_press_resume_takes_the_name_back_and_the_old_record_keeps_its_pla
     # fail on the order they ran in.
     here = [x for x in client.get("/api/sessions").json() if x["dir"] == str(tmp_path)]
     assert [x["id"] for x in here] == [sid]
+
+
+# -- TD-077 (a2), the page side: the suspended mark, and the New session verdict ------------------
+
+
+@pytest.mark.unit
+def test_the_suspended_mark_is_drawn_wherever_the_record_is_and_is_never_a_control(tmp_path, monkeypatch):
+    """§4.8a *An alarm's answers*: a suspension **ends no row and so writes no trail**, which makes
+    this mark its only record on a page — if it is not drawn, nothing says it happened. So it is
+    drawn wherever the record is (the card, the Focus header, the Inbox's state row), it is flat
+    and never pressable, and its words carry the when, the who and the why on hover.
+
+    The two ways out are a person's **Resume** and **Forget**, which exist already — which is why
+    there is no Unsuspend anywhere here, and why this is a mark rather than a control."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    (tmp_path / "hosts.yml").write_text("local:\n  name: kmaster\n  local: true\n")
+    from agentorc.ui.app import suspended_note, templates, view
+
+    got = suspended_note({"at": "2026-09-20T22:00:00Z", "by": "person", "why": "claimed to be ao-y"})
+    assert "suspended at 2026-09-20T22:00:00Z by person" in got and "claimed to be ao-y" in got
+    assert "only a person lifts it" in got and "resuming it or forgetting it" in got
+    # tolerant, like every derived chip: a record from another build costs its card a mark, not the grid
+    assert suspended_note(None) == "" and suspended_note("nonsense") == "" and suspended_note([]) == ""
+    assert "no detail recorded" in suspended_note({})
+    assert "no reason recorded" in suspended_note({"at": "x"})
+
+    base = {"id": "ao-x", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
+            "state": "exited", "since": "2026-09-19T16:00:00Z", "confidence": "hook", "pane": False,
+            "tail": ["…"], "created": "2026-09-19T15:00:00Z"}  # fmt: skip
+    assert view(base)["suspended_note"] == ""
+    v = view({**base, "suspended": {"at": "2026-09-20T22:00:00Z", "by": "person", "why": "claimed to be ao-y"}})
+    assert v["suspended_note"]
+
+    card = templates.get_template("card.html").render(s=v)
+    focus = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")
+    row = rows("needs", [{"row": "alarm", "id": "ao-x:alarm", "sid": "ao-x", "name": "w", "alarms": [],
+                          "mode": "enforce", "at": "", "suspended_note": v["suspended_note"]}])  # fmt: skip
+    for where, html in (("card", card), ("focus", focus), ("inbox row", row)):
+        assert 'class="badge suspendedmark"' in html, where
+        assert ">suspended<" in html, where
+        assert "data-act" not in html.split("suspendedmark")[1].split("</span>")[0], where  # never a control
+    css = (UI / "static" / "app.css").read_text()
+    mark = next(ln for ln in css.splitlines() if ln.startswith(".badge.suspendedmark"))
+    assert "cursor: default" in mark  # flat: nothing to press, and nothing that looks pressable
+    js = (UI / "static" / "app.js").read_text()
+    assert "Unsuspend" not in js and "unsuspend" not in js  # Resume and Forget are the way out
+
+
+@pytest.mark.unit
+def test_the_new_session_form_says_a_suspended_name_is_a_lift_and_leaves_start_enabled():
+    """§4.8a: **a person's create is the lift**, so Start stays enabled where a `live` holder
+    disables it, and the form says what pressing it does. The agent's own sentence is printed as it
+    wrote it — the why, the when and the two ways out are all inside it, and a page that recomposed
+    them from parts is how two surfaces come to say different things about one record."""
+    js = (UI / "static" / "app.js").read_text()
+    block = js.split('if (o.verdict === "suspended")')[1].split("} else")[0]
+    assert "esc(o.message)" in block  # the agent's sentence, escaped, never rebuilt from fields
+    assert "lifts the suspension" in block and "Look at it first" in block
+    assert "start.disabled" not in block  # only `live` disables Start; this one is a person's act
+    assert 'start.disabled = o.verdict === "live";' in js  # …and that rule is untouched

@@ -417,6 +417,26 @@ def alarm_view(raw: Any) -> list[dict[str, Any]]:
     return out
 
 
+def suspended_note(raw: Any) -> str:
+    """The **suspended** mark's words, or "" (design §4.8a *An alarm's answers*, TD-077 a2).
+
+    A suspension **ends no row and so writes no trail**, which makes this mark its only record on
+    a page: if it is not drawn, nothing says it happened. So it is drawn wherever the record is —
+    and it is a *mark*, never a control, because the two things that lift it are a person's Resume
+    and Forget, both of which already exist and neither of which belongs on a badge.
+
+    Tolerant, like every other derived chip here: a record written by another build, or repaired by
+    hand, costs its card a mark and never the grid (the `_age` rule)."""
+    if not isinstance(raw, dict):
+        return ""
+    at, by, why = (str(raw.get(k) or "") for k in ("at", "by", "why"))
+    if not (at or by or why):
+        return "suspended by a person — no detail recorded"
+    bits = [f"suspended{f' at {at}' if at else ''}{f' by {by}' if by else ''}"]
+    bits.append(why or "no reason recorded")
+    return f"{bits[0]}: {bits[1]} — only a person lifts it, by resuming it or forgetting it (design §4.8a)"
+
+
 def alarm_note(alarms: list[dict[str, Any]]) -> str:
     """The card mark's hover: the newest alarm in words, and how many there are in all. Empty when
     there are none, which is what draws no mark."""
@@ -537,6 +557,7 @@ def view(
     # one malformed entry costs that card its mark and not the grid.
     d["alarms"] = alarm_view(s.get("identity_alarms"))
     d["alarm_note"] = alarm_note(d["alarms"])
+    d["suspended_note"] = suspended_note(s.get("suspended"))
     # design §4.5a card **doing** line (§4.8, TD-074): what the session says it is doing, always with
     # its age — *says · 11m ago* — so a stale line reads as stale. Text a model wrote: shown, never
     # acted on, and escaped like everything else. `None` for a session that has said nothing, which
@@ -823,6 +844,7 @@ def state_rows(
             "state_class": v.get("state_class") or "",
             "state_label": v.get("state_label") or "",
             "scraped": bool(v.get("scraped")),
+            "suspended_note": v.get("suspended_note") or "",  # §4.8a: the mark rides with the record
             "host": v.get("host") or "",
             "text": text,
             "deadline": v.get("deadline") or "" if row == "permission" else "",
