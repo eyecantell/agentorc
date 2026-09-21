@@ -91,7 +91,7 @@ def emit(args: argparse.Namespace, result: Any, prose: Callable[[], None]) -> in
     return 0
 
 
-# ── ao wait: a lead blocks instead of sleeping (design §4.8 "Waking a lead", TD-049) ──────────
+# ── ao wait: a manager blocks instead of sleeping (design §4.8 "Waking a manager", TD-049) ────
 
 
 def cmd_wait(args: argparse.Namespace) -> int:
@@ -1452,8 +1452,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("keys", nargs="+")
     p.set_defaults(fn=cmd_keys)
 
-    # design §4.8 "Waking a lead" (TD-049): a lead's tick ends here instead of sleeping, so an
-    # event reaches it in a second and a quiet fleet costs one blocked connection, not a poll.
+    # design §4.8 "Waking a manager" (TD-049): a manager's round ends here instead of sleeping, so
+    # an event reaches it in a second and a quiet team costs one blocked connection, not a poll.
     p = add("wait", help="block until a session you control changes, or the timeout passes (design §4.8)")
     p.add_argument("--timeout", type=float, default=600.0, help="seconds to wait; this is also the fallback poll")
     p.add_argument(

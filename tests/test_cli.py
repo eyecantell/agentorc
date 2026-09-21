@@ -641,7 +641,7 @@ def test_ao_new_team_and_project_badges(subprocess_agent, tmp_path, capsys):
         call_sync("kill", id=sid)
 
 
-# ── TD-049: a lead blocks instead of sleeping (design §4.8 "Waking a lead") ────────────────────
+# ── TD-049: a manager blocks instead of sleeping (design §4.8 "Waking a manager") ──────────────
 
 
 def test_the_wake_vocabulary_ignores_what_moves_every_tick_and_notices_what_a_lead_acts_on():
