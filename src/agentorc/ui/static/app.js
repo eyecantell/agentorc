@@ -1081,6 +1081,26 @@
       // so without this a person watching the very session that is suspended from somewhere else
       // would see the state change and not the mark, and the mark is the suspension's only record
       // (review of PR #306). Always in the page, hidden until it is true, as the banners are.
+      // …and the two report-line marks that stand beside it, for the same reason (review of PR
+      // #323): *out of work* and *restart wanted* are declared by the session while a person may
+      // be watching it, and a chip drawn only at load would show neither the declaration nor the
+      // claim that clears it. The words are the template's; this keeps them current.
+      const oow = $("#foow");
+      if (oow) {
+        const o = v.out_of_work;
+        oow.classList.toggle("hidden", !o);
+        oow.title = (o && o.why) || "no reason recorded";
+        oow.textContent = "out of work" + (o && o.age ? ` ${o.age}` : "");
+      }
+      const rw = $("#frw");
+      if (rw) {
+        const r = v.restart_wanted, early = !!(r && r.early);
+        rw.classList.toggle("hidden", !r);
+        rw.classList.toggle("early", early);
+        rw.title = ((r && r.why) || "no reason recorded")
+          + (early ? " — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a)" : "");
+        rw.textContent = "restart wanted" + (early ? " · early" : "") + (r && r.age ? ` ${r.age}` : "");
+      }
       const susp = $("#fsuspended");
       if (susp) {
         susp.classList.toggle("hidden", !v.suspended_note);

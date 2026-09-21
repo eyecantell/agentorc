@@ -54,9 +54,15 @@
     {# design §4.5a card **report line**: only when a channel is non-empty (§4.8, TD-028 step 4),
        and the **out of work** chip beside it (§4.9a, TD-053 step 6) — which is why the row is drawn
        for a declaration even when neither channel has anything to say. #}
-    {% if s.report or s.findings_line or s.out_of_work %}<div class="row report">
+    {% if s.report or s.findings_line or s.out_of_work or s.restart_wanted %}<div class="row report">
       {% if s.out_of_work %}<span class="badge oow"
             title="{{ s.out_of_work.why or 'no reason recorded' }}">out of work{% if s.out_of_work.age %} {{ s.out_of_work.age }}{% endif %}</span>{% endif %}
+      {# design §4.5a **restart wanted** chip (§4.9a, TD-083): the third ending — beside the report
+         line, exactly as *out of work* is, a **mark** and never pressable, and not a state: the
+         session still reads `idle` or `exited`. An **early** one says so, because a controller
+         does not act on those and a chip that looked the same would promise that it would. #}
+      {% if s.restart_wanted %}<span class="badge rw{% if s.restart_wanted.early %} early{% endif %}"
+            title="{{ s.restart_wanted.why or 'no reason recorded' }}{% if s.restart_wanted.early %} — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a){% endif %}">restart wanted{% if s.restart_wanted.early %} · early{% endif %}{% if s.restart_wanted.age %} {{ s.restart_wanted.age }}{% endif %}</span>{% endif %}
       {% if s.report %}<span class="meta{% if s.report_derived %} scraped{% endif %}"
             title="{{ 'the agent derived this from the branch and its PRs — the session did not declare it' if s.report_derived else 'declared by the session' }}">{{ s.report }}</span>{% endif %}
       <span class="grow"></span>
