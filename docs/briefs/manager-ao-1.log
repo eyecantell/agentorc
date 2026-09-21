@@ -76,3 +76,5 @@
 10:23  anchor merged #357 (TD-094) and #360 (TD-075) → cadence check pass on both (review recorded); before 2 h, so no ask. Still queued: #361–#365
 10:27  #365 (TD-057) merged by the anchor → cadence pass
 10:47  inbox: second identity alarm m-157664b11395 on alarm-probe (the announced test; probe suspended and exited, left alone) → --outcome dropped; #366/#367 are the anchor's, not a member's
+10:48–11:05 quiet; anchor merged #366/#367 (its own), grinder-ao-1 merged #368 (TD-075 ledger) → cadence pass
+11:06  grinder-ao-1: restart_wanted 17:05:50Z (long context; #361–#364 wait on the anchor, rest written in TD-075/TD-057) + idle, not early, not suspended, 0 dirty / 0 unpushed, owes nothing → ao close + ao new same name/worktree/profile/brief (--role grinder --team ao-grind --project agentorc --lane free-pick --controller me), restart 1 of 3 in the window; new record 17:06:13Z working
