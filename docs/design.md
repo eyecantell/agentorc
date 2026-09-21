@@ -2710,7 +2710,8 @@ until step 1 below lands.
   never does. What its manager reads instead is one structured field, **`asks_waiting`** — new:
   the count of open `ask`s and `steer`s addressed to the record, computed by the home like
   `unread`, **a number and never their text** (nobody reads another session's inbox), printed by
-  `ao status -v`, and part of the wake digest, so a manager blocked in `ao wait` returns when a
+  `ao status -v`, and **added to the wake digest** (`wake_digest` gains a line for it, as it did
+  for `out_of_work` and `restart_wanted` — it is not there today), so a manager blocked in `ao wait` returns when a
   question lands on an empty seat. **The manager's rule for the seat**: `idle` with
   `asks_waiting` 0 → `ao close` it (it writes no code; anything dirty or unpushed in its
   worktree is the board's, and it is left open); `idle` with `asks_waiting` > 0 for twenty
@@ -2721,8 +2722,14 @@ until step 1 below lands.
   which is right everywhere but here, where the mail was addressed to the seat and the new
   session **is** the seat's next holder; so this one start moves the old record's mail to the
   new one exactly as a resume does (`_move_mail`, built for §4.1's resume) and resumes nothing
-  of the conversation. It is open to whoever may make that start anyway, and changes nothing
-  else about it. Fills have a ceiling of their own in the manager's brief — six in an hour,
+  of the conversation. **It is open to a person, and to a session only if it is in the held record's
+  `controllers`** — the manager that created the techlead is; a sibling is not — and is refused
+  otherwise, naming the rule. That is the whole scope, and it is enough: the new session
+  inherits a mailbox, and the only sessions that can cause that are ones that could already
+  read the old holder's screen, where its mail was read (`ao tail`, an acting controller's
+  right). It keys on the control graph, not on a role (§9 invariant 9), so it is not tied to
+  techleads — a person restarting any session cold may keep its mail — and it changes nothing
+  else about the start. Fills have a ceiling of their own in the manager's brief — six in an hour,
   then the board — and do not count as crash restarts. A full mailbox (`MAILBOX_DEPTH`) refuses
   the asker as it refuses anyone, and the asker then asks the person (*When it cannot answer*,
   below). It is **a manager's act, never the core's** (§4.9a): the host agent starts nothing
@@ -2741,8 +2748,8 @@ until step 1 below lands.
   anything destructive, outward-facing, spending, credentials, a change of scope, a permission
   prompt, or a question the asker addressed to the person by name. Everything else goes up.
 - **Passing up keeps the thread and the asker.** `ao msg --pass-up <id> --recommend "<one
-  line>" [--answer …]` — open only to **the addressee of an open `ask` or `steer`, once, and
-  only to the person**. The person's entry is the asker's question, from the asker, of its own
+  line>" [--answer …]` — open only to **the addressee of an open `ask` or `steer`, once (the entry
+  gains **`passed_up: <time>`**, and a second is refused), and only to the person**. The person's entry is the asker's question, from the asker, of its own
   kind — an `ask` under *Needs you*, a `steer` under *Steering* with **the time it has left**,
   since passing up buys no time — with the techlead's recommendation and suggested answers
   beside it, **labelled as the techlead's and drawn as text**. The person's reply goes **to the
@@ -2759,8 +2766,10 @@ until step 1 below lands.
   asker, with a copy to the answerer**, on the question's own thread — that, and not the
   ordinary reply-to-sender default, is what **Overrule** calls. **The debt (§4.10 *Outcomes*)**:
   an answer from a teammate creates none — the question was never the person's; an **Overrule**
-  does — the person has now answered it, so the asker owes an outcome on the question's id as
-  if it had asked the person; and a question **passed up** and answered by the person owes one
+  does, and needs no new case: the overruling reply is mail from the person to the asker, and
+  the home marks it **`handed`** (§4.8a *An alarm's answers* — work the person handed a session
+  owes an outcome, built), so the asker settles it with `--outcome … --for <the overruling
+  entry's id>`, which is in its own inbox; and a question **passed up** and answered by the person owes one
   in the ordinary way. The Inbox groups these
   under *Answered for you* (§4.5a), uncounted, newest first, and the team's header carries the
   number since the person last opened the group — a **mark**. **Overrule** on such a row is a
