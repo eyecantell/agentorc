@@ -73,7 +73,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "manager": {"brief": "manager.md", "lane": [], "grants": ["control"], "icon": "flag", "label": "Manager"},
     # The go-between (design §4.9b, TD-075): answers teammates' questions from the record, passes the
     # rest up. No grants — it acts on no session; the design's `alarms` grant is not built.
-    "techlead": {"brief": "techlead.md", "lane": [], "grants": [], "icon": "book", "label": "Tech lead"},
+    "techlead": {"brief": "techlead.md", "lane": [], "grants": [], "icon": "book", "label": "Tech Lead"},
     "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"

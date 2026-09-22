@@ -13,7 +13,7 @@
 {# a manager whose own badge puts its card in another group is named here, since no card below is it #}
 {% if g.manager and g.manager_elsewhere %}<span class="meta" title="the manager carries a different team badge, so its card is in that group (design §4.9)">{{ g.manager.role_label or 'Manager' }} <a class="name" href="/focus/{{ g.manager.id }}">{{ g.manager.name }}</a> elsewhere</span>
 {% elif not g.manager and g.members %}<span class="meta" title="no member of this team holds control over the others (design §4.8)">managed by you</span>
-{% elif not g.members and g.def_manager %}<span class="meta">Manager {{ g.def_manager }}{% if g.def_techlead %} · Tech lead {{ g.def_techlead }}{% endif %} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
+{% elif not g.members and g.def_manager %}<span class="meta">Manager {{ g.def_manager }}{% if g.def_techlead %} · Tech Lead {{ g.def_techlead }}{% endif %} · {{ g.def_members }} member{{ '' if g.def_members == 1 else 's' }}</span>{% endif %}
 {% if not g.members and g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
 {% if g.counts %}<span class="meta counts">· {{ g.counts | join(' · ') }}</span>{% endif %}
 {% endif %}

@@ -256,8 +256,8 @@ def test_parse_usage_and_credentials(tmp_path):
         {"five_hour": {"utilization": 42.7, "resets_at": "2026-09-07T02:00:00Z"}, "seven_day": {"utilization": 9}}
     )
     # TD-073: the endpoint's two windows become two labelled entries of a list; nothing above the
-    # adapter knows what `5h` and `wk` are, and a tool with other windows says what it has instead.
-    assert u and [(w.label, w.pct) for w in u.windows] == [("5h", 42), ("wk", 9)]
+    # adapter knows what `5h` and `week` are, and a tool with other windows says what it has instead.
+    assert u and [(w.label, w.pct) for w in u.windows] == [("5h", 42), ("week", 9)]
     assert u.windows[0].resets.startswith("2026") and u.windows[1].resets is None
     assert parse_usage({}) is None
     prof = profiles.Profile(name="t", config_dir=tmp_path)

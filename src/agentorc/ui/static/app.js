@@ -459,7 +459,7 @@
   // render, and the tests hold the two to the same cases. **A held reading goes stale, not out**
   // (TD-087): a refused poll keeps the last good windows, drawn dimmed with *· stale* and, on hover,
   // when they were read and why the poll since failed; a refusal with nothing ever held is
-  // `<profile> no reading`. An `ok` with no windows is a tool that reports no quota: no chip.
+  // `<profile>: no reading yet`. An `ok` with no windows is a tool that reports no quota: no chip.
   AO.usageChip = function (profile, u) {
     if (!u || typeof u !== "object") return null;
     const windows = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w.pct === "number");
@@ -470,11 +470,11 @@
       why = "the last poll was refused: " + (USAGE_WHY[reason] || reason);
       if (typeof u.retry_after === "number") why += `, which asked to be left ${Math.max(1, Math.ceil(u.retry_after / 60))} min`;
     }
-    if (!windows.length) return { text: `${profile} no reading`, title: `no usage reading for ${profile} yet — ${why}`, pct: 0, cls: "stale" };
+    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}`, pct: 0, cls: "stale" };
     const ws = windows.slice().sort((a, b) => b.pct - a.pct), worst = ws[0];
     let title = ws.map((w) => `${w.label} ${w.pct}% (resets ${w.resets || "?"})`).join(" · ");
     let cls = worst.pct >= 100 ? "cap" : worst.pct >= NEAR_CAP ? "near" : "";
-    let text = `${profile} ${worst.label} ${worst.pct}%`;  // the numbers say what they are (2026-09-18)
+    let text = `${profile} · ${worst.label} ${worst.pct}%`;  // the numbers say what they are (2026-09-18)
     if (stale) { title = `held reading from ${u.fetched || "an unknown time"} — ${why}. ${title}`; text += " · stale"; cls = (cls + " stale").trim(); }
     return { text, title, pct: worst.pct, cls };
   };

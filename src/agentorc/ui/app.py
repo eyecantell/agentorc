@@ -88,8 +88,8 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
     not out** (TD-087): when the last poll was refused, the host agent keeps the last good windows
     with the `reason` beside them, and the chip draws them dimmed with *· stale* and says on hover
     when they were read and why the poll since failed — *the chip went out* and *the allowance is
-    spent* are different things to a person. A refusal with no reading ever held is `<profile> no
-    reading`, the same way: a chip that silently went out is what this entry was. An `ok` answer
+    spent* are different things to a person. A refusal with no reading ever held is `<profile>: no
+    reading yet`, the same way: a chip that silently went out is what this entry was. An `ok` answer
     with no windows is an adapter that reports no quota, which has no chip.
 
     `app.js`'s `AO.usageChip` is the same rule for a pushed `usage` event; the tests hold the two
@@ -108,12 +108,12 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
             why += f", which asked to be left {max(1, math.ceil(u['retry_after'] / 60))} min"
     if not windows:
         title = f"no usage reading for {prof} yet — {why}"
-        return {"text": f"{prof} no reading", "title": title, "pct": 0, "cls": "stale"}
+        return {"text": f"{prof}: no reading yet", "title": title, "pct": 0, "cls": "stale"}
     ws = sorted(windows, key=lambda w: w["pct"], reverse=True)
     worst = ws[0]
     title = " · ".join(f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})" for w in ws)
     cls = "cap" if worst["pct"] >= 100 else "near" if worst["pct"] >= NEAR_CAP else ""
-    text = f"{prof} {worst.get('label')} {worst['pct']}%"
+    text = f"{prof} · {worst.get('label')} {worst['pct']}%"  # *grind · week 89%* (TD-095 h)
     if stale:
         title = f"held reading from {u.get('fetched') or 'an unknown time'} — {why}. {title}"
         text += " · stale"
