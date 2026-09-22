@@ -212,3 +212,4 @@
 17:13  grinder-ao-1: idle 21 min with TD-100 open (#434 waits on the anchor) → one ao send --wait per the idle rule; it answered: opening slice 2 (stacked on #434), then a TD-076 sweep (#438), then declares
 17:17  grinder-ao-1: PRs #437 (TD-100 slice 2, src/sessionorc) and #438 (TD-076, docs/briefs) open → both held for the anchor's read with #434
 17:18  grinder-ao-1: declared restart (context long; #434 #437 #438 wait on the anchor; next TD-107, TD-109 (1)), idle, clean and pushed, not early → ao close + ao new (restart 1, 23:18Z; role grinder, team ao-grind, lane free-pick, brief docs/briefs/grinder-ao-1.md) → working. #435 merged (anchor; TD-103–112). grinder-ao-2: finished, not sent to
+17:29  #434 (TD-100 slice 1, src/sessionorc) merged by the anchor after its read. The anchor sent grinder-ao-2 to rebase and merge #437 (off the hand-rule paths once rebased) → working again. grinder-ao-1: TD-107
