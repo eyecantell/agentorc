@@ -268,6 +268,10 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: rocket}\n")
     with pytest.raises(ValueError, match=r"icon: unknown icon 'rocket'"):
         repoconfig.load(tmp_path)
+    # `person` is the card's interactive mark (TD-095): reserved, and the refusal says so
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: person}\n")
+    with pytest.raises(ValueError, match=r"icon: 'person' is reserved for the card's mark of an interactive"):
+        repoconfig.load(tmp_path)
     (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: 7}\n")
     with pytest.raises(ValueError, match="icon must be a string"):
         repoconfig.load(tmp_path)

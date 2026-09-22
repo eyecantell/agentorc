@@ -1414,11 +1414,12 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     import asyncio
 
-    from agentorc.repoconfig import ICONS
+    from agentorc.repoconfig import ICONS, RESERVED_ICONS
     from agentorc.ui import app as uiapp
     from agentorc.ui.icons import ICON_PATHS, role_svg
 
-    assert sorted(ICON_PATHS) == sorted(ICONS)  # every name the config accepts has a picture
+    # every name the config accepts has a picture, and so does the one it reserves (TD-095)
+    assert sorted(ICON_PATHS) == sorted([*ICONS, *RESERVED_ICONS])
     assert 'stroke="currentColor"' in role_svg("flag") and 'aria-hidden="true"' in role_svg("flag")
     assert "M5 21V4M5 4h11l-2 4 2 4H5" in role_svg("flag")  # the flag, as the design gives it
     assert 'fill="none"' in role_svg("flag")  # stroked, never filled: it is not something to press

@@ -620,3 +620,33 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     assert "kmaster / agentorc" in head and "· 1 working · 1 idle" in head and " live<" not in head
     nohead = templates.get_template("group_head.html").render(g=none)
     assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
+
+
+def test_within_one_urgency_the_persons_own_sort_first_and_mine_shows_only_them(tmp_path, monkeypatch):
+    """Design §4.5 *One order, no control*, second pass (TD-095): the key is (rank, interactive
+    first, name) — a worker that needs a person still outranks the person's own idle session, and a
+    manager's card is placed first before any of this. §4.5a ***mine***: one press shows only the
+    interactive sessions; the card says which it is, the page's script does the rest."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import card_order, team_groups, templates, view
+
+    a = _card(id="ao-a", name="a")  # unattended, idle
+    z = _card(id="ao-z", name="z", unattended=False)  # interactive, idle
+    needs = _card(id="ao-n", name="n", state="needs-you", pending={"kind": "question", "text": "?"})
+    vs = [view(r) for r in (a, z, needs)]
+    assert [v["name"] for v in sorted(vs, key=card_order)] == ["n", "z", "a"]
+    mgr = _card(id="ao-m", name="zz-manager", team="t", capabilities=["control"], state="working")
+    team = [mgr, {**a, "team": "t", "controllers": ["ao-m"]}, {**z, "team": "t", "controllers": ["ao-m"]}]
+    (g,) = team_groups([view(r, team) for r in team])
+    assert g["ids"] == ["ao-m", "ao-z", "ao-a"]  # the manager first, then the person's own
+    card = templates.get_template("card.html")
+    assert 'data-mine="1"' in card.render(s=vs[1]) and "data-mine" not in card.render(s=vs[0])
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert "(!!b.dataset.mine - !!a.dataset.mine)" in js  # the page's re-sort keeps the same key
+    assert "(mine && !c.dataset.mine)" in js  # …and *mine* composes with the box
+    html = templates.get_template("org.html").render(
+        sessions=vs, groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
+        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Org",
+        agent_down=False, volatile=False, usage={},
+    )  # fmt: skip
+    assert 'id="mine" aria-pressed="false"' in html

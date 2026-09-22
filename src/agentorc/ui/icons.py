@@ -1,6 +1,7 @@
 """The role icons the UI ships (design §4.8 *Role presets*, §4.5a, TD-074).
 
-One place for the eight pictures `repoconfig.ICONS` names, so a config file never carries markup:
+One place for the pictures `repoconfig.ICONS` names, and `person` — reserved for the card's
+*interactive* mark (TD-095) — so a config file never carries markup:
 a name is a key here, and a name that is not is drawn as nothing. Each is a 24×24 stroke path drawn
 in `currentColor` at ~12px inside the role badge — monochrome, so the state pill stays the one
 coloured thing on a card — and `aria-hidden`, because the badge's own text is the label.
