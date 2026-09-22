@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import adapters, build, containers, hosts, identity, link, mail, modes, naming, paths, reports, waits
+from sessionorc import settings as settings_mod
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktree_path
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
@@ -119,6 +120,9 @@ TRAIL_FLOOR = timedelta(seconds=5)  # a row this short leaves no trail unless a 
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
 # killed anyway, because the whole point is that nobody is watching.
 WRAPUP_GRACE = timedelta(minutes=10)
+# The usage gate (design §6, TD-100) resumes a paused session no sooner than this after the pause:
+# a reading that flickers across the line must not type pause and resume at a session every minute.
+RESUME_MIN = timedelta(minutes=10)
 REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
 # An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
 # itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
@@ -561,6 +565,7 @@ class HostAgent:
             # detached: a slow usage endpoint (10 s timeout) must not hold up the tick or its push
             self._usage_task = asyncio.create_task(self._refresh_usage())
         await self._enforce_stop_times(snapshot_at)
+        await self._enforce_usage_gate(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
         self._ring_doorbells()
@@ -613,6 +618,88 @@ class HostAgent:
             if settled or now - _parse(s.wrapup_sent_at) >= WRAPUP_GRACE:
                 log.info("%s stopped after its wrap-up (%s)", s.id, "settled" if settled else "grace ran out")
                 await self.rpc_kill(s.id)
+
+    async def _enforce_usage_gate(self, now: datetime) -> None:
+        """Pause the unattended sessions of a profile whose usage crossed a line, and resume them
+        when every window is back under (design §6 *Usage gate*, TD-100).
+
+        The lines come from the person's reserves in `settings.yml`, read here on every tick, and
+        the windows from the profile's last good usage reading — a failed poll keeps the last one,
+        and a profile with no reading at all neither pauses nor resumes anything. A pause is a
+        **send, not a kill**: the mark `gated` is written the tick the line is crossed, the record's
+        `pause_prompt` is typed once and retried every tick until it lands (`sent_at`), and a session
+        sitting on a permission or a question is not typed at — waiting on a dialog, it is consuming
+        nothing, so the mark stands and the send lands after the dialog clears. The resume is the
+        `resume_prompt`, typed when every window is under its line and no sooner than `RESUME_MIN`
+        after the pause; the mark goes with it. Interactive sessions are never gated: a session a
+        person took over loses its mark on the next tick, with nothing typed."""
+        doc = settings_mod.reserves(settings_mod.load())
+        changed = False
+        for s in list(self.sessions.values()):
+            if not s.unattended or s.state in ("exited", "closed"):
+                if s.gated:
+                    s.gated = None  # the gate's reach is unattended, live sessions alone (§9 invariant 5)
+                    self.store.save(s)
+                    changed = True
+                continue
+            by_label = doc.get(s.profile)
+            reading = self._usage.get(s.profile) or {}
+            windows = reading.get("windows")
+            if windows is None and by_label:
+                continue  # no reading: the last word stands, whatever it was (§6: a failure never gates)
+            rows = settings_mod.lines(by_label or {}, windows, now)
+            over = settings_mod.crossed(rows)
+            if over is not None:
+                mark = {
+                    "profile": s.profile,
+                    "label": over["label"],
+                    "pct": over["pct"],
+                    "line": over["line"],
+                    "since": (s.gated or {}).get("since") or now_iso(),
+                    "next": over["next"],
+                    "sent_at": (s.gated or {}).get("sent_at"),
+                }
+                if mark != s.gated:
+                    if not s.gated:
+                        log.info("%s paused by the usage gate: %s %s %s%% >= %s%%", s.id, s.profile,
+                                 over["label"], over["pct"], over["line"])  # fmt: skip
+                    s.gated = mark
+                    self.store.save(s)
+                    changed = True
+                if not s.gated.get("sent_at") and s.pause_prompt and not self._on_a_dialog(s):
+                    try:
+                        await self._submit(s.id, adapters.get(s.adapter), s.pause_prompt)
+                    except Exception:  # noqa: BLE001 — retried on the next tick (§6)
+                        log.warning("%s would not take the pause prompt; retrying next tick", s.id)
+                    else:
+                        s.gated = {**s.gated, "sent_at": now_iso()}
+                        self.store.save(s)
+                        changed = True
+                continue
+            if not s.gated:
+                continue
+            if now - _parse(s.gated["since"]) < RESUME_MIN:
+                continue
+            if s.gated.get("sent_at") and s.resume_prompt:
+                if self._on_a_dialog(s):
+                    continue
+                try:
+                    await self._submit(s.id, adapters.get(s.adapter), s.resume_prompt)
+                except Exception:  # noqa: BLE001 — the mark stands and the resume is tried again
+                    log.warning("%s would not take the resume prompt; retrying next tick", s.id)
+                    continue
+            log.info("%s resumed by the usage gate", s.id)
+            s.gated = None
+            self.store.save(s)
+            changed = True
+        if changed:
+            await self._push_changes()
+
+    @staticmethod
+    def _on_a_dialog(s: Session) -> bool:
+        """Typing at a session on a permission or a question would answer the dialog rather than
+        reach the composer (§4.2) — the rule `send` refuses by."""
+        return bool(s.pending and s.pending.kind in ("permission", "question"))
 
     async def _backup(self, day: str) -> None:
         """The nightly tarball (§4.4a "When the home is lost"): off the loop, and never an error
@@ -1223,6 +1310,8 @@ class HostAgent:
         project: str = "",
         run_until: str | None = None,
         wrapup_prompt: str | None = None,
+        pause_prompt: str | None = None,
+        resume_prompt: str | None = None,
         host: str | None = None,
         caller: str | None = None,
         keep_mail: bool = False,
@@ -1365,6 +1454,8 @@ class HostAgent:
                 project=str(project or ""),
                 run_until=_stop_time(run_until),
                 wrapup_prompt=(str(wrapup_prompt).strip() or None) if wrapup_prompt else None,
+                pause_prompt=(str(pause_prompt).strip() or None) if pause_prompt else None,
+                resume_prompt=(str(resume_prompt).strip() or None) if resume_prompt else None,
                 previous_run=previous_run,
                 host=self.host,
             )
@@ -3499,6 +3590,8 @@ class HostAgent:
             return "no composer"  # without a submit confirmation a ring could land on a half-typed line
         if s.wrapup_sent_at or s.wrapup_at or (s.run_until and now >= _parse(s.run_until)):
             return "a wrap-up under way"  # mail never pushes a session past its stop
+        if s.gated:
+            return "paused by the usage gate"  # mail never wakes a session the gate paused (§6)
         if self.blocked_in_wait(s.id):
             return "blocked in wait"  # reachable already: the wait takes the decision
         return None
@@ -3705,6 +3798,74 @@ class HostAgent:
     async def rpc_usage(self) -> dict[str, dict[str, Any]]:
         """Last known usage per profile (TD-001): what the top bar shows."""
         return dict(self._usage)
+
+    async def rpc_gate(self) -> dict[str, Any]:
+        """The usage gate as it stands (design §4.7 `ao gate`, §6, TD-100): every profile with a
+        reserve in this host's `settings.yml`, each reserve, and the line it makes now against the
+        profile's last reading — `{profiles: {profile: {reserves, windows, labels}}}`, `labels`
+        being what the adapter reported (empty with no reading yet). A read: never gated."""
+        now = datetime.now(UTC)
+        doc = settings_mod.reserves(settings_mod.load())
+        out: dict[str, Any] = {}
+        for prof, by_label in sorted(doc.items()):
+            windows = (self._usage.get(prof) or {}).get("windows")
+            out[prof] = {
+                "reserves": by_label,
+                "windows": settings_mod.lines(by_label, windows, now),
+                "labels": [str(w.get("label")) for w in windows or []],
+            }
+        return {"profiles": out, "file": str(settings_mod.settings_file())}
+
+    async def rpc_set_settings(
+        self, profile: str, reserves: dict[str, Any] | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """Set or clear a profile's usage-gate reserves in this host's `settings.yml` (design §5,
+        §4.7 `ao gate`, TD-100): `reserves` maps a window label to a flat percent, to `{per_day:
+        N}`, or to None, which clears that window's reserve. **A person's own**, refused to a
+        session as `inbox_pause` is. A label the profile's adapter does not report is refused, with
+        the reported ones named, so a typo is not a silent no-op — except before the profile has any
+        reading, when nothing can be checked and the reply says `unchecked`. Takes effect on the
+        next tick. Served on a node, link or no link: the file is this host's own."""
+        if not mail.is_person(caller):
+            raise RpcError("set_settings is a person's own: refused to a session (design §5 settings.yml)")
+        prof = str(profile or "")
+        if not isinstance(reserves, dict) or not reserves:
+            raise RpcError("set_settings needs reserves: {label: percent | {per_day: N} | null}")
+        windows = (self._usage.get(prof) or {}).get("windows")
+        reported = [str(w.get("label")) for w in windows or []]
+        if windows is not None and (unknown := sorted(set(map(str, reserves)) - set(reported))):
+            raise RpcError(
+                f"profile {prof or '(default)'} reports no window {', '.join(unknown)}: "
+                f"its windows are {', '.join(reported) or 'none'} (design §4.7)"
+            )
+        parsed: dict[str, Any] = {}
+        for label, value in reserves.items():
+            try:
+                parsed[str(label)] = None if value is None else settings_mod.parse_reserve(value)
+            except ValueError as e:
+                raise RpcError(f"{label}: {e}") from None
+        doc = settings_mod.load()
+        gate = doc.get("usage_gate") if isinstance(doc.get("usage_gate"), dict) else {}
+        mine = dict(gate.get(prof) or {}) if isinstance(gate.get(prof), dict) else {}
+        for label, value in parsed.items():
+            if value is None:
+                mine.pop(label, None)
+            else:
+                mine[label] = value
+        if mine:
+            gate[prof] = mine
+        else:
+            gate.pop(prof, None)
+        doc["usage_gate"] = gate
+        settings_mod.save(doc)
+        log.info("usage gate for profile %s set to %s", prof or "(default)", mine or "no reserves")
+        now = datetime.now(UTC)
+        return {
+            "profile": prof,
+            "reserves": mine,
+            "windows": settings_mod.lines(mine, windows, now),
+            "unchecked": windows is None,
+        }
 
     async def rpc_adapters(self) -> list[str]:
         return adapters.names()
@@ -5066,9 +5227,20 @@ class HostAgent:
         function over a record map, so a node can forward and the home can answer (§4.4a)."""
         if method == "create" and params.get("capabilities"):
             _grants(params["capabilities"])  # an unknown grant name is refused before the gate reads it
-        reason = mail.act_gate(self._graph(), caller, method, params, controllers=self._ctl)
+        graph = self._graph()
+        reason = mail.act_gate(graph, caller, method, params, controllers=self._ctl)
         if reason:
             raise RpcError(reason)
+        if method == "send" and not mail.is_person(caller) and params.get("id") != caller:
+            # design §6 *Usage gate*: while gated, a controller's send is refused here, at the home,
+            # read from the record's `gated` — a node-owned field, so a replica carries it. A person's
+            # own send is not (§9 invariant 11): the way past the gate is a person's.
+            target = graph.get(self._addr(params.get("id", "")))
+            if target is not None and (g := target.gated):
+                raise RpcError(
+                    f"{params.get('id')} is paused by the usage gate ({g.get('profile')} {g.get('label')} "
+                    f"{g.get('pct')}% >= {g.get('line')}%): a controller's send waits for the resume (design §6)"
+                )
 
     def _addr(self, address: Any) -> str:
         """One normaliser for every id on the way in (design §4.4a, TD-057 step 1): a session on

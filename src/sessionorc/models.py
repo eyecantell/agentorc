@@ -80,6 +80,7 @@ NODE_OWNED = frozenset(
         "model",
         "subagents",
         "wrapup_sent_at",
+        "gated",
         "wrapup_at",
         "doorbell_failed",
         "run_log",
@@ -99,6 +100,8 @@ HOME_OWNED = frozenset(
         "unattended",
         "run_until",
         "wrapup_prompt",
+        "pause_prompt",
+        "resume_prompt",
         "progress",
         "findings",
         "out_of_work",
@@ -630,6 +633,14 @@ class Session:
     run_until: str | None = None
     wrapup_prompt: str | None = None
     wrapup_sent_at: str | None = None
+    # The usage gate (design §6, TD-100): how to ask this session to pause when its profile crosses
+    # a line, and to carry on when every window is back under — wording from the client, as the
+    # wrap-up's is. `gated` is the mark, `{profile, label, pct, line, since, next, sent_at}`: written
+    # the tick the line is crossed, `sent_at` once the pause prompt landed, gone with the resume.
+    # The node's (§4.4a: an enforcement it made from usage it fetched); the prompts are the home's.
+    pause_prompt: str | None = None
+    resume_prompt: str | None = None
+    gated: dict[str, Any] | None = None
     # The other wrap-up (design §4.10 "A pending stop beats mail", TD-052 step 7): when a `send`
     # marked `wrapup` typed the wrap-up prompt — the card's Wrap up, `ao team stop` and a
     # manager's wind-down (§4.9a) — which this package cannot tell from any other send by its
