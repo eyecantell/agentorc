@@ -1537,7 +1537,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*; up to four, 80 characters each, format characters stripped). **Drawn apart from the row's own controls** — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm — design 2026-09-20, TD-070; built 2026-09-20 (step 2), on the `ask` and `steer` rows, which is where **Reply** is drawn |
 | Inbox row: answered for you | **Overrule**, **Dismiss** | design 2026-09-20, TD-075, **built 2026-09-21 (step 2, the page half)** (§4.9b). An FYI the home files when a reply carries a `source`: the question, the answer, the source, who asked and who answered — all text. Under *Answered for you*, uncounted, newest first. **Overrule** opens a reply **to the asker** on the question's own thread (a copy to the answerer), marked `[person]`; **Dismiss** ends the row. Neither is offered on anything but this kind: it keys on the entry's structured `source`, never on who sent it. **As built:** the group is a fold under *Waiting on them* and above FYI, open until the person folds it (remembered in the browser) and drawn only when it holds something; the row keys on the FYI's `answered` (which carries the `source`), names the asker by the name it is known by and opens it, draws the question set off as a quotation, and **Overrule** is the page's Reply to that entry with the compose naming the asker — the home's reply-path branch does the addressing |
 | Inbox row: passed up | the row's own kind's controls (**Reply** and **suggested answers**; a `steer`'s **Pause** and ***Go with it***) | design 2026-09-20, TD-075, **built 2026-09-21 (step 3, the page half)** (§4.9b). The asker's question, from the asker, under its own heading — an `ask` in *Needs you*, a `steer` in *Steering* with the time it has left — with one addition: *`<techlead>` recommends: `<line>`*, **labelled and drawn as text**, and the techlead's suggested answers as the row's answer buttons, its recommendation first. A reply goes to the asker. **As built:** the line keys on `passed_up` with a structured `recommend` and names the passer by the name it is known by; the suggested-answers group reads *suggested by `<passer>`* on such a row, since the answers are the passer's |
-| team header | **PRs waiting** count | design 2026-09-21, TD-093 (§4.9b *The reader*), not built: *`n` PRs waiting · oldest `<age>`* from the seat's `prs_waiting: {n, oldest}` — a count and a time, never the entries; display only, not pressable (the entries are `ao inbox <seat>`'s). Absent without a seat or a `review:` block. And on the person's Inbox, an `ask` that carries `pr` (a `reader: person` repo) draws `#<n>` as a link to the PR beside its text — the number is a structured field, the text stays text |
+| team header | **PRs waiting** count | design 2026-09-21, TD-093 (§4.9b *The reader*), not built: *`n` PRs waiting · oldest `<age>`* from the seat's `prs_waiting: {n, oldest}` — a count and a time, never the entries; display only, not pressable (the entries are `ao inbox <seat>`'s). Absent without a seat, or when no session of the team carries `review`. And on the person's Inbox, an `ask` that carries `pr` (a `reader: person` repo) draws `#<n>` as a link to the PR beside its text — the number is a structured field, the text stays text |
 | team header | **answered for you** count | design 2026-09-20, TD-075, **built 2026-09-21**: the number of *answered for you* entries from this team's sessions since the person last opened that group — a **mark**, never pressable; the group is reached from the Inbox. **As built:** *since the person last opened that group* is this browser's memory, as FYI's *new* mark is — the newest row seen while the Inbox's group is open and the tab in view — so the home keeps no read state for it; the poll gives each row's team and time (`answered_marks`), never its text, and the header's mark is filled in by the page (the Org reads the poll at load for it) |
 | Inbox row: `steer` | **Reply**, **Go with it**, **Pause / Resume** | the text, **the default it will take, and the time left**; **Reply** says otherwise; **Go with it** closes it now — `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh, told to it by a `system` note that wakes it as a person's reply does — so it need not wait out the bound; doing nothing lets it lapse to the same end. **Pause** stops the clock and tells the sender not to take its default yet; the row moves to *Needs you* and **is counted while paused** — a session is now held on the person; **Resume** gives back the time that was left (§4.10 *Pause*). No Snooze on a `steer`. Not counted unless paused. Built 2026-09-19, step 1 |
 | Inbox section: **Waiting on them** | **Dismiss** | **built 2026-09-20 (TD-079 step 2)**. Answered questions that owe an outcome (§4.10 *Outcomes*) and whose asker is still live: the question, the answer given, how long ago, the asker's name and `doing` line. Never counted — it waits on a session, not on the person. **Dismiss** says *I do not need to hear back*, ends the debt and tells the asker by a `system` note (`inbox_dismiss`, person-only). When the asker has **exited without reporting**, or reported **`blocked`**, the row is under *Needs you* instead, counted, with **Open** / **Reply** and **Dismiss** — design 2026-09-20, TD-079. **The answer given** is what the person inbox still holds: a pressed suggested answer is in the entry itself (§4.10 *Suggested answers*), and a typed reply is not — it went to the asker's inbox, not to this one — so the row says *you answered* or *you let it go with its default* rather than inventing words the person did not write (2026-09-20, the build) |
@@ -3023,22 +3023,32 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   creator's, and that is right — the session that may dismiss an alarm is not one a cheap
   manager can mint. So an on-demand techlead never answers alarms, and §4.8a's *not live →
   the person at once* already says what happens. Not built, and not before TD-077's step 4.
-- **The reader: a PR that touches held paths waits for the techlead (design 2026-09-21, TD-093;
-  asked for by Paul the same day — *a configuration to require "techlead merges"*).** It is the
-  repo's policy, so it is said in the repo's `.agentorc.yml` (§5), not in a brief:
+- **The reader: a PR waits for the techlead (design 2026-09-21, TD-093; asked for by Paul the
+  same day — *a configuration to require "techlead merges"*; the shape below is his, 2026-09-21).**
+  **It is a setting of the role** — some teams need it and some do not (a documentation repo may
+  find dev-cadence's own steps enough) — so it is a key of a role preset (§4.8; the repo's
+  `roles:` in `.agentorc.yml`, or `org.yml`'s), and, as every preset key, **it sets a field on the
+  session's record at start and is read from the record afterwards** (§9 invariant 9: a preset
+  sets defaults at start and is a badge afterwards — nothing keys on the role's name):
 
   ```yaml
-  review:
-    held: [src/sessionorc/**, docs/briefs/**, org.yml]   # a PR touching any of these waits for the reader
-    reader: techlead          # the team's seat (the only reader today); `person` sends every held PR to the person
-    bound: 2h                 # unanswered this long, the author takes it to the person on the same thread
+  roles:
+    grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind,
+              review: {reader: techlead}}           # every PR waits for the reader; `held:` defaults to `**`
+    hunter:  {review: {reader: techlead, held: [src/**]}}   # only a PR touching these paths waits
+    plain:   {review: {reader: techlead}}           # a person's own `--team` session, when its role says so
   ```
 
-  **Whether a PR is held keys on the repo and its paths** — never on who wrote the PR, its
-  session's mode, or its role (its mode decides only who executes the merge, below): Paul's requirement is a person's own interactive session inside a
-  team (`ao new --team`) getting the same reader a grinder does, *a safety net for when I am not
-  intimately familiar with an architecture*. `held:` is a list of path globs matched against the
-  PR's changed files; a PR touching none merges as §3's cadence says (the author, on a green
+  `review: {reader, held, bound}` — `reader` is `techlead` (the team's seat; the only reader
+  today) or `person`; **`held` is a list of path globs matched against the PR's changed files and
+  defaults to every PR (`**`)**; `bound` defaults to two hours. The record carries it as
+  `review`, home-owned, set at start and shown on the Focus header as text. **Whether a PR is
+  held keys on the record's `review` and the PR's paths** — never on who wrote the PR or its
+  session's mode (its mode decides only who executes the merge, below): Paul's requirement is a
+  person's own interactive session inside a team (`ao new --team`, with a role whose preset
+  carries `review:`) getting the same reader a grinder does, *a safety net for when I am not
+  intimately familiar with an architecture*. A session whose record has no `review`, or whose
+  PR touches no held path, merges as §3's cadence says (the author, on a green
   `scripts/check_cadence.py`). **How the reader hears of a PR — the seat is filled by mail, so a
   PR is an `ask`**: when a held PR is green and carries its author's own `cadence-review:`
   comment, the author sends **`ao msg --kind ask --pr <n> {techlead} "…"`** — `pr` is a new
@@ -3088,12 +3098,12 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   --pr <n> person "…"`) and lands under *Needs you* as an ordinary counted `ask` with `#<n>`
   drawn as a link — no seat, no header count; a team whose repo says `reader: techlead` but
   defines no `techlead:` seat is the same case (`{techlead}` reads *none*, so the ask has nowhere
-  else to go), and `ao team start` says so as it does for a seat without a primer. **`review:`
-  is read by the author's own `ao`** (the client that checks a PR's files against `held:`),
-  never by the host agent — unlike the file's `unattended:` block, which §6's policies read.
+  else to go), and `ao team start` says so as it does for a seat without a primer. **The record's
+  `review` is read by the author's own `ao`** (the client that checks a PR's files against
+  `held:`), never by the host agent, which only stores it.
   **Not the reader**: a PR from
-  the person's own anchor session outside any team (no `team` badge, nobody to ask); a repo
-  without `review:`; and a read is never a re-review of what the author's reviewer found — it
+  the person's own anchor session outside any team (no `team` badge, nobody to ask); a session
+  whose record carries no `review`; and a read is never a re-review of what the author's reviewer found — it
   is the high-trust read the rule exists for.
 - **The trial, and the wall.** Paul's decision of 2026-09-19 stands: a **less-trusted model
   beside a high-trust one waits for the agents-only node** (§4.4a *A node that carries no
@@ -4025,16 +4035,13 @@ unattended:
   wrapup_minutes: 15
   creds_min_hours: 0.25
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
-  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}   # profile: §4.9
+  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind,   # profile: §4.9
+            review: {reader: techlead}}   # §4.9b *The reader*: its PRs wait for the techlead; `held:` defaults to every PR
   hunter: {brief: docs/briefs/hunter.md, icon: search}   # icon: §4.8, one name from the fixed set
   manager: {brief: docs/briefs/manager.md, grants: [control]}
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
-review:                               # §4.9b *The reader*: a PR touching a held path waits for the techlead
-  held: [src/sessionorc/**, docs/briefs/**, org.yml]
-  reader: techlead                    # or `person`
-  bound: 2h                           # then the author takes it to the person on the same thread
 teams:                                # §4.9: teams whose only project is this repo; org.yml wins a name
   grind: {manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
