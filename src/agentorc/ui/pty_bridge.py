@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import re
 from collections.abc import Awaitable, Callable
 
 import ptyprocess
@@ -85,15 +86,29 @@ def scroll_argv(session_id: str, direction: str, *, socket_name: str | None = No
     raise ValueError(f"scroll direction {direction!r}: expected 'up' or 'down'")
 
 
+# A frame made only of SGR mouse-wheel reports (button 64 up, 65 down, with any modifier bits xterm.js
+# adds — shift 4, meta 8, ctrl 16, in every combination): what the wheel sends once tmux's `mouse on` asks for tracking,
+# and all a read-only attach lets through. tmux scrolls its copy mode with them; a click or a drag
+# (any other button) is not one and is dropped with the keys.
+_WHEEL = b"|".join(str(64 + mods + down).encode() for mods in range(0, 32, 4) for down in (0, 1))
+WHEEL_ONLY = re.compile(rb"(?:\x1b\[<(?:" + _WHEEL + rb");\d+;\d+[Mm])+")
+
+
 async def pump(
     pty: PtySession,
     send: Callable[[bytes], object],
     recv: Callable[[], object],
     scroll: Callable[[str], Awaitable[None]] | None = None,
+    *,
+    read_only: bool = False,
 ) -> None:
     """Run both directions until either side ends. `recv` yields str (keys), bytes, or a dict
     with `resize: [cols, rows]` or `scroll: "up" | "down"`; `send` takes raw bytes for xterm.js;
-    `scroll` (optional) is awaited for scroll messages, which need a tmux command, not keys."""
+    `scroll` (optional) is awaited for scroll messages, which need a tmux command, not keys.
+
+    `read_only` (design §4.6 *A read-only attach*, TD-096): key frames are dropped — str and bytes
+    alike — except a frame that is only mouse-wheel reports, which tmux turns into scrolling its
+    history and never passes to the pane as typing. Resize and scroll messages pass as ever."""
 
     async def down() -> None:
         try:
@@ -114,7 +129,10 @@ async def pump(
                 elif "scroll" in msg and scroll is not None:
                     await scroll(str(msg["scroll"]))  # returns once the tmux command is spawned, not done
                 continue
-            pty.write(msg.encode() if isinstance(msg, str) else msg)
+            data = msg.encode() if isinstance(msg, str) else msg
+            if read_only and not WHEEL_ONLY.fullmatch(data):
+                continue
+            pty.write(data)
 
     d = asyncio.create_task(down())
     u = asyncio.create_task(up())

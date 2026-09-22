@@ -1678,8 +1678,10 @@ Decisions taken from a review of the `sessionorc` layer before build:
   logs of `exited`/`closed` sessions are deleted after `runs_keep_days` (default 30) on the
   agent's tick. Live logs are never truncated, so invariant 3 holds while the session exists.
 - **A read-only attach (TD-096).** The attach is opened read-only when the record says `unattended`
-  at open: the pump drops key frames (str and bytes) and passes resize and scroll, and the page is
-  told so in the first frame. The rule is enforced here, in the UI process, not by the terminal
+  at open: the pump drops key frames (str and bytes) and passes resize and scroll — and a frame that
+  is only mouse-wheel reports, which tmux's `mouse on` turns into scrolling its history, never typing
+  (`WHEEL_ONLY`; a click is dropped with the keys) — and the page is told so in the first frame, a
+  text frame `{"read_only": true}` that is not pane output and resets no backoff (TD-029). The rule is enforced here, in the UI process, not by the terminal
   widget — a client setting can be undone from a devtools console, and the point is that a person
   cannot type into a worker by accident. A mode change seen in the feed re-attaches.
 - **pty bridge implementation.** `ptyprocess` (or `pexpect`'s pty layer) for the child pty, so
