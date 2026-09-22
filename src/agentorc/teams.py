@@ -397,7 +397,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         prompt = block + prompt if prompt else block
     return Launch(
         name=name,
-        role=role.name,  # the current name, even when the definition still says `orchestrator` (TD-055)
+        role=role.name,
         home=home,
         dir=checkout,
         team=team.name,

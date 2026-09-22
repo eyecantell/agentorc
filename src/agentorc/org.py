@@ -39,7 +39,7 @@ from typing import Any
 
 import yaml
 
-from agentorc.repoconfig import deprecated_grant, deprecated_team_key, reserved
+from agentorc.repoconfig import deprecated_grant
 from sessionorc import hosts, paths
 from sessionorc.models import GRANT_ALIASES
 
@@ -184,7 +184,6 @@ def load(path: Path | None = None) -> Org:
     for tname, raw in _mapping(data.get("teams"), f"{label}: teams").items():
         org.teams[str(tname)] = _team(str(tname), raw, f"{label}: teams.{tname}", source=path)
     for rname, raw in _mapping(data.get("roles"), f"{label}: roles").items():
-        reserved(str(rname), f"{label}: roles.{rname}: role")
         org.roles[str(rname)] = dict(_mapping(raw, f"{label}: roles.{rname}"))
     _validate(org, label)
     return org
@@ -290,7 +289,7 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 
 MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
 MEMBER_KEYS = (*MANAGER_KEYS, "count", "team")
-TEAM_KEYS = ("projects", "manager", "lead", "techlead", "seats", "members", "host")
+TEAM_KEYS = ("projects", "manager", "techlead", "seats", "members", "host")
 TECHLEAD_KEYS = ("name", "home", "profile", "brief", "context")
 TECHLEAD_ROLE = "techlead"
 SEAT_KEYS = ("name", "role", "trigger", "brief", "profile", "home")
@@ -330,20 +329,6 @@ def _member(raw: Any, key: str) -> MemberDef:
     )
 
 
-def _manager_key(raw: dict[str, Any], key: str) -> str:
-    """Which key holds the team's manager (design §4.8 *The names*, TD-076): `manager:`, or the old
-    `lead:` for one release, said once per process. Both is refused: which was meant is not ours
-    to guess."""
-    if "lead" not in raw:
-        return "manager"
-    if "manager" in raw:
-        raise ValueError(
-            f"{key}: carries both `manager:` and `lead:` — `lead:` is the old name of `manager:` (TD-076); keep one"
-        )
-    deprecated_team_key("lead", "manager", key)
-    return "lead"
-
-
 def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
     raw = _mapping(raw, key)
     _no_stray(raw, TEAM_KEYS, key)
@@ -354,18 +339,17 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         projects = [projects]
     if not isinstance(projects, list):
         raise ValueError(f"{key}.projects must be a list of project names")
-    mkey = _manager_key(raw, key)
-    manager_raw = _mapping(raw.get(mkey), f"{key}.{mkey}")
-    _no_stray(manager_raw, MANAGER_KEYS, f"{key}.{mkey}")
+    manager_raw = _mapping(raw.get("manager"), f"{key}.manager")
+    _no_stray(manager_raw, MANAGER_KEYS, f"{key}.manager")
     manager = ManagerDef(
-        role=_str(manager_raw.get("role"), f"{key}.{mkey}.role", default=DEFAULT_MANAGER_ROLE),
-        name=_str(manager_raw.get("name"), f"{key}.{mkey}.name", default=f"{name}-lead"),
-        home=_str(manager_raw.get("home"), f"{key}.{mkey}.home"),
-        profile=_opt_str(manager_raw.get("profile"), f"{key}.{mkey}.profile"),
-        lane=_lane(manager_raw.get("lane"), f"{key}.{mkey}.lane"),
-        brief=_opt_str(manager_raw.get("brief"), f"{key}.{mkey}.brief"),
-        grants=_grants(manager_raw.get("grants"), f"{key}.{mkey}.grants"),
-        unattended=_flag(manager_raw.get("unattended"), f"{key}.{mkey}.unattended", default=True),
+        role=_str(manager_raw.get("role"), f"{key}.manager.role", default=DEFAULT_MANAGER_ROLE),
+        name=_str(manager_raw.get("name"), f"{key}.manager.name", default=f"{name}-lead"),
+        home=_str(manager_raw.get("home"), f"{key}.manager.home"),
+        profile=_opt_str(manager_raw.get("profile"), f"{key}.manager.profile"),
+        lane=_lane(manager_raw.get("lane"), f"{key}.manager.lane"),
+        brief=_opt_str(manager_raw.get("brief"), f"{key}.manager.brief"),
+        grants=_grants(manager_raw.get("grants"), f"{key}.manager.grants"),
+        unattended=_flag(manager_raw.get("unattended"), f"{key}.manager.unattended", default=True),
     )
     members_raw = raw.get("members")
     if members_raw is None:

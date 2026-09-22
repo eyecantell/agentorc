@@ -835,7 +835,7 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
             "name": "g1",
             "dir": str(tmp_path),
             "adapter": "hookstub",
-            "role": "lead",
+            "role": "manager",
             "grant": "control",
         },
         follow_redirects=False,
@@ -845,13 +845,13 @@ def test_the_new_session_form_shows_the_grants_it_would_give_and_only_starts_wha
     got = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert "control" in (got.get("capabilities") or [])
 
-    # unticked on a `lead` preset: the person's decision stands over the preset's grants.
+    # unticked on a `manager` preset: the person's decision stands over the preset's grants.
     # A second directory, since one agent session per directory is refused (§9 invariant 2).
     other = tmp_path / "other"
     other.mkdir()
     r = client.post(
         "/new",
-        data={"name": "g2", "dir": str(other), "adapter": "hookstub", "role": "lead"},
+        data={"name": "g2", "dir": str(other), "adapter": "hookstub", "role": "manager"},
         follow_redirects=False,
     )
     assert r.status_code == 303
@@ -1520,15 +1520,22 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
             r["repo"] = repo
         return r
 
-    records = [rec("ao-l", "lead"), rec("ao-g", "grinder", str(tmp_path)), rec("ao-p", "plain"), rec("ao-n")]
+    records = [
+        rec("ao-m", "manager"),
+        rec("ao-g", "grinder", str(tmp_path)),
+        rec("ao-p", "plain"),
+        rec("ao-n"),
+        rec("ao-l", "lead"),
+    ]
     uiapp._icon_cache.clear()
     icons = asyncio.run(uiapp.role_icons(records))
     card = uiapp.templates.get_template("card.html")
-    lead, grinder, plain, none = (card.render(s=uiapp.view(r, records, icons=icons)) for r in records)
-    # the picture, and the **label** beside it (design §4.8 *The names*, TD-076): a record badged
-    # with the retired word `lead` is labelled through the renamed-roles table, so it reads *Manager*
-    assert ICON_PATHS["flag"] in lead and ">Manager</span>" in lead and ">lead</span>" not in lead
-    assert 'title="the role preset it was started under — lead' in lead  # the key is still there, on hover
+    manager, grinder, plain, none, lead = (card.render(s=uiapp.view(r, records, icons=icons)) for r in records)
+    # the picture, and the **label** beside it (design §4.8 *The names*, TD-076)
+    assert ICON_PATHS["flag"] in manager and ">Manager</span>" in manager
+    assert 'title="the role preset it was started under — manager' in manager  # the key, on hover
+    # a record badged with an old word keeps its badge as text, labelled by its own name (TD-107)
+    assert ">Lead</span>" in lead and ICON_PATHS["flag"] not in lead
     # the repo's own `roles:` wins, exactly as it does for every other key
     assert ICON_PATHS["terminal"] in grinder and ICON_PATHS["wrench"] not in grinder
 

@@ -2036,29 +2036,12 @@ what was true on a day.
 
 **Role names.** The session that runs a team's lifecycle — starts its members, nudges them,
 wraps them up — is the `manager`; the technical go-between is the `techlead`; `director` keeps
-its name (its members are managers, and *director > manager > worker* reads as a line). Two
-tables sit beside the presets:
-
-- **Renamed roles**, looked up **once, never chained** — `orchestrator → manager`,
-  `lead → manager`, and no entry whose target is itself an old word. For one release both old
-  words resolve to `manager` wherever a role is named (`--role`, a team definition's `role:`, a
-  `roles:` key in `org.yml` or `.agentorc.yml`), the client prints one line per process naming
-  the rename that retired the word (TD-076 for both), and the record is written with `manager`.
-  A record already badged `lead` or `orchestrator` keeps its badge as written (§9 invariant 9)
-  and the page draws it under the new label, so an old card and a new one read the same. A team
-  definition's `lead:` block is `manager:`, and `lead: person` is `manager: person`; `lead:` is
-  still read as the same thing, with the same one line, and **a definition that carries both is
-  refused by name**. What `ao team` prints, the Org's team header and `--json` say `manager`, and
-  **`--json` carries no second key**. After the one release the old words stop resolving.
-- **Retired words**, each with the word that replaced it: **the bare word `lead` is retired and
-  never given a new meaning**; after the release it is **refused by name** — *`lead` was renamed
-  `manager` (TD-076)* — and that refusal stays, because a word that is merely unknown is one a
-  repo's `roles:` may define tomorrow. `orchestrate` and `orchestrator` (TD-055) are aliases
-  that are simply deleted when their release is over: falling back to *unknown role* costs
-  nothing since nobody wants the word.
-- **Reserved words** — a word decided before it is built — is a third table, empty: a repo, an
-  org or `ao new --role` naming one is refused with a line saying why, not as an unknown role,
-  so the word cannot arrive in live data meaning something the design then has to read around.
+its name (its members are managers, and *director > manager > worker* reads as a line). The
+older words — `orchestrator` and `lead` for the manager, `orchestrate` for `control` — resolve to
+nothing: there has been no release and one user, so there is no renamed-roles table, no
+retired-words table and no reserved-words table (TD-107). An old word is an unknown role like any
+other, and a team definition's `lead:` key is an unknown key. A record already badged `lead` or
+`orchestrator` keeps its badge as written (§9 invariant 9), labelled as any unknown role is.
 
 Session names carry no history: the team definitions use `manager-ao-1` and `grinder-ao-N`, with
 brief files named to match. A name is what a record, a worktree, a launch branch and a run log
@@ -2083,8 +2066,7 @@ It is a person's text from a config file and is drawn as text, escaped (an icon 
 thing: its name is a key into a fixed set and is never drawn). **It is resolved where the icon
 is, with the icon's limit**: the page reads roles from this host's disk, so a label a repo on
 *another* host gives its role is not seen and the badge falls back to the default — the role's
-name, raised — never to nothing. An old badge is labelled through the renamed-roles table:
-`role: orchestrator` draws *Manager* (TD-076).
+name, raised — never to nothing.
 
 Each preset also carries the test for when it has **run out of work**, which is the role's and
 never the core's; the tests and what a manager does with them are §4.9a.
@@ -2470,7 +2452,7 @@ teams:
 `host` (on the team, TD-057 step 4a): the host every session of the team lands on — a `nodes:`
 entry of the home — default the host the start runs on. Checkouts are resolved on it.
 
-`manager` (`lead`, its former name, is read for one release; both is refused — TD-076): `role`
+`manager` (`lead`, its former name, is an unknown key — TD-107): `role`
 (default `manager`; **`person`** means the person manages — no session is started and members
 get an empty `controllers` list plus the team badge), `name` (default `<team>-lead`), `home` (a
 repo name from the team's projects — required when the projects list more than one repo,
@@ -2770,8 +2752,7 @@ member searched, and exits; `ao team start ao-grind` then brings the team back.
 The techlead is a role of its own on a high-trust model: it filters what would reach the person,
 answers what is obvious, and passes the rest up; a manager's lifecycle work does not spend its
 tokens. **It is a ladder, not a new mechanism**: a worker's question goes to the techlead where its
-team has one, the techlead answers it or passes it up, and the person is the top. The word is not
-reserved (§4.8 *The names*). The preset brief says what to do when `ao` refuses a verb it names.
+team has one, the techlead answers it or passes it up, and the person is the top. The preset brief says what to do when `ao` refuses a verb it names.
 
 - **The seat.** A team definition may carry **`techlead: {name, profile, brief, home, context}`**
   beside `manager:` — optional, one per team, a session and never `person`; `name` defaults to

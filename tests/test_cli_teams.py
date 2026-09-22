@@ -219,25 +219,16 @@ def test_the_lead_is_created_first_and_members_carry_controllers_lead(world, cap
     assert "member grinder" in out
 
 
-def test_a_definition_still_naming_lead_or_orchestrator_starts_a_manager(world, capsys, monkeypatch):
-    """TD-055 step 2, then TD-076 step 2: an `org.yml` written before the renames — the `lead:` key,
-    `role: orchestrator` and a `roles: orchestrator:` overlay — starts the manager with the manager
-    brief, grants and the overlay's profile, records `role: manager`, and says once per old word
-    that the name changed."""
-    from agentorc import repoconfig
-
-    monkeypatch.setattr(repoconfig, "_warned", set())
+def test_a_definition_still_carrying_the_lead_key_is_refused(world, capsys):
+    """TD-107: `lead:` is no longer read as `manager:` — it is a stray key, refused by name like any
+    other, and nothing is started."""
     tmp_path, state = world
     doc = org_doc(tmp_path)
-    doc["teams"]["ao-grind"]["lead"] = {**doc["teams"]["ao-grind"].pop("manager"), "role": "orchestrator"}
-    doc["roles"]["orchestrator"] = {"profile": "org-grind"}
+    doc["teams"]["ao-grind"]["lead"] = doc["teams"]["ao-grind"].pop("manager")
     write_org(tmp_path, doc)
-    assert cli.main(["team", "start", "ao-grind"]) == 0
-    lead = creates(state)[0]
-    assert lead["role"] == "manager" and lead["capabilities"] == ["control"] and lead["profile"] == "org-grind"
-    assert "You are a **manager**" in lead["prompt"]
-    err = capsys.readouterr().err
-    assert err.count("role `orchestrator` is now `manager`") == 1 and err.count("`lead:` is now `manager:`") == 1
+    assert cli.main(["team", "start", "ao-grind"]) != 0
+    assert not creates(state)
+    assert "unknown key(s) ['lead']" in capsys.readouterr().err
 
 
 def test_an_interactive_member_is_started_but_said_to_be_out_of_its_leads_reach(world, capsys):

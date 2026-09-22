@@ -149,52 +149,25 @@ def test_discover_walks_up_to_the_file_or_the_git_root(tmp_path):
     assert repoconfig.discover(plain).root == plain
 
 
-def test_orchestrator_and_lead_are_deprecated_aliases_for_manager(tmp_path, capsys, monkeypatch):
-    """TD-055 step 2, repointed by TD-076 step 2: `orchestrator` and `lead` are both `manager` — one
-    lookup, never a chain (design §4.8 *The names*). Each old name still resolves for one release —
-    as a name and as a `roles:` key in the org overlay or the repo's file — with one line naming the
-    new word, and nothing lists or records either old name any more."""
-    monkeypatch.setattr(repoconfig, "_warned", set())
-    assert set(repoconfig.ROLE_ALIASES.values()).isdisjoint(repoconfig.ROLE_ALIASES)  # no chain
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  orchestrator: {profile: repo-prof}\n")
-    cfg = repoconfig.load(tmp_path)
-    role = repoconfig.resolve_role(
-        cfg, "orchestrator", {"orchestrator": {"lane": ["TD-1"]}, "manager": {"profile": "org"}}
-    )
-    assert role.name == "manager" and role.grants == ["control"] and role.brief == "manager.md"
-    assert role.lane == ["TD-1"]  # the org overlay's old key folded into `manager`
-    assert role.profile == "repo-prof"  # the repo layer still wins over the org layer
-    for _ in range(2):  # met twice, said once
-        assert repoconfig.resolve_role(repoconfig.RepoConfig(), "lead").name == "manager"
-    names = repoconfig.role_names(cfg, {"orchestrator": {}, "lead": {}})
-    assert "orchestrator" not in names and "lead" not in names
-    err = capsys.readouterr().err
-    assert err.count("role `orchestrator` is now `manager` (TD-076)") == 1  # once per process
-    assert err.count("role `lead` is now `manager` (TD-076)") == 1
-    # within one layer, a new key the person wrote beside the old one wins per key
-    both = repoconfig.resolve_role(
-        repoconfig.RepoConfig(), "manager", {"lead": {"profile": "old", "lane": ["x"]}, "manager": {"profile": "new"}}
-    )
-    assert both.profile == "new" and both.lane == ["x"]
+def test_old_role_names_are_unknown_roles(tmp_path):
+    """TD-107: the renamed-roles table is gone. `orchestrator` and `lead` resolve to nothing unless a
+    layer defines them, and a layer that does defines a role of that name, not `manager`."""
+    for old in ("orchestrator", "lead"):
+        with pytest.raises(KeyError, match=f"unknown role '{old}'"):
+            repoconfig.resolve_role(repoconfig.RepoConfig(), old)
+    (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {profile: repo-prof}\n")
+    role = repoconfig.resolve_role(repoconfig.load(tmp_path), "lead")
+    assert (role.name, role.profile, role.grants) == ("lead", "repo-prof", [])
 
 
-def test_techlead_is_a_preset_and_a_reserved_word_is_still_refused_by_name(tmp_path, monkeypatch):
+def test_techlead_is_a_preset(tmp_path):
     """TD-075 step 1, design §4.9b: `techlead` is a built-in preset — `techlead.md`, no lane, no
-    grants, icon `book`, label *Tech Lead* — and a repo may override its keys like any other's.
-    The reserved-words table it left stays (§4.8 *The names*): a word in it is still refused with
-    its reason wherever a role is named or defined, never as an unknown role."""
+    grants, icon `book`, label *Tech Lead* — and a repo may override its keys like any other's."""
     tl = repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
     assert (tl.brief, tl.lane, tl.grants, tl.icon, tl.display) == ("techlead.md", [], [], "book", "Tech Lead")
     assert "**techlead**" in tl.brief_text()
     (tmp_path / ".agentorc.yml").write_text("roles:\n  techlead: {profile: strong}\n")
     assert repoconfig.resolve_role(repoconfig.load(tmp_path), "techlead").profile == "strong"
-    assert repoconfig.RESERVED_ROLES == {}
-    monkeypatch.setitem(repoconfig.RESERVED_ROLES, "advisor", "reserved for a test")
-    with pytest.raises(ValueError, match="`advisor` is reserved for a test"):
-        repoconfig.resolve_role(repoconfig.RepoConfig(), "advisor")
-    (tmp_path / ".agentorc.yml").write_text("roles:\n  advisor: {grants: [control]}\n")
-    with pytest.raises(ValueError, match=r"`roles`\.advisor: role `advisor` is reserved"):
-        repoconfig.load(tmp_path)
 
 
 def test_techlead_placeholder_names_the_seat_or_says_none():
@@ -221,8 +194,8 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
     """design §4.8 *The names* (TD-076 step 3): a preset or a `roles:` entry may carry `label:` —
     what the role badge, a team header and an Inbox row **show** in place of the key; the key is
     what everything else reads. The built-ins' are *Manager*, *Grinder*, *Hunter*; the default is
-    the role's name with its first letter raised, and an old name is read through the renamed-roles
-    table, so a record badged `orchestrator` or `lead` reads *Manager*."""
+    the role's name with its first letter raised — an old badge too: `orchestrator` reads
+    *Orchestrator* (TD-107)."""
     builtin = {r.name: r.display for r in repoconfig.roles(repoconfig.RepoConfig())}
     assert builtin == {
         "grinder": "Grinder",
@@ -233,7 +206,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
         "plain": "Plain",
     }
     assert "label" in repoconfig.ROLE_KEYS
-    assert repoconfig.default_label("orchestrator") == repoconfig.default_label("lead") == "Manager"
+    assert repoconfig.default_label("orchestrator") == "Orchestrator"
     assert repoconfig.default_label("reviewer") == "Reviewer" and repoconfig.default_label("") == ""
     # a layer's label wins per key, as every other key does, and to_dict says what the page shows
     (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder: {label: TD grinder}\n  reviewer: {icon: eye}\n")

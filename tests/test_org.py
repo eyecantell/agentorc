@@ -315,24 +315,12 @@ def test_a_team_may_name_the_host_it_lands_on(tmp_path):
         org.load(f)
 
 
-def test_the_old_lead_key_is_read_as_manager_and_both_are_refused(tmp_path, capsys, monkeypatch):
-    """TD-076 step 2, design §4.8 *The names*: a team definition's `lead:` is the old name of
-    `manager:` — read as the same thing for one release, said once per process; a definition that
-    carries both is refused by name, since which one was meant is not ours to guess."""
-    from agentorc import repoconfig
-
-    monkeypatch.setattr(repoconfig, "_warned", set())
-    base = "projects: {p: {repos: {r: {kmaster: /tmp}}}}\nteams:\n"
+def test_the_old_lead_key_is_a_stray_key(tmp_path):
+    """TD-107: `lead:` was read as `manager:` for a release that never came; it is now refused as
+    any unknown key on a team is."""
     f = tmp_path / "org.yml"
-    f.write_text(
-        base + "  t: {projects: [p], lead: {role: lead, name: orc}}\n  u: {projects: [p], lead: {role: person}}\n"
-    )
-    o = org.load(f)
-    assert o.teams["t"].manager == org.ManagerDef(role="lead", name="orc", home="r")  # resolved at plan time
-    assert o.teams["u"].manager.role == org.PERSON
-    assert capsys.readouterr().err.count("`lead:` is now `manager:` (TD-076)") == 1
-    f.write_text(base + "  t: {projects: [p], lead: {name: a}, manager: {name: b}}\n")
-    with pytest.raises(ValueError, match=r"teams\.t: carries both `manager:` and `lead:`"):
+    f.write_text("projects: {p: {repos: {r: {kmaster: /tmp}}}}\nteams:\n  t: {projects: [p], lead: {name: orc}}\n")
+    with pytest.raises(ValueError, match=r"teams\.t: unknown key\(s\) \['lead'\]"):
         org.load(f)
 
 
