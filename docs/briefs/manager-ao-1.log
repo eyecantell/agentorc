@@ -215,3 +215,4 @@
 17:29  #434 (TD-100 slice 1, src/sessionorc) merged by the anchor after its read. The anchor sent grinder-ao-2 to rebase and merge #437 (off the hand-rule paths once rebased) → working again. grinder-ao-1: TD-107
 17:34  #438 (TD-076, docs/briefs) merged 23:29Z beside the anchor's #434 merge, not by a member (no merge in either grinder's screen) → cadence pass (review recorded). #439 open, the anchor's branch. grinder-ao-1: TD-107; grinder-ao-2: #437
 17:38  grinder-ao-2: noted TD-100 (2) done, #437 merged — but #437 is still OPEN and it is still working on a test → watching
+17:45  grinder-ao-2: corrected itself — #437 merged 23:45Z (rebased past #434, #439; no src/sessionorc in it, merged on the anchor's word) → cadence pass (review recorded)
