@@ -174,3 +174,4 @@
 07:50  grinder-ao-1: TD-088 work on branch td097-on-call-seat → derived TD-097 claim collides with grinder-ao-2's declared TD-097; note sent (rename the branch). grinder-ao-2: working TD-097
 07:51–07:58 quiet (grinder-ao-1 renamed its branch; the TD-097 collision cleared)
 07:59  grinder-ao-2: TD-097 done → PR #412 cadence pass (review recorded, not verified; no src/sessionorc files), note read; now TD-095. grinder-ao-1: working TD-088
+08:05  grinder-ao-1: TD-088 done → PR #413 cadence pass (review recorded), but it touches src/sessionorc/agent.py and was self-merged without the anchor's read (TD-093 by hand; 2nd after #402) → mail relaying TD-093's rule; board line for #406 updated (PR #415, fact-check running)
