@@ -4291,8 +4291,8 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
 7. The host agent's edits to a repo's board file are always committed, never left in the tree.
 8. A session's process is launched as the adapter's argv, never through the person's
    interactive shell (§4.1); tmux, not the host agent, holds the process.
-9. Nothing keys on a session's role, team or project: policies key on `unattended` and the
-   schedule, acting RPCs key on grants and `controllers`, displays key on the report channels
+9. Nothing keys on a session's role, team or project: policies key on `unattended`, `supervised` (§6) and the
+    schedule, acting RPCs key on grants and `controllers`, displays key on the report channels
    (§4.8). A preset sets defaults at start and is a badge afterwards; `team` and `project` are
    badges from the start (§4.9), and the Org page's grouping is derived from `controllers` and
    the badge on each tick, never stored. **One named exception:** the message gate's sideways
