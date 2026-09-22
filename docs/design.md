@@ -3050,7 +3050,10 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   verdict on a diff is nowhere written down before the read; `--source` on that reply names
   what the diff was measured against (the design's sections, the ledger entry), not an authority
   for the verdict, and the reply is still filed to the person as *answered for you* with
-  **Overrule**. Who merges is the one
+  **Overrule** — which, on a PR the reader has already merged, cannot unmerge anything: it
+  reaches the asker as any overrule does, and a revert is then that session's next task, said
+  in the overrule's text. The reader's merge is visible on the row (*merged #n*) so the person
+  knows which kind of overrule they are sending. Who merges is the one
   place the asker's mode matters, and it is about the person, not the rule: for an ask from an
   **`unattended`** session the reader merges the PR itself (a `gh` act on the repo — not a
   session act, so no grant covers it and none is needed) and replies so; for an ask from an **`interactive`** session — a person is at it — the reply is a
