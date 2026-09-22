@@ -641,7 +641,7 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Priority:** Low
 **Added:** 2026-09-18 (the anchor session; Paul's review of the Org page)
-**Status:** Open — a list to pick from, none approved. Built in the same PR as this entry: a team with nothing live keeps its card (Start on it, its dead cards folded, below the live teams and *No team*), the **Teams** strip retired, state glyphs on every pill, *Person inbox* → **Inbox**.
+**Status:** Open — a list to pick from, none approved; **items 3, 4 and 5 are settled by TD-095's card (2026-09-21)**, below. Left: 1 and 2 (each a §4.5a row first — the anchor's design), 6 and 7 (the mockups, `docs/mockups/gen.py` — the Teams strip retired 2026-09-18 is still drawn there), 8 (Paul's canvas). Built in the same PR as this entry: a team with nothing live keeps its card (Start on it, its dead cards folded, below the live teams and *No team*), the **Teams** strip retired, state glyphs on every pill, *Person inbox* → **Inbox**.
 **Location:** `src/agentorc/ui/` (templates, `app.js`, `app.css`)
 
 **Why:** on 2026-09-18 the page was seven cards, six of them dead, under a strip of three stopped teams: nothing on it said which dead card was whose, and what was running was one card among them. The review fixed the grouping; these are what it turned up beside it, kept here so they are not lost with the conversation.
@@ -649,9 +649,9 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Ideas, cheapest first:**
 1. **Forget all** on a stopped team's card — seven exited cards is seven Forget clicks today. A team-level control: §4.5a row first. It should refuse while any of the team's sessions is not ready to close (unpushed work, as `orchestrator-ao-1`'s *305 unpushed* flag showed on 2026-09-18).
 2. **Unread mail on a folded team** — the header of a folded team says nothing about its sessions' unread counts (`tdgrind-1` held 19 on 2026-09-18). A `✉ n` beside the fold count. Unread mail on an exited session is by design as far as it goes: an unread entry never ages out (§4.10), and a *resumed* conversation takes the old record's mail with it (`agent.py`, `_supersede` → `_move_mail`). **Not verified:** what a fresh `ao team start` under the same name does with the dead record's inbox. Most of those 19 were claim notes, stale within the hour — worth deciding whether an unread `note` should outlive the run it was sent to (§4.10).
-3. **A roll-up on a live team's header** — `3 working · 1 idle` as glyph counts, so a team is read without reading its cards.
-4. **Exited cards carry less** — profile line, *under* chip and stop note say nothing once a session is dead; a dead card could be two rows and Forget.
-5. **The mode badge** — *unattended* is the loudest thing on every card (filled, dark) and is true of every team session. Quieter, or a glyph; *interactive* is the rarer fact worth marking.
+3. ~~**A roll-up on a live team's header**~~ — **built by TD-095 (2026-09-21, PR #389)**: the header reads `host / repo · 2 working · 1 unseen · 1 idle`, counts in the grid's order, *needs you* its ringed mark. In words, not glyphs — the counts sit beside pills that already carry the glyphs.
+4. ~~**Exited cards carry less**~~ — **decided otherwise by TD-095** (design §4.5 *The card's anatomy*, Paul 2026-09-21): every card is the same six rows at one height, a dead one included, so a page of cards reads as a grid; what a dead card does carry less of is controls — its foot leads with Forget (PR #384), and a stopped team folds its dead cards away (2026-09-18).
+5. ~~**The mode badge**~~ — **built by TD-095 (2026-09-21, PRs #384 and #391)**: *unattended* is a plain quiet word, *interactive* carries the `person` mark at full strength (reserved for it), the toggle moved into *more*, and the Org filter gained *mine*.
 6. **The legend** — the note under the grid explains the sort order in words; with glyphs it could be the glyphs.
 
 7. **The mockups are behind the page** — `docs/mockups/gen.py` and the generated `Main.dc.html` / `MainDark.dc.html` still draw the Urgent first / Pinned control and the Teams strip, both retired 2026-09-18 (review of PR #229). Regenerate them with the look-and-feel pass rather than twice.
