@@ -19,7 +19,7 @@
   {% if node_banner %}<div class="warn" id="nodebanner">⚠ <b>{{ host }}</b>: {{ node_banner }}</div>{% endif %}
   {# design §4.5a: what is left of the **Teams** strip (retired 2026-09-18 — Start is on the team's
      card): one line, only when there is something to say about the definitions themselves. #}
-  {% if strip.elsewhere or strip.notes or not strip.teams or identity_note %}
+  {% if strip.elsewhere or strip.notes or not strip.teams or identity_note or editor_note %}
   <div class="strip" id="teams" data-source="{{ strip.source }}">
     {% if strip.elsewhere %}<span class="meta">Teams: {{ strip.elsewhere }}</span>
     {% elif not strip.teams %}<span class="meta">Teams: none defined{% if strip.source %} in {{ strip.source }}{% endif %} — a team is <code>teams:</code> there, or in a repo's <code>.agentorc.yml</code></span>{% endif %}
@@ -27,6 +27,9 @@
     {# design §4.8a: which mode this host is in, said here and by `ao status -v` — and said only
        when it is not `enforce`, because a host that is not enforcing is not yet protected. #}
     {% if identity_note %}<span class="meta warnish" id="identitynote" title="who is calling: the channel decides, and a claim that disagrees is refused and shown (design §4.8a)">{{ identity_note }}</span>{% endif %}
+    {# design §5 *The person's own*: an `open_in:` that does not parse, or is refused, is named here
+       and the default editor button drawn — a pasted bad line never becomes a link that runs #}
+    {% if editor_note %}<span class="meta warnish" id="editornote" title="{{ editor_note }}">⚠ ui.yml: open_in refused — the VS Code button is drawn instead ({{ editor_note }})</span>{% endif %}
   </div>
   {% endif %}
   {# design §4.5a Org **team groups** (§4.9): a section per team when any session carries a badge
