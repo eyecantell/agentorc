@@ -179,3 +179,4 @@
 08:09  grinder-ao-2: TD-095 (f),(i) done → PR #414 cadence pass (review recorded; no held paths). Send to grinder-ao-1 on #413: submitted (its --wait lost to the 14:09Z host restart, verdict read from the record). PR #415 closed: the anchor's #416 already dropped the #406 line
 08:10–08:20 quiet (#418 td098-seats and #419 td071 opened, neither touches held paths)
 08:21  grinder-ao-2: TD-071 (6,7) done → PR #419 cadence pass (review recorded; no held paths). grinder-ao-1: TD-098, #418 open
+08:23  grinder-ao-1: TD-098 step 1 done → PR #418 cadence pass (review recorded; no held paths)
