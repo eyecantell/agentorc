@@ -808,7 +808,9 @@ def cmd_tail(args: argparse.Namespace) -> int:
 
 
 def cmd_mode(args: argparse.Namespace) -> int:
-    s = call_sync("set_mode", id=args.id, unattended=args.mode == "unattended")
+    s = call_sync(
+        "set_mode", id=args.id, unattended=args.mode == "unattended", **teams.gate_prompts(args.mode == "unattended")
+    )
     return emit(args, s, lambda: print(f"{s['id']}: {'unattended' if s['unattended'] else 'interactive'}"))
 
 

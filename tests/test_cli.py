@@ -179,7 +179,8 @@ def test_json_on_every_subcommand(subprocess_agent, tmp_path, capsys, monkeypatc
     assert cli.main(["--json", "keys", sid, "Enter"]) == 0
     assert out() == {"ok": True, "id": sid}
     assert cli.main(["--json", "mode", sid, "unattended"]) == 0
-    assert out()["unattended"] is True
+    flipped = out()
+    assert flipped["unattended"] is True and flipped["pause_prompt"]  # the gate's texts ride along (TD-100)
     assert cli.main(["--json", "status"]) == 0
     assert sid in [r["id"] for r in out()]  # the module agent holds other tests' sessions too
     assert cli.main(["--json", "kill", sid]) == 0
