@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import os
 import pathlib
 import re
@@ -857,18 +858,28 @@ def _reserve_text(r: Any) -> str:
 
 
 def _gate_line(prof: str, windows: list[dict[str, Any]]) -> str:
-    """*grind · 5h 30 → line 70% · wk 10/day → line 60% (moves Thu 07:00)* (design §4.7)."""
+    """*grind · 5h 30 → line 70% · week 10/day → line 60% (4 days left, moves Thu 07:00)* (design
+    §4.7). A row with `unread` set is a reserve on a profile with no usage reading yet."""
     parts = [prof or "(default)"]
     for w in windows:
+        head = f"{w['label']} {_reserve_text(w['reserve'])}"
+        if w.get("unread"):
+            parts.append(f"{head} → no reading yet")
+            continue
         if w.get("line") is None:
-            parts.append(f"{w['label']} {_reserve_text(w['reserve'])} → no line (the window reports no reset)")
+            parts.append(f"{head} → no line (the window reports no reset)")
             continue
         now = f", now {w['pct']}%" if isinstance(w.get("pct"), int | float) else ""
-        moves = ""
-        if isinstance(w.get("reserve"), dict) and w.get("next"):
-            when = datetime.fromisoformat(str(w["next"]).replace("Z", "+00:00")).astimezone()
-            moves = f", moves {when:%a %H:%M}"
-        parts.append(f"{w['label']} {_reserve_text(w['reserve'])} → line {w['line']}%{now}{moves}")
+        extra = ""
+        if isinstance(w.get("reserve"), dict) and w.get("resets"):
+            resets = datetime.fromisoformat(str(w["resets"]).replace("Z", "+00:00"))
+            left = max(1, math.ceil((resets - datetime.now(UTC)) / timedelta(days=1)))
+            extra = f"{left} day{'s' if left != 1 else ''} left"
+            if w.get("next"):
+                when = datetime.fromisoformat(str(w["next"]).replace("Z", "+00:00")).astimezone()
+                extra += f", moves {when:%a %H:%M}"
+            extra = f" ({extra})"
+        parts.append(f"{head} → line {w['line']}%{now}{extra}")
     return " · ".join(parts)
 
 
@@ -884,19 +895,17 @@ def cmd_gate(args: argparse.Namespace) -> int:
             if not got["profiles"]:
                 print(f"no usage gate: no reserves in {got['file']}")
             for prof, v in got["profiles"].items():
-                rows = v["windows"] or [
-                    {"label": k, "reserve": r, "line": None, "pct": None} for k, r in v["reserves"].items()
-                ]
-                print(_gate_line(prof, rows) + ("" if v["windows"] else "  (no usage reading yet)"))
+                rows = v["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in v["reserves"].items()]
+                print(_gate_line(prof, rows))
 
         return emit(args, got, prose)
     if not args.reserves:
-        raise AgentError("ao gate <profile> <label>=<reserve>…, e.g. ao gate grind 5h=30 wk=10/day")
+        raise AgentError("ao gate <profile> <label>=<reserve>…, e.g. ao gate grind 5h=30 week=10/day")
     reserves: dict[str, Any] = {}
     for item in args.reserves:
         label, eq, value = item.partition("=")
         if not eq or not label:
-            raise AgentError(f"{item!r}: a reserve is <label>=<reserve>, e.g. 5h=30 or wk=10/day")
+            raise AgentError(f"{item!r}: a reserve is <label>=<reserve>, e.g. 5h=30 or week=10/day")
         reserves[label] = _reserve(value)
     prof = "" if args.profile == "-" else args.profile
     got = call_sync("set_settings", profile=prof, reserves=reserves)
@@ -905,9 +914,7 @@ def cmd_gate(args: argparse.Namespace) -> int:
         if not got["reserves"]:
             print(f"{prof or '(default)'}: no reserves — the gate pauses nothing on this profile")
         else:
-            rows = got["windows"] or [
-                {"label": k, "reserve": r, "line": None, "pct": None} for k, r in got["reserves"].items()
-            ]
+            rows = got["windows"] or [{"label": k, "reserve": r, "unread": True} for k, r in got["reserves"].items()]
             print(_gate_line(prof, rows))
         if got.get("unchecked"):
             print("  (the profile has no usage reading yet, so the labels were not checked)")
@@ -1669,7 +1676,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = add("gate", help="show or set the usage gate's reserves per profile (design §6, TD-100)")
     p.add_argument("profile", nargs="?", help="the profile; `-` for the unnamed default. None: show every profile")
-    p.add_argument("reserves", nargs="*", help="<label>=<reserve>: 5h=30, wk=10/day; wk= clears it")
+    p.add_argument("reserves", nargs="*", help="<label>=<reserve>: 5h=30, week=10/day; week= clears it")
     p.set_defaults(fn=cmd_gate)
 
     for name, help_ in (

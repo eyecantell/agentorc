@@ -1571,6 +1571,10 @@ def test_msg_source_and_the_answered_for_you_lines(subprocess_agent, tmp_path, c
         call_sync("kill", id=sid)
 
 
+def _iso(t: datetime.datetime) -> str:
+    return t.isoformat().replace("+00:00", "Z")
+
+
 def test_gate_reserves_parse_and_the_line_reads_as_the_design_writes_it():
     """`ao gate` (design §4.7, TD-100 slice 2): `30` flat, `10/day` per day, empty clears; the line
     names the reserve, the line and, for a per-day reserve, when it moves."""
@@ -1582,12 +1586,20 @@ def test_gate_reserves_parse_and_the_line_reads_as_the_design_writes_it():
             _reserve(bad)
     rows = [
         {"label": "5h", "reserve": 30, "line": 70, "pct": 12, "next": None},
-        {"label": "wk", "reserve": {"per_day": 10}, "line": 60, "pct": 55, "next": "2026-09-24T13:00:00Z"},
+        {
+            "label": "week",
+            "reserve": {"per_day": 10},
+            "line": 60,
+            "pct": 55,
+            "resets": _iso(datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=3, hours=1)),
+            "next": "2026-09-24T13:00:00Z",
+        },
         {"label": "x", "reserve": {"per_day": 5}, "line": None, "pct": 1, "next": None},
     ]
     line = _gate_line("grind", rows)
-    assert line.startswith("grind · 5h 30 → line 70%, now 12% · wk 10/day → line 60%, now 55%, moves ")
+    assert line.startswith("grind · 5h 30 → line 70%, now 12% · week 10/day → line 60%, now 55% (4 days left, moves ")
     assert "x 5/day → no line" in line
+    assert _gate_line("grind", [{"label": "5h", "reserve": 30, "unread": True}]) == "grind · 5h 30 → no reading yet"
     assert _gate_line("", []) == "(default)"
 
 
@@ -1600,12 +1612,14 @@ def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys,
     monkeypatch.delenv("AGENTORC_SESSION", raising=False)
     assert cli.main(["gate"]) == 0
     assert "no usage gate" in capsys.readouterr().out
-    assert cli.main(["gate", "grind", "5h=30", "wk=10/day"]) == 0
+    assert cli.main(["gate", "grind", "5h=30", "week=10/day"]) == 0
     out = capsys.readouterr().out
-    assert "grind · 5h 30" in out and "not checked" in out  # no reading for `grind` in a test home
+    assert "grind · 5h 30 → no reading yet" in out and "not checked" in out  # no reading for `grind` here
+    assert cli.main(["gate"]) == 0
+    assert "grind · 5h 30 → no reading yet · week 10/day → no reading yet" in capsys.readouterr().out
     assert cli.main(["--json", "gate"]) == 0
-    assert json.loads(capsys.readouterr().out)["profiles"]["grind"]["reserves"] == {"5h": 30, "wk": {"per_day": 10}}
-    assert cli.main(["gate", "grind", "5h=", "wk="]) == 0
+    assert json.loads(capsys.readouterr().out)["profiles"]["grind"]["reserves"] == {"5h": 30, "week": {"per_day": 10}}
+    assert cli.main(["gate", "grind", "5h=", "week="]) == 0
     assert "no reserves" in capsys.readouterr().out
     assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path), "--unattended"]) == 0
     rec = json.loads(capsys.readouterr().out)
