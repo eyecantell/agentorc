@@ -58,7 +58,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-097 | An empty seat's card says *exited*, which reads as a failure | Medium | Built — live look pending |
 | TD-098 | Seats with a trigger — a doc audit or a test audit that fills after n PRs or every so often | Medium | Partly done — seats load and start, `auditor` preset built |
 | TD-099 | A team with nothing working still offers Wind down, and a manager that stops for the usage window goes idle instead of declaring | Medium | Open |
-| TD-100 | The wind-down percentage is a sentence in a brief; Paul wants a knob set by the week's interactive load, later from a settings page | Medium | Partly done — slice 1 built (PR #434, awaiting the anchor) |
+| TD-100 | The wind-down percentage is a sentence in a brief; Paul wants a knob set by the week's interactive load, later from a settings page | Medium | Partly done — slice 1 built (PR #434, awaiting the anchor); slice 3's mark built |
 | TD-101 | A one-day override of the usage reserves, gone at the reset | Low | Open |
 
 ---
