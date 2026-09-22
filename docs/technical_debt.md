@@ -58,6 +58,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-097 | An empty seat's card says *exited*, which reads as a failure | Medium | Built — live look pending |
 | TD-098 | Seats with a trigger — a doc audit or a test audit that fills after n PRs or every so often | Medium | Open |
 | TD-099 | A team with nothing working still offers Wind down, and a manager that stops for the usage window goes idle instead of declaring | Medium | Open |
+| TD-100 | The wind-down percentage is a sentence in a brief; Paul wants a knob set by the week's interactive load, later from a settings page | Medium | Open |
 
 ---
 
@@ -966,3 +967,13 @@ Two things are missing, and the design round chooses between them or takes both:
 **Related:** TD-083 (a run ends with a declaration), TD-095 (the header), TD-091 (the usage gate and the compaction rule are the same kind of stop).
 
 
+## TD-100: The wind-down percentage is a sentence in a brief; Paul wants a knob set by the week's interactive load, later from a settings page
+
+**Priority:** Medium
+**Added:** 2026-09-22 (the anchor session; Paul the same morning)
+**Status:** Open — **not designed.** Paul, 2026-09-22, after the briefs got their 95% (PR #410): *"We will drop the wind down percentage back down after this week's reset. I like to have the ability to change it based on the amount of interactive work I will be doing, to maximize token usage for the subscription without hindering my interactive work. Eventually we will want a settings page where we can change this manually in the shiftlead ui."* Today the figure is prose in `docs/briefs/manager-ao-1.md` and `grinder-ao-1.md`, read by the workers at team start and judged by them — the only lever there is, since the §6 usage gate is not built. Four decisions before a build: **(1) where the number lives** — design §6 and §5 put `usage_gate: {pct, per_window}` in the repo's `.agentorc.yml` `unattended:` block, per profile; a figure a person moves week by week does not belong in a file under git, so the likely home is a host-level setting under `~/.agentorc` that an RPC can write (the page's settings later), keyed by profile, with §6's block as the default; **(2) what happens at the threshold** — §6 says *pause … resume when usage drops*, which fits the 5-hour window and not the weekly one, where nothing drops until the reset: for the weekly window the act is the team's wind-down with the manager declaring `restart --why "usage window, resets <time>"` (TD-099 (1)), so the team reads *wound down · restart wanted*; **(3) whether the team starts again at the reset by itself** — TD-026's schedule, or Paul's word as now; **(4) the settings page** — a new screen, so §4.5 gets it and §4.5a its controls (a control not in that table does not exist), with the gate's figure per profile the first setting on it; the usage chip on the Org page could carry the figure as a mark (*wk 91% · stops at 95%*) before any page exists. Until (1)–(2) are built the briefs' sentence is the rule, and the figure is changed by editing them and restarting the team.
+**Location:** design §6 (*Usage gate*), §5 (`usage_gate:`), §4.5 (screens) and §4.5a; `src/sessionorc/agent.py` (the policies tick), `~/.agentorc`; the two briefs
+
+**Why:** the subscription is one pool for Paul's interactive work and the team's; the team should take what he will not use that week, and only he knows how much that is. A number in a brief is read once, at start, by a model that then judges it; a number in a setting is read every tick by the host agent, moved without a restart, and shown on the page.
+
+**Related:** TD-099 (a usage stop is a declaration; the header's collapse), TD-026 (schedules; a start at the reset), design §6, §4.2a (profiles), TD-073 (the windows and labels are the adapter's).
