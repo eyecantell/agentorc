@@ -5,11 +5,12 @@ Guidance for Claude Code sessions working in this repository.
 ## What this repo is
 
 agentorc is a self-hosted web dashboard that orchestrates interactive AI coding-agent sessions
-(Claude Code first) and plain shells running in tmux across hosts. **Status: phase 1 in
-progress** (host agent, Claude Code adapter, Org and Focus pages). [`docs/design.md`](docs/design.md) is the source of truth: requirements,
+(Claude Code first) and plain shells running in tmux across hosts. **Status: past phase 1**
+(§7 of the design says what each phase has and lacks). [`docs/design.md`](docs/design.md) is the source of truth: requirements,
 architecture, every control (§4.5a — a control that is not in that table does not exist), the
-phase plan (§7), invariants (§9), and the dated question log (§10, six items still open). A change in behaviour is a
-change to that document first. Mockups regenerate from `docs/mockups/gen.py`.
+phase plan (§7), invariants (§9), and the dated question log (§10). It is written in the present tense and says what
+is true now; the dated record of how each rule came to be is [`docs/design-history.md`](docs/design-history.md). A
+change in behaviour is a change to the design first, and the dated fact goes to the history, never the other way round. Mockups regenerate from `docs/mockups/gen.py`.
 
 ## Stack and conventions
 
@@ -86,6 +87,7 @@ header belong to dev-cadence: edit them there, never here.
 | Need | Where |
 |---|---|
 | What agentorc is and how it works | [docs/design.md](docs/design.md) |
+| How the design got here: dated decisions, reversals and review rounds, by section | [docs/design-history.md](docs/design-history.md) |
 | What a word means (lead, director, worker, host agent, …) | [docs/glossary.md](docs/glossary.md) |
 | Why dev-cadence was adopted, what it changed in the design | [docs/decisions/2026-09-06-adopt-dev-cadence.md](docs/decisions/2026-09-06-adopt-dev-cadence.md) |
 | Why herdr is prior art and not the session substrate | [docs/decisions/2026-09-10-herdr-spike.md](docs/decisions/2026-09-10-herdr-spike.md) |
