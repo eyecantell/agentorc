@@ -121,3 +121,4 @@
 17:47  techlead-ao-1: exited with asks_waiting 1 → FILL #2 at 23:47Z (same form as #1)
 17:47  techlead-ao-1: fill #2 idle at 23:47:48Z (<1 min), 0 waiting → ao close. Batch: 1 steer from grinder-ao-2 (TD-095 Cursor editor preset) answered with a source (design §5 The person's own), default taken, 0 passed up, 0 lapsed
 17:47–00:07Z quiet (18:07 MDT); grinder-ao-2: TD-095 page merged #386 #388 #389 #390 #391 → cadence all pass, review rows recorded; #385 (src/sessionorc) waits on the anchor (→ 01:22Z), #392 board in fact-check
+18:16  grinder-ao-2: TD-071 claimed then dropped, TD-076 claimed → ok
