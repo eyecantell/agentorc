@@ -717,7 +717,10 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
     assert gated_view({**mark, "sent_at": "2026-09-21T01:00:05Z"})["text"].endswith(" · pause sent")
     assert gated_view({**mark, "profile": "", "next": None})["text"] == "paused · usage — default week 75% ≥ 70%"
     # one malformed record costs its card the mark, never the grid
-    assert all(gated_view(j) is None for j in (None, "x", [1], {"pct": "75", "line": 70}, {"pct": 75}))
+    assert all(
+        gated_view(j) is None
+        for j in (None, "x", [1], {"pct": "75", "line": 70}, {"pct": 75}, {"pct": True, "line": 0})
+    )
 
     v = view(_card(gated=mark, doing={"text": "TD-1: the rows", "at": "2026-09-21T01:30:00Z"}))
     assert v["state"] == "idle" and v["slot"]["kind"] == "lim" and v["slot"]["text"] == g["text"]

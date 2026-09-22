@@ -791,8 +791,8 @@ def gated_view(raw: Any) -> dict[str, str] | None:
     if not isinstance(raw, dict):
         return None
     pct, line = raw.get("pct"), raw.get("line")
-    if not isinstance(pct, int | float) or not isinstance(line, int | float):
-        return None
+    if any(isinstance(n, bool) or not isinstance(n, int | float) for n in (pct, line)):
+        return None  # a bool is an int to isinstance, and `True%` is no reading
     prof = str(raw.get("profile") or "default")
     text = f"paused · usage — {prof} {raw.get('label') or '?'} {pct:g}% ≥ {line:g}%"
     if nxt := _clock(raw.get("next")):
