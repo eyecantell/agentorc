@@ -42,6 +42,7 @@ READS = frozenset(
         "name_check",
         "recent_dirs",
         "usage",
+        "gate",
         "adapters",
         "ping",
         "whoami",
