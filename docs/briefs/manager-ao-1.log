@@ -180,3 +180,5 @@
 08:10–08:20 quiet (#418 td098-seats and #419 td071 opened, neither touches held paths)
 08:21  grinder-ao-2: TD-071 (6,7) done → PR #419 cadence pass (review recorded; no held paths). grinder-ao-1: TD-098, #418 open
 08:23  grinder-ao-1: TD-098 step 1 done → PR #418 cadence pass (review recorded; no held paths)
+08:24–08:36 quiet (#421 td095-polish-g-h, #422 td098-auditor opened; no held paths)
+08:37  grinder-ao-2: TD-095 (g),(h) done → PR #421 cadence pass (review recorded; no held paths); TD-095 built in full. grinder-ao-1: TD-098, #422 open
