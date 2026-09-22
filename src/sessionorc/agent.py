@@ -60,7 +60,6 @@ from sessionorc.models import (
     apply_home,
     apply_node,
     attention_kind,
-    canonical_grants,
     has_control,
     normalize_ref,
     now_iso,
@@ -367,9 +366,6 @@ class HostAgent:
                 self.store.save(s)
             if not s.host:  # a record written before TD-057 step 1: it ran here, so it is this host's
                 s.host = self.host
-                self.store.save(s)
-            if renamed := getattr(s, "renamed_grants", None):  # TD-055: read for one release, written new
-                log.warning("%s: grant %s is now `control` (TD-055); the record is rewritten", s.id, ", ".join(renamed))
                 self.store.save(s)
         # (sender, client nonce) → the verdict its first send got (design §4.4a "Delivery and
         # time"): a retry after a reconnect never lands twice and is not an identical repeat —
@@ -4234,7 +4230,7 @@ class HostAgent:
                 continue
             if s.run_until != stop_before:
                 s.wrapup_sent_at = None  # a new stop time is a new run, as `set_stop` has it
-            if _renamed_grants(s, f"the intent from {self.home}") or s.to_dict() != before:
+            if s.to_dict() != before:
                 self.store.save(s)
                 changed = True
         if changed:
@@ -4824,7 +4820,6 @@ class HostAgent:
             except (NotTheSameSession, TypeError, ValueError, KeyError) as e:
                 log.warning("link from %s: could not take %s: %s", host, rid, e)
                 continue
-            _renamed_grants(mine[rid], f"the link from {host}")  # saved just below
             self._remote_store(host).save(mine[rid])
         if whole:
             for rid in [r for r in mine if r not in seen]:
@@ -5750,19 +5745,6 @@ def launch_params(given: dict[str, Any]) -> dict[str, Any]:
     return {k: given[k] for k in LAUNCH_KEYS if k in given and given[k] is not None}
 
 
-def _renamed_grants(s: Session, where: str) -> bool:
-    """A copy that arrived with a renamed grant's old name (TD-055) was normalised as it was read;
-    say so, as the loader does, and tell the caller to save it. True when there was one."""
-    renamed = getattr(s, "renamed_grants", None)
-    if not renamed:
-        return False
-    log.warning(
-        "%s: grant %s is now `control` (TD-055), from %s; the record is rewritten", s.id, ", ".join(renamed), where
-    )
-    del s.renamed_grants
-    return True
-
-
 def _alarm_since(s: Session) -> str:
     """When an alarm row began: the first alarm's own time, not the record's state transition."""
     first = (s.identity_alarms or [{}])[0]
@@ -5892,9 +5874,7 @@ def _source(source: str) -> str:
 
 
 def _grants(names: list[str]) -> list[str]:
-    """Validate a list of grant names against `GRANTS`, in canonical order. A renamed grant's old
-    name is accepted as the new one for a release (`GRANT_ALIASES`, TD-055)."""
-    names = canonical_grants(list(names))
+    """Validate a list of grant names against `GRANTS`, in canonical order."""
     bad = [n for n in names if n not in GRANTS]
     if bad:
         raise RpcError(f"unknown grant {', '.join(map(str, bad))}; grants are: {', '.join(GRANTS)}")

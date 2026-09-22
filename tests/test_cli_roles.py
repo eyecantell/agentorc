@@ -89,12 +89,13 @@ def test_old_role_names_are_unknown_and_techlead_starts_the_go_between(repo, cap
     assert "{techlead}" not in p["prompt"] and "$AGENTORC_SESSION" in p["prompt"]
 
 
-def test_grant_orchestrate_on_the_command_line_is_sent_as_control(repo, capsys):
-    """TD-055 step 3: `--grant orchestrate` is accepted for a release, sent as `control`, and named."""
+def test_grant_orchestrate_on_the_command_line_is_refused(repo, capsys):
+    """TD-107: `orchestrate`, the old name of `control`, is no longer a choice of `--grant`."""
     _, calls = repo
-    assert cli.main(["new", "o3", "--grant", "orchestrate"]) == 0
-    assert created(calls)["capabilities"] == ["control"]
-    assert "grant `orchestrate` is now `control`" in capsys.readouterr().err
+    with pytest.raises(SystemExit):
+        cli.main(["new", "o3", "--grant", "orchestrate"])
+    assert not [c for c in calls if c[0] == "create"]
+    assert "invalid choice: 'orchestrate'" in capsys.readouterr().err
 
 
 def test_controllers_default_from_the_role_then_the_repo_and_names_resolve(repo, capsys):

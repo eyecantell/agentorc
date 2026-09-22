@@ -28,21 +28,11 @@ PROGRESS_STATUSES = ("claimed", "done", "dropped")
 # Grants a session record can hold in `capabilities` (design §4.8). `control`: the session may
 # act on other sessions through the host agent (§9 invariant 11).
 GRANTS = ("control",)
-# Renamed grants, old → new (TD-055, docs/glossary.md). For one release the old name is read
-# wherever a grant is named — a stored record (normalised on load, so its next save writes the new
-# name), a request, a role's `grants:` — and never written.
-GRANT_ALIASES: dict[str, str] = {"orchestrate": "control"}
-
-
-def canonical_grants(names: list[str]) -> list[str]:
-    """`names` with renamed grants under their current names, each once, in the order given."""
-    return list(dict.fromkeys(GRANT_ALIASES.get(n, n) for n in names))
 
 
 def has_control(capabilities: list[str] | None) -> bool:
-    """Whether a record's grants include `control`, under either name — a client can be newer than
-    the host agent whose records it reads until that agent restarts (TD-062)."""
-    return "control" in canonical_grants(list(capabilities or []))
+    """Whether a record's grants include `control`."""
+    return "control" in (capabilities or [])
 
 
 # Message kinds (design §4.10): a small closed set, so a message's purpose is read off its envelope.
@@ -798,9 +788,6 @@ class Session:
         known = {f for f in cls.__dataclass_fields__}
         obj = cls(**{k: v for k, v in d.items() if k in known})
         obj.pending = Pending.from_dict(pending) if pending else None
-        if renamed := [g for g in obj.capabilities if g in GRANT_ALIASES]:
-            obj.capabilities = canonical_grants(obj.capabilities)
-            obj.renamed_grants = renamed  # not a field: tells the loader to save and say so (TD-055)
         obj.progress = [ProgressEntry.from_dict(p) for p in progress]
         obj.findings = [FindingEntry.from_dict(f) for f in findings]
         obj.inbox = [MailEntry.from_dict(e) for e in inbox]
@@ -900,10 +887,6 @@ def _overlay(record: Session, copy: Mapping[str, Any], owned: frozenset[str]) ->
     parsed = Session.from_dict({**record.to_dict(), **{k: copy[k] for k in taken}})
     for f in taken - GROWS:
         setattr(record, f, getattr(parsed, f))
-    if "capabilities" in taken and (renamed := getattr(parsed, "renamed_grants", None)):
-        # the copy carried a renamed grant: normalised above, and the marker kept, so the caller
-        # saves and says so as the loader does (TD-055; review of TD-057 step 2, fixed in 4b.3)
-        record.renamed_grants = renamed
     if "sends" in taken:
         by_id = {e.id: e for e in (*parsed.sends, *record.sends)}  # on one id the record's own entry stands
         record.sends = sorted(by_id.values(), key=lambda e: (e.at, e.id))[-SENDS_KEPT:]

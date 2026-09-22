@@ -20,7 +20,7 @@ from collections.abc import Callable, Mapping
 from datetime import datetime, timedelta
 from typing import Any
 
-from sessionorc.models import GRANTS, PERSON, SYSTEM, MailEntry, Session, canonical_grants, has_control
+from sessionorc.models import GRANTS, PERSON, SYSTEM, MailEntry, Session, has_control
 
 # -- bounds (design §4.10 "The bounds are part of the design"); numbers are TD-052 step 6's --------
 RECIPIENT_CAP = 5  # addressees the *sender* names; automatic copies are exempt
@@ -121,9 +121,7 @@ def act_gate(
         # No target to be a member of yet. What create is gated on instead is attenuation: the
         # child's grants must be a subset of the creator's (design §4.8, capability attenuation).
         excess = [
-            g
-            for g in canonical_grants(list(params.get("capabilities") or []))
-            if g in GRANTS and g not in canonical_grants(me.capabilities)
+            g for g in dict.fromkeys(params.get("capabilities") or []) if g in GRANTS and g not in me.capabilities
         ]
         if excess:
             return (

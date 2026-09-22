@@ -1852,9 +1852,7 @@ repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references,
 **Grants** — gated, recorded in `capabilities` on the session, checked by the host agent on every
 acting RPC. One exists:
 
-- `control` (the old name `orchestrate` is read for one release — on a stored record, which is
-  rewritten on load, in a request, and in a role's or team's `grants:`, each saying so once — and
-  never written; TD-055): the session may act on *other* sessions — `send`, `keys`, wrap-up,
+- `control` (`orchestrate`, its old name, is an unknown grant — TD-107): the session may act on *other* sessions — `send`, `keys`, wrap-up,
   `kill`, `close`, `mode`, `new`, `remove`, and `set_grants` (gated on every target, so a session
   cannot grant itself). Without it, an acting RPC whose caller is a session and whose target is a
   different session is refused with "needs the control grant"; reads (`status`, `tail`,

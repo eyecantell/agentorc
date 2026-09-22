@@ -280,22 +280,16 @@ def test_a_key_nobody_reads_is_an_error_naming_it(tmp_path):
             org.load(tmp_path / "org.yml")
 
 
-def test_grants_orchestrate_in_a_team_is_read_as_control(tmp_path, capsys, monkeypatch):
-    """TD-055 step 3: `grants: [orchestrate]` on a team's lead or member still loads, as `control`,
-    and says so once."""
-    from agentorc import repoconfig
-
-    monkeypatch.setattr(repoconfig, "_warned", set())
+def test_grants_orchestrate_in_a_team_is_an_unknown_grant(tmp_path):
+    """TD-107: `grants: [orchestrate]` on a team's manager or member is refused when the file loads."""
     f = tmp_path / "org.yml"
     f.write_text(
         "projects: {p: {repos: {r: {kmaster: /tmp}}}}\n"
         "teams:\n"
-        "  t: {projects: [p], manager: {grants: [orchestrate]},\n"
-        "      members: [{role: grinder, grants: [orchestrate, control]}]}\n"
+        "  t: {projects: [p], members: [{role: grinder, grants: [orchestrate, control]}]}\n"
     )
-    g = org.load(f).teams["t"]
-    assert g.manager.grants == ["control"] and g.members[0].grants == ["control"]
-    assert capsys.readouterr().err.count("grant `orchestrate` is now `control`") == 1
+    with pytest.raises(ValueError, match="unknown grant 'orchestrate'"):
+        org.load(f)
 
 
 def test_a_team_may_name_the_host_it_lands_on(tmp_path):

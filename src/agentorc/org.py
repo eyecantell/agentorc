@@ -39,9 +39,8 @@ from typing import Any
 
 import yaml
 
-from agentorc.repoconfig import deprecated_grant
 from sessionorc import hosts, paths
-from sessionorc.models import GRANT_ALIASES
+from sessionorc.models import GRANTS
 
 DEFAULT_MANAGER_ROLE = "manager"
 PERSON = "person"  # a manager role meaning the person manages: no manager session is started (§4.9)
@@ -280,11 +279,10 @@ def _grants(raw: Any, key: str) -> list[str] | None:
         return None
     if not isinstance(raw, list):
         raise ValueError(f"{key} must be a list of grants")
-    grants = [_str(g, key) for g in raw]
-    # TD-055: a renamed grant is read under its new name for one release, saying so where it is met
-    for old in dict.fromkeys(g for g in grants if g in GRANT_ALIASES):
-        deprecated_grant(old, key)
-    return list(dict.fromkeys(GRANT_ALIASES.get(g, g) for g in grants))
+    grants = list(dict.fromkeys(_str(g, key) for g in raw))
+    if bad := [g for g in grants if g not in GRANTS]:
+        raise ValueError(f"{key}: unknown grant {bad[0]!r} (known: {', '.join(GRANTS)})")
+    return grants
 
 
 MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
