@@ -231,3 +231,19 @@ async def test_while_gated_a_controllers_send_is_refused_and_the_doorbell_holds(
         for s in (sid, lead):
             await person.call("kill", id=s)
             await person.call("remove", id=s)
+
+
+@pytest.mark.integration
+async def test_a_session_made_unattended_later_can_carry_the_two_texts(agent, tmp_path):
+    """`set_mode` takes the gate's texts as `set_stop` takes the wrap-up's, so a session flipped to
+    unattended after its create is not gated with nothing to type (review of TD-100 slice 2)."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = (await person.call("create", name="i", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        assert agent.sessions[sid].pause_prompt is None
+        got = await person.call("set_mode", id=sid, unattended=True, pause_prompt="p", resume_prompt="r")
+        assert (got["unattended"], got["pause_prompt"], got["resume_prompt"]) == (True, "p", "r")
+        got = await person.call("set_mode", id=sid, unattended=False)
+        assert got["pause_prompt"] == "p", "left alone when not given"
+        await person.call("kill", id=sid)
+        await person.call("remove", id=sid)

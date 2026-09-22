@@ -2059,9 +2059,18 @@ class HostAgent:
         await self._push_changes()
         return self._view(s)
 
-    async def rpc_set_mode(self, id: str, unattended: bool) -> dict[str, Any]:
+    async def rpc_set_mode(
+        self, id: str, unattended: bool, pause_prompt: str | None = None, resume_prompt: str | None = None
+    ) -> dict[str, Any]:
+        """The mode toggle and `ao mode`. The usage gate's two texts ride along as the wrap-up's
+        ride `set_stop` (design §6, TD-100): a session made unattended after its create would
+        otherwise be gated with nothing to type. Given only when set; an empty one clears it."""
         s = self._find(id)  # the home's own copy of another host's record too (4a)
         s.unattended = bool(unattended)
+        if pause_prompt is not None:
+            s.pause_prompt = str(pause_prompt).strip() or None
+        if resume_prompt is not None:
+            s.resume_prompt = str(resume_prompt).strip() or None
         self._save(s)
         return self._view(s)
 
