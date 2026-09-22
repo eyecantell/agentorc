@@ -164,6 +164,24 @@ def _identity_line() -> None:
     print(f"{r.get('host') or ''}: identity {r['mode']} · detached-process check {check}{note}{tail}")
 
 
+def _running_build() -> dict[str, Any] | None:
+    """Which commit the running host agent was built from, and whether `origin/main` in the
+    checkout it came from has moved past it (design §4.4 *Version skew is survivable*, TD-062 (c)):
+    a merge is not live until the next promote, and this is how a person sees the gap. None when
+    the agent is down — the listing already says so."""
+    from sessionorc import build
+
+    try:
+        r = call_sync("host")
+    except (AgentError, AgentUnavailable, OSError):
+        return None
+    if not isinstance(r, dict):
+        return None
+    b = r.get("built_from") or {}
+    started = str(r.get("started_at") or "")
+    return {"built_from": b, "started_at": started, "ahead": build.ahead(b), "line": build.line(b, started)}
+
+
 def _node_status_line() -> str:
     """What a node's listing is (design §4.4a), and **`unreachable` only when it is** (TD-084).
 
@@ -199,6 +217,8 @@ def cmd_status(args: argparse.Namespace) -> int:
         return 0
     if args.verbose:
         _identity_line()
+        if running := _running_build():
+            print(running["line"])
     if not sessions:
         print("no sessions")
         return 0
@@ -1239,7 +1259,10 @@ def cmd_service(args: argparse.Namespace) -> int:
         service.uninstall()
         return emit(args, {"ok": True}, lambda: print("units disabled and removed (tmux sessions untouched)"))
     status = service.status()
-    return emit(args, {"status": status}, lambda: print(status))
+    running = _running_build()
+    return emit(
+        args, {"status": status, "build": running}, lambda: print(status + (f"\n{running['line']}" if running else ""))
+    )
 
 
 def cmd_host(args: argparse.Namespace) -> int:

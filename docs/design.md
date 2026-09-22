@@ -550,6 +550,17 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   (`hook`) keeps everything. The drop happens before the gate, so a refusal still says why it
   refused. What this does not cover is a *new method* or a changed meaning, which still needs the
   promotion.
+- **What is running says which commit it is** (2026-09-21, TD-062 (c)). A promote installs a wheel,
+  and a wheel was a flat `0.0.1` whatever it held, so nothing could say that `main` had moved past
+  the running copy. The build hook (`pdm_build.py`) writes `sessionorc/_build.json` into every wheel
+  built from a git checkout — the commit, whether the tree had changes on top of it, the directory
+  it came from and when; the host agent reads it once at start and reports it, with its own start
+  time, on `host` (`built_from`, `started_at`). `ao status -v` and `ao service status` print one
+  line from it: the commit, and how many commits `origin/main` in that directory — as last fetched —
+  holds that the build does not (*not live until the next promote*), or why that cannot be said. A
+  build with no record (an editable install, a wheel from an sdist, an agent from before this) is
+  said to be *unknown* rather than left out. Measured on the caller's side, since the checkout is a
+  directory on the caller's host and not something the agent holds.
 - Board write-back: **Snooze** (edit the `Due:` date) and **Done** (check the item off) on a
   dev-cadence `user_attention.md` item are one-line edits the host agent makes and commits with a
   fixed message naming the session (`agentorc: snooze <item> to <date> (session <name>)`), so the
