@@ -204,3 +204,4 @@
 16:11  grinder-ao-1: TD-102 → PR #431 open (no held paths), TD-064 (b),(c) claimed. grinder-ao-2: a person sent it TD-099 (2) and TD-064 (a) after #430 → working again (no longer finished once it claims)
 16:16  grinder-ao-1 note: main red since #430 (archived TD-102 lacks **Resolved:**), fixed in its #431. grinder-ao-2: TD-064a dropped, TD-099 claimed
 16:21  grinder-ao-1: TD-102 + TD-064 done → PR #431 merged, cadence pass (review recorded; no held paths). grinder-ao-2: TD-099 working
+16:30  grinder-ao-1: TD-100 → PR #434 open 22:29Z, touches src/sessionorc → held for the anchor's read (ask at 2h). grinder-ao-2: TD-099 → PR #433 open (no held paths)
