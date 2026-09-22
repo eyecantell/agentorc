@@ -60,6 +60,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-099 | A team with nothing working still offers Wind down, and a manager that stops for the usage window goes idle instead of declaring | Medium | Open |
 | TD-100 | The wind-down percentage is a sentence in a brief; Paul wants a knob set by the week's interactive load, later from a settings page | Medium | Open |
 | TD-101 | A one-day override of the usage reserves, gone at the reset | Low | Open |
+| TD-102 | A held peer message is a menu the adapter does not see, and the briefs do not forbid the channel | Medium | Open |
 
 ---
 
@@ -989,3 +990,15 @@ Two things are missing, and the design round chooses between them or takes both:
 **Why:** on 2026-09-22 Paul wanted one day at 95% and the team back the next week at the standing line; with reserves that is a reserve of 5 for the last day, but 5 a day for the whole week moves every day's line up (65% on the reset day, not 30%). The honest form of a one-day change is an override that expires, not a new standing number — and building it is not worth its complexity until the standing gate (TD-100) exists and the by-hand way has hurt.
 
 **Related:** TD-100 (the standing reserves and the settings page), TD-026 (overrides with an expiry).
+
+## TD-102: A held peer message is a menu the adapter does not see, and the briefs do not forbid the channel
+
+**Priority:** Medium
+**Added:** 2026-09-22 (the anchor session, from a live observation on the samscrape-grind team's first run)
+**Status:** Open. Two halves. **(a) The screen rule.** Claude Code delivers a message from another session (its `SendMessage` peer channel) straight into the conversation only when both sessions run the same permission-mode class; otherwise it draws a *Held message from another session* panel with a two-item menu — *Deny — drop it and tell the sender it was declined* / *Deliver this message to Claude* — and waits. On 2026-09-22 at 13:39 MDT Paul's interactive samscrape session sent one to `manager-sam-1` (unattended, bypass mode), and `ao explain` read the manager as `idle (hook)`, *no screen rule matched*, with the menu on its screen: no hook fires for a menu, the composer was blocked, and the manager's rounds waited behind it until the anchor pressed Deliver (`ao keys … Down Enter`). Add a rule to `src/agentorc/adapters/claude_code/screen_rules.toml` beside `trust-dialog`: `any` the panel's heading, `all` the two options (the heading alone could be prose), `needs-you` with `pending: {kind: question, text: "held message from another session (deliver or deny in the terminal)"}` — a manager's brief already escalates a `question` rather than answering it, and §9 invariant 6 says the core never types a menu choice into a pane, so a person decides; the Focus header then says so instead of *idle*. **(b) The channel.** `ao --skill` (`src/agentorc/skill.md`) and the built-in briefs (`src/agentorc/briefs/*.md`) say nothing about Claude Code's own peer tools, and samscrape's first grinder briefs told members to *coordinate via ListAgents/SendMessage* — claims and mail have their own channels (`ao progress claim`, a lease that refuses a held reference; `ao msg`, read at the receiver's next round and marked by who sent it), and a peer message is held for a person whenever the modes differ, which for a person's session and an unattended one they always do. One sentence in the skill under the report channels, and in each built-in brief's rules: *never message another session through the tool's own peer channel; `ao msg` is the channel* — agentorc's own briefs got the sentence 2026-09-22 (this entry's PR), samscrape's were told the same day.
+**Location:** `src/agentorc/adapters/claude_code/screen_rules.toml` (a), `src/agentorc/skill.md` and `src/agentorc/briefs/` (b); design §4.2 (screen rules), §9 invariant 6
+
+**Why:** a modal that agentorc reads as *idle* is the TD-032 shape again — the resting state of a session waiting on a person, shown for a session that is not resting — and a manager blocked behind one runs no rounds, so nothing on its team is watched until a person happens to look.
+
+**Related:** TD-032 (the Remote-Control stand-down, the same *idle under a modal* shape), TD-041 (interactive sessions out of reach), §4.10 (mail).
+
