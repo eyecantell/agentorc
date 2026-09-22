@@ -61,6 +61,10 @@ not mix:
   meaning, so that a record badged `lead` and a definition's `lead:` key cannot come to mean a
   different session than the one they were written for. In text dated before the rename it
   means the manager.
+- **ShiftLead** — the project's name (shiftlead.dev): the thing that runs a shift of agents and
+  tells the person what needs them. Spelled as one word with two capitals in prose; the command
+  is `ao`, and `agentorc` remains the name of the packages, the state directory, the units and
+  the config file until TD-060's machine-side step. — **decided** 2026-09-21 (Paul).
 - **director** — the session that coordinates managers: its members are managers, not workers.
   Agentorc does not treat it specially (design §4.8); the word names a position in the graph, not
   a kind of session. Director > manager > worker. *Not:* conductor (decided and replaced the same

@@ -1,4 +1,8 @@
-# agentorc — design
+# ShiftLead — design
+
+*ShiftLead is the project's name (Paul, 2026-09-21; shiftlead.dev). This document still says `agentorc` wherever it
+names the packages, the state directory, the units, the config file or the command's home, because those are
+still their names: the machine-side rename is TD-060's second step, at a release boundary. The command is `ao`.*
 
 Status: **phase 1 in progress** (2026-09-04 design; the last of the original open questions
 closed 2026-09-05; building since 2026-09-05). The host agent, the Claude Code adapter, the Org
