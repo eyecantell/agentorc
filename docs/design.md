@@ -599,7 +599,8 @@ link. The home is also a node for its own host's sessions (one process, both rol
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
   `run_until`, `supervised`, `seat`, `seat_due`, `restarts`, `restart_ceiling`, `restart_blocked`,
-  `nudged_at` (§6 *Keeping a team running*), the wrap-up, pause and resume prompts, reports, the
+  `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
+  send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
   inbox, `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and
   `mail_decided`. So when the link is
   down, the node wraps a worker up and it exits, and a person at the home extends its `run_until`,
@@ -4060,11 +4061,10 @@ code and needs no grant; a session doing the same work does.
   record handed to `create` again, never the definition re-read (the host agent does not read
   `org.yml`, §4.9). The launch record is deleted with the record on Forget and kept across a
   supersede. **A replay that fails** — the worktree reaped, the profile gone, the name taken by a
-  live session — is not retried silently: it counts toward the ceiling as any restart does, with
-  `why: failed` and the error text on the entry, so an unrepairable record reaches the Inbox row
+  live session — is not retried silently: it counts toward the ceiling as any restart does, keeping its `why` and carrying the
+  error text as `error` on the entry, so an unrepairable record reaches the Inbox row
   within three ticks rather than never. **Each supervised session's pass is isolated**: one
-  session's exception is logged and the tick goes on to the next, as the stop-time policy
-  already does per record. **The restarts run at the home** (§4.4a: policies that start run at the home), so a
+  session's exception is logged and the tick goes on to the next, which the stop-time policy is to do per record as well (today only its send is guarded). **The restarts run at the home** (§4.4a: policies that start run at the home), so a
   member on an unreachable host is left as it is until its link returns — refused, not queued,
   looked at again on the next tick; the nudge and the seat close run at the home and execute on
   the member's node as any act does. A policy needs no grant and passes no gate; it acts on the
@@ -4079,7 +4079,8 @@ code and needs no grant; a session doing the same work does.
      (only the session that exited, never its siblings) — the numbers §4.8 took from OTP, systemd
      and Circus, now constants. Each restart is appended to the record's `restarts: [{at, why}]`
      (home-owned, carried across the supersede so the count survives the restart it counts);
-     `why` is `crash`, `wanted` or `fill`. At the ceiling the policy stops, writes
+     `why` is `crash`, `wanted` or `fill`, and a replay that failed keeps its `why` and adds
+     `error` (the text), so a failed entry still says what it was trying. At the ceiling the policy stops, writes
      `restart_ceiling: {at, count}` on the record, and the session is a person's: the card's slot
      says *restarts exhausted · 3 in 2 h* as an ending (§4.5 row 5 (b)) and the Inbox lists it
      under *Needs you* (§4.5a **Inbox row: restart**). The host agent writes no board line
@@ -4109,7 +4110,8 @@ code and needs no grant; a session doing the same work does.
      that is `idle` with no `seat_due`, hook-confirmed, with nothing dirty or unpushed, is closed
      (a seat that left work is the board's, as today). **The fill ceiling**: `FILL_CEILING` — six
      fills an hour over all seats sharing a controller (the graph, not the team badge), then
-     `restart_ceiling` and the Inbox row as for a crash; fills are not crash restarts and do not
+     `restart_ceiling` on the seat whose fill tripped it and the Inbox row as for a crash, its
+     siblings merely refused fills until the hour rolls; fills are not crash restarts and do not
      count toward `RESTART_CEILING`. The card draws the count toward a `prs:` trigger from
      `seat_due`'s progress (*on call — 4 of 10 PRs*), which §4.9b could not while the number was
      the manager's. (This is TD-104, folded here.)
