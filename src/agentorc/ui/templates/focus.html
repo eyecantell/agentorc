@@ -62,7 +62,7 @@
       <button class="btn" data-act="shell-here" data-id="{{ s.id }}">⌘ Open shell here</button>
       {% if s.editor %}<a class="btn editor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}
       <button class="btn ghost" id="tcopy" title="copy the terminal selection — Shift+drag to select (Ctrl+Shift+C, or Ctrl+C with a selection). Wheel or Shift+PageUp scrolls history; Shift+PageDown, q or Esc returns">⧉ Copy</button>
-      <button class="btn ghost" id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click) — not while you are watching: Take over first">⎘ Paste</button>
+      <button class="btn ghost" id="tpaste" title="paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click){% if s.unattended %} — not while you are watching: Take over first{% endif %}">⎘ Paste</button>
       <button class="btn" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail a note or an ask into this session's inbox — it lands and types nothing (Send, below, types)">✉ Message</button>
       <button class="btn" data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
       <button class="btn danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept.">✕ Kill</button>
@@ -89,7 +89,7 @@
         <dt>directory</dt><dd class="mono small">{{ s.dir }}</dd>
         <dt>started</dt><dd>{{ s.created[:16].replace('T', ' ') }}Z</dd>
         <dt>last output</dt><dd id="last_output">{{ s.last_output or '—' }}</dd>
-        <dt>mode</dt><dd id="fmode" title="changed by the header's {{ s.mode_act }}">{{ 'unattended' if s.unattended else 'interactive' }}</dd>
+        <dt>mode</dt><dd id="fmode" title="changed by the mode toggle in the header">{{ 'unattended' if s.unattended else 'interactive' }}</dd>
         {% if s.run_log %}<dt>run log</dt><dd class="mono small">{{ s.run_log.rsplit('/', 1)[-1] }}</dd>{% endif %}
       </dl>
     </div>

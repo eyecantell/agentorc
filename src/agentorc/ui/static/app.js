@@ -1245,6 +1245,8 @@
       }
       const fm = $("#fmode"); if (fm) fm.textContent = v.unattended ? "unattended" : "interactive";
       const cp = $("#composer"); if (cp) cp.classList.toggle("hidden", !!v.unattended);
+      const tp = $("#tpaste");
+      if (tp) tp.title = "paste the clipboard into the terminal (Ctrl+V, Ctrl+Shift+V, Shift+Insert, or right-click)" + (v.unattended ? " — not while you are watching: Take over first" : "");
       // §4.8a (TD-077 a2): the **suspended** mark rides the pushed delta like the state does. It
       // is drawn server-side at load and lives *outside* `#fstate` — a suspension is not a state —
       // so without this a person watching the very session that is suspended from somewhere else
