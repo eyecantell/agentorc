@@ -144,3 +144,7 @@
 - Cadence: 42 PRs over 12 h all pass; review rows recorded, not verified. No fails, no relays.
 - Escalations: board #394 (wind-down; #385 waits on the anchor). Notes to the person: grinder-ao-1's stop and its retraction; wind-down with the trial numbers.
 - Mechanical enough for a §6 policy: the techlead seat's rule (fill on exited + asks_waiting>0; close on idle + 0) needed no judgement — both fills and all three closes read one field. The one manual step was rebuilding the seat's brief: `ao new --keep-mail` has no way to say "the team's own brief for this seat", so I rendered it through teams.plan(); a `ao team fill <team> techlead` (or the host agent filling it itself) would remove that.
+
+## Run 2026-09-22 (started 02:15Z by ao team start ao-grind)
+
+02:16  start: grinder-ao-1, grinder-ao-2, techlead-ao-1 all working; inbox empty; no relays (every cadence-changes entry landed before these records were created)
