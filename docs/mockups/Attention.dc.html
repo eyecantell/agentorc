@@ -13,7 +13,15 @@
   a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-decoration: underline; }
   .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
   .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
-  .pill .dot { display: none; } .pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
+  .pill .dot { display: none; }
+  /* design §4.5a **state icon**, as app.css draws it: a page of cards is read by shape before it is
+     read by word, and a glyph never looks like something to press */
+  .pill::before { font-size: 9px; line-height: 1; }
+  .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
+  .pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
+  .pill.s-closed::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; } .pill.s-oncall::before { content: "◇"; font-size: 11px; }
+  .pill.s-idle.unseen::before { content: "●"; font-size: 9px; letter-spacing: 0; }
+  .pill.plain::before { content: none; }  /* a due date or a report's status is not a session state */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
      alive, at rest, may be spoken to (idle · unseen is idle's blue); everything over or out of
@@ -23,7 +31,7 @@
   .s-idle { background: #dbeafe; color: #1e40af; }
   .s-ended { background: #e5e7eb; color: #4b5563; }
   .s-stalled { background: #fecaca; color: #991b1b; }
-  .s-exited, .s-closed { background: #e5e7eb; color: #4b5563; }
+  .s-exited, .s-closed, .s-oncall { background: #e5e7eb; color: #4b5563; }
   .s-done { background: #d1fae5; color: #065f46; } /* Focus's reports and checklist only — --done leaves the card */
   .s-limited { background: #ede9fe; color: #5b21b6; }
   .s-unreachable { background: #e5e7eb; color: #4b5563; }
@@ -158,35 +166,35 @@
   <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600;">samscrape</span><span class="mono muted" style="font-size: 11px;">swept 2026-09-04 03:00 · 26 open · 5 due/overdue</span><span style="flex-grow: 1;"></span><a href="#" class="mono" style="font-size: 11px;">user_attention.md</a></div>
   
   <div style="display: flex; flex-direction: column;"><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-stalled" style="justify-self: start;">14d overdue</span>
+  <span class="pill plain s-stalled" style="justify-self: start;">14d overdue</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">Get the TD-259 keep-half snapshot off this array — it is the only copy.</div><div class="meta">2026-08-18 · session <a href="#">tdgrind-1</a> · TD-259</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-stalled" style="justify-self: start;">7d overdue</span>
+  <span class="pill plain s-stalled" style="justify-self: start;">7d overdue</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">Decide TD-196 per tool: delete or port. A judgement call, so not done unattended.</div><div class="meta">2026-08-21 · session <a href="#">tdgrind-2</a> · TD-196</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-stalled" style="justify-self: start;">2d overdue</span>
+  <span class="pill plain s-stalled" style="justify-self: start;">2d overdue</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">Decide whether to turn the signup → CM board writer ON. PAT in Doppler, PR merged, migration applied.</div><div class="meta">2026-08-27 · session <a href="#">2fb13646</a> · PR #343</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-needs" style="justify-self: start;">due today</span>
+  <span class="pill plain s-needs" style="justify-self: start;">due today</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">Deploy TD-296, then un-flag and republish the two DARPA notices.</div><div class="meta">2026-09-01 · session <a href="#">tdgrind-2</a> · PR #437</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-needs" style="justify-self: start;">due today</span>
+  <span class="pill plain s-needs" style="justify-self: start;">due today</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">Deploy TD-036 step 2 (merged after the 05:00 UTC rollout, so not live).</div><div class="meta">2026-08-28 · session <a href="#">tdgrind-1</a> · PR #410</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-ended" style="justify-self: start;">due 09-05</span>
+  <span class="pill plain s-ended" style="justify-self: start;">due 09-05</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">Deploy the R3 consumer migrations — three deployments, fold into the next skaffold run.</div><div class="meta">2026-09-02 · session <a href="#">tdgrind-1</a> · PR #512</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-ended" style="justify-self: start;">due 09-06</span>
+  <span class="pill plain s-ended" style="justify-self: start;">due 09-06</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">PR #577 needs an independent review and a full-suite run before it merges.</div><div class="meta">2026-09-04 · session <a href="#">tdgrind-2</a> · PR #577</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-ended" style="justify-self: start;">undated</span>
+  <span class="pill plain s-ended" style="justify-self: start;">undated</span>
   <div class="muted" style="font-size: 12.5px;">19 more items with no Due date — surfaced only here, never on the Org strip.</div>
   <span class="btn sm ghost">show ▾</span>
 </div></div>
@@ -194,7 +202,7 @@
   <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600;">dev-cadence</span><span class="mono muted" style="font-size: 11px;">swept 2026-08-12 · 1 open · 1 overdue</span><span style="flex-grow: 1;"></span><a href="#" class="mono" style="font-size: 11px;">user_attention.md</a></div>
   <div class="warn" style="padding: 6px 10px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg><span>last sweep 23d ago — run /stranded-work in this repo</span></div>
   <div style="display: flex; flex-direction: column;"><div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-stalled" style="justify-self: start;">2d overdue</span>
+  <span class="pill plain s-stalled" style="justify-self: start;">2d overdue</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">Add --fetch to the SessionStart hook line in samscrape, contractmatch and pneuma-ops settings.json (SEED files, sync does not carry it).</div><div class="meta">2026-08-26 · session <a href="#">3168de4c</a> · TD-030 · PR #76</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div></div>
