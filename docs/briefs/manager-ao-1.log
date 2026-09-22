@@ -154,3 +154,15 @@
 02:43  grinder-ao-2: stopped itself for the usage window (weekly 89%, resets 09-23 00:00Z), note read. grinder-ao-1: idle on PR #402 CI → wrap-up send (land #402 if green) → idle, rebasing #402
 02:44–02:58 quiet (grinder-ao-1 landing #402)
 02:59  grinder-ao-1: TD-062 (c) done → PR #402 cadence pass (review recorded); wrapping up. grinder-ao-2: idle since 02:42 after its usage stop
+03:02  grinder-ao-2: idle 20 min after its usage stop, clean and pushed → ao close. Cadence --since 12h: agentorc 46 PRs, 45 pass, #398 ledger fail (Paul's board PR board-td093-shape, merged 01:24Z before this run — not a member's, reported only); samscrape 1 pass
+03:03–03:10 quiet (grinder-ao-1 wrapping up)
+03:12  grinder-ao-1: wrap-up done (summary written; #405 ledger PR cadence pass; clean, pushed, no open PRs) → ao close. Note to the person: stopped for the usage window. Run over.
+
+## End-of-run summary (2026-09-22 run, 02:15Z–03:12Z)
+
+- grinder-ao-1: closed clean after my wrap-up send (1 send, --wait → idle; it landed #402 then wrapped up). Merged #402 (TD-062 c: build commit in the wheel, "main is ahead" line) and #405 (ledger + board live check, Due 09-24). Not out of work.
+- grinder-ao-2: stopped itself for the usage window at 02:42Z (weekly 89%, resets 09-23 00:00Z) and asked not to be restarted before then; closed by me at 03:02Z after 20 idle minutes, clean. Merged #403 (TD-096 Focus watches). Sends: 0. It declared neither none nor restart. Its brief says a wrap-up needs no declaration, but a self-stop for usage leaves its record looking merely idle.
+- techlead-ao-1: idle with 0 waiting at start, so closed at 02:17Z. No questions this run, so no fills.
+- Cadence: #402, #403, #405 pass (review recorded, not verified). --since 12h: agentorc 45 of 46 pass; #398 ledger fail is Paul's own board PR (board-td093-shape, merged 01:24Z before this run), reported, not sent. samscrape 1 of 1 pass. No relays needed, since every cadence-changes entry predates these records.
+- Escalations: none; one note to the person.
+- For a §6 policy: "a member's self-reported usage stop means wrap up the rest" was mechanical, but it rests on one worker's reading of a shared meter. A usage field on the host record (the adapter reads it from the status line) would make it a policy rather than a relay.
