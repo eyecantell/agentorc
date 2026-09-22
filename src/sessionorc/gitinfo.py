@@ -24,6 +24,9 @@ class GitInfo:
     # them. `pushed_against` says what it was measured against, so a page can show it.
     unpushed: int = 0
     pushed_against: str = ""
+    # the commit HEAD is at, so a detached HEAD can be named by it (design §4.5 *The card's
+    # anatomy*, row 3, TD-095: *detached at <short sha>*); "" in a repo with no commit yet
+    oid: str = ""
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -104,9 +107,12 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
         return None
     if cp.returncode != 0:
         return None
-    branch, upstream, ahead, behind, files = "?", None, 0, 0, []
+    branch, upstream, ahead, behind, files, oid = "?", None, 0, 0, [], ""
     for line in cp.stdout.splitlines():
-        if line.startswith("# branch.head "):
+        if line.startswith("# branch.oid "):
+            oid = line.split(" ", 2)[2]
+            oid = "" if oid == "(initial)" else oid
+        elif line.startswith("# branch.head "):
             branch = line.split(" ", 2)[2]
         elif line.startswith("# branch.upstream "):
             upstream = line.split(" ", 2)[2]
@@ -136,6 +142,7 @@ def git_info(directory: Path | str, timeout: float = 5.0) -> GitInfo | None:
         files=files[:20],
         unpushed=unpushed,
         pushed_against=against,
+        oid=oid,
     )
 
 
