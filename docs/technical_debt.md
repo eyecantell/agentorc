@@ -793,6 +793,8 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Done when** the failure is reproduced (run the file in a loop under load — the full suite beside it) and its wait or ordering assumption is fixed, or a week of CI and local full runs passes without it and the entry is closed as not reproduced.
 
+**A fourth sighting, a new shape — 2026-09-21 (grinder-ao-1, CI on PR #383, Python 3.13 only; 3.12 passed the same commit):** `tests/test_agent.py::test_send_wait_three_outcomes` at line 375, `assert (await asyncio.wait_for(task, 5))["state"] == "idle"` — `AgentError: prompt-stalled: ao-test-send-wait-three-outcomes0-w showed no activity within 0.6 s`. Not the exited-record paste of #286: the send landed and the pane was judged idle-without-activity inside the test's 0.6 s prompt-stall window, so that window is too short for a loaded 3.13 runner. Not investigated; the job was re-run (run 35666996420). If it recurs, bound the wait on the pane's own signal as TD-088 did, rather than widening 0.6 s.
+
 **Related:** `tests/README.md` (the fixtures' timing rules), TD-069 (where it was seen).
 
 ## TD-080: A manager's round log reads as unpushed work forever
@@ -911,6 +913,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Constraints that stand** (none of this session's to change): state and alarm marks are never pressable; colours are tokens; nothing on a card is a control built from what a session wrote; a control not in §4.5a does not exist.
 
 **The mockups, 2026-09-21 (grinder-ao-1, build step 1):** `docs/mockups/gen.py` draws the Org card to §4.5 *The card's anatomy* and its second pass — six fixed rows at one height, the tool's title only where it differs, the mode a word (*interactive* with the `person` mark, *unattended* quiet), the one clock on row 2, `wt/` only when the worktree is not the name and `host / repo` only outside a team's group, the report with a reference once, the slot as one text with *ready to close ✓* its caption, and the quiet foot led by the next act (Allow the one filled button). The team header lost its manager and gained its place and counts by state; **Wind down** replaces the header's *Stop*; the *Urgent first / Pinned* toggle, retired 2026-09-18, is gone from the artboard. The legend (*States & badges*) carries the state tokens under grinder-ao-2's names for the page: `--working` green, `--idle` blue, `--ended` one grey (text `#4b5563`), `--new` for unread; a closed pill is `s-closed`, and green `s-done` is left to Focus. A finished worker (`tdgrind-4`, *idle · unseen* — renamed from *finished · unseen* by Paul, #382 — out of work) is added to the sample team. Not redrawn: the phone artboard's card (TD-003 is Paul's) and the Focus header, which only take the new colours.
+
+**The report line, 2026-09-21 (grinder-ao-1, handed over by grinder-ao-2):** `report_line()` in `src/sessionorc/models.py` — the one formatter for the card and `ao status -v` — drops ` → #N` when the entry's reference is that PR, so it reads `#359 · 1/2 done`; a different PR is still named (`#360 → #361`). `src/sessionorc`, so the anchor merges it.
 
 **Done when** §4.5 and §4.5a say what a card carries, once each, and where; the mockups show it; the page matches them; and Paul has looked at the live page and said so.
 

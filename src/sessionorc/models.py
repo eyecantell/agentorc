@@ -496,7 +496,9 @@ def report_line(session: dict[str, Any]) -> str:
     """The one-line report a card or `ao status -v` shows (design §4.8): the reference in hand, the
     PR it is on, and the lane count — `TD-027 → #60 · 1/2 done`. A reference whose entry the agent
     derived rather than the session declared carries `~`, as a scraped state does (§9 invariant 10).
-    Empty when the session has neither a lane nor a single entry."""
+    A reference is shown once: where the entry's reference is the PR itself, `#359 · 1/2 done`,
+    never `#359 → #359` (§4.5a card **report line**, TD-095). Empty when the session has neither a
+    lane nor a single entry."""
     progress = session.get("progress") or []
     lane = [r for r in (session.get("lane") or []) if r != "free-pick"]
     done = [p for p in progress if p.get("status") == "done"]
@@ -506,7 +508,7 @@ def report_line(session: dict[str, Any]) -> str:
         bits.append(
             head["ref"]
             + ("~" if head.get("source", "declared") != "declared" else "")
-            + (f" → #{head['pr']}" if head.get("pr") else "")
+            + (f" → #{head['pr']}" if head.get("pr") and head["ref"] != f"#{head['pr']}" else "")
         )
     if total := (len(lane) or len(progress)):
         bits.append(f"{len(done)}/{total} done")

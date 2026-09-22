@@ -135,6 +135,15 @@ def test_report_line_shows_the_reference_the_pr_and_the_lane_count():
     free = Session(id="b", name="b", kind="interactive", adapter="shell", dir="/", lane=["free-pick"])
     free.report_progress(ProgressEntry(ref="TD-025", status="done", pr=59))
     assert report_line(free.to_dict()) == "TD-025 → #59 · 1/1 done"
+    # a reference is shown once: an entry whose reference is its PR never reads `#359 → #359` (TD-095)
+    pr = Session(id="c", name="c", kind="interactive", adapter="shell", dir="/")
+    pr.report_progress(ProgressEntry(ref="359", status="done", pr=359))
+    pr.report_progress(ProgressEntry(ref="#360", source="derived", pr=360))
+    assert report_line(pr.to_dict()) == "#360~ · 1/2 done"
+    pr.progress[1] = ProgressEntry(ref="#360", status="done", pr=361)
+    assert report_line(pr.to_dict()) == "#360 → #361 · 2/2 done"  # a different PR is still named
+    pr.progress[1] = ProgressEntry(ref="#360", status="done", pr=360)
+    assert report_line(pr.to_dict()) == "#360 · 2/2 done"
 
 
 def test_every_record_field_has_exactly_one_owner():
