@@ -383,6 +383,14 @@ resting between turns, which is why an unattended worker it happened to sat twen
 PR unmerged and nothing flagged it (TD-032). A screen rule reads the banner as `stalled?` with a
 note saying so, and a `stalled?` card shows that note above its tail.
 
+**A held peer message is a menu.** Claude Code delivers a message from another Claude session
+(its own peer channel, not agentorc's mail) straight into the conversation only when both run the
+same permission-mode class; otherwise it draws a panel, *Held message from another session*, with
+a deliver-or-deny menu, and waits. No hook fires for it, so the session read as `idle` with its
+composer blocked (a manager, 2026-09-22, TD-102). A screen rule reads the two menu lines as
+`needs-you` with a `question` pending; deliver or deny is a person's (§9 invariant 6), and the
+briefs and `ao --skill` forbid the channel — `ao msg` is the one sessions use (§4.10).
+
 ### 4.2a Profiles: tool · account · model
 
 People run more than one account of one tool, and more than one tool. A **profile** is

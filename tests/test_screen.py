@@ -53,6 +53,7 @@ def test_manifest_load_priority_and_pending(tmp_path):
         ("usage-limit-hit", "usage-limit", "limited"),
         ("rate-limited-429", "rate-limited-429", "limited"),
         ("remote-control-standdown", "remote-control-standdown", "stalled?"),
+        ("held-peer-message", "held-peer-message", "needs-you"),
     ],
 )
 def test_claude_code_rules_on_the_spike_screens(name, rule, state):
@@ -62,7 +63,15 @@ def test_claude_code_rules_on_the_spike_screens(name, rule, state):
 
 
 @pytest.mark.parametrize(
-    "name", ["trust-dialog", "usage-limit-reached", "usage-limit-hit", "rate-limited-429", "remote-control-standdown"]
+    "name",
+    [
+        "trust-dialog",
+        "usage-limit-reached",
+        "usage-limit-hit",
+        "rate-limited-429",
+        "remote-control-standdown",
+        "held-peer-message",
+    ],
 )
 def test_rules_fire_within_the_ticks_tail(name):
     """The tick hands the rules `TAIL_LINES` lines; every fixture's key line must be inside them, or
@@ -147,3 +156,31 @@ def test_a_stood_down_pane_that_is_also_rate_limited_reads_as_limited():
     both = ["  Remote Control disconnected, standing down (code 4090)", "  429 rate limit, retry later"]
     got = m.explain(both)
     assert got is not None and (got.rule, got.state) == ("rate-limited-429", "limited")
+
+
+def test_a_held_peer_message_needs_a_person_and_prose_about_it_does_not():
+    """TD-102: Claude Code holds a message from a session in another permission-mode class behind a
+    two-item menu, no hook fires, and the session read as `idle`. The rule keys on the two menu
+    lines, each anchored to its whole line, because the panel's heading is above the tick's tail
+    once a preview is drawn and because the options quoted in prose must not fire it."""
+    m = Manifest.load(RULES_FILE)
+    got = m.explain(screen("held-peer-message")[-15:])
+    assert got is not None and (got.rule, got.state) == ("held-peer-message", "needs-you")
+    assert got.pending is not None and got.pending.kind == "question"
+    # the cursor on the other option, and no preview at all
+    assert m.explain(["  Deny — drop it and tell the sender it was declined", "❯ Deliver this message to Claude"])
+    quiet = [
+        ["  Deny — drop it and tell the sender it was declined"],  # one option alone
+        ["  I pressed *Deny — drop it and tell the sender it was declined* / *Deliver this message to Claude*"],
+        ["  - Deny — drop it and tell the sender it was declined", "  - Deliver this message to Claude"],
+        ["● Held peer message — from uds:/run/user/1000/cc-socks/1.sock — not delivered to Claude (1 held)"],
+    ]
+    for lines in quiet:
+        assert m.explain(lines) is None, lines
+    root = pathlib.Path(__file__).parents[1]
+    for rel in (RULES_FILE, root / "tests" / "test_screen.py", root / "docs" / "technical_debt.md",
+                root / "docs" / "design.md"):  # fmt: skip
+        lines = pathlib.Path(rel).read_text().splitlines()
+        for i in range(max(1, len(lines) - 14)):
+            got = m.explain(lines[i : i + 15])
+            assert not (got and got.rule == "held-peer-message"), f"{rel} line {i + 1}"

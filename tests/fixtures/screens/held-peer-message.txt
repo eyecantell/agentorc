@@ -1,0 +1,21 @@
+────────────────────────────────────────────────────────────────────────────────
+ Held message from another session
+
+ Another Claude session sent a message: from
+ uds:/run/user/1000/cc-socks/3952439.sock [verified pid 3952439] (peer claims
+ name: anchor-session)
+
+ The sending session's permission mode class doesn't match this session's, so
+ it wasn't delivered automatically.
+
+ Message body (this is what will be delivered):
+ «Claiming TD-123 right now, please keep your grinders off it. I am the
+
+ anchor session, working in the main checkout. Two notes for your round,
+
+ neither needing a reply:
+
+ …[12 lines, 1764 chars total — full body will be delivered on approve]»
+
+ ❯ Deny — drop it and tell the sender it was declined
+   Deliver this message to Claude
