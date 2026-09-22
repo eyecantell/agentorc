@@ -72,21 +72,16 @@ def test_role_fills_brief_lane_grants_profile_and_the_record(repo, capsys):
     assert p["role"] == "" and p["prompt"] is None and p["capabilities"] == [] and p["ledger"] == "docs/debt.md"
 
 
-def test_role_orchestrator_or_lead_still_starts_a_manager_and_says_so(repo, capsys, monkeypatch):
-    """TD-055 step 2, repointed by TD-076 step 2: `--role orchestrator` and `--role lead` are
-    deprecated aliases for one release — the session is started as `manager`, with the manager
-    brief and grants, and stderr names the new word. `--role techlead` starts the go-between (TD-075
-    step 1), with no grant and its brief saying it has no seat to name."""
-    from agentorc import repoconfig
-
-    monkeypatch.setattr(repoconfig, "_warned", set())
+def test_old_role_names_are_unknown_and_techlead_starts_the_go_between(repo, capsys):
+    """TD-107: `--role orchestrator` and `--role lead` are unknown roles like any other word — the
+    renamed-roles table is gone, nothing is started. `--role techlead` starts the go-between
+    (TD-075 step 1), with no grant and its brief saying it has no seat to name."""
     _, calls = repo
     for old in ("orchestrator", "lead"):
         calls.clear()
-        assert cli.main(["new", f"o-{old}", "--role", old]) == 0
-        p = created(calls)
-        assert p["role"] == "manager" and p["capabilities"] == ["control"] and "**manager**" in p["prompt"]
-        assert f"role `{old}` is now `manager` (TD-076)" in capsys.readouterr().err
+        assert cli.main(["new", f"o-{old}", "--role", old]) != 0
+        assert not [c for c in calls if c[0] == "create"]
+        assert f"unknown role '{old}'" in capsys.readouterr().err
     calls.clear()
     assert cli.main(["new", "t1", "--role", "techlead"]) == 0
     p = created(calls)

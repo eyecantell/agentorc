@@ -93,8 +93,7 @@ teams:
   optionally `home`, `profile`, `lane`, `brief`, `grants`, `unattended`. **`manager: {role: person}`**
   means *the person manages*: no manager session is started. (`manager: person`, the bare string, is
   refused — *teams.<name>.manager must be a mapping, not str*.) `lead:`, its name until
-  2026-09-20 (TD-076), is still read for one release with a line saying so; a team carrying both
-  is refused.
+  2026-09-20 (TD-076), is refused as an unknown key.
 - **`techlead:`** — optional, one per team: the go-between that answers teammates' questions
   before they reach you (design §4.9b). `name` (default `<team>-techlead`), and optionally `home`,
   `profile`, `brief`, `context`; no `role` and no `grants`. It is started after the manager, under
@@ -126,7 +125,7 @@ A role is a preset: a brief, a lane, grants, a profile, an icon. Four are built 
 | `techlead` | the package's `techlead.md` | none |
 | `plain` | none | none |
 
-(`lead` and `orchestrator`, the manager's old names, still resolve to it for one release.)
+(`lead` and `orchestrator`, the manager's old names, are unknown roles.)
 
 — and a repo overrides any key in its `.agentorc.yml`:
 

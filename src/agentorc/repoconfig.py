@@ -80,52 +80,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
-# Renamed roles, old → new (TD-055, TD-076, docs/glossary.md): the old name still resolves for one
-# release, wherever a role is named — `--role`, a team definition, an `org.yml` or `.agentorc.yml`
-# `roles:` key — and says so once per process, naming the new word. Looked up once, never chained
-# (design §4.8 *The names*): no entry's target is itself an old word, so `orchestrator` was
-# repointed to `manager` when `lead` was renamed, not left pointing at `lead`.
-ROLE_ALIASES: dict[str, str] = {"orchestrator": "manager", "lead": "manager"}
-# Reserved role names (design §4.8 *The names*): a word that is decided but not built. Refused by
-# name wherever a role is named or defined, so it cannot arrive in live data meaning something
-# the entry that builds it then has to read around. Empty since `techlead` was built (TD-075 step 1).
-RESERVED_ROLES: dict[str, str] = {}
 _warned: set[str] = set()
-
-
-def canonical_role(name: str) -> str:
-    """The role's current name; an old one is accepted with a deprecation line on stderr, and a
-    reserved one is a `ValueError` saying why."""
-    reserved(name, "role")
-    new = ROLE_ALIASES.get(name)
-    if new is None:
-        return name
-    _deprecated(name, new)
-    return new
-
-
-def reserved(name: str, where: str) -> None:
-    """Refuse a reserved role name (`RESERVED_ROLES`) with its reason, not as an unknown role."""
-    if name in RESERVED_ROLES:
-        raise ValueError(f"{where} `{name}` is {RESERVED_ROLES[name]} (design §4.8)")
-
-
-def _deprecated(old: str, new: str) -> None:
-    if old not in _warned:
-        _warned.add(old)
-        print(
-            f"role `{old}` is now `{new}` (TD-076); `{old}` is still accepted for one release — rename it",
-            file=sys.stderr,
-        )
-
-
-def deprecated_team_key(old: str, new: str, where: str) -> None:
-    if f"key:{old}" not in _warned:
-        _warned.add(f"key:{old}")
-        print(
-            f"{where}: `{old}:` is now `{new}:` (TD-076); `{old}:` is still accepted for one release — rename it",
-            file=sys.stderr,
-        )
 
 
 def deprecated_grant(old: str, where: str) -> None:
@@ -135,19 +90,6 @@ def deprecated_grant(old: str, where: str) -> None:
             f"{where}: grant `{old}` is now `{GRANT_ALIASES[old]}` (TD-055); `{old}` is still accepted for one release",
             file=sys.stderr,
         )
-
-
-def _aliased(blocks: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    """A `roles:` mapping with old keys folded into their new names. When a layer spells both, the
-    new key's values win per key: it is the one the person wrote since the rename."""
-    if not any(old in blocks for old in ROLE_ALIASES):
-        return blocks
-    out = {k: v for k, v in blocks.items() if k not in ROLE_ALIASES}
-    for old, new in ROLE_ALIASES.items():
-        if old in blocks:
-            _deprecated(old, new)
-            out[new] = {**(blocks[old] or {}), **(blocks.get(new) or {})}
-    return out
 
 
 # Reads one file by its absolute path and returns its text, or None when there is no such file;
@@ -309,8 +251,6 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
             cfg.unattended = dict(value)
     elif key == "roles":
         blocks = _mapping(value, where)
-        for name in blocks:
-            reserved(name, f"{where}.{name}: role")
         cfg.roles = {name: _role_block(name, raw, where) for name, raw in blocks.items()}
     elif key == "controllers":
         cfg.controllers = _str_list(value, where)
@@ -405,27 +345,22 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
 
 
 def default_label(name: str) -> str:
-    """A role's label when nothing gives one: its current name — an old one read through the
-    renamed-roles table, so `orchestrator` reads *Manager* — with its first letter raised. Quiet:
-    it names no rename on stderr, because the page draws old badges on every load."""
-    name = ROLE_ALIASES.get(name, name)
+    """A role's label when nothing gives one: its name with its first letter raised."""
     return name[:1].upper() + name[1:]
 
 
 def role_names(cfg: RepoConfig, roles_overlay: dict[str, dict[str, Any]] | None = None) -> list[str]:
     """Every role that resolves here: the built-ins first, then what the layers add, each once."""
-    return list(dict.fromkeys([*PRESETS, *_aliased(roles_overlay or {}), *_aliased(cfg.roles)]))
+    return list(dict.fromkeys([*PRESETS, *(roles_overlay or {}), *cfg.roles]))
 
 
 def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, Any]] | None = None) -> Role:
     """Built-in < `roles_overlay` (the org layer, a later step) < the repo's `roles:`, per key.
-    An unknown name is a `KeyError` naming it and what would have resolved. A renamed role's old
-    name resolves to the new one (`ROLE_ALIASES`), and the returned `Role` carries the new name."""
-    name = canonical_role(name)
+    An unknown name is a `KeyError` naming it and what would have resolved."""
     layers = [
         ("built-in", PRESETS.get(name)),
-        ("org", _aliased(roles_overlay or {}).get(name)),
-        ("repo", _aliased(cfg.roles).get(name)),
+        ("org", (roles_overlay or {}).get(name)),
+        ("repo", cfg.roles.get(name)),
     ]
     spoke = [(src, block) for src, block in layers if block is not None]
     if not spoke:

@@ -49,8 +49,8 @@ not mix:
   them, checks their merges against the cadence, wraps them up. Its members are the sessions
   whose `controllers` name it. Started from the `manager` role; shown as *Manager*. A person may
   manage a team instead (`manager: person`), in which case no manager session exists. Called
-  **lead** from 2026-09-16 to 2026-09-20 and `orchestrator` before that; both old role names
-  resolve to `manager` for one release and warn. *Not:* lead, orchestrator, orc, supervisor.
+  **lead** from 2026-09-16 to 2026-09-20 and `orchestrator` before that; neither old role name
+  resolves any more (TD-107). *Not:* lead, orchestrator, orc, supervisor.
   — **decided** 2026-09-19 (Paul), confirmed 2026-09-20 (TD-076, design §4.8 *The names*).
 - **techlead** — the technical go-between of TD-075: a session that answers technical
   questions for a team's workers before they reach a person. Shown as *Tech Lead*. A team's
@@ -87,7 +87,7 @@ not mix:
   2026-09-13).
 - **role** — a skillset preset an agent is started from: brief template, lane shape, grants,
   profile. Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `manager`,
-  `plain` (`manager` was `lead` until 2026-09-20, TD-076, and `orchestrator` until 2026-09-17, TD-055 step 2; both old names are aliases for one release). A role may carry a display `label:` — what the badge shows; nothing keys on it. *Not:* type, kind. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
+  `plain` (`manager` was `lead` until 2026-09-20, TD-076, and `orchestrator` until 2026-09-17, TD-055 step 2; neither old name resolves, TD-107). A role may carry a display `label:` — what the badge shows; nothing keys on it. *Not:* type, kind. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
 - **seat** — a place in a team definition that one session fills at a time, named by what it
   does rather than by who is in it: the team's `techlead:` seat. A seat is *empty* or *filled*
   — the session in it may end and another be started into it (`ao new --keep-mail`, so the

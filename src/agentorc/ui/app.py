@@ -393,8 +393,8 @@ def _look_for(repo: str, role: str, org_roles: Any) -> tuple[str, str]:
     """The role's icon and display label in that repo (design §4.8): the repo's own `roles:` over
     the org's over the built-in, resolved by `repoconfig` — the core never keys on a role, and the
     UI is free to (§9 invariant 9). A repo with no file, an unreadable one, a role nothing defines,
-    a repo on another host: no icon, and the **default label** — the role's name, raised, an old
-    name read through the renamed-roles table — never nothing (§4.8 *The names*)."""
+    a repo on another host: no icon, and the **default label** — the role's name, raised — never
+    nothing (§4.8 *The names*)."""
     try:
         cfg = repoconfig.load(repo) if repo else repoconfig.RepoConfig()
         r = repoconfig.resolve_role(cfg, role, org_roles)

@@ -268,6 +268,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-20: session names in the team definitions renamed (`orchestrator-ao-1` → `manager-ao-1`, `tdgrind-ao-N` → `grinder-ao-N`), as new sessions, on a restart that is Paul's word to give.
 - 2026-09-21 (TD-095, PR #389; built the same day): Paul reversed the 2026-09-19 decision after seeing both one above the other — the manager's `doing` line is on the manager's card, the first in the group, and the team header stops repeating it. PR #391: `person` reserved as the interactive mark's icon and refused as a role's.
 - 2026-09-21 (TD-098): the `auditor` preset designed; built 2026-09-22 (step 3).
+- 2026-09-22 (TD-107, from the design review): the renamed-roles, retired-words and reserved-words tables deleted, code and design — "for one release" had no meaning with no release and one user. `orchestrator` and `lead` are unknown roles, `lead:` an unknown team key; a record badged with either keeps its badge as text, labelled by its own name.
 - The first real `ao team start` broke on a brief that named one night (TD-042): two sessions came up whose brief told them to stop at a time already past, and one did so within a minute — the origin of "a brief describes the job, not the run".
 - The first manager was described as "a session, not code" running "for a few evenings" before any rule became a §6 policy.
 
@@ -306,6 +307,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-21 (TD-095, PR #389): the team header stopped repeating the manager's name, state and line, which are on the manager's card.
 - 2026-09-22 (TD-099): a live team that is concluded (every live session `idle` and declared, the rest exited or closed) is drawn as a stopped one, with Start and no wind-down.
 - TD-076: `manager` replaced `lead` as the key; `lead` read for one release, both refused.
+- 2026-09-22 (TD-107): `lead:` stopped being read; it is an unknown key.
 - TD-041: interactive members out of a manager's reach became a gate (§9 invariant 5), so the start reports it per member.
 
 ## 4.9a Winding down: a team that runs out of work
