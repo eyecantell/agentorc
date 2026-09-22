@@ -148,3 +148,6 @@
 ## Run 2026-09-22 (started 02:15Z by ao team start ao-grind)
 
 02:16  start: grinder-ao-1, grinder-ao-2, techlead-ao-1 all working; inbox empty; no relays (every cadence-changes entry landed before these records were created)
+02:17  techlead-ao-1: idle, 0 waiting, clean → ao close (not a fill); grinder-ao-2 claimed TD-096; grinder-ao-1 working
+02:18–02:41 quiet (grinder-ao-1 claimed TD-062, grinder-ao-2 TD-096; techlead-ao-1 exited after close, 0 waiting → left empty)
+02:42  grinder-ao-2: TD-096 done → PR #403 cadence pass (review recorded, not verified); note read (promote is the anchor's). grinder-ao-1: idle since 02:31 with TD-062 claimed → watching the 20 min
