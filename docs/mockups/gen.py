@@ -11,7 +11,15 @@ CSS = """
   a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-decoration: underline; }
   .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
   .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
-  .pill .dot { display: none; } .pill.s-needs .dot, .pill.s-limited .dot, .pill.s-stalled .dot { display: block; }
+  .pill .dot { display: none; }
+  /* design §4.5a **state icon**, as app.css draws it: a page of cards is read by shape before it is
+     read by word, and a glyph never looks like something to press */
+  .pill::before { font-size: 9px; line-height: 1; }
+  .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
+  .pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
+  .pill.s-closed::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; } .pill.s-oncall::before { content: "◇"; font-size: 11px; }
+  .pill.s-idle.unseen::before { content: "●"; font-size: 9px; letter-spacing: 0; }
+  .pill.plain::before { content: none; }  /* a due date or a report's status is not a session state */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
      alive, at rest, may be spoken to (idle · unseen is idle's blue); everything over or out of
@@ -21,7 +29,7 @@ CSS = """
   .s-idle { background: #dbeafe; color: #1e40af; }
   .s-ended { background: #e5e7eb; color: #4b5563; }
   .s-stalled { background: #fecaca; color: #991b1b; }
-  .s-exited, .s-closed { background: #e5e7eb; color: #4b5563; }
+  .s-exited, .s-closed, .s-oncall { background: #e5e7eb; color: #4b5563; }
   .s-done { background: #d1fae5; color: #065f46; } /* Focus's reports and checklist only — --done leaves the card */
   .s-limited { background: #ede9fe; color: #5b21b6; }
   .s-unreachable { background: #e5e7eb; color: #4b5563; }
@@ -188,10 +196,10 @@ def rank(host, state):
         return 4 if host in VOLATILE else 2.5
     return RANK[state]
 
-def pill(state, label=None, scraped=False):
-    names = {"working": "working", "needs": "needs you", "idle": "idle", "stalled": "stalled?", "exited": "exited", "done": "closed", "limited": "limited", "unreachable": "unreachable"}
+def pill(state, label=None, scraped=False, unseen=False):
+    names = {"oncall": "on call", "working": "working", "needs": "needs you", "idle": "idle", "stalled": "stalled?", "exited": "exited", "done": "closed", "limited": "limited", "unreachable": "unreachable"}
     cls = {"done": "closed"}.get(state, state)  # a closed session is grey; s-done is Focus's green tick
-    return f'<span class="pill s-{cls}{" scraped" if scraped else ""}"><span class="dot"></span>{label or names[state]}</span>'
+    return f'<span class="pill s-{cls}{" unseen" if unseen else ""}{" scraped" if scraped else ""}"><span class="dot"></span>{label or names[state]}</span>'
 
 def head(title):
     return f'<!doctype html>\n<html>\n<head>\n  <meta charset="utf-8">\n  <script src="./support.js"></script>\n</head>\n<body>\n<x-dc>\n<helmet>{CSS}</helmet>\n'
@@ -268,9 +276,9 @@ def due_strip(compact=False):
     rows = ""
     for cls, due, repo, text, sess in DUE:
         if compact:
-            rows += f'<div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill {cls}">{due}</span><span style="font-size: 12px; flex-basis: 100%;">{text}</span><span class="meta">{repo} · {sess}</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div>'
+            rows += f'<div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill plain {cls}">{due}</span><span style="font-size: 12px; flex-basis: 100%;">{text}</span><span class="meta">{repo} · {sess}</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div>'
         else:
-            rows += f'<div class="due"><span class="pill {cls}" style="width: 78px; justify-content: center;">{due}</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{text}</span><span class="meta" style="flex-shrink: 0;">{repo} · session <a href="#">{sess}</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>'
+            rows += f'<div class="due"><span class="pill plain {cls}" style="width: 78px; justify-content: center;">{due}</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{text}</span><span class="meta" style="flex-shrink: 0;">{repo} · session <a href="#">{sess}</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>'
     return f'''<div class="card" style="display: flex; flex-direction: column;">
     <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Due</span><span class="muted">4 overdue · 2 today · from the dev-cadence boards</span><span style="flex-grow: 1;"></span><a href="#" style="font-size: 12px;">full board →</a><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
     {rows}
@@ -298,39 +306,32 @@ EXTRA = {
     "tdgrind-4": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "#809 · 2/2 done",
                   "ready": True, "ending": "out of work — nothing open on the ledger that my brief lets me take"},
     # the team's seat (§4.9b), ended between questions as designed: `exited` in every payload, drawn
-    # *◇ on call* with what would make it come, and Message… first (§4.5, TD-097)
+    # *on call* (◇) with what would make it come, and Message… first (§4.5, TD-097)
     "techlead-1": {"team": "samscrape-grind", "role": "techlead", "under": "orc-1", "report": "3 answered", "seat": True},
     "main":      {"findings": "1 filed"},
     # the person's own, finished while nobody was looking: *idle · unseen* (§4.2, interactive only)
     "errors-alerts": {"title": "Error Checker", "unseen": True},
 }
 
-# §4.9 team definitions, as the Teams strip reads them: every team in ~/.agentorc/org.yml and in the
-# repos' .agentorc.yml, its source, and how many of its members are live right now.
+# §4.9 team definitions: every team in ~/.agentorc/org.yml and in the repos' .agentorc.yml, its
+# source, its manager, and how many of its members are live right now. A team with nothing live
+# keeps its card (§4.5a **team groups**, 2026-09-18 — the Teams strip that listed them is retired):
+# below the live teams and *No team*, its dead cards folded, Start on its header.
 TEAMS = [
     ("samscrape-grind", "org.yml", "orc-1", 4, "samscrape"),
-    ("ao-grind", "org.yml", "orchestrator-ao-1", 0, "agentorc"),
+    ("ao-grind", "org.yml", "manager-ao-1", 0, "agentorc"),
     ("cadence-sweep", "dev-cadence/.agentorc.yml", "sweeper", 0, "dev-cadence"),
 ]
+# what a stopped team's header says: its folded sessions and *wound down <t> ago* when every one of
+# them declared out of work (§4.9a), else *stopped*; a definition no session carries is the same
+# card, empty, headed by what the definition says
+STOPPED = {
+    "ao-grind": {"folded": 4, "wound": "6h", "place": "kmaster / agentorc"},
+    "cadence-sweep": {"def": "Manager sweeper · 1 member · dev-cadence"},
+}
 
 def doing_of(name):
     return EXTRA.get(name, {}).get("doing")
-
-def teams_strip():
-    rows = ""
-    # 2026-09-16: a live team is not listed here — its group's card carries Stop / Stop now.
-    for team, source, lead, live, repo in TEAMS:
-        if live:
-            continue
-        state = '<span class="pill s-ended">not running</span>'
-        acts = '<span class="btn sm primary">Start</span>'
-        rows += (f'<div class="due"><span style="font-weight: 600; font-size: 12.5px; width: 150px;">{team}</span>{state}'
-                 f'<span class="meta">lead {lead} · {repo} · {source}</span>'
-                 f'<span style="flex-grow: 1;"></span>{acts}</div>')
-    return f'''<div class="card" style="display: flex; flex-direction: column;">
-    <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Teams</span><span class="muted">3 defined · 2 not running · from ~/.agentorc/org.yml and the repos</span><span style="flex-grow: 1;"></span><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
-    {rows}
-  </div>'''
 
 def where_row(host, repo, name, where, in_team):
     """row 3 of the card's anatomy (§4.5): `branch <name>`, `wt/<name> ·` only when the worktree
@@ -373,7 +374,7 @@ def team_desktop():
         title = e.get("title")
         title_html = (f'<span class="meta fill" title="the session\'s name as its tool holds it">{title}</span>'
                       if title and title != name else "")
-        state_pill = (pill("idle", "● idle · unseen") if unseen else pill("exited", "◇ on call") if seat
+        state_pill = (pill("idle", "idle · unseen", unseen=True) if unseen else pill("oncall") if seat
                       else pill(state, scraped=(conf == "scraped")))
         # (2) what it is: role, mode (a word, never pressable), marks, the stops note, the one clock
         role = (f'<span class="badge" title="the role preset it was started under (design §4.8)">'
@@ -509,7 +510,23 @@ def team_desktop():
         grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True) for h, r, x in members), needs, team=True)
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
     grid += group("No team", f"{len(rest)} sessions", "".join(card(h, r, x, False) for h, r, x in rest))
+    for team, source, lead, live, repo in TEAMS:
+        if live:
+            continue
+        st = STOPPED.get(team, {})
+        sub = st.get("place") or st.get("def", "")
+        fold = (f'<span class="btn sm ghost" title="a stopped team\'s cards are folded away">{st["folded"]} sessions — show</span>'
+                if st.get("folded") else "")
+        when = f'wound down {st["wound"]} ago' if st.get("wound") else "stopped"
+        grid += (f'<div style="display: flex; align-items: center; gap: 10px; border: 1px solid #cbd0d6; border-radius: 8px; '
+                 f'padding: 10px 14px; background: #eceef1;" title="defined in {source}">'
+                 f'<span style="font-weight: 600; font-size: 15px;">{team}</span><span class="meta">{sub}</span>{fold}'
+                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span></div>')
     cards = grid
+    # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
+    ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
+                              pill("working"), pill("idle", "idle · unseen", unseen=True), pill("idle"), pill("exited"),
+                              pill("done")])  # an on-call seat sorts as the `exited` / `closed` it is (TD-097)
     return head("Org") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
@@ -521,10 +538,9 @@ def team_desktop():
     <span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">profile: all ▾</span><span class="btn ghost" style="color: #9ca3af;">☐ show command runs (2)</span>
   </div>
   {due_strip()}
-  {teams_strip()}
   <div class="warn" style="background: #f3f4f6; border-color: #cbd0d6; color: #374151; align-items: center;">{ICON["warn"]}<span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
   <div style="display: flex; flex-direction: column; gap: 22px;">{cards}</div>
-  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (idle · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>: the manager's card first, then needs you → limited → stalled? → unreachable (non-volatile) → working → unseen idle → idle → exited → closed, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab.</div>
+  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (idle · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>, by the pills' own glyphs: the manager's card first, then {ORDER_PILLS}, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab.</div>
 </div>
 </div>
 ''' + TAIL
@@ -547,7 +563,7 @@ def team_phone():
         place = f"{host} / {repo} · {where}" if repo else f"{host} / {where}"
         return f'''<div class="card{" off" if state == "unreachable" else ""}" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
   <div class="sbar" style="background: {BAR[state]};"></div>
-  <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">{name}</span><span style="flex-grow: 1;"></span>{pill("exited", "◇ on call") if seat else pill(state, scraped=(conf == "scraped"))}</div>
+  <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">{name}</span><span style="flex-grow: 1;"></span>{pill("oncall") if seat else pill(state, scraped=(conf == "scraped"))}</div>
   <div class="meta" style="margin-top: 4px; color: #374151;">{place}</div>
   <div class="meta" style="margin-top: 2px;">{tool} · {age}</div>
   {flag_html}{pend}{actions}
@@ -636,9 +652,9 @@ def focus():
     <div class="card" style="padding: 12px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">1/3 done · 2 filed</span></div>
       <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-301</span><span class="pill s-working">claimed</span><a href="#">#811</a><span class="meta">20:04</span><span style="flex-grow: 1;"></span><span class="badge">declared</span><span class="btn sm ghost">Drop</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-299</span><span class="pill s-done">done</span><a href="#">#809</a><span class="meta">18:40</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-288</span><span class="pill s-ended">dropped</span><span class="meta">held by tdgrind-3</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-301</span><span class="pill plain s-working">claimed</span><a href="#">#811</a><span class="meta">20:04</span><span style="flex-grow: 1;"></span><span class="badge">declared</span><span class="btn sm ghost">Drop</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-299</span><span class="pill plain s-done">done</span><a href="#">#809</a><span class="meta">18:40</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-288</span><span class="pill plain s-ended">dropped</span><span class="meta">held by tdgrind-3</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
         <div style="border-top: 1px solid #eceef1; padding-top: 6px; display: flex; align-items: center; gap: 6px;"><span class="mono">TD-402</span><span class="badge">filed · medium</span><span class="meta">19:12</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-403</span><span class="badge">filed · low</span><span class="meta">19:48</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
       </div>
@@ -708,7 +724,7 @@ def focus_orchestrator():
     <div class="card" style="padding: 12px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">last tick 20:10</span></div>
       <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">#811</span><span class="pill s-done">done</span><span class="meta">merged · cadence ✓</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">#811</span><span class="pill plain s-done">done</span><span class="meta">merged · cadence ✓</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-404</span><span class="badge">filed · medium</span><span class="meta">tdgrind-2 stood down</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
       </div>
     </div>
@@ -740,7 +756,7 @@ def new_session():
   </div>
   <div class="field"><label>Where</label>
     <div style="display: flex; flex-direction: column; gap: 6px;">
-      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>This directory</div><div class="note">the checkout itself, or any directory</div></div><span style="flex-grow: 1;"></span><span class="pill s-ended">in use by main</span></div>
+      <div class="radio" style="opacity: .55;"><span class="rb"></span><div><div>This directory</div><div class="note">the checkout itself, or any directory</div></div><span style="flex-grow: 1;"></span><span class="pill plain s-ended">in use by main</span></div>
       <div class="radio on"><span class="rb"></span><div><div>New worktree</div><div class="note">for a git repo: <span class="mono">.claude/worktrees/&lt;name&gt;</span> on branch <span class="mono">&lt;name&gt;</span>, from origin's default branch; reused if it exists</div></div><span class="input mono" style="width: 240px; margin-left: auto;">td-302</span></div>
     </div>
   </div>
@@ -774,7 +790,7 @@ def legend():
         ("unreachable", "Grey, and the card is dimmed. The host stopped answering, so every card on it flips at once and keeps its last known state. Sorts with idle on a volatile host (asleep laptop), after stalled? on one that should be up."),
     ]
     def lpill(s):
-        return pill("idle", "● idle · unseen") if s == "unseen" else pill(s)
+        return pill("idle", "idle · unseen", unseen=True) if s == "unseen" else pill(s)
     body = "".join(f'<tr><td style="width: 150px;">{lpill(s)}</td><td>{d}</td></tr>' for s, d in rows)
     # the state tokens the page's stylesheet carries (design §4.5 *The card's anatomy*, TD-095)
     tokens = [
@@ -995,13 +1011,13 @@ def attention():
         rows = ""
         for kind, due, date, sess, text, ctx in items:
             rows += f'''<div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill {dcls[kind]}" style="justify-self: start;">{due}</span>
+  <span class="pill plain {dcls[kind]}" style="justify-self: start;">{due}</span>
   <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">{text}</div><div class="meta">{date} · session <a href="#">{sess}</a> · {ctx}</div></div>
   <div style="display: flex; gap: 4px;"><span class="btn sm ghost">{ICON["focus"]}Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
 </div>'''
         if repo == "samscrape":
             rows += '''<div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill s-ended" style="justify-self: start;">undated</span>
+  <span class="pill plain s-ended" style="justify-self: start;">undated</span>
   <div class="muted" style="font-size: 12.5px;">19 more items with no Due date — surfaced only here, never on the Org strip.</div>
   <span class="btn sm ghost">show ▾</span>
 </div>'''
