@@ -33,14 +33,14 @@ h1{font:600 15px system-ui;margin:0 0 4px}p.k{font:12.5px system-ui;color:var(--
 .legend{display:flex;gap:10px;align-items:center;margin:4px 0 18px;font:12px system-ui;color:var(--muted)}
 ol{font:12.5px/1.6 system-ui;color:#c9d1db;margin:6px 0 0;padding-left:20px;columns:2;column-gap:40px;max-width:1700px}ol b{color:#fff}
 </style>
-<h1>TD-095 — the card's anatomy with its second pass, 2026-09-21 (a sketch, not the page): six rows, one height, one clock; interactive stands out; a quiet foot</h1>
-<p class="k">Same sessions as the screenshot of 2026-09-21. Every card has the same six rows in the same places and the same height; a row with nothing to say stays, empty, rather than moving what is below it. Foot: the next act is outlined, the rest are plain links, dimmed would mean disabled, and the only filled button is Allow. The editor button (VS Code here) is the person's to rename or remove.</p>
+<h1>TD-095 / TD-097 / TD-098 — the card, with seats: a seat with nobody in it reads <i>on call</i>, an auditor is a seat with a trigger (a sketch, not the page, 2026-09-21)</h1>
+<p class="k">Three cards are new: <b>techlead-ao-1</b> (a seat on call: comes on the next question), <b>test-audit-ao-1</b> (a filled seat, working) and <b>docs-audit-ao-1</b> (a seat on call with a trigger: runs after 10 PRs). <i>unseen</i> is drawn only on an interactive session — grinder-ao-2 is plain idle. Same sessions otherwise as the screenshot of 2026-09-21. Every card has the same six rows in the same places and the same height; a row with nothing to say stays, empty, rather than moving what is below it. Foot: the next act is outlined, the rest are plain links, dimmed would mean disabled, and the only filled button is Allow. The editor button (VS Code here) is the person's to rename or remove.</p>
 <div class="legend">state colours:
- <span class="pill p-n">▲ needs you</span><span class="pill p-s">? stalled?</span><span class="pill p-w">∿ working</span><span class="pill p-i">›_ idle</span><span class="pill p-i">● finished · unseen</span><span class="pill p-e">○ exited</span><span class="pill p-e">✓ closed</span>
- <span>— amber and red stay the loudest; green is working and nothing else; blue is alive and at rest; grey is over or out of reach.</span></div>
+ <span class="pill p-n">▲ needs you</span><span class="pill p-s">? stalled?</span><span class="pill p-w">∿ working</span><span class="pill p-i">›_ idle</span><span class="pill p-i">● idle · unseen</span><span class="pill p-e">◌ on call</span><span class="pill p-e">○ exited</span><span class="pill p-e">✓ closed</span>
+ <span>— amber and red stay the loudest; green is working and nothing else; blue is alive and at rest; grey is over, out of reach, or a seat on call.</span></div>
 
 <div class="grp">
- <div class="gh"><span class="t">ao-grind</span><span class="m">kmaster / agentorc</span><span class="m">·</span><span class="m">2 working · 1 finished</span><span class="grow"></span><span class="btn">Wind down</span><span class="btn g">Stop now</span></div>
+ <div class="gh"><span class="t">ao-grind</span><span class="m">kmaster / agentorc</span><span class="m">·</span><span class="m">3 working · 1 idle · 1 needs you · 2 on call</span><span class="grow"></span><span class="btn">Wind down</span><span class="btn g">Stop now</span></div>
  <div class="grid">
   <div class="c w"><div class="r r1"><span class="n">manager-ao-1</span><span class="grow"></span><span class="pill p-w">∿ working</span></div>
    <div class="r" style="margin-top:6px"><span class="b">⚑ Manager</span><span class="mode">· unattended</span><span class="grow"></span><span class="meta">2h 29m</span></div>
@@ -56,7 +56,7 @@ ol{font:12.5px/1.6 system-ui;color:#c9d1db;margin:6px 0 0;padding-left:20px;colu
    <div class="slot"><div class="clamp">TD-075: five PRs (#357, #360–#363) reviewed, waiting on the anchor's merge</div><div class="says">says · 56m ago</div></div>
    <div class="f"><span class="btn p">▣ Focus</span><span class="btn g">‹› VS Code</span><span class="grow"></span><span class="btn g">⋯</span></div></div>
 
-  <div class="c i"><div class="r r1"><span class="n">grinder-ao-2</span><span class="grow"></span><span class="pill p-i">● finished · unseen</span></div>
+  <div class="c i"><div class="r r1"><span class="n">grinder-ao-2</span><span class="grow"></span><span class="pill p-i">›_ idle</span></div>
    <div class="r" style="margin-top:6px"><span class="b">🔧 Grinder</span><span class="mode">· unattended</span><span class="grow"></span><span class="meta">1h 41m</span></div>
    <div class="r" style="margin-top:6px"><span class="meta">detached at <b>71b8aa8</b></span></div>
    <div class="r" style="margin-top:4px"><span class="meta">claude-code · paul · <b>sonnet-5</b></span><span class="grow"></span><span class="meta"><b>#359</b> · 1/2 done</span></div>
@@ -69,6 +69,27 @@ ol{font:12.5px/1.6 system-ui;color:#c9d1db;margin:6px 0 0;padding-left:20px;colu
    <div class="r" style="margin-top:4px"><span class="meta">claude-code · paul · <b>sonnet-5</b></span><span class="grow"></span><span class="meta">3 filed</span></div>
    <div class="slot need"><div class="clamp">permission: Bash(rm -rf .claude/worktrees/old-*)</div><div class="says">via hook · 4m left</div></div>
    <div class="f"><span class="btn fill">Allow</span><span class="btn p">Deny</span><span class="btn g">▣ Focus</span><span class="grow"></span><span class="btn g">⋯</span></div></div>
+
+  <div class="c"><div class="r r1"><span class="n">techlead-ao-1</span><span class="grow"></span><span class="pill p-e">◌ on call</span></div>
+   <div class="r" style="margin-top:6px"><span class="b">📖 Tech lead</span><span class="mode">· unattended</span><span class="grow"></span><span class="meta">12m</span></div>
+   <div class="r" style="margin-top:6px"><span class="meta">branch <b>techlead-ao-1</b></span></div>
+   <div class="r" style="margin-top:4px"><span class="meta">claude-code · paul · <b>opus-5</b></span><span class="grow"></span><span class="meta">3 answered</span></div>
+   <div class="slot"><div class="clamp">on call — comes on the next question</div><div class="says">last came · 12m ago</div></div>
+   <div class="f"><span class="btn p">✉ Message…</span><span class="btn g">▣ Details</span><span class="grow"></span><span class="btn g">⋯</span></div></div>
+
+  <div class="c w"><div class="r r1"><span class="n">test-audit-ao-1</span><span class="grow"></span><span class="pill p-w">∿ working</span></div>
+   <div class="r" style="margin-top:6px"><span class="b">🔍 Auditor · tests</span><span class="mode">· unattended</span><span class="grow"></span><span class="meta">4m</span></div>
+   <div class="r" style="margin-top:6px"><span class="meta">branch <b>test-audit-ao-1</b></span></div>
+   <div class="r" style="margin-top:4px"><span class="meta">claude-code · paul · <b>sonnet-5</b></span><span class="grow"></span><span class="meta">2 filed</span></div>
+   <div class="slot"><div class="clamp">running the suite against §4.2's fixtures; two tests assert a scraped state they never set up</div><div class="says">says · 1m ago</div></div>
+   <div class="f"><span class="btn p">▣ Focus</span><span class="btn g">‹› VS Code</span><span class="grow"></span><span class="btn g">⋯</span></div></div>
+
+  <div class="c"><div class="r r1"><span class="n">docs-audit-ao-1</span><span class="grow"></span><span class="pill p-e">◌ on call</span></div>
+   <div class="r" style="margin-top:6px"><span class="b">🔍 Auditor · docs</span><span class="mode">· unattended</span><span class="grow"></span><span class="meta">6h 10m</span></div>
+   <div class="r" style="margin-top:6px"><span class="meta">branch <b>docs-audit-ao-1</b></span></div>
+   <div class="r" style="margin-top:4px"><span class="meta">claude-code · paul · <b>sonnet-5</b></span><span class="grow"></span><span class="meta">1 filed</span></div>
+   <div class="slot"><div class="clamp">on call — runs after 10 PRs (3 so far)</div><div class="says">last ran · 6h 10m ago</div></div>
+   <div class="f"><span class="btn p">✉ Message…</span><span class="btn g">▣ Details</span><span class="grow"></span><span class="btn g">⋯</span></div></div>
  </div>
 </div>
 

@@ -88,8 +88,18 @@ not mix:
   does rather than by who is in it: the team's `techlead:` seat. A seat is *empty* or *filled*
   — the session in it may end and another be started into it (`ao new --keep-mail`, so the
   questions that were waiting are still there) — and it is never *finished*, since it declares
-  nothing and is not counted in a wind-down (design §4.9b). Workers are members, not seats. —
-  **decided** 2026-09-21 (asked for by Paul: the word was in use and not defined).
+  nothing and is not counted in a wind-down (design §4.9b). Workers are members, not seats. On
+  a card a seat with nobody in it reads **on call** — *empty* and *filled* are what the manager
+  does to it, *on call* is what a person sees (TD-097). Every seat has a **trigger**: the
+  techlead's is a question; an **auditor**'s is a count of merged PRs or a period (TD-098). —
+  **decided** 2026-09-21 (asked for by Paul: the word was in use and not defined; *on call* his
+  choice the same evening).
+- **on call** — what a seat's card says while nobody is in it: grey, nothing for the person to
+  do, and the slot says what would make it come. Not a state: the record is `exited` or `closed`.
+  — **decided** 2026-09-21 (Paul; *empty* and *available* read as something to do).
+- **auditor** — a role for a seat with a trigger: checks one area (docs, tests) every n merged
+  PRs or every so often, files what it finds, and ends. Hunter-shaped unless its brief says
+  otherwise. — *proposed* 2026-09-21 (design §4.9b *Seats with a trigger*, TD-098).
 - **grinder** — a role: resolves each lane item to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.

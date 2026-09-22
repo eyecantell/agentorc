@@ -340,9 +340,13 @@ tool's own limit message and a `stalled?` that can say why. Scraped never outran
 state — fresh meaning a hook reported within the stall window; a session no hook has reported
 on yet (the trust dialog appears before any hook fires) takes the classifier's verdict at once.
 
-**Unseen idle.** An `idle` session nobody has looked at since it finished (`since > seen_at`;
+**Unseen idle.** An **interactive** `idle` session nobody has looked at since it finished (`since > seen_at`;
 Focus sets `seen_at`) renders "idle · unseen" and sorts above plain `idle` — the morning
-triage case. (It read *finished · unseen* until 2026-09-21, TD-095 (e): *finished* is what a member
+triage case: the person's own sessions that answered while they were away. **Never on an
+`unattended` session** (decided by Paul 2026-09-21, TD-095 (f)): its result was read by its
+manager, the person is not expected to open it, and its slot already says *out of work* with
+Close session as the act — so a finished worker is plain `idle`, and the mark keys on the
+`unattended` field. (It read *finished · unseen* until 2026-09-21, TD-095 (e): *finished* is what a member
 that declared itself out of work is called (§4.9a), and this is a turn nobody has looked at, not a
 run that is over — Paul's decision.) Not a state: `idle` stays `idle` in every payload (TD-017).
 
@@ -1269,7 +1273,20 @@ Screens:
    says the **state and nothing else** — a session that declared itself out of work is still
    `idle` (*idle · unseen* until a person has looked, §4.2), since a declaration is not a state
    (§4.9a), and the first sketch's grey *finished* pill was the sketch's mistake; the slot says how
-   it ended; the caption says *ready to close ✓*; the button does it. Nothing on a card carries a
+   it ended; the caption says *ready to close ✓*; the button does it. **One composed pill, as
+   *idle · unseen* is: a seat with nobody in it reads *on call*** (design 2026-09-21, TD-097, the
+   word Paul's) — an `exited` or `closed` record that the team definition names as a seat
+   (§4.9b; by name, as `teamrun.wound_down` keys, never by role) is drawn with the grey pill
+   *◌ on call*, the state stays `exited` or `closed` in every payload, the slot says what would
+   make it come — *on call — comes on the next question*, *on call — runs after 10 PRs*, *on call
+   — runs every 6h*, from the seat's trigger — the caption is *last came · `<age>`* (*last ran*
+   for a trigger seat) from the record's `since`, the report is its own (*3 answered*, *2 filed*),
+   and the foot's first button is **Message…** — asking it is how it comes — then Details, and
+   never Forget or Close session while the definition names it. A seat that is filled is an
+   ordinary card in its live state. The team's header counts them apart: *2 on call*. Why not
+   *exited*: the one card behaving exactly as designed looked like the one that had failed;
+   why not *empty* (the mechanism word, §4.9b) or *available*: both read, at a glance, as
+   something the person has to do. Nothing on a card carries a
    second **state** age: row 2's clock is the only one, and an ending is dated by it, never in the
    slot — a `doing` line keeps its own *says · `<age>`* caption (§4.8), which is the line's age,
    not the session's. **Inside a team's own group a card drops what the group says**: its `team` badge,
@@ -1560,8 +1577,8 @@ noted). If a control is not in this table it does not exist.
 | New session | **Where**: this directory / new worktree | for a git repo, the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there — landed 2026-09-06 after a session was started in the main checkout beside its anchor |
 | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC; landed 2026-09-11): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
 | New session | directory field → occupancy | as you type, the form asks the host agent who holds the agent slot for that directory — agentorc's own live agent sessions *and* live sessions the adapters can see outside agentorc (Claude Code's registry) — and, when it is taken, disables "this directory" and selects a new worktree (landed 2026-09-06; the create RPC refuses the same way) |
-| Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state, its marks (the needs-you count, *answered for you*) and its controls, and **not** its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*; design and build 2026-09-21, TD-095, PR #389 — until then the header named the manager and its state, and its projects); a manager whose card is in another group is still named, *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9) — landed 2026-09-13. Each team's group is drawn as **one card holding its sessions' cards**, and a team that has a definition carries its **Wind down** and **Stop now** on that card's header, beside the live count: the control sits on the thing it stops (2026-09-16; the first was labelled **Stop** until 2026-09-19 — beside *Stop now* it did not say how the two differ, and *wind down* is already the word for what it does, §4.9a). **A team with nothing live keeps its card** (2026-09-18; the page used to go flat when the last badged session exited, which read as the team cards being lost): the header reads *stopped* or *wound down <t> ago* in place of the live count and carries **Start** when the team has a definition, the sessions' cards are **folded** behind *n sessions — show* (one click, remembered per team in the browser; a team with something live is never folded), and a definition no session carries is the same card, empty. Order: teams with something live, then *No team*, then teams with nothing live — what is running is what is read first. *No team* is a plain section, not a card — nothing there stops as one. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set: a filter shows what it matched, and clearing it brings the card back |
-| card, team header | **state icon** | every state pill opens with a glyph, so a page of cards is read by shape before it is read by word: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ✓ closed, ⌀ unreachable. **A glyph never looks like something to press**: the first set (2026-09-18, PR #226) used ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way, and was replaced the same day — a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there. The word stays beside it — the glyph is for scanning, the word is the state, and colour alone was carrying both. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph — design and build 2026-09-18 |
+| Org | **team groups** | when any session carries a `team` badge, or any team is defined, the grid is grouped: a header per team — the team, the host / repo its sessions share (*mixed* where they do not), the counts by state (a seat with nobody in it counted as *on call*, TD-097), its marks (the needs-you count, *answered for you*) and its controls, and **not** its manager's name, state or line, which are on the manager's card (§4.5 *The card's anatomy*; design and build 2026-09-21, TD-095, PR #389 — until then the header named the manager and its state, and its projects); a manager whose card is in another group is still named, *elsewhere* — the manager's card first, members after; flat otherwise. Derived each tick from the badge and the `controllers` edges, never stored (§4.9) — landed 2026-09-13. Each team's group is drawn as **one card holding its sessions' cards**, and a team that has a definition carries its **Wind down** and **Stop now** on that card's header, beside the live count: the control sits on the thing it stops (2026-09-16; the first was labelled **Stop** until 2026-09-19 — beside *Stop now* it did not say how the two differ, and *wind down* is already the word for what it does, §4.9a). **A team with nothing live keeps its card** (2026-09-18; the page used to go flat when the last badged session exited, which read as the team cards being lost): the header reads *stopped* or *wound down <t> ago* in place of the live count and carries **Start** when the team has a definition, the sessions' cards are **folded** behind *n sessions — show* (one click, remembered per team in the browser; a team with something live is never folded), and a definition no session carries is the same card, empty. Order: teams with something live, then *No team*, then teams with nothing live — what is running is what is read first. *No team* is a plain section, not a card — nothing there stops as one. The filter hides a team's card, controls included, when none of its sessions match, and a card with no sessions while any filter is set: a filter shows what it matched, and clearing it brings the card back |
+| card, team header | **state icon** | every state pill opens with a glyph, so a page of cards is read by shape before it is read by word: ▲ needs you, ◔ limited, ? stalled?, ∿ working, ›_ idle, ● idle · unseen, ◌ exited, ○ on call (a seat with nobody in it, TD-097 — composed as *idle · unseen* is, from `exited` / `closed` and the definition), ✓ closed, ⌀ unreachable. **A glyph never looks like something to press**: the first set (2026-09-18, PR #226) used ▶ ‖ ■, which read as play, pause and stop on a page where nothing starts, pauses or stops a session that way, and was replaced the same day — a pulse for running, the prompt for sitting at one, a dotted outline for something no longer there. The word stays beside it — the glyph is for scanning, the word is the state, and colour alone was carrying both. The mode toggle keeps its filled/hollow dot, and *unattended* is a fact about who answers, not a state, so it gets no state glyph — design and build 2026-09-18 |
 | Org | team card: **Start / Wind down / Stop now** per definition | every team in `org.yml` and the repos' `.agentorc.yml`; Start runs the same sequence as `ao team start` (all checks before any create), **Wind down** the same as `ao team stop` (wrap-up members, then the manager — each finishes what it holds and exits), **Stop now** the same as `ao team stop --now` (kills). The CLI verb stays `stop`: the label is the page's, and the confirm and the toast use the page's words (§4.9) — landed 2026-09-13 as a **Teams** strip above the grid, which listed every definition with its source and live count. The strip is retired (2026-09-18): Start is on the card of a team with nothing live, Wind down and Stop now on the card of one with something live (row above), and the definition's source file is the header's tooltip. What remains above the grid is one line, only when there is something to say: a definition that could not be read, that none is defined, or — on a node — where the org is. The wrap-up wait runs behind the response, so the page reports what was sent and the state deltas show the members settling, and the page reports the manager's own outcome when it comes — a failure there is logged and toasted, never dropped |
 | New session | **Project** picker | narrows the repo list to the project's repos on this host, with their checkout paths, and prefixes the brief with the Project block naming them and the home (§4.9). Optional: a session without a project is what every session was before — landed 2026-09-13 |
 | card / Focus header | **stops** note | when an unattended session's `run_until` falls due, in the host's local clock — *stops 06:00*, or *stops Mon 06:00* when it is not today, and *· wrap-up sent* once the host agent has asked. Shown only when something will stop the session; the same formatter `ao status -v` uses (§6, TD-026) — landed 2026-09-13. On **Focus** it is also the control that edits it: click it for a time (`06:00`, `+8h`, an ISO time), empty to clear, and the host agent parses and refuses exactly as `ao until` does. Drawn there only for an unattended session — a stop time is a policy and policies leave an interactive session alone (§4.2), so the host agent refuses one either way and a control that is always refused is worse than none. A session with no stop time shows a dim *no stop time* rather than nothing, since "nothing will stop this" is the fact a person opening Focus most needs. Setting a **different** time is a new run and the wrap-up is asked again; re-confirming the same one is not, so looking at the control during a wrap-up grace cannot ask twice or defer the kill — landed 2026-09-14 |
@@ -2866,6 +2883,38 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   all declared reads *wound down* without the seat's word (2026-09-21): the seat is known by the
   name its definition gives it — or that name with the numeric suffix a stale tmux session forces,
   unless a member is defined under it — never by a role badge.
+- **Seats with a trigger (design 2026-09-21, TD-098; Paul's idea — *a role like "doc audit" or
+  "test audit" that checks every so often, like after every n PRs*).** The techlead is the first
+  seat, and its trigger is a question landing. A team definition may carry more, under
+  **`seats:`** — each `{name, role, trigger, brief, profile, home}`, a session and never `person`
+  — with `trigger` one of **`asks`** (the techlead's: `asks_waiting` leaves zero), **`prs: <n>`**
+  (n PRs merged to the team's repo since the seat last came — the seat's record's `created`;
+  since the team start when it never has — a count the manager reads from `gh`, the way it reads
+  the merge queue), or **`every: <duration>`** (since it last came; the manager's clock, since
+  the home times nothing, §4.9b *When it cannot answer*):
+
+  ```yaml
+  techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}   # the first seat: trigger `asks`
+  seats:
+    - {name: docs-audit-ao-1, role: auditor, brief: docs/briefs/docs-audit.md, trigger: {prs: 10}}
+    - {name: test-audit-ao-1, role: auditor, brief: docs/briefs/test-audit.md, trigger: {every: 6h}}
+  ```
+
+  **The manager's seat rule is the same for every seat**: when a seat's trigger is met and it is
+  `exited` or `closed`, fill it (`ao new --keep-mail`, so a question that was waiting is still
+  there); the ceiling of six fills an hour is the team's, over all its seats; a seat that is
+  `idle` with its trigger unmet is closed as the techlead is. A seat runs its brief and ends on
+  its own — it declares nothing (§4.9a), holds **no grants** as the techlead holds none (it files
+  and opens PRs with `gh`, which is not an act on a session), and is not counted in a
+  wind-down; `teamrun.seat_names` names every seat, not only the techlead. **`auditor`** is a
+  preset like any other — hunter-shaped by default (finds and files with evidence, its
+  `findings` on its record, never fixes; a brief may make it grinder-shaped and open the PR) —
+  and the area (docs, tests) is the brief's, with the label drawn as *Auditor · docs* from the
+  preset's `label:` and the definition's name. What a seat's card says while it is on call is in
+  §4.5 (*on call — runs after 10 PRs*); **the count toward a `prs:` trigger is not drawn**, since
+  the home does not watch GitHub and the manager's number would be a scraped one. Not designed
+  here: a seat whose trigger is another seat's findings, and a trigger a person presses (a seat
+  is asked by mail, which is the person's way in already).
 - **It answers cold, and is filled on demand.** A techlead is **started per batch of questions
   and ends when it has answered them**: no context piles up over a night, an idle team costs
   nothing, and — Paul's second reason — *composing the message forces the worker to pull the
