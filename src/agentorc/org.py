@@ -10,6 +10,7 @@ teams:
     projects: [agentorc]
     manager: {role: manager, name: manager-ao-1}
     techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}   # optional: the go-between (§4.9b)
+    seats: [{name: docs-audit-ao-1, role: auditor, trigger: {prs: 10}}]   # optional: seats with a trigger (§4.9b)
     members:
       - {role: grinder, count: 2, name: grinder-ao, lane: free-pick}
       - {team: ao-ui}                 # a nested team
@@ -31,6 +32,7 @@ it — it stores `team` and `project` as two plain strings on the record and not
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -80,6 +82,34 @@ class TechleadDef:
 
 
 @dataclass
+class SeatDef:
+    """A seat with a trigger (design §4.9b *Seats with a trigger*, TD-098): a session its manager
+    fills when `trigger` is met and that ends on its own — `asks` (a question landed, the
+    techlead's), `prs` (that many PRs merged since it last came) or `every` (a duration since it
+    last came, `6h`). It holds no grants, declares nothing and is not counted in a wind-down, so
+    `grants` is fixed empty and there is no lane; the role is any preset, `auditor` the designed one."""
+
+    name: str = ""  # default `<team>-<role>`, filled by the loader
+    role: str = ""
+    trigger: str = "asks"  # `asks` | `prs` | `every`
+    after: str = ""  # the trigger's value: `prs`' count, `every`'s duration as written; "" for `asks`
+    home: str = ""
+    profile: str | None = None
+    brief: str | None = None  # overrides the role's template
+    lane: list[str] = field(default_factory=list)
+    grants: list[str] | None = field(default_factory=list)  # [], never None: the role's grants are not read (§4.9b)
+    unattended: bool = True
+
+    def when(self) -> str:
+        """What would make it come, in the card's words (§4.5 *on call — runs after 10 PRs*)."""
+        if self.trigger == "prs":
+            return f"runs after {self.after} PR" + ("" if self.after == "1" else "s")
+        if self.trigger == "every":
+            return f"runs every {self.after}"
+        return "comes on the next question"
+
+
+@dataclass
 class MemberDef:
     role: str = ""
     count: int = 1
@@ -106,6 +136,7 @@ class TeamDef:
     manager: ManagerDef = field(default_factory=ManagerDef)
     members: list[MemberDef] = field(default_factory=list)
     techlead: TechleadDef | None = None  # the seat (§4.9b), when the definition has one
+    seats: list[SeatDef] = field(default_factory=list)  # seats with a trigger (§4.9b, TD-098)
     source: Path | None = None  # the file it was read from (`ao team list` names it)
     host: str = ""  # where every session lands (design §4.4a "Teams across hosts"); "" is the host the start runs on
 
@@ -259,9 +290,12 @@ def _grants(raw: Any, key: str) -> list[str] | None:
 
 MANAGER_KEYS = ("role", "name", "home", "profile", "lane", "brief", "grants", "unattended")
 MEMBER_KEYS = (*MANAGER_KEYS, "count", "team")
-TEAM_KEYS = ("projects", "manager", "lead", "techlead", "members", "host")
+TEAM_KEYS = ("projects", "manager", "lead", "techlead", "seats", "members", "host")
 TECHLEAD_KEYS = ("name", "home", "profile", "brief", "context")
 TECHLEAD_ROLE = "techlead"
+SEAT_KEYS = ("name", "role", "trigger", "brief", "profile", "home")
+TRIGGERS = ("asks", "prs", "every")
+_DURATION = re.compile(r"[1-9]\d*[mhd]")
 
 
 def _no_stray(raw: dict[str, Any], known: tuple[str, ...], key: str) -> None:
@@ -346,6 +380,7 @@ def _team(name: str, raw: Any, key: str, *, source: Path) -> TeamDef:
         manager,
         members,
         techlead=_techlead(name, raw.get("techlead"), f"{key}.techlead") if "techlead" in raw else None,
+        seats=_seats(name, raw.get("seats"), f"{key}.seats"),
         source=source,
         host=_str(raw.get("host"), f"{key}.host"),
     )
@@ -364,6 +399,61 @@ def _techlead(team: str, raw: Any, key: str) -> TechleadDef:
         brief=_opt_str(raw.get("brief"), f"{key}.brief"),
         context=_opt_str(raw.get("context"), f"{key}.context"),
     )
+
+
+def _seats(team: str, raw: Any, key: str) -> list[SeatDef]:
+    """`seats: [{name, role, trigger, brief, profile, home}]` (design §4.9b *Seats with a trigger*).
+    `trigger` is `asks`, `{prs: <n>}` or `{every: <n>m|h|d}`, and is required: a seat nobody says
+    when to fill is a member that never runs. A seat is a session and never `person`, and holds no
+    `grants:` and no `lane:` — the design gives it none, so a key for them is refused as a typo is."""
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError(f"{key} must be a list")
+    out: list[SeatDef] = []
+    for i, item in enumerate(raw):
+        skey = f"{key}[{i}]"
+        item = _mapping(item, skey)
+        _no_stray(item, SEAT_KEYS, skey)
+        role = _str(item.get("role"), f"{skey}.role")
+        if not role:
+            raise ValueError(f"{skey}.role is required")
+        if role in (PERSON, DEFAULT_MANAGER_ROLE, TECHLEAD_ROLE):
+            raise ValueError(
+                f"{skey}.role: {role!r} is not a seat's role — a seat is a session its manager fills on a trigger "
+                "(the techlead has its own `techlead:` key)"
+            )
+        trigger, after = _trigger(item.get("trigger"), f"{skey}.trigger")
+        out.append(
+            SeatDef(
+                name=_str(item.get("name"), f"{skey}.name", default=f"{team}-{role}"),
+                role=role,
+                trigger=trigger,
+                after=after,
+                home=_str(item.get("home"), f"{skey}.home"),
+                profile=_opt_str(item.get("profile"), f"{skey}.profile"),
+                brief=_opt_str(item.get("brief"), f"{skey}.brief"),
+            )
+        )
+    return out
+
+
+def _trigger(raw: Any, key: str) -> tuple[str, str]:
+    """`asks` | `{prs: <n>}` | `{every: <duration>}` → `(kind, value as written)`."""
+    if raw is None:
+        raise ValueError(f"{key} is required: `asks`, `{{prs: <n>}}` or `{{every: <n>m|h|d}}`")
+    if raw == "asks":
+        return "asks", ""
+    if not isinstance(raw, dict) or len(raw) != 1 or next(iter(raw)) not in TRIGGERS[1:]:
+        raise ValueError(f"{key}: expected `asks`, `{{prs: <n>}}` or `{{every: <n>m|h|d}}`, got {raw!r}")
+    kind, value = next(iter(raw.items()))
+    if kind == "prs":
+        if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+            raise ValueError(f"{key}.prs must be a whole number of PRs, 1 or more (got {value!r})")
+        return "prs", str(value)
+    if not isinstance(value, str) or not _DURATION.fullmatch(value):
+        raise ValueError(f"{key}.every must be a duration like 30m, 6h or 1d (got {value!r})")
+    return "every", value
 
 
 # ── validation ────────────────────────────────────────────────────────────────────────────────
@@ -385,6 +475,8 @@ def _validate(org: Org, label: str) -> None:
             team.manager.home = _home(team.manager.home, repos, f"{key}.manager.home")
         if team.techlead is not None:
             team.techlead.home = _home(team.techlead.home, repos, f"{key}.techlead.home")
+        for i, seat in enumerate(team.seats):
+            seat.home = _home(seat.home, repos, f"{key}.seats[{i}].home")
         for i, m in enumerate(team.members):
             mkey = f"{key}.members[{i}]"
             if m.team is not None:

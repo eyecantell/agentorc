@@ -104,7 +104,7 @@ class Launch:
     lane: list[str] = field(default_factory=list)
     unattended: bool = True
     lead: bool = False
-    seat: bool = False  # the team's techlead (§4.9b)
+    seat: bool = False  # a seat of the team: its techlead, or one with a trigger (§4.9b)
     ledger: str | None = None
     host: str = ""  # the host this session lands on; "" is the host the start runs on
 
@@ -145,6 +145,7 @@ class Plan:
     lead: Launch | None = None
     techlead: Launch | None = None
     techlead_id: str = ""  # the id the seat will take, which every brief's `{techlead}` names
+    seats: list[Launch] = field(default_factory=list)  # seats with a trigger (§4.9b, TD-098)
     members: list[Launch] = field(default_factory=list)
     host: str = ""  # where the team lands when that is not the host the start runs on (§4.4a)
     warnings: list[str] = field(default_factory=list)
@@ -154,8 +155,13 @@ class Plan:
 
     @property
     def launches(self) -> list[Launch]:
-        """In creation order: the manager, the seat (its controller is the manager, §4.9b), the members."""
-        return ([self.lead] if self.lead else []) + ([self.techlead] if self.techlead else []) + list(self.members)
+        """In creation order: the manager, the seats (their controller is the manager, §4.9b), the members."""
+        return (
+            ([self.lead] if self.lead else [])
+            + ([self.techlead] if self.techlead else [])
+            + list(self.seats)
+            + list(self.members)
+        )
 
 
 def find(org: orgmod.Org, name: str) -> orgmod.TeamDef:
@@ -225,7 +231,7 @@ def reach_block(org: orgmod.Org, project: str, here: Path | str, host: str) -> t
 # A lead, a member and the techlead seat are shaped alike where a launch is concerned (§4.9): each
 # names a lane, a brief override, grants, a profile and whether it is unattended. `None` is the
 # person-lead case.
-Spec = orgmod.MemberDef | orgmod.ManagerDef | orgmod.TechleadDef | None
+Spec = orgmod.MemberDef | orgmod.ManagerDef | orgmod.TechleadDef | orgmod.SeatDef | None
 
 
 # `(host, checkout, [paths relative to it])` → `{path: text, or None when there is no such file}`:
@@ -353,7 +359,10 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
     except (KeyError, ValueError, OSError) as e:
         raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
-    lane = list(member.lane) if member is not None and member.lane else list(role.lane)
+    if isinstance(member, orgmod.SeatDef):
+        lane: list[str] = []  # a seat has no lane, whatever its role's (§4.9b): its area is its brief's
+    else:
+        lane = list(member.lane) if member is not None and member.lane else list(role.lane)
     grants = list(member.grants) if member is not None and member.grants is not None else list(role.grants)
     # Profile precedence (§4.9 "Roles gain a profile"), lowest first: the package's built-ins,
     # `org.yml`'s `roles:` and the repo's `.agentorc.yml` (those three inside `resolve_role`), the
@@ -444,6 +453,31 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
         missing = _primer_missing(seat, p.techlead.dir, host, here, files)
         if missing:
             p.notes.append(missing)
+    for trig in team.seats:
+        # A seat with a trigger (§4.9b, TD-098): launched as the techlead is — its manager its
+        # controller, no grants — and filled again by the manager when its trigger is met.
+        if trig.name in seen:
+            raise TeamError(f"team {team.name}: two sessions would be called {trig.name!r} — a name is one session")
+        seen.add(trig.name)
+        p.seats.append(
+            _launch(
+                org=org,
+                team=team,
+                name=trig.name,
+                role_name=trig.role,
+                home=trig.home,
+                host=host,
+                here=here,
+                profile_override=profile or trig.profile,
+                member=trig,
+                lead=False,
+                block=project_block(org, team.projects, host, trig.home) if reach else "",
+                files=files,
+                techlead=tid,
+                context=ctx,
+                seat=True,
+            )
+        )
     for member in team.members:
         if member.team is not None:
             raise TeamError(

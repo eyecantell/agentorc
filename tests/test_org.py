@@ -364,3 +364,49 @@ def test_a_team_may_carry_one_techlead_seat(tmp_path):
         f.write_text(base + f"    techlead: {bad}\n")
         with pytest.raises(ValueError, match=why):
             org.load(f)
+
+
+def test_a_team_may_carry_seats_with_a_trigger(tmp_path):
+    """TD-098 step 1, design §4.9b *Seats with a trigger*: `seats:` — each `{name, role, trigger,
+    brief, profile, home}` — with `trigger` one of `asks`, `{prs: n}` or `{every: <duration>}`, and
+    required. The name defaults to `<team>-<role>` and `home` follows the members' rule; a seat
+    holds no grants and has no lane, so neither key is read, and it is never the person, the
+    manager or the techlead, which have keys of their own."""
+    f = tmp_path / "org.yml"
+    base = "projects: {p: {repos: {r: {kmaster: /tmp/r}}}}\nteams:\n  t:\n    projects: [p]\n"
+    f.write_text(
+        base + "    seats:\n"
+        "      - {name: docs-audit, role: auditor, brief: docs/briefs/docs-audit.md, trigger: {prs: 10}}\n"
+        "      - {role: auditor, trigger: {every: 6h}, profile: strong}\n"
+        "      - {name: asker, role: hunter, trigger: asks}\n"
+    )
+    seats = org.load(f).teams["t"].seats
+    assert [(s.name, s.role, s.trigger, s.after, s.home) for s in seats] == [
+        ("docs-audit", "auditor", "prs", "10", "r"),
+        ("t-auditor", "auditor", "every", "6h", "r"),
+        ("asker", "hunter", "asks", "", "r"),
+    ]
+    assert seats[0].brief == "docs/briefs/docs-audit.md" and seats[1].profile == "strong"
+    assert all(s.grants == [] and s.lane == [] for s in seats)
+    assert [s.when() for s in seats] == ["runs after 10 PRs", "runs every 6h", "comes on the next question"]
+    f.write_text(base)
+    assert org.load(f).teams["t"].seats == []
+    for bad, why in (
+        ("[{role: auditor}]", "trigger is required"),
+        ("[{trigger: asks}]", "role is required"),
+        ("[{role: auditor, trigger: {prs: 0}}]", "whole number"),
+        ("[{role: auditor, trigger: {prs: true}}]", "whole number"),
+        ("[{role: auditor, trigger: {every: 6}}]", "duration"),
+        ("[{role: auditor, trigger: {every: 6w}}]", "duration"),
+        ("[{role: auditor, trigger: {daily: 1}}]", "expected"),
+        ("[{role: auditor, trigger: sometimes}]", "expected"),
+        ("[{role: auditor, trigger: asks, grants: [control]}]", "unknown key"),
+        ("[{role: auditor, trigger: asks, lane: [TD-1]}]", "unknown key"),
+        ("[{role: techlead, trigger: asks}]", "not a seat's role"),
+        ("[{role: person, trigger: asks}]", "not a seat's role"),
+        ("[{role: auditor, trigger: asks, home: nope}]", "not a repo of the team"),
+        ("{role: auditor}", "must be a list"),
+    ):
+        f.write_text(base + f"    seats: {bad}\n")
+        with pytest.raises(ValueError, match=why):
+            org.load(f)
