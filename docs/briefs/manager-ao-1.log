@@ -171,3 +171,4 @@
 
 ## Run of 2026-09-22 13:44Z (weekly usage 90% at start)
 07:45  techlead-ao-1: idle, 0 waiting, clean → ao close (not a fill). grinder-ao-1, grinder-ao-2: working (free-pick). Relays: none (every cadence-changes entry predates these records)
+07:50  grinder-ao-1: TD-088 work on branch td097-on-call-seat → derived TD-097 claim collides with grinder-ao-2's declared TD-097; note sent (rename the branch). grinder-ao-2: working TD-097
