@@ -526,7 +526,7 @@ def team_desktop():
     # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
                               pill("working"), pill("idle", "idle · unseen", unseen=True), pill("idle"), pill("exited"),
-                              pill("oncall"), pill("done")])
+                              pill("done")])  # an on-call seat sorts as the `exited` / `closed` it is (TD-097)
     return head("Org") + f'''<div style="width: 1440px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
