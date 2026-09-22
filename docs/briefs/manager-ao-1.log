@@ -184,3 +184,15 @@
 08:37  grinder-ao-2: TD-095 (g),(h) done → PR #421 cadence pass (review recorded; no held paths); TD-095 built in full. grinder-ao-1: TD-098, #422 open
 08:42  grinder-ao-2: declared out of work (none) after #412 #414 #417 #419 #421 #423; #417, #423 (board PRs) cadence pass. grinder-ao-1: reported TD-098 step 3 done on #422, but #422 is still OPEN (3 unpushed) → watching
 08:48  grinder-ao-1: #422 merged (its done note had gone out before the merge; it corrected itself) → PR #422 cadence pass (review recorded; no held paths)
+08:49  grinder-ao-1: declared none 14:49Z, idle → every member finished. Cadence --since 12h: agentorc 20 of 20 pass; samscrape #938 pass, #939 review fail (memory-telegram-bar, not a member's; reported only). ao team stop ao-grind --close: both grinders closed clean. ao progress none. Run over.
+
+## End-of-run summary (2026-09-22 run, 13:44Z–14:50Z)
+
+- grinder-ao-1: out of work 14:49Z, closed clean by the team stop. Merged #413 (TD-088, the ended-by word; touched src/sessionorc/agent.py), #418 (TD-098 step 1, seats) and #422 (TD-098 step 3, auditor preset). Dropped TD-076 (only the anchor's brief is left). Messages: two mails (the branch-name collision at 07:50; TD-093's rule after #413) and one `ao send --wait` on #413 under the hand rule from #406. The send was submitted, but its --wait lost its connection to the 14:09Z host restart; I read the verdict from the record. It announced #422 as done before the merge landed and corrected itself.
+- grinder-ao-2: out of work 14:42Z, closed clean. Merged #412 (TD-097), #414 and #421 (TD-095 f–i, now built in full), #419 (TD-071 6, 7), and board PRs #417 and #423. Sends: 0.
+- techlead-ao-1: idle with 0 waiting at start, so closed at 07:45. No questions this run, so no fills.
+- Cadence: every member PR passes (review recorded, not verified). No relays needed, since every cadence-changes entry predates these records.
+- Hand rule: #413 is the second member self-merge of src/sessionorc without the anchor's read, after #402. Handled per #406: one send, and a line to Paul (m-9453aac823aa); nothing reverted. My board PR #415 was closed as superseded by the anchor's #416.
+- Escalations: none on the board. One note to the person.
+- For a §6 policy: the hand rule's check is mechanical: a merged member PR whose files match `src/sessionorc/|docs/briefs/|org.yml` and that has no anchor comment. It belongs in check_cadence.py as a row, or better, before the merge as TD-093's `held:`. Two slips in two runs came from a brief that lacked a line, and a gate needs no line in a brief.
+- Also: a worker's branch name derives a claim (`td097-…` while it worked TD-088), and the claim lease doesn't see derived collisions. That's worth a line in TD-093's or the lease's ledger entry for the anchor to weigh.
