@@ -699,3 +699,41 @@ def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):
     assert not worker["unseen"] and worker["state_label"] == "idle"
     mine = view(_card(**finished, unattended=False))
     assert mine["unseen"] and mine["state_label"] == "idle · unseen" and mine["rank"] < worker["rank"]
+
+
+def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_path, monkeypatch):
+    """design §4.5a **paused · usage** (§6 *Usage gate*, TD-100 slice 3): the record's `gated`,
+    composed by the page from the mark's own fields — never from what the session said. It is (a)
+    in the slot, *what explains a stop*, and waits behind a permission, a question, a limit or a
+    stall; the Focus header shows it regardless. A mark, not a state: the pill stays `idle`."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import gated_view, templates, view
+
+    mark = {"profile": "grind", "label": "week", "pct": 75, "line": 70, "since": "2026-09-21T01:00:00Z",
+            "next": "2026-09-21T14:00:00Z", "sent_at": None}  # fmt: skip
+    g = gated_view(mark)
+    assert g["text"].startswith("paused · usage — grind week 75% ≥ 70%, line moves ")
+    assert "pause sent" not in g["text"] and "waits for a clear composer" in g["full"] and "ao gate" in g["full"]
+    assert gated_view({**mark, "sent_at": "2026-09-21T01:00:05Z"})["text"].endswith(" · pause sent")
+    assert gated_view({**mark, "profile": "", "next": None})["text"] == "paused · usage — default week 75% ≥ 70%"
+    # one malformed record costs its card the mark, never the grid
+    assert all(gated_view(j) is None for j in (None, "x", [1], {"pct": "75", "line": 70}, {"pct": 75}))
+
+    v = view(_card(gated=mark, doing={"text": "TD-1: the rows", "at": "2026-09-21T01:30:00Z"}))
+    assert v["state"] == "idle" and v["slot"]["kind"] == "lim" and v["slot"]["text"] == g["text"]
+    assert v["slot"]["full"] == g["full"]
+    # a person's answer comes first: the mark waits behind the question in the slot…
+    q = view(_card(state="needs-you", pending={"kind": "question", "text": "a or b?"}, gated=mark))
+    assert q["slot"]["text"] == "question: a or b?"
+    # …and the Focus header shows it regardless, hidden (not absent) when there is none
+    focus = templates.get_template("focus.html")
+    html = focus.render(
+        s={**q, "grants_all": [], "ready": [], "created": "2026-09-21T00:00:00Z"}, host="h", active="Org"
+    )
+    assert 'id="fgated"' in html and g["text"] in html
+    plain = view(_card())
+    assert plain["gated"] is None
+    html = focus.render(
+        s={**plain, "grants_all": [], "ready": [], "created": "2026-09-21T00:00:00Z"}, host="h", active="Org"
+    )
+    assert 'class="badge gated hidden" id="fgated"' in html

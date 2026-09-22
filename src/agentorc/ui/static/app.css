@@ -201,6 +201,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
    An **early** one is the one a controller does not act on, so it is marked as needing a person
    rather than a restart; still flat, still nothing to press. */
 .badge.rw.early { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); }
+.badge.gated { color: var(--limited-fg); background: var(--limited-bg); border-color: var(--limited); } /* paused · usage (TD-100): the limit family, a mark */
 .badge.suspendedmark { cursor: default; color: var(--alarm-fg); background: transparent; border-color: var(--alarm); text-transform: uppercase; letter-spacing: .04em; font-size: 9.5px; }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }

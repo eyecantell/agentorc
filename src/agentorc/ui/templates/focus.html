@@ -41,6 +41,11 @@
          declared or cleared one (review of PR #323). #}
       <span class="badge rw{% if s.restart_wanted and s.restart_wanted.early %} early{% endif %}{% if not s.restart_wanted %} hidden{% endif %}" id="frw"
             title="{{ (s.restart_wanted or {}).why or 'no reason recorded' }}{% if s.restart_wanted and s.restart_wanted.early %} — asked inside its own first half hour, so a controller does not act on it: this one is for a person (design §4.9a){% endif %}">restart wanted{% if s.restart_wanted and s.restart_wanted.early %} · early{% endif %}{% if s.restart_wanted and s.restart_wanted.age %} {{ s.restart_wanted.age }}{% endif %}</span>
+      {# design §4.5a **paused · usage** (§6 *Usage gate*, TD-100): shown regardless of what else
+         the slot holds, and not pressable — the way out is Take over, or a lower reserve. Always in
+         the page and hidden until true, kept current from the pushed delta as the two above are. #}
+      <span class="badge gated{% if not s.gated %} hidden{% endif %}" id="fgated"
+            title="{{ (s.gated or {}).full }}">{{ (s.gated or {}).text or 'paused · usage' }}</span>
       {# design §4.8 `doing` (TD-074): what the session says it is doing, beside the other things it
          said about itself, always with its age. Its own words: shown, never acted on. #}
       {% if s.doing %}<span class="meta doing"

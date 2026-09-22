@@ -712,6 +712,7 @@ def view(
     # design §6 / §4.5a: when this session stops, from the same formatter `ao status -v` uses, in
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
+    d["gated"] = gated_view(s.get("gated"))  # the usage gate's pause (§6, TD-100): a mark, never a state
     d["grants_all"] = list(GRANTS)
     # The Focus header's mode toggle, under the name of what it does (design §4.5a, TD-096): Take
     # over an unattended session; hand an interactive one back where there is someone to hand it
@@ -770,6 +771,45 @@ def view(
     return d
 
 
+def _clock(iso: Any) -> str:
+    """An instant as the host's local clock, *14:00*, with the day once it is not today (*Thu
+    14:00*) — `stop_note`'s form, so a time on a card reads the same wherever it is. "" for anything
+    unreadable, which costs a line its time and never the page."""
+    at = _instant(iso)
+    if at is None:
+        return ""
+    at = at.astimezone()
+    return ("" if at.date() == datetime.now().astimezone().date() else at.strftime("%a ")) + f"{at:%H:%M}"
+
+
+def gated_view(raw: Any) -> dict[str, str] | None:
+    """design §4.5a **paused · usage** mark (§6 *Usage gate*, TD-100 slice 3): the record's `gated`
+    as the words a card's slot and the Focus header show — *paused · usage — grind week 75% ≥ 70%,
+    line moves 14:00 · pause sent* — composed from the mark's own fields, never from anything the
+    session said. None when there is no mark, or none this can read: one malformed record costs its
+    card the mark and not the grid. A mark, not pressable; it goes when the resume send clears it."""
+    if not isinstance(raw, dict):
+        return None
+    pct, line = raw.get("pct"), raw.get("line")
+    if not isinstance(pct, int | float) or not isinstance(line, int | float):
+        return None
+    prof = str(raw.get("profile") or "default")
+    text = f"paused · usage — {prof} {raw.get('label') or '?'} {pct:g}% ≥ {line:g}%"
+    if nxt := _clock(raw.get("next")):
+        text += f", line moves {nxt}"
+    if raw.get("sent_at"):
+        text += " · pause sent"
+    since = _clock(raw.get("since"))
+    full = (
+        f"{text}. Paused by the usage gate{f' since {since}' if since else ''}: the profile crossed the line "
+        "its reserve makes (design §6), so the session was asked to pause"
+        + ("" if raw.get("sent_at") else " — the ask is not typed yet, it waits for a clear composer")
+        + ". It resumes by itself when every window is back under its line; to go on now, Take over, "
+        "or lower the reserve with `ao gate`."
+    )
+    return {"text": text, "full": full}
+
+
 BRANCH_SHOWN = 34  # characters of row 3's branch a card shows before it shortens it in the middle
 
 
@@ -813,6 +853,10 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         kind, text = "needs", ptext
     elif state == "unreachable" and d["host_note"]:
         text = d["host_note"]
+    elif d.get("gated"):
+        # the usage gate's pause explains a stop (§4.5a **paused · usage**, TD-100); it waits behind
+        # a permission, a question, a limit or a stall above, which are a person's to answer
+        kind, text, full = "lim", d["gated"]["text"], d["gated"]["full"]
     elif d.get("seat"):
         # what would make it come (§4.5): the techlead's trigger is a question landing (§4.9b)
         # (§4.9b) — or a seat's own trigger: after n PRs, every so often (TD-098)
