@@ -575,6 +575,8 @@ def test_focus_watches_an_unattended_session(client, subprocess_agent, tmp_path)
     tmux.run("send-keys", "-t", f"={sid}:", "seq 1 200", "Enter")  # history for the wheel to scroll
     assert wait_for(lambda: "200" in pane())
     assert client.post(f"/api/sessions/{sid}/mode", json={"unattended": True}).json()["ok"] is True
+    rec = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+    assert rec.get("pause_prompt"), "the gate's texts ride the toggle (TD-100)"
     page = client.get(f"/focus/{sid}").text
     assert 'id="fmodeact"' in page and ">Take over</button>" in page and 'data-unattended="1"' in page
     assert re.search(r'class="card composer hidden" id="composer"', page)  # the composer types: closed

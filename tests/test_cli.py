@@ -179,7 +179,8 @@ def test_json_on_every_subcommand(subprocess_agent, tmp_path, capsys, monkeypatc
     assert cli.main(["--json", "keys", sid, "Enter"]) == 0
     assert out() == {"ok": True, "id": sid}
     assert cli.main(["--json", "mode", sid, "unattended"]) == 0
-    assert out()["unattended"] is True
+    flipped = out()
+    assert flipped["unattended"] is True and flipped["pause_prompt"]  # the gate's texts ride along (TD-100)
     assert cli.main(["--json", "status"]) == 0
     assert sid in [r["id"] for r in out()]  # the module agent holds other tests' sessions too
     assert cli.main(["--json", "kill", sid]) == 0
@@ -1569,3 +1570,63 @@ def test_msg_source_and_the_answered_for_you_lines(subprocess_agent, tmp_path, c
     assert f"answered by {answerer} from design §4.9b, the seat; a reply here goes to the asker" in out
     for sid in (asker, answerer):
         call_sync("kill", id=sid)
+
+
+def _iso(t: datetime.datetime) -> str:
+    return t.isoformat().replace("+00:00", "Z")
+
+
+def test_gate_reserves_parse_and_the_line_reads_as_the_design_writes_it():
+    """`ao gate` (design §4.7, TD-100 slice 2): `30` flat, `10/day` per day, empty clears; the line
+    names the reserve, the line and, for a per-day reserve, when it moves."""
+    from agentorc.cli import _gate_line, _reserve
+
+    assert (_reserve("30"), _reserve("10/day"), _reserve("")) == (30, {"per_day": 10}, None)
+    for bad in ("30%", "ten", "-5", "1.5/day"):
+        with pytest.raises(AgentError, match="whole percent"):
+            _reserve(bad)
+    rows = [
+        {"label": "5h", "reserve": 30, "line": 70, "pct": 12, "next": None},
+        {
+            "label": "week",
+            "reserve": {"per_day": 10},
+            "line": 60,
+            "pct": 55,
+            "resets": _iso(datetime.datetime.now(datetime.UTC) + datetime.timedelta(days=3, hours=1)),
+            "next": "2026-09-24T13:00:00Z",
+        },
+        {"label": "x", "reserve": {"per_day": 5}, "line": None, "pct": 1, "next": None},
+    ]
+    line = _gate_line("grind", rows)
+    assert line.startswith("grind · 5h 30 → line 70%, now 12% · week 10/day → line 60%, now 55% (4 days left, moves ")
+    assert "x 5/day → no line" in line
+    assert _gate_line("grind", [{"label": "5h", "reserve": 30, "unread": True}]) == "grind · 5h 30 → no reading yet"
+    assert _gate_line("", []) == "(default)"
+
+
+def test_ao_gate_sets_shows_and_is_a_persons(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """`ao gate` end to end: the reserves land in settings.yml through `set_settings`, `ao gate`
+    shows them, a session's `ao gate` is refused by the host agent, and `ao new --unattended`
+    carries the pause and resume texts onto the record."""
+    from agentorc import teams
+
+    monkeypatch.delenv("AGENTORC_SESSION", raising=False)
+    assert cli.main(["gate"]) == 0
+    assert "no usage gate" in capsys.readouterr().out
+    assert cli.main(["gate", "grind", "5h=30", "week=10/day"]) == 0
+    out = capsys.readouterr().out
+    assert "grind · 5h 30 → no reading yet" in out and "not checked" in out  # no reading for `grind` here
+    assert cli.main(["gate"]) == 0
+    assert "grind · 5h 30 → no reading yet · week 10/day → no reading yet" in capsys.readouterr().out
+    assert cli.main(["--json", "gate"]) == 0
+    assert json.loads(capsys.readouterr().out)["profiles"]["grind"]["reserves"] == {"5h": 30, "week": {"per_day": 10}}
+    assert cli.main(["gate", "grind", "5h=", "week="]) == 0
+    assert "no reserves" in capsys.readouterr().out
+    assert cli.main(["--json", "new", "w", "-a", "shell", "-d", str(tmp_path), "--unattended"]) == 0
+    rec = json.loads(capsys.readouterr().out)
+    assert (rec["pause_prompt"], rec["resume_prompt"]) == (teams.PAUSE_PROMPT, teams.RESUME_PROMPT)
+    monkeypatch.setenv("AGENTORC_SESSION", rec["id"])
+    assert cli.main(["gate", "grind", "5h=30"]) != 0
+    assert "a person's own" in capsys.readouterr().err
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["kill", rec["id"]]) == 0

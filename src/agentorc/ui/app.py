@@ -1919,6 +1919,7 @@ def create_app() -> FastAPI:
             prompt=text,
             resume=resume.strip() or None,
             unattended=unattended == "on",
+            **teams.gate_prompts(unattended == "on"),  # the usage gate's two texts (§6, TD-100)
             worktree=wt,
             repo=dir.strip() if wt else None,
             # The Grants checkboxes were ticked from the preset when the page loaded and as the
@@ -1991,7 +1992,8 @@ def create_app() -> FastAPI:
         elif action == "wrapup":
             await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True)
         elif action == "mode":
-            s = await call("set_mode", id=sid, unattended=bool(body.get("unattended")))
+            on = bool(body.get("unattended"))
+            s = await call("set_mode", id=sid, unattended=on, **teams.gate_prompts(on))  # §6's two texts
             due = _instant(s.get("run_until"))
             if s.get("unattended") and due is not None and due <= datetime.now(UTC):
                 # **Hand back** (design §4.5a, TD-096): a stop time that fell due while the person held

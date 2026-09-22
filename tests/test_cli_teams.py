@@ -1136,3 +1136,16 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     assert teamrun.seat_names(org.teams["ao-grind"], sessions) == {"techlead-ao", "audit-ao-2"}
     assert teamrun.rows(org, sessions)[0]["wound_down"] == "2026-09-21T06:00:00Z"
     assert teamrun.seat_ids(org, sessions) == {"b": "comes on the next question", "c": "runs every 6h"}
+
+
+def test_every_unattended_member_carries_the_usage_gates_two_texts(world):
+    """Design §6 *Usage gate* (TD-100 slice 2): the host agent types the record's `pause_prompt` and
+    `resume_prompt`, so a team's unattended members get both at create, in `agentorc.teams`' words."""
+    from agentorc import teams
+
+    _tmp, state = world
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    for p in creates(state):
+        want = teams.gate_prompts(p["unattended"])
+        assert {k: p.get(k) for k in want} == want and ("pause_prompt" in p) == bool(p["unattended"])
+    assert any(p["unattended"] for p in creates(state))
