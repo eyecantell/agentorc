@@ -538,8 +538,12 @@ def view(
     d["rank"] = STATE_RANK.get(state, 9)
     # Finished while nobody was looking (design §4.2, TD-017): not a state, a rendering of `idle`
     # that sorts just above the idle it will become once someone opens Focus. Both stamps are whole
-    # seconds, so a finish in the same second as the last look reads as seen.
-    d["unseen"] = state == "idle" and (not s.get("seen_at") or (s.get("since") or "") > s["seen_at"])
+    # seconds, so a finish in the same second as the last look reads as seen. **Interactive only**
+    # (Paul, 2026-09-21, TD-095 f): an unattended session's result is its manager's to read, and
+    # its slot already says how it ended — a finished worker is plain `idle`.
+    d["unseen"] = (
+        state == "idle" and not s.get("unattended") and (not s.get("seen_at") or (s.get("since") or "") > s["seen_at"])
+    )
     if d["unseen"]:
         d["state_label"] = "idle · unseen"  # not *finished*: that word is a declaration's (§4.9a, TD-095 e)
         d["rank"] = STATE_RANK["idle"] - 0.5

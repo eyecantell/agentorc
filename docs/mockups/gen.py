@@ -292,15 +292,17 @@ EXTRA = {
     # no `doing` on tdgrind-3 on purpose: it is `limited`, and the slot shows the cap — what needs
     # a person comes first (§4.5a), so a line here would be data no branch draws (review of PR #288)
     "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed", "mail": 2},
-    # declared itself out of work and nobody has looked yet: `idle` in every payload, drawn as
-    # *idle · unseen*; the ending is said once, in the slot, and *ready to close ✓* is its caption
+    # declared itself out of work: plain `idle` — *unseen* is drawn only on an interactive session
+    # (§4.2, TD-095 f), its manager read the result; the ending is said once, in the slot, and
+    # *ready to close ✓* is its caption
     "tdgrind-4": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "#809 · 2/2 done",
-                  "unseen": True, "ready": True, "ending": "out of work — nothing open on the ledger that my brief lets me take"},
+                  "ready": True, "ending": "out of work — nothing open on the ledger that my brief lets me take"},
     # the team's seat (§4.9b), ended between questions as designed: `exited` in every payload, drawn
     # *◇ on call* with what would make it come, and Message… first (§4.5, TD-097)
     "techlead-1": {"team": "samscrape-grind", "role": "techlead", "under": "orc-1", "report": "3 answered", "seat": True},
     "main":      {"findings": "1 filed"},
-    "errors-alerts": {"title": "Error Checker"},
+    # the person's own, finished while nobody was looking: *idle · unseen* (§4.2, interactive only)
+    "errors-alerts": {"title": "Error Checker", "unseen": True},
 }
 
 # §4.9 team definitions, as the Teams strip reads them: every team in ~/.agentorc/org.yml and in the
@@ -481,7 +483,7 @@ def team_desktop():
         box = "border: 1px solid #cbd0d6; border-radius: 8px; padding: 12px 14px 14px; background: #eceef1;" if team else ""
         return (f'<div style="display: flex; flex-direction: column; gap: 12px; {box}">'
                 f'<div style="display: flex; align-items: center; gap: 10px;">'
-                f'<span style="font-weight: 600; font-size: 13.5px;">{title}</span>'
+                f'<span style="font-weight: 600; font-size: 15px;">{title}</span>'
                 f'<span class="meta">{sub}</span>{flag}{acts}</div>'
                 f'<div style="{GRID}">{cards_html}</div></div>')
 
@@ -765,7 +767,7 @@ def legend():
         ("needs", "Waiting on you: a permission (Allow / Deny answer it through the tool's hook; the terminal dialog only appears if the hook times out), a question (Focus — the terminal owns menus), or an empty prompt. Sorted to the top."),
         ("limited", "Hit a usage or token cap and is waiting on a reset. Reset time shown. Nothing you do unblocks it except switching the profile (account/model)."),
         ("idle", "Blue: alive, at rest, and may be spoken to. Turn finished (Stop hook), nothing pending. Flagged if the tree is dirty or unpushed."),
-        ("unseen", "Still <span class=\"mono\">idle</span> in every payload, drawn in idle's blue with its own glyph and words: the session finished or declared itself out of work and nobody has looked since. A declaration is not a state — how it ended is said in the slot, <i>ready to close ✓</i> in its caption."),
+        ("unseen", "Still <span class=\"mono\">idle</span> in every payload, drawn in idle's blue with its own glyph and words: an <b>interactive</b> session finished and nobody has looked since — never an unattended one, whose manager read the result. A declaration is not a state — how it ended is said in the slot, <i>ready to close ✓</i> in its caption."),
         ("stalled", "Reported working, but no output for longer than the adapter's stall_after. How a credential lapse shows up."),
         ("exited", "Grey, like everything over or out of reach. Process ended or tmux session gone. Run log kept; the slot says <i>exited · code N</i>, and the foot's first button is Forget."),
         ("done", "Grey. You clicked Close: session killed, worktree reaped, card kept a day then filed under Resumable. Only you close a session; the checklist just says when it is ready. The slot says <i>closed by you</i>, in the text colour — no longer green."),

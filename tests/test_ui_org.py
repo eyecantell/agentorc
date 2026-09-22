@@ -681,3 +681,17 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
     assert other["state_label"] == "exited" and other["next_act"] == "forget"
     # the team's header counts them apart
     assert state_counts([v, other, live]) == ["1 working", "1 on call", "1 exited"]
+
+
+def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):
+    """Design §4.2 *Unseen idle*, TD-095 (f), Paul 2026-09-21: an unattended session that finished
+    while nobody looked is plain `idle` — its manager read the result and its slot says how it
+    ended; the person's own interactive session is *idle · unseen* and sorts above idle."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import view
+
+    finished = {"since": "2026-09-21T03:00:00Z", "seen_at": "2026-09-21T02:00:00Z"}
+    worker = view(_card(**finished))  # `_card` is unattended
+    assert not worker["unseen"] and worker["state_label"] == "idle"
+    mine = view(_card(**finished, unattended=False))
+    assert mine["unseen"] and mine["state_label"] == "idle · unseen" and mine["rank"] < worker["rank"]

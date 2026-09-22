@@ -225,8 +225,10 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .tgroup.folded:not(.filtering) .grid { display: none; } .tgroup.folded:not(.filtering) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
 .tgroup[data-live="0"]:not([data-team=""]) { background: transparent; border-style: dashed; }
 .tgroup:not(:has(.sc)) .grid { display: none; } .tgroup:not(:has(.sc)) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }  /* a definition nothing carries yet */
-.ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; font-size: 12px; } .ghead .h2 { font-size: 14px; }
-.ghead .name { font-family: "JetBrains Mono", monospace; font-size: 12px; font-weight: 600; color: var(--fg); text-decoration: none; }
+/* one scale with the cards (TD-095 i): the header sits on the body's 13 px and its title is no
+   smaller than a card's name — it was 12 / 14 px from when it carried less */
+.ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; } .ghead .h2 { font-size: 16px; }
+.ghead .name { font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 600; color: var(--fg); text-decoration: none; }
 .badge.team { cursor: pointer; color: var(--fg); }
 /* the card's *under <controller>* chip and the Focus header's controllers chips (design §4.5a,
    §4.8): one control drawn in two places, so both are `.badge` like every other chip on the page.
