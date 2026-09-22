@@ -8,6 +8,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks, wait_state
 
+from sessionorc.agent import _ended_by
 from sessionorc.client import AgentError, LocalClient
 from sessionorc.models import Pending, Session, attention_kind
 
@@ -259,10 +260,9 @@ async def test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows(agen
     no row, no words and no snooze of the old one's (review of PR #269)."""
     # **No background tick inside the window below** (TD-088). The `agent` fixture runs a live
     # tick loop, and a tick between the `kill` and the `create` ends the row on its own — the
-    # record is `exited`, so its kind is `""` — and writes *resolved* before the name rule can say
-    # what really ended it. That is a race in the test *and* a word this build has no better
-    # answer for; the entry holds the second half. The loop is stopped, not slowed: every tick
-    # from here is one this test takes by hand.
+    # record is `exited`, so its kind is `""` — and writes *the session exited* before the name
+    # rule can say what really ended it. The loop is stopped, not slowed: every tick from here is
+    # one this test takes by hand.
     await park_ticks(agent)
     async with LocalClient() as person, LocalClient() as feeder:
         sid = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
@@ -296,10 +296,9 @@ async def test_a_name_taken_back_by_a_resume_says_resumed(agent, hookstub, tmp_p
     of its name. Same id, one card, and the trail says which road the row left by (§4.10 rule 2)."""
     # **No background tick inside the window below** (TD-088). The `agent` fixture runs a live
     # tick loop, and a tick between the `kill` and the `create` ends the row on its own — the
-    # record is `exited`, so its kind is `""` — and writes *resolved* before the name rule can say
-    # what really ended it. That is a race in the test *and* a word this build has no better
-    # answer for; the entry holds the second half. The loop is stopped, not slowed: every tick
-    # from here is one this test takes by hand.
+    # record is `exited`, so its kind is `""` — and writes *the session exited* before the name
+    # rule can say what really ended it. The loop is stopped, not slowed: every tick from here is
+    # one this test takes by hand.
     await park_ticks(agent)
     async with LocalClient() as person, LocalClient() as feeder:
         sid = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name))["id"]
@@ -330,3 +329,28 @@ async def test_a_name_taken_back_by_a_resume_says_resumed(agent, hookstub, tmp_p
             "and now?",
         )
         await person.call("kill", id=sid)
+
+
+async def test_a_row_its_session_ended_says_so(agent, hookstub, tmp_path):
+    """Design §4.10 rule 2, TD-088: a row that ended **because its session did** is a thing the home
+    can tell, so it is not *resolved* — the word for when it cannot, which told a person whose
+    question a worker died holding that it had sorted itself out. An exit and a close each say
+    which; a word an act wrote still comes first (the two name-rule tests above)."""
+    await park_ticks(agent)  # every tick is taken by hand: the ending is the test's, not the loop's
+    async with LocalClient() as person, LocalClient() as feeder:
+        for name, end, want in (("gone", "kill", "the session exited"), ("shut", "close", "the session was closed")):
+            sid = (await person.call("create", name=name, dir=str(tmp_path), adapter=hookstub.name))["id"]
+            await feeder.call("hook", session=sid, state="needs-you", pending={"kind": "question", "text": "which?"})
+            await wait_state(person, sid, "needs-you")
+            await agent.tick()
+            agent._attention[f"{sid}|state"] = ("question", "2026-09-20T00:00:00Z", "which?")
+            await person.call(end, id=sid)
+            await agent.tick()
+            got = [e for e in (await person.call("inbox"))["trail"] if e["sid"] == sid]
+            assert [(e["kind"], e["how"], e["text"]) for e in got] == [("question", want, "which?")], end
+    agent.trail.clear()
+    # an alarm does not end with its session, and an `unpushed` row is a row *of* an exited record
+    assert _ended_by(_rec(state="exited"), "alarm", "alarm") == ""
+    assert _ended_by(_rec(state="exited"), "state", "unpushed") == ""
+    assert _ended_by(_rec(state="closed"), "state", "unpushed") == "the session was closed"
+    assert _ended_by(_rec(state="idle"), "state", "question") == ""
