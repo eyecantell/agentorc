@@ -32,6 +32,7 @@ Read `docs/technical_debt.md` and pick open entries suited to autonomous complet
 - A behaviour change is a change to docs/design.md first (§4.5a: a control not in that table does not exist). Keep design edits minimal and in the same PR.
 - Files with a SYNCED FILE header (scripts/, docs/cadence.md, .claude/skills/) belong to dev-cadence — never edit them here.
 - `gh pr edit` fails in this repo; use `gh api -X PATCH repos/eyecantell/agentorc/pulls/N --input -`. Merge with `gh pr merge N --squash --delete-branch`; never delete a branch another open PR is based on (GitHub auto-closes the stacked PR and its base cannot be changed afterwards).
+- **The anchor's hand (TD-093).** You merge your own PR when `python3 scripts/check_cadence.py --pr N` exits 0 **and** the diff touches nothing under `src/sessionorc/`, `docs/briefs/` or `org.yml`. One that does — and any PR you are unsure of — gets your Sonnet review and its `cadence-review:` comment, and then waits: `ao msg person "PR #N is reviewed and waiting for the anchor"` as a `note`, and go on to the next pick. The anchor session reads and merges those, and only the anchor promotes. (Added 2026-09-22: this brief had no such sentence, and #402, which touched `src/sessionorc`, was merged on the cadence check alone.)
 - `sessionorc` never imports `agentorc`; tool-specific names stay inside `agentorc/adapters/<tool>/`.
 - Never run process-matching kill commands with patterns that can match your own shell command line (they kill the wrapping shell); prefer exact-name matching.
 
