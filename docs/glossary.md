@@ -84,6 +84,12 @@ not mix:
 - **role** — a skillset preset an agent is started from: brief template, lane shape, grants,
   profile. Nothing keys on it at runtime (invariant 9). Built-in: `grinder`, `hunter`, `manager`,
   `plain` (`manager` was `lead` until 2026-09-20, TD-076, and `orchestrator` until 2026-09-17, TD-055 step 2; both old names are aliases for one release). A role may carry a display `label:` — what the badge shows; nothing keys on it. *Not:* type, kind. — *proposed*; the `orchestrator` → `lead` rename is **decided**.
+- **seat** — a place in a team definition that one session fills at a time, named by what it
+  does rather than by who is in it: the team's `techlead:` seat. A seat is *empty* or *filled*
+  — the session in it may end and another be started into it (`ao new --keep-mail`, so the
+  questions that were waiting are still there) — and it is never *finished*, since it declares
+  nothing and is not counted in a wind-down (design §4.9b). Workers are members, not seats. —
+  **decided** 2026-09-21 (asked for by Paul: the word was in use and not defined).
 - **grinder** — a role: resolves each lane item to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.

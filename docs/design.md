@@ -3023,22 +3023,32 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   creator's, and that is right — the session that may dismiss an alarm is not one a cheap
   manager can mint. So an on-demand techlead never answers alarms, and §4.8a's *not live →
   the person at once* already says what happens. Not built, and not before TD-077's step 4.
-- **The reader: a PR that touches held paths waits for the techlead (design 2026-09-21, TD-093;
-  asked for by Paul the same day — *a configuration to require "techlead merges"*).** It is the
-  repo's policy, so it is said in the repo's `.agentorc.yml` (§5), not in a brief:
+- **The reader: a PR waits for the techlead (design 2026-09-21, TD-093; asked for by Paul the
+  same day — *a configuration to require "techlead merges"*; the shape below is his, 2026-09-21).**
+  **It is a setting of the role** — some teams need it and some do not (a documentation repo may
+  find dev-cadence's own steps enough) — so it is a key of a role preset (§4.8; the repo's
+  `roles:` in `.agentorc.yml`, or `org.yml`'s), and, as every preset key, **it sets a field on the
+  session's record at start and is read from the record afterwards** (§9 invariant 9: a preset
+  sets defaults at start and is a badge afterwards — nothing keys on the role's name):
 
   ```yaml
-  review:
-    held: [src/sessionorc/**, docs/briefs/**, org.yml]   # a PR touching any of these waits for the reader
-    reader: techlead          # the team's seat (the only reader today); `person` sends every held PR to the person
-    bound: 2h                 # unanswered this long, the author takes it to the person on the same thread
+  roles:
+    grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind,
+              review: {reader: techlead}}           # every PR waits for the reader; `held:` defaults to `**`
+    hunter:  {review: {reader: techlead, held: [src/**]}}   # only a PR touching these paths waits
+    plain:   {review: {reader: techlead}}           # a person's own `--team` session, when its role says so
   ```
 
-  **Whether a PR is held keys on the repo and its paths** — never on who wrote the PR, its
-  session's mode, or its role (its mode decides only who executes the merge, below): Paul's requirement is a person's own interactive session inside a
-  team (`ao new --team`) getting the same reader a grinder does, *a safety net for when I am not
-  intimately familiar with an architecture*. `held:` is a list of path globs matched against the
-  PR's changed files; a PR touching none merges as §3's cadence says (the author, on a green
+  `review: {reader, held, bound}` — `reader` is `techlead` (the team's seat; the only reader
+  today) or `person`; **`held` is a list of path globs matched against the PR's changed files and
+  defaults to every PR (`**`)**; `bound` defaults to two hours. The record carries it as
+  `review`, home-owned, set at start and shown on the Focus header as text. **Whether a PR is
+  held keys on the record's `review` and the PR's paths** — never on who wrote the PR or its
+  session's mode (its mode decides only who executes the merge, below): Paul's requirement is a
+  person's own interactive session inside a team (`ao new --team`, with a role whose preset
+  carries `review:`) getting the same reader a grinder does, *a safety net for when I am not
+  intimately familiar with an architecture*. A session whose record has no `review`, or whose
+  PR touches no held path, merges as §3's cadence says (the author, on a green
   `scripts/check_cadence.py`). **How the reader hears of a PR — the seat is filled by mail, so a
   PR is an `ask`**: when a held PR is green and carries its author's own `cadence-review:`
   comment, the author sends **`ao msg --kind ask --pr <n> {techlead} "…"`** — `pr` is a new
@@ -3088,9 +3098,9 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   --pr <n> person "…"`) and lands under *Needs you* as an ordinary counted `ask` with `#<n>`
   drawn as a link — no seat, no header count; a team whose repo says `reader: techlead` but
   defines no `techlead:` seat is the same case (`{techlead}` reads *none*, so the ask has nowhere
-  else to go), and `ao team start` says so as it does for a seat without a primer. **`review:`
-  is read by the author's own `ao`** (the client that checks a PR's files against `held:`),
-  never by the host agent — unlike the file's `unattended:` block, which §6's policies read.
+  else to go), and `ao team start` says so as it does for a seat without a primer. **The record's
+  `review` is read by the author's own `ao`** (the client that checks a PR's files against
+  `held:`), never by the host agent, which only stores it.
   **Not the reader**: a PR from
   the person's own anchor session outside any team (no `team` badge, nobody to ask); a repo
   without `review:`; and a read is never a re-review of what the author's reviewer found — it
@@ -4025,16 +4035,13 @@ unattended:
   wrapup_minutes: 15
   creds_min_hours: 0.25
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
-  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind}   # profile: §4.9
+  grinder: {brief: docs/briefs/grinder.md, lane: free-pick, profile: grind,   # profile: §4.9
+            review: {reader: techlead}}   # §4.9b *The reader*: its PRs wait for the techlead; `held:` defaults to every PR
   hunter: {brief: docs/briefs/hunter.md, icon: search}   # icon: §4.8, one name from the fixed set
   manager: {brief: docs/briefs/manager.md, grants: [control]}
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
-review:                               # §4.9b *The reader*: a PR touching a held path waits for the techlead
-  held: [src/sessionorc/**, docs/briefs/**, org.yml]
-  reader: techlead                    # or `person`
-  bound: 2h                           # then the author takes it to the person on the same thread
 teams:                                # §4.9: teams whose only project is this repo; org.yml wins a name
   grind: {manager: {role: manager, name: manager}, members: [{role: grinder, count: 2, name: grinder}]}
 ready_when: [tree_clean, branch_pushed, pr_merged, no_subagents, ledger_touched]
