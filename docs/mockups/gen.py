@@ -177,6 +177,9 @@ ROLE_ICON = {
 # no role may name it, so a card never shows the same glyph twice for two reasons.
 PERSON = "M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM4 21a8 8 0 0 1 16 0"
 
+# a role's label is a title (TD-095 g): the preset's `label:`, else its name with the first letter raised
+ROLE_LABEL = {"techlead": "Tech Lead"}
+
 def role_icon(role):
     d = ROLE_ICON.get(role)
     if not d:
@@ -212,7 +215,7 @@ def topbar(active="Org", narrow=False):
   <span class="wordmark">agent<b>orc</b></span>
   <div style="display: flex; gap: 2px;">{tabs}</div>
   <div style="flex-grow: 1;"></div>
-  {"" if narrow else '<span class="mono" style="font-size: 11px; color: #aab3bf;">usage 5h 41% · wk 58%</span><span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>'}
+  {"" if narrow else '<span class="mono" style="font-size: 11px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>'}
   <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;">{ICON["term"]}Shell</span><span class="btn primary" style="height: 26px;">{ICON["plus"]}New session</span>
 </div>'''
 
@@ -378,7 +381,7 @@ def team_desktop():
                       else pill(state, scraped=(conf == "scraped")))
         # (2) what it is: role, mode (a word, never pressable), marks, the stops note, the one clock
         role = (f'<span class="badge" title="the role preset it was started under (design §4.8)">'
-                f'{role_icon(e["role"])}{e["role"]}</span>') if e.get("role") else ""
+                f'{role_icon(e["role"])}{ROLE_LABEL.get(e["role"], e["role"].capitalize())}</span>') if e.get("role") else ""
         if tag == "unattended":
             mode = '<span class="mode">unattended</span>'
         else:

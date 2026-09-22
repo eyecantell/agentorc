@@ -53,7 +53,7 @@ not mix:
   resolve to `manager` for one release and warn. *Not:* lead, orchestrator, orc, supervisor.
   — **decided** 2026-09-19 (Paul), confirmed 2026-09-20 (TD-076, design §4.8 *The names*).
 - **techlead** — the technical go-between of TD-075: a session that answers technical
-  questions for a team's workers before they reach a person. Shown as *Tech lead*. A team's
+  questions for a team's workers before they reach a person. Shown as *Tech Lead*. A team's
   optional `techlead:` seat; started per batch of questions, holds no grant (design §4.9b). —
   **decided** as a name 2026-09-19 (Paul); the seat, the preset and the briefs *built* 2026-09-20
   (TD-075 step 1), its mail verbs not yet.

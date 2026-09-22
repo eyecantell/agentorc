@@ -172,11 +172,11 @@ def test_orchestrator_and_lead_are_deprecated_aliases_for_manager(tmp_path, caps
 
 def test_techlead_is_a_preset_and_a_reserved_word_is_still_refused_by_name(tmp_path, monkeypatch):
     """TD-075 step 1, design §4.9b: `techlead` is a built-in preset — `techlead.md`, no lane, no
-    grants, icon `book`, label *Tech lead* — and a repo may override its keys like any other's.
+    grants, icon `book`, label *Tech Lead* — and a repo may override its keys like any other's.
     The reserved-words table it left stays (§4.8 *The names*): a word in it is still refused with
     its reason wherever a role is named or defined, never as an unknown role."""
     tl = repoconfig.resolve_role(repoconfig.RepoConfig(), "techlead")
-    assert (tl.brief, tl.lane, tl.grants, tl.icon, tl.display) == ("techlead.md", [], [], "book", "Tech lead")
+    assert (tl.brief, tl.lane, tl.grants, tl.icon, tl.display) == ("techlead.md", [], [], "book", "Tech Lead")
     assert "**techlead**" in tl.brief_text()
     (tmp_path / ".agentorc.yml").write_text("roles:\n  techlead: {profile: strong}\n")
     assert repoconfig.resolve_role(repoconfig.load(tmp_path), "techlead").profile == "strong"
@@ -220,7 +220,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
         "grinder": "Grinder",
         "hunter": "Hunter",
         "manager": "Manager",
-        "techlead": "Tech lead",
+        "techlead": "Tech Lead",
         "plain": "Plain",
     }
     assert "label" in repoconfig.ROLE_KEYS

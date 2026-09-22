@@ -52,8 +52,8 @@ def test_a_team_with_nothing_live_keeps_its_card_below_the_live_ones_and_no_team
     assert idle["def_techlead"] is None
     (seated,) = team_groups([], [{**rows[0], "techlead": "tl-1"}])
     head = templates.get_template("group_head.html").render(g=seated)
-    assert "Manager orc · Tech lead tl-1 · 2 members" in head
-    assert "Tech lead" not in templates.get_template("group_head.html").render(g=idle)
+    assert "Manager orc · Tech Lead tl-1 · 2 members" in head
+    assert "Tech Lead" not in templates.get_template("group_head.html").render(g=idle)
 
 
 def test_two_teams_each_with_a_lead():
@@ -279,7 +279,7 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
         "grind": {
             "windows": [
                 {"label": "5h", "pct": 19, "resets": "2026-09-20T22:00:00Z"},
-                {"label": "wk", "pct": 88, "resets": "2026-09-24T00:00:00Z"},
+                {"label": "week", "pct": 88, "resets": "2026-09-24T00:00:00Z"},
             ],
             "fetched": "2026-09-20T20:00:00Z",
         },
@@ -291,10 +291,10 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
         counts={}, host="kmaster", active="Org", agent_down=False, volatile=False, usage=usage,
         person_needs=0, node_banner="", identity_note="",
     )  # fmt: skip
-    assert "grind wk 88%" in html and "5h 19%" not in html.split("grind wk 88%")[1].split("</span>")[0]
+    assert "grind · week 88%" in html and "5h 19%" not in html.split("grind · week 88%")[1].split("</span>")[0]
     assert 'data-profile="grind" data-pct="88" class="near"' in html
-    assert "wk 88% (resets 2026-09-24T00:00:00Z) · 5h 19% (resets 2026-09-20T22:00:00Z)" in html
-    assert 'data-profile="openai" data-pct="100" class="cap"' in html and "openai day 100%" in html
+    assert "week 88% (resets 2026-09-24T00:00:00Z) · 5h 19% (resets 2026-09-20T22:00:00Z)" in html
+    assert 'data-profile="openai" data-pct="100" class="cap"' in html and "openai · day 100%" in html
     assert 'data-profile="quietly"' not in html  # no windows, no chip
     assert "five_hour" not in html and "weekly" not in html
 
@@ -302,13 +302,13 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
 # One profile's usage as the host agent holds it after a poll (design §4.2, TD-087), for the chip's
 # rule in both its homes — `usage_chip` for the server's render and `AO.usageChip` for a pushed event.
 USAGE_CASES = {
-    "fresh": {"windows": [{"label": "5h", "pct": 19, "resets": "r1"}, {"label": "wk", "pct": 88, "resets": None}],
+    "fresh": {"windows": [{"label": "5h", "pct": 19, "resets": "r1"}, {"label": "week", "pct": 88, "resets": None}],
               "fetched": "2026-09-20T20:00:00Z", "reason": "ok"},
     "legacy": {"windows": [{"label": "day", "pct": 40, "resets": "r2"}], "fetched": "x"},  # before TD-087: no reason
-    "held_429": {"windows": [{"label": "wk", "pct": 49, "resets": "r3"}], "fetched": "2026-09-20T20:00:00Z",
+    "held_429": {"windows": [{"label": "week", "pct": 49, "resets": "r3"}], "fetched": "2026-09-20T20:00:00Z",
                  "reason": "rate_limited", "retry_after": 1800},
     "held_cap": {"windows": [{"label": "5h", "pct": 100, "resets": "r4"}], "fetched": "f", "reason": "error"},
-    "held_odd_wait": {"windows": [{"label": "wk", "pct": 49}], "reason": "rate_limited", "retry_after": 150},
+    "held_odd_wait": {"windows": [{"label": "week", "pct": 49}], "reason": "rate_limited", "retry_after": 150},
     "never_read": {"reason": "no_credentials"},
     "unknown_word": {"reason": "brand_new_reason"},
     "no_quota": {"windows": [], "fetched": "x", "reason": "ok"},
@@ -328,18 +328,18 @@ def test_a_refused_usage_poll_draws_the_held_reading_stale_rather_than_nothing()
     from agentorc.ui.app import usage_chip
 
     got = {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
-    assert got["fresh"] == {"text": "grind wk 88%", "title": "wk 88% (resets ?) · 5h 19% (resets r1)",
+    assert got["fresh"] == {"text": "grind · week 88%", "title": "week 88% (resets ?) · 5h 19% (resets r1)",
                             "pct": 88, "cls": "near"}  # fmt: skip
-    assert got["legacy"]["text"] == "grind day 40%" and got["legacy"]["cls"] == ""  # no reason is ok, not stale
+    assert got["legacy"]["text"] == "grind · day 40%" and got["legacy"]["cls"] == ""  # no reason is ok, not stale
     held = got["held_429"]
-    assert held["text"] == "grind wk 49% · stale" and held["cls"] == "stale" and held["pct"] == 49
+    assert held["text"] == "grind · week 49% · stale" and held["cls"] == "stale" and held["pct"] == 49
     assert held["title"].startswith("held reading from 2026-09-20T20:00:00Z — the last poll was refused: ")
     assert "rate-limited by the usage endpoint, which asked to be left 30 min" in held["title"]
-    assert held["title"].endswith("wk 49% (resets r3)")  # every window is still on hover
+    assert held["title"].endswith("week 49% (resets r3)")  # every window is still on hover
     # a stale reading at a cap is still red: it is the best evidence there is
     assert got["held_cap"]["cls"] == "cap stale" and "could not be read" in got["held_cap"]["title"]
     assert "asked to be left 3 min" in got["held_odd_wait"]["title"]  # rounded up, in both homes alike
-    assert got["never_read"]["text"] == "grind no reading" and got["never_read"]["cls"] == "stale"
+    assert got["never_read"]["text"] == "grind: no reading yet" and got["never_read"]["cls"] == "stale"
     assert "no credentials for this profile" in got["never_read"]["title"]
     assert "brand_new_reason" in got["unknown_word"]["title"]  # a word we do not know is shown, not dropped
     assert got["no_quota"] is None and got["not_a_dict"] is None

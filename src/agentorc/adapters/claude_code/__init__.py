@@ -441,7 +441,7 @@ class ClaudeCodeAdapter:
 
     def usage(self, profile: Profile, timeout: float = 10.0) -> Usage | None:
         """This account's quota windows from the OAuth usage endpoint tdgrind already polls —
-        for Claude Code the 5-hour and the weekly one, labelled `5h` and `wk`. The token never
+        for Claude Code the 5-hour and the weekly one, labelled `5h` and `week`. The token never
         touches argv; nothing here gates anything.
 
         Raises `UsageRefused` with a **reason** for every failure it can name (TD-087): the
@@ -497,7 +497,7 @@ def parse_usage(d: dict) -> Usage | None:
         return Usage(
             windows=[
                 Window(label="5h", pct=int(f["utilization"]), resets=f.get("resets_at")),
-                Window(label="wk", pct=int(w["utilization"]), resets=w.get("resets_at")),
+                Window(label="week", pct=int(w["utilization"]), resets=w.get("resets_at")),
             ],
             fetched=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
         )
