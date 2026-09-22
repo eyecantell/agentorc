@@ -74,6 +74,9 @@ PRESETS: dict[str, dict[str, Any]] = {
     # The go-between (design §4.9b, TD-075): answers teammates' questions from the record, passes the
     # rest up. No grants — it acts on no session; the design's `alarms` grant is not built.
     "techlead": {"brief": "techlead.md", "lane": [], "grants": [], "icon": "book", "label": "Tech Lead"},
+    # A seat with a trigger (design §4.9b, TD-098): hunter-shaped — checks one area every n merged
+    # PRs or every so often, files what it finds, and ends. The area is its brief's, never a lane.
+    "auditor": {"brief": "auditor.md", "lane": [], "grants": [], "icon": "eye", "label": "Auditor"},
     "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"

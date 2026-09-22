@@ -15,7 +15,7 @@ def test_missing_file_gives_the_defaults(tmp_path):
     assert cfg.ready_when == ["tree_clean", "branch_pushed", "no_subagents"]
     assert cfg.commands == [] and cfg.unattended is None and cfg.controllers == [] and cfg.teams == {}
     assert cfg.ledger == "docs/technical_debt.md"
-    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "techlead", "plain"]
+    assert [r.name for r in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "techlead", "auditor", "plain"]
 
 
 def test_the_section_5_example_loads(tmp_path):
@@ -57,7 +57,15 @@ commands:
     assert o.grants == ["control"] and o.lane == [] and o.controllers == []
     r = repoconfig.resolve_role(cfg, "reviewer")
     assert r.source == "repo" and r.brief is None and r.lane == ["ui", "tests"] and r.controllers == ["ui-orc"]
-    assert [x.name for x in repoconfig.roles(cfg)] == ["grinder", "hunter", "manager", "techlead", "plain", "reviewer"]
+    assert [x.name for x in repoconfig.roles(cfg)] == [
+        "grinder",
+        "hunter",
+        "manager",
+        "techlead",
+        "auditor",
+        "plain",
+        "reviewer",
+    ]
     with pytest.raises(KeyError, match="unknown role 'nope'; known: grinder, hunter"):
         repoconfig.resolve_role(cfg, "nope")
 
@@ -65,11 +73,11 @@ commands:
 def test_the_org_overlay_sits_between_built_in_and_repo(tmp_path):
     (tmp_path / ".agentorc.yml").write_text("roles: {grinder: {lane: [TD-001]}}\n")
     cfg = repoconfig.load(tmp_path)
-    overlay = {"grinder": {"profile": "grind", "lane": ["free-pick"]}, "auditor": {"grants": ["control"]}}
+    overlay = {"grinder": {"profile": "grind", "lane": ["free-pick"]}, "scout": {"grants": ["control"]}}
     g = repoconfig.resolve_role(cfg, "grinder", roles_overlay=overlay)
     assert g.profile == "grind" and g.lane == ["TD-001"] and g.source == "built-in + org + repo"
-    assert repoconfig.resolve_role(cfg, "auditor", roles_overlay=overlay).source == "org"
-    assert "auditor" in repoconfig.role_names(cfg, overlay)
+    assert repoconfig.resolve_role(cfg, "scout", roles_overlay=overlay).source == "org"
+    assert "scout" in repoconfig.role_names(cfg, overlay)
 
 
 @pytest.mark.parametrize(
@@ -221,6 +229,7 @@ def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path)
         "hunter": "Hunter",
         "manager": "Manager",
         "techlead": "Tech Lead",
+        "auditor": "Auditor",
         "plain": "Plain",
     }
     assert "label" in repoconfig.ROLE_KEYS
@@ -247,7 +256,14 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     `grinder: wrench`, `hunter: search` and `plain` none; a layer overrides it per key like every
     other key; an unknown name is refused when the file is read, as an unknown grant is."""
     builtin = {r.name: r.icon for r in repoconfig.roles(repoconfig.RepoConfig())}
-    assert builtin == {"grinder": "wrench", "hunter": "search", "manager": "flag", "techlead": "book", "plain": None}
+    assert builtin == {
+        "grinder": "wrench",
+        "hunter": "search",
+        "manager": "flag",
+        "techlead": "book",
+        "auditor": "eye",
+        "plain": None,
+    }
     assert "icon" in repoconfig.ROLE_KEYS
     assert set(builtin.values()) - {None} <= set(repoconfig.ICONS)
     # the repo's own file overrides it, and its other keys are untouched
@@ -275,3 +291,15 @@ def test_a_role_may_carry_an_icon_from_the_fixed_set(tmp_path):
     (tmp_path / ".agentorc.yml").write_text("roles:\n  lead: {icon: 7}\n")
     with pytest.raises(ValueError, match="icon must be a string"):
         repoconfig.load(tmp_path)
+
+
+def test_the_auditor_preset_is_a_hunter_for_a_seat():
+    """TD-098 step 3, design §4.8's preset table and §4.9b *Seats with a trigger*: `auditor` holds no
+    grants and no lane — a seat's area is its brief's — and its built-in brief says so, fills the
+    techlead, never fixes, and declares nothing."""
+    role = repoconfig.resolve_role(repoconfig.RepoConfig(), "auditor")
+    assert (role.grants, role.lane, role.display) == ([], [], "Auditor")
+    text = role.brief_text([], techlead="ao-x-techlead")
+    assert "**auditor**" in text and "## Area: (none given)" in text and "`ao-x-techlead`" in text
+    assert "never fix" in text and "You declare nothing" in text
+    assert "{" not in text.replace("{lane}", "")  # every placeholder filled
