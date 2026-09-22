@@ -208,3 +208,4 @@
 16:31  grinder-ao-2: TD-099 (2) done → PR #433 merged, cadence pass (review recorded; no held paths)
 16:50  grinder-ao-2: TD-100 slice 3 → PR #436 open (no held paths). grinder-ao-1: #434 in review, held for the anchor
 16:52  grinder-ao-2: TD-100 (3) done → PR #436 merged, cadence pass (review recorded; no held paths). Rest of (3) waits on #434
+16:56  grinder-ao-2: declared out of work again, idle → finished (next picks: TD-103–112 when the anchor's #435 merges). grinder-ao-1: idle, TD-100 claimed, #434 waiting on the anchor's read (opened 22:29Z)
