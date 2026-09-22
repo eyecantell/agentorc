@@ -60,7 +60,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-099 | A team with nothing working still offers Wind down, and a manager that stops for the usage window goes idle instead of declaring | Medium | Open |
 | TD-100 | The wind-down percentage is a sentence in a brief; Paul wants a knob set by the week's interactive load, later from a settings page | Medium | Open |
 | TD-101 | A one-day override of the usage reserves, gone at the reset | Low | Open |
-| TD-102 | A held peer message is a menu the adapter does not see, and the briefs do not forbid the channel | Medium | Open |
 | TD-103 | The manager is an LLM doing policy the tick should do: crash restart, the idle nudge, seat fills and outcome chasing are brief sentences read on Opus every round, and §6's run window, stall, credential-lapse and exit-reap policies do not exist in the code | High | Open — awaiting Paul's decision on the host agent starting sessions |
 | TD-104 | A seat's trigger is timed and counted by the manager, against the design's own rule that the host agent applies bounds and a controller reads a field | Medium | Open |
 | TD-105 | Mail carries more kinds and machinery than a night's traffic warrants: fold `conflict` into a multi-addressee `ask`, freeze the outcome debt at what is built, state the two tallies as one bound | Medium | Open |
