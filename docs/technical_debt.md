@@ -56,6 +56,8 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-093 | Who must look at a PR before it merges is a sentence in a brief and a message in an inbox, not something a team is configured with | Medium | Open |
 | TD-095 | The Org's cards say the same thing several times, are uneven, and *working* does not stand apart | Medium | Partly done |
 | TD-096 | Focus hands a person the keyboard of an unattended session, and typing into one lands in the middle of its work | Medium | Built — live check pending |
+| TD-097 | An empty seat's card says *exited*, which reads as a failure | Medium | Open |
+| TD-098 | Seats with a trigger — a doc audit or a test audit that fills after n PRs or every so often | Medium | Open |
 
 ---
 
@@ -940,3 +942,30 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the design says it, Focus on an unattended session cannot type by accident, taking over and handing back are one press each and are fields a manager reads, and Paul has used it.
 
 **Related:** TD-095 (the mode on a card, and *interactive* standing out), TD-075 (the techlead seat), §9 invariant 5.
+
+## TD-097: An empty seat's card says *exited*, which reads as a failure
+
+**Priority:** Medium
+**Added:** 2026-09-21 (the anchor session; from Paul's question the same evening)
+**Status:** Open — **design first, the anchor's; not built.** Paul: *since the techlead is meant to exit, should we change that state to "Available" or similar — I am wondering if a user would get confused by it saying exited.* The anchor's recommendation: keep the **state** (`exited` is a fact about the tmux session, and TD-095 just made the pill the state and nothing else) and change **what a seat's card draws**, keyed on the structured fact that the team definition names the session as its seat (as `teamrun.wound_down` already keys on it, by name): an ended seat's pill reads **empty** — the word §4.9b and the glossary already use (a seat is *empty* or *filled*) — in the same grey; the slot says *fills on the next question*; the foot's first button is **Message…**, since asking it is how it fills, never Forget. *Available* is not recommended: it suggests something sitting ready, and nothing is until a question lands. Paul has not yet said which.
+**Location:** design §4.5 *The card's anatomy* (the slot's endings, the foot's first button), §4.5a (the state pill, the foot), §4.9b (the seat), `src/agentorc/ui/templates/card.html`, `docs/mockups/gen.py`
+
+**Why:** the seat's normal resting state — started per batch, answered, ended — is drawn with the same grey `exited` pill and *exited · ready to close ✓* slot as a crashed worker, so the one card on the page that is behaving exactly as designed looks like the one that failed.
+
+**Done when** the design says what an ended seat's card carries, the mockups show it, the page matches, and Paul has looked at it.
+
+**Related:** TD-075 (the seat), TD-095 (the pill is the state), TD-098 (seats with a trigger share the word).
+
+## TD-098: Seats with a trigger — a doc audit or a test audit that fills after n PRs or every so often
+
+**Priority:** Medium
+**Added:** 2026-09-21 (the anchor session; Paul's idea the same evening)
+**Status:** Open — **not designed; a design round of its own, after TD-097's word is settled.** Paul: *I am envisioning a role like "doc audit" or "test audit" that would make sure docs or tests are in good shape — they would have a similar function of only checking every so often (configurable?) like after every n PRs, and would be "Waiting" or similar when they are waiting to be awoken.* The anchor's reading: **the techlead seat with a different trigger.** Today's seat has one trigger — a question landed (`asks_waiting` leaves zero, §4.9b) — and the manager fills it. The generalisation: a team definition's `seats:` (of which `techlead:` becomes the first), each `{name, role, trigger}`, with `trigger` one of `asks` (today's), `prs: <n>` (n PRs merged to the repo since the seat's last fill — the manager already reads `gh pr list` for the queue, so the count is one call, and *last fill* is the seat's record's `created`), or `every: <duration>`. The manager's seat rule (§4.9b, its ceiling) fills a seat whose trigger is met; between runs it is **empty**, and the card's slot says why it will fill — *empty · fills after 10 PRs (3 so far)*, *fills at 06:00* — so the word is TD-097's and a person learns one thing. The audit roles are presets like any other: hunter-shaped (find and file with evidence, never fix) or grinder-shaped (fix and open a PR), the role decides; the area is the brief's. **Not *waiting*:** the Inbox already uses that word for a question the person owes an outcome on, and a seat is not waiting on anyone. Open for the round: whether a seat's role may hold grants (the techlead holds none by design); whether `every:` is the home's clock or the manager's (the home times nothing today, §4.9b *When it cannot answer*); how a trigger reads on the team's header; and whether the audit's findings go to the ledger, the board or the techlead.
+**Location:** design §4.9b (the seat, the manager's seat rule), §4.8 (role presets), §4.9 (the team definition), the manager's brief
+
+**Why:** a check that runs on every PR is too much and one that never runs is what happens now; a seat that fills on a count or a clock is the shape in between, and the team already knows how to fill one.
+
+**Done when** the design says what a seat with a trigger is, a team can define one, the manager fills it on its trigger and the card says why it will, and one audit role has run for real.
+
+**Related:** TD-075 (the seat and its fill rule), TD-097 (the word for an empty seat), TD-091 (a periodic act on a count is the same shape as compacting on a threshold).
+
