@@ -4058,8 +4058,10 @@ code and needs no grant; a session doing the same work does.
   and it is off by default). A restart re-creates a session the person or `ao team start` already
   chose to run — same name, directory, worktree, profile, brief, lane, role, badges and
   `controllers` — and supersedes its record in place (§4.1), so nothing appears on the Org that a
-  person did not put there. It replays the session's **launch record**: at every supervised
-  create the host agent writes `launch/<id>.json` under its home — the adapter, the profile, the
+  person did not put there. It replays the session's **launch record**: at every create whose
+  record carries `supervised` — attended or not, so a *Resume with changes…* that leaves
+  *Unattended* off still writes one and a later Hand back replays the person's latest choices —
+  the host agent writes `launch/<id>.json` under its home — the adapter, the profile, the
   prompt as handed (placeholders filled), the lane and the fields above — and a restart is that
   record handed to `create` again, never the definition re-read (the host agent does not read
   `org.yml`, §4.9). The launch record is deleted with the record on Forget and kept across a
