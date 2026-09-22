@@ -31,7 +31,7 @@ priority = 95
 region = 15
 all = ["^\\s*(❯\\s*)?(\\d+\\.\\s*)?Deny\\W+drop it and tell the sender it was declined\\s*$"]
 any = ["^\\s*(❯\\s*)?(\\d+\\.\\s*)?Deliver this message to Claude\\s*$"]
-pending = { kind = "question", text = "held message from another session (deliver or deny in the terminal)" }
+pending = { kind = "question", text = "a message from another Claude Code session is held (deliver or deny in the terminal)" }
 
 [[rules]]
 # The tool's own limit message (the ADR's three usage-limit screens), before TD-001's poll sees it.
