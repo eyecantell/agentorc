@@ -650,3 +650,34 @@ def test_within_one_urgency_the_persons_own_sort_first_and_mine_shows_only_them(
         agent_down=False, volatile=False, usage={},
     )  # fmt: skip
     assert 'id="mine" aria-pressed="false"' in html
+
+
+def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(tmp_path, monkeypatch):
+    """Design §4.5 *The card's anatomy*, TD-097: an `exited` or `closed` record the team definition
+    names as a seat is drawn *◇ on call* — composed, as *idle · unseen* is, so the state stays what
+    it is — the slot says what would make it come, the caption when it last came, and the foot's
+    first button is Message…, never Forget or Close session. A seat that is filled is an ordinary
+    card, and a record the definition does not name is the `exited` it always was."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import state_counts, templates, view
+
+    clean = {"branch": "w", "dirty": 0, "unpushed": 0, "upstream": "origin/w"}
+    for state in ("exited", "closed"):
+        v = view(_card(state=state, exit_code=0, git=clean, pane=False), seats={"ao-w"})
+        assert v["state"] == state and (v["state_class"], v["state_label"]) == ("oncall", "on call")
+        assert v["slot"]["text"] == "on call — comes on the next question"
+        assert v["slot"]["caption"].startswith("last came")  # never *ready to close ✓*: it is not closed
+        assert v["next_act"] == "message"
+        html = templates.get_template("card.html").render(s=v)
+        foot = html.split('class="sc-foot"')[1]
+        assert foot.index('data-act="message"') < foot.index("/focus/ao-w")  # Message… first, then Details
+        assert 'data-act="remove"' not in html and "Close session" not in html
+        assert 'class="pill s-oncall' in html and ">on call</span>" in html
+    # filled: an ordinary card in its live state
+    live = view(_card(state="working"), seats={"ao-w"})
+    assert live["state_label"] == "working" and not live["seat"] and live["next_act"] == "focus"
+    # not a seat: exited as ever, Forget first
+    other = view(_card(state="exited", exit_code=0))
+    assert other["state_label"] == "exited" and other["next_act"] == "forget"
+    # the team's header counts them apart
+    assert state_counts([v, other, live]) == ["1 working", "1 on call", "1 exited"]

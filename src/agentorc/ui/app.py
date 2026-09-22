@@ -521,11 +521,13 @@ def view(
     *,
     fleet_known: bool = True,
     icons: dict[tuple[str, str], tuple[str, str]] | None = None,
+    seats: Collection[str] = (),
 ) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
     a lead — which sessions it controls. Without it both come back empty, which is what a
-    caller that has only one record should show."""
+    caller that has only one record should show. `seats` is the ids a team definition names as a
+    seat (`teamrun.seat_ids`): without it, a seat with nobody in it is drawn as the `exited` it is."""
     now = datetime.now(UTC)
     d = dict(s)
     state = s["state"]
@@ -541,6 +543,13 @@ def view(
     if d["unseen"]:
         d["state_label"] = "idle · unseen"  # not *finished*: that word is a declaration's (§4.9a, TD-095 e)
         d["rank"] = STATE_RANK["idle"] - 0.5
+    # A seat with nobody in it reads *on call* (design §4.5 *The card's anatomy*, TD-097): composed
+    # as *idle · unseen* is, from `exited` / `closed` and the definition — the state stays what it
+    # is in every payload. A seat ends between questions by design, and drawn as *exited* the one
+    # card behaving exactly as designed looked like the one that had failed.
+    d["seat"] = state in DEAD and s.get("id") in seats
+    if d["seat"]:
+        d["state_class"], d["state_label"] = "oncall", "on call"
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
     # Another host's record, as the home shows it (design §4.4a): its own host on the card, and a
@@ -795,6 +804,10 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         kind, text = "needs", ptext
     elif state == "unreachable" and d["host_note"]:
         text = d["host_note"]
+    elif d.get("seat"):
+        # what would make it come (§4.5): the techlead's trigger is a question landing (§4.9b)
+        text = "on call — comes on the next question"
+        full = f"{text}: a question to it fills the seat, and it ends again once it has answered (design §4.9b)"
     elif state == "exited":
         code = d.get("exit_code")
         kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")
@@ -826,6 +839,9 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
     caption, ccls = "", ""
     if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
         caption, ccls = "via hook", "countdown"  # the page's clock fills in the time left
+    elif d.get("seat"):
+        # never *ready to close ✓*: a seat is not closed while the definition names it (§4.5)
+        caption = "last came" + (f" · {d['age']} ago" if d.get("age") else "")
     elif d["ready_ok"] and state in ("idle", "exited"):
         caption, ccls = "ready to close ✓", "ready"
     elif kind == "doing":
@@ -838,10 +854,13 @@ def next_act(d: dict[str, Any]) -> str:
     person would press next. `allow` (with Deny beside it) for a hook permission; `forget` for an
     exited session, ready to close or not — there is no process left to close; `close` for an idle
     session the checklist passes; `details` when the pane is gone; else `focus`. A `limited`
-    session's *Switch profile…* / *Wait* have no route yet, so it falls to Focus."""
+    session's *Switch profile…* / *Wait* have no route yet, so it falls to Focus. A seat on call
+    (TD-097) → `message`: asking it is how it comes, and it is never Forget or Close session."""
     state, pend = d["state"], d["pending"]
     if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
         return "allow"
+    if d.get("seat"):
+        return "message"
     if state == "exited":
         return "forget"
     if state == "idle" and d["ready_ok"]:
@@ -909,6 +928,7 @@ COUNT_ORDER = (
     ("working", "working"),
     ("unseen", "unseen"),
     ("idle", "idle"),
+    ("oncall", "on call"),
     ("exited", "exited"),
     ("closed", "closed"),
 )
@@ -916,10 +936,11 @@ COUNT_ORDER = (
 
 def state_counts(members: list[dict[str, Any]]) -> list[str]:
     """A team header's counts by state — `["1 limited", "2 working", "1 unseen"]`, in urgency order,
-    zeros left out. An idle session nobody has looked at counts as *unseen*, as its pill says."""
+    zeros left out. An idle session nobody has looked at counts as *unseen*, and a seat with nobody
+    in it as *on call* (TD-097), as their pills say."""
     tally: dict[str, int] = {}
     for m in members:
-        key = "unseen" if m.get("unseen") else str(m.get("state") or "")
+        key = "unseen" if m.get("unseen") else "oncall" if m.get("seat") else str(m.get("state") or "")
         tally[key] = tally.get(key, 0) + 1
     return [f"{tally[k]} {label}" for k, label in COUNT_ORDER if tally.get(k)]
 
@@ -984,9 +1005,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 # the header names its manager only when that card is in another group (TD-095: its
                 # name, state and line are on its own card, the first here); `role_label` is what it
                 # is called there (§4.8 *The names*, TD-076): *Manager*, or its role's own label.
-                "manager": {k: manager.get(k) for k in ("id", "name", "state", "role_label")}
-                if manager
-                else None,
+                "manager": {k: manager.get(k) for k in ("id", "name", "state", "role_label")} if manager else None,
                 "manager_elsewhere": manager_elsewhere,  # its card sits under its own badge, not here
                 "members": members,
                 "ids": [m["id"] for m in members],
@@ -1547,15 +1566,23 @@ def create_app() -> FastAPI:
 
     defs_cache: dict[str, Any] = {"at": 0.0, "org": None}
 
-    async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """The definitions' rows for a delta's headers. The page reads the files on every load;
-        the events stream re-renders every header on every delta, so it reads them at most once in
-        `DEFS_TTL` seconds — a definition edited by hand shows on the next load, or within that."""
+    async def defs() -> orgmod.Org:
+        """The team definitions, read at most once in `DEFS_TTL` seconds: the events stream
+        re-renders every header on every delta — a definition edited by hand shows within that."""
         now = time.monotonic()
         if defs_cache["org"] is None or now - defs_cache["at"] > DEFS_TTL:
             # off the loop: every open page shares it, and the read is a file per registered repo
             defs_cache.update(at=now, org=(await asyncio.to_thread(org_here))[0])
-        return _aged(teamrun.rows(defs_cache["org"], sessions))
+        return defs_cache["org"]
+
+    async def team_rows(sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The definitions' rows for a delta's headers."""
+        return _aged(teamrun.rows(await defs(), sessions))
+
+    async def seats_of(fleet: list[dict[str, Any]]) -> set[str]:
+        """The ids in `fleet` a team definition names as a seat — what `view()` draws *on call*
+        while nobody is in one (TD-097). Every page that draws a pill asks, so they agree."""
+        return teamrun.seat_ids(await defs(), fleet)
 
     async def group_heads(known: dict[str, dict[str, Any]]) -> list[dict[str, Any]] | None:
         """The team groups as the events stream ships them (design §4.5a **team groups**): per group
@@ -1563,7 +1590,8 @@ def create_app() -> FastAPI:
         uses — so the client moves cards between groups and swaps headers without composing any
         markup of its own. `None` means "flat grid", exactly as the page renders it."""
         fleet = list(known.values())
-        groups = team_groups([view(s, fleet) for s in fleet], await team_rows(fleet))
+        seats = await seats_of(fleet)
+        groups = team_groups([view(s, fleet, seats=seats) for s in fleet], await team_rows(fleet))
         if groups is None:
             return None
         head = templates.get_template("group_head.html")
@@ -1606,7 +1634,8 @@ def create_app() -> FastAPI:
                 raise
             sessions, agent_down = [], True
         icons = await role_icons(sessions)
-        vs = sorted((view(s, sessions, icons=icons) for s in sessions), key=card_order)
+        seats = await seats_of(sessions)
+        vs = sorted((view(s, sessions, icons=icons, seats=seats) for s in sessions), key=card_order)
         # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
         # record the Org counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
@@ -1662,7 +1691,7 @@ def create_app() -> FastAPI:
             request,
             "focus.html",
             {
-                "s": view(s, fleet, fleet_known=known, icons=await role_icons([s])),
+                "s": view(s, fleet, fleet_known=known, icons=await role_icons([s]), seats=await seats_of([s])),
                 "host": host_name(),
                 "active": "Org",
             },
@@ -2146,7 +2175,8 @@ def create_app() -> FastAPI:
         polls is corrected by the next one, and nothing here has to ride the pushed stream to be
         no more than a few seconds behind the Org."""
         icons = await role_icons(fleet)
-        views = [view(s, fleet, icons=icons) for s in fleet]
+        seats = await seats_of(fleet)
+        views = [view(s, fleet, icons=icons, seats=seats) for s in fleet]
         info = await identity_info()
         return state_rows(
             views,
@@ -2399,7 +2429,8 @@ def create_app() -> FastAPI:
     async def api_sessions():
         sessions = await call("list")
         icons = await role_icons(sessions)
-        return [view(s, sessions, icons=icons) for s in sessions]
+        seats = await seats_of(sessions)
+        return [view(s, sessions, icons=icons, seats=seats) for s in sessions]
 
     # -- live state ------------------------------------------------------------------------------
 
@@ -2426,7 +2457,7 @@ def create_app() -> FastAPI:
                 if ev.get("event") == "session":
                     s = ev["session"]
                     known[s["id"]] = s
-                    v = view(s, list(known.values()), icons=await role_icons([s]))
+                    v = view(s, list(known.values()), icons=await role_icons([s]), seats=await seats_of([s]))
                     # `groups` rides on every delta (design §4.5a **team groups**): a badge or a
                     # `controllers` change on one record can move a card, change a lead, or turn
                     # grouping on or off for the whole page, and only the server sees the fleet.
@@ -2456,7 +2487,12 @@ def create_app() -> FastAPI:
                         # session that is gone until the page is reloaded (review 2026-09-13).
                         for other in list(known.values()):
                             if went in (other.get("controllers") or []):
-                                ov = view(other, list(known.values()), icons=await role_icons([other]))
+                                ov = view(
+                                    other,
+                                    list(known.values()),
+                                    icons=await role_icons([other]),
+                                    seats=await seats_of([other]),
+                                )
                                 await ws.send_text(
                                     json.dumps(
                                         {

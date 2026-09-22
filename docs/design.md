@@ -1279,7 +1279,8 @@ Screens:
    (§4.9a), and the first sketch's grey *finished* pill was the sketch's mistake; the slot says how
    it ended; the caption says *ready to close ✓*; the button does it. **One composed pill, as
    *idle · unseen* is: a seat with nobody in it reads *on call*** (design 2026-09-21, TD-097, the
-   word Paul's) — an `exited` or `closed` record that the team definition names as a seat
+   word Paul's; built 2026-09-22 for the techlead seat, keyed on `teamrun.seat_ids` — a trigger
+   seat's slot words come with TD-098, and the report is the record's report line, as any card's) — an `exited` or `closed` record that the team definition names as a seat
    (§4.9b; by name, as `teamrun.wound_down` keys, never by role) is drawn with the grey pill
    *◇ on call*, the state stays `exited` or `closed` in every payload, the slot says what would
    make it come — *on call — comes on the next question*, *on call — runs after 10 PRs*, *on call

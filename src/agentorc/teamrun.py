@@ -141,6 +141,18 @@ def seat_names(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> set[str]
     return {n for s in sessions if (n := str(s.get("name") or "")) and shape.fullmatch(n) and n not in members}
 
 
+def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> set[str]:
+    """The ids among `sessions` that are a seat of the team whose badge they carry (`seat_names`,
+    design §4.9b) — what the Org page draws *on call* while nobody is in one (§4.5 *The card's
+    anatomy*, TD-097). Keyed by the definition and the name, never by a role (§9 invariant 9)."""
+    out: set[str] = set()
+    for t in org.teams.values():
+        mine = badged(t.name, sessions)
+        names = seat_names(t, mine)
+        out.update(str(s["id"]) for s in mine if s.get("id") and s.get("name") in names)
+    return out
+
+
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
     the name, the file it came from, its projects, how many sessions it starts, how many carrying

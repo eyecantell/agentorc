@@ -1040,3 +1040,6 @@ def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
     (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
     org = cli._org_here(tmp_path / "agentorc")
     assert teamrun.seat_names(org.teams["ao-grind"], [*sessions, {"name": "techlead-ao-3"}]) == {"techlead-ao-2"}
+    # the page's *on call* keys on the same rule, by id, and only under the team's own badge (TD-097)
+    other = {"id": "c", "name": "techlead-ao", "team": "other", "state": "exited"}
+    assert teamrun.seat_ids(org, [*sessions, {"id": "d", "name": "techlead-ao-3", "team": "ao-grind"}, other]) == {"b"}
