@@ -1919,6 +1919,7 @@ def create_app() -> FastAPI:
             prompt=text,
             resume=resume.strip() or None,
             unattended=unattended == "on",
+            **teams.gate_prompts(unattended == "on"),  # the usage gate's two texts (§6, TD-100)
             worktree=wt,
             repo=dir.strip() if wt else None,
             # The Grants checkboxes were ticked from the preset when the page loaded and as the

@@ -38,6 +38,21 @@ WRAPUP_PROMPT = (
 """The one wrap-up text (design §4.5a **Wrap up**, §4.9 `ao team stop`). The UI imports it from here,
 so the card and the CLI send the same words — one code path, not two."""
 
+PAUSE_PROMPT = (
+    "agentorc: pause — the usage gate's line for your profile was crossed. Finish the step in hand, commit "
+    "and push what you have, then stop and wait for a resume; do not start anything new."
+)
+RESUME_PROMPT = "agentorc: resume — the usage gate's line is clear again. Carry on from where you paused."
+"""The usage gate's two texts (design §6 *Usage gate*, TD-100): set on the record at create, beside
+the wrap-up's, because the host agent types them and `sessionorc` must not know what a brief says."""
+
+
+def gate_prompts(unattended: bool) -> dict[str, str]:
+    """The `create` arguments that let the usage gate pause and resume this session — an unattended
+    one only: the gate never touches an interactive session (§6), so it gets nothing to type."""
+    return {"pause_prompt": PAUSE_PROMPT, "resume_prompt": RESUME_PROMPT} if unattended else {}
+
+
 REACH_NOTE = (
     "These checkouts exist on this host and that is the whole of the reach: no credential and no "
     "permission comes with it. Your home is the one marked above — the anchor rule holds there — "
@@ -132,6 +147,7 @@ class Launch:
             "ledger": self.ledger,
             "team": self.team,
             "project": self.project,
+            **gate_prompts(self.unattended),
         }
 
 

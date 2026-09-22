@@ -466,6 +466,7 @@ def cmd_new(args: argparse.Namespace) -> int:
         team=getattr(args, "team", None) or "",  # badges (design §4.9): plain strings, unvalidated
         project=getattr(args, "project", None) or "",
         **_stop(args),
+        **teams.gate_prompts(bool(args.unattended)),
         **({"host": args.host} if getattr(args, "host", None) else {}),  # sent only when set (§4.4 skew rule)
     )
     if not s.get("controllers") and not args.json:
@@ -837,6 +838,81 @@ def cmd_until(args: argparse.Namespace) -> int:
     when = None if args.clear else stop_time(args.when or "")
     s = call_sync("set_stop", id=resolve(args.id), run_until=when, wrapup_prompt=teams.WRAPUP_PROMPT)
     return emit(args, s, lambda: print(f"{s['id']}: {stop_note(s) or 'no stop time'}"))
+
+
+def _reserve(text: str) -> Any:
+    """`30` → 30, `10/day` → `{per_day: 10}`, empty → None (clears that window's reserve)."""
+    t = text.strip()
+    if not t:
+        return None
+    per_day = t.endswith("/day")
+    n = t.removesuffix("/day").strip()
+    if not n.isdigit():
+        raise AgentError(f"a reserve is a whole percent (30) or a percent per day (10/day), not {text!r}")
+    return {"per_day": int(n)} if per_day else int(n)
+
+
+def _reserve_text(r: Any) -> str:
+    return f"{r['per_day']}/day" if isinstance(r, dict) else str(r)
+
+
+def _gate_line(prof: str, windows: list[dict[str, Any]]) -> str:
+    """*grind · 5h 30 → line 70% · wk 10/day → line 60% (moves Thu 07:00)* (design §4.7)."""
+    parts = [prof or "(default)"]
+    for w in windows:
+        if w.get("line") is None:
+            parts.append(f"{w['label']} {_reserve_text(w['reserve'])} → no line (the window reports no reset)")
+            continue
+        now = f", now {w['pct']}%" if isinstance(w.get("pct"), int | float) else ""
+        moves = ""
+        if isinstance(w.get("reserve"), dict) and w.get("next"):
+            when = datetime.fromisoformat(str(w["next"]).replace("Z", "+00:00")).astimezone()
+            moves = f", moves {when:%a %H:%M}"
+        parts.append(f"{w['label']} {_reserve_text(w['reserve'])} → line {w['line']}%{now}{moves}")
+    return " · ".join(parts)
+
+
+def cmd_gate(args: argparse.Namespace) -> int:
+    """`ao gate` / `ao gate <profile> <label>=<reserve>…` (design §4.7, §6 *Usage gate*, TD-100):
+    print every profile's reserves and the lines they make now, or set them through `set_settings` —
+    a person's own, which the host agent refuses to a session. `-` names the unnamed default
+    profile; `label=` alone clears that window's reserve."""
+    if not args.profile:
+        got = call_sync("gate")
+
+        def prose() -> None:
+            if not got["profiles"]:
+                print(f"no usage gate: no reserves in {got['file']}")
+            for prof, v in got["profiles"].items():
+                rows = v["windows"] or [
+                    {"label": k, "reserve": r, "line": None, "pct": None} for k, r in v["reserves"].items()
+                ]
+                print(_gate_line(prof, rows) + ("" if v["windows"] else "  (no usage reading yet)"))
+
+        return emit(args, got, prose)
+    if not args.reserves:
+        raise AgentError("ao gate <profile> <label>=<reserve>…, e.g. ao gate grind 5h=30 wk=10/day")
+    reserves: dict[str, Any] = {}
+    for item in args.reserves:
+        label, eq, value = item.partition("=")
+        if not eq or not label:
+            raise AgentError(f"{item!r}: a reserve is <label>=<reserve>, e.g. 5h=30 or wk=10/day")
+        reserves[label] = _reserve(value)
+    prof = "" if args.profile == "-" else args.profile
+    got = call_sync("set_settings", profile=prof, reserves=reserves)
+
+    def said() -> None:
+        if not got["reserves"]:
+            print(f"{prof or '(default)'}: no reserves — the gate pauses nothing on this profile")
+        else:
+            rows = got["windows"] or [
+                {"label": k, "reserve": r, "line": None, "pct": None} for k, r in got["reserves"].items()
+            ]
+            print(_gate_line(prof, rows))
+        if got.get("unchecked"):
+            print("  (the profile has no usage reading yet, so the labels were not checked)")
+
+    return emit(args, got, said)
 
 
 def cmd_control(args: argparse.Namespace) -> int:
@@ -1590,6 +1666,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("when", nargs="?", help="06:00 (the next one, local), +8h, or an ISO time")
     p.add_argument("--clear", action="store_true", help="remove the stop time: nothing will stop it")
     p.set_defaults(fn=cmd_until)
+
+    p = add("gate", help="show or set the usage gate's reserves per profile (design §6, TD-100)")
+    p.add_argument("profile", nargs="?", help="the profile; `-` for the unnamed default. None: show every profile")
+    p.add_argument("reserves", nargs="*", help="<label>=<reserve>: 5h=30, wk=10/day; wk= clears it")
+    p.set_defaults(fn=cmd_gate)
 
     for name, help_ in (
         ("grant", "give a session a grant: `control` lets it act on other sessions (design §4.8)"),
