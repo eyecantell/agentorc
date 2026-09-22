@@ -133,3 +133,14 @@
 - Fill #1 23:24:45Z: 1 waiting when seen (3 on the new record) → idle 23:25Z (~1 min). 3 steers from grinder-ao-2: 2 answered with a source, 1 withdrawn test send closed.
 - Fill #2 23:47:08Z: 1 waiting → idle 23:47:48Z (<1 min). 1 steer from grinder-ao-2 answered with a source (default taken).
 - Totals: 4 questions put to the seat (all steers, all from grinder-ao-2; 1 a withdrawn test); 3 answered with a source; 0 passed up; 0 lapsed to a default; 0 taken to the person after TECHLEAD_WAIT. 2 fills, 0 against the six-an-hour ceiling's limit. Its friction: `ao msg --reply-to … --pick n` cannot carry text, so it answered in text naming the answer number.
+18:33  board PR #394: Sonnet fact-check 1 finding (#383 had merged 00:18Z, so only #385 waits) → fixed → READY; cadence-review FIXED posted, CI green, check pass, squash-merged 75a495d
+18:34  run over: log pushed, then ao close on myself
+
+## End-of-run summary (2026-09-21 evening run, 22:56Z–00:34Z)
+
+- grinder-ao-1 — finished, closed clean by ao team stop. Merged #380 and #387 (TD-095 mockups, legend, idle · unseen); #383 (TD-095 report line, src/sessionorc) handed to the anchor, merged 00:18Z. Sends: 0. It sent a stop note at 86% weekly usage and took it back within a minute; restart_wanted (early) stayed on its record and was never acted on.
+- grinder-ao-2 — finished, closed clean. Merged TD-095's page #381 #384 #386 #388–#391, plus #392 (board) and #393 (TD-071 struck); #385 (src/sessionorc) still waits on the anchor (2 h at 01:22Z). Sends: 0.
+- techlead-ao-1 — closed at start (idle, 0 waiting); 2 fills, 4 questions, 3 answered with a source, 0 passed up (numbers above).
+- Cadence: 42 PRs over 12 h all pass; review rows recorded, not verified. No fails, no relays.
+- Escalations: board #394 (wind-down; #385 waits on the anchor). Notes to the person: grinder-ao-1's stop and its retraction; wind-down with the trial numbers.
+- Mechanical enough for a §6 policy: the techlead seat's rule (fill on exited + asks_waiting>0; close on idle + 0) needed no judgement — both fills and all three closes read one field. The one manual step was rebuilding the seat's brief: `ao new --keep-mail` has no way to say "the team's own brief for this seat", so I rendered it through teams.plan(); a `ao team fill <team> techlead` (or the host agent filling it itself) would remove that.
