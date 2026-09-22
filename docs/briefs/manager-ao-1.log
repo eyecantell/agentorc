@@ -200,3 +200,4 @@
 ## Run of 2026-09-22 from 21:55Z
 
 15:56  grinder-ao-1, grinder-ao-2: working (free-pick, just started). techlead-ao-1: idle, 0 waiting → closed. Merged since last run #424–#429: anchor branches, not members. No open PRs; no relays owed (every cadence-changes entry predates these records)
+15:57  grinder-ao-2: declared out of work on arrival (21:56Z), idle → finished; its note: nearest candidate TD-069 step 3 waits on the board write-back (agent.py). grinder-ao-1: working TD-102
