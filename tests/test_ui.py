@@ -556,6 +556,88 @@ def test_a_dead_attach_is_final(client, subprocess_agent, tmp_path):
     assert e.value.code == 4404
 
 
+def test_focus_watches_an_unattended_session(client, subprocess_agent, tmp_path):
+    """TD-096, design §4.6 *A read-only attach*: an unattended session's attach says it is read-only
+    in its first frame and drops every key frame — the rule is the server's, so a devtools console
+    cannot undo it — while the wheel still reaches tmux, which scrolls its history with it. The
+    header toggle is named for what it does, and after **Take over** the next attach takes keys."""
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "watch"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+    tmux = Tmux(socket_name=subprocess_agent.sock_name)
+
+    def pane() -> str:
+        return tmux.run("capture-pane", "-p", "-t", f"={sid}:", check=False).stdout
+
+    def in_mode() -> str:
+        return tmux.run("display", "-p", "-t", f"={sid}:", "#{pane_in_mode}", check=False).stdout.strip()
+
+    tmux.run("send-keys", "-t", f"={sid}:", "seq 1 200", "Enter")  # history for the wheel to scroll
+    assert wait_for(lambda: "200" in pane())
+    assert client.post(f"/api/sessions/{sid}/mode", json={"unattended": True}).json()["ok"] is True
+    page = client.get(f"/focus/{sid}").text
+    assert 'id="fmodeact"' in page and ">Take over</button>" in page and 'data-unattended="1"' in page
+    assert re.search(r'class="card composer hidden" id="composer"', page)  # the composer types: closed
+    with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
+        assert json.loads(ws.receive_text()) == {"read_only": True}
+        ws.send_text("echo TYPED-$((40+2))\r")
+        ws.send_bytes(b"echo BYTES-$((40+3))\r")
+        ws.send_text("\x1b[<0;5;5M\x1b[<0;5;5m")  # a click is not the wheel: dropped with the keys
+        assert wait_for(lambda: tmux.run("show-options", "-t", f"={sid}:", "mouse", check=False).stdout.strip())
+        assert wait_for(lambda: in_mode() == "0")
+        ws.send_text("\x1b[<64;5;5M")  # the wheel, up: tmux enters copy mode over its history
+        assert wait_for(lambda: in_mode() == "1"), "the wheel did not reach tmux on a read-only attach"
+    time.sleep(0.3)
+    assert "TYPED-42" not in pane() and "BYTES-43" not in pane() and "echo TYPED" not in pane()
+    tmux.run("send-keys", "-t", f"={sid}:", "-X", "cancel", check=False)
+
+    # Take over: the toggle is the mode's, and the next attach sends no read-only word and takes keys
+    assert client.post(f"/api/sessions/{sid}/mode", json={"unattended": False}).json()["ok"] is True
+    page = client.get(f"/focus/{sid}").text
+    assert ">Switch to unattended</button>" in page  # no controller and no team: nobody to hand it to
+    with client.websocket_connect(f"/term/{sid}?cols=100&rows=20") as ws:
+        ws.send_text("echo TOOK-$((40+4))\r")
+        buf = b""
+        deadline = time.time() + 8
+        while time.time() < deadline and b"TOOK-44" not in buf:
+            buf += ws.receive_bytes()  # bytes from the first frame on: no read-only word
+        assert b"TOOK-44" in buf
+    client.post(f"/api/sessions/{sid}/kill")
+
+
+def test_hand_back_clears_a_stop_time_that_passed_while_the_person_held_it(client, subprocess_agent, tmp_path):
+    """TD-096, design §4.5a **Hand back**: a stop time that fell due while the session was
+    interactive is not a deadline any more — nothing acted on it, and handing back must not have the
+    next tick kill it — so it is cleared; one still ahead stays."""
+    from agentorc.ui.app import view
+
+    assert view({"id": "a", "state": "idle", "unattended": False, "team": "t"})["mode_act"] == "Hand back"
+    assert view({"id": "a", "state": "idle", "unattended": False, "controllers": ["m"]})["mode_act"] == "Hand back"
+    assert view({"id": "a", "state": "idle", "unattended": False})["mode_act"] == "Switch to unattended"
+    assert view({"id": "a", "state": "idle", "unattended": True})["mode_act"] == "Take over"
+
+    r = client.post("/shell", data={"dir": str(tmp_path), "name": "handback"}, follow_redirects=False)
+    sid = r.headers["location"].rsplit("/", 1)[-1]
+    wait_state(client, sid, "idle")
+
+    def rec() -> dict:
+        return next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
+
+    soon = (datetime.now(UTC) + timedelta(seconds=2)).isoformat()
+    later = (datetime.now(UTC) + timedelta(hours=3)).isoformat()
+    client.post(f"/api/sessions/{sid}/mode", json={"unattended": True})
+    assert client.post(f"/api/sessions/{sid}/stop", json={"until": soon}).json()["run_until"]
+    client.post(f"/api/sessions/{sid}/mode", json={"unattended": False})  # taken over before it fell due
+    assert wait_for(lambda: datetime.now(UTC).isoformat() > soon, timeout=5)
+    client.post(f"/api/sessions/{sid}/mode", json={"unattended": True})  # handed back
+    assert rec()["run_until"] is None and rec()["unattended"] is True
+    assert client.post(f"/api/sessions/{sid}/stop", json={"until": later}).json()["run_until"]
+    client.post(f"/api/sessions/{sid}/mode", json={"unattended": False})
+    client.post(f"/api/sessions/{sid}/mode", json={"unattended": True})
+    assert rec()["run_until"]  # still ahead: it stays
+    client.post(f"/api/sessions/{sid}/kill")
+
+
 def test_the_card_report_line_and_the_focus_reports_panel(client, tmp_path):
     """TD-028 step 4, design §4.5a: the card's **report line** (only when a channel is non-empty,
     dashed for what the agent derived), the Focus **Reports** panel with **Drop**, and the header

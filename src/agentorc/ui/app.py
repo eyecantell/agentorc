@@ -695,6 +695,21 @@ def view(
     # the host's local clock. Empty for every session nothing will stop, which is most of them.
     d["stop_note"] = stop_note(s)
     d["grants_all"] = list(GRANTS)
+    # The Focus header's mode toggle, under the name of what it does (design §4.5a, TD-096): Take
+    # over an unattended session; hand an interactive one back where there is someone to hand it
+    # to — its `controllers` as written, or a team — and otherwise just switch it.
+    if s.get("unattended"):
+        d["mode_act"] = "Take over"
+        d["mode_title"] = (
+            "you are watching: the terminal is read-only. Take over switches this session to interactive "
+            "and gives you the keyboard — its controllers and the policies leave it alone until you hand it back"
+        )
+    else:
+        d["mode_act"] = "Hand back" if s.get("controllers") or s.get("team") else "Switch to unattended"
+        d["mode_title"] = (
+            "switch this session to unattended: the terminal goes read-only, and its manager and the policies "
+            "pick it up again. A stop time that passed while you held it is cleared; one still ahead stays"
+        )
     # Membership, both directions (design §4.8, §4.5a, TD-036 step 3). `controllers` is on the
     # record; `members` is derived across the records on every render and never stored — the same
     # rule `ao status -v` follows, so the page and the CLI cannot disagree. A controller whose
@@ -1876,7 +1891,14 @@ def create_app() -> FastAPI:
         elif action == "wrapup":
             await call("send", id=sid, text=WRAPUP_PROMPT, wrapup=True)
         elif action == "mode":
-            await call("set_mode", id=sid, unattended=bool(body.get("unattended")))
+            s = await call("set_mode", id=sid, unattended=bool(body.get("unattended")))
+            due = _instant(s.get("run_until"))
+            if s.get("unattended") and due is not None and due <= datetime.now(UTC):
+                # **Hand back** (design §4.5a, TD-096): a stop time that fell due while the person held
+                # the session is not a deadline any more — the resume's rule — and nothing acted on it
+                # while it was interactive, so handing back must not kill it on the next tick. One
+                # still ahead stays.
+                await call("set_stop", id=sid, run_until=None)
         elif action == "keys":
             await call("keys", id=sid, keys=list(body.get("keys") or []))
         elif action == "shell-here":
@@ -2517,6 +2539,13 @@ def create_app() -> FastAPI:
             await ws.close()
             return
 
+        # design §4.6 *A read-only attach* (TD-096): the mode is read once, here, and a read-only attach
+        # tells the page so in its first frame — a text frame, which is the page's to read and not
+        # pane output, so it neither counts as a painted screen nor resets the page's backoff. An
+        # attach that sends none takes keys. A mode change re-attaches.
+        read_only = bool(s.get("unattended"))
+        if read_only:
+            await ws.send_text(json.dumps({"read_only": True}))
         produced = False
 
         async def send(data: bytes) -> None:
@@ -2551,7 +2580,7 @@ def create_app() -> FastAPI:
             reapers.add(asyncio.ensure_future(proc.wait()))
 
         try:
-            await pump(pty, send, recv, scroll)
+            await pump(pty, send, recv, scroll, read_only=read_only)
         finally:
             for f in reapers:
                 f.cancel()
