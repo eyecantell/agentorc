@@ -167,4 +167,4 @@
 - Escalations: none; one note to the person.
 - For a §6 policy: "a member's self-reported usage stop means wrap up the rest" was mechanical, but it rests on one worker's reading of a shared meter. A usage field on the host record (the adapter reads it from the status line) would make it a policy rather than a relay.
 03:20  person note m-b998859e46e6: #402 (src/sessionorc) merged by grinder-ao-1 without the anchor's read (TD-093 hand rule). I missed it in my cadence check: the check has no row for it. The rule is now in the brief via PR #406, left open for Paul since it touches docs/briefs/. Design merged tonight for members to pick from next run: TD-097, TD-098 (once its PR lands), TD-095 (f).
-03:40  board PR #411 (line for #406, Due 09-23): Sonnet fact-check READY, cadence-review SHIP, check pass → squash-merged. Wrapped up on the host's word; #406 left open for Paul.
+03:50  board PR #411 (line for #406, Due 09-23): Sonnet fact-check READY; cadence-review SHIP; title dropped TD-093 (ledger row); rebased over the anchor's 95% line; check pass → squash-merged 0e8032e. Wrapped up on the host's word; #406 left open for Paul.
