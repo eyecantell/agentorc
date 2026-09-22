@@ -124,7 +124,9 @@
     const menu = b.closest("details.more"); if (menu) menu.open = false;
     try {
       let body = {};
-      if (action === "mode") body = { unattended: !b.classList.contains("on") };
+      // The Focus header's toggle carries the mode it is drawn for (TD-096: it is re-drawn in place
+      // from the pushed delta, and `.btn.on` is a style); a card's *more* entry carries `.on`.
+      if (action === "mode") body = { unattended: "unattended" in b.dataset ? b.dataset.unattended !== "1" : !b.classList.contains("on") };
       // design §4.5a: **Drop** on a claimed progress item, and the grants chip (§4.8, TD-028 step 4)
       if (action === "drop") body = { ref: b.dataset.ref };
       if (action === "grants") body = b.classList.contains("off") ? { add: [b.dataset.grant] } : { remove: [b.dataset.grant] };
@@ -782,6 +784,11 @@
   // socket never opened. Nothing can reach that difference today (a 1006 is client-synthesised and
   // carries no reason, and this server sends none), which is exactly why it had to be closed here
   // rather than left as a comment.
+  // A keystroke frame that is only mouse-wheel reports — the one thing a read-only attach passes
+  // (the server's `WHEEL_ONLY`, `pty_bridge.py`: buttons 64/65 with any of the modifier bits).
+  AO.isWheel = function (d) {
+    return /^(?:\x1b\[<(\d+);\d+;\d+[Mm])+$/.test(d) && [...d.matchAll(/\x1b\[<(\d+);/g)].every((m) => (Number(m[1]) & ~0x1d) === 64);
+  };
   AO.termClose = function (code, opened, delay, reason) {
     if (code === 4404) return { retry: false, final: true, delay, why: "no terminal for this session" };
     if (code === 1006 && !opened) {
@@ -1085,6 +1092,10 @@
     AO.termRenderer(term);
     AO.termFont(term, fit);
     let ws, delay = 500, paneGone = false;
+    // design §4.5 *Focus watches* (TD-096): an unattended session's attach is read-only. The server
+    // decides and drops the keys (§4.6); the page learns it from the attach's first frame and only
+    // says so — `mode` is the record's as last seen, and a change to it re-attaches.
+    let readOnly = false, mode = !!s.unattended, hinted = 0;
     // The pane is gone for good: end the terminal and stop reconnecting. The events push says so
     // before any reconnect could, and the server's 4404 says so too (TD-029).
     function endTerm(text) {
@@ -1094,13 +1105,25 @@
     }
     function openTerm() {
       if (paneGone) return;
+      readOnly = false;  // until this attach says otherwise, in its first frame
       const cols = Number.isFinite(term.cols) && term.cols > 0 ? term.cols : 120, rows = Number.isFinite(term.rows) && term.rows > 0 ? term.rows : 32;
       ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/term/${encodeURIComponent(id)}?cols=${cols}&rows=${rows}`);
       ws.binaryType = "arraybuffer";
       ws.onopen = () => { ws.send(JSON.stringify({ resize: [cols, rows] })); };
       // The backoff resets on pane output, never on open (TD-029): a connection the server accepts
       // and then ends is not a working terminal, and resetting there retried twice a second forever.
-      ws.onmessage = (m) => { delay = 500; term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data)); };
+      ws.onmessage = (m) => {
+        if (typeof m.data === "string" && m.data.startsWith("{")) {
+          // The attach's own word, not pane output: it does not reset the backoff (TD-029).
+          let c = null; try { c = JSON.parse(m.data); } catch (e) { c = null; }
+          if (c && "read_only" in c) {
+            readOnly = !!c.read_only;
+            if (readOnly) term.write("\x1b[90m[agentorc] watching: this session is unattended, so the terminal is read-only — Take over (above) to type.\x1b[0m\r\n");
+            return;
+          }
+        }
+        delay = 500; term.write(typeof m.data === "string" ? m.data : new Uint8Array(m.data));
+      };
       let opened = false;
       ws.addEventListener("open", () => { opened = true; });
       ws.onclose = (e) => {
@@ -1112,14 +1135,30 @@
         setTimeout(openTerm, delay); delay = v.delay;
       };
     }
+    // A mode change seen in the feed: end this attach without the retry path and open a new one,
+    // which reads the mode afresh (§4.6).
+    function reattach() {
+      if (paneGone) return;
+      if (ws) { try { ws.onclose = null; ws.close(); } catch (e) { /* already closing */ } }
+      delay = 500; openTerm();
+    }
     if (AO.paneIsGone(s)) { paneGone = true; term.write("\x1b[90m[agentorc] this session's pane is gone (killed, closed, or the tmux server restarted).\x1b[0m\r\n"); }
     else openTerm();
-    term.onData((d) => ws && ws.readyState === 1 && ws.send(d));
+    term.onData((d) => {
+      if (!ws || ws.readyState !== 1) return;
+      // A read-only attach passes the wheel (tmux scrolls its history with it) and drops the rest,
+      // server-side; the page only spares the round trip and says why nothing happened.
+      if (readOnly && !AO.isWheel(d)) {
+        if (Date.now() - hinted > 5000) { hinted = Date.now(); AO.toast("watching: the terminal is read-only — Take over to type"); }
+        return;
+      }
+      ws.send(d);
+    });
     // Copy / paste: Ctrl+C with a selection copies (no ^C), Ctrl+Shift+C copies, Ctrl+Shift+V and
     // right-click paste; the header buttons do the same for discoverability. Clipboard access
     // needs a secure context (https or localhost) — ssh -L to 127.0.0.1 qualifies.
     const copySel = () => { const t = term.getSelection(); if (t) navigator.clipboard.writeText(t).then(() => AO.toast("copied", true), () => AO.toast("clipboard blocked (needs https or localhost)")); return !!t; };
-    const pasteClip = () => navigator.clipboard.readText().then((t) => { if (t && ws && ws.readyState === 1) term.paste(t); }, () => AO.toast("clipboard blocked (needs https or localhost)"));
+    const pasteClip = () => readOnly ? AO.toast("watching: paste is off — Take over to type") : navigator.clipboard.readText().then((t) => { if (t && ws && ws.readyState === 1) term.paste(t); }, () => AO.toast("clipboard blocked (needs https or localhost)"));
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== "keydown") return true;
       if (e.ctrlKey && e.shiftKey && (e.key === "C" || e.key === "c")) { copySel(); return false; }
@@ -1196,6 +1235,16 @@
           : "starts a new turn";
       }
       $("#fstate").innerHTML = head;
+      // The mode toggle, named for what it does, and what it governs (design §4.5a, TD-096): the
+      // composer is closed on an unattended session — it types, and typing is the disruption.
+      const ma = $("#fmodeact");
+      if (ma && v.mode_act) {
+        ma.textContent = v.mode_act; ma.title = v.mode_title || "";
+        ma.dataset.unattended = v.unattended ? "1" : "0";
+        ma.classList.toggle("primary", !!v.unattended);
+      }
+      const fm = $("#fmode"); if (fm) fm.textContent = v.unattended ? "unattended" : "interactive";
+      const cp = $("#composer"); if (cp) cp.classList.toggle("hidden", !!v.unattended);
       // §4.8a (TD-077 a2): the **suspended** mark rides the pushed delta like the state does. It
       // is drawn server-side at load and lives *outside* `#fstate` — a suspension is not a state —
       // so without this a person watching the very session that is suspended from somewhere else
@@ -1382,6 +1431,7 @@
           endTerm("this session's pane is gone (see the banner).");
         }
         render(ev.session);
+        if (!!ev.session.unattended !== mode) { mode = !!ev.session.unattended; reattach(); }
         // Focus is open on it, so a finish here is seen the moment it happens (TD-017)
         if (ev.session.unseen) act(id, "seen", {}).catch(() => {});
       } else if (ev.event === "session" || ev.event === "gone") {

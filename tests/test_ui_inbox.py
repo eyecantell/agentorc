@@ -1779,8 +1779,10 @@ global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
 global.location = { pathname: "/focus/ao-x", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
-const gone = window.AO.paneIsGone, close = window.AO.termClose;
+const gone = window.AO.paneIsGone, close = window.AO.termClose, wheel = window.AO.isWheel;
 console.log(JSON.stringify({
+  wheel: ["\x1b[<64;5;5M", "\x1b[<65;1;1M\x1b[<65;1;1M", "\x1b[<81;3;3M", "\x1b[<0;5;5M", "\x1b[<96;5;5M",
+          "a", "\x1b[<64;5;5Mx", ""].map(wheel),
   gone_closed: gone({state: "closed", pane: true}),
   gone_pane_false: gone({state: "working", pane: false}),
   gone_working: gone({state: "working", pane: true}),
@@ -1858,7 +1860,14 @@ def test_the_terminals_two_client_rules_are_reachable_and_right():
     js = (UI / "static" / "app.js").read_text()
     assert "AO.termClose(e.code, opened, delay, e.reason)" in js and "AO.paneIsGone(ev.session)" in js
     assert "e.code !== 1006" not in js  # the reason rule lives in `termClose`, not beside it
-    assert "ws.onmessage = (m) => { delay = 500;" in js  # the one place the backoff resets
+    # the one place the backoff resets: pane output, after the attach's own read-only word (TD-096),
+    # which is not output and must not reset it
+    assert js.count("delay = 500; term.write(") == 1
+    assert js.index('"read_only" in c') < js.index("delay = 500; term.write(")
+
+    # TD-096: the one frame a read-only attach passes is the wheel — buttons 64/65 with any modifier
+    # bits, as the server's `WHEEL_ONLY` has it; a click, wheel-with-motion, a key or a mix is not
+    assert got["wheel"] == [True, True, True, False, False, False, False, False]
     assert "ws.onopen = () => { delay = 500; }" not in js.split("AO.focus")[-1]  # never on open
 
 

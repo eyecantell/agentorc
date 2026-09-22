@@ -55,7 +55,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-092 | Nothing reaches a person who is not looking at the page when a session needs them | Low | Open |
 | TD-093 | Who must look at a PR before it merges is a sentence in a brief and a message in an inbox, not something a team is configured with | Medium | Open |
 | TD-095 | The Org's cards say the same thing several times, are uneven, and *working* does not stand apart | Medium | Partly done |
-| TD-096 | Focus hands a person the keyboard of an unattended session, and typing into one lands in the middle of its work | Medium | Open |
+| TD-096 | Focus hands a person the keyboard of an unattended session, and typing into one lands in the middle of its work | Medium | Built — live check pending |
 
 ---
 
