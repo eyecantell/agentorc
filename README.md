@@ -1,7 +1,9 @@
-# agentorc
+# ShiftLead
 
-*Was `sessionherd` for the first day of design; renamed 2026-09-04 to sit beside
-[cmdorc](https://github.com/eyecantell/textual-cmdorc).*
+*The project is **ShiftLead** ([shiftlead.dev](https://shiftlead.dev)), decided 2026-09-21; the command is `ao`.
+The packages, the state directory, the units and the config file are still named `agentorc` until the
+machine-side rename lands at a release boundary (TD-060). Was `sessionherd` for the first day of design,
+and `agentorc` from 2026-09-04 to sit beside [cmdorc](https://github.com/eyecantell/textual-cmdorc).*
 
 A self-hosted web dashboard that orchestrates interactive AI coding-agent sessions (Claude Code first;
 Gemini CLI, Codex CLI, and on-prem harnesses via adapters) — and plain shells — running in tmux across one or more
