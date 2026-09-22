@@ -1259,7 +1259,9 @@ Screens:
    `idle` (*idle · unseen* until a person has looked, §4.2), since a declaration is not a state
    (§4.9a), and the first sketch's grey *finished* pill was the sketch's mistake; the slot says how
    it ended; the caption says *ready to close ✓*; the button does it. Nothing on a card carries a
-   second age. **Inside a team's own group a card drops what the group says**: its `team` badge,
+   second **state** age: row 2's clock is the only one, and an ending is dated by it, never in the
+   slot — a `doing` line keeps its own *says · `<age>`* caption (§4.8), which is the line's age,
+   not the session's. **Inside a team's own group a card drops what the group says**: its `team` badge,
    and *under `<manager>`* when that is its only controller; outside one — *No team*, a filtered
    or flat grid — both are drawn, and host / repo leads row 3. **The team's header** carries the
    team, the host / repo its sessions share (*mixed* where they do not), the counts by state, the
