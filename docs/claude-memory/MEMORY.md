@@ -20,3 +20,4 @@
 - [Read inbox before merging](read-inbox-before-merging.md) — the anchor merges src/sessionorc PRs; mail changes merge rights mid-run
 - [No checks means conflicting](no-checks-means-conflicting.md) — `gh pr checks` empty after a push: the PR conflicts with main, so no pull_request run; rebase
 - [Gate a merge on the check's exit code](gate-a-merge-on-the-checks-exit-code.md) — `check_cadence.py | head` hides a FAIL; capture the exit code, then merge
+- [Reviewer prompts keep out of the anchor](reviewer-prompts-keep-out-of-the-anchor.md) — a reviewer given `git -C /home/kmaster/agentorc` ran a checkout there; worktree paths only
