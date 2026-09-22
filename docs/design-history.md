@@ -72,6 +72,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-20 (TD-080): *pushed* became one measure computed once by the host agent. Before, the card's *n unpushed* flag, the checklist, the Inbox row and `ao team stop --close` had three tests between them. What it replaced: *ahead of the upstream*, which is *unmerged* when the upstream is `origin/main` — a launch branch tracking `origin/main` and pushed to `origin/<branch>` at wrap-up read as *308 unpushed* for ever, and a row that is always there teaches a person to ignore the row.
 - 2026-09-21 (TD-095 (e)): the unseen mark read *finished · unseen* until this date; Paul's decision renamed it *idle · unseen*, because *finished* is what a member that declared itself out of work is called (§4.9a), and this is a turn nobody has looked at, not a run that is over.
 - 2026-09-21 (TD-095 (f), decided by Paul): the unseen mark never applies to an `unattended` session — its result was read by its manager, the person is not expected to open it, and its slot already says *out of work* with Close session as the act.
+- 2026-09-22 (TD-064, PR #431, grinder-ao-1): the unattended launch's settings layer gained `crossSessionInbound: refuse`, written to its own `<profile>[+cadence]+unattended.json`; the held-peer-message screen rule and the briefs' sentence landed with it. Paul's word: *refuse them*.
 
 ## 4.2a Profiles: tool · account · model
 
@@ -201,6 +202,8 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-21 (TD-093, **PRs waiting** count): designed, not built.
 - 2026-09-21 (Paul, TD-099): *if a team is fully idle, does hitting Wind down wake them up?* — it would, to find nothing. 2026-09-22: a concluded team is drawn like a stopped one, with **Start** alone, and from this date `ao team start` closes each concluded session before it creates under its name.
 - 2026-09-22 (TD-100, §6 *Usage gate*): the **usage** chip's reserve line and the *paused · usage* mark designed; Claude Code's `week` label was *wk* until 2026-09-22 (TD-095 (h): short for no reason).
+- 2026-09-22 (TD-099 step 2, PR #433, grinder-ao-2): `teamrun.concluded`, `concluded` on `teamrun.rows`, and the page drawing a concluded team as stopped with Start alone; step (1), the host agent's close-then-start behind that Start, still unbuilt.
+- 2026-09-22 (TD-100 slice 3, PR #436, grinder-ao-2): the *paused · usage* mark on the card's slot and the Focus header (`gated_view`); the chip's line waits on slice 1.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
