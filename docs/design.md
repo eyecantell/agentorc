@@ -3432,8 +3432,9 @@ both the words the session sees are the host agent's, never the sender's:
 The rules that bound both:
 
 - **A pending stop beats mail.** Before it rings, the doorbell checks, in order: a wrap-up under
-  way (stop time, usage gate, run window — §6, or a team's wind-down, §4.9a), the wake budget, and
-  only then unread mail. Mail never pushes a session past its stop or back into a wind-down already
+  way (stop time, run window — §6, or a team's wind-down, §4.9a) or a usage-gate pause (§6, TD-100:
+  a pause is a send and not a wrap-up, but a paused session is not rung either), the wake budget,
+  and only then unread mail. Mail never pushes a session past its stop or back into a wind-down already
   running; it lands and waits. A session that has only *declared* `out_of_work` is **not** past a
   stop and may be rung within budget: §4.9a promises that mail is how *there is work now* reaches
   it, and for a worker the doorbell is the only wake there is. (The first 2026-09-16 text listed
@@ -4108,7 +4109,7 @@ those is refused when the graph does not permit it; a session out of wake budget
   §4.4a) names the host whose agent holds the org's graph and mail; an agent whose file names no
   `home:`, or names itself, is the home. On Paul's machines it is `home: kmaster`.
 - **The person's own** (design 2026-09-21, TD-095 second pass; `ui.yml` and `open_in:` built 2026-09-21, PR #390 — the card's button and Focus's; *edit yml* waits for the Commands page): **`ui.yml`**, beside `hosts.yml` and `org.yml` in the agentorc home (`~/.agentorc`, or `AGENTORC_HOME` — resolved as its siblings are), read by the UI process on the machine it runs on. It is the one scope that is a person's preference and nobody else's business, which hosts, repos and the org are not; today one UI process serves one person — nothing in this design has it serve two — and if that ever changes this scope moves with the person, not the process. Its first key is **`open_in:`**, the editor button of the card, the Focus header and *edit yml*: **`vscode`** — the default, and what a missing file means: today's two forms, `vscode://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank` and, where the UI runs on the machine the person sits at, `vscode://file{path}?windowId=_blank`; **`cursor`** — the same two forms under the `cursor://` scheme, which the builder **confirms against the editor's own documentation before it ships** and records here — **checked 2026-09-21 and not met, so there is no `cursor` preset**: Cursor's own documentation (`cursor.com/docs/reference/deeplinks`) documents only its `cursor://anysphere.cursor-deeplink/…` prompt, command and rule links, not a form that opens a folder, and community write-ups are not the editor's documentation; `open_in: cursor` is refused and named like any bad value, and a Cursor user writes the form as a template, `{label: Cursor, url: "cursor://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank"}`, which is theirs to trust (decided with the techlead, TD-095); **`{label: "…", url: "…"}`** — a template of the person's own, which is how any other editor is reached (Zed, a JetBrains Gateway link: their remote forms are not the same shape, so they are not presets); or **`none`**, which removes the button everywhere. A template takes `{path}` (percent-encoded, as today — TD-011) and `{remote}`, the host's `vscode_host` from `hosts.yml` — an ssh alias in the person's own `~/.ssh/config`, whatever editor reads it; with no `{remote}` in it, a template is used as it stands on every host. **A template must be `scheme://…`, and `javascript`, `data`, `vbscript` and `file` are refused as schemes** — the scheme being the part before `://`, parsed, never a substring (`vscode://file…` is scheme `vscode`); one that does not parse, or is refused, is named on the page when it is served and the default button is drawn — the file is the person's own, and a pasted bad line should still not become a link that runs. The label is text the person wrote, escaped. Nothing here reaches a host agent: no session and no policy reads it.
-- **The host agent's settings a person moves** (design 2026-09-22, TD-100): **`settings.yml`**, beside `hosts.yml` in the agentorc home on **each session host**, read by that host's agent on every tick (`sessionorc.settings`) and written only by its `set_settings` RPC — a person's own, refused to a session as `inbox_pause` is, and the RPC the settings page (§4.5, listed and unbuilt) and `ao gate` (§4.7) both write through; nobody edits the file by hand while the agent runs, though a hand edit is read on the next tick. It is not `ui.yml`, which no host agent reads, and not `hosts.yml`, which is topology. Its first key is the usage gate's reserves (§6), per profile, per window label as the adapter names them (§4.3), a flat percent or a percent per day:
+- **The host agent's settings a person moves** (design 2026-09-22, TD-100): **`settings.yml`**, beside `hosts.yml` in the agentorc home on **each session host**, read by that host's agent on every tick (`sessionorc.settings`) and written only by its `set_settings` RPC — a person's own, refused to a session as `inbox_pause` is, and the RPC that `ao gate` (§4.7) writes through, and a settings page would when §4.5 lists one (TD-100 (4): not yet); nobody edits the file by hand while the agent runs, though a hand edit is read on the next tick. It is not `ui.yml`, which no host agent reads, and not `hosts.yml`, which is topology. Its first key is the usage gate's reserves (§6), per profile, per window label as the adapter names them (§4.3), a flat percent or a percent per day:
 
 ```yaml
 usage_gate:
@@ -4241,7 +4242,9 @@ the block. A policy is agent code and needs no grant; a session doing the same w
   travels on the record as `wrapup_prompt` does, and for the same reason. While gated: the doorbell
   does not ring the session, a controller's `send` is refused at the home with the gate as the
   reason — read from the replica's `gated`, a node-owned field like `state` (§4.4a) — and a
-  person's own send, from Focus or `ao send`, is not: taking over is §9 invariant 5's way out. The
+  person's own send is not — `ao send` directly (a person is not a session, §9 invariant 11), or
+  from Focus after **Take over** (TD-096: the composer of an unattended session is closed), which
+  makes the session interactive and out of the gate's reach altogether (§9 invariant 5). The
   card's slot reads ***paused · usage** — grind week 71% ≥ 70%, line moves Thu 07:00* as *what
   explains a stop* (§4.5 *The card's anatomy*, row 5 (a)), **after** what needs a person: a pending
   permission or question is still drawn first, since a person is needed for it and not for the
@@ -4258,8 +4261,8 @@ the block. A policy is agent code and needs no grant; a session doing the same w
   act or a schedule's (TD-026, off by default), so a team paused for the night would be a team ended
   for the week. Interactive sessions are never paused and carry no line: at 100% they show
   `limited`, as today. The reserves are the person's, per profile, in the host's `settings.yml`
-  (§5), read on every tick and changed by `ao gate` (§4.7) or, when it exists, the settings page
-  (§4.5); the top bar's chip shows the line beside the number (§4.5a). A one-day change to a reserve
+  (§5), read on every tick and changed by `ao gate` (§4.7) or, once §4.5 lists one, a settings
+  page; the top bar's chip shows the line beside the number (§4.5a). A one-day change to a reserve
   is by hand — the reserve down, and back after the reset; TD-101 is the override that would expire
   on its own, not wanted yet.
 - **Credential lapse**: adapter `credentials_ok()` false → don't start; running workers get a
