@@ -1958,7 +1958,10 @@ the tail on activity; they do not replace the timer's job of noticing absence.
   attention board** (the ceiling OTP, systemd and Circus each arrived at). The numbers are §6's
   `RESTART_CEILING` (*Keeping a team running*, TD-103 — designed, not built; the briefs carry them
   until it lands), so a director and a manager alike read a member's `restarts` and
-  `restart_ceiling` rather than counting. A
+  `restart_ceiling` rather than counting. A director's managers are `supervised` like any session
+  `ao team start` creates (a nested team is started by the outer start, §4.9), so once §6 lands a
+  crashed manager is restarted by the tick's rule 1 and never by the director, whose part is to
+  read the marks and escalate; until then its brief performs the restart under the same two rules. A
   manager that exits does **not** take its workers down, and its entries in their lists do not
   vanish: the workers keep running, surfaced as controlled by a session that is gone, for a person
   or the director to re-attach with `ao control`. Adoption is an explicit edit, never automatic
