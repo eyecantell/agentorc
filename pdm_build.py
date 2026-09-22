@@ -22,15 +22,16 @@ def _git(root, *args: str) -> str:
 def pdm_build_update_files(context, files) -> None:
     if context.target != "wheel":
         return
-    try:
+    try:  # a build record is never worth a failed build: any git trouble writes none
         commit = _git(context.root, "rev-parse", "HEAD")
+        dirty = bool(commit and _git(context.root, "status", "--porcelain", "--untracked-files=no"))
     except (OSError, subprocess.SubprocessError):
         return
     if not commit:
         return
     info = {
         "commit": commit,
-        "dirty": bool(_git(context.root, "status", "--porcelain", "--untracked-files=no")),
+        "dirty": dirty,
         "source": str(context.root.resolve()),
         "built_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
