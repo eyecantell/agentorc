@@ -34,7 +34,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from sessionorc import adapters, containers, hosts, identity, link, mail, modes, naming, paths, reports, waits
+from sessionorc import adapters, build, containers, hosts, identity, link, mail, modes, naming, paths, reports, waits
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktree_path
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
 from sessionorc.models import (
@@ -246,6 +246,11 @@ class HostAgent:
         proc: identity.ProcReader | None = None,
     ):
         paths.ensure_layout()
+        # What `host` reports about this process (design §4.4 *Version skew is survivable*, TD-062):
+        # when it started, and the commit its install was built from, read once — a promote replaces
+        # the files under a running agent, and what is running is what was read at start.
+        self.started_at = now_iso()
+        self.build = build.info()
         # Who is calling (design §4.8a, TD-077): `off | observe | enforce` from `local: {identity: …}`,
         # the panes the last list saw, the home's own alarms (about no record), and a tally of
         # connections by class and deciding signal since start — what `ao identity` prints, and what
@@ -3701,8 +3706,9 @@ class HostAgent:
     async def rpc_host(self) -> dict[str, Any]:
         """Who this host agent is in the org (design §4.4a): its host, its home, its mode, and
         whether the home can be reached — which a client on a node needs before it labels what it
-        shows *offline*."""
+        shows *offline*; and which build it runs and since when (§4.4, TD-062)."""
         out = {"host": self.host, "home": self.home, "mode": self.mode, "home_reachable": self.home_reachable()}
+        out["built_from"], out["started_at"] = dict(self.build), self.started_at
         if self.mode == "home":
             out["links"] = {h: dict(v) for h, v in sorted(self.links.items())}
         else:

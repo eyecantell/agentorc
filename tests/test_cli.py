@@ -211,7 +211,8 @@ def test_json_on_every_subcommand(subprocess_agent, tmp_path, capsys, monkeypatc
     assert capsys.readouterr().err == ""
     monkeypatch.setattr("agentorc.service.status", lambda: "agentorc-agent: active")
     assert cli.main(["--json", "service", "status"]) == 0
-    assert out() == {"status": "agentorc-agent: active"}
+    got = out()  # and the running build (design §4.4, TD-062 (c)); this test's agent runs the checkout
+    assert got["status"] == "agentorc-agent: active" and got["build"]["line"].startswith("host agent: build")
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "empty-home"))
     assert cli.main(["--json", "status"]) == 3
     e = out()
