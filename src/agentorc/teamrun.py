@@ -131,6 +131,50 @@ def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> s
     return max(str(d["at"]) for d in seen)
 
 
+def _declared_at(s: dict[str, Any]) -> tuple[str, bool] | None:
+    """A session's declaration — `out_of_work` or `restart_wanted` (§4.9a, TD-083) — as its instant
+    and whether it asks for a restart, or None. Either shape may be anything a different build left
+    on the record; one that is not a dict with an `at` is no declaration (review of PR #203)."""
+    for key, restart in (("restart_wanted", True), ("out_of_work", False)):
+        d = s.get(key)
+        if isinstance(d, dict) and d.get("at"):
+            return str(d["at"]), restart
+    return None
+
+
+def concluded(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> dict[str, Any] | None:
+    """When a live team has said everything it has to say (design §4.5a **team groups**, §4.9a
+    *A person's Start on a concluded team*, TD-099): every live session carrying its badge is `idle`
+    and has declared — `out_of_work` or `restart_wanted` — the rest exited or closed, and its seats
+    not there or `idle`. Then `{at, restart, names}`: the latest declaration's instant (as
+    `wound_down` takes it), whether any of them asks for a restart, and the live sessions a Start
+    would close first. Else None — and None for a team with nothing live, which is `wound_down`'s.
+
+    *Concluded* is the team's word, not a member's *finished*: it takes either declaration, since
+    either says the run is over. The state is part of the test because a declaration is cleared only
+    by a later declared claim — a session that declared and then took a turn is `working` with the
+    word still on its record, and its team is not concluded while it is. A seat never declares; one
+    that is `working` is answering somebody."""
+    up = live(sessions)
+    said: list[tuple[str, bool]] = []
+    for s in up:
+        if s["state"] != "idle":
+            return None
+        if s.get("name") in seats:
+            continue
+        d = _declared_at(s)
+        if d is None:
+            return None
+        said.append(d)
+    if not said:
+        return None  # only seats are live: nobody declared anything, so there is no instant to say
+    return {
+        "at": max(at for at, _ in said),
+        "restart": any(r for _, r in said),
+        "names": sorted(str(s.get("name") or s["id"]) for s in up),
+    }
+
+
 def _seat_whens(team: orgmod.TeamDef) -> dict[str, str]:
     """Every seat the definition names — the techlead and each seat with a trigger (§4.9b, TD-098) —
     with what would make it come, in the card's words (`SeatDef.when`)."""
@@ -181,7 +225,8 @@ def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
 def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """One row per definition for `ao team list` and the Org page's **Teams** strip (design §4.5a):
     the name, the file it came from, its projects, how many sessions it starts, how many carrying
-    its badge are live, and — when none are and every one of them said why — when it wound down.
+    its badge are live, and — when none are and every one of them said why — when it wound down;
+    when some are and every one is idle and declared, when it concluded (TD-099).
     There is no team record — a team that is stopped is only its definition, so both are counted
     across the fleet on every call."""
     up = live(sessions)
@@ -202,6 +247,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
                 "wound_down": None if n_live else wound_down(mine, seat_names(t, mine)),
+                # …and when something is live but every live session is idle and declared (TD-099)
+                "concluded": concluded(mine, seat_names(t, mine)) if n_live else None,
             }
         )
     return rows_out

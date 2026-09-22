@@ -568,6 +568,49 @@ def test_list_shows_every_definition_its_source_and_whether_it_is_live(world, ca
     out = capsys.readouterr().out
     assert "ao-grind" in out and "wound down" in out
     assert "repo-team" in out and "stopped" in out  # one that never ran is not wound down
+    # live, and every live session idle and declared: *concluded*, said beside the live count (TD-099)
+    for s in state["sessions"]:
+        if s.get("team") == "ao-grind":
+            s["state"] = "idle"
+    capsys.readouterr()
+    assert cli.main(["team", "list"]) == 0
+    assert "4 live, concluded" in capsys.readouterr().out
+
+
+def test_a_live_team_is_concluded_when_every_live_session_is_idle_and_declared(world):
+    """TD-099, design §4.5a **team groups** and §4.9a *A person's Start on a concluded team*: the
+    team's word, taking either declaration; the state is part of the test; the dead are ignored; a
+    seat never declares and is concluded only while it is idle."""
+    tmp_path, _state = world
+    out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
+    rw = {"at": "2026-09-22T21:00:00Z", "why": "usage window", "early": True}
+
+    def rec(name, state="idle", **kw):
+        return {"id": f"ao-{name}", "name": name, "team": "ao-grind", "state": state, **kw}
+
+    c = teamrun.concluded([rec("orc-ao", restart_wanted=rw), rec("grind-1", out_of_work=out), rec("x", "exited")])
+    assert c == {"at": rw["at"], "restart": True, "names": ["grind-1", "orc-ao"]}
+    assert teamrun.concluded([rec("grind-1", out_of_work=out)])["restart"] is False
+    # declared and then took a turn: the word is still on the record, the team is not concluded
+    assert teamrun.concluded([rec("grind-1", "working", out_of_work=out)]) is None
+    # idle without the word is merely idle — Wind down is owed to it (a paused team, TD-100)
+    assert teamrun.concluded([rec("grind-1", out_of_work=out), rec("grind-2")]) is None
+    # a declaration in any other shape is none, never a raise (review of PR #203)
+    assert all(teamrun.concluded([rec("grind-1", out_of_work=j)]) is None for j in ("x", ["y"], 7, {"why": "no at"}))
+    # nothing live: that is `wound_down`'s word, not this one
+    assert teamrun.concluded([rec("grind-1", "closed", out_of_work=out)]) is None
+    # a seat: idle and undeclared is fine, and it is closed with the rest; working is answering somebody
+    seat = {"techlead-ao"}
+    c = teamrun.concluded([rec("grind-1", out_of_work=out), rec("techlead-ao")], seat)
+    assert c and c["names"] == ["grind-1", "techlead-ao"]
+    assert teamrun.concluded([rec("grind-1", out_of_work=out), rec("techlead-ao", "working")], seat) is None
+    assert teamrun.concluded([rec("techlead-ao")], seat) is None  # only a seat live: nobody said anything
+    # the definition's row carries it only while something is live
+    org = cli._org_here(tmp_path / "agentorc")
+    (row,) = teamrun.rows(org, [rec("orc-ao", out_of_work=out)])
+    assert row["live"] == 1 and row["concluded"]["at"] == out["at"] and row["wound_down"] is None
+    (row,) = teamrun.rows(org, [rec("orc-ao", "closed", out_of_work=out)])
+    assert row["concluded"] is None and row["wound_down"] == out["at"]
 
 
 # ── the profile precedence chain, and `ao new --project` ──────────────────────────────────────

@@ -47,7 +47,7 @@
       {% for s in sessions %}{% include "card.html" %}{% endfor %}
     </div></section>
     {% else %}{% for g in groups %}
-    <section class="tgroup" data-team="{{ g.team }}" data-manager="{{ g.manager.id if g.manager else '' }}" data-live="{{ g.live }}">
+    <section class="tgroup" data-team="{{ g.team }}" data-manager="{{ g.manager.id if g.manager else '' }}" data-live="{{ 0 if g.stopped else g.live }}">
       <div class="row gap wrap ghead">{% include "group_head.html" %}</div>
       <div class="grid">{% for s in g.members %}{% include "card.html" %}{% endfor %}</div>
     </section>

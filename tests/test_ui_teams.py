@@ -271,6 +271,42 @@ def test_a_stopped_teams_card_reads_wound_down_where_it_would_have_read_stopped(
     assert "orc-ao" in grid  # the dead cards are the team's
 
 
+def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, client):
+    """TD-099, design §4.5a **team groups** and **Start / Wind down / Stop now**: a live team whose
+    every live session is idle and declared stops offering a wind-down that would only wake its
+    manager. It reads *concluded <t> ago · restart wanted*, folds and sorts with the stopped teams,
+    and carries Start alone, whose confirm names the sessions it closes first."""
+    _tmp, fleet = world
+    rw = {"at": "2026-09-22T21:00:00Z", "why": "usage window, resets 06:00", "early": True}
+    out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
+    fleet.sessions = [
+        {**badged("orc-ao", "ao-grind", state="idle"), "tail": [], "restart_wanted": rw},
+        {**badged("grind-1", "ao-grind", state="idle"), "tail": [], "out_of_work": out},
+        {**badged("adhoc-1", "adhoc"), "tail": []},
+    ]
+    html = client.get("/").text
+    sec = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
+    assert 'data-live="0"' in sec[:200]  # what the fold keys on
+    head = sec[: sec.index('<div class="grid">')]
+    assert "concluded" in head and "ago · restart wanted" in head and ">stopped<" not in head
+    assert 'data-fold="ao-grind" data-n="2"' in head
+    assert 'data-team-act="start"' in head and 'data-team-act="stop' not in head
+    assert "It first closes grind-1, orc-ao" in head  # the confirm names what the Start closes
+    assert html.index('data-team="adhoc"') < html.index('data-team="ao-grind"')  # sorted with the stopped
+    # every declaration out of work: the header says so
+    fleet.sessions[0] = {**badged("orc-ao", "ao-grind", state="idle"), "tail": [], "out_of_work": out}
+    assert "ago · out of work" in client.get("/").text
+    # one member took a turn: not concluded, and Wind down is back
+    fleet.sessions[1]["state"] = "working"
+    head = (
+        client.get("/").text.split('<section class="tgroup" data-team="ao-grind"', 1)[1].split('<div class="grid">')[0]
+    )
+    assert (
+        "every session still here is idle" not in head and ">Wind down</button>" in head
+    )  # the tmp path says concluded
+    assert "data-fold" not in head
+
+
 def test_a_live_teams_card_carries_stop_and_stop_now_and_never_folds(world, client):
     """Design §4.5a **team groups** (2026-09-16): the control sits on the thing it stops."""
     _tmp, fleet = world
