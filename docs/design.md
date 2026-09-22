@@ -3690,7 +3690,10 @@ state alike:
    of its own (persisted beside the person inbox, the newest 100, each kept for `MAIL_RETENTION`),
    where `how` is what the home can tell — *allowed by you*, *denied by you* (the `decide` RPC from
    a person), *answered in the terminal* (the pending thing cleared with no `decide`), *resumed*,
-   *pushed*, *forgotten*, *the limit reset*, *dismissed by you* (an identity alarm, §4.8a — the word since 2026-09-20, when the control was renamed from *Acknowledge*; beside *logged by you → `<controller>`*, not yet built; a suspension ends no row and writes nothing here), and
+   *pushed*, *forgotten*, *the session exited* or *the session was closed* (the record's own
+   state says so, beneath any word an act wrote — a resume or a forget leaves it closed or exited
+   too; an `unpushed` row is itself a row of an exited record, so only a close ends it this way —
+   2026-09-22, TD-088), *the limit reset*, *dismissed by you* (an identity alarm, §4.8a — the word since 2026-09-20, when the control was renamed from *Acknowledge*; beside *logged by you → `<controller>`*, not yet built; a suspension ends no row and writes nothing here), and
    plain *resolved* when it cannot tell (for a node's session the home sees the replica change and
    knows its own `decide`s, so *by you* is always known and the rest is as good as the node's
    report). `text` is cleaned and capped as a `doing` line is. FYI lists the trail; **Dismiss**

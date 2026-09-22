@@ -1069,7 +1069,7 @@ class HostAgent:
                 if was:
                     # what the row *said*, remembered from when it began: by the time it ends the
                     # pending is cleared, and a trail entry with no words is no use to a person
-                    self._trail_append(s, was, since, now, text=text)
+                    self._trail_append(s, was, since, now, text=text, ended=_ended_by(s, slot, was))
                 if kind:
                     # `began`, never the old row's: `kind != was` here (the `continue` above), so
                     # this is always a row starting — one that inherited the previous row's start
@@ -1081,7 +1081,14 @@ class HostAgent:
             del self._attention[key]  # a record that is gone left through `_forget`, not here
 
     def _trail_append(
-        self, s: Session, kind: str, since: str, now: datetime, how: str = "", text: str = ""
+        self,
+        s: Session,
+        kind: str,
+        since: str,
+        now: datetime,
+        how: str = "",
+        text: str = "",
+        ended: str = "",
     ) -> None:
         """One ending, coalesced. A repeat of the same `{sid, kind, how}` inside the retention
         window is one entry carrying a `count` and its first and last time, so a session flapping
@@ -1095,7 +1102,9 @@ class HostAgent:
         how = how or self._attention_how.pop(f"{who}|{slot}", "") or self._attention_how.get(f"{who}|*", "")
         # A resumed record says so on its own face, so the word is right for a **node's** session
         # too, where the resume ran at the node and this home never saw the act (review of PR #269).
-        how = how or ("resumed" if s.superseded_by else "") or "resolved"
+        # `ended` is what the record's own state says ended the row (`_ended_by`): below every word
+        # an act wrote, since a resume or a forget also leaves the record closed or exited (TD-088).
+        how = how or ("resumed" if s.superseded_by else "") or ended or "resolved"
         stamp = now.replace(microsecond=0).isoformat().replace("+00:00", "Z")
         if not how.endswith("by you") and since:
             with contextlib.suppress(ValueError, TypeError):
@@ -5523,6 +5532,21 @@ def _alarm_since(s: Session) -> str:
     """When an alarm row began: the first alarm's own time, not the record's state transition."""
     first = (s.identity_alarms or [{}])[0]
     return str(first.get("at") or first.get("first") or "")
+
+
+def _ended_by(s: Session, slot: str, was: str) -> str:
+    """The word for a state row that ended **because its session did** (design §4.10 rule 2,
+    TD-088): the record now reads `exited` or `closed`, so the home can tell, and *resolved* — the
+    word for when it cannot — would tell a person whose question a worker died holding that it had
+    sorted itself out. An alarm row does not end with the session, and an `unpushed` row is itself
+    a row of an exited record, so the exit is not what ended it; a close is."""
+    if slot != "state":
+        return ""
+    if s.state == "closed":
+        return "the session was closed"
+    if s.state == "exited" and was != "unpushed":
+        return "the session exited"
+    return ""
 
 
 def _alarm_report(s: Session, mode: str | None) -> str:

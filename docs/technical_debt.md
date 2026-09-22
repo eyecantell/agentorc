@@ -50,7 +50,6 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-078 | Two timing flakes in the suite: the restart test's migration assertion (fixed, PR #264) and a `send` to a pane that was gone in `test_send_wait_three_outcomes` (diagnosed and refused in words, PR #286; watching until 2026-09-27) | Low | Partly done |
 | TD-080 | A manager's round log, committed to a launch branch that tracks `origin/main`, reads as *308 unpushed* forever — a false *exited with unpushed work* row | Medium | Partly done |
 | TD-083 | A worker that ends its run on purpose, with work still on the ledger, is neither *finished* nor *exited*: no rule of its manager's fires, and the team sits parked until a person restarts it | Medium | Partly done |
-| TD-088 | A row that ends because its session exited is trailed as *resolved*, and two trail tests raced the tick for it | Low | Partly done |
 | TD-091 | Nothing says how much context a session has left, or that it has just compacted | Low | Open |
 | TD-092 | Nothing reaches a person who is not looking at the page when a session needs them | Low | Open |
 | TD-093 | Who must look at a PR before it merges is a sentence in a brief and a message in an inbox, not something a team is configured with | Medium | Open |
@@ -836,23 +835,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-053 (out of work, §4.9a — the declared case), TD-081 (a same-name start keeps the record's mail: a restart here must too), TD-026 (schedules), TD-076 (the manager's brief is rewritten by the rename).
 
-
-## TD-088: A row that ends because its session exited is trailed as *resolved*, and two trail tests race the tick for it
-
-**Priority:** Low
-**Added:** 2026-09-20 (`tdgrind-ao-1`, from a CI failure the anchor saw on the docs-only PR #294, `test (3.12)` on `a825242`)
-**Status:** Partly done — **the test race is fixed (PR #297)**; the word is a design question and is open.
-**Location:** `tests/test_attention.py` (`test_a_name_taken_back_does_not_hand_the_new_session_the_old_rows`, `test_a_name_taken_back_by_a_resume_says_resumed`), `src/sessionorc/agent.py` (`_note_attention`, `_trail_append`), design §4.10 *The Inbox is a queue* rule 2
-
-**Why:** CI read `how='resolved'` where the test expects `'forgotten'`. It is not a timing artefact of the assertion — it is the tick doing its job. The `agent` fixture runs a live tick loop at 0.3 s; between the test's `kill` and its `create` a tick sees the record `exited`, whose `attention_kind` is `""`, so **the row ends there** and `_trail_append` writes it with no word to hand: `_attention_how` is empty, `superseded_by` is unset, and the fallback is *resolved*. `_take_name`'s `_attention_gone` then finds the slot already popped and says nothing. Reproduced on demand by putting one tick's worth of sleep in that window: the entry comes out `('…-w', 'question', 'resolved', 'which one?')` against the expected `'forgotten'`, which is the CI line exactly.
-
-**Two halves.** The **test** half is this entry's family — a test that raced the loop instead of driving it — and is fixed: both tests **stop** the loop rather than slow it (`conftest.park_ticks`, which cancels the ticker and awaits it, so an in-flight tick is finished or cancelled before the test goes on) and take every tick they want by hand, so the name rule, not the clock, decides what the trail says. The first fix only lengthened the tick interval and slept past one period, which the review of PR #297 rightly called *a narrower window, not a closed one* — a real tick does tmux reads and `git` subprocesses, and nothing bounds those by two tick periods on a loaded runner. `HostAgent.serve` now keeps its ticker on the agent (`_ticker`) so a test can cancel it; the one line exists for that. The **word** half is real and is left open: the row a person was looking at ended *because the session exited*, and the home knows that — but the vocabulary §4.10 rule 2 builds has no word for it (*allowed / denied / acknowledged by you*, *resumed*, *forgotten*, else *resolved*), so it falls to *resolved*, which the design defines as **when the home cannot tell**. On the live system a person whose question a worker died holding reads *resolved*, as if it had sorted itself out.
-
-**Fix (the open half):** decide the word in §4.10 rule 2 — *the session exited* is the obvious candidate, beside the three the design already lists as unbuilt (*answered in the terminal*, *pushed*, *the limit reset*) — then derive it in `_note_attention`, where the record's new state is in hand, rather than in `_trail_append`'s fallback. Worth deciding with those three rather than alone: they are one list, and each is a case where the home can tell and does not say.
-
-**Done when** the trail says why a row ended for every ending the home can name, and *resolved* means only what the design says it means.
-
-**Related:** TD-079 (the trail), TD-078 (the same family of test: a wait bounded on something other than the thing waited for), design §4.10 rule 2.
 
 ## TD-091: Nothing says how much context a session has left, or that it has just compacted
 
