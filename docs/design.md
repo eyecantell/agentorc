@@ -4092,9 +4092,10 @@ code and needs no grant; a session doing the same work does.
      under *Needs you* (§4.5a **Inbox row: restart**). The host agent writes no board line
      (§4.4 board write-back is not built); the Inbox row is the person's channel, and a manager
      reads the field.
-  2. **Wanted restart.** A supervised member carrying `restart_wanted` (§4.9a) that is `idle`,
-     `exited` or `closed`, **not `early`**, not suspended, **not gated**, with **nothing uncommitted and nothing
-     unpushed** on its git fields (known, not merely absent: an unknown git state is left alone)
+  2. **Wanted restart.** A supervised member carrying `restart_wanted` (§4.9a) that is `idle`, or
+     `exited` by a natural exit (`pane` true) — a kill or a Close, a person's or the stop time's,
+     is never undone, as in rule 1 — with **no stop time passed**, **not `early`**, not suspended,
+     **not gated**, with **nothing uncommitted and nothing unpushed** on its git fields (known, not merely absent: an unknown git state is left alone)
      is closed if it is still there — the one close a policy makes outside a wrap-up, safe because
      the work is pushed — and restarted as rule 1 does, under the same ceiling (`why: wanted`).
      With work left it is **not** restarted: one send of fixed text naming what is left (the dirty
