@@ -5,7 +5,7 @@ gate holds off while it stands."""
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from conftest import wait_for
+from conftest import park_ticks, wait_for
 
 from sessionorc import settings
 from sessionorc.agent import RESUME_MIN
@@ -37,6 +37,8 @@ def test_a_line_is_computed_from_a_reserve():
     assert settings.moves(week, _iso(resets), NOW) == NOW + timedelta(hours=1)
     assert settings.moves(30, _iso(resets), NOW) == resets
     assert settings.moves(week, _iso(NOW + timedelta(hours=2)), NOW) == NOW + timedelta(hours=2)
+    assert settings.moves(week, _iso(NOW - timedelta(hours=1)), NOW) is None  # a stale reading's past reset
+    assert settings.moves(30, _iso(NOW - timedelta(hours=1)), NOW) is None
 
 
 @pytest.mark.unit
@@ -75,19 +77,13 @@ async def _worker(person, tmp_path, name="w", **kw):
     )["id"]
 
 
-def _no_refresh(agent):
-    """The usage poll drops a profile no live Claude session runs under — every shell session's
-    `""` — so the reading a test puts in place would vanish on the next tick. Keep it."""
-
-    async def nothing() -> None:
-        return None
-
-    agent._refresh_usage = nothing
+async def _typed(agent, sid: str, text: str) -> bool:
+    return any(text in t for t in await agent.rpc_tail(sid, 20))
 
 
 @pytest.mark.integration
 async def test_a_crossed_line_pauses_by_a_send_and_the_resume_follows(agent, tmp_path):
-    _no_refresh(agent)
+    await park_ticks(agent)  # the test owns the clock: no tick types, polls or re-reads a state
     async with LocalClient() as person:
         sid = await _worker(person, tmp_path)
         agent._usage[""] = {"windows": [{"label": "wk", "pct": 75, "resets": None}], "reason": "ok"}
@@ -99,7 +95,7 @@ async def test_a_crossed_line_pauses_by_a_send_and_the_resume_follows(agent, tmp
         g = rec.gated
         assert g and (g["profile"], g["label"], g["pct"], g["line"]) == ("", "wk", 75, 70) and g["sent_at"]
         assert rec.state not in ("exited", "closed"), "a pause is a send, never a kill"
-        assert await wait_for(lambda: any("PAUSE-NOW" in t for t in agent.sessions[sid].tail), timeout=10)
+        assert await wait_for(lambda: _typed(agent, sid, "PAUSE-NOW"), timeout=10)
         # the pause is typed once: a second tick over the line types nothing more and keeps `since`
         since, sent = g["since"], g["sent_at"]
         typed: list[str] = []
@@ -118,7 +114,7 @@ async def test_a_crossed_line_pauses_by_a_send_and_the_resume_follows(agent, tmp
         assert rec.gated is not None
         await agent._enforce_usage_gate(now + RESUME_MIN + timedelta(seconds=5))
         assert rec.gated is None and typed == ["echo RESUME-NOW"]
-        assert await wait_for(lambda: any("RESUME-NOW" in t for t in agent.sessions[sid].tail), timeout=10)
+        assert await wait_for(lambda: _typed(agent, sid, "RESUME-NOW"), timeout=10)
         await person.call("kill", id=sid)
         await person.call("remove", id=sid)
 
@@ -128,7 +124,7 @@ async def test_the_gate_waits_out_a_dialog_and_leaves_interactive_sessions_alone
     """A session on a permission or a question is not typed at (§4.2): the mark stands and the send
     lands the tick after the dialog clears. A session a person took over is out of the gate's reach
     (§9 invariant 5): its mark goes and nothing is typed."""
-    _no_refresh(agent)
+    await park_ticks(agent)  # the test owns the clock: no tick types, polls or re-reads a state
     async with LocalClient() as person:
         sid = await _worker(person, tmp_path)
         agent._usage[""] = {"windows": [{"label": "wk", "pct": 95, "resets": None}], "reason": "ok"}
@@ -149,7 +145,7 @@ async def test_the_gate_waits_out_a_dialog_and_leaves_interactive_sessions_alone
 
 @pytest.mark.integration
 async def test_no_reading_gates_nothing_and_a_cleared_reserve_resumes(agent, tmp_path):
-    _no_refresh(agent)
+    await park_ticks(agent)  # the test owns the clock: no tick types, polls or re-reads a state
     async with LocalClient() as person:
         sid = await _worker(person, tmp_path)
         rec = agent.sessions[sid]
@@ -179,7 +175,7 @@ async def test_no_reading_gates_nothing_and_a_cleared_reserve_resumes(agent, tmp
 
 @pytest.mark.integration
 async def test_set_settings_is_a_persons_and_checks_the_labels(agent, tmp_path):
-    _no_refresh(agent)
+    await park_ticks(agent)  # the test owns the clock: no tick types, polls or re-reads a state
     async with LocalClient() as person:
         sid = await _worker(person, tmp_path)
         agent._usage[""] = {"windows": [{"label": "5h", "pct": 1}, {"label": "wk", "pct": 2}], "reason": "ok"}
@@ -204,7 +200,7 @@ async def test_set_settings_is_a_persons_and_checks_the_labels(agent, tmp_path):
 async def test_while_gated_a_controllers_send_is_refused_and_the_doorbell_holds(agent, composerstubs, tmp_path):
     """§6: the doorbell does not ring a paused session, and a controller's send is refused at the
     home with the gate as the reason; a person's own send is not (§9 invariant 11)."""
-    _no_refresh(agent)
+    await park_ticks(agent)  # the test owns the clock: no tick types, polls or re-reads a state
     async with LocalClient() as person:
         lead = await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])
         lead = lead["id"]
@@ -216,7 +212,7 @@ async def test_while_gated_a_controllers_send_is_refused_and_the_doorbell_holds(
                 controllers=[lead], pause_prompt="pause now",
             )
         )["id"]  # fmt: skip
-        assert await wait_for(lambda: any(t.startswith(">>") for t in agent.sessions[sid].tail), timeout=5)
+        assert await wait_for(lambda: _typed(agent, sid, ">>"), timeout=5)
         agent._usage[""] = {"windows": [{"label": "wk", "pct": 90, "resets": None}], "reason": "ok"}
         await person.call("set_settings", profile="", reserves={"wk": 30})
         await agent._enforce_usage_gate(datetime.now(UTC))

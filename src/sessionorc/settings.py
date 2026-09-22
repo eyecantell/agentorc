@@ -116,8 +116,8 @@ def moves(reserve: int | dict[str, int], resets: Any, now: datetime) -> datetime
     """When this window's line next changes: the next day boundary counted back from `resets` for
     a per-day reserve, or the reset itself — whichever is sooner, as design §6's `next` is."""
     when = _when(resets)
-    if when is None:
-        return None
+    if when is None or when <= now:
+        return None  # a reset already past: a reading kept through failed polls (TD-087) — not known
     if isinstance(reserve, dict):
         step = when - (days_left(when, now) - 1) * DAY
         return step if step > now else when
