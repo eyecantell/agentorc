@@ -359,7 +359,10 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         role = repoconfig.resolve_role(cfg, role_name, org.roles)
     except (KeyError, ValueError, OSError) as e:
         raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
-    lane = list(member.lane) if member is not None and member.lane else list(role.lane)
+    if isinstance(member, orgmod.SeatDef):
+        lane: list[str] = []  # a seat has no lane, whatever its role's (§4.9b): its area is its brief's
+    else:
+        lane = list(member.lane) if member is not None and member.lane else list(role.lane)
     grants = list(member.grants) if member is not None and member.grants is not None else list(role.grants)
     # Profile precedence (§4.9 "Roles gain a profile"), lowest first: the package's built-ins,
     # `org.yml`'s `roles:` and the repo's `.agentorc.yml` (those three inside `resolve_role`), the

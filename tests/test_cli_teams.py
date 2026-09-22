@@ -1074,7 +1074,9 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "techlead-ao", "audit-ao", "grind-1", "grind-2", "hunt"]
     audit = made[2]
-    assert audit["role"] == "hunter" and audit["capabilities"] == []
+    # neither the role's grants nor its lane (the hunter preset has both): a seat's area is its brief's
+    assert audit["role"] == "hunter" and audit["capabilities"] == [] and audit["lane"] == []
+    assert "(none given)" in audit["prompt"]
     assert audit["controllers"] == ["ao-agentorc-orc-ao"] and audit["team"] == "ao-grind"
     assert "`ao-agentorc-techlead-ao`" in audit["prompt"]
     assert "ao-agentorc-audit-ao  seat hunter" in capsys.readouterr().out

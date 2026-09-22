@@ -97,7 +97,7 @@ class SeatDef:
     profile: str | None = None
     brief: str | None = None  # overrides the role's template
     lane: list[str] = field(default_factory=list)
-    grants: list[str] | None = field(default_factory=list)  # none, whatever the role holds (§4.9b)
+    grants: list[str] | None = field(default_factory=list)  # [], never None: the role's grants are not read (§4.9b)
     unattended: bool = True
 
     def when(self) -> str:
