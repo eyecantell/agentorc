@@ -1508,7 +1508,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, TD-069). The top bar's **Inbox** opens it, and its number is the **Needs you** section only — a running `steer`, a `note` and anything snoozed are never counted (a **paused** `steer` is: a session is held on the person), so the number means *what is waiting on a person*. It is not the Org's needs-you count, which is session states alone: the Inbox's number adds open `ask`s to the person, paused `steer`s and due board items, so the two may differ, and each says on hover what it counts and how it differs from the other. The count is `inbox_sections`' **Needs you** list, one computation the page and the poll both read, and the poll marks nothing read (§4.10); the state rows join *Needs you* in that same computation, so the two numbers cannot disagree. The page's mail is polled from the `inbox` RPC (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the page's own poll rather than the pushed stream, which is per record where this page is per person (§4.5 screen 6). Team filter as on the Org (`team:name`, and `team:` alone for entries whose sender carried none), remembered in the browser. Not built: due board items in the count (TD-069 step 3) |
 | Inbox: section heading, the **i** mark | **i** (one per section) | a section is its name, its count and an **i** mark holding the paragraph that says what the section is and what it counts (§4.5 screen 6 *Layout*, TD-082): a tooltip on hover and keyboard focus, and pressed it opens that paragraph in place under the heading (pressed again, it closes); which are open is remembered in the browser. It is a `<button>` — Enter and Space press it — carrying `aria-expanded` and `aria-controls` naming the paragraph, labelled *About <section>*; the tooltip is the same text as the button's description (`aria-describedby`), so a screen reader hears it without pressing — which needs the paragraph in the page always, closed by the `hidden` attribute and never removed. Touch has no hover: a tap opens it in place. Fixed text in the source |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Open** (not built: **Switch profile… / Wait** here, since neither is built on the card; the row gains them when the card does); exited with unpushed work: what Ready to close says (§4.2) and the ref it was measured against, **Reopen and push**, **Resume**, **Open** (details). *Reopen and push* (TD-081) is the banner's one-press **Resume** plus a first prompt the page wrote — *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); offered only where Resume would be silent; the session is attended, so a `git push` the tool asks about arrives as an Allow / Deny row, and the result returns as an outcome (§4.10 *Outcomes*); it depends on `--outcome` (TD-079). A state row leaves the list when the state does; only `stalled?` and unpushed work can be snoozed, being off the tool's clock: their **Snooze** (TD-079) is the home-owned store `attention_snooze` writes, keyed on the record and the row kind, so a session's permission and its stalled row are set aside separately; no `until` clears it, and a snoozed row is in no section and no count until its time. The row is built from the card's own view (pill, `title`, `doing` line, badges); the pill is a `<span>` and a state mark never looks pressable (TD-071 item 8). One predicate (`state_kind`) answers for the rows and the Org's needs-you badge, so every session the Org counts has exactly one row; a `needs-you` record whose `pending` is empty, not a dict, or of an unknown kind is a plain **needs you** row with **Open** and no Allow / Deny — a control built from what is not there is what §4.2 forbids |
-| Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | design 2026-09-22 (TD-103, §6 *Keeping a team running*; not built): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and the mark; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or Dismiss |
+| Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | design 2026-09-22 (TD-103, §6 *Keeping a team running*; not built): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and the mark; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, Dismiss, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is never lifted by the tick |
 | Inbox row: identity alarm | **Suspend**, **Log TD**, **Open**, **Dismiss** | §4.8a *An alarm's answers* is the full text (TD-077). One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and counted: an alarm is a bug of ours or a session misbehaving, and a person should know which. Not built: under *Steering*, uncounted, while a techlead holds it (§4.8a *Who answers first*). The row lists the alarms in words — channel, what was claimed, the rpc, the count, first–last in the person's clock, *(others)* as *and n more distinct claims* — and the host's identity mode, since *observe* records what *enforce* would refuse. Two of the four are answers and only an answer ends the row (§4.10 *The Inbox is a queue*): **Dismiss** (wire name `identity_ack`) clears that list, the record's or the host's; trail *dismissed by you*. **Log TD** (`identity_log`) hands the alarm, in words the home composes from its fields, to the record's first live controller — read from the control graph, never a badge (`alarm_to`, the home's answer, which the RPC reads too) — as mail from the person that owes an outcome (§4.8a, TD-079's debt), clears the list; trail *logged by you → `<controller>`*. Drawn only where such a session exists — not on the host's row, not on a record with no live controller (a manager's own is one); elsewhere the row reads *no session answers for this one* (or *for the host's own list*); its confirm names that session and the outcome owed; a controller gone between draw and press is the agent's refusal, in words, as the toast, and the refreshed row says nobody answers. The other two act on the session and leave the row standing: **Open** focuses it while its record is here; **Suspend** (`rpc_suspend`) stops it at once — no wrap-up — keeps worktree and conversation, and marks the record *suspended*, which only a person lifts and which refuses every session's `create` under that name, a whole `ao team start` included (§4.8a); offered only on a record's row while that session is live — not the host's row, not a record already suspended, `exited` or `closed`; its confirm says what it does. A suspended record's row says so in a flat mark — its only record, since a suspension ends no row and writes no trail; the mark is drawn wherever the record is (card, Focus header, Inbox state row), never pressable, with the when, who and why on hover, tolerant of a record another build wrote (it costs that card its mark, never the grid). No Unsuspend control anywhere, by design: a person's **Resume** and **Forget** lift it. The New session form's `suspended` verdict keeps Start enabled, since a person's create *is* the lift; the form prints the agent's sentence and adds what pressing Start does. All four are a person's own acts, caller-less and refused to every session as `inbox_delete` is (one exception, not built and never on a host that carries a person: a techlead's `identity_ack` and `suspend` for a record it controls, §4.8a *Who answers first*), and none is a never-gated read — a session that could clear the list could erase evidence of its own forgery, one that could suspend could stop its rival. The host agent's log keeps every alarm, a line each. On the card the alarm is a mark and nothing more, as is *suspended*. A node's record is answered at that node: alarms are node-owned, an `id` naming another host is routed there (§4.4a step 4a), the node clears its list and the home takes the cleared record from the reply. **Suspend** is the home's act — `suspended` is the home's field — and only its `kill` is routed. The host's own list is whichever host was asked, and never travels |
 | Inbox row: `ask` | **Reply**, **Delete**, **Snooze** | the whole text, sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms, closes it as `declined` and the asker is told by a `system` note (§4.10); **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of — the snoozed entry is listed behind *n snoozed — show* with **Unsnooze**, which clears it. Suggested answers, when the envelope carries them, are the row below |
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*, TD-070; up to four, 80 characters each, format characters stripped). Drawn apart from the row's own controls — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm |
@@ -2722,8 +2722,9 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   it began did not run out of context.
 - **Not finished, so the team does not wind down.** A member that wants a restart is by its own
   word not out of work, so it never counts toward *every member is finished*; a manager that
-  wants one says so to the person — a manager has no controller, and nothing restarts it but a
-  person or `ao team start`.
+  wants one is restarted by the tick as a member is, since `ao team start` supervises it too
+  (§6 *Keeping a team running*); until that lands, a manager has no controller and nothing
+  restarts it but a person or `ao team start`.
 - **A summary is not a declaration.** A worker's brief ends a run with **one of the three
   words** — `done` on what it finished and then `none` or `restart` — and only then the
   summary; a manager's brief treats a member that is `idle` with **no** declaration as merely
@@ -4036,10 +4037,15 @@ code and needs no grant; a session doing the same work does.
   designed, not built). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
   says `unattended: true` and `supervised: true`.** `supervised` is a home-owned intent field
-  (§4.4a), set by `ao team start` on every member and seat it creates and by `ao new
-  --supervised`, and by nothing else; a person's New session form does not offer it yet (not
-  built). It says *someone chose to keep this session running*, which is the whole of what the
-  four rules act on. Nothing keys on a role, a team badge or a controller (§9 invariant 9): a
+  (§4.4a), set by `ao team start` on **every session it creates — the manager, the seats and the
+  members alike** — and by `ao new --supervised`, and by nothing else; a person's New session
+  form does not offer it yet (not built). It says *someone chose to keep this session running*,
+  which is the whole of what the four rules act on. **It is cleared by nothing but Forget**: it
+  is inert while the session is interactive (below) and live again when a person hands it back,
+  and every Resume carries it as it carries `controllers` — the one-press Resume starts an
+  attended session, where it is inert until a person flips the mode; *Resume with changes…*
+  carries it with *Unattended*. So a manager that crashes is restarted as a member is (rule 1),
+  and a manager that ends a wind-down with `ao close` on itself (§4.9a) has closed, not crashed. Nothing keys on a role, a team badge or a controller (§9 invariant 9): a
   `manager: person` team's members are supervised exactly as a manager's are. An interactive
   session is never supervised (§9 invariant 5: **Take over** on Focus takes a member out of these
   rules on the next tick, and **Hand back** returns it); a suspended record never is (§4.8a).
@@ -4053,7 +4059,12 @@ code and needs no grant; a session doing the same work does.
   prompt as handed (placeholders filled), the lane and the fields above — and a restart is that
   record handed to `create` again, never the definition re-read (the host agent does not read
   `org.yml`, §4.9). The launch record is deleted with the record on Forget and kept across a
-  supersede. **The restarts run at the home** (§4.4a: policies that start run at the home), so a
+  supersede. **A replay that fails** — the worktree reaped, the profile gone, the name taken by a
+  live session — is not retried silently: it counts toward the ceiling as any restart does, with
+  `why: failed` and the error text on the entry, so an unrepairable record reaches the Inbox row
+  within three ticks rather than never. **Each supervised session's pass is isolated**: one
+  session's exception is logged and the tick goes on to the next, as the stop-time policy
+  already does per record. **The restarts run at the home** (§4.4a: policies that start run at the home), so a
   member on an unreachable host is left as it is until its link returns — refused, not queued,
   looked at again on the next tick; the nudge and the seat close run at the home and execute on
   the member's node as any act does. A policy needs no grant and passes no gate; it acts on the
@@ -4075,23 +4086,26 @@ code and needs no grant; a session doing the same work does.
      (§4.4 board write-back is not built); the Inbox row is the person's channel, and a manager
      reads the field.
   2. **Wanted restart.** A supervised member carrying `restart_wanted` (§4.9a) that is `idle`,
-     `exited` or `closed`, **not `early`**, not suspended, with **nothing uncommitted and nothing
+     `exited` or `closed`, **not `early`**, not suspended, **not gated**, with **nothing uncommitted and nothing
      unpushed** on its git fields (known, not merely absent: an unknown git state is left alone)
      is closed if it is still there — the one close a policy makes outside a wrap-up, safe because
      the work is pushed — and restarted as rule 1 does, under the same ceiling (`why: wanted`).
      With work left it is **not** restarted: one send of fixed text naming what is left (the dirty
      files' count and the unpushed count, from the record, never a session's words), once
      (`restart_blocked_sent_at`), and if the git fields still show work after `IDLE_NUDGE` the
-     record carries `restart_blocked: {at, dirty, unpushed}` and the same Inbox row lists it. An
-     `early` one is the Inbox row at once, as §4.9a says: a controller does not act on it, and
+     record carries `restart_blocked: {at, dirty, unpushed}` and the same Inbox row lists it. The
+     tick keeps looking: the moment the git fields read clean and pushed — a person or a sibling
+     pushed — the restart runs and clears the mark itself, so `restart_blocked` is transient
+     where `restart_ceiling` is not: the ceiling stands until a person's Resume, Forget or Dismiss,
+     never lifted by the window rolling on. An `early` one is the Inbox row at once, as §4.9a says: a controller does not act on it, and
      neither does the tick.
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b), and the tick computes **`seat_due: {at,
      by}`** from it: for `asks`, when `asks_waiting` leaves zero; for `prs: n`, when the derived
      reports tick (§4.8, its five-minute `gh` cadence) counts `n` PRs merged to the seat's repo's
      default branch since the seat's record was created; for `every: <d>`, when `d` has passed
-     since it was created. A supervised seat that is `exited` or `closed` with `seat_due` set is
-     filled: `create` with `keep_mail` (§4.9b), the launch record, and `seat_due` cleared; a seat
+     since it was created. A supervised seat that is `exited` or `closed` with `seat_due` set, on a profile that
+     is not gated, is filled: `create` with `keep_mail` (§4.9b), the launch record, and `seat_due` cleared; a seat
      that is `idle` with no `seat_due`, hook-confirmed, with nothing dirty or unpushed, is closed
      (a seat that left work is the board's, as today). **The fill ceiling**: `FILL_CEILING` — six
      fills an hour over all seats sharing a controller (the graph, not the team badge), then
@@ -4101,12 +4115,14 @@ code and needs no grant; a session doing the same work does.
      the manager's. (This is TD-104, folded here.)
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
-     `dropped` entry, or a declared `claimed` entry with no `done` or `dropped` — and no
+     `dropped` entry, a declared `claimed` entry with no `done` or `dropped`, or, for a seat,
+     `seat_due` set (a question waiting on an idle techlead) — and no
      declaration, no pending, not gated, its composer empty (§4.2 `send`'s rules; the doorbell's
      *one typist per pane* holds), is sent **one fixed line** through `send`'s path: *[agentorc]
      you have been idle 20 minutes with `<ref>` open — end the run with one of `ao progress done
      <ref> --pr N`, `ao progress drop <ref> --why`, `ao progress none --why` or `ao progress
-     restart --why`*, naming the first open reference and nothing a session wrote. Once per idle
+     restart --why`*, naming the first open reference — for a seat, the number waiting: *you have N questions
+     waiting — run `ao inbox`* — and nothing a session wrote. Once per idle
      stretch (`nudged_at`; a stretch ends when the state changes), never a second before the
      first is answered — the same rule as the doorbell's *rung only for new mail*. It spends no
      wake budget (§4.10: it is the host agent's own clock, like a lapse). After the nudge the
