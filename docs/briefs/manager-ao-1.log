@@ -182,3 +182,4 @@
 08:23  grinder-ao-1: TD-098 step 1 done → PR #418 cadence pass (review recorded; no held paths)
 08:24–08:36 quiet (#421 td095-polish-g-h, #422 td098-auditor opened; no held paths)
 08:37  grinder-ao-2: TD-095 (g),(h) done → PR #421 cadence pass (review recorded; no held paths); TD-095 built in full. grinder-ao-1: TD-098, #422 open
+08:42  grinder-ao-2: declared out of work (none) after #412 #414 #417 #419 #421 #423; #417, #423 (board PRs) cadence pass. grinder-ao-1: reported TD-098 step 3 done on #422, but #422 is still OPEN (3 unpushed) → watching
