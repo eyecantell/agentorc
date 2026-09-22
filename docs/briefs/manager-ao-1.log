@@ -207,3 +207,4 @@
 16:30  grinder-ao-1: TD-100 → PR #434 open 22:29Z, touches src/sessionorc → held for the anchor's read (ask at 2h). grinder-ao-2: TD-099 → PR #433 open (no held paths)
 16:31  grinder-ao-2: TD-099 (2) done → PR #433 merged, cadence pass (review recorded; no held paths)
 16:50  grinder-ao-2: TD-100 slice 3 → PR #436 open (no held paths). grinder-ao-1: #434 in review, held for the anchor
+16:52  grinder-ao-2: TD-100 (3) done → PR #436 merged, cadence pass (review recorded; no held paths). Rest of (3) waits on #434
