@@ -1192,7 +1192,7 @@ agent there.
 Screens:
 
 1. **Org** (home; named Herd, then Team, until the team definitions of §4.9 landed): a **card grid** (decision 2026-09-04, over a table — keeps each session's
-   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). What a card carries, and where, is *The card's anatomy*, below (being built from 2026-09-21 in slices, TD-095 — its entry says which have landed: the state colours, the six rows with the slot's order, the foot — the next act first, quiet — the team header and `open_in:` are built; *mine* and its sort are not yet).
+   facts grouped and shows a live tail), grouped by team when any live session carries a team badge (§4.9). What a card carries, and where, is *The card's anatomy*, below (built 2026-09-21 in slices, TD-095 — its entry lists them: the state colours, the six rows with the slot's order, the foot — the next act first, quiet — the team header, `open_in:`, *mine* and its sort are built — what is left is Paul's look at the live page).
    The **more** menu holds Wrap up, Kill
    (confirms), Close (enabled only when Ready to close passes; a card that passes also shows it
    inline, see §4.2), Open shell here, Copy tmux command. A scraped state shows as a dashed pill outline.
@@ -1277,7 +1277,7 @@ Screens:
    *new* mail) — an idle card with unread mail is blue twice, which reads rightly: it is at rest
    and has been spoken to. The legend (`docs/mockups/gen.py`, *States & badges*) changes with the
    tokens. **One order, no control**
-   (2026-09-18; **second pass 2026-09-21, not built: within one urgency an `interactive` session
+   (2026-09-18; **second pass 2026-09-21, built the same day, PR #391: within one urgency an `interactive` session
    sorts ahead of an unattended one** — *one urgency* is one value of the rank the server already
    sorts by, and the key becomes **(rank, interactive first, name)**; a worker that needs a
    person still outranks the person's own idle session, and the manager's card is placed first
@@ -1452,7 +1452,7 @@ noted). If a control is not in this table it does not exist.
 | top bar | **New session** | opens the New session form |
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
 | Org | ~~**Urgent first / Pinned**~~ | dropped 2026-09-18: there is one order — the manager, then urgency, inside a team; a live team with a `needs-you` session above the other live teams — and no control for it. A `needs-you` card keeps its ring and the header its *n needs you* count; the list to work through is the Inbox (TD-069) |
-| Org | ***mine*** | design 2026-09-21, TD-095 second pass, not built: one press beside the filter that shows only `interactive` sessions — the person's own, a taken-over worker included — and a second press that shows everything again. A toggle, not a word typed into the box: it has no value to type. **It composes with whatever is typed**, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing |
+| Org | ***mine*** | design 2026-09-21, TD-095 second pass, built 2026-09-21, PR #391 (remembered per browser, as a team's fold is): one press beside the filter that shows only `interactive` sessions — the person's own, a taken-over worker included — and a second press that shows everything again. A toggle, not a word typed into the box: it has no value to type. **It composes with whatever is typed**, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing |
 | Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
 | Org banner | **Retry** | asks the host agent on an unreachable host again now instead of on the next tick |
 | card | **Allow / Deny** | answers a pending permission through the hook channel; shown with the time left |
@@ -1957,7 +1957,7 @@ template, a default lane shape, default grants, and — since 2026-09-13, §4.9 
 pick-list adds an agent by skillset in one choice; the record keeps the name as `role` for the
 badge and nothing keys on it (§9 invariant 9). A preset may also carry an **`icon:`** (2026-09-19,
 TD-074) — one name from a fixed set the UI ships (`flag`, `wrench`, `search`, `eye`, `book`,
-`shield`, `terminal` — and `person`, until TD-095's second pass is built, which **reserves `person` for the card's *interactive* mark** and refuses it as a role's icon, §4.5 *The card's anatomy*; an unknown name is refused when the file is read, as an unknown grant is), never
+`shield`, `terminal`; **`person` is reserved for the card's *interactive* mark** and refused as a role's icon, with that reason — §4.5 *The card's anatomy*, TD-095, built 2026-09-21, PR #391; an unknown name is refused when the file is read, as an unknown grant is), never
 markup from a config file — drawn small and monochrome inside the role badge, so the state tile
 stays the one coloured thing on a card. The built-ins carry `manager: flag`, `grinder: wrench`,
 `hunter: search`. It is a label's picture and nothing more: **a card's layout does not vary by

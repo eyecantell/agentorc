@@ -525,7 +525,9 @@
     sections().forEach((sec) => {
       const grid = $(".grid", sec), manager = sec.dataset.manager || "";
       const cards = $$(".sc", grid);
-      cards.sort((a, b) => (b.dataset.id === manager) - (a.dataset.id === manager) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
+      // `card_order` in app.py: urgency, then an interactive session ahead of an unattended one (TD-095)
+      cards.sort((a, b) => (b.dataset.id === manager) - (a.dataset.id === manager) || (+a.dataset.rank - +b.dataset.rank)
+        || (!!b.dataset.mine - !!a.dataset.mine) || a.dataset.name.localeCompare(b.dataset.name))
         .forEach((c) => grid.appendChild(c));
     });
     applyFilter();
@@ -539,6 +541,7 @@
   }
   function applyFilter() {
     const raw = ($("#filter") ? $("#filter").value : "").trim(), cmd = $("#showcmd") && $("#showcmd").checked;
+    const mine = !!$("#mine") && $("#mine").getAttribute("aria-pressed") === "true";
     // `team:<name>` is the form the card's team badge writes: an exact match on the badge, not a
     // substring of the card's text, so a team whose name also appears in a branch stays clean.
     const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
@@ -546,11 +549,11 @@
     $$("#groups .sc").forEach((c) => {
       const hideKind = c.dataset.kind === "command" && !cmd;
       const miss = team !== null ? (c.dataset.team || "").toLowerCase() !== team : !!q && !c.textContent.toLowerCase().includes(q);
-      c.hidden = hideKind || miss;
+      c.hidden = hideKind || miss || (mine && !c.dataset.mine);  // *mine* composes with the box (§4.5a)
     });
     // A group with nothing left to show goes away with its header; the empty page says so once.
     // A team's card stays while no filter is set, sessions or none: it is where Start lives.
-    const filtering = !!raw;
+    const filtering = !!raw || mine;
     sections().forEach((sec) => {
       sec.hidden = !$$(".sc", sec).some((c) => !c.hidden) && (filtering || !sec.dataset.team);
       sec.classList.toggle("filtering", filtering);  // a filter shows what it matched, folded or not
@@ -889,6 +892,11 @@
 
   AO.org = function () {
     $("#filter").addEventListener("input", layout);
+    // *mine* (§4.5a, TD-095): a toggle this browser remembers, as it remembers a team's fold
+    const mineBtn = $("#mine");
+    const setMine = (on) => { mineBtn.setAttribute("aria-pressed", on ? "true" : "false"); mineBtn.classList.toggle("on", on); };
+    setMine(!!store.get("mine", false));
+    mineBtn.addEventListener("click", () => { const on = mineBtn.getAttribute("aria-pressed") !== "true"; store.set("mine", on); setMine(on); layout(); });
     $("#showcmd").addEventListener("change", layout);
     $("#retry").addEventListener("click", () => location.reload());
     const box = $("#groups");

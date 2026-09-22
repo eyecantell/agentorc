@@ -5,7 +5,7 @@
    and hidden inside that group by the stylesheet — the card cannot know where it is drawn. #}
 <div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}" id="card-{{ s.id }}"
      data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
-     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}"{% if s.unseen %} data-unseen="1"{% endif %}>
+     data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}"{% if s.unseen %} data-unseen="1"{% endif %}{% if not s.unattended %} data-mine="1"{% endif %}>
   <div class="sbar"></div>
   <div class="sc-body">
     {# (1) name and state: the name once, the tool's title only when it differs (§4.5a **title**,

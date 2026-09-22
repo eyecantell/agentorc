@@ -12,6 +12,10 @@
     </span>
     <span class="grow"></span>
     <input class="input" id="filter" placeholder="filter… (team:name)" style="width: 200px;">
+    {# design §4.5a Org ***mine*** (TD-095, second pass): one press shows only the person's own —
+       `interactive` sessions, a taken-over worker included — a second shows everything again. A
+       toggle, composed with the box; client-side, and it changes nothing #}
+    <button class="btn ghost" id="mine" aria-pressed="false" title="show only your own sessions — the interactive ones; press again for everyone">{{ role_svg('person') }}mine</button>
     <label class="btn ghost"><input type="checkbox" id="showcmd"> show command runs</label>
   </div>
   <div class="warn{% if not agent_down %} hidden{% endif %}" id="agentdown">⚠ <b>{{ host }}</b>: host agent unreachable{% if volatile %} (a volatile host: asleep?){% endif %} · last states kept <span class="grow"></span><button class="btn sm ghost" id="retry">Retry</button></div>

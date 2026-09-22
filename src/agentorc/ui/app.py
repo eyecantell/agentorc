@@ -877,6 +877,14 @@ NO_TEAM = ""  # the group key for sessions carrying no `team` badge; rendered as
 DEAD = ("exited", "closed")
 
 
+def card_order(v: dict[str, Any]) -> tuple[float, bool, str]:
+    """The grid's one order (design §4.5 *One order, no control*): urgency first, then — within one
+    urgency — an `interactive` session ahead of an unattended one (TD-095, second pass: the person's
+    own are what a person looks for), then the name. The manager's card is placed first before any
+    of this, by `team_groups` and by the page's layout."""
+    return (v["rank"], bool(v.get("unattended")), str(v.get("name") or ""))
+
+
 # The header's counts, in the order the grid sorts by (§4.5 *One order*). *needs you* is not among
 # them: the header carries it as its ringed mark, which is what a person scans a page of headers for.
 COUNT_ORDER = (
@@ -935,7 +943,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
         return None
     groups: list[dict[str, Any]] = []
     for team in sorted(by_team):
-        members = sorted(by_team[team], key=lambda v: (v["rank"], v["name"]))
+        members = sorted(by_team[team], key=card_order)
         manager, manager_elsewhere = None, False
         if team != NO_TEAM:
             named = {c for m in members for c in (m.get("controllers") or [])}
@@ -1583,7 +1591,7 @@ def create_app() -> FastAPI:
                 raise
             sessions, agent_down = [], True
         icons = await role_icons(sessions)
-        vs = sorted((view(s, sessions, icons=icons) for s in sessions), key=lambda v: (v["rank"], v["name"]))
+        vs = sorted((view(s, sessions, icons=icons) for s in sessions), key=card_order)
         # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
         # record the Org counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
