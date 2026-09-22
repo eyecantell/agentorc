@@ -122,3 +122,14 @@
 17:47  techlead-ao-1: fill #2 idle at 23:47:48Z (<1 min), 0 waiting → ao close. Batch: 1 steer from grinder-ao-2 (TD-095 Cursor editor preset) answered with a source (design §5 The person's own), default taken, 0 passed up, 0 lapsed
 17:47–00:07Z quiet (18:07 MDT); grinder-ao-2: TD-095 page merged #386 #388 #389 #390 #391 → cadence all pass, review rows recorded; #385 (src/sessionorc) waits on the anchor (→ 01:22Z), #392 board in fact-check
 18:16  grinder-ao-2: TD-071 claimed then dropped, TD-076 claimed → ok
+18:16  grinder-ao-2: dropped TD-076, declared out_of_work 00:16Z → idle → finished; grinder-ao-1 finished since 23:33Z → every member finished
+18:17  final sweep check_cadence --since 12h: 41 PRs, all pass; review rows recorded, not verified. samscrape: none in scope
+18:17  ao team stop ao-grind --close --timeout 90 → both members finished, nothing sent, closed
+18:19  board: my earlier wind-down line rewritten for this run (#383/#385 wait on the anchor, 2 h at 01:16Z/01:22Z) → branch orch-ao-grind-wound-down-0921c, PR #394, Sonnet fact-check running
+18:20  ao progress none --why (each member and the why on its record)
+
+## Techlead trial numbers (TD-075 step 5), run 2026-09-21 22:56Z–00:20Z
+- Start: seat idle at start with 0 waiting → closed 22:57Z (not a fill).
+- Fill #1 23:24:45Z: 1 waiting when seen (3 on the new record) → idle 23:25Z (~1 min). 3 steers from grinder-ao-2: 2 answered with a source, 1 withdrawn test send closed.
+- Fill #2 23:47:08Z: 1 waiting → idle 23:47:48Z (<1 min). 1 steer from grinder-ao-2 answered with a source (default taken).
+- Totals: 4 questions put to the seat (all steers, all from grinder-ao-2; 1 a withdrawn test); 3 answered with a source; 0 passed up; 0 lapsed to a default; 0 taken to the person after TECHLEAD_WAIT. 2 fills, 0 against the six-an-hour ceiling's limit. Its friction: `ao msg --reply-to … --pick n` cannot carry text, so it answered in text naming the answer number.
