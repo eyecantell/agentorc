@@ -47,7 +47,10 @@ ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon", "label
 # ships, never markup from a config file. Drawn small and monochrome inside the role badge — a
 # label's picture and nothing more. An unknown name is refused when the file is read, as an unknown
 # grant is; a role with no icon draws nothing.
-ICONS = ("flag", "wrench", "search", "eye", "book", "shield", "terminal", "person")
+ICONS = ("flag", "wrench", "search", "eye", "book", "shield", "terminal")
+# `person` is the card's *interactive* mark — the person's own sessions (§4.5 *The card's anatomy*,
+# TD-095) — so no role may wear it: a card never shows one glyph for two reasons.
+RESERVED_ICONS = {"person": "reserved for the card's mark of an interactive session, the person's own (design §4.5)"}
 # A role's display label (design §4.8 *The names*, TD-076): what the role badge, a team header and
 # an Inbox row show in place of the bare key. A person's text, drawn escaped; nothing keys on it.
 LABEL_CAP = 40
@@ -372,6 +375,8 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             if v is not None and (not isinstance(v, str) or not v.strip()):
                 raise ValueError(f"{here}.icon must be a string")
             name = v.strip() if isinstance(v, str) else None
+            if name in RESERVED_ICONS:
+                raise ValueError(f"{here}.icon: {name!r} is {RESERVED_ICONS[name]}")
             if name is not None and name not in ICONS:
                 raise ValueError(f"{here}.icon: unknown icon {name!r} (known: {', '.join(ICONS)})")
             out[k] = name

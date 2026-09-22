@@ -16,7 +16,7 @@ from collections.abc import Collection
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
-from urllib.parse import quote, urlencode
+from urllib.parse import urlencode
 
 from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -34,6 +34,7 @@ from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
 from sessionorc.models import GRANTS, STATE_RANK, canonical_grants, has_control, report_head, report_line, stop_note
 
+from . import uiconf
 from .icons import role_svg
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
 
@@ -278,17 +279,16 @@ def teams_view(sessions: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def vscode_url(directory: str) -> str:
-    """`vscode://vscode-remote/ssh-remote+<alias><path>` — the alias must be in the person's own
-    ~/.ssh/config (design §4.5) — or `vscode://file/…` when the UI runs where the person sits."""
+    """The VS Code link for a directory on this host — the default editor button's (design §4.5)."""
     h = hosts.local_host()
-    # Percent-encode the path: a space or `?` in a directory name would otherwise produce a URI the
-    # browser silently drops (TD-011). `/` stays, so the path reads as a path.
-    path = quote(directory, safe="/")
-    if h.local:
-        return f"vscode://file{path}?windowId=_blank"
-    # windowId=_blank: a new VS Code window. Without it the handler reuses the current window and
-    # replaces whatever it was showing (first-use finding 2026-09-06).
-    return f"vscode://vscode-remote/ssh-remote+{h.vscode_host}{path}?windowId=_blank"
+    return uiconf.vscode_link(directory, local=h.local, remote=h.vscode_host)
+
+
+def editor_link(directory: str, reach: str = "") -> dict[str, str] | None:
+    """The editor button for a directory on this host, from the person's `open_in:` (design §5 *The
+    person's own*, TD-095): `{label, url}`, or None for no button."""
+    h = hosts.local_host()
+    return uiconf.editor_link(directory, local=h.local, remote=h.vscode_host, reach=reach)
 
 
 # -- view model ------------------------------------------------------------------------------------
@@ -539,7 +539,7 @@ def view(
     # seconds, so a finish in the same second as the last look reads as seen.
     d["unseen"] = state == "idle" and (not s.get("seen_at") or (s.get("since") or "") > s["seen_at"])
     if d["unseen"]:
-        d["state_label"] = "finished · unseen"
+        d["state_label"] = "idle · unseen"  # not *finished*: that word is a declaration's (§4.9a, TD-095 e)
         d["rank"] = STATE_RANK["idle"] - 0.5
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
@@ -553,9 +553,11 @@ def view(
     hl = s.get("host_link") or {}
     sup = hl.get("supervisor") or {}
     d["host_note"] = sup.get("doing") or (hl.get("why", "") if state == "unreachable" else "")
-    # A container node's record reaches VS Code by attaching to that container (§4.4a "Reach"),
-    # from what the home derived when the node dialed in; any other host's record has no link.
-    d["vscode"] = vscode_url(s["dir"]) if s.get("dir") and here else (hl.get("reach") or {}).get("vscode", "")
+    # The editor button (§4.5a, §5 *The person's own*, TD-095): the person's `open_in:`. A container
+    # node's record reaches VS Code by attaching to that container (§4.4a "Reach"), from what the
+    # home derived when the node dialed in; any other host's record has no link.
+    reach = "" if here else str((hl.get("reach") or {}).get("vscode") or "")
+    d["editor"] = editor_link(str(s.get("dir") or ""), reach) if here or reach else None
     d["place"] = f"{d['host']} / {Path(s['repo']).name}" if s.get("repo") else f"{d['host']} / {s.get('dir', '')}"
     git = s.get("git") or {}
     where = s.get("dir", "")
@@ -564,6 +566,24 @@ def view(
     if git.get("branch"):
         where += f" → {git['branch']}"
     d["where"] = where
+    # design §4.5 *The card's anatomy*, row 3 (TD-095): **where**, alone on its row — the branch
+    # by name, shortened in the middle so both ends read, whole on hover; a detached HEAD by its
+    # short sha; the directory for a session with no repo. `wt/<name> ·` leads only when the
+    # worktree is not the session's own name, which on a team is every member's.
+    wt = Path(s["dir"]).name if s.get("repo") and s.get("dir") and s["dir"] != s["repo"] else ""
+    d["wt_prefix"] = f"wt/{wt} · " if wt and wt != s.get("name") else ""
+    branch = str(git.get("branch") or "")
+    if branch == "(detached)":
+        oid = str(git.get("oid") or "")
+        d["branch_full"] = f"detached at {oid[:7]}" if oid else "detached HEAD"
+    elif branch and branch != "?":
+        d["branch_full"] = f"branch {branch}"
+    else:
+        d["branch_full"] = "" if s.get("repo") else str(s.get("dir") or "")
+    d["branch_line"] = _middle(d["branch_full"], BRANCH_SHOWN)
+    # what leads row 3 outside a team's own group, where the header does not say it: `host / repo ·`,
+    # or `host /` before the directory of a session with no repo
+    d["place_prefix"] = f"{d['place']} · " if s.get("repo") else f"{d['host']} / "
     flags = []
     if git.get("dirty"):
         flags.append("dirty")
@@ -660,6 +680,9 @@ def view(
     # for every adapter that gives none, which is what draws nothing.
     tool_title = s.get("title")
     d["title"] = tool_title.strip() if isinstance(tool_title, str) else ""
+    # on a card only when it says something the name does not (TD-095): a team's members are
+    # titled by their names, and the same word twice is noise. Focus shows it as before.
+    d["title_shown"] = d["title"] if d["title"] != s.get("name") else ""
     # The role's icon (design §4.8 *Role presets*): resolved here from the role's *name* — nothing in
     # the core keys on a role (§9 invariant 9) and no icon is stored on the record. Without a map
     # (a caller that did not resolve one) the badge draws its word alone, as it always has.
@@ -696,11 +719,121 @@ def view(
         for o in (fleet or [])
         if s.get("id") in (o.get("controllers") or [])
     ]
+    # *under `<manager>`* is not drawn inside a team's own group when that manager is the only
+    # controller (§4.5a, TD-095): the group says it. The card cannot know which group it is drawn
+    # in, so it marks the chip and the stylesheet hides it there — a filtered grid still shows it.
+    only = by_id.get(d["under"][0]["id"]) if len(d["under"]) == 1 else None
+    d["under_is_manager"] = bool(
+        only and s.get("team") and only.get("team") == s.get("team") and has_control(only.get("capabilities"))
+    )
     d["holds_control"] = has_control(s.get("capabilities"))
     # `fleet_known=False`: the caller asked for the fleet and did not get it. An empty members list
     # then means *unknown*, and Ready to close must not read it as *none* (review of PR #195).
     d["ready"] = ready_to_close(s, d["members"] if fleet_known else None)
+    d["ready_ok"] = bool(d["ready"]) and all(ok for _, ok in d["ready"])
+    d["not_ready"] = [name for name, ok in d["ready"] if not ok]  # what *more ▾ → Close* says it waits on
+    d["slot"] = card_slot(d)
+    d["next_act"] = next_act(d)
     return d
+
+
+BRANCH_SHOWN = 34  # characters of row 3's branch a card shows before it shortens it in the middle
+
+
+def _middle(text: str, width: int) -> str:
+    """`text` shortened in the middle to `width` characters, so both ends read — a branch is told
+    apart by its prefix (`td095-`) and its end (`-rows`) alike. Whole when it fits."""
+    if len(text) <= width:
+        return text
+    keep = width - 1
+    return f"{text[: keep - keep // 2]}…{text[len(text) - keep // 2 :]}"
+
+
+def _first_line(text: str) -> str:
+    return text.strip().splitlines()[0] if text.strip() else ""
+
+
+def card_slot(d: dict[str, Any]) -> dict[str, Any]:
+    """The card's slot (design §4.5 *The card's anatomy*, row 5; §4.5a **doing**, TD-095): **one
+    text, the first that applies**, and a caption. (a) what needs a person or explains a stop, (b)
+    an ending — exited, closed, or a declaration — (c) what the session says it is doing, (d) its
+    last output. The caption: the time a pending answer has left, else *ready to close ✓* whenever
+    the checklist passes, else *says · age* under a `doing` line. `text` is a session's or a tool's
+    words: escaped by the template, shown, never a control.
+
+    `kind` picks the rule's colour (`needs`, `lim`, `bad`, `ok`, `doing`, `tail`, or "") and `full`
+    is the hover; a working pane's two lines keep their line break (`tail`)."""
+    state, pend = d["state"], d["pending"]
+    ptext = str(pend.get("text") or "")
+    kind, text, full = "", "", ""
+    if state == "needs-you" and pend:
+        # a hook permission says its tool and command; a question says that it is one
+        kind = "needs"
+        text = ptext if pend.get("kind") == "permission" else f"{pend.get('kind')}: {ptext}"
+    elif state == "unreachable" and pend and pend.get("host_unreachable"):
+        # design §4.4a "Permission prompts follow the same line": the waiter is on the node
+        kind, text = "needs", f"{pend.get('kind')}: {ptext} — answer it at {d['host']}"
+    elif state == "limited" and pend:
+        kind, text = "lim", ptext
+    elif state == "stalled?" and pend:
+        # design §4.2: "a `stalled?` that can say why" — a screen rule's note (TD-032)
+        kind, text = "needs", ptext
+    elif state == "unreachable" and d["host_note"]:
+        text = d["host_note"]
+    elif state == "exited":
+        code = d.get("exit_code")
+        kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")
+    elif state == "closed":
+        kind, text = "ok", "closed by you"
+        full = f"closed by you at {d['closed_at']}" if d.get("closed_at") else ""
+    elif d["out_of_work"] or d["restart_wanted"]:
+        # a declaration (§4.9a): the fixed words, then the first line of its reason
+        # (§4.9a); the whole reason and when it was said are the hover — a card holds one clock
+        said = d["out_of_work"] or d["restart_wanted"]
+        words = "out of work" if d["out_of_work"] else "restart wanted"
+        if not d["out_of_work"] and said["early"]:
+            words += " · early — for a person"
+        why = said["why"]
+        text = words + (f" — {_first_line(why)}" if why else "")
+        when = f" {said['age']} ago" if said["age"] else ""
+        full = f"{words}{when} — {why or 'no reason recorded'}"
+        if not d["out_of_work"] and said["early"]:
+            full += " — asked inside its own first half hour, so a controller does not act on it (design §4.9a)"
+    elif d["doing"]:
+        kind, text = "doing", d["doing"]["text"]
+    elif state in ("working", "stalled?"):
+        # the pane's last two lines, as they stand — for a shell or a command run that is the work
+        tail = [str(line) for line in (d.get("tail") or [])[-2:] if str(line).strip()]
+        kind, text = "tail", "\n".join(tail) or "at prompt"
+    else:
+        tail_last = (d.get("tail") or [""])[-1]
+        text = f"last: {tail_last}" if tail_last else "at prompt"
+    caption, ccls = "", ""
+    if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
+        caption, ccls = "via hook", "countdown"  # the page's clock fills in the time left
+    elif d["ready_ok"] and state in ("idle", "exited"):
+        caption, ccls = "ready to close ✓", "ready"
+    elif kind == "doing":
+        caption = "says" + (f" · {d['doing']['age']} ago" if d["doing"]["age"] else "")
+    return {"kind": kind, "text": text, "full": full or text, "caption": caption, "ccls": ccls}
+
+
+def next_act(d: dict[str, Any]) -> str:
+    """The foot's first button, by state (design §4.5 *The card's anatomy*, row 6, TD-095): what a
+    person would press next. `allow` (with Deny beside it) for a hook permission; `forget` for an
+    exited session, ready to close or not — there is no process left to close; `close` for an idle
+    session the checklist passes; `details` when the pane is gone; else `focus`. A `limited`
+    session's *Switch profile…* / *Wait* have no route yet, so it falls to Focus."""
+    state, pend = d["state"], d["pending"]
+    if state == "needs-you" and pend.get("kind") == "permission" and pend.get("tool_use_id"):
+        return "allow"
+    if state == "exited":
+        return "forget"
+    if state == "idle" and d["ready_ok"]:
+        return "close"
+    if state == "closed" or d.get("pane") is False:
+        return "details"
+    return "focus"
 
 
 def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ()) -> list[tuple[str, bool]]:
@@ -744,6 +877,45 @@ NO_TEAM = ""  # the group key for sessions carrying no `team` badge; rendered as
 DEAD = ("exited", "closed")
 
 
+def card_order(v: dict[str, Any]) -> tuple[float, bool, str]:
+    """The grid's one order (design §4.5 *One order, no control*): urgency first, then — within one
+    urgency — an `interactive` session ahead of an unattended one (TD-095, second pass: the person's
+    own are what a person looks for), then the name. The manager's card is placed first before any
+    of this, by `team_groups` and by the page's layout."""
+    return (v["rank"], bool(v.get("unattended")), str(v.get("name") or ""))
+
+
+# The header's counts, in the order the grid sorts by (§4.5 *One order*). *needs you* is not among
+# them: the header carries it as its ringed mark, which is what a person scans a page of headers for.
+COUNT_ORDER = (
+    ("limited", "limited"),
+    ("stalled?", "stalled?"),
+    ("unreachable", "unreachable"),
+    ("working", "working"),
+    ("unseen", "unseen"),
+    ("idle", "idle"),
+    ("exited", "exited"),
+    ("closed", "closed"),
+)
+
+
+def state_counts(members: list[dict[str, Any]]) -> list[str]:
+    """A team header's counts by state — `["1 limited", "2 working", "1 unseen"]`, in urgency order,
+    zeros left out. An idle session nobody has looked at counts as *unseen*, as its pill says."""
+    tally: dict[str, int] = {}
+    for m in members:
+        key = "unseen" if m.get("unseen") else str(m.get("state") or "")
+        tally[key] = tally.get(key, 0) + 1
+    return [f"{tally[k]} {label}" for k, label in COUNT_ORDER if tally.get(k)]
+
+
+def group_place(members: list[dict[str, Any]]) -> str:
+    """Where a team's sessions are, said once in its header so no card has to (TD-095): the
+    `host / repo` they share, or *mixed* when they do not. Empty for a group with no sessions."""
+    places = {str(m.get("place") or "") for m in members}
+    return "" if not places else places.pop() if len(places) == 1 else "mixed"
+
+
 def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = ()) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
@@ -771,7 +943,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
         return None
     groups: list[dict[str, Any]] = []
     for team in sorted(by_team):
-        members = sorted(by_team[team], key=lambda v: (v["rank"], v["name"]))
+        members = sorted(by_team[team], key=card_order)
         manager, manager_elsewhere = None, False
         if team != NO_TEAM:
             named = {c for m in members for c in (m.get("controllers") or [])}
@@ -794,14 +966,10 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
             {
                 "team": team,
                 "label": team or "No team",
-                # `doing` rides with the manager (design §4.5a **team groups**, TD-074): the team
-                # card's header shows its manager's line, which is the manager reporting on the team
-                # without being asked to narrate each member. `role_label` is what the header calls
-                # it (§4.8 *The names*, TD-076): *Manager*, or whatever label its role carries.
-                "manager": {
-                    k: manager.get(k)
-                    for k in ("id", "name", "state", "state_class", "state_label", "scraped", "doing", "role_label")
-                }
+                # the header names its manager only when that card is in another group (TD-095: its
+                # name, state and line are on its own card, the first here); `role_label` is what it
+                # is called there (§4.8 *The names*, TD-076): *Manager*, or its role's own label.
+                "manager": {k: manager.get(k) for k in ("id", "name", "state", "role_label")}
                 if manager
                 else None,
                 "manager_elsewhere": manager_elsewhere,  # its card sits under its own badge, not here
@@ -810,6 +978,11 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
                 "live": sum(1 for m in members if m.get("state") not in DEAD),
+                # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the
+                # team's sessions are, once, and how many are in each state — never its manager's
+                # name, state or line, which are on the manager's card, the first in the group
+                "place": group_place(members),
+                "counts": state_counts(members),
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),
@@ -1418,7 +1591,7 @@ def create_app() -> FastAPI:
                 raise
             sessions, agent_down = [], True
         icons = await role_icons(sessions)
-        vs = sorted((view(s, sessions, icons=icons) for s in sessions), key=lambda v: (v["rank"], v["name"]))
+        vs = sorted((view(s, sessions, icons=icons) for s in sessions), key=card_order)
         # the needs-you badge is the same predicate the Inbox rows are (review of PR #251): a
         # record the Org counts and the Inbox did not list was the two pages disagreeing in public
         counts = {"needs-you": sum(1 for v in vs if state_kind(v) in NEEDS_YOU_ROWS)}
@@ -1453,6 +1626,7 @@ def create_app() -> FastAPI:
                 "person_fyi": person_fyi,
                 "node_banner": node_banner(info),
                 "identity_note": identity_note(id_info),
+                "editor_note": uiconf.open_in().error,
             },
         )
 

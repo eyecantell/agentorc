@@ -77,15 +77,16 @@
   }
   AO.act = act;
 
-  // vscode:// links: hand the URL to the protocol handler without navigating this tab away
-  // (a plain click replaced the Org with a blank page when the handler declined — first-use finding).
+  // the editor button (vscode://, or the person's own `open_in:` scheme, design §5): hand the URL to
+  // the protocol handler without navigating this tab away (a plain click replaced the Org with a
+  // blank page when the handler declined — first-use finding).
   document.addEventListener("click", (ev) => {
-    const a = ev.target.closest('a[href^="vscode://"]');
+    const a = ev.target.closest("a.editor");
     if (!a) return;
     ev.preventDefault();
     const f = document.createElement("iframe"); f.style.display = "none"; f.src = a.href;
     document.body.appendChild(f); setTimeout(() => f.remove(), 3000);
-    AO.toast("opening in VS Code…", true);
+    AO.toast(`opening in ${a.dataset.label || "the editor"}…`, true);
   });
 
   // design §4.5a **Message** / Focus Inbox **Reply** (§4.10): one composer for both, a <dialog>.
@@ -524,7 +525,9 @@
     sections().forEach((sec) => {
       const grid = $(".grid", sec), manager = sec.dataset.manager || "";
       const cards = $$(".sc", grid);
-      cards.sort((a, b) => (b.dataset.id === manager) - (a.dataset.id === manager) || (+a.dataset.rank - +b.dataset.rank) || a.dataset.name.localeCompare(b.dataset.name))
+      // `card_order` in app.py: urgency, then an interactive session ahead of an unattended one (TD-095)
+      cards.sort((a, b) => (b.dataset.id === manager) - (a.dataset.id === manager) || (+a.dataset.rank - +b.dataset.rank)
+        || (!!b.dataset.mine - !!a.dataset.mine) || a.dataset.name.localeCompare(b.dataset.name))
         .forEach((c) => grid.appendChild(c));
     });
     applyFilter();
@@ -538,6 +541,7 @@
   }
   function applyFilter() {
     const raw = ($("#filter") ? $("#filter").value : "").trim(), cmd = $("#showcmd") && $("#showcmd").checked;
+    const mine = !!$("#mine") && $("#mine").getAttribute("aria-pressed") === "true";
     // `team:<name>` is the form the card's team badge writes: an exact match on the badge, not a
     // substring of the card's text, so a team whose name also appears in a branch stays clean.
     const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
@@ -545,11 +549,11 @@
     $$("#groups .sc").forEach((c) => {
       const hideKind = c.dataset.kind === "command" && !cmd;
       const miss = team !== null ? (c.dataset.team || "").toLowerCase() !== team : !!q && !c.textContent.toLowerCase().includes(q);
-      c.hidden = hideKind || miss;
+      c.hidden = hideKind || miss || (mine && !c.dataset.mine);  // *mine* composes with the box (§4.5a)
     });
     // A group with nothing left to show goes away with its header; the empty page says so once.
     // A team's card stays while no filter is set, sessions or none: it is where Start lives.
-    const filtering = !!raw;
+    const filtering = !!raw || mine;
     sections().forEach((sec) => {
       sec.hidden = !$$(".sc", sec).some((c) => !c.hidden) && (filtering || !sec.dataset.team);
       sec.classList.toggle("filtering", filtering);  // a filter shows what it matched, folded or not
@@ -888,6 +892,11 @@
 
   AO.org = function () {
     $("#filter").addEventListener("input", layout);
+    // *mine* (§4.5a, TD-095): a toggle this browser remembers, as it remembers a team's fold
+    const mineBtn = $("#mine");
+    const setMine = (on) => { mineBtn.setAttribute("aria-pressed", on ? "true" : "false"); mineBtn.classList.toggle("on", on); };
+    setMine(!!store.get("mine", false));
+    mineBtn.addEventListener("click", () => { const on = mineBtn.getAttribute("aria-pressed") !== "true"; store.set("mine", on); setMine(on); layout(); });
     $("#showcmd").addEventListener("change", layout);
     $("#retry").addEventListener("click", () => location.reload());
     const box = $("#groups");
@@ -1264,7 +1273,9 @@
       $("#reportscard").classList.toggle("hidden", !(progress.length || findings.length));
       $("#progresslist").innerHTML = progress.map((p) => {
         const derived = (p.source || "declared") !== "declared";
-        const pr = p.pr ? ` <span class="st">→ #${esc(p.pr)}</span>` : "";
+        // a reference is shown once (§4.5a **report line**, TD-095): an entry whose reference is
+        // its PR never reads `#359 → #359` — the rule `report_line` follows for the card
+        const pr = p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ #${esc(p.pr)}</span>` : "";
         const why = p.why ? ` <span class="st">${esc(p.why)}</span>` : "";
         const drop = p.status === "claimed"
           ? ` <button class="btn sm ghost" data-act="drop" data-id="${id}" data-ref="${esc(p.ref)}" data-confirm="Drop ${esc(p.ref)}? It is recorded as dropped by you.">Drop</button>` : "";

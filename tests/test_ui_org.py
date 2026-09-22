@@ -149,7 +149,8 @@ def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
     )
     assert '<span class="h1">Org</span>' in html and "Org · agentorc" in html
     assert 'data-team="ao-grind"' in html and "No team" in html
-    assert 'class="badge team"' in html  # the card's team badge
+    # the card's team badge: drawn, and marked for the stylesheet to hide inside its own group (TD-095)
+    assert 'class="badge team ingroup"' in html
     assert "orchestrator-ao-1" in html and 'id="card-ao-g1"' in html
     assert html.index('data-team="ao-grind"') < html.index('id="card-ao-sh"')  # No team last
 
@@ -420,7 +421,8 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
         assert "restart wanted" in html, where
         assert "TD-090 is half done" in html, where  # the why is the hover: a card cannot hold it
         assert "· early" not in html, where
-        assert "data-act" not in html.split("badge rw")[1].split("</span>")[0], where  # never pressable
+        if where == "focus":  # on a card it is the slot's text since TD-095, which carries no control
+            assert "data-act" not in html.split("badge rw")[1].split("</span>")[0], where  # never pressable
 
     early = view({**base, "restart_wanted": {**said, "early": True}})
     assert early["restart_wanted"]["early"] is True
@@ -429,7 +431,10 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     for where, html in pages:
         assert "restart wanted · early" in html, where
         assert "a controller does not act on it" in html, where  # the hover says why it is different
-        assert 'class="badge rw early"' in html, where
+        if where == "focus":
+            assert 'class="badge rw early"' in html, where
+        else:  # the slot says it wants a person, in words (design §4.5 *The card's anatomy*, TD-095)
+            assert "restart wanted · early — for a person" in html
     css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
     assert ".badge.rw.early" in css  # …and it does not look the same
 
@@ -448,3 +453,200 @@ def test_the_restart_wanted_chip_says_early_because_a_controller_does_not_act_on
     for junk in ("nonsense", 7, [], {"why": "no at, so nothing was said"}):
         assert view({**base, "restart_wanted": junk})["restart_wanted"] is None, junk
     assert view({**base, "restart_wanted": {"at": "2026-09-21T01:30:00Z"}})["restart_wanted"]["why"] == ""
+
+
+# ── the card's anatomy (design §4.5, TD-095): six rows, one text in the slot, the next act first ──
+
+
+def _card(**kw):
+    """A record as the host agent lists it, idle and clean unless told otherwise."""
+    rec = {
+        "id": "ao-w",
+        "name": "w",
+        "kind": "agent",
+        "adapter": "claude-code",
+        "dir": "/r/.claude/worktrees/w",
+        "repo": "/r",
+        "state": "idle",
+        "since": "2026-09-21T01:00:00Z",
+        "confidence": "hook",
+        "pane": True,
+        "tail": ["done.", "❯ "],
+        "seen_at": "2026-09-21T02:00:00Z",
+        "unattended": True,
+        "git": {"branch": "w", "dirty": 1},
+    }  # fmt: skip — dirty, so it does not read ready to close
+    rec.update(kw)
+    return rec
+
+
+def test_the_slot_holds_one_text_the_first_that_applies_and_a_caption(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import view
+
+    perm = {"kind": "permission", "text": "Bash: rm -rf build", "tool_use_id": "tu", "deadline": "2026-09-21T03:00:00Z"}
+    doing = {"text": "TD-095: the rows", "at": "2026-09-21T01:30:00Z"}
+    oow = {"at": "2026-09-21T01:40:00Z", "why": "the ledger is empty\nand the second line is on hover"}
+    # (a) what needs a person comes before what the session says it is doing
+    slot = view(_card(state="needs-you", pending=perm, doing=doing))["slot"]
+    assert (slot["kind"], slot["text"]) == ("needs", "Bash: rm -rf build")
+    assert (slot["caption"], slot["ccls"]) == ("via hook", "countdown")
+    q = view(_card(state="needs-you", pending={"kind": "question", "text": "a or b?"}))["slot"]
+    assert q["text"] == "question: a or b?" and q["caption"] == ""
+    assert view(_card(state="limited", pending={"kind": "limit", "text": "resets 18:00"}))["slot"]["kind"] == "lim"
+    # (b) an ending: exited, and a declaration — its first line, the rest on hover
+    ex = view(_card(state="exited", exit_code=2, doing=doing))["slot"]
+    assert ex["text"] == "exited · code 2" and ex["kind"] == "bad"
+    said = view(_card(out_of_work=oow, doing=doing))["slot"]
+    assert said["text"] == "out of work — the ledger is empty" and "second line" in said["full"]
+    assert not said["caption"].startswith("says")  # an ending hides the line that caption would date
+    # (c) the doing line, with *says* as its caption; (d) the last output line, or *at prompt*
+    d = view(_card(doing=doing))["slot"]
+    assert d["kind"] == "doing" and d["text"] == "TD-095: the rows" and d["caption"].startswith("says")
+    assert view(_card())["slot"]["text"] == "last: ❯ "
+    assert view(_card(tail=[]))["slot"]["text"] == "at prompt"
+    w = view(_card(state="working", tail=["a", "b", "c"]))["slot"]
+    assert w["kind"] == "tail" and w["text"] == "b\nc"  # two lines, as the slot is
+
+
+def test_ready_to_close_is_the_caption_and_the_next_act_is_the_foots_first_button(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    clean = {"branch": "w", "dirty": 0, "unpushed": 0, "upstream": "origin/w"}
+    ready = view(_card(git=clean, doing={"text": "done with TD-1", "at": "2026-09-21T01:30:00Z"}))
+    assert ready["ready_ok"] and ready["slot"]["caption"] == "ready to close ✓"
+    assert ready["slot"]["text"] == "done with TD-1"  # its last word stays in the slot
+    assert ready["next_act"] == "close"
+    # exited reads ready to close too, and its first button is still Forget: nothing left to close
+    ex = view(_card(state="exited", exit_code=0, git=clean))
+    assert ex["slot"]["caption"] == "ready to close ✓" and ex["next_act"] == "forget"
+    assert view(_card(state="closed", pane=False))["next_act"] == "details"
+    assert view(_card(state="working"))["next_act"] == "focus"
+    perm = {"kind": "permission", "text": "Bash: ls", "tool_use_id": "tu"}
+    assert view(_card(state="needs-you", pending=perm))["next_act"] == "allow"
+    html = templates.get_template("card.html").render(s=ready)
+    foot = html.split('class="sc-foot"')[1]
+    assert foot.index('data-act="close"') < foot.index("/focus/ao-w")  # the next act comes first
+    assert 'data-act="close"' not in html.split('class="sc-foot"')[0]  # and nothing is left in the slot
+
+
+def test_row_three_says_where_once_and_the_group_hides_what_it_already_says(tmp_path, monkeypatch):
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import _middle, templates, view
+
+    # the worktree named for the session is not repeated; one named otherwise is
+    v = view(_card(git={"branch": "td095-rows"}))
+    assert (v["wt_prefix"], v["branch_full"]) == ("", "branch td095-rows")
+    assert view(_card(dir="/r/.claude/worktrees/other"))["wt_prefix"] == "wt/other · "
+    assert view(_card(git={"branch": "(detached)", "oid": "89de0bd1234567"}))["branch_full"] == "detached at 89de0bd"
+    assert view(_card(git={"branch": "(detached)"}))["branch_full"] == "detached HEAD"  # an older agent's record
+    shell = view(_card(repo=None, dir="/etc/wireguard", adapter="shell", git={}))
+    assert shell["branch_full"] == "/etc/wireguard" and shell["place_prefix"].endswith(" / ")
+    # a long branch keeps both ends, and the whole of it on hover
+    assert _middle("td095-a-really-long-branch-name-rows", 20) == "td095-a-re…name-rows"
+    # the title is drawn only when it differs from the name
+    assert view(_card(title="w"))["title_shown"] == "" and view(_card(title="Fix it"))["title_shown"] == "Fix it"
+    # *under <manager>* is marked for the group to hide when that manager is the only controller
+    mgr = _card(id="ao-m", name="m", team="t", capabilities=["control"])
+    member = _card(team="t", controllers=["ao-m"])
+    assert view(member, [mgr, member])["under_is_manager"] is True
+    assert view({**member, "controllers": ["ao-m", "ao-x"]}, [mgr, member])["under_is_manager"] is False
+    html = templates.get_template("card.html").render(s=view(member, [mgr, member]))
+    assert 'class="meta under ingroup"' in html and 'class="badge team ingroup"' in html
+    css = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.css").read_text()
+    assert '.tgroup:not([data-team=""]):not(.filtering) .sc .ingroup { display: none; }' in css
+
+
+def test_the_mode_is_a_word_on_the_card_and_its_toggle_is_in_more(tmp_path, monkeypatch):
+    """Design §4.5a **unattended / interactive** (TD-095): a mark, never pressable, on the card;
+    *interactive* — the person's own — carries the `person` mark; the toggle is an entry of *more*."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+    from agentorc.ui.icons import ICON_PATHS
+
+    card = templates.get_template("card.html")
+    worker, mine = card.render(s=view(_card())), card.render(s=view(_card(unattended=False)))
+    head = worker.split('class="sc-foot"')[0]
+    assert 'data-act="mode"' not in head and 'class="meta mode"' in head
+    assert '<button data-act="mode" data-id="ao-w" class="on">Switch to interactive</button>' in worker
+    assert ICON_PATHS["person"] in mine.split('class="meta mode mine"')[1].split("</span>")[0]
+    assert ">Switch to unattended</button>" in mine
+
+
+def test_the_foot_is_quiet_and_only_allow_is_filled(tmp_path, monkeypatch):
+    """Design §4.5 *The card's anatomy*, row 6 (TD-095, second pass): the next act is outlined, the
+    rest are plain links, and the one filled button a card carries is Allow on a *needs you* card.
+    *more ▾ → Close* is enabled only when Ready to close passes (§4.5) — dimmed means disabled, and
+    its hover says what it waits on."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    card = templates.get_template("card.html")
+
+    def foot(rec):
+        return card.render(s=view(rec)).split('class="sc-foot"')[1]
+
+    working = foot(_card(state="working"))
+    assert "primary" not in working and 'class="btn sm next" href="/focus/ao-w"' in working
+    assert 'class="btn sm link"' in working  # the editor button and more are plain links
+    perm = {"kind": "permission", "text": "Bash: ls", "tool_use_id": "tu"}
+    asking = foot(_card(state="needs-you", pending=perm))
+    assert asking.count("primary") == 1 and 'class="btn sm primary" data-act="allow"' in asking
+    assert 'class="btn sm link" href="/focus/ao-w"' in asking  # Focus is not the next act here
+    # the default card is dirty: Close in more is disabled, and says why
+    assert 'data-confirm="Close w?" disabled title="not ready to close — tree clean' in working
+    clean = {"branch": "w", "dirty": 0, "unpushed": 0}
+    assert 'data-confirm="Close w?">Close</button>' in foot(_card(git=clean))
+
+
+def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_count():
+    """Design §4.5 *The card's anatomy* (TD-095): the header carries the host / repo its sessions
+    share — *mixed* where they do not — and the counts by state in the grid's order, *needs you*
+    being its ringed mark instead; *No team* is headed by its count and nothing else."""
+    from agentorc.ui.app import group_place, state_counts, team_groups, templates
+
+    def v(sid, state, place, unseen=False, **kw):
+        return {**sess(sid, sid, state=state, **kw), "place": place, "unseen": unseen}
+
+    same = [v("a", "working", "kmaster / agentorc", team="t"), v("b", "idle", "kmaster / agentorc", team="t")]
+    assert group_place(same) == "kmaster / agentorc" and group_place([]) == ""
+    assert group_place([*same, v("c", "idle", "vps / agentorc", team="t")]) == "mixed"
+    many = [*same, v("c", "needs-you", "x"), v("d", "idle", "x", unseen=True), v("e", "limited", "x")]
+    assert state_counts(many) == ["1 limited", "1 working", "1 unseen", "1 idle"]  # urgency order
+    groups = team_groups([*same, v("n1", "idle", "kmaster / wg"), v("n2", "exited", "kmaster / wg")])
+    team, none = groups
+    head = templates.get_template("group_head.html").render(g=team)
+    assert "kmaster / agentorc" in head and "· 1 working · 1 idle" in head and " live<" not in head
+    nohead = templates.get_template("group_head.html").render(g=none)
+    assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
+
+
+def test_within_one_urgency_the_persons_own_sort_first_and_mine_shows_only_them(tmp_path, monkeypatch):
+    """Design §4.5 *One order, no control*, second pass (TD-095): the key is (rank, interactive
+    first, name) — a worker that needs a person still outranks the person's own idle session, and a
+    manager's card is placed first before any of this. §4.5a ***mine***: one press shows only the
+    interactive sessions; the card says which it is, the page's script does the rest."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import card_order, team_groups, templates, view
+
+    a = _card(id="ao-a", name="a")  # unattended, idle
+    z = _card(id="ao-z", name="z", unattended=False)  # interactive, idle
+    needs = _card(id="ao-n", name="n", state="needs-you", pending={"kind": "question", "text": "?"})
+    vs = [view(r) for r in (a, z, needs)]
+    assert [v["name"] for v in sorted(vs, key=card_order)] == ["n", "z", "a"]
+    mgr = _card(id="ao-m", name="zz-manager", team="t", capabilities=["control"], state="working")
+    team = [mgr, {**a, "team": "t", "controllers": ["ao-m"]}, {**z, "team": "t", "controllers": ["ao-m"]}]
+    (g,) = team_groups([view(r, team) for r in team])
+    assert g["ids"] == ["ao-m", "ao-z", "ao-a"]  # the manager first, then the person's own
+    card = templates.get_template("card.html")
+    assert 'data-mine="1"' in card.render(s=vs[1]) and "data-mine" not in card.render(s=vs[0])
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert "(!!b.dataset.mine - !!a.dataset.mine)" in js  # the page's re-sort keeps the same key
+    assert "(mine && !c.dataset.mine)" in js  # …and *mine* composes with the box
+    html = templates.get_template("org.html").render(
+        sessions=vs, groups=None, counts=dict.fromkeys(("needs-you", "limited", "stalled?"), 0),
+        strip={"teams": [{"name": "t"}], "source": "", "notes": []}, host="h", active="Org",
+        agent_down=False, volatile=False, usage={},
+    )  # fmt: skip
+    assert 'id="mine" aria-pressed="false"' in html

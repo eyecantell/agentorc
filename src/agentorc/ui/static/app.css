@@ -238,10 +238,30 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .strip .warnish { color: var(--warn-fg); }
 .badge[hidden] { display: none; }      /* same trap: `.badge` is inline-block (TD-026's Focus stop control) */
 .sc { display: flex; flex-direction: column; gap: 14px; padding: 16px; overflow: hidden; position: relative; } .sc.off { opacity: .55; }
-.sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { min-height: 54px; display: flex; flex-direction: column; gap: 8px; } .sc-foot { display: flex; gap: 6px; align-items: center; }
-/* The head row wraps: a long name plus role and team badges used to push the state pill out past
-   the card's edge, where `overflow: hidden` clipped it (seen live 2026-09-16). */
-.sc-body > .row:first-child { flex-wrap: wrap; row-gap: 4px; } .sc-body > .row:first-child .badge { white-space: nowrap; }
+/* design §4.5 *The card's anatomy* (TD-095): six rows, the same on every card, **at one height** —
+   so every row is one line that never wraps, and what does not fit is clipped with the whole of it
+   on hover. The name, the pill and the clock never shrink; the long derived strings do. */
+.sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { display: flex; flex-direction: column; gap: 4px; } .sc-foot { display: flex; gap: 6px; align-items: center; height: 24px; }
+.sc-body > .row { height: 20px; flex-wrap: nowrap; overflow: hidden; } .sc-body > .row.r1 { height: 24px; }
+.sc-body > .row > * { flex: 0 1 auto; min-width: 0; } .sc-body > .row > .grow { flex: 1 1 0; }
+.sc .r1 .name, .sc .r1 .pill, .sc .r2 .age, .sc .r3 .flag { flex-shrink: 0; }
+.sc .badge { white-space: nowrap; }
+.sc .r2 .mode { font-size: 11px; } .sc .r2 .mode.mine { color: var(--fg); font-weight: 600; } .sc .r2 .mode .ricon { vertical-align: -2px; margin-right: 3px; }
+.sc .r3 .under { flex-shrink: 0; }
+/* what a team's group already says (its badge, host / repo, *under* its manager) is not said again
+   on a card inside that group; a filter shows it, since a filtered grid reads card by card */
+.tgroup:not([data-team=""]):not(.filtering) .sc .ingroup { display: none; }
+/* the slot: two lines and a caption, whatever it holds — a longer text clamped, the whole on hover */
+.sc-slot { height: 66px; justify-content: space-between; }
+.sc-slot > .status { height: calc(2 * 1.55em); padding: 0 0 0 10px; line-height: 1.55; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.sc-slot > .status.tail { white-space: pre-line; color: var(--muted); }
+.sc-slot > .caption { height: 16px; } .sc-slot > .caption.ready { color: var(--fg); }
+/* the foot (TD-095, second pass): the next act outlined at normal strength, the rest plain links at
+   normal strength — never the dimmed grey a disabled control wears — and Allow the one filled button */
+.sc-foot .btn.next { background: transparent; color: var(--fg); border-color: var(--muted); }
+.sc-foot .btn.next:hover, .sc-foot .btn.link:hover { background: var(--hover); }
+.sc-foot .btn.link { background: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
+details.more .menu button:disabled { opacity: .45; cursor: default; } details.more .menu button:disabled:hover { background: none; }
 .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }
 .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ended); }
 .sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); } .sc.s-idle .sbar { background: var(--idle); }

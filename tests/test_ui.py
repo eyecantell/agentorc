@@ -333,14 +333,14 @@ def test_closed_session_terminal_is_final_and_occupancy_endpoint(client, tmp_pat
 
 
 def test_unseen_idle_until_focused(client, tmp_path):
-    """TD-017: an idle session nobody has looked at renders "finished · unseen" and sorts just above
+    """TD-017: an idle session nobody has looked at renders "idle · unseen" and sorts just above
     plain idle; opening Focus (or acting on the card) marks it seen; a later finish is unseen again."""
     r = client.post("/shell", data={"dir": str(tmp_path), "name": "unseen"}, follow_redirects=False)
     sid = r.headers["location"].rsplit("/", 1)[-1]  # the redirect to Focus is not followed: never seen
     s = wait_state(client, sid, "idle")
-    assert s["unseen"] is True and s["state_label"] == "finished · unseen" and s["rank"] == 4.5
+    assert s["unseen"] is True and s["state_label"] == "idle · unseen" and s["rank"] == 4.5
     r = client.get("/")
-    assert f'id="card-{sid}"' in r.text and "finished · unseen" in r.text and 'data-unseen="1"' in r.text
+    assert f'id="card-{sid}"' in r.text and "idle · unseen" in r.text and 'data-unseen="1"' in r.text
     assert client.get(f"/focus/{sid}").status_code == 200  # Focus = seen
     s = next(x for x in client.get("/api/sessions").json() if x["id"] == sid)
     assert s["unseen"] is False and s["state_label"] == "idle" and s["rank"] == 5 and s["seen_at"]
@@ -479,7 +479,9 @@ def test_a_stalled_card_says_why_when_a_screen_rule_explained_it(tmp_path, monke
     stood_down = {**s, "pending": {"kind": "note", "text": "stood down: another device took over this session"}}
     html = card.render(s=view(stood_down))
     assert "stood down: another device took over this session" in html
-    assert "code 4090" in html  # the tail is still there under it
+    # the slot holds one text, the first that applies (design §4.5 *The card's anatomy*, TD-095):
+    # the note that explains the stop, not the tail under it
+    assert "code 4090" not in html and view(stood_down)["slot"]["kind"] == "needs"
 
 
 def test_the_name_check_endpoint_answers_before_start(client, tmp_path):
@@ -1094,7 +1096,10 @@ def test_a_declaration_of_no_work_is_a_chip_on_the_card_and_the_focus_header(tmp
     at = (datetime.now(UTC) - timedelta(hours=2)).isoformat().replace("+00:00", "Z")
     done = {**base, "out_of_work": {"at": at, "why": why}}
     html = card.render(s=view(done))
-    assert "out of work 2h" in html and why in html  # the words, and the reason on hover
+    # in the slot since TD-095 (an ending): the words and the reason's first line, and on hover the
+    # whole reason and when it was said — the card's one clock is the state's
+    assert f"out of work — {why}" in html and "out of work 2h" in view(done)["slot"]["full"]
+    assert 'class="badge oow' not in html
     assert view(done)["out_of_work"]["age"].startswith("2h")
     # the chip does not pretend to be a state: the card still reads `idle` (§4.2's unseen-idle rule)
     assert 'data-state="idle"' in html and "out-of-work" not in html
@@ -1188,9 +1193,11 @@ def test_the_card_shows_what_the_session_says_it_is_doing_before_the_tail(tmp_pa
     assert text in card.render(s=noage)
 
 
-def test_a_teams_header_shows_its_leads_doing_line(tmp_path, monkeypatch):
-    """design §4.5a **team groups** (§4.8, TD-074): the team card's header carries the lead's line,
-    with its age — the lead reporting on the team without narrating each member."""
+def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch):
+    """design §4.5a **team groups** (§4.8, TD-074; reversed by Paul 2026-09-21, TD-095): the header
+    carried the manager's name, state and line, and the manager's card said them again directly
+    beneath it. The line is on the card, the first in the group; the header says where the team's
+    sessions are and how many are in each state."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     from agentorc.ui.app import team_groups, templates, view
 
@@ -1202,13 +1209,12 @@ def test_a_teams_header_shows_its_leads_doing_line(tmp_path, monkeypatch):
          "team": "ao-grind", "controllers": ["ao-orc"], "tail": ["…"]},
     ]  # fmt: skip
     (g,) = team_groups([view(r, records) for r in records])
-    assert g["manager"]["doing"]["text"] == "round 3: reviewing PR 236"
     head = templates.get_template("group_head.html").render(g=g)
-    assert "round 3: reviewing PR 236" in head and "says · 11m ago" in head
-    # a lead that has said nothing adds no line
-    (quiet,) = team_groups([view({**rec, "doing": None}, records) for rec in records])
-    assert quiet["manager"]["doing"] is None
-    assert "says" not in templates.get_template("group_head.html").render(g=quiet)
+    assert "round 3: reviewing PR 236" not in head and ">orc<" not in head and "s-idle" not in head
+    assert g["counts"] == ["1 working", "1 unseen"] and "· 1 working · 1 unseen" in head
+    assert g["place"].endswith(f" / {tmp_path}") and g["place"] in head  # no repo: host / directory
+    card = templates.get_template("card.html").render(s=g["members"][0])
+    assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card
 
 
 def test_the_role_label_is_what_the_badge_the_team_header_and_the_inbox_row_show(tmp_path, monkeypatch):
@@ -1238,10 +1244,13 @@ def test_the_role_label_is_what_the_badge_the_team_header_and_the_inbox_row_show
     assert ">TD grinder</span>" in card.render(s=views[1])
     assert "the role preset it was started under — grinder" in card.render(s=views[1])  # the key, on hover
     assert ">Grinder</span>" in card.render(s=views[2])  # a repo this host cannot read: the default
-    # the team header calls its manager by the manager's label, escaped
+    # the manager's card carries its label, escaped; the team header names a manager only when its
+    # card is in another group (TD-095: the header no longer repeats the manager's card)
+    assert ">Shift &lt;lead&gt;</span>" in card.render(s=views[0])
     (g,) = [g for g in uiapp.team_groups(views) if g["team"] == "ao-grind"]
-    head = uiapp.templates.get_template("group_head.html").render(g=g)
-    assert '<span class="meta">Shift &lt;lead&gt;</span> <a class="name" href="/focus/ao-m">manager-ao-1</a>' in head
+    head = uiapp.templates.get_template("group_head.html").render(g={**g, "manager_elsewhere": True})
+    assert 'Shift &lt;lead&gt; <a class="name" href="/focus/ao-m">manager-ao-1</a> elsewhere' in head
+    assert "manager-ao-1" not in uiapp.templates.get_template("group_head.html").render(g=g)
     # …and an Inbox row carries the badge the card does
     row = uiapp.state_rows([{**views[1], "state": "stalled?"}])[0]
     assert row["role_label"] == "TD grinder"
@@ -1261,7 +1270,7 @@ def test_a_permission_on_an_unreachable_host_sends_the_person_to_the_hosts_own_d
         "pending": {"kind": "permission", "text": "Bash: git push", "tool_use_id": "tu", "host_unreachable": True},
     }  # fmt: skip
     html = templates.get_template("card.html").render(s=view(s))
-    assert "permission: Bash: git push — host unreachable" in html and "answer it at laptop" in html
+    assert "permission: Bash: git push — answer it at laptop" in html
     assert 'data-act="allow"' not in html
 
 
@@ -1405,11 +1414,12 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     import asyncio
 
-    from agentorc.repoconfig import ICONS
+    from agentorc.repoconfig import ICONS, RESERVED_ICONS
     from agentorc.ui import app as uiapp
     from agentorc.ui.icons import ICON_PATHS, role_svg
 
-    assert sorted(ICON_PATHS) == sorted(ICONS)  # every name the config accepts has a picture
+    # every name the config accepts has a picture, and so does the one it reserves (TD-095)
+    assert sorted(ICON_PATHS) == sorted([*ICONS, *RESERVED_ICONS])
     assert 'stroke="currentColor"' in role_svg("flag") and 'aria-hidden="true"' in role_svg("flag")
     assert "M5 21V4M5 4h11l-2 4 2 4H5" in role_svg("flag")  # the flag, as the design gives it
     assert 'fill="none"' in role_svg("flag")  # stroked, never filled: it is not something to press
@@ -1437,11 +1447,16 @@ def test_a_role_badge_draws_its_icon_and_a_role_without_one_draws_nothing(tmp_pa
     assert 'title="the role preset it was started under — lead' in lead  # the key is still there, on hover
     # the repo's own `roles:` wins, exactly as it does for every other key
     assert ICON_PATHS["terminal"] in grinder and ICON_PATHS["wrench"] not in grinder
+
     # `plain` carries no icon, and a session with no role carries no badge at all
-    assert "ricon" not in plain and "ricon" not in none
+    # (the mode's own `person` mark on an interactive card is not the role's: look at the badge alone)
+    def role_badge(html):
+        return html.split('title="the role preset')[1].split("</span>")[0]
+
+    assert "ricon" not in role_badge(plain) and 'title="the role preset' not in none
     # a caller that resolved no icons still renders the badge's word — the default label — and nothing breaks
     bare = card.render(s=uiapp.view(records[0], records))
-    assert "ricon" not in bare and ">Manager</span>" in bare
+    assert "ricon" not in role_badge(bare) and ">Manager</span>" in bare
 
 
 def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_path, monkeypatch):
@@ -1457,7 +1472,8 @@ def test_a_permission_with_nothing_to_answer_offers_no_allow_on_the_card(tmp_pat
         "pending": {"kind": "permission", "text": "Bash: git push"},
     }  # fmt: skip
     html = templates.get_template("card.html").render(s=view(s))
-    assert 'data-act="allow"' not in html and "answer in the terminal (Focus)" in html
+    # the foot's next act is Focus, where the tool's own dialog is (design §4.5 *The card's anatomy*)
+    assert 'data-act="allow"' not in html and view(s)["next_act"] == "focus"
     with_id = {**s, "pending": {**s["pending"], "tool_use_id": "tu"}}
     assert 'data-act="allow"' in templates.get_template("card.html").render(s=view(with_id))
 
@@ -1507,3 +1523,11 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     # here, which nobody had seen, because the line never fitted (TD-085)
     # the age is measured against now, so the shape is what is pinned, not the number
     assert "rebasing #269 · says " in head_html and " ago" in head_html and "· says ·" not in head_html
+
+
+def test_the_focus_reports_panel_shows_a_reference_once():
+    """§4.5a **report line** (TD-095): an entry whose reference is its PR reads `#359`, never
+    `#359 → #359` — on the Focus Reports panel as on the card. The panel is drawn inside `AO.focus`'s
+    closure, which the node probe cannot reach, so the rule is pinned where it is written."""
+    js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
+    assert "const pr = p.pr && String(p.ref) !== `#${p.pr}` ?" in js
