@@ -151,3 +151,6 @@
 02:17  techlead-ao-1: idle, 0 waiting, clean → ao close (not a fill); grinder-ao-2 claimed TD-096; grinder-ao-1 working
 02:18–02:41 quiet (grinder-ao-1 claimed TD-062, grinder-ao-2 TD-096; techlead-ao-1 exited after close, 0 waiting → left empty)
 02:42  grinder-ao-2: TD-096 done → PR #403 cadence pass (review recorded, not verified); note read (promote is the anchor's). grinder-ao-1: idle since 02:31 with TD-062 claimed → watching the 20 min
+02:43  grinder-ao-2: stopped itself for the usage window (weekly 89%, resets 09-23 00:00Z), note read. grinder-ao-1: idle on PR #402 CI → wrap-up send (land #402 if green) → idle, rebasing #402
+02:44–02:58 quiet (grinder-ao-1 landing #402)
+02:59  grinder-ao-1: TD-062 (c) done → PR #402 cadence pass (review recorded); wrapping up. grinder-ao-2: idle since 02:42 after its usage stop
