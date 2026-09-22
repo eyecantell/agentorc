@@ -265,6 +265,8 @@ def _aged(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     now = datetime.now(UTC)
     for r in rows:
         r["wound_down_age"] = _age(r.get("wound_down"), now)
+        c = r.get("concluded")
+        r["concluded_age"] = _age(c.get("at"), now) if isinstance(c, dict) else ""  # TD-099, the same way
     return rows
 
 
@@ -1012,6 +1014,11 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                     manager_elsewhere = True
         projects = sorted({str(m.get("project")) for m in members if m.get("project")})
         row = defs.get(team) or {}
+        live = sum(1 for m in members if m.get("state") not in DEAD)
+        c = row.get("concluded")
+        # the definition's rows read the raw records; a view that disagrees about what is live (a
+        # delta between the two reads) is not drawn concluded — Wind down is the safe offer then
+        concluded = c if live and isinstance(c, dict) and len(c.get("names") or ()) == live else None
         groups.append(
             {
                 "team": team,
@@ -1025,7 +1032,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 "ids": [m["id"] for m in members],
                 "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
-                "live": sum(1 for m in members if m.get("state") not in DEAD),
+                "live": live,
                 # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the
                 # team's sessions are, once, and how many are in each state — never its manager's
                 # name, state or line, which are on the manager's card, the first in the group
@@ -1040,12 +1047,18 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 # *nothing running* and *nothing left to run* are different facts (§4.9a)
                 "wound_down": row.get("wound_down"),
                 "wound_down_age": row.get("wound_down_age"),
+                # live, and every live session idle and declared (§4.5a, TD-099): drawn like a
+                # stopped team — folded, sorted with them, Start alone — since a wind-down would
+                # only wake the manager to find nothing to wind down
+                "concluded": concluded,
+                "concluded_age": row.get("concluded_age") if concluded else "",
+                "stopped": not live or concluded is not None,
             }
         )
     # what is running is read first; *No team* is never "stopped" — nothing there starts as one
     # …and among the live teams, one with a session that needs a person comes first (2026-09-18)
     groups.sort(
-        key=lambda g: (2 if g["team"] and not g["live"] else 1 if not g["team"] else 0, not g["needs"], g["team"])
+        key=lambda g: (2 if g["team"] and g["stopped"] else 1 if not g["team"] else 0, not g["needs"], g["team"])
     )
     return groups
 
@@ -1613,7 +1626,7 @@ def create_app() -> FastAPI:
             {
                 "team": g["team"],
                 "manager": (g["manager"] or {}).get("id", ""),
-                "live": g["live"],
+                "live": 0 if g["stopped"] else g["live"],  # what the fold keys on: a concluded team folds
                 "ids": g["ids"],
                 "html": head.render(g=g),
             }

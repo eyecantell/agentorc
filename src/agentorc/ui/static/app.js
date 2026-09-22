@@ -918,7 +918,8 @@
     // Start, Wind down and Stop now are all on the team's card, and so is its fold.
     box.addEventListener("click", (e) => {
       const b = e.target.closest("[data-team-act]");
-      if (b) return teamAct(b.dataset.team, b.dataset.teamAct, b);
+      // a concluded team's Start closes its sessions first, and its confirm names them (TD-099)
+      if (b) return b.dataset.confirm && !confirm(b.dataset.confirm) ? undefined : teamAct(b.dataset.team, b.dataset.teamAct, b);
       const f = e.target.closest("[data-fold]");
       if (f) { store.set(foldKey(f.dataset.fold), !store.get(foldKey(f.dataset.fold), true)); syncTeams(); }
     });

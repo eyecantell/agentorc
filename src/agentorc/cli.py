@@ -698,8 +698,11 @@ def cmd_team_list(args: argparse.Namespace) -> int:
         for r in rows:
             # *stopped* and *wound down* are different facts about a team (§4.9a, TD-053 step 6),
             # and the strip says which — so this does too, from the same rows, or the page and the
-            # CLI would disagree about the same definition.
+            # CLI would disagree about the same definition. A live team whose every live session is
+            # idle and declared is *concluded* on both (TD-099).
             live = f"{r['live']} live" if r["live"] else ("wound down" if r["wound_down"] else "stopped")
+            if r.get("concluded"):
+                live += ", concluded"
             print(
                 f"{r['name']:<{w}}  {live:<10}  manager: {r['manager']}  "
                 + (f"techlead: {r['techlead']}  " if r.get("techlead") else "")

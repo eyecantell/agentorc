@@ -5,7 +5,9 @@
    line). *No team* is headed by its count and nothing else. Rendered on page load and re-rendered
    per delta on /events — the client swaps the header's contents, never composes them. A team with
    nothing live keeps its card (2026-09-18): the header then reads *stopped* / *wound down*, carries
-   Start, and folds the cards. #}
+   Start, and folds the cards. A **concluded** team — live, every live session idle and declared
+   (TD-099) — is drawn the same way (`g.stopped`), reading *concluded <t> ago*, and its Start's
+   confirm names the sessions it closes first. #}
 <span class="h2"{% if g.source %} title="defined in {{ g.source }}"{% endif %}>{{ g.label }}</span>
 {% if not g.team %}<span class="meta">{{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</span>
 {% else %}
@@ -19,15 +21,16 @@
 {% endif %}
 {# the fold (design §4.5a **team groups**): only a team with nothing live folds; the client keeps
    the choice per team and sets the word #}
-{% if g.team and not g.live and g.members %}<button class="btn sm ghost fold" data-fold="{{ g.team }}" data-n="{{ g.members | length }}" title="a stopped team's cards are folded away: its sessions have exited and are waiting for Forget">{{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</button>{% endif %}
+{% if g.team and g.stopped and g.members %}<button class="btn sm ghost fold" data-fold="{{ g.team }}" data-n="{{ g.members | length }}" title="{% if g.concluded %}a concluded team's cards are folded away: every session still there is idle and has said its run is over{% else %}a stopped team's cards are folded away: its sessions have exited and are waiting for Forget{% endif %}">{{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</button>{% endif %}
 <span class="grow"></span>
-{% if g.team and not g.live %}{% if g.wound_down %}<span class="meta" title="every session that carried this team's badge declared it was out of work — Start is the restart">wound down{% if g.wound_down_age %} {{ g.wound_down_age }} ago{% endif %}</span>
+{% if g.team and g.concluded %}<span class="meta" title="every session still here is idle and has declared its run over ({{ 'one asks for a restart' if g.concluded.restart else 'out of work' }}) — Start closes them and starts the team again">concluded{% if g.concluded_age %} {{ g.concluded_age }} ago{% endif %} · {{ 'restart wanted' if g.concluded.restart else 'out of work' }}</span>
+{% elif g.team and not g.live %}{% if g.wound_down %}<span class="meta" title="every session that carried this team's badge declared it was out of work — Start is the restart">wound down{% if g.wound_down_age %} {{ g.wound_down_age }} ago{% endif %}</span>
 {% else %}<span class="meta">stopped</span>{% endif %}{% endif %}
 {# Start, or Wind down / Stop now, on the team's own card (design §4.5a, 2026-09-16 and 2026-09-18): the
    control sits on the thing it acts on, and only a team with a definition has either. #}
-{% if g.team and g.defined %}{% if g.live %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="each member finishes what it holds and exits, then the manager (`ao team stop`)">Wind down</button>
+{% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="each member finishes what it holds and exits, then the manager (`ao team stop`)">Wind down</button>
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="kill every session carrying this badge (`ao team stop --now`)">Stop now</button>
-{% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="the same sequence as `ao team start`: every check before any session is created">Start</button>{% endif %}{% endif %}
+{% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="the same sequence as `ao team start`: every check before any session is created"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead."{% endif %}>Start</button>{% endif %}{% endif %}
 {# design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): how many answers this
    team's sessions gave from the record since this browser last opened the Inbox's group — a
    **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,
