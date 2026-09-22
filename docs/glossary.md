@@ -170,6 +170,7 @@ not mix:
 - **unattended / interactive** — whether policies (run window, usage gate, stall) may act on a
   session. An interactive session is never acted on by another session (invariant 5). —
   *proposed*.
+- **supervised** — a session someone chose to keep running: `ao team start` marks every member and seat, `ao new --supervised` marks one by hand, and §6's *Keeping a team running* restarts, fills and nudges only sessions so marked (and `unattended`). A person's session is never supervised. — *design 2026-09-22, TD-103*.
 - **out of work** — a session's own declaration that its role's test finds nothing left
   (`out_of_work`, design §4.9a). **Wind down** — a manager stopping its team after every member
   declared it. — *proposed*.
