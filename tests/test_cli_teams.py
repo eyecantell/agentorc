@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from agentorc import cli, teams
+from agentorc import cli, teamrun, teams
 
 pytestmark = pytest.mark.unit
 
@@ -1016,7 +1016,6 @@ def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
     all declared reads *wound down* although its techlead never did — the seat is known by the name
     its definition gives it, not by a role badge (§9 invariant 9). Without a seat, one member that
     never declared still means the team stopped for another reason."""
-    from agentorc import teamrun
 
     tmp_path, state = world
     done = {"at": "2026-09-21T06:00:00Z", "why": "nothing left"}
@@ -1042,4 +1041,53 @@ def test_the_techlead_seat_is_not_counted_when_a_team_winds_down(world):
     assert teamrun.seat_names(org.teams["ao-grind"], [*sessions, {"name": "techlead-ao-3"}]) == {"techlead-ao-2"}
     # the page's *on call* keys on the same rule, by id, and only under the team's own badge (TD-097)
     other = {"id": "c", "name": "techlead-ao", "team": "other", "state": "exited"}
-    assert teamrun.seat_ids(org, [*sessions, {"id": "d", "name": "techlead-ao-3", "team": "ao-grind"}, other]) == {"b"}
+    assert teamrun.seat_ids(org, [*sessions, {"id": "d", "name": "techlead-ao-3", "team": "ao-grind"}, other]) == {
+        "b": "comes on the next question"
+    }
+
+
+def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(world, capsys):
+    """TD-098 step 1, design §4.9b *Seats with a trigger*: each of `seats:` starts with the team,
+    after the techlead and before the members, under the manager and with no grants whatever its
+    role holds; `ao team list` carries the triggers the manager fills them by; and a seat is a seat
+    wherever the techlead is one — not counted in a wind-down, and *on call* on the page with its
+    own words."""
+    tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}
+    doc["teams"]["ao-grind"]["seats"] = [
+        {"name": "audit-ao", "role": "manager-ish", "trigger": {"prs": 10}},
+    ]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) != 0  # an unknown role stops the start, as a member's does
+    assert creates(state) == []
+    capsys.readouterr()
+    doc["teams"]["ao-grind"]["seats"] = [
+        {"name": "audit-ao", "role": "manager", "trigger": {"prs": 10}},
+    ]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) != 0  # the manager role is refused as a seat's
+    assert "not a seat's role" in capsys.readouterr().err
+    doc["teams"]["ao-grind"]["seats"] = [{"name": "audit-ao", "role": "hunter", "trigger": {"every": "6h"}}]
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    made = creates(state)
+    assert [p["name"] for p in made] == ["orc-ao", "techlead-ao", "audit-ao", "grind-1", "grind-2", "hunt"]
+    audit = made[2]
+    assert audit["role"] == "hunter" and audit["capabilities"] == []
+    assert audit["controllers"] == ["ao-agentorc-orc-ao"] and audit["team"] == "ao-grind"
+    assert "`ao-agentorc-techlead-ao`" in audit["prompt"]
+    assert "ao-agentorc-audit-ao  seat hunter" in capsys.readouterr().out
+    assert cli.main(["team", "list", "--json"]) == 0
+    (row,) = json.loads(capsys.readouterr().out)["teams"]
+    assert row["seats"] == [{"name": "audit-ao", "role": "hunter", "trigger": "every", "after": "6h"}]
+    org = cli._org_here(tmp_path / "agentorc")
+    done = {"at": "2026-09-21T06:00:00Z", "why": "nothing left"}
+    sessions = [
+        {"id": "a", "name": "grind-1", "team": "ao-grind", "state": "exited", "out_of_work": done},
+        {"id": "b", "name": "techlead-ao", "team": "ao-grind", "state": "exited"},
+        {"id": "c", "name": "audit-ao-2", "team": "ao-grind", "state": "exited"},
+    ]
+    assert teamrun.seat_names(org.teams["ao-grind"], sessions) == {"techlead-ao", "audit-ao-2"}
+    assert teamrun.rows(org, sessions)[0]["wound_down"] == "2026-09-21T06:00:00Z"
+    assert teamrun.seat_ids(org, sessions) == {"b": "comes on the next question", "c": "runs every 6h"}

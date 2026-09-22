@@ -118,9 +118,10 @@ def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> s
     single session that never declared means the team stopped for some other reason. A team with no
     session carrying its badge has never run, or has been forgotten, and is neither.
 
-    `seats` are the names the team's techlead runs under (`seat_names`; design §4.9b, TD-075 step
-    4): a seat is empty or filled, never finished, so it never declares and is not counted — read
-    from the definition, never from a role badge (§9 invariant 9).
+    `seats` are the names the team's seats run under — its techlead and any seat with a trigger
+    (`seat_names`; design §4.9b, TD-075 step 4, TD-098): a seat is empty or filled, never
+    finished, so it never declares and is not counted — read from the definition, never from a
+    role badge (§9 invariant 9).
     """
     seen = [d if isinstance(d := s.get("out_of_work"), dict) else {} for s in sessions if s.get("name") not in seats]
     if not seen or not all(d.get("at") for d in seen):
@@ -130,26 +131,50 @@ def wound_down(sessions: list[dict[str, Any]], seats: Collection[str] = ()) -> s
     return max(str(d["at"]) for d in seen)
 
 
-def seat_names(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> set[str]:
-    """The names among `sessions` that are the team's techlead seat: the definition's name, or that
-    name with the numeric suffix a session takes when a stale tmux session held its id (§4.1, the
-    note `ao team start` prints then) — and never a name the definition gives one of its members."""
-    if team.techlead is None:
-        return set()
+def _seat_whens(team: orgmod.TeamDef) -> dict[str, str]:
+    """Every seat the definition names — the techlead and each seat with a trigger (§4.9b, TD-098) —
+    with what would make it come, in the card's words (`SeatDef.when`)."""
+    out = {team.techlead.name: "comes on the next question"} if team.techlead is not None else {}
+    out.update({s.name: s.when() for s in team.seats})
+    return out
+
+
+def _seat_of(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> dict[str, str]:
+    """name → when-words, for the names among `sessions` that are one of the team's seats: the
+    definition's name, or that name with the numeric suffix a session takes when a stale tmux
+    session held its id (§4.1, the note `ao team start` prints then) — and never a name the
+    definition gives one of its members."""
+    whens = _seat_whens(team)
+    if not whens:
+        return {}
     members = {n for m in team.members if m.team is None for n in m.names()}
-    shape = re.compile(re.escape(team.techlead.name) + r"(-\d+)?")
-    return {n for s in sessions if (n := str(s.get("name") or "")) and shape.fullmatch(n) and n not in members}
+    out: dict[str, str] = {}
+    for s in sessions:
+        n = str(s.get("name") or "")
+        if not n or n in members:
+            continue
+        base = n if n in whens else re.sub(r"-\d+$", "", n)
+        if base in whens:
+            out[n] = whens[base]
+    return out
 
 
-def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> set[str]:
+def seat_names(team: orgmod.TeamDef, sessions: list[dict[str, Any]]) -> set[str]:
+    """The names among `sessions` that are one of the team's seats (`_seat_of`)."""
+    return set(_seat_of(team, sessions))
+
+
+def seat_ids(org: orgmod.Org, sessions: list[dict[str, Any]]) -> dict[str, str]:
     """The ids among `sessions` that are a seat of the team whose badge they carry (`seat_names`,
-    design §4.9b) — what the Org page draws *on call* while nobody is in one (§4.5 *The card's
-    anatomy*, TD-097). Keyed by the definition and the name, never by a role (§9 invariant 9)."""
-    out: set[str] = set()
+    design §4.9b), each with what would make it come (*comes on the next question*, *runs after
+    10 PRs*) — what the Org page draws *on call* while nobody is in one, and its slot (§4.5 *The
+    card's anatomy*, TD-097, TD-098). Keyed by the definition and the name, never by a role (§9
+    invariant 9)."""
+    out: dict[str, str] = {}
     for t in org.teams.values():
         mine = badged(t.name, sessions)
-        names = seat_names(t, mine)
-        out.update(str(s["id"]) for s in mine if s.get("id") and s.get("name") in names)
+        whens = _seat_of(t, mine)
+        out.update({str(s["id"]): whens[s["name"]] for s in mine if s.get("id") and s.get("name") in whens})
     return out
 
 
@@ -171,6 +196,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
                 "projects": list(t.projects),
                 "manager": t.manager.name if t.manager.role != orgmod.PERSON else "person",
                 "techlead": t.techlead.name if t.techlead else None,  # the seat (§4.9b), if any
+                # seats with a trigger (§4.9b, TD-098): what the manager reads to fill each one
+                "seats": [{"name": s.name, "role": s.role, "trigger": s.trigger, "after": s.after} for s in t.seats],
                 "members": sum(len(m.names()) for m in t.members if m.team is None),
                 "live": n_live,
                 # only when nothing is live: a team still running is described by what it is doing
@@ -249,6 +276,10 @@ def start(
                     f"the techlead started as {rec['id']}, but the briefs name {plan.techlead_id} — "
                     "a stale tmux session holds that id; tell the team, or restart it once that session is gone"
                 )
+        for x in plan.seats:
+            # A seat with a trigger (§4.9b, TD-098): started with the team, as the techlead is, so it
+            # runs once now and is on call after; its manager fills it again when its trigger is met.
+            created.append(call("create", **x.create_params([lead_id] if lead_id else [])))
         for m in plan.members:
             # A person runs a team start, so no attenuation applies (§4.8 create rule); a
             # lead running it is subject to it as for any create, in the host agent.

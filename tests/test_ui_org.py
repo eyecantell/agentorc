@@ -663,7 +663,7 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
 
     clean = {"branch": "w", "dirty": 0, "unpushed": 0, "upstream": "origin/w"}
     for state in ("exited", "closed"):
-        v = view(_card(state=state, exit_code=0, git=clean, pane=False), seats={"ao-w"})
+        v = view(_card(state=state, exit_code=0, git=clean, pane=False), seats={"ao-w": "comes on the next question"})
         assert v["state"] == state and (v["state_class"], v["state_label"]) == ("oncall", "on call")
         assert v["slot"]["text"] == "on call — comes on the next question"
         assert v["slot"]["caption"].startswith("last came")  # never *ready to close ✓*: it is not closed
@@ -674,13 +674,17 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
         assert 'data-act="remove"' not in html and "Close session" not in html
         assert 'class="pill s-oncall' in html and ">on call</span>" in html
     # filled: an ordinary card in its live state
-    live = view(_card(state="working"), seats={"ao-w"})
+    live = view(_card(state="working"), seats={"ao-w": "comes on the next question"})
     assert live["state_label"] == "working" and not live["seat"] and live["next_act"] == "focus"
     # not a seat: exited as ever, Forget first
     other = view(_card(state="exited", exit_code=0))
     assert other["state_label"] == "exited" and other["next_act"] == "forget"
     # the team's header counts them apart
     assert state_counts([v, other, live]) == ["1 working", "1 on call", "1 exited"]
+    # a seat with a trigger says its own (TD-098): what makes it come, and that it *ran*
+    audit = view(_card(state="exited", exit_code=0, git=clean, pane=False), seats={"ao-w": "runs after 10 PRs"})
+    assert audit["slot"]["text"] == "on call — runs after 10 PRs"
+    assert audit["slot"]["caption"].startswith("last ran") and audit["next_act"] == "message"
 
 
 def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):

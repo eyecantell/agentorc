@@ -12,7 +12,7 @@ import logging
 import math
 import os
 import time
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
@@ -521,13 +521,14 @@ def view(
     *,
     fleet_known: bool = True,
     icons: dict[tuple[str, str], tuple[str, str]] | None = None,
-    seats: Collection[str] = (),
+    seats: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
     needed only for the membership directions (design §4.8): who controls this session, and — for
     a lead — which sessions it controls. Without it both come back empty, which is what a
     caller that has only one record should show. `seats` is the ids a team definition names as a
-    seat (`teamrun.seat_ids`): without it, a seat with nobody in it is drawn as the `exited` it is."""
+    seat, each with what would make it come (`teamrun.seat_ids`): without it, a seat with nobody in
+    it is drawn as the `exited` it is."""
     now = datetime.now(UTC)
     d = dict(s)
     state = s["state"]
@@ -551,7 +552,9 @@ def view(
     # as *idle · unseen* is, from `exited` / `closed` and the definition — the state stays what it
     # is in every payload. A seat ends between questions by design, and drawn as *exited* the one
     # card behaving exactly as designed looked like the one that had failed.
+    seats = seats or {}
     d["seat"] = state in DEAD and s.get("id") in seats
+    d["seat_when"] = seats.get(s.get("id") or "", "") if d["seat"] else ""
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
     d["age"] = _age(s.get("since"), now)
@@ -810,8 +813,13 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         text = d["host_note"]
     elif d.get("seat"):
         # what would make it come (§4.5): the techlead's trigger is a question landing (§4.9b)
-        text = "on call — comes on the next question"
-        full = f"{text}: a question to it fills the seat, and it ends again once it has answered (design §4.9b)"
+        # (§4.9b) — or a seat's own trigger: after n PRs, every so often (TD-098)
+        text = f"on call — {d.get('seat_when') or 'comes on the next question'}"
+        full = (
+            f"{text}: a question to it fills the seat, and it ends again once it has answered (design §4.9b)"
+            if not d.get("seat_when") or d["seat_when"] == "comes on the next question"
+            else f"{text}: its manager fills the seat when that comes due, and it ends once it has run (§4.9b)"
+        )
     elif state == "exited":
         code = d.get("exit_code")
         kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")
@@ -845,7 +853,9 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         caption, ccls = "via hook", "countdown"  # the page's clock fills in the time left
     elif d.get("seat"):
         # never *ready to close ✓*: a seat is not closed while the definition names it (§4.5)
-        caption = "last came" + (f" · {d['age']} ago" if d.get("age") else "")
+        # *last ran* for a seat with a trigger: it runs its brief rather than answering (§4.5, TD-098)
+        came = "last came" if d.get("seat_when") in ("", "comes on the next question") else "last ran"
+        caption = came + (f" · {d['age']} ago" if d.get("age") else "")
     elif d["ready_ok"] and state in ("idle", "exited"):
         caption, ccls = "ready to close ✓", "ready"
     elif kind == "doing":
@@ -1583,7 +1593,7 @@ def create_app() -> FastAPI:
         """The definitions' rows for a delta's headers."""
         return _aged(teamrun.rows(await defs(), sessions))
 
-    async def seats_of(fleet: list[dict[str, Any]]) -> set[str]:
+    async def seats_of(fleet: list[dict[str, Any]]) -> dict[str, str]:
         """The ids in `fleet` a team definition names as a seat — what `view()` draws *on call*
         while nobody is in one (TD-097). Every page that draws a pill asks, so they agree."""
         return teamrun.seat_ids(await defs(), fleet)

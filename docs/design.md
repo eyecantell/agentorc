@@ -1279,8 +1279,8 @@ Screens:
    (§4.9a), and the first sketch's grey *finished* pill was the sketch's mistake; the slot says how
    it ended; the caption says *ready to close ✓*; the button does it. **One composed pill, as
    *idle · unseen* is: a seat with nobody in it reads *on call*** (design 2026-09-21, TD-097, the
-   word Paul's; built 2026-09-22 for the techlead seat, keyed on `teamrun.seat_ids` — a trigger
-   seat's slot words come with TD-098, and the report is the record's report line, as any card's) — an `exited` or `closed` record that the team definition names as a seat
+   word Paul's; built 2026-09-22 for the techlead seat, keyed on `teamrun.seat_ids`, and the same day
+   for a seat with a trigger, whose slot words and *last ran* come from its trigger (TD-098), and the report is the record's report line, as any card's) — an `exited` or `closed` record that the team definition names as a seat
    (§4.9b; by name, as `teamrun.wound_down` keys, never by role) is drawn with the grey pill
    *◇ on call*, the state stays `exited` or `closed` in every payload, the slot says what would
    make it come — *on call — comes on the next question*, *on call — runs after 10 PRs*, *on call
@@ -2920,7 +2920,13 @@ yet, and the preset brief says what to do when `ao` refuses a verb it names (`--
   §4.5 (*on call — runs after 10 PRs*); **the count toward a `prs:` trigger is not drawn**, since
   the home does not watch GitHub and the manager's number would be a scraped one. Not designed
   here: a seat whose trigger is another seat's findings, and a trigger a person presses (a seat
-  is asked by mail, which is the person's way in already).
+  is asked by mail, which is the person's way in already). **Built 2026-09-22 (TD-098 step 1):** `seats:` is read by
+  the loader (`trigger` required; `{prs: <n>}` a whole number from 1, `{every: …}` a duration in
+  `m`, `h` or `d`; a seat's role is never `person`, `manager` or `techlead`), `ao team start`
+  starts each seat after the techlead with the manager as its controller and no grants,
+  `teamrun.seat_names` names every seat, and `ao team list --json` carries each seat's `trigger`
+  and `after`, which is what the manager fills them by. The manager's rule for filling a seat, and
+  the `auditor` preset, are not built yet (steps 2 and 3).
 - **It answers cold, and is filled on demand.** A techlead is **started per batch of questions
   and ends when it has answered them**: no context piles up over a night, an idle team costs
   nothing, and — Paul's second reason — *composing the message forces the worker to pull the

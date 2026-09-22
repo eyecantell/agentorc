@@ -597,7 +597,9 @@ def cmd_team_start(args: argparse.Namespace) -> int:
 
 def _team_line(rec: dict[str, Any], team: str, p: teams.Plan) -> str:
     launch = next((x for x in p.launches if x.name == rec.get("name")), None)
-    what = "manager" if launch and launch.lead else "techlead" if launch and launch.seat else "member"
+    what = "manager" if launch and launch.lead else "member"
+    if launch and launch.seat:
+        what = "techlead" if launch.role == "techlead" else "seat"  # a seat with a trigger (§4.9b, TD-098)
     role = f" {launch.role}" if launch and launch.role else ""
     return f"{rec['id']}  {what}{role}  {rec.get('dir', '')}"
 
@@ -701,6 +703,7 @@ def cmd_team_list(args: argparse.Namespace) -> int:
             print(
                 f"{r['name']:<{w}}  {live:<10}  manager: {r['manager']}  "
                 + (f"techlead: {r['techlead']}  " if r.get("techlead") else "")
+                + (f"seats: {', '.join(s['name'] for s in r['seats'])}  " if r.get("seats") else "")
                 + f"members: {r['members']}  "
                 f"projects: {', '.join(r['projects'])}  [{r['source']}]"
             )
