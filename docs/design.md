@@ -2699,8 +2699,9 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   as `none` is — a fresh start does not carry the conversation the debt was made in, so the
   debt is settled (`blocked` is an outcome) before the run ends; and it and `none` refuse each
   other: a session is out of work or it wants another run at it, never both.
-- **What a controller does with it.** A member carrying `restart_wanted` that is `idle`,
-  `exited` or `closed`, **with nothing uncommitted and nothing unpushed** on its record's git
+- **What a controller does with it.** A member carrying `restart_wanted` that is `idle`, or
+  `exited` by a natural exit — a kill or a Close is never undone (§6 rule 2) — **with nothing
+  uncommitted and nothing unpushed** on its record's git
   fields, is restarted by its controller: `ao close` on it if it is still there — the one close
   a manager makes outside a wrap-up, safe because the work is pushed — then the same `ao new`
   the crash rule uses, under the same name, directory, worktree, profile and brief, which
