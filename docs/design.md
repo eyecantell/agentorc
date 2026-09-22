@@ -4099,14 +4099,15 @@ code and needs no grant; a session doing the same work does.
      tick keeps looking: the moment the git fields read clean and pushed — a person or a sibling
      pushed — the restart runs and clears the mark itself, so `restart_blocked` is transient
      where `restart_ceiling` is not: the ceiling stands until a person's Resume, Forget or Dismiss,
-     never lifted by the window rolling on. An `early` one is the Inbox row at once, as §4.9a says: a controller does not act on it, and
+     never lifted by the window rolling on; a person's Resume clears `restarts` with the mark, so a
+     resumed session gets three fresh restarts, where the tick's own supersede carries the list. An `early` one is the Inbox row at once, as §4.9a says: a controller does not act on it, and
      neither does the tick.
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b), and the tick computes **`seat_due: {at,
      by}`** from it: for `asks`, when `asks_waiting` leaves zero; for `prs: n`, when the derived
      reports tick (§4.8, its five-minute `gh` cadence) counts `n` PRs merged to the seat's repo's
      default branch since the seat's record was created; for `every: <d>`, when `d` has passed
-     since it was created. A supervised seat that is `exited` or `closed` with `seat_due` set, on a profile that
+     since it was created. A supervised seat that is `exited` or `closed` with `seat_due` set, not suspended, on a profile that
      is not gated, is filled: `create` with `keep_mail` (§4.9b), the launch record, and `seat_due` cleared; a seat
      that is `idle` with no `seat_due`, hook-confirmed, with nothing dirty or unpushed, is closed
      (a seat that left work is the board's, as today). **The fill ceiling**: `FILL_CEILING` — six
