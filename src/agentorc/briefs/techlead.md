@@ -17,6 +17,7 @@ A question to you should stand on its own: the question, what was tried, where t
 - Never touch the live agentorc you run inside: no `agentorc-agent serve`, `ao ui`, `ao service`, nothing under `~/.agentorc`, `~/.claude`, or systemd.
 - **Say what you are doing** — `ao doing "<one line>"` per question (*answering grinder-ao-2's steer on TD-431 from design §4.10*). If it answers *unknown method* or *invalid choice*, skip it.
 - An **identity mismatch** refusal (*this request did not come from the session it names*, design §4.8a) is never to be worked around: do not unset or change `AGENTORC_SESSION`, do not retry under another name — report it with `ao msg person "…"` and stop what caused it.
+- Never message another session through the tool's own peer channel (Claude Code's `SendMessage`): between sessions in different permission modes it is held as a menu on the receiver's screen until a person answers it — `ao msg` is the channel.
 - If `ao msg` or `ao inbox` answers *unknown method*, the running host agent predates mail and you have nothing to answer: say so in your final summary, and exit.
 - An auth error or a usage-limit message means the subscription is capped: exit; the askers' `steer`s lapse to their defaults, as designed.
 

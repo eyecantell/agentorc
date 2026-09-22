@@ -143,6 +143,24 @@ def test_repo_wires_cadence_and_layer_choice(tmp_path, monkeypatch):
     assert write_hooks_file(prof).name == "p.json"  # no cwd: the plain layer, as before
 
 
+def test_an_unattended_layer_refuses_the_tools_peer_messages(tmp_path, monkeypatch):
+    """TD-064 (a), design §4.10 *The tool's own peer channel*: Claude Code's default holds a message
+    from a session in another permission-mode class behind a deliver-or-deny panel no hook reports,
+    so an unattended launch refuses them in its layer; an interactive one keeps the tool's default,
+    and the two are separate files so concurrent launches never overwrite each other's."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
+    prof = profiles.Profile(name="p")
+    assert "crossSessionInbound" not in hooks_settings(prof)
+    assert hooks_settings(prof, unattended=True)["crossSessionInbound"] == "refuse"
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    att, un = write_hooks_file(prof, bare), write_hooks_file(prof, bare, unattended=True)
+    assert (att.name, un.name) == ("p+cadence.json", "p+cadence+unattended.json")
+    assert "crossSessionInbound" not in json.loads(att.read_text())
+    assert json.loads(un.read_text())["crossSessionInbound"] == "refuse"
+    assert write_hooks_file(prof, unattended=True).name == "p+unattended.json"
+
+
 def test_launch_argv_and_env(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path / "home"))
     (tmp_path / "home").mkdir()
@@ -164,6 +182,10 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert g.adapter_id == "abc-123" and "--resume" in g.argv and "--session-id" not in g.argv
     assert "--dangerously-skip-permissions" in g.argv
     assert g.env["CLAUDE_CONFIG_DIR"] == "/tmp/cc-grind" and g.env["AGENTORC_PERMISSION_WAIT"] == "30"
+    # the unattended launch carries the refusing layer, the interactive one does not (TD-064 (a))
+    g_layer = json.loads(Path(g.argv[g.argv.index("--settings") + 1]).read_text())
+    assert g_layer["crossSessionInbound"] == "refuse"
+    assert "crossSessionInbound" not in json.loads(hooks_path.read_text())
     dashed = ad.launch(profile="", resume=None, prompt="-1 is the answer", unattended=False, cwd=tmp_path)
     assert dashed.argv[-2:] == ["--", "-1 is the answer"]
     with pytest.raises(KeyError, match="unknown profile"):

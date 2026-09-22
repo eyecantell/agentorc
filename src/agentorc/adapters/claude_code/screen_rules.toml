@@ -16,6 +16,24 @@ all = ["Yes, proceed|No, exit"]  # the dialog's own options: the question alone 
 pending = { kind = "question", text = "trust this folder? (answer in the terminal)" }
 
 [[rules]]
+# A message from another Claude session through the tool's own peer channel, held because the two
+# sessions' permission-mode classes differ (TD-102): Claude Code draws a "Held message from another
+# session" panel with a two-item menu and waits, no hook fires for it, and the session read as
+# `idle (hook)` while its composer was blocked (samscrape's manager, 2026-09-22). Deliver or deny
+# is a person's call — §9 invariant 6: the core never types a menu choice into a pane.
+# The panel's heading sits more than TAIL_LINES above the menu once the message preview is drawn,
+# so the rule keys on the two menu lines, each anchored to its whole line: the options quoted in
+# prose (the ledger, the design, this comment) never start a line and never end one.
+# Priority just under the trust dialog: while the panel is up nothing else on the screen can be acted on.
+id = "held-peer-message"
+state = "needs-you"
+priority = 95
+region = 15
+all = ["^\\s*(❯\\s*)?(\\d+\\.\\s*)?Deny\\W+drop it and tell the sender it was declined\\s*$"]
+any = ["^\\s*(❯\\s*)?(\\d+\\.\\s*)?Deliver this message to Claude\\s*$"]
+pending = { kind = "question", text = "a message from another Claude Code session is held (deliver or deny in the terminal)" }
+
+[[rules]]
 # The tool's own limit message (the ADR's three usage-limit screens), before TD-001's poll sees it.
 id = "usage-limit"
 state = "limited"

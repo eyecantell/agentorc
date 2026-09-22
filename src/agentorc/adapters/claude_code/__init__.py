@@ -151,14 +151,20 @@ CADENCE_HOOK_TIMEOUT = 150  # > 5 children × the runner's 25 s child timeout
 CADENCE_WIRED_MARKERS = ("scripts/cadence_hooks.sh", "scripts/nudge_user_attention.py")
 
 
-def hooks_file(profile: Profile, cadence_line: bool = False) -> Path:
-    suffix = "+cadence" if cadence_line else ""
+def hooks_file(profile: Profile, cadence_line: bool = False, unattended: bool = False) -> Path:
+    suffix = ("+cadence" if cadence_line else "") + ("+unattended" if unattended else "")
     return paths.home() / "claude-hooks" / f"{profile.name}{suffix}.json"
 
 
-def hooks_settings(profile: Profile, hook_cmd: str = "agentorc-hook", cadence_line: bool = False) -> dict:
-    """The settings layer passed with `--settings`. Only hooks; the profile's own settings still apply.
-    With `cadence_line`, SessionStart also runs dev-cadence's hook runner (CADENCE_HOOK_LINE)."""
+def hooks_settings(
+    profile: Profile, hook_cmd: str = "agentorc-hook", cadence_line: bool = False, unattended: bool = False
+) -> dict:
+    """The settings layer passed with `--settings`. Hooks, and one setting; the profile's own settings
+    still apply. With `cadence_line`, SessionStart also runs dev-cadence's hook runner
+    (CADENCE_HOOK_LINE). With `unattended`, the tool's own peer messages are refused (design §4.10
+    *The tool's own peer channel*, TD-064): its default holds one behind a deliver-or-deny panel that
+    no hook reports and nobody at an unattended pane answers; the sender is told, and `ao msg` is the
+    channel. An interactive launch keeps the tool's default — its person is there to answer."""
     hooks: dict[str, list] = {}
     for ev in HOOK_EVENTS:
         # PermissionRequest may block for the whole permission wait; the others must be instant.
@@ -168,7 +174,10 @@ def hooks_settings(profile: Profile, hook_cmd: str = "agentorc-hook", cadence_li
         hooks["SessionStart"][0]["hooks"].append(
             {"type": "command", "command": CADENCE_HOOK_LINE, "timeout": CADENCE_HOOK_TIMEOUT}
         )
-    return {"hooks": hooks}
+    layer: dict = {"hooks": hooks}
+    if unattended:
+        layer["crossSessionInbound"] = "refuse"
+    return layer
 
 
 def repo_wires_cadence(cwd: Path) -> bool:
@@ -185,12 +194,12 @@ def repo_wires_cadence(cwd: Path) -> bool:
     return any(m in c for c in cmds for m in CADENCE_WIRED_MARKERS)
 
 
-def write_hooks_file(profile: Profile, cwd: Path | None = None) -> Path:
+def write_hooks_file(profile: Profile, cwd: Path | None = None, unattended: bool = False) -> Path:
     """Write the layer for this launch: the `+cadence` variant when `cwd` does not wire dev-cadence's
-    hooks itself. Two files per profile, chosen by name, so concurrent launches into different
-    directories never overwrite each other's choice."""
+    hooks itself, the `+unattended` variant for an unattended launch. Up to four files per profile,
+    chosen by name, so concurrent launches never overwrite each other's choice."""
     cadence_line = cwd is not None and not repo_wires_cadence(cwd)
-    p = hooks_file(profile, cadence_line)
+    p = hooks_file(profile, cadence_line, unattended)
     p.parent.mkdir(parents=True, exist_ok=True)
     cmd = shutil.which("agentorc-hook")
     if cmd is None:
@@ -200,7 +209,7 @@ def write_hooks_file(profile: Profile, cwd: Path | None = None) -> Path:
             "agentorc-hook not on PATH (%s); hooks for profile %s may never fire", os.environ.get("PATH"), profile.name
         )
         cmd = "agentorc-hook"
-    p.write_text(json.dumps(hooks_settings(profile, cmd, cadence_line), indent=1), encoding="utf-8")
+    p.write_text(json.dumps(hooks_settings(profile, cmd, cadence_line, unattended), indent=1), encoding="utf-8")
     return p
 
 
@@ -256,7 +265,7 @@ class ClaudeCodeAdapter:
         prof = profiles_mod.get(profile or None)
         adapter_id = resume or str(uuid.uuid4())
         pretrust(cwd, prof)
-        argv = [self.binary, "--settings", str(write_hooks_file(prof, cwd))]
+        argv = [self.binary, "--settings", str(write_hooks_file(prof, cwd, unattended))]
         argv += ["--resume", resume] if resume else ["--session-id", adapter_id]
         if name:
             argv += ["--name", name]

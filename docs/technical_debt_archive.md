@@ -974,3 +974,5 @@ The substrate is already there and unused by sessions: the agent's `subscribe` t
 **Why:** a modal that agentorc reads as *idle* is the TD-032 shape again — the resting state of a session waiting on a person, shown for a session that is not resting — and a manager blocked behind one runs no rounds, so nothing on its team is watched until a person happens to look.
 
 **Related:** TD-032 (the Remote-Control stand-down, the same *idle under a modal* shape), TD-041 (interactive sessions out of reach), §4.10 (mail).
+
+**Resolved:** 2026-09-22 (PR #430, folded into TD-064) — nothing was built under this number; the screen rule and the briefs' sentence were built under TD-064 by PR #431.
