@@ -1277,7 +1277,7 @@ Screens:
    *new* mail) — an idle card with unread mail is blue twice, which reads rightly: it is at rest
    and has been spoken to. The legend (`docs/mockups/gen.py`, *States & badges*) changes with the
    tokens. **One order, no control**
-   (2026-09-18; **second pass 2026-09-21, built the same day, PR #N-MINE: within one urgency an `interactive` session
+   (2026-09-18; **second pass 2026-09-21, built the same day, PR #391: within one urgency an `interactive` session
    sorts ahead of an unattended one** — *one urgency* is one value of the rank the server already
    sorts by, and the key becomes **(rank, interactive first, name)**; a worker that needs a
    person still outranks the person's own idle session, and the manager's card is placed first
@@ -1452,7 +1452,7 @@ noted). If a control is not in this table it does not exist.
 | top bar | **New session** | opens the New session form |
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
 | Org | ~~**Urgent first / Pinned**~~ | dropped 2026-09-18: there is one order — the manager, then urgency, inside a team; a live team with a `needs-you` session above the other live teams — and no control for it. A `needs-you` card keeps its ring and the header its *n needs you* count; the list to work through is the Inbox (TD-069) |
-| Org | ***mine*** | design 2026-09-21, TD-095 second pass, built 2026-09-21, PR #N-MINE (remembered per browser, as a team's fold is): one press beside the filter that shows only `interactive` sessions — the person's own, a taken-over worker included — and a second press that shows everything again. A toggle, not a word typed into the box: it has no value to type. **It composes with whatever is typed**, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing |
+| Org | ***mine*** | design 2026-09-21, TD-095 second pass, built 2026-09-21, PR #391 (remembered per browser, as a team's fold is): one press beside the filter that shows only `interactive` sessions — the person's own, a taken-over worker included — and a second press that shows everything again. A toggle, not a word typed into the box: it has no value to type. **It composes with whatever is typed**, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing |
 | Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
 | Org banner | **Retry** | asks the host agent on an unreachable host again now instead of on the next tick |
 | card | **Allow / Deny** | answers a pending permission through the hook channel; shown with the time left |
@@ -1957,7 +1957,7 @@ template, a default lane shape, default grants, and — since 2026-09-13, §4.9 
 pick-list adds an agent by skillset in one choice; the record keeps the name as `role` for the
 badge and nothing keys on it (§9 invariant 9). A preset may also carry an **`icon:`** (2026-09-19,
 TD-074) — one name from a fixed set the UI ships (`flag`, `wrench`, `search`, `eye`, `book`,
-`shield`, `terminal`; **`person` is reserved for the card's *interactive* mark** and refused as a role's icon, with that reason — §4.5 *The card's anatomy*, TD-095, built 2026-09-21, PR #N-MINE; an unknown name is refused when the file is read, as an unknown grant is), never
+`shield`, `terminal`; **`person` is reserved for the card's *interactive* mark** and refused as a role's icon, with that reason — §4.5 *The card's anatomy*, TD-095, built 2026-09-21, PR #391; an unknown name is refused when the file is read, as an unknown grant is), never
 markup from a config file — drawn small and monochrome inside the role badge, so the state tile
 stays the one coloured thing on a card. The built-ins carry `manager: flag`, `grinder: wrench`,
 `hunter: search`. It is a label's picture and nothing more: **a card's layout does not vary by
