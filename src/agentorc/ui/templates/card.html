@@ -83,6 +83,9 @@
       <button class="btn sm next" data-act="deny" data-id="{{ s.id }}">Deny</button>
     {% elif s.next_act == 'forget' %}
       <button class="btn sm next" data-act="remove" data-id="{{ s.id }}">Forget</button>
+    {% elif s.next_act == 'message' %}
+      {# a seat on call (TD-097): asking it is how it comes — the same control as *more*'s #}
+      <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail a question into its inbox — that is what fills the seat (design §4.9b)">Message…</button>
     {% elif s.next_act == 'close' %}
       <button class="btn sm next" data-act="close" data-id="{{ s.id }}">Close session</button>
     {% endif %}

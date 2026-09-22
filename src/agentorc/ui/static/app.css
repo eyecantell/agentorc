@@ -83,6 +83,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 /* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
 .pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
 .pill.s-closed::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; }
+.pill.s-oncall::before { content: "◇"; font-size: 11px; }  /* a seat with nobody in it (TD-097) */
 .sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: 9px; letter-spacing: 0; }  /* not the idle glyph's tuning */
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
@@ -206,7 +207,7 @@ input.input, select.input, textarea.input { width: 100%; } textarea.input.tall {
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
 .s-idle { background: var(--idle-bg); color: var(--idle-fg); } .s-stalled { background: var(--stalled-bg); color: var(--stalled-fg); }
 /* the shared idle / exited / unreachable rule is split (TD-095): what is over is grey, idle is not */
-.s-exited, .s-closed, .s-unreachable { background: var(--ended-bg); color: var(--ended-fg); } .s-limited { background: var(--limited-bg); color: var(--limited-fg); }
+.s-exited, .s-closed, .s-oncall, .s-unreachable { background: var(--ended-bg); color: var(--ended-fg); } .s-limited { background: var(--limited-bg); color: var(--limited-fg); }
 .badge { display: inline-block; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; font-size: 10px; color: var(--muted); font-family: "JetBrains Mono", monospace; background: transparent; }
 .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
 .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; }

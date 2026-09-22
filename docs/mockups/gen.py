@@ -217,6 +217,7 @@ SESS = [
         ("tdgrind-2", "claude-code · grind · sonnet", "stalled", "47m", "wt/tdgrind-2 → td-296", "3 unpushed", "hook", "no output 47m · creds expire in 0.2h", "unattended"),
         ("tdgrind-3", "claude-code · grind · sonnet", "limited", "9m", "wt/tdgrind-3 → td-290", "", "hook", "5h window at 100% · resets 02:00 MDT (1h 51m)", "unattended"),
         ("tdgrind-4", "claude-code · grind · sonnet", "idle", "1h 12m", "wt/tdgrind-4 → td-299-summaries-fallback", "", "hook", "", "unattended"),
+        ("techlead-1", "claude-code · grind · opus", "exited", "2h", "wt/techlead-1", "", "hook", "", "unattended"),
         ("errors-alerts", "claude-code · paul (max) · opus", "idle", "3h", "wt/errors-alerts", "dirty · 2 unpushed", "hook", "", ""),
     ]),
     ("kmaster", "contractmatch", "/home/kmaster/contractmatch", [
@@ -295,6 +296,9 @@ EXTRA = {
     # *idle · unseen*; the ending is said once, in the slot, and *ready to close ✓* is its caption
     "tdgrind-4": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "#809 · 2/2 done",
                   "unseen": True, "ready": True, "ending": "out of work — nothing open on the ledger that my brief lets me take"},
+    # the team's seat (§4.9b), ended between questions as designed: `exited` in every payload, drawn
+    # *◇ on call* with what would make it come, and Message… first (§4.5, TD-097)
+    "techlead-1": {"team": "samscrape-grind", "role": "techlead", "under": "orc-1", "report": "3 answered", "seat": True},
     "main":      {"findings": "1 filed"},
     "errors-alerts": {"title": "Error Checker"},
 }
@@ -360,13 +364,15 @@ def team_desktop():
         name, tool, state, age, where, flag, conf, pending, tag = s
         e = EXTRA.get(name, {})
         unseen = state == "idle" and e.get("unseen")
+        seat = state in ("exited", "done") and e.get("seat")
         ready = e.get("ready") or pending.startswith("ready")
         # (1) name and state: the tool's title only when it differs from the name; the pill says the
         # state and nothing else — a declaration is not a state, so *out of work* is `idle`
         title = e.get("title")
         title_html = (f'<span class="meta fill" title="the session\'s name as its tool holds it">{title}</span>'
                       if title and title != name else "")
-        state_pill = pill("idle", "● idle · unseen") if unseen else pill(state, scraped=(conf == "scraped"))
+        state_pill = (pill("idle", "● idle · unseen") if unseen else pill("exited", "◇ on call") if seat
+                      else pill(state, scraped=(conf == "scraped")))
         # (2) what it is: role, mode (a word, never pressable), marks, the stops note, the one clock
         role = (f'<span class="badge" title="the role preset it was started under (design §4.8)">'
                 f'{role_icon(e["role"])}{e["role"]}</span>') if e.get("role") else ""
@@ -397,6 +403,8 @@ def team_desktop():
             cls, text = "bad", pending
         elif state == "unreachable":
             text = pending
+        elif seat:
+            text, cap = "on call — comes on the next question", f"last came · {age} ago"
         elif state == "exited":
             cls, text = "end", "exited · code 0"
         elif state == "done":
@@ -422,6 +430,8 @@ def team_desktop():
             rest = focus
         elif state == "limited":
             first, rest = '<span class="next">Switch profile…</span><span class="lk">Wait</span>', focus
+        elif seat:
+            first, rest = '<span class="next">Message…</span>', details  # asking it is how it comes
         elif state == "exited":
             first, rest = '<span class="next">Forget</span>', details
         elif state == "done":
@@ -488,7 +498,9 @@ def team_desktop():
         place = places.pop() if len(places) == 1 else "mixed"
         counts = {}  # by state, in the grid's own order (members are sorted already); needs you is the pill
         for h, r, x in counted:
-            w = "unseen" if x[2] == "idle" and EXTRA.get(x[0], {}).get("unseen") else WORDS.get(x[2], x[2])
+            ex = EXTRA.get(x[0], {})
+            w = ("unseen" if x[2] == "idle" and ex.get("unseen") else "on call" if x[2] == "exited" and ex.get("seat")
+                 else WORDS.get(x[2], x[2]))
             if x[2] != "needs":
                 counts[w] = counts.get(w, 0) + 1
         tally = " · ".join(f"{n} {w}" for w, n in counts.items())
@@ -501,7 +513,7 @@ def team_desktop():
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
   <div style="display: flex; align-items: center; gap: 10px;">
     <span style="font-size: 16px; font-weight: 600;">Org</span>
-    <span class="muted">14 sessions · 1 team · </span>{pill("needs", "1 needs you")}{pill("limited", "1 limited")}{pill("stalled", "1 stalled")}
+    <span class="muted">15 sessions · 1 team · </span>{pill("needs", "1 needs you")}{pill("limited", "1 limited")}{pill("stalled", "1 stalled")}
     <span style="flex-grow: 1;"></span>
     <span class="input" style="width: 200px; height: 28px; color: #9ca3af;">filter…</span>
     <span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">profile: all ▾</span><span class="btn ghost" style="color: #9ca3af;">☐ show command runs (2)</span>
@@ -525,11 +537,15 @@ def team_phone():
             cls = {"limited": "lim", "done": "ok", "unreachable": ""}.get(state, "bad" if (state in ("stalled",) or pending.startswith("not done")) else "")
             pend = f'<div class="status {cls}" style="white-space: normal; margin-top: 8px;">{pending}</div>' if pending else ""
             actions = f'<div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;">{ICON["focus"]}Focus</span></div>'
+        seat = state == "exited" and EXTRA.get(name, {}).get("seat")
+        if seat:  # a seat with nobody in it (§4.5, TD-097): what would make it come, and Message… first
+            pend = '<div class="status" style="white-space: normal; margin-top: 8px;">on call — comes on the next question</div>'
+            actions = '<div style="display: flex; gap: 8px; margin-top: 10px;"><span class="btn ghost" style="height: 44px; flex-grow: 1; justify-content: center; border-color: #dfe3e8;">Message…</span></div>'
         flag_html = f'<div class="flag" style="margin-top: 6px;">{ICON["warn"]}{flag}</div>' if flag else ""
         place = f"{host} / {repo} · {where}" if repo else f"{host} / {where}"
         return f'''<div class="card{" off" if state == "unreachable" else ""}" style="padding: 12px 12px 12px 14px; position: relative; overflow: hidden;">
   <div class="sbar" style="background: {BAR[state]};"></div>
-  <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">{name}</span><span style="flex-grow: 1;"></span>{pill(state, scraped=(conf == "scraped"))}</div>
+  <div style="display: flex; align-items: center; gap: 8px;"><span class="name" style="font-family: 'JetBrains Mono', monospace; font-size: 15px; font-weight: 600;">{name}</span><span style="flex-grow: 1;"></span>{pill("exited", "◇ on call") if seat else pill(state, scraped=(conf == "scraped"))}</div>
   <div class="meta" style="margin-top: 4px; color: #374151;">{place}</div>
   <div class="meta" style="margin-top: 2px;">{tool} · {age}</div>
   {flag_html}{pend}{actions}
