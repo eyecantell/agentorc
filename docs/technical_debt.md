@@ -918,7 +918,7 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **The report line, 2026-09-21 (grinder-ao-1, handed over by grinder-ao-2):** `report_line()` in `src/sessionorc/models.py` — the one formatter for the card and `ao status -v` — drops ` → #N` when the entry's reference is that PR, so it reads `#359 · 1/2 done`; a different PR is still named (`#360 → #361`). `src/sessionorc`, so the anchor merges it.
 
-**Promoted 2026-09-21 18:26 local (the anchor), with #383 and #385 merged into it — the page Paul looks at is this one.** The anchor's own headless look at 1400 px, three cards across: the six rows hold and the foot is quiet, but row 2 and row 4 truncate on a card that narrow — *unattend…*, *paul ·…*, *TD-431~ → #936 …* — so the mode word and the account are the first things cut. Not fixed; for Paul's look and the polish pass after it.
+**Promoted 2026-09-21 18:29 local (the anchor), right after #383 (18:18) and #385 (18:28) merged — the page Paul looks at is this one.** The anchor's own headless look at 1400 px, three cards across: the six rows hold and the foot is quiet, but row 2 and row 4 truncate on a card that narrow — *unattend…*, *paul ·…*, *TD-431~ → #936 …* — so the mode word and the account are the first things cut. Not fixed; for Paul's look and the polish pass after it.
 
 **Done when** §4.5 and §4.5a say what a card carries, once each, and where; the mockups show it; the page matches them; and Paul has looked at the live page and said so.
 
