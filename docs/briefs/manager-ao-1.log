@@ -196,3 +196,7 @@
 - Escalations: none on the board. One note to the person.
 - For a §6 policy: the hand rule's check is mechanical: a merged member PR whose files match `src/sessionorc/|docs/briefs/|org.yml` and that has no anchor comment. It belongs in check_cadence.py as a row, or better, before the merge as TD-093's `held:`. Two slips in two runs came from a brief that lacked a line, and a gate needs no line in a brief.
 - Also: a worker's branch name derives a claim (`td097-…` while it worked TD-088), and the claim lease doesn't see derived collisions. That's worth a line in TD-093's or the lease's ledger entry for the anchor to weigh.
+
+## Run of 2026-09-22 from 21:55Z
+
+15:56  grinder-ao-1, grinder-ao-2: working (free-pick, just started). techlead-ao-1: idle, 0 waiting → closed. Merged since last run #424–#429: anchor branches, not members. No open PRs; no relays owed (every cadence-changes entry predates these records)
