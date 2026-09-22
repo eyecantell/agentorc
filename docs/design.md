@@ -242,7 +242,7 @@ uses it when the session directory's own `.claude/settings.json` — the worktre
 the tool will load — does not already run those hooks: a worktree whose settings predate a hook
 change still runs the current set, and the line is a no-op in a directory that is not a
 dev-cadence consumer. A directory that wires them itself gets the plain layer, or each hook would
-run twice — the pre-2026-09-11 per-hook block counts as wiring them, so such a worktree runs only the hooks its block names until its branch carries the runner line. The line is byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`).
+run twice — the pre-2026-09-11 per-hook block counts as wiring them, so such a worktree runs only the hooks its block names until its branch carries the runner line. The line is byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`). **An unattended launch's layer also refuses the tool's own peer messages** (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064); the variants are separate files named for what they carry (`<profile>+cadence+unattended.json`), so concurrent launches never overwrite each other's.
 Rules and tools stay in the repo — a hand-started session, a human, a clone on another machine
 need them without agentorc; only the wiring for agentorc's own sessions lives here. The hook script (`agentorc-hook`) knows which agentorc session
 it belongs to from `AGENTORC_SESSION`, and which agent to talk to from `AGENTORC_HOME`; the host
@@ -382,14 +382,6 @@ and the footer carries a failed `/rc`. The pane lives, the tool answers, and not
 resting between turns, which is why an unattended worker it happened to sat twenty hours with its
 PR unmerged and nothing flagged it (TD-032). A screen rule reads the banner as `stalled?` with a
 note saying so, and a `stalled?` card shows that note above its tail.
-
-**A held peer message is a menu.** Claude Code delivers a message from another Claude session
-(its own peer channel, not agentorc's mail) straight into the conversation only when both run the
-same permission-mode class; otherwise it draws a panel, *Held message from another session*, with
-a deliver-or-deny menu, and waits. No hook fires for it, so the session read as `idle` with its
-composer blocked (a manager, 2026-09-22, TD-102). A screen rule reads the two menu lines as
-`needs-you` with a `question` pending; deliver or deny is a person's (§9 invariant 6), and the
-briefs and `ao --skill` forbid the channel — `ao msg` is the one sessions use (§4.10).
 
 ### 4.2a Profiles: tool · account · model
 
