@@ -2103,7 +2103,7 @@ session would make every one of those lie. So:
   read around. It is now a built-in preset like the others; the reserved-words table stays, empty,
   for the next word decided before it is built.
 - **A role has a display label.** A preset or a `roles:` entry may carry **`label:`** — *Manager*,
-  *Tech lead*, *Grinder*, *Hunter* are the built-ins'; the default is the role's name with its
+  *Tech Lead*, *Grinder*, *Hunter* are the built-ins'; the default is the role's name with its
   first letter raised; `plain` has none and draws no badge, as today. The label is what the role
   badge, the team header and an Inbox row **show**; the key is what everything else reads —
   `--role`, `--json`, the record's `role` field — and nothing keys on a label. It is a person's
@@ -4108,7 +4108,7 @@ unattended:
   workers: 3
   brief: ~/.tdgrind/{name}-prompt.md
   window: {weekday: "20:00-06:00", weekend: all}
-  usage_gate: {pct: 70, per_window: {wk: 60}}   # any window at or above `pct`; a label may set its own (§4.3)
+  usage_gate: {pct: 70, per_window: {week: 60}}   # any window at or above `pct`; a label may set its own (§4.3)
   wrapup_minutes: 15
   creds_min_hours: 0.25
 roles:                                # §4.8 presets; every key optional, built-ins apply otherwise
