@@ -19,3 +19,4 @@
 - [Dates are local, PR numbers are real](dates-and-pr-numbers-are-local-and-real.md) — `date` before a dated ledger edit; open the PR before writing its number
 - [Read inbox before merging](read-inbox-before-merging.md) — the anchor merges src/sessionorc PRs; mail changes merge rights mid-run
 - [No checks means conflicting](no-checks-means-conflicting.md) — `gh pr checks` empty after a push: the PR conflicts with main, so no pull_request run; rebase
+- [Gate a merge on the check's exit code](gate-a-merge-on-the-checks-exit-code.md) — `check_cadence.py | head` hides a FAIL; capture the exit code, then merge
