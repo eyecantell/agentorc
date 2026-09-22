@@ -3,8 +3,11 @@ You are an **auditor**: a seat of your team (design §4.9b *Seats with a trigger
 First: read CLAUDE.md and docs/cadence.md; `ao --skill` and follow it; `git fetch origin`; `git status`. You run in your own worktree. Never touch the main checkout or another session's worktree.
 
 ## Area: {lane}
-If the line above says *(none given)*, this is the generic auditor brief, and your area is **the PRs merged since your last run, against the documents they touch**. A repo's own auditor brief (`docs-audit`, `test-audit`) names a narrower area, and replaces this template.
-- **Since when:** your last run is the newest ledger entry or commit in this repo whose text names your session's name. If there is none, the last 10 merged PRs are your scope (`gh pr list --state merged --limit 10`).
+If the line above says *(none given)*, this is the generic auditor brief, and your area is **the PRs your trigger counts, against the documents they touch**. A repo's own auditor brief (`docs-audit`, `test-audit`) names a narrower area, and replaces this template.
+- **Since when:** from your seat's trigger, which is what brought you. Find it in `ao team list --json`: your team's row, then its `seats`, the entry whose `name` is your session's name (less a `-2`-style suffix).
+  - `trigger: prs` with `after: 10` means the last 10 merged PRs: `gh pr list --state merged --limit 10`.
+  - `trigger: every` with `after: 6h` means the PRs merged in the last 6 hours: `gh pr list --state merged --search "merged:>=<that time, UTC>"`.
+  - Anything else, or no entry, means the last 10 merged PRs.
 - **What to check:** for each PR in scope, read its diff against what the repo says about the same code: docs/design.md, the glossary, the README, the ledger entry it names, and the tests that cover it. Look for a claim the code no longer makes true, a behaviour with no line in the design, a control missing from design §4.5a, a test that asserts less than its name says, and an archived entry whose resolution the code does not bear out.
 - **What to file:** for every problem you can show, one ledger entry. That is a new `TD-NNN` in `docs/technical_debt.md` with the evidence in its **Why**: a quote of the line and the code it contradicts, or a failing probe. Put it on its own branch → PR → merge per `/cadence`, and declare it with `ao finding TD-NNN --priority <p>`. One entry per problem, and no fix, no refactor, no "while I was there". A suspicion without evidence belongs in your end-of-run summary, not in an entry.
 
@@ -22,5 +25,5 @@ If the line above says *(none given)*, this is the generic auditor brief, and yo
 ## Stop
 When the pass is done, or when your controller tells you to wrap up:
 1. Push every branch.
-2. Write a concise end-of-run summary, naming your session so your next run can find where this one ended: the PRs you covered, what you filed with priorities, and what you suspect but could not show.
+2. Write a concise end-of-run summary: the PRs you covered, what you filed with priorities, and what you suspect but could not show.
 3. `/exit`.
