@@ -4069,7 +4069,8 @@ code and needs no grant; a session doing the same work does.
   looked at again on the next tick; the nudge and the seat close run at the home and execute on
   the member's node as any act does. A policy needs no grant and passes no gate; it acts on the
   record's own fields and never on text a session wrote. The rules:
-  1. **Crash restart.** A supervised member that is `exited` by a **natural exit** — `pane` true,
+  1. **Crash restart.** A supervised member **other than a seat** (a seat's ending is its own,
+     and rule 3 is the only rule that fills one) that is `exited` by a **natural exit** — `pane` true,
      the tool left on its own — with **no declaration** (`out_of_work` and `restart_wanted` both
      absent), **no wrap-up asked** (`wrapup_at` and `wrapup_sent_at` empty), **no stop time
      passed**, **not gated** (§6 *Usage gate*: a paused profile is not restarted into a pause)
@@ -4332,8 +4333,8 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
     channel, and is never derived — alone among what the channels carry, it has no derived form,
     because every clause of the test is a judgement over prose the core cannot read. A worker
     that exits without declaring it is a crash and is restarted. `restart_wanted` (TD-083,
-    §4.9a) is the same kind of word under the same rule: the session's own, never derived, and
-    acted on by its controller, never by the core.
+    §4.9a) is the same kind of word under the same rule: the session's own, never derived, and acted on by its controller or, for a supervised member,
+    by the host agent's tick under §6 *Keeping a team running* rule 2 (TD-103), never inferred by the core.
 15. The org's **graph, intent and mail have one writer, the home host agent**; a session's
     **observed state has one writer, its node** (§4.4a). `controllers`, grants, team,
     `unattended`, `supervised` and the supervision marks (§6), stop time, reports, inboxes, `sends`,
