@@ -220,3 +220,4 @@
 17:58  host agent restarted (the anchor's promote); ao wait remade itself. grinder-ao-1: TD-107 step 1 → PR #440 merged, cadence pass (review recorded; no held paths); step 2 → #442 open 23:53Z, touches src/sessionorc → held for the anchor. #441 is the anchor's. grinder-ao-2: idle, finished
 18:04  grinder-ao-1: TD-109 (1) → #443 open, touches docs/briefs → held for the anchor; now TD-104
 18:15  grinder-ao-1: TD-104 dropped (#444 closed); TD-103 → #445 open (ledger only). #442, #443 still wait on the anchor
+18:20  grinder-ao-1: TD-103 done → PR #445 merged, cadence check exit pass (review recorded); now TD-108
