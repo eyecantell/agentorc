@@ -307,3 +307,5 @@
 13:56  New manager-ao-1 instance. Team ao-grind restarted: grinder-ao-1 (working, TD-117), grinder-ao-2 (working), techlead-ao-1 seat idle/empty. Inbox empty. No relays due (last cadence change landed 09-11, before both grinders' 13:55Z start). No open member PRs. No outcomes owed.
 13:56–14:05 quiet (techlead seat closed itself idle/empty, host agent's own tick)
 14:10  grinder-ao-1: TD-117 done → PR #486 merged. Cadence pass (review recorded, ci green, ledger, worktree, pr). No src/sessionorc/briefs/org.yml paths — no anchor hold needed. grinder-ao-2 still on TD-118, pushed td118-ledger-header.
+14:10–14:14 quiet; grinder-ao-1 claimed TD-008 then TD-116; grinder-ao-2 briefly idle then back to working, no action needed (host agent's 20-min nudge, not fired)
+14:14  grinder-ao-1: TD-008 done → PR #488 merged (archive of TD-008/TD-117). Cadence pass, ledger/docs only.
