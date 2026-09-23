@@ -362,7 +362,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
             role = (
                 repoconfig.resolve_role(cfg, args.role, overlay)
                 if getattr(args, "role", None)
-                else repoconfig.Role(name="")
+                else repoconfig.Role(name="", root=cfg.root)
             )
         lane = args.lane or list(role.lane)
         if args.prompt and getattr(args, "brief", None):
@@ -370,7 +370,9 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
                 "--prompt is the whole opening prompt, filling nothing; --brief is a repo's part of a role's; give one"
             )
         brief = getattr(args, "brief", None)
-        supplement = str(pathlib.Path(brief).expanduser().resolve()) if brief else None
+        # relative to the repo the session starts in, as every brief path is (design §4.9), not to
+        # the shell's cwd: `ao new --dir` from elsewhere must read the same file (review of PR #463)
+        supplement = brief or None
         prompt = args.prompt or role.brief_text(lane, supplement=supplement)
         # TD-114's transition (design §4.8): a whole brief given as a supplement repeats the template
         for heading in repoconfig.repeated_headings(prompt or "") if supplement else []:
