@@ -158,6 +158,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-21 (TD-096, on Paul's word): *Focus watches* designed — Focus opens read-only on an unattended session, with Take over and Hand back.
 - 2026-09-21 (TD-097, the word *on call* Paul's): a seat with nobody in it reads *on call*, designed. Why not *exited*: the one card behaving exactly as designed looked like the one that had failed; why not *empty* or *available*: both read at a glance as something the person has to do.
 - 2026-09-22: *on call* built for the techlead seat, keyed on `teamrun.seat_ids`, and the same day for a seat with a trigger, whose slot words and *last ran* come from its trigger (TD-098), the report being the record's report line as on any card.
+- 2026-09-23 (TD-069 step 3, grinder-ao-2, on the techlead's answer): board items joined the Inbox's *Needs you*, counted, with Snooze and Done on §4.4's write-back (grinder-ao-1's `board_edit`). The read half was built first and held back: a counted row a person cannot clear from the page breaks *a row leaves only by an answer*, so the rows waited for the write-back. The Inbox's +1 day and +1 week count from today, not from the item's old date, since an overdue item snoozed a day from its old date would still be overdue.
 - Phone layout: planned for phase 2 with the phone's route in (WireGuard or the tunnel); until then the UI is reachable only over `ssh -L`.
 
 ## 4.5a Controls

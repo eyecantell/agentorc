@@ -115,7 +115,8 @@
     // design §4.5a **Inbox row: state** (TD-069 step 2): a state row on the Inbox page carries the
     // card's own controls, so the press goes to the card's own route — and the row, which is the
     // state and not a copy of it, leaves the moment the state is answered.
-    const staterow = b.closest(".staterow");
+    // a board row (TD-069 step 3) goes the way a state row does: out on the answer, back on a refusal
+    const staterow = b.closest(".staterow, .boardrow");
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
     // A choice made in a row's *more ▾* or *Snooze* menu folds that menu — and only a menu: the
     // nearest `<details>` of any kind used to be closed, and a control that sits in no menu (an FYI
@@ -192,6 +193,17 @@
       // an outcome debt or a trail entry leaves. A list of ids, because *Dismiss all* sends the
       // ones on screen; one press sends a list of one, through the same route and the same RPC.
       if (action === "dismiss") body = { msg: [b.dataset.msg] };
+      // design §4.5a **Due strip / Attention** → **Snooze ▾** / **Done** on a board row (§4.4, TD-069
+      // step 3): the host agent's one-line edit, committed in that repo. The row sends back what the
+      // reader gave it — board, line, text — so the agent can refuse a line that has moved on.
+      if (action === "board") {
+        body = { action: b.dataset.boardAct, board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text };
+        if (body.action === "snooze") {
+          const due = boardDue(b.dataset.when);
+          if (!due) return;
+          body.due = due;
+        }
+      }
       // §4.5a **Inbox row: state**: a state row's snooze. It is keyed on the record **and the row
       // kind** — the home has no mail entry to hang it on — and no `until` is the clear.
       if (action === "attention_snooze") {
@@ -244,6 +256,7 @@
       if (action === "identity_ack") AO.toast("dismissed — the agent's log keeps every alarm, a line each", true);
       if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
+      if (action === "board") AO.toast(body.action === "done" ? "checked off — committed on the board, not pushed" : `snoozed to ${body.due} — committed on the board, not pushed`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
       if (action === "attention_snooze" && String(res.snoozed_until || "").startsWith("dismissed:")) AO.toast("dismissed — the mark stays on the record, and a new one comes back as a new row", true);
       else if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
@@ -704,6 +717,18 @@
 
   // §4.5a **Snooze**: 1 h · tomorrow 08:00 · a date. Returned as a UTC instant, whole seconds,
   // which is what the entry stores; the prompt is in the person's own clock.
+  // A board item's new `Due:` date (§4.5a Snooze ▾: +1 day · +1 week · a date), counted from today
+  // on this browser's own calendar — the board's dates are civil dates, never instants.
+  function boardDue(when) {
+    const day = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const d = new Date();
+    if (when === "1d" || when === "1w") { d.setDate(d.getDate() + (when === "1d" ? 1 : 7)); return day(d); }
+    const s = prompt("Snooze to… (YYYY-MM-DD)", (d.setDate(d.getDate() + 1), day(d)));
+    if (!s) return null;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s.trim())) { AO.toast(`${s}: a date is YYYY-MM-DD`); return null; }
+    return s.trim();
+  }
+
   function snoozeUntil(when) {
     const iso = (d) => new Date(d.getTime() - d.getMilliseconds()).toISOString().replace(/\.\d+Z$/, "Z");
     const d = new Date();
@@ -862,6 +887,9 @@
     // …and nothing else changes while it is down: an empty `html` would blank every section and a
     // `needs` of 0 would claim nothing is waiting, which is precisely what is not known (§4.5)
     if (!got || got.agent_down || !got.html) return;
+    // the board reader's note (TD-069 step 3): a board that could not be read is said, not blank
+    const bn = $("#boardnote");
+    if (bn) { bn.textContent = got.board_note || ""; bn.classList.toggle("hidden", !got.board_note); }
     IN_SECS.forEach((k) => {
       const el = $("#rows-" + k);
       if (el && AO.maySwapSection(el, document.activeElement)) el.innerHTML = got.html[k] || "";

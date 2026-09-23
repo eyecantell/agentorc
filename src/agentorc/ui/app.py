@@ -11,6 +11,8 @@ import json
 import logging
 import math
 import os
+import subprocess
+import sys
 import time
 from collections.abc import Collection, Mapping
 from datetime import UTC, datetime, timedelta
@@ -1424,6 +1426,118 @@ def state_rows(
     return rows
 
 
+# design §4.5 screen 6 / §4.4 (TD-069 step 3): **board items** in the Inbox. The board is each
+# repo's `docs/user_attention.md`, in dev-cadence's format, and its reader is dev-cadence's own
+# `nudge_user_attention.py --report --json` — never a second parser here (§4.4: the items, with the
+# board line each sits on, come from that report). It is run over the boards of the repos this host
+# knows, with the script from the first of them that carries it (a SYNCED file: every copy is the
+# same), at most once every `BOARD_TTL` seconds, since the page and the top bar poll every few.
+BOARD_FILE = Path("docs") / "user_attention.md"
+BOARD_SCRIPT = Path("scripts") / "nudge_user_attention.py"
+BOARD_TTL = 60.0
+BOARD_ACTS = ("snooze", "done")  # §4.5a's two answers to a board row, the `board_edit` RPC's actions
+BOARD_TIMEOUT = 20.0
+
+
+def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
+    """The command that reads the due items of these repos' boards, or None and a note saying why
+    nothing is read. No board anywhere is not a fault and has no note; boards with no reader do,
+    since the Inbox would otherwise look clear when it is not (§4.5 *no silent failure path*)."""
+    rs = [Path(r).expanduser() for r in roots]
+    boards = [str(r / BOARD_FILE) for r in rs if (r / BOARD_FILE).is_file()]
+    if not boards:
+        return None, ""
+    script = next((r / BOARD_SCRIPT for r in rs if (r / BOARD_SCRIPT).is_file()), None)
+    if script is None:
+        return None, f"board items are not shown: no repo here carries {BOARD_SCRIPT}, dev-cadence's reader"
+    argv = [sys.executable, str(script), "--report", "--due-only", "--json"]
+    for b in boards:
+        argv += ["--board", b]
+    return argv, ""
+
+
+def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
+    """Each checkout on `host` → the team whose projects hold it (§4.5 screen 6: *a board item
+    carries its repo, which `org.yml`'s projects map to teams*). A repo two teams share is the
+    first's, in definition order: a row carries one team badge, as a message does."""
+    out: dict[str, str] = {}
+    for tname, t in org.teams.items():
+        for pname in t.projects:
+            p = org.projects.get(pname)
+            for by in p.repos.values() if p else ():
+                path = by.get(host)
+                if path:
+                    out.setdefault(str(Path(path).expanduser().resolve()), tname)
+    return out
+
+
+def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
+    """design §4.5a **Due strip / Attention** rows, as the Inbox draws them (TD-069 step 3): one
+    per item the report says is due today or overdue — its repo, its due words, the whole text, and
+    the board at that line in the editor. `at` is the due date, so *oldest first* in **Needs you**
+    puts the longest overdue first among the states and the mail. The text is the board's, shown as
+    text: nothing here is a control built from it (TD-071 item 8)."""
+    rows: list[dict[str, Any]] = []
+    boards = report.get("boards") if isinstance(report, dict) else None
+    for b in boards if isinstance(boards, list) else ():
+        if not isinstance(b, dict):
+            continue
+        root = str(b.get("root") or "")
+        board = str(b.get("board") or "")
+        label = str(b.get("label") or Path(root).name)
+        team = (teams or {}).get(str(Path(root).resolve()), "") if root else ""
+        for it in b.get("items") or ():
+            if not isinstance(it, dict) or not it.get("text"):
+                continue
+            line, text, tag = it.get("line"), str(it["text"]), str(it.get("due_tag") or "")
+            url = vscode_url(board) if board else ""
+            if url and isinstance(line, int):
+                head, _, query = url.partition("?")
+                url = f"{head}:{line}" + (f"?{query}" if query else "")
+            rows.append(
+                {
+                    "row": "board",
+                    "id": f"board:{root}:{line}",
+                    "repo": label,
+                    "root": root,
+                    "board": board,
+                    "line": line,
+                    "team": team,
+                    "text": text,
+                    "due": str(it.get("due") or ""),
+                    "due_tag": tag,
+                    "at": str(it.get("due") or ""),
+                    "editor": url,
+                    "find": _find_text(label, text, tag, "board"),
+                }
+            )
+    return rows
+
+
+def read_boards(run: Any = subprocess.run) -> tuple[list[dict[str, Any]], str]:
+    """The due board items of the repos this host knows, as Inbox rows, and a note when they could
+    not be read — a reader that failed is said in words, never shown as an empty board (§4.5 *no
+    silent failure path*). On a node the org is the home's (§4.4a), so a node reads none."""
+    if hosts.is_node():
+        return [], ""
+    argv, note = board_argv(hosts.local_host().repos())
+    if argv is None:
+        return [], note
+    try:
+        done = run(argv, capture_output=True, text=True, timeout=BOARD_TIMEOUT, check=False)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return [], f"board items are not shown: the reader did not finish ({e})"
+    if done.returncode != 0:
+        why = (done.stderr or "").strip().splitlines()
+        return [], f"board items are not shown: the reader exited {done.returncode}" + (f" — {why[-1]}" if why else "")
+    try:
+        report = json.loads(done.stdout)
+    except ValueError:
+        return [], "board items are not shown: the reader's output is not JSON"
+    org, _ = org_here()
+    return board_rows(report, repo_teams(org, host_name())), ""
+
+
 def _needs_key(item: dict[str, Any]) -> tuple[int, str]:
     """The **Needs you** order (design §4.5 screen 6): *what is on the tool's clock first (a
     permission's countdown), then oldest first* — across states and mail together, which is why one
@@ -1525,10 +1639,14 @@ def inbox_sections(
     states: Collection[dict[str, Any]] = (),
     trail: Collection[dict[str, Any]] = (),
     attention_snoozed: dict[str, Any] | None = None,
+    boards: Collection[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Design §4.5 screen 6: the person inbox split into the page's three sections, plus what is
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
-    into **Needs you** here rather than anywhere else. Board items are step 3 and join the same way.
+    into **Needs you** here rather than anywhere else. From step 3 the due **board items**
+    (`boards`, from `board_rows`) join it the same way, counted: a due board item is waiting on a
+    person by definition. They carry no snooze of the Inbox's own: a board row's Snooze is §4.4's
+    write-back, which moves its `Due:` date on the board itself.
 
     - **Needs you** — the state rows, open `ask`s to the person (an open `conflict` too: it cannot be addressed to
       the person, §4.10, but one written before that gate would still be a question nobody else
@@ -1608,6 +1726,7 @@ def inbox_sections(
         else:
             out["fyi"].append(e)
     out["fyi"].extend(_trail_rows(trail or (), at))
+    out["needs"].extend(boards)
     out["needs"].sort(key=_needs_key)
     out["steering"].sort(key=lambda e: (not e.get("bound"), str(e.get("bound") or "")))
     out["waiting"].sort(key=lambda e: str(e.get("closed_at") or e.get("at") or ""))
@@ -1824,6 +1943,19 @@ def create_app() -> FastAPI:
                 identity_cache.update(at=now, info={})
         return identity_cache["info"] or {}
 
+    board_cache: dict[str, Any] = {"at": None, "rows": [], "note": ""}
+
+    async def board_items(fresh: bool = False) -> tuple[list[dict[str, Any]], str]:
+        """The Inbox's board rows and the note beside them (TD-069 step 3), read at most once every
+        `BOARD_TTL` seconds and off the event loop: the reader is a subprocess over every board on
+        the host, and the page and the top bar both poll every few seconds. `fresh` reads now — after
+        a Snooze or Done, so the row the person answered is gone from the next refresh."""
+        now = time.monotonic()
+        if fresh or board_cache["at"] is None or now - board_cache["at"] > BOARD_TTL:
+            rows, note = await asyncio.to_thread(read_boards)
+            board_cache.update(at=now, rows=rows, note=note)
+        return board_cache["rows"], board_cache["note"]
+
     async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
         fleet the request already read. Every host the home knows, exactly as the Org shows them —
@@ -1905,6 +2037,7 @@ def create_app() -> FastAPI:
         person_states=person_states,
         person_view=person_view,
         person_inbox=person_inbox,
+        board_items=board_items,
         inbox_html=inbox_html,
     )
     for register in (_pages_routes, _new_routes, _sessions_routes, _teams_routes, _inbox_routes, _stream_routes):
@@ -1914,7 +2047,7 @@ def create_app() -> FastAPI:
 
 def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The Org page and Focus (design §4.5)."""
-    call, seats_of, identity_info = h.call, h.seats_of, h.identity_info
+    call, seats_of, identity_info, board_items = h.call, h.seats_of, h.identity_info, h.board_items
 
     @app.get("/", response_class=HTMLResponse)
     async def org(request: Request):
@@ -1954,7 +2087,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         counts.update({k: sum(1 for v in vs if v["state"] == k) for k in ("limited", "stalled?")})
         strip = teams_view(sessions)
         id_info = {} if agent_down else await identity_info()
-        if entries or vs:
+        boards = [] if agent_down else (await board_items())[0]
+        if entries or vs or boards:
             secs = inbox_sections(
                 entries,
                 states=state_rows(
@@ -1963,6 +2097,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     host=str(id_info.get("host") or host_name()),
                     identity_mode=str(id_info.get("mode") or ""),
                 ),
+                boards=boards,
             )
             person_needs, person_fyi = secs["count"], secs["fyi_n"]
         return templates.TemplateResponse(
@@ -2491,13 +2626,13 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
 
 def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
     """The person's Inbox: the page, its payload and its controls (design §4.10, §4.5a)."""
-    call, person_view, inbox_html = h.call, h.person_view, h.inbox_html
+    call, person_view, inbox_html, board_items = h.call, h.person_view, h.inbox_html, h.board_items
 
     @app.get("/inbox", response_class=HTMLResponse)
     async def inbox_page(request: Request):
         """design §4.5 screen 6 / §4.5a **Inbox page** (TD-069 steps 1 and 2): full width, the
         person inbox and the sessions' states in three sections, and the count that means *what is
-        waiting on a person*. Board items are step 3 and join the same sections here."""
+        waiting on a person*. From step 3 the due board items join **Needs you** too."""
         agent_down = False
         try:
             got, states = await person_view()
@@ -2505,14 +2640,22 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if e.status_code != 503:
                 raise
             got, states, agent_down = {"entries": []}, [], True  # the banner + Retry, never a bare 503
+        # with the host agent down nothing is claimed as waiting — the Org's top bar and the poll say
+        # the same — so the board is left unread rather than counted on this page alone (review of #472)
+        boards, board_note = ([], "") if agent_down else await board_items()
         sections = inbox_sections(
-            got["entries"], states=states, trail=got.get("trail") or (), attention_snoozed=got.get("attention_snoozed")
+            got["entries"],
+            states=states,
+            trail=got.get("trail") or (),
+            attention_snoozed=got.get("attention_snoozed"),
+            boards=boards,
         )
         return templates.TemplateResponse(
             request,
             "inbox.html",
             {
                 "sections": sections,
+                "board_note": board_note,
                 "person_needs": sections["count"],
                 "person_fyi": sections["fyi_n"],
                 "host": host_name(),
@@ -2558,10 +2701,16 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "agent_down": True,
                 "why": str(e.detail),
             }
+        boards, board_note = await board_items()
         sections = inbox_sections(
-            got["entries"], states=states, trail=got.get("trail") or (), attention_snoozed=got.get("attention_snoozed")
+            got["entries"],
+            states=states,
+            trail=got.get("trail") or (),
+            attention_snoozed=got.get("attention_snoozed"),
+            boards=boards,
         )
         got["agent_down"] = False
+        got["board_note"] = board_note
         got["sections"] = {k: [e["id"] for e in sections[k]] for k in INBOX_SECTIONS}
         got["needs"] = sections["count"]
         # §4.10 *The Inbox is a queue*: FYI's own quiet number, **never added to the first** — the
@@ -2602,6 +2751,27 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             else:
                 got = await call(PERSON_ACTS[action], msg=ref)
             return JSONResponse({"ok": True, **got})
+        if action == "board":
+            # design §4.5a **Due strip / Attention** → **Snooze ▾** and **Done** on a board row
+            # (§4.4 *Board write-back*, TD-069 step 3): the host agent edits the one line and commits
+            # it in the repo's main checkout. The row hands back what the reader gave it — the board,
+            # the line and its text — and the agent refuses the edit when that line has moved on.
+            what = str(body.get("action") or "")
+            if what not in BOARD_ACTS:
+                raise HTTPException(400, f"a board row's act is {' or '.join(BOARD_ACTS)}, not {what!r}")
+            try:
+                line = int(body.get("line"))
+            except (TypeError, ValueError):
+                raise HTTPException(400, "a board row's act names the item's line") from None
+            board, text = str(body.get("board") or ""), str(body.get("text") or "")
+            if not board or not text:
+                raise HTTPException(400, "a board row's act names the board and the item's text")
+            due = str(body.get("due") or "").strip() or None
+            if what == "snooze" and not due:
+                raise HTTPException(400, "a snooze names the new date, YYYY-MM-DD")
+            got = await call("board_edit", board=board, line=line, text=text, action=what, due=due)
+            await board_items(fresh=True)
+            return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "dismiss":
             # design §4.10 *The Inbox is a queue* (TD-079 step 2): **Dismiss** and **Dismiss all**.
             # A **list of ids**, because *Dismiss all* dismisses the entries **this browser has on
