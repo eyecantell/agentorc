@@ -145,16 +145,13 @@ HEADER = re.compile(
 )
 
 
-def test_an_entry_with_the_header_carries_all_three_lines_in_order_with_known_values():
+def test_every_open_entry_carries_the_header_in_order_with_known_values():
     """TD-118: `Owner`, `Kind` and `Pickable` after `Added`, so an out-of-work search filters on them.
 
-    The entries are migrated in batches; until the last lands, an entry without any of the three
-    is allowed, and one with some of them must have all three, right after `Added`, with a value
-    from the preamble's list — a typo'd owner would drop an entry out of every filter silently.
+    Every open entry has all three, right after `Added`, with a value from the preamble's list — a
+    missing header or a typo'd owner would drop an entry out of every filter silently.
     """
     for id_, body in entries(OPEN):
-        if not re.search(r"^\*\*(Owner|Kind|Pickable):\*\*", body, re.M):
-            continue
         m = HEADER.search(body)
         assert m, f"{id_}: Owner, Kind and Pickable go together, in that order, right after Added"
         assert m["owner"] in OWNERS, f"{id_}: unknown Owner {m['owner']!r} (one of {sorted(OWNERS)})"
