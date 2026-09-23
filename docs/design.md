@@ -2051,7 +2051,7 @@ template's current ones — so `ao team start` **warns, naming them, and starts 
 supplement carries a Markdown heading whose text, after the `#` marks, is one of the template's — a
 heuristic read, the same shape as the repeatable-brief warning below, not a guarantee against a
 re-worded duplicate; the three repos' briefs are cut the day the build is promoted (TD-114). The recipe
-(`ao team --skill`) says what a supplement contains (TD-114 step 3, not written yet). A template's slot
+(`ao team --skill`) says what a supplement contains, with a skeleton of one. A template's slot
 reads *none* when a repo gives nothing, and the template then stands alone, as a plain `ao new --role
 grinder` starts one. A role the package ships no template for (a repo's own role) has nothing to
 supplement, so its `brief:` is the whole brief. The techlead's `context:` is the same idea for that seat — its primer is

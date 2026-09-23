@@ -132,7 +132,7 @@ nested checkouts that a `git add -A` in the main checkout stages as gitlinks.
 
 ## 4. Say what the roles are
 
-A role is a preset: a brief, a lane, grants, a profile, an icon. Four are built in —
+A role is a preset: a brief, a lane, grants, a profile, an icon. Six are built in —
 
 | role | brief | grants |
 |---|---|---|
@@ -140,6 +140,7 @@ A role is a preset: a brief, a lane, grants, a profile, an icon. Four are built 
 | `grinder` | the package's `grinder.md` | none |
 | `hunter` | the package's `hunter.md` | none |
 | `techlead` | the package's `techlead.md` | none |
+| `auditor` | the package's `auditor.md` | none |
 | `plain` | none | none |
 
 (`lead` and `orchestrator`, the manager's old names, are unknown roles.)
@@ -156,8 +157,10 @@ ledger: docs/technical_debt.md
 
 Resolution is lowest first: the package's built-ins, then an org-wide `roles:` overlay in
 `org.yml`, then the repo's own — each overriding **per key**, so a repo that sets only `brief`
-keeps the built-in's grants. A `brief:` path is relative to the repo root; a built-in name is the
-package's own file. At the start a brief's placeholders are filled: `{lane}` with the member's lane,
+keeps the built-in's grants. A `brief:` path is relative to the repo root. **A repo's brief is a
+supplement, never a replacement** (design §4.8): the package's template is always the brief, and
+the repo's file is filled into its *This repo's rules* section — see *A repo's brief*, below. At
+the start a brief's placeholders are filled: `{lane}` with the member's lane,
 `{techlead}` and `{manager}` with the ids those sessions take, `{context}` with the seat's primer —
 each `none` where there is nothing to name (an empty lane reads `(none given)`).
 
@@ -180,6 +183,39 @@ Check what resolves, from inside the repo:
 ```
 ao roles
 ```
+
+### A repo's brief
+
+The built-in templates hold every agentorc mechanic — the lane loop, claims and leases, the
+cadence review and merge, asking and outcomes, the declarations a run ends with, the usage gate's
+pause, the never-list of `ao` verbs — and move with the package on every promote. They also assume
+agentorc's own layout: `CLAUDE.md` and `docs/cadence.md` as first reads, `pdm run test` and
+`pdm run lint`, `/cadence` and `scripts/check_cadence.py` as the gate, `docs/technical_debt.md`
+and `docs/user_attention.md` as ledger and board. **A repo whose layout, gate or standing rules
+differ says so in its own brief**, and only that. Wherever it is given — a member's or manager's
+`brief:` in the team definition (which takes the slot in place of the role's), a repo's
+`roles.<name>.brief`, or `ao new --role <r> --brief <path>` — it is filled under *This repo's
+rules*, and **where it and the template disagree, the repo's wins**, except that it may add to the
+never-list and never take from it. What the host agent enforces (the usage gate, the restart
+ceiling, the permission gate) no brief moves. A role the package ships no template for takes its
+brief whole.
+
+A skeleton — one short section each, and nothing the template already says:
+
+- **First reads** — the files to read before anything, if not `CLAUDE.md` and `docs/cadence.md`.
+- **Where it works** — the branch naming, the default branch, anything about worktrees the repo
+  does differently.
+- **The gate** — the test and lint commands, the merge check, who reviews and who merges which
+  PRs (e.g. *anything under `src/core/` waits for the anchor*).
+- **Standing rules** — what is never done here: deploys, destructive data operations, files with
+  their own line endings, what waits on the person, whole areas the team leaves alone.
+- **The lane** — what a `free-pick` excludes in this repo, or the context a named list needs.
+- **Asking** — only if it differs from the template's (a techlead, else the person).
+
+`ao team start` and `ao new` say, and start anyway, when a repo's brief repeats one of the
+template's headings — the sign of a whole brief not yet cut down to the repo's own rules — and
+`ao team start` says the same of a clock time or a run number in it: a brief describes the job,
+not the run (design §4.8), because the start is also the restart.
 
 ### A techlead's primer
 

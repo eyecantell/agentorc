@@ -1079,6 +1079,21 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
     assert "not\n  built" in text  # the sentence wraps in the file; the claim is what matters
 
 
+def test_the_recipe_and_every_template_agree_on_the_supplement_slot():
+    """TD-114 / TD-113 (c): the recipe tells a repo its brief is filled under *This repo's rules*;
+    every built-in template must carry that section and its `{repo}` slot, or the recipe lies."""
+    from importlib import resources
+
+    from agentorc import repoconfig
+    from agentorc.cli import team_skill_text
+
+    assert "*This repo's rules*" in team_skill_text() and "### A repo's brief" in team_skill_text()
+    for preset in repoconfig.PRESETS.values():
+        if preset["brief"]:
+            text = resources.files("agentorc").joinpath("briefs", preset["brief"]).read_text(encoding="utf-8")
+            assert "## This repo's rules" in text and "{repo}" in text, preset["brief"]
+
+
 def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
     """TD-113 (b): the recipe lists the keys `.agentorc.yml` takes, so a second repo does not learn
     them from samscrape's files. Each it names is accepted by `repoconfig._apply`, `projects` —
