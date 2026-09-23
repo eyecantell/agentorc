@@ -1065,3 +1065,18 @@ The substrate is already there and unused by sessions: the agent's `subscribe` t
 **Resolved:** 2026-09-23 (PR #486, grinder-ao-1). An optional *why?* box (`input.denywhy`) sits beside Deny on the card, the Focus header and the Inbox's permission row; `AO.denyBody` sends a filled one as the decision's `reason`, and `AO.denyWhys` / `AO.restoreDenyWhys` keep typed text through redraws. Design §4.5a (card, Focus, Inbox rows) and §10 carry it; test `test_deny_carries_an_optional_reason_from_every_place_it_is_offered`, with `test_ui.py`'s permission round trip for the hook half. "Allow for this session" stays *no, not now* in §10.
 
 **Related:** TD-008 (the permission questions), TD-116 (who may decide), design §10.
+
+## TD-008: Deny reason input and "allow for this session" (design §10 open questions)
+
+**Priority:** Low
+**Added:** 2026-09-06
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — both halves decided 2026-09-23; the build is TD-117, which archives this entry
+**Status:** Resolved 2026-09-23 — was: Open — **decided by Paul 2026-09-23: Deny with a reason, yes (TD-117 builds it); "allow for this session", no, not now.** **Design review 2026-09-22:** the deny-with-reason half endorsed as cheap and useful for unattended permission loops; "allow for this session" still not recommended.
+**Location:** `src/agentorc/ui/templates/card.html`, `focus.html`; design §10
+
+**Why:** The hook decision already carries a `reason` (the API and CLI accept one), but the UI's Deny button sends none. "Allow for this session" is not built. Both are open questions in design §10 for Paul to decide (board item).
+
+**Resolved:** 2026-09-23 (PR #486, grinder-ao-1, as TD-117). Both halves decided by Paul 2026-09-23 and marked so in design §10. Deny with a reason is built — the optional *why?* box beside Deny on the card, the Focus header and the Inbox's permission row (design §4.5a); "allow for this session" is *no, not now*, so nothing is built for it and §4.5a lists no such control.
+

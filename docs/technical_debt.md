@@ -19,7 +19,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-004 | Host identity: `hosts.yml` `local` entry complete; ssh entries pending (phase 2, now the node→home link of TD-057) | Medium | Partly done |
 | TD-005 | `pretrust()` can lose a concurrent Claude Code rewrite of `.claude.json` | Low | Open |
 | TD-006 | `.claude.json` location under a custom `CLAUDE_CONFIG_DIR` is assumed, not verified | Low | Open |
-| TD-008 | Deny reason input and "allow for this session" (design §10 open questions) | Low | Open |
 | TD-026 | Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI | Medium | Partly done |
 | TD-028 | Capabilities and report channels: the `orchestrate` grant with a caller check, `progress`/`findings` with `ao progress`/`ao finding`, the card's report line, role presets | Medium | Open |
 | TD-029 | Close from Focus leaves the terminal reconnecting twice a second, printing tmux's "can't find session" until Forget | Medium | Open |
@@ -175,20 +174,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 **Fix:** create a throwaway `CLAUDE_CONFIG_DIR`, run `claude` once, see where `.claude.json` lands, pin it with a test. Done when the second profile (grind) launches without the dialog.
 
 **Related:** TD-005, design §4.2a.
-
-## TD-008: Deny reason input and "allow for this session" (design §10 open questions)
-
-**Priority:** Low
-**Added:** 2026-09-06
-**Owner:** grinder
-**Kind:** build
-**Pickable:** no — both halves decided 2026-09-23; the build is TD-117, which archives this entry
-**Status:** Open — **decided by Paul 2026-09-23: Deny with a reason, yes (TD-117 builds it); "allow for this session", no, not now.** **Design review 2026-09-22:** the deny-with-reason half endorsed as cheap and useful for unattended permission loops; "allow for this session" still not recommended.
-**Location:** `src/agentorc/ui/templates/card.html`, `focus.html`; design §10
-
-**Why:** The hook decision already carries a `reason` (the API and CLI accept one), but the UI's Deny button sends none. "Allow for this session" is not built. Both are open questions in design §10 for Paul to decide (board item).
-
-**Fix:** after the decision: an optional reason field next to Deny (card, Focus, phone); if approved, a third smaller button that updates the session's permission rules through the hook output, never the default. Done when §10 marks both decided and the controls table lists what exists.
 
 ## TD-026: Scheduling: start/stop times and window overrides for unattended sessions, editable from the UI
 
