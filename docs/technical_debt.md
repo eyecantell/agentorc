@@ -71,6 +71,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-115 | A session's own exit hook can be judged outside and refused, and the refusal is applied anyway through the events queue | Medium | Open |
 | TD-116 | `decide` is ungated: any session may answer another session's permission prompt | Medium | Open — decided 2026-09-23 |
 | TD-118 | Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose | High | Open — decided 2026-09-23; profiles split the same day |
+| TD-119 | A session may answer its own permission prompt: the gate passes every acting RPC a session makes on itself, `decide` included | Medium | Open — needs a decision |
 
 ---
 
@@ -1225,3 +1226,19 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix, in order:** (1) **The ledger header** — three fixed lines after `**Added:**` on every open entry, enforced by `test_ledger.py`: `**Owner:** anchor | grinder | paul | dev-cadence`, `**Kind:** build | design-first | live-check | evaluation | decision`, `**Pickable:** yes | no — <one clause>`; the grinder template's out-of-work rule becomes *filter on the header, re-read only what is pickable*, and `ao progress none --why` cites counts by kind and owner (*excluded: 12 design-first, 8 anchor, 6 dev-cadence, 3 live-check*) rather than a sentence per entry; the manager's wind-down board line follows. Migrate the entries in batches of twenty, a grinder's, the test tightened once the last batch lands. (2) `grinder.md`'s first read names cadence §1–§4, as the manager's does; the two restart mentions leave `manager.md`. (3) The hook: dev-cadence scopes the SessionStart nudge to the session's own board, without `--fetch`, when the session is unattended (the fourth item on the board's dev-cadence line); the machine-wide `--fetch` view stays `/attention`'s. (4) After a clean night, `manager` to Haiku, one org line.
 
 **Related:** TD-103 (the rules that left the manager's brief), TD-114 (briefs as supplements), TD-105 and TD-106 (the same theme in mail and identity), TD-060 (the profile names are renamed with the rest).
+
+## TD-119: A session may answer its own permission prompt: the gate passes every acting RPC a session makes on itself, `decide` included
+
+**Priority:** Medium
+**Added:** 2026-09-23 (`grinder-ao-1`, found building TD-116, PR #490)
+**Owner:** anchor
+**Kind:** decision
+**Pickable:** no — whether a self-`decide` is refused is a decision, not yet made
+**Status:** Open — needs a decision: refuse `decide` on the caller's own record, or leave it as `send` to oneself is
+**Location:** `src/sessionorc/mail.py` (`act_gate`: `if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller: return None`), `src/sessionorc/modes.py` (`offline_refusal`, the same self rule), design §4.8 (the gate), §9 invariant 11
+
+**Why:** TD-116 made `decide` an acting RPC "exactly as `send` does", and `act_gate` passes any acting RPC a session makes on **itself**: that is right for `send`, `set_mode` or `close` (a session may type into, or close, its own pane). But a permission prompt exists so that someone other than the session approves the call: a session whose main turn is blocked on the hook can still run `ao allow $AGENTORC_SESSION` from a background task or a subagent and approve its own tool call. The gate already carves out the two RPCs that edit authority (`set_grants`, `set_controllers`) for the same reason; a permission answer is arguably a third. Not changed in PR #490 because the decision said "exactly as `send`".
+
+**Fix:** decide; if yes, add `decide` to the self-exclusion tuple in `act_gate` (and refuse it in `offline_refusal`'s self branch), with the refusal worded as *a session does not answer its own permission prompt (design §4.8)*, a test beside `test_a_session_answers_a_permission_only_as_a_controller`, and §4.8's sentence on the self case updated. A person's `decide` (no caller) is untouched either way.
+
+**Related:** TD-116 (the gate on `decide`), TD-117 (Deny with a reason), design §4.8, §9 invariant 11.
