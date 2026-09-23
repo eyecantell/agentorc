@@ -15,6 +15,7 @@ import time
 from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Annotated, Any
 from urllib.parse import urlencode
 
@@ -1677,6 +1678,113 @@ def create_app() -> FastAPI:
             for g in groups
         ]
 
+    identity_cache: dict[str, Any] = {"at": 0.0, "info": None}
+
+    async def identity_info() -> dict[str, Any]:
+        """This host's identity mode (design §4.8a), for the Org's one-line note. The `identity`
+        RPC is a never-gated read, and it is read at most once every `DEFS_TTL` seconds — the same
+        idiom as the team definitions, so a page under a delta storm never asks per render. An
+        agent that is down or too old to answer leaves the note off rather than the page."""
+        now = time.monotonic()
+        if identity_cache["info"] is None or now - identity_cache["at"] > DEFS_TTL:
+            try:
+                identity_cache.update(at=now, info=await call("identity"))
+            except HTTPException:
+                identity_cache.update(at=now, info={})
+        return identity_cache["info"] or {}
+
+    async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
+        fleet the request already read. Every host the home knows, exactly as the Org shows them —
+        the same records and the same `view()` — plus this host's own identity alarms (§4.8a).
+
+        Rendered server-side on the page's load *and* on its poll: a state that changed between
+        polls is corrected by the next one, and nothing here has to ride the pushed stream to be
+        no more than a few seconds behind the Org."""
+        icons = await role_icons(fleet)
+        seats = await seats_of(fleet)
+        views = [view(s, fleet, icons=icons, seats=seats) for s in fleet]
+        info = await identity_info()
+        return state_rows(
+            views,
+            host_alarms=alarm_view(info.get("alarms")),
+            host=str(info.get("host") or host_name()),
+            identity_mode=str(info.get("mode") or ""),
+        )
+
+    async def person_view() -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        """The mail and the state rows of one Inbox request — over **one** `list`. Both halves need
+        the fleet (the mail for its senders' names, the states for the records themselves), and
+        this runs on every page load and every poll: two fleet lists on that path would be two for
+        no reason (review of PR #251)."""
+        fleet = await call("list")
+        return await person_inbox(fleet), await person_states(fleet)
+
+    async def person_inbox(fleet: list[dict[str, Any]]) -> dict[str, Any]:
+        """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
+        caller and no id — **a person's read, which sets no `read_at`**, because a person is not
+        the session. That is what lets the Inbox page poll it every few seconds without marking
+        anything read and without freeing a depth slot an unanswered question still holds; it is
+        the rule the dialog this page replaces already relied on, so no `peek` was needed. Each
+        sender gets the name it is known by, and `from_open` the id **Open** goes to while that
+        record still exists (§4.5 screen 6: a row opens the session that needs the person)."""
+        got = await call("inbox")
+        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        records = {o.get("id"): o for o in fleet}
+        at = datetime.now(UTC)
+        for e in got["entries"]:
+            e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            e["from_open"] = e["from"] if e["from"] in names else ""
+            _owing(e, records.get(e["from"]), at)
+            e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
+            # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the
+            # client fills in — `left` for a `steer`'s bound, `until_words` for a snoozed entry,
+            # whose row upgrades to the browser's own clock once the script runs.
+            e["left"] = _left(e.get("bound"), at)
+            e["until_words"] = _left(e.get("snoozed_until"), at)
+            # §4.9b (TD-075 step 3): a question **passed up** is the asker's own entry, and the
+            # passer — whose recommendation and suggested answers it carries — is named as a sender is
+            rec = e.get("recommend")
+            if e.get("passed_up") and isinstance(rec, dict) and rec.get("by"):
+                e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
+            # §4.9b: an *answered for you* row names **who asked** — the session Overrule writes
+            # to — by the name it is known by, and opens it while it is here
+            asker = str(_answered_of(e).get("asker") or "")
+            if asker:
+                e["asker_name"] = names.get(asker, asker)
+                e["asker_open"] = asker if asker in names else ""
+        return got
+
+    def inbox_html(sections: dict[str, Any]) -> dict[str, str]:
+        """Each section's rows, rendered by the one template the page itself renders them with, so
+        a poll replaces a section without the client composing any markup — the shape the events
+        stream already uses for team headers. Jinja escapes every field, which is what keeps what a
+        session wrote text and nothing else (TD-071 item 8)."""
+        rows = templates.get_template("inbox_rows.html")
+        return {k: rows.render(rows=sections[k], section=k) for k in INBOX_SECTIONS}
+
+    h = SimpleNamespace(
+        call=call,
+        render_card=render_card,
+        defs=defs,
+        team_rows=team_rows,
+        seats_of=seats_of,
+        group_heads=group_heads,
+        identity_info=identity_info,
+        person_states=person_states,
+        person_view=person_view,
+        person_inbox=person_inbox,
+        inbox_html=inbox_html,
+    )
+    for register in (_pages_routes, _new_routes, _sessions_routes, _teams_routes, _inbox_routes, _stream_routes):
+        register(app, h)
+    return app
+
+
+def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
+    """The Org page and Focus (design §4.5)."""
+    call, seats_of, identity_info = h.call, h.seats_of, h.identity_info
+
     @app.get("/", response_class=HTMLResponse)
     async def org(request: Request):
         # An unreachable agent still gets a page: the banner + Retry are the recovery path
@@ -1767,6 +1875,11 @@ def create_app() -> FastAPI:
                 "active": "Org",
             },
         )
+
+
+def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
+    """New session: the form, its checks, and a shell (design §4.5a *New session*)."""
+    call = h.call
 
     @app.get("/new", response_class=HTMLResponse)
     async def new_form(
@@ -1940,6 +2053,26 @@ def create_app() -> FastAPI:
         s = await call("create", name=name, dir=dir, adapter="shell")
         return RedirectResponse(f"/focus/{s['id']}", status_code=303)
 
+    @app.get("/api/occupancy")
+    async def api_occupancy(dir: str = ""):
+        if not dir.strip():
+            return {"dir": "", "occupants": [], "git": False}
+        return await call("occupancy", dir=dir.strip())
+
+    @app.get("/api/name_check")
+    async def api_name_check(dir: str = "", name: str = "", worktree: bool = False):
+        """What §4.1's name rule would do (design §4.5a, TD-030): the New session form asks as you
+        type, the way it already asks about directory occupancy. `worktree` puts the name in the
+        repo's scope, which is where the session would actually land."""
+        if not (dir.strip() and name.strip()):
+            return {"id": "", "name": name, "verdict": "free", "holder": None, "message": ""}
+        return await call("name_check", dir=dir.strip(), name=name.strip(), repo=dir.strip() if worktree else None)
+
+
+def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
+    """A session's own controls and reads: resume, the card's actions, its inbox, the list."""
+    call, seats_of = h.call, h.seats_of
+
     # -- actions (every control in design §4.5a that exists in phase 1) --------------------------
 
     @app.post("/api/sessions/{sid}/resume")
@@ -2088,20 +2221,29 @@ def create_app() -> FastAPI:
                 await call("seen", id=sid)  # acting on a card counts as looking at it (TD-017)
         return JSONResponse({"ok": True})
 
-    @app.get("/api/occupancy")
-    async def api_occupancy(dir: str = ""):
-        if not dir.strip():
-            return {"dir": "", "occupants": [], "git": False}
-        return await call("occupancy", dir=dir.strip())
+    @app.get("/api/sessions/{sid}/inbox")
+    async def api_inbox(sid: str):
+        """design §4.5a Focus side panel **Inbox** (§4.10 "A bounded body"): bodies never ride the
+        pushed record, so the panel fetches them here. No caller — a person's read, which sets no
+        `read_at`, because a person is not the session. Each sender gets its name beside its id."""
+        got = await call("inbox", id=sid)
+        fleet = await call("list")
+        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        for e in got["entries"]:
+            e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+        return got
 
-    @app.get("/api/name_check")
-    async def api_name_check(dir: str = "", name: str = "", worktree: bool = False):
-        """What §4.1's name rule would do (design §4.5a, TD-030): the New session form asks as you
-        type, the way it already asks about directory occupancy. `worktree` puts the name in the
-        repo's scope, which is where the session would actually land."""
-        if not (dir.strip() and name.strip()):
-            return {"id": "", "name": name, "verdict": "free", "holder": None, "message": ""}
-        return await call("name_check", dir=dir.strip(), name=name.strip(), repo=dir.strip() if worktree else None)
+    @app.get("/api/sessions")
+    async def api_sessions():
+        sessions = await call("list")
+        icons = await role_icons(sessions)
+        seats = await seats_of(sessions)
+        return [view(s, sessions, icons=icons, seats=seats) for s in sessions]
+
+
+def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
+    """Teams: the list, Start, and Stop / Wind down (design §4.9, §4.9a)."""
+    call = h.call
 
     # -- the Teams strip (design §4.5a Org **Teams** strip, §4.9) --------------------------------
     # Start and Stop are `agentorc.teamrun`'s, the sequence `ao team start|stop` runs: every
@@ -2212,102 +2354,10 @@ def create_app() -> FastAPI:
             {"ok": True, "team": name, "now": now, "sessions": st.acted, "manager": pending, "text": msg}
         )
 
-    @app.get("/api/sessions/{sid}/inbox")
-    async def api_inbox(sid: str):
-        """design §4.5a Focus side panel **Inbox** (§4.10 "A bounded body"): bodies never ride the
-        pushed record, so the panel fetches them here. No caller — a person's read, which sets no
-        `read_at`, because a person is not the session. Each sender gets its name beside its id."""
-        got = await call("inbox", id=sid)
-        fleet = await call("list")
-        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
-        for e in got["entries"]:
-            e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
-        return got
 
-    identity_cache: dict[str, Any] = {"at": 0.0, "info": None}
-
-    async def identity_info() -> dict[str, Any]:
-        """This host's identity mode (design §4.8a), for the Org's one-line note. The `identity`
-        RPC is a never-gated read, and it is read at most once every `DEFS_TTL` seconds — the same
-        idiom as the team definitions, so a page under a delta storm never asks per render. An
-        agent that is down or too old to answer leaves the note off rather than the page."""
-        now = time.monotonic()
-        if identity_cache["info"] is None or now - identity_cache["at"] > DEFS_TTL:
-            try:
-                identity_cache.update(at=now, info=await call("identity"))
-            except HTTPException:
-                identity_cache.update(at=now, info={})
-        return identity_cache["info"] or {}
-
-    async def person_states(fleet: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        """The session-state rows of the Inbox (design §4.5 screen 6, TD-069 step 2), from the
-        fleet the request already read. Every host the home knows, exactly as the Org shows them —
-        the same records and the same `view()` — plus this host's own identity alarms (§4.8a).
-
-        Rendered server-side on the page's load *and* on its poll: a state that changed between
-        polls is corrected by the next one, and nothing here has to ride the pushed stream to be
-        no more than a few seconds behind the Org."""
-        icons = await role_icons(fleet)
-        seats = await seats_of(fleet)
-        views = [view(s, fleet, icons=icons, seats=seats) for s in fleet]
-        info = await identity_info()
-        return state_rows(
-            views,
-            host_alarms=alarm_view(info.get("alarms")),
-            host=str(info.get("host") or host_name()),
-            identity_mode=str(info.get("mode") or ""),
-        )
-
-    async def person_view() -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """The mail and the state rows of one Inbox request — over **one** `list`. Both halves need
-        the fleet (the mail for its senders' names, the states for the records themselves), and
-        this runs on every page load and every poll: two fleet lists on that path would be two for
-        no reason (review of PR #251)."""
-        fleet = await call("list")
-        return await person_inbox(fleet), await person_states(fleet)
-
-    async def person_inbox(fleet: list[dict[str, Any]]) -> dict[str, Any]:
-        """The person inbox as every surface here reads it (§4.10, §4.5a): the `inbox` RPC with no
-        caller and no id — **a person's read, which sets no `read_at`**, because a person is not
-        the session. That is what lets the Inbox page poll it every few seconds without marking
-        anything read and without freeing a depth slot an unanswered question still holds; it is
-        the rule the dialog this page replaces already relied on, so no `peek` was needed. Each
-        sender gets the name it is known by, and `from_open` the id **Open** goes to while that
-        record still exists (§4.5 screen 6: a row opens the session that needs the person)."""
-        got = await call("inbox")
-        names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
-        records = {o.get("id"): o for o in fleet}
-        at = datetime.now(UTC)
-        for e in got["entries"]:
-            e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
-            e["from_open"] = e["from"] if e["from"] in names else ""
-            _owing(e, records.get(e["from"]), at)
-            e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
-            # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the
-            # client fills in — `left` for a `steer`'s bound, `until_words` for a snoozed entry,
-            # whose row upgrades to the browser's own clock once the script runs.
-            e["left"] = _left(e.get("bound"), at)
-            e["until_words"] = _left(e.get("snoozed_until"), at)
-            # §4.9b (TD-075 step 3): a question **passed up** is the asker's own entry, and the
-            # passer — whose recommendation and suggested answers it carries — is named as a sender is
-            rec = e.get("recommend")
-            if e.get("passed_up") and isinstance(rec, dict) and rec.get("by"):
-                e["passer_name"] = names.get(str(rec["by"]), str(rec["by"]))
-            # §4.9b: an *answered for you* row names **who asked** — the session Overrule writes
-            # to — by the name it is known by, and opens it while it is here
-            asker = str(_answered_of(e).get("asker") or "")
-            if asker:
-                e["asker_name"] = names.get(asker, asker)
-                e["asker_open"] = asker if asker in names else ""
-        return got
-
-    def inbox_html(sections: dict[str, Any]) -> dict[str, str]:
-        """Each section's rows, rendered by the one template the page itself renders them with, so
-        a poll replaces a section without the client composing any markup — the shape the events
-        stream already uses for team headers. Jinja escapes every field, which is what keeps what a
-        session wrote text and nothing else (TD-071 item 8)."""
-        rows = templates.get_template("inbox_rows.html")
-        return {k: rows.render(rows=sections[k], section=k) for k in INBOX_SECTIONS}
+def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
+    """The person's Inbox: the page, its payload and its controls (design §4.10, §4.5a)."""
+    call, person_view, inbox_html = h.call, h.person_view, h.inbox_html
 
     @app.get("/inbox", response_class=HTMLResponse)
     async def inbox_page(request: Request):
@@ -2498,12 +2548,10 @@ def create_app() -> FastAPI:
             return JSONResponse({"ok": True, "unread": got["unread"], "declined": bool(got.get("declined"))})
         raise HTTPException(404, f"no action {action}")
 
-    @app.get("/api/sessions")
-    async def api_sessions():
-        sessions = await call("list")
-        icons = await role_icons(sessions)
-        seats = await seats_of(sessions)
-        return [view(s, sessions, icons=icons, seats=seats) for s in sessions]
+
+def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
+    """The two websockets: the events stream and the terminal."""
+    call, render_card, seats_of, group_heads = h.call, h.render_card, h.seats_of, h.group_heads
 
     # -- live state ------------------------------------------------------------------------------
 
@@ -2709,8 +2757,6 @@ def create_app() -> FastAPI:
                     await ws.close(code=4404)
                 else:
                     await ws.close()
-
-    return app
 
 
 app = create_app()
