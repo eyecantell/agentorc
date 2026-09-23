@@ -414,6 +414,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
         "lane": lane,
         "role": role.name,
         "ledger": cfg.ledger if cfg.root else None,  # None for a shell: there is no repo file behind it
+        "review": role.review,  # who reads its PRs (design §4.9b *The reader*); None is none
     }
 
 
@@ -539,6 +540,8 @@ def cmd_roles(args: argparse.Namespace) -> int:
                 f"brief: {r.brief or '-'}",
                 f"label: {r.display}",  # what the page shows for it (design §4.8 *The names*)
             ]
+            if r.review:  # who reads its PRs (design §4.9b *The reader*)
+                bits.append(f"review: {r.review['reader']} on {', '.join(r.review['held'])}, {r.review['bound']}")
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
 
     return emit(args, result, prose)
@@ -1187,6 +1190,8 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "thread": args.thread,
         # design §4.9b (TD-075): where a reply's answer is written down; the person is told of it
         "source": args.source,
+        # design §4.9b *The reader* (TD-093): the PR a held author's `ask` puts in front of its reader
+        "pr": args.pr,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
 
@@ -1798,6 +1803,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="a steer's or an ask's bound in seconds (default: the host agent's; an ask to the person takes none)",
     )
     p.add_argument("--cites", help="a conflict: the `sends` ids it cannot reconcile, comma-separated")
+    p.add_argument(
+        "--pr", type=int, metavar="N", help="an ask: the pull request it puts in front of its reader (design §4.9b)"
+    )
     # design §4.10 *Suggested answers* (TD-070): the likely answers on a question, and how a reply
     # picks one of them by the number `ao inbox` prints.
     p.add_argument(

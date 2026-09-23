@@ -34,7 +34,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc.models import GRANTS
+from sessionorc.models import GRANTS, normalize_review
 
 FILE = ".agentorc.yml"
 DEFAULT_ADAPTER = "claude-code"
@@ -42,7 +42,7 @@ DEFAULT_WORKTREES = ".claude/worktrees"
 DEFAULT_ANCHOR = "main-checkout-single"
 DEFAULT_LEDGER = "docs/technical_debt.md"
 DEFAULT_READY_WHEN = ("tree_clean", "branch_pushed", "no_subagents")
-ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon", "label")
+ROLE_KEYS = ("brief", "lane", "grants", "profile", "controllers", "icon", "label", "review")
 # A role's icon (design §4.8 *Role presets*, 2026-09-19, TD-074): one name from the fixed set the UI
 # ships, never markup from a config file. Drawn small and monochrome inside the role badge — a
 # label's picture and nothing more. An unknown name is refused when the file is read, as an unknown
@@ -130,6 +130,7 @@ class Role:
     icon: str | None = None  # one name from `ICONS` (§4.8), or None: the badge draws no picture
     label: str | None = None  # the display label (§4.8 *The names*); None is the default, `display`
     controllers: list[str] = field(default_factory=list)
+    review: dict[str, Any] | None = None  # who reads its PRs (design §4.9b *The reader*, TD-093)
     controllers_set: bool = False  # a layer said `controllers:` — an empty list then means *nobody*,
     # deliberately, and the repo's default is not fallen back to (review of PR #116)
     sources: list[str] = field(default_factory=list)  # `built-in`, `org`, `repo`: which layers spoke
@@ -370,6 +371,13 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             if isinstance(v, str) and len(v.strip()) > LABEL_CAP:
                 raise ValueError(f"{here}.label is longer than {LABEL_CAP} characters")
             out[k] = v.strip() if isinstance(v, str) else None
+        elif k == "review":
+            # §4.9b *The reader* (TD-093): checked by the one function the host agent also applies,
+            # so a typo is a line naming the key when the file is read, never a PR nobody holds
+            try:
+                out[k] = normalize_review(v)
+            except ValueError as e:
+                raise ValueError(f"{here}.{e}") from None
         elif k == "grants":
             grants = _str_list(v, f"{here}.grants")
             grants = list(dict.fromkeys(grants))
@@ -417,6 +425,12 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
             role.icon = block["icon"]
         if "label" in block:
             role.label = block["label"]
+        if "review" in block:
+            # every layer through the one check: `org.yml`'s `roles:` reaches here unchecked
+            try:
+                role.review = normalize_review(block["review"])
+            except ValueError as e:
+                raise ValueError(f"{src} roles.{name}.{e}") from None
         if "controllers" in block:
             role.controllers, role.controllers_set = list(block["controllers"]), True
     return role

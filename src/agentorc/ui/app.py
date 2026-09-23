@@ -2174,6 +2174,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             capabilities=[g for g in dict.fromkeys(grant) if g in GRANTS],
             lane=refs or (list(preset.lane) if preset else []),
             role=preset.name if preset else "",
+            review=preset.review if preset else None,  # who reads its PRs (design §4.9b *The reader*)
             ledger=ledger,
             controllers=[c for c in controller if c.strip()],
             project=project.strip(),  # a badge, exactly as `ao new --project` sets it (§9 invariant 9)

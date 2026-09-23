@@ -98,6 +98,7 @@ HOME_OWNED = frozenset(
         "seat",
         "seat_due",
         "seat_count",
+        "review",
         "wrapup_prompt",
         "pause_prompt",
         "resume_prompt",
@@ -269,6 +270,10 @@ class MailEntry:
     # at their defaults, because `from_dict` keeps only the fields the class declares.
     answers: list[str] = field(default_factory=list)
     answer: int | None = None
+    # A pull request the entry is about (design §4.9b *The reader*, TD-093): the PR number an
+    # author's `ask` puts in front of its reader, an integer so a row can link it and a header can
+    # count it — the text stays the author's summary. Only an `ask` carries one.
+    pr: int | None = None
     # A `system` note whose wake is **uncharged** (§4.10: a lapse is the home's clock, not another
     # session's message). It is on the entry rather than in a set beside the records so that it
     # survives what the entry survives: a resume moves it with the note, and a host-agent restart
@@ -408,6 +413,38 @@ class SendEntry:
         d = dict(d)
         d["from_"] = d.pop("from", d.pop("from_", ""))
         return cls(**{k: v for k, v in d.items() if k in cls.__dataclass_fields__})
+
+
+REVIEW_READERS = ("techlead", "person")
+REVIEW_BOUND = "2h"  # §4.9b *The reader*: a read of a diff, unless the preset says otherwise
+_REVIEW_DURATION = re.compile(r"[1-9]\d*[mhd]")
+
+
+def normalize_review(review: Any) -> dict[str, Any] | None:
+    """A role preset's `review:` (design §4.9b *The reader*, TD-093) as the record keeps it:
+    `{reader, held, bound}` — `reader` is `techlead` or `person`, `held` a list of path globs
+    defaulting to every PR (`**`), `bound` a duration written as a seat's `every:` is (`90m`,
+    `2h`), default two hours. A `ValueError` rather than a guess: a malformed setting would hold
+    nothing and say nothing. The one check, read by the config loader and the host agent alike."""
+    if review is None:
+        return None
+    if not isinstance(review, dict):
+        raise ValueError(f"review: a mapping of reader, held and bound, not {review!r}")
+    unknown = sorted(str(k) for k in set(review) - {"reader", "held", "bound"})
+    if unknown:
+        raise ValueError(f"review: unknown key(s) {', '.join(unknown)}; it takes reader, held and bound")
+    reader = str(review.get("reader") or "")
+    if reader not in REVIEW_READERS:
+        raise ValueError(f"review: reader is one of {', '.join(REVIEW_READERS)}, not {reader or 'nothing'!r}")
+    held = review.get("held", ["**"])
+    if isinstance(held, str):
+        held = [held]
+    if not isinstance(held, list) or not held or not all(isinstance(g, str) and g.strip() for g in held):
+        raise ValueError(f"review: held is a list of path globs, not {held!r}")
+    bound = str(review.get("bound") or REVIEW_BOUND).strip()
+    if not _REVIEW_DURATION.fullmatch(bound):
+        raise ValueError(f"review: bound is a duration such as 90m or 2h, not {bound!r}")
+    return {"reader": reader, "held": [g.strip() for g in held], "bound": bound}
 
 
 def normalize_ref(ref: str) -> str:
@@ -676,6 +713,10 @@ class Session:
     # reading and never reads as zero. Both the home's, computed at the home.
     seat_due: dict[str, Any] | None = None
     seat_count: dict[str, Any] | None = None
+    # Who reads this session's PRs before they merge (design §4.9b *The reader*, TD-093):
+    # `{reader, held, bound}` from its role preset's `review:`, written at start. The home stores
+    # it and times nothing; the author's own `ao` reads it to decide whether a PR is held.
+    review: dict[str, Any] | None = None
     # The other wrap-up (design §4.10 "A pending stop beats mail", TD-052 step 7): when a `send`
     # marked `wrapup` typed the wrap-up prompt — the card's Wrap up, `ao team stop` and a
     # manager's wind-down (§4.9a) — which this package cannot tell from any other send by its
@@ -742,6 +783,7 @@ class Session:
             d.pop("wakes")
         d["unread"] = self.unread()
         d["asks_waiting"] = self.asks_waiting()
+        d["prs_waiting"] = self.prs_waiting()
         d["mail"] = self.mail_marks()
         return d
 
@@ -775,6 +817,28 @@ class Session:
             and not e.passed_up  # the person's to answer now (§4.9b): no seat need be filled for it
             and any(where(x) == mine for x in e.to)
         )
+
+    def prs_waiting(self, *, home: str | None = None) -> dict[str, Any] | None:
+        """Design §4.9b *The reader* (TD-093): of `asks_waiting`, the `ask`s that carry a `pr` —
+        `{n, oldest}`, a number and the oldest one's time, never their text. None when there are
+        none, so a header draws nothing."""
+        storing = home or self.host
+        mine = (self.id, self.host or storing)
+
+        def where(address: str) -> tuple[str, str]:
+            sid, host = naming.split_address(address)
+            return sid, host or storing
+
+        held = [
+            e.at
+            for e in self.inbox
+            if e.open
+            and e.kind == "ask"
+            and e.pr is not None
+            and not e.passed_up
+            and any(where(x) == mine for x in e.to)
+        ]
+        return {"n": len(held), "oldest": min(held)} if held else None
 
     def mail_marks(self) -> dict[str, Any]:
         """What a card and an `ao` reply say about this session's mail without a body: open `ask`s

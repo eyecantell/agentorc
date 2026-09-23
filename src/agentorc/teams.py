@@ -123,6 +123,7 @@ class Launch:
     trigger: dict[str, str] | None = None  # a seat's `{trigger, after?}`, written on its record (§6, TD-103)
     ledger: str | None = None
     host: str = ""  # the host this session lands on; "" is the host the start runs on
+    review: dict[str, Any] | None = None  # who reads its PRs, from its role (design §4.9b *The reader*)
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
@@ -153,6 +154,7 @@ class Launch:
             "supervised": True,
             # a seat's ending is its own: the record says it is one, so no crash restart acts on it
             **({"seat": dict(self.trigger)} if self.trigger else {}),
+            **({"review": dict(self.review)} if self.review else {}),
         }
 
 
@@ -432,6 +434,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         trigger=_trigger(member) if seat else None,
         ledger=cfg.ledger,
         host=host if host != here else "",
+        review=dict(role.review) if role.review else None,
     )
 
 
