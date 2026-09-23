@@ -222,3 +222,4 @@
 18:15  grinder-ao-1: TD-104 dropped (#444 closed); TD-103 → #445 open (ledger only). #442, #443 still wait on the anchor
 18:20  grinder-ao-1: TD-103 done → PR #445 merged, cadence check exit pass (review recorded); now TD-108
 18:50  grinder-ao-1: TD-108 → PR #446 merged, cadence pass (review recorded; no held paths); TD-103 → #447 open, touches src/sessionorc → held. Held for the anchor now: #442, #443, #447
+18:51  grinder-ao-1: declared restart again (context long after 8 PRs; TD-103 slices 2–5 left), idle, clean, pushed, not early → ao close + ao new (restart 2 of 3 in 2 h, the first at 23:18Z)
