@@ -545,14 +545,27 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   until the next promote*), or why that cannot be said — measured on the caller's side, where the
   checkout is. A build with no record (an editable install, a wheel from an sdist, an older
   agent) is *unknown*, never left out.
-- Board write-back. Not built. **Snooze** (edit the `Due:` date) and **Done** (check the item off)
-  on a dev-cadence `user_attention.md` item are one-line edits the host agent makes and commits
-  with a fixed message naming the session (`agentorc: snooze <item> to <date> (session <name>)`),
-  so the main checkout never sits dirty and the history is auditable. The host agent is the only
-  writer to those files from this system; it never pushes. A bounded carve-out from cadence §4's
-  branch → PR rule, proposed upstream to dev-cadence. The items, with the board line each sits
-  on, come from `nudge_user_attention.py --report --json`; the Due strip, the Attention tab and
-  the edits all key on that line number.
+- Board write-back (the RPC is built, TD-069 step 3; no page offers it yet). **Snooze** (edit the
+  `Due:` date, or add one) and **Done** (`- [ ]` → `- [x]`) on a dev-cadence `user_attention.md`
+  item are one-line edits the host agent makes and commits with a fixed message naming the item's
+  head and the session that raised it (`agentorc: snooze <item> to <date> (session <name>)`,
+  `agentorc: done <item> (session <name>)`; `n/a` when the item names none), so the main checkout
+  never sits dirty and the history is auditable. The call is **`board_edit {board, line, text,
+  action, due}`**, the person's alone (refused to every session, as `inbox_delete` is), served by
+  the host whose checkout it is, on a board of a checkout in that host's repos registry and no
+  other file. The host agent is the only writer to those files from this system; it never pushes.
+  A bounded carve-out from cadence §4's branch → PR rule (cadence §4, *tool-made board edits*).
+  The items, with the board line each sits on, come from `nudge_user_attention.py --report
+  --json`; the Inbox, the Due strip, the Attention tab and the edits all key on that line number,
+  **and on the item's text**: the edit is refused unless that line still holds that item, open,
+  word for word — a board edited since the read has moved its lines. **It is refused, touching
+  nothing, whenever the checkout cannot take the commit cleanly**: the checkout on any branch but
+  `origin`'s default (a board edit is committed on the default branch only, never onto someone's
+  feature branch), the board file already carrying uncommitted changes, or a merge, rebase,
+  cherry-pick or index lock under way. The commit takes the board file alone (`--only`), so what
+  else the checkout has staged or edited is left as it was; a commit that fails (a hook, say) or
+  does not finish inside twenty seconds puts the board back as it was, and edits on one host are
+  made one at a time, so two presses never interleave a read and a write. Each refusal says why and what to do, in words the Inbox shows.
 
 ### 4.4a Home and nodes: one session graph across hosts
 
@@ -2303,7 +2316,7 @@ not an answer to the alarm.
   by you*, at the home and on a node's routed act alike.
 - **Log TD** files the alarm where work is picked up (TD-077 b). The host agent does not write a
   repo's ledger — it never commits on a session's behalf (§4.10 *A bounded exchange*), and board
-  write-back (§4.4) is unbuilt — so *filing* is handing it to the session that answers for this
+  write-back (§4.4) only edits an item already on a board, at a person's press — so *filing* is handing it to the session that answers for this
   one: **the record's first live controller**, in the order `controllers` holds them — the
   session that created it (§4.8 *Create adds the creator*), a team member's manager (§4.9) — read
   from the control graph, never from a badge (§9 invariant 9; the host agent does not read
@@ -3738,7 +3751,8 @@ The evidence to re-read is the same: the records of a night's team.
   **`bound_hit`** mark on the thread that both cards and every participant's `ao` replies show — so
   the other side learns the exchange stopped, not only the refused sender. The refused sender
   writes the `user_attention.md` line itself, with the thread attached; the host agent never
-  commits to a board on a session's behalf (board write-back, §4.4, is not built). The person is
+  commits to a board on a session's behalf (board write-back, §4.4, edits an existing item at a
+  person's press and nothing else). The person is
   the tie-break (§10). **A person's message into a thread is never counted, and resets that
   thread**: it clears `bound_hit` and the thread's tally on every record holding it, so the
   sessions may reply to the person's ruling under the same root — the same rule as the wake budget,
@@ -4114,7 +4128,7 @@ code and needs no grant; a session doing the same work does.
      `restart_ceiling: {at, count}` on the record, and the session is a person's: the card's slot
      says *restarts exhausted · 3 in 2 h* as an ending (§4.5 row 5 (b)) and the Inbox lists it
      under *Needs you* (§4.5a **Inbox row: restart**). The host agent writes no board line
-     (§4.4 board write-back is not built); the Inbox row is the person's channel, and a manager
+     (§4.4's write-back edits an item a person pressed, and adds none); the Inbox row is the person's channel, and a manager
      reads the field.
   2. **Wanted restart.** A supervised member carrying `restart_wanted` (§4.9a) that is `idle`, or
      `exited` by a natural exit (`pane` true) — a kill or a Close, a person's or the stop time's,
