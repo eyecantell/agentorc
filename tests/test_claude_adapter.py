@@ -352,6 +352,24 @@ def test_hook_script_queues_when_agent_down(tmp_path, monkeypatch):
     assert json.loads(q) == {"adapter_id": "u", "state": "idle", "pending": None}
 
 
+async def test_a_refused_hook_is_never_queued(agent, tmp_path):
+    """TD-115: an error in the reply is the host agent answering, not an agent that is down. A
+    refusal queued to `events/` was applied unjudged by the next tick — the record went `exited
+    (hook)` two seconds after §4.8a refused the very event."""
+    from sessionorc import identity
+
+    agent.identity_mode = "enforce"
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="a", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+    # from the pytest process, under no pane: a hook from outside is refused
+    cp = await asyncio.to_thread(run_hook, sid, {"hook_event_name": "SessionEnd", "reason": "other"})
+    assert cp.returncode == 0 and cp.stdout == ""
+    assert identity.MISMATCH in cp.stderr
+    assert not (tmp_path / "home" / "events" / f"{sid}.jsonl").exists()
+    await asyncio.sleep(0.3)  # a few ticks: nothing drains into the record
+    assert agent.sessions[sid].state != "exited"
+
+
 def test_pid_alive_corroborates_procstart():
     me = os.getpid()
     stat = Path(f"/proc/{me}/stat").read_text()

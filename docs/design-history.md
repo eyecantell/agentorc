@@ -73,6 +73,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-21 (TD-095 (e)): the unseen mark read *finished · unseen* until this date; Paul's decision renamed it *idle · unseen*, because *finished* is what a member that declared itself out of work is called (§4.9a), and this is a turn nobody has looked at, not a run that is over.
 - 2026-09-21 (TD-095 (f), decided by Paul): the unseen mark never applies to an `unattended` session — its result was read by its manager, the person is not expected to open it, and its slot already says *out of work* with Close session as the act.
 - 2026-09-22 (TD-064, PR #431, grinder-ao-1): the unattended launch's settings layer gained `crossSessionInbound: refuse`, written to its own `<profile>[+cadence]+unattended.json`; the held-peer-message screen rule and the briefs' sentence landed with it. Paul's word: *refuse them*.
+- 2026-09-22 (TD-115, grinder-ao-1): the hook stopped queueing an error reply. Until this date `agentorc-hook` treated any error from the host agent as an agent that was down and appended the event to `events/<session>.jsonl`, which the tick applies unjudged — so a hook refused by §4.8a was applied two seconds later anyway (the techlead seat's `exited (hook)` at 03:55Z on 2026-09-23, after the refusal).
 
 ## 4.2a Profiles: tool · account · model
 
@@ -298,6 +299,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-21 (TD-077 b, built): **Log TD** — `identity_log`, the message to the record's first live controller, and the debt extension: an entry from the person marked `handed` is a debt on its addressee, `MailEntry.owes` gains the case, `owed()` counts inbox entries too. Before this, TD-079's debt existed only on a session's own question to the person, so work the *person* handed a session had no debt to settle.
 - 2026-09-21 (review of PR #318): a handed entry that still owes cannot be deleted by the person's `inbox_delete` — it is the first debt-bearing mail that RPC can reach — so the delete is refused in words; the debt ends by an outcome or by the person's Dismiss, which tells the session.
 - 2026-09-21 (built): a container node's identity mode is said at the home in its `nodes:` entry; `ao host up` carries the word into the node's `local:` and restarts the node's agent when what it wrote has changed.
+- 2026-09-22 (TD-115, grinder-ao-1): **a hook just after its pane ended** became its session's for `PANE_GONE_GRACE` (ten seconds). Found live the same night: a techlead seat's last hook at `/exit` twice raised *outside claimed ao-agentorc-techlead-ao-1 on hook* (03:33:22Z and 03:55:29Z, 2026-09-23), each within twenty seconds of the run's end and a few after the pane left the tick's list — the ending process's hook connected when the walk met no pane pid, and the gone pane was no longer on the list for its session id or terminal to match. Once the tick closes idle seats and members (TD-103 slices (3) and (4)), every such close would risk the same alarm. The events queue's hole was written under *What this does not stop* in place of a build.
 
 ## 4.9 Org, Team, Project: the definitions above a session
 

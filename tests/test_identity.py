@@ -167,6 +167,16 @@ def test_a_hook_is_bound_to_its_pane():
     assert identity.judge(identity.OUTSIDE, None, "hook", hook_session="ao-x").refusal  # a hook runs under a pane
 
 
+def test_a_gone_pane_is_matched_by_session_id_then_terminal_never_by_a_walk():
+    """TD-115: the orphaned hook of a pane that ended keeps the pane's sid and its terminal."""
+    x = PANES[0]
+    fp = FakeProc([P(1, 0, 1), P(130, 1, 100, 0x8801), P(131, 1, 9999, 0x8801), P(132, 1, 9999, 0x8810)])
+    assert identity.classify_gone(130, x, fp) == Channel("session", "ao-x", "sid")
+    assert identity.classify_gone(131, x, fp) == Channel("session", "ao-x", "tty")
+    assert identity.classify_gone(132, x, fp) is None  # neither: not its pane's
+    assert identity.classify_gone(133, x, fp) is None  # gone before it could be read
+
+
 def test_identical_alarms_coalesce_so_a_loop_cannot_evict_a_different_one():
     a = {"channel": "session ao-x", "claimed": "ao-y", "rpc": "msg"}
     b = {"channel": "outside", "claimed": "ao-x", "rpc": "kill"}
@@ -419,6 +429,33 @@ async def test_a_hook_is_bound_to_its_pane_end_to_end(agent, tmp_path):
             raise AssertionError("a hook from outside every pane was served")
         except Exception as e:  # noqa: BLE001
             assert identity.MISMATCH in str(e)
+
+
+async def test_a_hook_just_after_its_pane_ended_is_its_sessions_for_the_grace(agent, monkeypatch):
+    """TD-115: a techlead seat's last hook at `/exit` read *outside claimed <itself> on hook*, twice
+    in one night — its pane had left the tick's list before the hook connected. The pane is kept
+    for `PANE_GONE_GRACE` and a `hook` naming that record is matched against it; nothing else is."""
+    agent.identity_mode = "enforce"
+    agent._id_detached = ""  # off: no tmux server is asked
+    # 130 is pane X's orphaned hook: reparented to init, still in X's session and on X's terminal
+    monkeypatch.setattr(agent, "proc", FakeProc([*BASE, P(130, 1, 100, 0x8801)]))
+    agent._id_panes = list(PANES)
+    agent._id_note_panes({})  # the tick: both panes are gone
+    assert set(agent._id_gone) == {"ao-x", "ao-y"}
+
+    def hook(session: str) -> dict:
+        return {"id": 1, "method": "hook", "params": {"session": session, "state": "exited"}}
+
+    assert await agent._identify(hook("ao-x"), 130) is None  # its own record: served
+    assert (await agent._identify(hook("ao-y"), 130))["error"] == identity.MISMATCH  # another's gone pane
+    doing = {"id": 1, "method": "doing", "caller": "ao-x", "params": {"id": "ao-x", "text": "late"}}
+    assert (await agent._identify(doing, 130))["error"] == identity.MISMATCH  # the grace is the hook's alone
+    # past the grace it is outside again, and the next tick forgets it
+    pane, at = agent._id_gone["ao-x"]
+    agent._id_gone["ao-x"] = (pane, at - identity.PANE_GONE_GRACE)
+    assert (await agent._identify(hook("ao-x"), 130))["error"] == identity.MISMATCH
+    agent._id_note_panes({})
+    assert "ao-x" not in agent._id_gone and "ao-y" in agent._id_gone
 
 
 def test_no_read_decides_anything_on_its_caller():

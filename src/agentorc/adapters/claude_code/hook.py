@@ -4,6 +4,8 @@ Reads the hook payload on stdin, finds its agentorc session in `AGENTORC_SESSION
 host agent what happened. A `PermissionRequest` blocks until the person answers from the UI or the
 wait elapses, then prints the decision (or nothing, letting Claude Code draw its own dialog).
 Every other event is fire-and-forget: socket first, `events/<session>.jsonl` if the agent is down.
+An error in the reply is the agent answering — a refusal (design §4.8a) or a bug — and is never
+queued: the tick applies the queue unjudged, so a queued refusal would be applied anyway (TD-115).
 
 Always exits 0. A hook that fails would break the session it is watching.
 """
@@ -100,8 +102,13 @@ def describe_tool_input(tool: str, ti: dict[str, Any]) -> str:
     return json.dumps(ti)[:200] if ti else ""
 
 
+class Refused(Exception):
+    """The host agent answered with an error: it is up, and the event is not to be queued."""
+
+
 def call_agent(params: dict[str, Any], timeout: float | None) -> Any:
-    """One request over the socket; raises on any transport problem."""
+    """One request over the socket; raises `Refused` on an error reply, and anything else on a
+    transport problem."""
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
         s.settimeout(5)
         s.connect(str(paths.socket_path()))
@@ -115,7 +122,7 @@ def call_agent(params: dict[str, Any], timeout: float | None) -> Any:
             buf += chunk
     resp = json.loads(buf or b"{}")
     if "error" in resp:
-        raise RuntimeError(resp["error"])
+        raise Refused(resp["error"])
     return resp.get("result")
 
 
@@ -146,6 +153,8 @@ def main() -> int:
         return 0
     try:
         call_agent(params, timeout=3)
+    except Refused as e:
+        print(f"agentorc-hook: {session}: the host agent refused the event: {e}", file=sys.stderr)
     except Exception:  # noqa: BLE001
         with contextlib.suppress(OSError):
             EventQueue().append(session, {k: v for k, v in params.items() if k != "session"})
