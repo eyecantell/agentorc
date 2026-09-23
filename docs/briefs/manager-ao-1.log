@@ -279,3 +279,4 @@
 00:26  grinder-ao-1: TD-069 write-back #474 done (held); TD-113 archive → #475 open (no held paths). grinder-ao-2: out-of-work cleared, reclaimed TD-069 (row controls on #472) 06:25Z, working. Held: #470 #474
 00:27–00:32 quiet
 00:34  grinder-ao-1: TD-113 archive → #475 merged 06:33Z, cadence pass (review recorded). Held: #470 #474
+00:36  grinder-ao-1: TD-032 archive → #476 open (no held paths). grinder-ao-2: declared out of work again 06:35Z, idle → finished. Held: #470 #474
