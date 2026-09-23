@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import threading
 from datetime import date
 from pathlib import Path
 
@@ -27,6 +28,9 @@ SESSION_RE = re.compile(r"\(session `?(?P<name>[^`\s,)]+)")
 HEAD_RE = re.compile(r"\*\*(?P<head>.+?)\*\*")
 HEAD_MAX = 60
 GIT_TIMEOUT = 20.0
+# One edit at a time on this host: each is a read, a write and a commit, and two interleaved would
+# leave a commit saying *done* over a file where the other's write undid it (review of PR #474).
+_EDIT = threading.Lock()
 
 
 class Refused(Exception):
@@ -68,9 +72,15 @@ def message(text: str, action: str, due: str | None = None) -> str:
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT, check=False
-    )
+    """One git call; a git that cannot be run or does not finish is a refusal, never a raw error."""
+    try:
+        return subprocess.run(
+            ["git", "-C", str(root), *args], capture_output=True, text=True, timeout=GIT_TIMEOUT, check=False
+        )
+    except subprocess.TimeoutExpired:
+        raise Refused(f"git {args[0]} did not finish in {GIT_TIMEOUT:g} s in {root}") from None
+    except OSError as e:
+        raise Refused(f"git could not be run in {root}: {e}") from None
 
 
 def default_branch(root: Path) -> str:
@@ -111,6 +121,11 @@ def write_back(root: str | Path, line: int, text: str, action: str, due: str | N
     root = Path(root)
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
+    with _EDIT:
+        return _write_back(root, line, text, action, due)
+
+
+def _write_back(root: Path, line: int, text: str, action: str, due: str | None) -> dict[str, str]:
     ready(root)
     path = root / BOARD
     try:
@@ -123,9 +138,13 @@ def write_back(root: str | Path, line: int, text: str, action: str, due: str | N
     lines[line - 1] = edit_line(lines[line - 1], text, action, due)
     msg = message(text, action, due)
     path.write_text("".join(lines), encoding="utf-8")
-    cp = _git(root, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD))
-    if cp.returncode != 0:
+    try:
+        cp = _git(root, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD))
+    except Refused as e:
         path.write_text(was, encoding="utf-8")  # the board as it was: a failed commit leaves no dirty file
+        raise Refused(f"the commit failed, and the board is as it was: {e}") from None
+    if cp.returncode != 0:
+        path.write_text(was, encoding="utf-8")
         why = (cp.stderr or cp.stdout).strip().splitlines()
         raise Refused(f"the commit failed, and the board is as it was: {why[-1] if why else cp.returncode}")
     return {"commit": _git(root, "rev-parse", "--short", "HEAD").stdout.strip(), "message": msg}

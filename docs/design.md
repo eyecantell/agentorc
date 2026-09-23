@@ -563,8 +563,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `origin`'s default (a board edit is committed on the default branch only, never onto someone's
   feature branch), the board file already carrying uncommitted changes, or a merge, rebase,
   cherry-pick or index lock under way. The commit takes the board file alone (`--only`), so what
-  else the checkout has staged or edited is left as it was; a commit that fails (a hook, say)
-  puts the board back as it was. Each refusal says why and what to do, in words the Inbox shows.
+  else the checkout has staged or edited is left as it was; a commit that fails (a hook, say) or
+  does not finish inside twenty seconds puts the board back as it was, and edits on one host are
+  made one at a time, so two presses never interleave a read and a write. Each refusal says why and what to do, in words the Inbox shows.
 
 ### 4.4a Home and nodes: one session graph across hosts
 

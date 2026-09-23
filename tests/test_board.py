@@ -96,6 +96,30 @@ def test_a_failed_commit_leaves_the_board_as_it_was(repo):
     assert (repo / board.BOARD).read_text() == BOARD_TEXT and git(repo, "status", "--porcelain") == ""
 
 
+def test_a_commit_that_does_not_finish_leaves_the_board_as_it_was(repo, monkeypatch):
+    """Review of PR #474: a timeout raised past the returncode check and left the edit uncommitted."""
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.write_text("#!/bin/sh\nsleep 5\n")
+    hook.chmod(0o755)
+    monkeypatch.setattr(board, "GIT_TIMEOUT", 0.5)
+    with pytest.raises(board.Refused, match="did not finish"):
+        board.write_back(repo, 7, ITEM, "done")
+    assert (repo / board.BOARD).read_text() == BOARD_TEXT
+
+
+def test_two_edits_at_once_are_made_one_after_the_other(repo):
+    """Review of PR #474: two interleaved read-write-commits left *done* in the log and undone on disk."""
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(2) as pool:
+        a = pool.submit(board.write_back, repo, 7, ITEM, "done")
+        b = pool.submit(board.write_back, repo, 8, "n/a — undated.", "done")
+        a.result(), b.result()
+    text = (repo / board.BOARD).read_text()
+    assert f"- [x] {ITEM}" in text and "- [x] n/a — undated." in text
+    assert git(repo, "status", "--porcelain") == ""
+
+
 async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, tmp_path):
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
