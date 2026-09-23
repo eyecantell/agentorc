@@ -2144,7 +2144,10 @@ what was true on a day.
 | `plain` | — (no template) | — | none | whatever it declares |
 
 **Role names.** The session that runs a team's lifecycle — starts its members, nudges them,
-wraps them up — is the `manager`; the technical go-between is the `techlead`; `director` keeps
+wraps them up — is the `manager`; the technical go-between is the `techlead`; the person's
+design seat — an `interactive` session, one per repo team, that writes this document and the
+entries the grinders pick, and merges nothing on a held path (TD-120) — is the `designer`, a role a
+repo or `org.yml` defines with its own brief, not a preset; `director` keeps
 its name (its members are managers, and *director > manager > worker* reads as a line). The
 older words — `orchestrator` and `lead` for the manager, `orchestrate` for `control` — resolve to
 nothing: there has been no release and one user, so there is no renamed-roles table, no
