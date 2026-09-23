@@ -2019,7 +2019,7 @@ not vary by role** — that would be the first thing to key on one — and the c
 by role without a rule, because it draws whichever channels are non-empty. The built-ins ship
 with the package; a repo may redefine any of them or add its own (§5, TD-040):
 `agentorc.repoconfig` reads the file, the templates are `agentorc/briefs/<role>.md` with the
-`{lane}` and `{techlead}` placeholders (`{context}` in the techlead's; `{repo}` once TD-114 is built), a repo's `roles.<name>` overrides per key over the built-in, and the record
+`{lane}`, `{techlead}` and `{manager}` placeholders (`{context}` in the techlead's; `{repo}` once TD-114 is built), a repo's `roles.<name>` overrides per key over the built-in, and the record
 carries `role` and the repo's `ledger:` (so the derived-report tick reads the right file without
 `sessionorc` knowing the config).
 
@@ -2536,7 +2536,7 @@ exited or closed holders are superseded as §4.1 says, which makes `ao team star
 after a night's exit the restart too. Then it creates the manager (its grants, profile and mode —
 the role's `control`, the host's profile and unattended, unless the definition overrides any of
 them — in a worktree), and each member with `controllers: [lead id]`, its role, lane, brief (the
-role's template with `{lane}` and `{techlead}` filled, the Project block in front — and once TD-114 is built a `brief:` in its `{repo}` slot rather than in place of the template),
+role's template with `{lane}`, `{techlead}` and `{manager}` filled — `{manager}` the id the manager takes, worked out before anything starts as `{techlead}` is, said by the start should it come up under another, and `none` where a person leads or the session was started by hand — the Project block in front — and once TD-114 is built a `brief:` in its `{repo}` slot rather than in place of the template),
 profile and worktree. A person runs it, so no attenuation applies (§4.8 create rule); a manager
 running it is subject to it as for any create. It prints one line per session with the id,
 `--json` the records. The manager is started with an empty `controllers` list: the definition,

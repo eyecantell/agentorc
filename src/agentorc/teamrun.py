@@ -314,6 +314,11 @@ def start(
             rec = call("create", **plan.lead.create_params([]))
             created.append(rec)
             lead_id = str(rec["id"])
+            if plan.manager_id and lead_id != plan.manager_id:
+                notes.append(
+                    f"the manager started as {lead_id}, but the members' briefs name {plan.manager_id} — "
+                    "a stale tmux session holds that id; its members' done lines will not reach it until a restart"
+                )
         if plan.techlead:
             # The seat is its manager's member (design §4.9b): the manager is its controller, as
             # for any member. Its id was named in every brief before it existed (`{techlead}`).

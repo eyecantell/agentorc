@@ -314,6 +314,7 @@ decisions; this file points at them rather than repeating them.
 - TD-076: `manager` replaced `lead` as the key; `lead` read for one release, both refused.
 - 2026-09-22 (TD-107): `lead:` stopped being read; it is an unknown key.
 - TD-041: interactive members out of a manager's reach became a gate (§9 invariant 5), so the start reports it per member.
+- 2026-09-22 (TD-113 (a), grinder-ao-2): `{manager}` added beside `{techlead}`, so a member's `done` line names its manager's id instead of telling it to read `under:` off its own record; the same night the manager preset's crash-restart rule gave way to the tick's (TD-113 (0), §6 rule 1).
 
 ## 4.9a Winding down: a team that runs out of work
 

@@ -906,6 +906,16 @@ def test_the_manager_brief_fills_the_techlead_seat_on_its_questions():
     assert "never restart it" not in text  # a fill is not the crash restart, and not forbidden
 
 
+def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():
+    """TD-113 (0), design §6 *Keeping a team running* rule 1: a supervised member that exits with no
+    declaration is restarted by the host agent's tick, so the preset must not send its manager down
+    a hand `ao new` for it (which would race the tick and ship `{lane}` unfilled); what is left to the
+    manager is reading `restart_ceiling` and boarding it."""
+    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
+    assert "**the host agent restarts it**" in text and "restart_ceiling" in text
+    assert "restart it once with `ao new`" not in text
+
+
 def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-052 step 2 (design §4.10 "Surface"): `ao msg` prints what landed and refusals as the host
     agent words them; `ao inbox` opens with the fixed header, names who sent the last keystrokes,
