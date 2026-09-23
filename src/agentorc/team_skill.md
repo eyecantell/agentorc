@@ -159,7 +159,7 @@ Resolution is lowest first: the package's built-ins, then an org-wide `roles:` o
 keeps the built-in's grants. A `brief:` path is relative to the repo root; a built-in name is the
 package's own file. At the start a brief's placeholders are filled: `{lane}` with the member's lane,
 `{techlead}` and `{manager}` with the ids those sessions take, `{context}` with the seat's primer —
-each `none` where there is nothing to name.
+each `none` where there is nothing to name (an empty lane reads `(none given)`).
 
 **A `profile:` must already exist**, in `~/.agentorc/profiles.yml` — it is an account of a tool,
 not a word you may invent, and `ao team start` refuses a name that is not declared:

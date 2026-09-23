@@ -69,7 +69,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-110 | A night report: one generated summary per team at wind-down, from the records, in place of the manager's prose round log | Medium | Open |
 | TD-111 | `ao doctor`: one command that checks what the ledger keeps finding live — hooks, tmux, identity, usage, links, build | Medium | Open |
 | TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
-| TD-113 | `ao team --skill` sends a second repo to samscrape's files: the recipe is silent on what the built-in briefs assume, the list-shaped lane, a brief's skeleton, the primer's three checks, `.agentorc.yml`'s keys | Medium | Partly done — (0), (a), (b) and (8) done; (c) with TD-114 |
+| TD-113 | `ao team --skill` sends a second repo to samscrape's files: the recipe is silent on what the built-in briefs assume, the list-shaped lane, a brief's skeleton, the primer's four checks, `.agentorc.yml`'s keys | Medium | Partly done — (0), (a), (b) and (8) done; (c) with TD-114 |
 | TD-114 | A repo's brief replaces the whole template, so three repos carry copies of agentorc's mechanics that go stale together: make it a supplement filled into a `{repo}` slot | High | Open — designed 2026-09-22 |
 
 ---
