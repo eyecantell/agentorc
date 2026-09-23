@@ -292,9 +292,9 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
         person_needs=0, node_banner="", identity_note="",
     )  # fmt: skip
     assert "grind · week 88%" in html and "5h 19%" not in html.split("grind · week 88%")[1].split("</span>")[0]
-    assert 'data-profile="grind" data-pct="88" class="near"' in html
+    assert 'data-profile="grind" data-pct="88" data-near="1" class="near"' in html
     assert "week 88% (resets 2026-09-24T00:00:00Z) · 5h 19% (resets 2026-09-20T22:00:00Z)" in html
-    assert 'data-profile="openai" data-pct="100" class="cap"' in html and "openai · day 100%" in html
+    assert 'data-profile="openai" data-pct="100" data-near="1" class="cap"' in html and "openai · day 100%" in html
     assert 'data-profile="quietly"' not in html  # no windows, no chip
     assert "five_hour" not in html and "weekly" not in html
 
@@ -314,6 +314,16 @@ USAGE_CASES = {
     "no_quota": {"windows": [], "fetched": "x", "reason": "ok"},
     "junk_window": {"windows": [{"label": "5h", "pct": "19"}, "nonsense"], "reason": "ok"},
     "not_a_dict": "garbage",
+    # the gate's reading attached (§6, TD-100): a line per reserved window, and worst is the smallest gap
+    "lined": {"windows": [{"label": "5h", "pct": 40, "resets": "r5"}, {"label": "week", "pct": 61, "resets": "r6"}],
+              "reason": "ok", "lines": [{"label": "week", "pct": 61, "line": 70, "resets": "r6",
+                                         "next": "2026-09-24T07:00:00Z", "reserve": {"per_day": 10}}]},
+    "unreserved_outranks": {"windows": [{"label": "5h", "pct": 97, "resets": "r7"}, {"label": "week", "pct": 40}],
+                            "reason": "ok", "lines": [{"label": "week", "line": 70, "next": None, "reserve": 30}]},
+    "flat_far": {"windows": [{"label": "week", "pct": 85}], "reason": "ok",
+                 "lines": [{"label": "week", "line": 100, "next": "n", "reserve": 0}, {"label": "5h", "line": 1}]},
+    "no_line_made": {"windows": [{"label": "week", "pct": 85}], "reason": "ok",
+                     "lines": [{"label": "week", "line": None, "reserve": {"per_day": 10}}]},
 }  # fmt: skip
 
 
@@ -329,7 +339,7 @@ def test_a_refused_usage_poll_draws_the_held_reading_stale_rather_than_nothing()
 
     got = {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
     assert got["fresh"] == {"text": "grind · week 88%", "title": "week 88% (resets ?) · 5h 19% (resets r1)",
-                            "pct": 88, "cls": "near"}  # fmt: skip
+                            "pct": 88, "cls": "near", "near": True}  # fmt: skip
     assert got["legacy"]["text"] == "grind · day 40%" and got["legacy"]["cls"] == ""  # no reason is ok, not stale
     held = got["held_429"]
     assert held["text"] == "grind · week 49% · stale" and held["cls"] == "stale" and held["pct"] == 49
@@ -344,6 +354,38 @@ def test_a_refused_usage_poll_draws_the_held_reading_stale_rather_than_nothing()
     assert "brand_new_reason" in got["unknown_word"]["title"]  # a word we do not know is shown, not dropped
     assert got["no_quota"] is None and got["not_a_dict"] is None
     assert got["junk_window"] is None  # a window whose number is not a number is not drawn from
+
+
+def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap():
+    """design §4.5a **usage** chip, §6 *Usage gate* (TD-100 slice 3, the chip's line): a window the
+    profile has a reserve for prints its line after the number, *grind · week 61% / 70%*, with the
+    reserve, the days left and when the line next moves on hover. *Worst* is the smallest gap to a
+    line — the tool's 100% where there is none, so an unreserved 97% outranks a reserved 40% of a
+    70% line — and *near* is within ten points of a line, 80% without one."""
+    from agentorc.ui.app import usage_chip, with_lines
+
+    got = {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
+    lined = got["lined"]
+    assert lined["text"] == "grind · week 61% / 70%" and lined["pct"] == 61
+    assert lined["near"] is True and lined["cls"] == "near"  # 9 points under its line
+    assert lined["title"] == (
+        "week 61% / line 70% (reserve 10% a day, 3 days left; line moves 2026-09-24T07:00:00Z; resets r6)"
+        " · 5h 40% (resets r5)"
+    )
+    assert got["unreserved_outranks"]["text"] == "grind · 5h 97%" and got["unreserved_outranks"]["cls"] == "near"
+    assert "week 40% / line 70% (reserve 30%; line moves ?; resets ?)" in got["unreserved_outranks"]["title"]
+    # 85% of a 100% line is 15 points off it: not near, where 85% with no line at all is
+    assert got["flat_far"]["text"] == "grind · week 85% / 100%" and got["flat_far"]["near"] is False
+    assert got["no_line_made"]["text"] == "grind · week 85%" and got["no_line_made"]["near"] is True
+    # the page's join of the two reads: a profile the gate has no reserves for is left as it was
+    usage = {"grind": {"windows": [], "reason": "ok"}, "paul": {"windows": []}, "gone": None}
+    gate = {"profiles": {"grind": {"windows": [{"label": "week", "line": 70}]}}}
+    assert with_lines(usage, gate) == {
+        "grind": {"windows": [], "reason": "ok", "lines": [{"label": "week", "line": 70}]},
+        "paul": {"windows": []},
+        "gone": None,
+    }
+    assert with_lines(usage, None) == usage and with_lines(None, gate) == {}
 
 
 def test_the_usage_chip_rule_is_the_same_in_the_page_and_in_app_js(tmp_path):

@@ -82,10 +82,42 @@ USAGE_WHY = {
 NEAR_CAP = 80  # "at or near a cap" (§4.5a): never collapsed into +n; `app.js` keeps the same number
 
 
+def _usage_line(w: dict[str, Any], lines: Any) -> dict[str, Any] | None:
+    """This window's row of the gate's reading (§6 *Usage gate*, TD-100): `{line, reserve, next}`
+    where the profile has a reserve for the window and it makes a line, else None."""
+    for row in lines if isinstance(lines, list) else []:
+        if isinstance(row, dict) and row.get("label") == w.get("label"):
+            ln = row.get("line")
+            return row if isinstance(ln, int | float) and not isinstance(ln, bool) else None
+    return None
+
+
+def _usage_hover(w: dict[str, Any], row: dict[str, Any] | None) -> str:
+    """One window on the chip's hover: its number, and where it has a line the line, the reserve,
+    the days left a per-day reserve counts and when the line next moves (§4.5a **usage**)."""
+    if row is None:
+        return f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})"
+    r, ln = row.get("reserve"), row["line"]
+    if isinstance(r, dict) and isinstance(r.get("per_day"), int) and r["per_day"] > 0:
+        why = f"reserve {r['per_day']}% a day"
+        if ln > 0:
+            why += f", {(100 - ln) // r['per_day']} days left"
+    else:
+        why = f"reserve {r}%"
+    return (
+        f"{w.get('label')} {w['pct']}% / line {ln:g}% ({why}; line moves {row.get('next') or '?'}; "
+        f"resets {w.get('resets') or '?'})"
+    )
+
+
 def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
     """One profile's top-bar chip (design §4.5a **usage**, TD-073, TD-087), or None for no chip.
 
-    The worst window is printed, every window on hover, red at a cap. **A held reading goes stale,
+    The worst window is printed, every window on hover, red at a cap. **Worst** is the window with
+    the smallest gap to its line — the line the profile's reserve makes (§6, TD-100: `u["lines"]`,
+    the `gate` reading the page attaches), the tool's 100% where it has none — and a window with a
+    line prints it after the number, *grind · week 61% / 70%*. *Near* (never collapsed into +n) is
+    within ten points of a line, 80% without one. **A held reading goes stale,
     not out** (TD-087): when the last poll was refused, the host agent keeps the last good windows
     with the `reason` beside them, and the chip draws them dimmed with *· stale* and says on hover
     when they were read and why the poll since failed — *the chip went out* and *the allowance is
@@ -97,7 +129,11 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
     to the same cases."""
     if not isinstance(u, dict):
         return None
-    windows = [w for w in (u.get("windows") or []) if isinstance(w, dict) and isinstance(w.get("pct"), int | float)]
+    windows = [
+        w
+        for w in (u.get("windows") or [])
+        if isinstance(w, dict) and isinstance(w.get("pct"), int | float) and not isinstance(w.get("pct"), bool)
+    ]
     reason = str(u.get("reason") or "ok")
     stale = reason != "ok"
     if not windows and not stale:
@@ -109,17 +145,34 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
             why += f", which asked to be left {max(1, math.ceil(u['retry_after'] / 60))} min"
     if not windows:
         title = f"no usage reading for {prof} yet — {why}"
-        return {"text": f"{prof}: no reading yet", "title": title, "pct": 0, "cls": "stale"}
-    ws = sorted(windows, key=lambda w: w["pct"], reverse=True)
-    worst = ws[0]
-    title = " · ".join(f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})" for w in ws)
-    cls = "cap" if worst["pct"] >= 100 else "near" if worst["pct"] >= NEAR_CAP else ""
+        return {"text": f"{prof}: no reading yet", "title": title, "pct": 0, "cls": "stale", "near": False}
+    rows = [(w, _usage_line(w, u.get("lines"))) for w in windows]
+    ws = sorted(rows, key=lambda x: ((x[1]["line"] if x[1] else 100) - x[0]["pct"], -x[0]["pct"]))
+    worst, row = ws[0]
+    title = " · ".join(_usage_hover(w, r) for w, r in ws)
+    near = worst["pct"] >= 100 or (worst["pct"] >= row["line"] - 10 if row else worst["pct"] >= NEAR_CAP)
+    cls = "cap" if worst["pct"] >= 100 else "near" if near else ""
     text = f"{prof} · {worst.get('label')} {worst['pct']}%"  # *grind · week 89%* (TD-095 h)
+    if row:
+        text += f" / {row['line']:g}%"  # *grind · week 61% / 70%* (§4.5a, TD-100)
     if stale:
         title = f"held reading from {u.get('fetched') or 'an unknown time'} — {why}. {title}"
         text += " · stale"
         cls = f"{cls} stale".strip()
-    return {"text": text, "title": title, "pct": worst["pct"], "cls": cls}
+    return {"text": text, "title": title, "pct": worst["pct"], "cls": cls, "near": near}
+
+
+def with_lines(usage: Any, gate: Any) -> dict[str, Any]:
+    """The host agent's `usage` with each profile's rows of its `gate` reading attached as `lines`
+    (§6, TD-100), which is what the chip reads its line from — on the page's render and on each
+    pushed `usage` event alike. A gate that could not be read (an older agent, no `settings.yml`)
+    leaves every chip as it was: a number with no line."""
+    profiles = gate.get("profiles") if isinstance(gate, dict) else None
+    out: dict[str, Any] = {}
+    for prof, u in (usage or {}).items():
+        g = profiles.get(prof) if isinstance(profiles, dict) else None
+        out[prof] = {**u, "lines": g.get("windows") or []} if isinstance(u, dict) and isinstance(g, dict) else u
+    return out
 
 
 templates.env.globals["usage_chip"] = usage_chip
@@ -1797,6 +1850,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         try:
             sessions = await call("list")
             usage = await call("usage")
+            with contextlib.suppress(Exception):  # an agent before TD-100 slice 1 has no `gate`: no lines
+                usage = with_lines(usage, await call("gate"))
             info = await call("host")
             try:
                 # the top bar's number: the Inbox page's **Needs you** section, and not unread mail
@@ -2627,6 +2682,12 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                     )
                                 )
                         continue
+                    if isinstance(ev.get("usage"), dict):
+                        # the chip's line (§4.5a **usage**, TD-100) is the gate's reading, which the
+                        # event does not carry: read it now, since the agent took this poll first
+                        with contextlib.suppress(Exception):
+                            prof = str(ev.get("profile"))
+                            ev["usage"] = with_lines({prof: ev["usage"]}, await call("gate"))[prof]
                     await ws.send_text(json.dumps(ev))
 
         try:
