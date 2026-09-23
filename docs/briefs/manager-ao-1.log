@@ -311,3 +311,4 @@
 14:14  grinder-ao-1: TD-008 done → PR #488 merged (archive of TD-008/TD-117). Cadence pass, ledger/docs only.
 14:14–14:32 quiet, both grinders working (grinder-ao-1: TD-116, TD-096; grinder-ao-2: TD-118)
 14:32  grinder-ao-1: TD-116 built → PR #490 open 14:20Z, touches src/sessionorc/ — held for the anchor's read (TD-093 rule), not yet 2h. Also filed TD-119 (self-decide) → PR #491 merged, cadence pass, docs only.
+14:36  grinder-ao-1: TD-096 built → PR #492 open 14:31Z, also touches src/sessionorc/ — held for the anchor's read, not yet 2h. Two held PRs now: #490, #492.
