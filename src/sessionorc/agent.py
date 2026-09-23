@@ -133,6 +133,9 @@ RESTART_WINDOW = timedelta(hours=2)
 FILL_CEILING = 6
 FILL_WINDOW = timedelta(hours=1)
 SEAT_IDLE_GRACE = timedelta(minutes=2)
+# §6 rules 2 and 4 (TD-103 slice 4): how long a member sits hook-confirmed idle with open work before
+# the one nudge, and how long a wanted restart held by work left waits before it is the Inbox's.
+IDLE_NUDGE = timedelta(minutes=20)
 REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
 # An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
 # itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
@@ -707,8 +710,8 @@ class HostAgent:
             await self._push_changes()
 
     async def _keep_running(self, now: datetime) -> None:
-        """Design §6 *Keeping a team running* (TD-103), the rules built so far: rule 1, the crash
-        restart, and rule 3, the seats. **The restarts run at the home** (§4.4a: policies that start
+        """Design §6 *Keeping a team running* (TD-103): rule 1, the crash restart; rule 2, the wanted
+        restart; rule 3, the seats; rule 4, the idle nudge. **The restarts run at the home** (§4.4a: policies that start
         run at the home), over this host's records and every node's — a member on a host whose link
         is down is left as it is and looked at again on the next tick, refused rather than queued.
         **Each record's pass is isolated**: one's exception is logged and the tick goes on to the next."""
@@ -718,7 +721,9 @@ class HostAgent:
         for s in records:
             try:
                 await self._crash_restart(s, now)
+                await self._wanted_restart(s, now)
                 await self._seat_pass(s, now, records)
+                await self._idle_nudge(s, now)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
                 log.exception("%s: the keep-running pass failed", self._address(s))
         if (
@@ -783,6 +788,140 @@ class HostAgent:
             return
         log.info("%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1)
         await self._replay(s, "crash")
+
+    async def _wanted_restart(self, s: Session, now: datetime) -> None:
+        """Rule 2 (design §6, §4.9a): a supervised member that declared `restart_wanted` and is `idle`,
+        or `exited` on its own — a kill or a Close is never undone — is closed if it is still there and
+        restarted as rule 1 does, under the same ceiling, **only when its git fields are known and show
+        nothing uncommitted and nothing unpushed**. With work left it is sent one fixed line naming the
+        counts, and `IDLE_NUDGE` later carries `restart_blocked`; the moment the work reads pushed the
+        restart runs. An `early` one is left to the person (§4.9a), and so is an unknown git state."""
+        rw = s.restart_wanted
+        if not (rw and s.supervised and s.unattended) or s.seat is not None or rw.get("early"):
+            return
+        if s.superseded_by or s.suspended or s.restart_ceiling or s.gated:
+            return
+        # the tick's own close, then a replay that failed, leaves it `closed`: still the tick's to retry
+        closed_by_tick = s.state == "closed" and bool(s.restarts) and s.restarts[-1].get("why") == "wanted"
+        if not (s.state == "idle" or (s.state == "exited" and s.pane) or closed_by_tick):
+            return
+        if (s.run_until and now >= _parse(s.run_until)) or self._profile_gated(s.profile, now):
+            return
+        if s.host != self.host and s.host not in self._link_muxes:
+            return  # its link is down: left as it is, looked at again next tick (§4.4a)
+        git = s.git or {}
+        if not isinstance(git.get("dirty"), int) or not isinstance(git.get("unpushed"), int):
+            return  # an unknown git state is left alone (§6 rule 2)
+        if git["dirty"] or git["unpushed"]:
+            await self._restart_held(s, now, git["dirty"], git["unpushed"])
+            return
+        recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+        if len(recent) >= RESTART_CEILING:
+            s.restart_ceiling = {"at": now_iso(), "count": len(recent)}
+            log.warning("%s: %d restarts in %s — the ceiling; it is a person's now", s.id, len(recent), RESTART_WINDOW)
+            self._save(s)
+            await self._push_changes()
+            return
+        log.info("%s wants another run and its work is pushed: restarting it", s.id)
+        if s.state == "idle":
+            try:
+                if s.host == self.host:
+                    await self.rpc_close(s.id)
+                else:
+                    await self._route_act("close", {"id": s.id}, None, s.host)
+            except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
+                # `rpc_close` marks the record closed before its own tail runs, so a failure there
+                # leaves it `closed` with nothing replayed: the entry is what lets the next tick
+                # retry it (`closed_by_tick`) rather than strand it (review of PR #461)
+                s.restarts = [*s.restarts, {"at": now_iso(), "why": "wanted", "error": f"close: {e}"}]
+                log.warning("%s: the close before a wanted restart failed: %s", s.id, e)
+                self._save(s)
+                await self._push_changes()
+                return
+        await self._replay(s, "wanted")
+
+    async def _restart_held(self, s: Session, now: datetime, dirty: int, unpushed: int) -> None:
+        """Rule 2 with work left: one fixed send, once, naming the counts from the record and never a
+        session's words; `IDLE_NUDGE` after it (after the declaration, where nothing could be typed)
+        the record carries `restart_blocked` and the Inbox lists it."""
+        if not s.restart_blocked_sent_at and s.state == "idle" and s.host == self.host:
+            line = (
+                f"[agentorc] your restart is held: {dirty} uncommitted and {unpushed} unpushed in your checkout "
+                "— commit and push them, and the host agent restarts you"
+            )
+            if await self._policy_send(s, line):
+                s.restart_blocked_sent_at = now_iso()
+                self._save(s)
+        start = s.restart_blocked_sent_at or (s.restart_wanted or {}).get("at")
+        if not s.restart_blocked and start and now - _parse(str(start)) >= IDLE_NUDGE:
+            s.restart_blocked = {"at": now_iso(), "dirty": dirty, "unpushed": unpushed}
+            log.info("%s: its restart is held by work left — the person's now", s.id)
+            self._save(s)
+            await self._push_changes()
+
+    async def _idle_nudge(self, s: Session, now: datetime) -> None:
+        """Rule 4 (design §6): a supervised member hook-confirmed `idle` for `IDLE_NUDGE` with open work
+        — a lane reference not done or dropped, a declared claim not done or dropped, or for a seat a
+        question waiting — and nothing declared, is sent one fixed line naming it, once per idle
+        stretch (`nudged_at`; a stretch ends when the state changes). It spends no wake budget. The
+        send needs the pane here: a node's member is not nudged yet (TD-103)."""
+        if not (s.supervised and s.unattended) or s.superseded_by or s.suspended or s.host != self.host:
+            return
+        if s.state != "idle" or s.confidence != "hook" or s.pending or s.out_of_work or s.restart_wanted:
+            return
+        if not s.since or now - _parse(s.since) < IDLE_NUDGE:
+            return
+        if s.nudged_at and _parse(s.nudged_at) >= _parse(s.since):
+            return  # this stretch was nudged already: never a second before the first is answered
+        if s.wrapup_at or s.wrapup_sent_at or (s.run_until and now >= _parse(s.run_until)):
+            return
+        if s.gated or self._profile_gated(s.profile, now):
+            return
+        line = self._nudge_line(s)
+        if line and await self._policy_send(s, line):
+            s.nudged_at = now_iso()
+            log.info("%s: idle %s with work open — nudged", s.id, IDLE_NUDGE)
+            self._save(s)
+            await self._push_changes()
+
+    def _nudge_line(self, s: Session) -> str | None:
+        if s.seat is not None:
+            n = s.asks_waiting(home=self.host) if s.seat_due else 0
+            return f"[agentorc] you have {n} questions waiting — run `ao inbox`" if n else None
+        ended = {e.ref for e in s.progress if e.status in ("done", "dropped")}
+        claimed = [e.ref for e in s.progress if e.source == "declared" and e.status == "claimed"]
+        ref = next((r for r in [*s.lane, *claimed] if r != "free-pick" and r not in ended), None)
+        if ref is None:
+            return None
+        return (
+            f"[agentorc] you have been idle {int(IDLE_NUDGE.total_seconds() // 60)} minutes with `{ref}` open "
+            f"— end the run with one of `ao progress done {ref} --pr N`, `ao progress drop {ref} --why`, "
+            "`ao progress none --why` or `ao progress restart --why`"
+        )
+
+    async def _policy_send(self, s: Session, text: str) -> bool:
+        """A policy's fixed line, typed through `send`'s path under the doorbell's rules (§6, §4.10):
+        one typist per pane, never at a dialog, only into an empty composer — someone's half-typed
+        words would be submitted with it. Recorded on `sends` as the home's own (`system`). False
+        when it was not typed: the tick looks again next time."""
+        adapter = adapters.get(s.adapter)
+        if getattr(adapter, "composer", None) is None or self._on_a_dialog(s):
+            return False
+        typing = self._typing[s.id]
+        if typing.locked():
+            return False
+        async with typing:
+            tail = await asyncio.to_thread(self.tmux.capture_tail, s.id, COMPOSER_LINES, raw=True)
+            if adapter.composer(tail) != "":
+                return False
+            entry = self._record_send(s, SYSTEM, text)
+            try:
+                await self._type(s.id, adapter, text)
+            except Exception as e:  # noqa: BLE001 — a failed send is not a sent one; next tick looks again
+                entry.verdict = str(e) or type(e).__name__
+                self.store.save(s)
+                return False
+        return True
 
     async def _replay(self, s: Session, why: str, **extra: Any) -> None:
         """One restart by the tick (§6): the record's launch record handed to `create` again — here,

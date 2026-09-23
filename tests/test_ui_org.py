@@ -542,6 +542,11 @@ def test_the_slot_holds_one_text_the_first_that_applies_and_a_caption(tmp_path, 
     # the crash restart's ceiling (§6 *Keeping a team running* rule 1, TD-103): an ending of its own
     ceil = view(_card(state="exited", exit_code=1, restart_ceiling={"at": "2026-09-22T20:00:00Z", "count": 3}))["slot"]
     assert ceil["text"] == "restarts exhausted · 3 in 2 h" and ceil["kind"] == "bad" and "Resume" in ceil["full"]
+    # the idle nudge (§6 rule 4): nudged in this stretch and still idle twenty minutes later
+    stale = view(_card(since="2026-09-21T01:00:00Z", nudged_at="2026-09-21T01:20:00Z"))["slot"]
+    assert stale["text"] == "idle · open work" and stale["kind"] == "lim"
+    # a nudge from an earlier stretch says nothing about this one
+    assert view(_card(since="2026-09-21T02:00:00Z", nudged_at="2026-09-21T01:20:00Z"))["slot"]["text"] != stale["text"]
     said = view(_card(out_of_work=oow, doing=doing))["slot"]
     assert said["text"] == "out of work — the ledger is empty" and "second line" in said["full"]
     assert not said["caption"].startswith("says")  # an ending hides the line that caption would date

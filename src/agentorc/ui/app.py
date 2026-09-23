@@ -13,7 +13,7 @@ import math
 import os
 import time
 from collections.abc import Collection, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Annotated, Any
@@ -824,6 +824,12 @@ def view(
     d["ready"] = ready_to_close(s, d["members"] if fleet_known else None)
     d["ready_ok"] = bool(d["ready"]) and all(ok for _, ok in d["ready"])
     d["not_ready"] = [name for name, ok in d["ready"] if not ok]  # what *more ▾ → Close* says it waits on
+    # §6 rule 4 (TD-103): nudged once in this idle stretch and still idle another twenty minutes
+    # later — the host agent is done, and it is for a person or its manager to judge
+    nudged, since = _iso(s.get("nudged_at")), _iso(s.get("since"))
+    d["open_work"] = bool(
+        state == "idle" and nudged and since and nudged >= since and now - nudged >= timedelta(minutes=20)
+    )
     d["slot"] = card_slot(d)
     d["next_act"] = next_act(d)
     return d
@@ -963,6 +969,12 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         full = f"{words}{when} — {why or 'no reason recorded'}"
         if not d["out_of_work"] and said["early"]:
             full += " — asked inside its own first half hour, so a controller does not act on it (design §4.9a)"
+    elif d.get("open_work"):
+        kind, text = "lim", "idle · open work"
+        full = (
+            "idle with its work open: the host agent nudged it once, twenty minutes into this stretch, and it "
+            "is still idle — yours or its manager's to judge (design §6)"
+        )
     elif d["doing"]:
         kind, text = "doing", d["doing"]["text"]
     elif state in ("working", "stalled?"):

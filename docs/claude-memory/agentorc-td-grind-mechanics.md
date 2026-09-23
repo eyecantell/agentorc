@@ -58,6 +58,14 @@ Added 2026-09-14 (same session, a later run, ten PRs merged):
 - **Never `git checkout <file>` to undo a test fixture edit** while you have uncommitted work in
   that file — it silently discards the real change too. Copy the file aside and copy it back.
 
+Added 2026-09-22 (grinder-ao-1):
+
+- **The verdict word is `SHIP`, `FIXED` or `BLOCK`, never `PASS`.** The first line must be
+  `cadence-review: FIXED · <model> · <code|docs> · <n> findings`. A reviewer briefed to answer
+  `cadence-review: PASS` produces a comment the check reads as no review at all. Ask the
+  reviewer for its findings, then write the verdict line yourself. Post a corrected comment
+  rather than editing the old one.
+
 **Why:** these cost real time and one wrong PR state on the first run.
 **How to apply:** when scripting ledger moves or chaining merges in this repo, reuse these rules;
 a helper that skips the template block lives only in a session scratchpad, so rewrite it.
