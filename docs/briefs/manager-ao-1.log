@@ -276,3 +276,4 @@
 00:11  grinder-ao-1: TD-103 briefs cut → #471 merged 06:10Z, cadence pass (review recorded). techlead-ao-1: read stalled? (scraped; screen at composer after /exit), 0 waiting, clean, host tick had not closed it for 20 min → ao close. Held: #470. grinder-ao-2 finished
 00:12–00:16 quiet (techlead-ao-1 exited after the close, 0 waiting → left empty)
 00:18  grinder-ao-1: took TD-069 write-back → #474 open 06:17Z, src/sessionorc → held. Held: #470 #474; #472 draft (grinder-ao-2's read half, waits on #474)
+00:26  grinder-ao-1: TD-069 write-back #474 done (held); TD-113 archive → #475 open (no held paths). grinder-ao-2: out-of-work cleared, reclaimed TD-069 (row controls on #472) 06:25Z, working. Held: #470 #474
