@@ -210,6 +210,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-22 (TD-100 slice 3, PR #436, grinder-ao-2): the *paused · usage* mark on the card's slot and the Focus header (`gated_view`); the chip's line waits on slice 1.
 - 2026-09-22 (TD-100 slice 3, PR #449, grinder-ao-1): the **usage** chip's line — the page reads the `gate` RPC beside `usage` and attaches each profile's lines (`with_lines`), on the render and on each pushed `usage` event; worst by the gap to the line, *near* within ten points of it.
 - 2026-09-22 (TD-100 slice 3, PR #450, grinder-ao-1): `gated` gained `resets`, so the *paused · usage* mark says *resets* when its line moves only at the window's reset; it said *line moves* always until then.
+- 2026-09-23 (TD-117, grinder-ao-1): **Deny with a reason** built — §10's question, decided yes by Paul the same day: an optional *why?* box beside Deny on the card, the Focus header and the Inbox's permission row, sent as the hook decision's `reason` (the route and `ao deny <id> [reason]` already carried one; only the page lacked the words). "Allow for this session" stays *no, not now*.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.

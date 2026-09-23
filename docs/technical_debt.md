@@ -71,7 +71,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-114 | A repo's brief replaces the whole template, so three repos carry copies of agentorc's mechanics that go stale together: make it a supplement filled into a `{repo}` slot | High | Partly done — step (1) built, awaiting the anchor with (2) and (3) |
 | TD-115 | A session's own exit hook can be judged outside and refused, and the refusal is applied anyway through the events queue | Medium | Open |
 | TD-116 | `decide` is ungated: any session may answer another session's permission prompt | Medium | Open — decided 2026-09-23 |
-| TD-117 | Deny with a reason: the permission row's Deny carries no words for the session to read | Low | Open — decided 2026-09-23 |
 | TD-118 | Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose | High | Open — decided 2026-09-23; profiles split the same day |
 
 ---
@@ -1168,19 +1167,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** design first, in the same PR — §4.8 moves `decide` into the gated list and §4.4a's node table keeps it as a node-owned act; `_gate` covers `decide` (a person's `decide` from the page has no caller and is served as today); a test that a session without the grant, or with it but not in the target's `controllers`, is refused with the standard line.
 
 **Related:** TD-028 (where it was left ungated), TD-036 (membership), design §4.8, §9 invariant 11.
-
-## TD-117: Deny with a reason: the permission row's Deny carries no words for the session to read
-
-**Priority:** Low
-**Added:** 2026-09-23 (the anchor session; design §10's question since 2026-09-06, decided by Paul 2026-09-23)
-**Status:** Open — decided 2026-09-23: **yes to Deny with a reason; no, for now, to "allow for this session".** The hook decision already carries a `reason` (`rpc_decide(behavior, reason)`, and the hook script prints it back to Claude Code); what is missing is the words: an optional one-line *why* beside Deny on the card, the Focus header and the Inbox's permission row; `ao deny <id> [reason]` already carries one.
-**Location:** design §4.5a (the permission row, the card's Deny), §4.2, §10 (the question, marked decided); `src/agentorc/ui/templates/card.html`, `inbox_row.html`, `focus.html`, `static/app.js`, `src/agentorc/cli.py` (`ao deny`), `src/sessionorc/agent.py` (`rpc_decide` already takes `reason`)
-
-**Why:** a bare refusal makes an unattended session try the same call another way; one sentence steers its next attempt, and the hook already carries it for free.
-
-**Fix:** design first, in the same PR — §4.5a's row gains the optional reason (one input, never required, the button unchanged); the page sends it as `reason`, as `ao deny <id> [reason]` already does; a test that the reason reaches the hook's decision. "Allow for this session" stays a §10 question marked *no, not now*.
-
-**Related:** TD-008 (the permission questions), TD-116 (who may decide), design §10.
 
 ## TD-118: Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose
 

@@ -71,6 +71,8 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .btn.on { background: var(--ended-bg); color: var(--fg); }
 .input { height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: 13px; font-family: inherit; display: flex; align-items: center; }
 input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; }
+/* Deny's optional reason (§4.5a, TD-117): button-height, and it gives way before a button does */
+input.denywhy { height: 24px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-family: inherit; flex: 0 1 11em; min-width: 5em; width: 11em; }
 .field { display: flex; flex-direction: column; gap: 5px; } .field label { font-size: 11px; font-weight: 600; color: var(--strong); text-transform: uppercase; letter-spacing: .04em; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .radio { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
