@@ -27,7 +27,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-038 | The embedded terminal is a bare xterm.js: default palette, no bundled font, no renderer addon — it reads as black-and-white next to VS Code's terminal | Medium | Built — live check pending |
 | TD-039 | Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation | Medium | Open |
 | TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Partly done |
-| TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Open |
+| TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Designed 2026-09-23 — a grinder builds |
 | TD-050 | The cadence check's `review` row reads the verdict only on a comment's first line, so a report that ends with it counts as no review at all | Medium | Open |
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Partly done — steps 1–8 done (5 was a measurement); the second-adapter step and the live check remain |
 | TD-053 | A team never winds down when it runs out of work: build design §4.9a — the declaration, the role tests, the lead's wind-down and the board line | Medium | Partly done |
@@ -42,7 +42,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-067 | Standing up a team has no operator's guide: the briefs README predates `ao team start`, design §4.9 is a spec, and `ao --skill` is for a session, not for the person or the Claude session that sets a team up | Medium | Open |
 | TD-069 | One place to work from: an Inbox page listing everything that needs a person — session states, mail, due board items — each with its controls, filtered by team; today they are in three places and the mail dialog is too narrow to read | Medium | Open |
 | TD-070 | Neither an `ask` nor a board item can offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, and an answers field on the board entry (a dev-cadence format change), rendered as buttons | Medium | Open |
-| TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Open |
+| TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Items 1 and 2 designed 2026-09-23 — a grinder builds; 8 is Paul's |
 | TD-072 | Sessions exit with unread mail: nothing makes a worker read its inbox before it says it is out of work, and an unread `note` outlives the run it was sent to | Medium | Open |
 | TD-075 | Every question a worker has goes to the person: a go-between — the lead, or a session beside it, on a stronger model — could answer what is already written down and steering, and pass up the rest with a recommendation | Medium | Partly done |
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
@@ -70,7 +70,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-114 | A repo's brief replaces the whole template, so three repos carry copies of agentorc's mechanics that go stale together: make it a supplement filled into a `{repo}` slot | High | Partly done — step (1) built, awaiting the anchor with (2) and (3) |
 | TD-115 | A session's own exit hook can be judged outside and refused, and the refusal is applied anyway through the events queue | Medium | Open |
 | TD-118 | Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose | High | Partly done — (1) and (2) built 2026-09-23; (3) is dev-cadence's |
-| TD-119 | A session may answer its own permission prompt: the gate passes every acting RPC a session makes on itself, `decide` included | Medium | Open — needs a decision |
+| TD-119 | A session may answer its own permission prompt: the gate passes every acting RPC a session makes on itself, `decide` included | Medium | Decided 2026-09-23: refuse — a grinder builds |
 
 ---
 
@@ -321,11 +321,11 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-13 (raised by Paul)
-**Owner:** anchor
-**Kind:** design-first
-**Pickable:** no — its design round is the anchor's, next
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
 
-**Status:** Open — **the design round is next, the anchor's (Paul, 2026-09-23: *go with your recommendations*):** one OS window per Focus, the six pieces below decided in §4.5a and §4.5, then a grinder builds. Was: design task first: not to be coded before the control is in design §4.5a and the behaviour in §4.5
+**Status:** Designed 2026-09-23 (the anchor) — **build it as design §4.5 screen 2 *Pop out* and the §4.5a rows **Pop out**, **Focus** (its *Focus window* reading) and **title** say; the six pieces below are decided there:** (1) Pop out in the card's *more ▾* and the Focus header, Focus itself a plain link so middle-click stays the browser's; (2) `/focus/{sid}?window=1`, the whole Focus minus nav and top bar, panels included; (3) `window.open` named `ao-focus-<id>`, size and position per session in the browser, default fits 100 columns; (4) the title `<name> · <state>`, `▲ ` while it needs you, from the feed — on every Focus, tab or window; (5) no ceiling, a tab's cost each, the window never closes itself; (6) the card reads *Focus window* and raises it in the browser that opened it, other browsers open Focus as ever. One PR for the page (`src/agentorc/ui/`: `card.html`, `focus.html`, `base.html`, `app.js`, `app.py`); no `src/sessionorc` change. Was: **the design round is next, the anchor's (Paul, 2026-09-23: *go with your recommendations*):** one OS window per Focus, the six pieces below decided in §4.5a and §4.5, then a grinder builds. Was: design task first: not to be coded before the control is in design §4.5a and the behaviour in §4.5
 
 **Location:** `src/agentorc/ui/templates/card.html` (the Focus button), `focus.html`, `base.html` (the chrome a popped-out window should not carry), `src/agentorc/ui/static/app.js` (the events websocket, one per tab today), `src/agentorc/ui/app.py` (`/focus/{sid}`), design §4.5 screen 2 and §4.5a
 
@@ -721,10 +721,10 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Priority:** Low
 **Added:** 2026-09-18 (the anchor session; Paul's review of the Org page)
-**Owner:** anchor
-**Kind:** design-first
-**Pickable:** no — items 1 and 2 wait on the anchor's §4.5a rows
-**Status:** Open — **items 1 and 2 approved by Paul 2026-09-23: the anchor writes their two §4.5a rows in one design PR, then a grinder builds; item 8 stays Paul's canvas.** Was: a list to pick from, none approved; **items 3, 4 and 5 are settled by TD-095's card (2026-09-21)**, **6 and 7 by the mockups catching up (2026-09-22, grinder-ao-2)**, below. Left: 1 and 2 (each a §4.5a row first — the anchor's design), 8 (Paul's canvas). Built in the same PR as this entry: a team with nothing live keeps its card (Start on it, its dead cards folded, below the live teams and *No team*), the **Teams** strip retired, state glyphs on every pill, *Person inbox* → **Inbox**.
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — **items 1 and 2 designed 2026-09-23 (the anchor): §4.5a rows *team card: Forget all* and *team header ✉ n*; build them as the rows say, one page PR each or together (`src/agentorc/ui/`: `group_head.html`, `org.html`, `app.js`); item 8 is Paul's canvas.** Forget all is n Forgets behind one confirm, skipping and naming every card with the dirty / unpushed flag (not refusing the team on one flag — the per-card Forget refuses nothing but a suspended record, `rpc_remove`); the unread sum on a folded header is display only, the mail staying under §4.10. Item 2's open question is answered by the code: a start under the same name moves the old record's mail to the new session (`_supersede`, TD-081), so an unread note outlives the run and lands in the next one's inbox — by design, and now visible on the fold. Was: **items 1 and 2 approved by Paul 2026-09-23: the anchor writes their two §4.5a rows in one design PR, then a grinder builds; item 8 stays Paul's canvas.** Was: a list to pick from, none approved; **items 3, 4 and 5 are settled by TD-095's card (2026-09-21)**, **6 and 7 by the mockups catching up (2026-09-22, grinder-ao-2)**, below. Left: 1 and 2 (each a §4.5a row first — the anchor's design), 8 (Paul's canvas). Built in the same PR as this entry: a team with nothing live keeps its card (Start on it, its dead cards folded, below the live teams and *No team*), the **Teams** strip retired, state glyphs on every pill, *Person inbox* → **Inbox**.
 **Location:** `src/agentorc/ui/` (templates, `app.js`, `app.css`)
 
 **Why:** on 2026-09-18 the page was seven cards, six of them dead, under a strip of three stopped teams: nothing on it said which dead card was whose, and what was running was one card among them. The review fixed the grouping; these are what it turned up beside it, kept here so they are not lost with the conversation.
@@ -1268,10 +1268,10 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Priority:** Medium
 **Added:** 2026-09-23 (`grinder-ao-1`, found building TD-116, PR #490)
-**Owner:** anchor
-**Kind:** decision
-**Pickable:** no — whether a self-`decide` is refused is a decision, not yet made
-**Status:** Open — needs a decision: refuse `decide` on the caller's own record, or leave it as `send` to oneself is
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Decided 2026-09-23 (the anchor): **refuse.** A permission prompt exists so that someone other than the session approves the call; a session answering its own is the prompt defeated, the same class as `set_grants` on oneself, which the gate already carves out. Build the *Fix* below as written: `decide` joins the self-exclusion tuple in `act_gate` and `offline_refusal`'s self branch, the refusal reads *a session does not answer its own permission prompt (design §4.8)*, a test beside `test_a_session_answers_a_permission_only_as_a_controller`, and §4.8's self-case sentence says it — design first, in the same PR. `src/sessionorc`, so the anchor merges it (TD-093). Was: Open — needs a decision: refuse `decide` on the caller's own record, or leave it as `send` to oneself is
 **Location:** `src/sessionorc/mail.py` (`act_gate`: `if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller: return None`), `src/sessionorc/modes.py` (`offline_refusal`, the same self rule), design §4.8 (the gate), §9 invariant 11
 
 **Why:** TD-116 made `decide` an acting RPC "exactly as `send` does", and `act_gate` passes any acting RPC a session makes on **itself**: that is right for `send`, `set_mode` or `close` (a session may type into, or close, its own pane). But a permission prompt exists so that someone other than the session approves the call: a session whose main turn is blocked on the hook can still run `ao allow $AGENTORC_SESSION` from a background task or a subagent and approve its own tool call. The gate already carves out the two RPCs that edit authority (`set_grants`, `set_controllers`) for the same reason; a permission answer is arguably a third. Not changed in PR #490 because the decision said "exactly as `send`".
