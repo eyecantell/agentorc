@@ -68,8 +68,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
 | TD-114 | A repo's brief replaces the whole template, so three repos carry copies of agentorc's mechanics that go stale together: make it a supplement filled into a `{repo}` slot | High | Partly done — step (1) built, awaiting the anchor with (2) and (3) |
 | TD-118 | Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose | High | Partly done — (1) and (2) built 2026-09-23; (3) is dev-cadence's |
-| TD-119 | A session may answer its own permission prompt: the gate passes every acting RPC a session makes on itself, `decide` included | Medium | Decided 2026-09-23: refuse — a grinder builds |
 | TD-120 | The anchor's jobs go to the team: the techlead reads the held PRs, promotion is a person's press or a policy, and a designer seat holds the design conversation | Medium | Open — decided 2026-09-23; the designer role is in org.yml, its team seat waits on §4.9a |
+
 
 ---
 
@@ -1220,22 +1220,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-103 (the rules that left the manager's brief), TD-114 (briefs as supplements), TD-105 and TD-106 (the same theme in mail and identity), TD-060 (the profile names are renamed with the rest).
 
-## TD-119: A session may answer its own permission prompt: the gate passes every acting RPC a session makes on itself, `decide` included
-
-**Priority:** Medium
-**Added:** 2026-09-23 (`grinder-ao-1`, found building TD-116, PR #490)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Decided 2026-09-23 (the anchor): **refuse.** A permission prompt exists so that someone other than the session approves the call; a session answering its own is the prompt defeated, the same class as `set_grants` on oneself, which the gate already carves out. Build the *Fix* below as written: `decide` joins the self-exclusion tuple in `act_gate` and `offline_refusal`'s self branch, the refusal reads *a session does not answer its own permission prompt (design §4.8)*, a test beside `test_a_session_answers_a_permission_only_as_a_controller`, and §4.8's self-case sentence says it — design first, in the same PR. `src/sessionorc`, so the anchor merges it (TD-093). Was: Open — needs a decision: refuse `decide` on the caller's own record, or leave it as `send` to oneself is
-**Location:** `src/sessionorc/mail.py` (`act_gate`: `if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller: return None`), `src/sessionorc/modes.py` (`offline_refusal`, the same self rule), design §4.8 (the gate), §9 invariant 11
-
-**Why:** TD-116 made `decide` an acting RPC "exactly as `send` does", and `act_gate` passes any acting RPC a session makes on **itself**: that is right for `send`, `set_mode` or `close` (a session may type into, or close, its own pane). But a permission prompt exists so that someone other than the session approves the call: a session whose main turn is blocked on the hook can still run `ao allow $AGENTORC_SESSION` from a background task or a subagent and approve its own tool call. The gate already carves out the two RPCs that edit authority (`set_grants`, `set_controllers`) for the same reason; a permission answer is arguably a third. Not changed in PR #490 because the decision said "exactly as `send`".
-
-**Fix:** decide; if yes, add `decide` to the self-exclusion tuple in `act_gate` (and refuse it in `offline_refusal`'s self branch), with the refusal worded as *a session does not answer its own permission prompt (design §4.8)*, a test beside `test_a_session_answers_a_permission_only_as_a_controller`, and §4.8's sentence on the self case updated. A person's `decide` (no caller) is untouched either way.
-
-**Related:** TD-116 (the gate on `decide`), TD-117 (Deny with a reason), design §4.8, §9 invariant 11.
-
 ## TD-120: The anchor's jobs go to the team: the techlead reads the held PRs, promotion is a person's press or a policy, and a designer seat holds the design conversation
 
 **Priority:** Medium
@@ -1252,3 +1236,4 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** (1) TD-093 slice 4, then the `review:` line in `org.yml` and the hand rule's retirement in TD-093, `techlead-context.md` and CLAUDE.md. (2) Design the `promote:` block (§5, the repo's own), the policy (§6) and its Inbox row (§4.5a), then a grinder builds it (`src/sessionorc`, the reader merges); this repo's `.agentorc.yml` gets its block, and each other repo writes its own. (3) Design the on-demand interactive member (§4.9, §4.9a, §4.5a's header button), build the definition key, the concluded test's change and the button, add the designer to `ao-grind`. Every piece is a repo's declaration or a rule about mode, never about this repo or a role name.
 
 **Related:** TD-093 (the reader), TD-062 (the live copy is promoted), TD-096 (an interactive member is left alone), TD-075 (the techlead), design §4.9a, §4.9b.
+
