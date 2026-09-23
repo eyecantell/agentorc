@@ -3594,13 +3594,14 @@ follow, and they bind every row kind, mail and state alike:
    entry id of its own (`t-<hex>`, as mail's is `m-<hex>`; the entry id is what `inbox_dismiss`
    takes) to a small **attention trail** persisted beside the person inbox, the newest 100, each
    kept for `MAIL_RETENTION`. `how` is what the home can tell: *allowed by you*, *denied by you*
-   (the `decide` RPC from a person), *answered in the terminal* (the pending thing cleared with no
+   (the `decide` RPC from a person; *allowed by `<name>`* when a controller answered it, §4.8 —
+   and, not being a person's, a quick one leaves no trail — below), *answered in the terminal* (the pending thing cleared with no
    `decide`), *resumed*, *pushed*, *forgotten*, *the session exited* or *the session was closed*
    (the record's own state says so, beneath any word an act wrote; an `unpushed` row is a row of an
    exited record, so only a close ends it this way — TD-088), *the limit reset*, *dismissed by you*
    (an identity alarm, §4.8a; beside *logged by you → `<controller>`*; a suspension ends
    no row and writes nothing here), and plain *resolved* when it cannot tell (for a node's session
-   the home knows its own `decide`s, so *by you* is always known). `text` is cleaned and capped as
+   the home knows its own `decide`s, so who answered is always known). `text` is cleaned and capped as
    a `doing` line is. FYI lists the trail; **Dismiss** removes an entry early; a row offers
    **Open** only while the record it names still exists — after a resume the trail names the record
    that ended, and says *resumed*. **Bounded like the identity alarms (§4.8a):** a repeat of the

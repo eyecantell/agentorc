@@ -4297,7 +4297,8 @@ class HostAgent:
         200 ms answer stays under the trail's floor."""
         who = "you"
         if not mail.is_person(caller):
-            rec = self.sessions.get(str(caller))
+            # the one graph, so a controller on another host is named too, not shown as `id@host`
+            rec = self._graph().get(self._addr(caller))
             who = rec.name if rec is not None else str(caller)
         return f"{'allowed' if behavior == 'allow' else 'denied'} by {who}"
 
