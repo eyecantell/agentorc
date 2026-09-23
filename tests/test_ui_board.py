@@ -138,25 +138,86 @@ def test_due_board_items_are_counted_in_needs_you_oldest_first_among_the_mail(tm
 
 
 @pytest.mark.unit
-def test_a_board_row_is_text_says_how_it_leaves_and_offers_no_unbuilt_control(tmp_path, monkeypatch):
-    """§4.5a *Due strip / Attention*: the item's text and *open board in VS Code* at that line. Snooze
-    and Done are §4.4's write-back, not built — the row says so rather than drawing them. The text is
-    the board's, escaped: nothing on the page is a control made from it (TD-071 item 8)."""
+def test_a_board_row_is_text_and_its_two_answers_carry_what_the_reader_gave(tmp_path, monkeypatch):
+    """§4.5a *Due strip / Attention*: the item's text, *open board in VS Code* at that line, **Snooze ▾**
+    (+1 day · +1 week · a date) and **Done** (confirms). Each control carries the board, the line and
+    the text, which the agent re-checks. The text is the board's, escaped: nothing on the page is a
+    control made from it (TD-071 item 8) — it rides only as an attribute value."""
     host(tmp_path, monkeypatch)
     from agentorc.ui.app import board_rows, templates
 
     root = tmp_path / "samscrape"
-    rows = board_rows(
-        report(root, item(9, "<b>Allow</b> the rm. Due: 2026-09-20.", "2026-09-20", "2d overdue")),
-        {str(root.resolve()): "sam"},
-    )
+    text = '<b>Allow</b> the "rm". Due: 2026-09-20.'
+    rows = board_rows(report(root, item(9, text, "2026-09-20", "2d overdue")), {str(root.resolve()): "sam"})
     html = templates.get_template("inbox_rows.html").render(rows=rows, section="needs")
     assert 'data-kind="board"' in html and 'data-team="sam"' in html and 'class="mailrow boardrow"' in html
     assert "&lt;b&gt;Allow&lt;/b&gt;" in html and "<b>Allow</b>" not in html
     assert ">samscrape<" in html and "2d overdue" in html and ">board<" in html
     assert "Open board" in html and "user_attention.md:9" in html
-    assert "data-act" not in html  # no Snooze, no Done, no Dismiss: nothing here the page could act on
-    assert "not built" in html
+    acts = html.count('data-act="board"')
+    assert acts == 4  # +1 day, +1 week, a date, Done — and nothing else acts
+    assert html.count('data-act="') == acts
+    assert html.count('data-board-act="snooze"') == 3 and html.count('data-board-act="done"') == 1
+    assert html.count('data-line="9"') == 4 and html.count(f'data-board="{root}/docs/user_attention.md"') == 4
+    assert html.count('data-text="&lt;b&gt;Allow&lt;/b&gt; the &#34;rm&#34;. Due: 2026-09-20."') == 4
+    assert 'data-when="1d"' in html and 'data-when="1w"' in html and 'data-when="pick"' in html
+    done = html[html.index('data-board-act="done"') :]
+    assert "data-confirm=" in done.split(">")[0]
+
+
+@pytest.mark.unit
+def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_again(tmp_path, monkeypatch):
+    """The route (§4.4, TD-069 step 3) hands the row's board, line and text to `board_edit`,
+    caller-less — the person's own act — and reads the boards again at once, so the answered row is
+    gone from the next refresh. What it cannot know is refused before the agent is asked."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+
+    reads, calls = [], []
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (reads.append(1), ([], ""))[1])
+
+    class Fake:
+        def __init__(self, *a, **k):
+            self.kw = k
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method == "board_edit":
+                calls.append((self.kw.get("caller"), kw))
+                return {"commit": "abc123", "message": "agentorc: done x (session n/a)"}
+            return {"list": [], "inbox": {"entries": [], "trail": []}}.get(method, {})
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    board = str(tmp_path / "r/docs/user_attention.md")
+    with TestClient(uiapp.create_app()) as c:
+        c.get("/api/person/inbox")
+        assert len(reads) == 1
+        r = c.post("/api/person/board", json={"action": "done", "board": board, "line": 4, "text": "x"})
+        assert r.status_code == 200 and r.json()["commit"] == "abc123"
+        assert len(reads) == 2  # read again at once, not at the next minute
+        r = c.post(
+            "/api/person/board",
+            json={"action": "snooze", "board": board, "line": "4", "text": "x", "due": "2026-09-30"},
+        )
+        assert r.status_code == 200
+        assert [k for _, k in calls] == [
+            {"board": board, "line": 4, "text": "x", "action": "done", "due": None},
+            {"board": board, "line": 4, "text": "x", "action": "snooze", "due": "2026-09-30"},
+        ]
+        assert all(caller is None for caller, _ in calls)  # a person is not a session
+        for bad in (
+            {"action": "delete", "board": board, "line": 4, "text": "x"},
+            {"action": "done", "board": board, "line": "four", "text": "x"},
+            {"action": "done", "board": "", "line": 4, "text": "x"},
+            {"action": "snooze", "board": board, "line": 4, "text": "x"},
+        ):
+            assert c.post("/api/person/board", json=bad).status_code == 400
+        assert len(calls) == 2
 
 
 @pytest.mark.unit

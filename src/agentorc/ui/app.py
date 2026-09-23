@@ -1435,6 +1435,7 @@ def state_rows(
 BOARD_FILE = Path("docs") / "user_attention.md"
 BOARD_SCRIPT = Path("scripts") / "nudge_user_attention.py"
 BOARD_TTL = 60.0
+BOARD_ACTS = ("snooze", "done")  # §4.5a's two answers to a board row, the `board_edit` RPC's actions
 BOARD_TIMEOUT = 20.0
 
 
@@ -1644,8 +1645,8 @@ def inbox_sections(
     snoozed — and, from TD-069 step 2, the **session states** (`states`, from `state_rows`) joined
     into **Needs you** here rather than anywhere else. From step 3 the due **board items**
     (`boards`, from `board_rows`) join it the same way, counted: a due board item is waiting on a
-    person by definition. They have no snooze of their own here — snoozing one is editing its
-    `Due:` date on the board, which is §4.4's write-back and not built.
+    person by definition. They carry no snooze of the Inbox's own: a board row's Snooze is §4.4's
+    write-back, which moves its `Due:` date on the board itself.
 
     - **Needs you** — the state rows, open `ask`s to the person (an open `conflict` too: it cannot be addressed to
       the person, §4.10, but one written before that gate would still be a question nobody else
@@ -1944,12 +1945,13 @@ def create_app() -> FastAPI:
 
     board_cache: dict[str, Any] = {"at": None, "rows": [], "note": ""}
 
-    async def board_items() -> tuple[list[dict[str, Any]], str]:
+    async def board_items(fresh: bool = False) -> tuple[list[dict[str, Any]], str]:
         """The Inbox's board rows and the note beside them (TD-069 step 3), read at most once every
         `BOARD_TTL` seconds and off the event loop: the reader is a subprocess over every board on
-        the host, and the page and the top bar both poll every few seconds."""
+        the host, and the page and the top bar both poll every few seconds. `fresh` reads now — after
+        a Snooze or Done, so the row the person answered is gone from the next refresh."""
         now = time.monotonic()
-        if board_cache["at"] is None or now - board_cache["at"] > BOARD_TTL:
+        if fresh or board_cache["at"] is None or now - board_cache["at"] > BOARD_TTL:
             rows, note = await asyncio.to_thread(read_boards)
             board_cache.update(at=now, rows=rows, note=note)
         return board_cache["rows"], board_cache["note"]
@@ -2747,6 +2749,27 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             else:
                 got = await call(PERSON_ACTS[action], msg=ref)
             return JSONResponse({"ok": True, **got})
+        if action == "board":
+            # design §4.5a **Due strip / Attention** → **Snooze ▾** and **Done** on a board row
+            # (§4.4 *Board write-back*, TD-069 step 3): the host agent edits the one line and commits
+            # it in the repo's main checkout. The row hands back what the reader gave it — the board,
+            # the line and its text — and the agent refuses the edit when that line has moved on.
+            what = str(body.get("action") or "")
+            if what not in BOARD_ACTS:
+                raise HTTPException(400, f"a board row's act is {' or '.join(BOARD_ACTS)}, not {what!r}")
+            try:
+                line = int(body.get("line"))
+            except (TypeError, ValueError):
+                raise HTTPException(400, "a board row's act names the item's line") from None
+            board, text = str(body.get("board") or ""), str(body.get("text") or "")
+            if not board or not text:
+                raise HTTPException(400, "a board row's act names the board and the item's text")
+            due = str(body.get("due") or "").strip() or None
+            if what == "snooze" and not due:
+                raise HTTPException(400, "a snooze names the new date, YYYY-MM-DD")
+            got = await call("board_edit", board=board, line=line, text=text, action=what, due=due)
+            await board_items(fresh=True)
+            return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
         if action == "dismiss":
             # design §4.10 *The Inbox is a queue* (TD-079 step 2): **Dismiss** and **Dismiss all**.
             # A **list of ids**, because *Dismiss all* dismisses the entries **this browser has on

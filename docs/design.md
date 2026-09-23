@@ -1395,8 +1395,13 @@ Screens:
    seconds without emptying the depths, which count what is unread *or* open. State rows come
    from one fresh `list` on each render, since the pushed stream is per record and this page is
    per person — a row whose state changed between polls is corrected by the next one, and a
-   permission answered here leaves at once. Not built: board items in the Inbox (TD-069 step 3);
-   until they land the page's count is mail and states.
+   permission answered here leaves at once. **Board items** (TD-069 step 3) are read by
+   dev-cadence's own `nudge_user_attention.py --report --due-only --json` over the boards of the
+   repos in this host's registry — never a second parser — at most once a minute and off the page's
+   loop, and read again at once after a Snooze or Done; each due item is a counted *Needs you* row
+   (its repo, the team whose projects hold it, its due words, the whole text as text, **Open board**
+   at its line) whose **Snooze ▾** and **Done** are §4.4's write-back. A reader that fails is said
+   in a note above the rows, never shown as a clear board.
 
    **Layout (TD-082; mockup `Inbox.dc.html`).** *The page is one centred column*, 1100 px at
    most: a queue reads in order, top to bottom, and a message's text runs the width of its row.

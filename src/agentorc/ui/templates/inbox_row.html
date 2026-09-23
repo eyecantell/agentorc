@@ -457,9 +457,11 @@
    step 3) ─────────────────────────────────────────────────────────────────────────────────────
    A board item due today or overdue, counted in *Needs you*: its repo, its due words, the whole
    text, and — §4.5a *item text* — the board at that line in the editor. The text is the board's,
-   shown as text; nothing here is a control made from it (TD-071 item 8). **Snooze** and **Done**
-   are §4.4's write-back, which is not built: until it is, the row says so, and the one way to
-   clear it is the board itself — editing the `Due:` date or checking the item off. #}
+   shown as text; nothing here is a control made from it (TD-071 item 8). Its two answers are §4.4's
+   write-back, made by the host agent in the repo's main checkout and committed there: **Snooze ▾**
+   (+1 day · +1 week · a date) moves the item's `Due:` date, **Done** checks it off (confirms). Each
+   hands back the board, the line and the text the reader gave, and the agent refuses the edit when
+   that line no longer holds this item. #}
 {% macro board(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.board }}">{{ e.repo }}</span>
@@ -470,9 +472,17 @@
 </div>
 <div class="body">{{ e.text }}</div>
 <div class="row gap wrap mfoot">
-  <span class="st">on the board — it leaves when its <code>Due:</code> date is moved or it is checked off there (Snooze and Done from here are not built)</span>
+  <span class="st">on the board — Snooze moves its <code>Due:</code> date and Done checks it off, each one commit in {{ e.repo }}'s checkout, never pushed</span>
   <span class="grow"></span>
   {%- if e.editor %}<a class="btn sm ghost" href="{{ e.editor }}" title="open {{ e.board }} at line {{ e.line }}">Open board</a>{% endif %}
+  <details class="more"><summary class="btn sm ghost" title="move its Due: date on the board">Snooze</summary>
+    <div class="menu">
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">+1 day</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="1w" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">+1 week</button>
+      <button data-act="board" data-id="person" data-board-act="snooze" data-when="pick" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">a date…</button>
+    </div>
+  </details>
+  <button class="btn sm" data-act="board" data-id="person" data-board-act="done" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-confirm="Check this item off {{ e.repo }}'s board? It is committed in that checkout.">Done</button>
 </div>
 {%- endmacro %}
 
