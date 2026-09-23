@@ -29,6 +29,7 @@ from fastapi.templating import Jinja2Templates
 from agentorc import org as orgmod
 from agentorc import profiles as profiles_mod
 from agentorc import repoconfig, teamrun, teams
+from agentorc import review as reviewmod
 from agentorc.cli import stop_time as clistop
 from sessionorc import hosts, identity, mail, naming, paths
 from sessionorc.adapters import short_model
@@ -1105,6 +1106,19 @@ def group_place(members: list[dict[str, Any]]) -> str:
     return "" if not places else places.pop() if len(places) == 1 else "mixed"
 
 
+def prs_waiting(members: Collection[dict[str, Any]], now: datetime | None = None) -> dict[str, Any] | None:
+    """Design §4.5a **team header** → *PRs waiting* (§4.9b *The reader*, TD-093): the held PRs
+    put in front of the team's reader and not yet answered, from each record's `prs_waiting` — the
+    seat's, in practice — as `{n, age}` of the oldest. A count and a time, never the entries. None
+    when nothing waits, or when no record carries the field (a host agent older than it)."""
+    got = [m["prs_waiting"] for m in members if isinstance(m.get("prs_waiting"), dict)]
+    n = sum(int(w.get("n") or 0) for w in got if isinstance(w.get("n"), int))
+    if n <= 0:
+        return None
+    oldest = min((str(w["oldest"]) for w in got if w.get("oldest")), default="")
+    return {"n": n, "age": _age(oldest, now or datetime.now(UTC))}
+
+
 def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = ()) -> list[dict[str, Any]] | None:
     """Design §4.5a Org **team groups** (§4.9, §9 invariant 9): the grid grouped by the `team` badge,
     derived from the views on every render and every delta, never stored. `rows` is the definitions
@@ -1170,6 +1184,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 "ids": [m["id"] for m in members],
                 "projects": projects or list(row.get("projects") or []),
                 "needs": sum(1 for m in members if m.get("state") == "needs-you"),
+                "prs_waiting": prs_waiting(members) if team != NO_TEAM else None,
                 "live": live,
                 # the header's own facts (design §4.5 *The card's anatomy*, TD-095): where the
                 # team's sessions are, once, and how many are in each state — never its manager's
@@ -2010,6 +2025,9 @@ def create_app() -> FastAPI:
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
+            if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
+                sender = records.get(e["from"]) or {}
+                e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
             _owing(e, records.get(e["from"]), at)
             e["age"] = _age(e.get("at"), at)  # the client keeps it ticking; this is what it opens on
             # §4.5 screen 6 *Layout* (TD-082): a duration is words from here, never a `…` the

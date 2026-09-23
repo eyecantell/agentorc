@@ -43,4 +43,8 @@
    **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,
    since what "last opened" means lives in the browser; it is empty and hidden as rendered. #}
 {% if g.team %}<span class="meta answeredmark hidden" data-answered-team="{{ g.team }}" title="answers this team's sessions gave for you from the record since you last opened Answered for you in the Inbox (design §4.9b) — read them there"></span>{% endif %}
+{# design §4.5a **team header** → *PRs waiting* (§4.9b *The reader*, TD-093): the held PRs the
+   team's reader has not answered — a count and the oldest's age, never pressable; the entries are
+   `ao inbox <seat>`'s #}
+{% if g.prs_waiting %}<span class="meta prswaiting" title="held PRs waiting for this team's reader (design §4.9b) — read them with ao inbox on the seat">{{ g.prs_waiting.n }} PR{{ '' if g.prs_waiting.n == 1 else 's' }} waiting{% if g.prs_waiting.age %} · oldest {{ g.prs_waiting.age }}{% endif %}</span>{% endif %}
 {% if g.needs %}<span class="pill s-needs"><span class="dot"></span>{{ g.needs }} needs you</span>{% endif %}

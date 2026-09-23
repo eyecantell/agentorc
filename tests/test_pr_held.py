@@ -81,3 +81,55 @@ def test_ao_pr_held_answers_from_the_record_and_the_files(monkeypatch, capsys):
     _world(monkeypatch, None, ["src/sessionorc/x.py"])  # no review: never held, and gh is not asked
     assert cli.main(["pr", "held", "12"]) == 0
     assert "has no review on its record" in capsys.readouterr().out
+
+
+# -- the page half (design §4.5a *PRs waiting*, TD-093 slice 3) --------------------------------------
+
+
+def test_a_github_origin_makes_a_pr_link_and_anything_else_draws_it_bare(monkeypatch):
+    remotes = {
+        "/a": "git@github.com:eyecantell/agentorc.git\n",
+        "/b": "https://github.com/eyecantell/samscrape\n",
+        "/c": "https://gitlab.com/x/y.git\n",
+    }
+
+    def git(argv, **_kw):
+        d = argv[2]
+        return subprocess.CompletedProcess(argv, 0 if d in remotes else 2, remotes.get(d, ""), "")
+
+    reviewmod._github.cache_clear()
+    monkeypatch.setattr(reviewmod.subprocess, "run", git)
+    assert reviewmod.pr_url("/a", 12) == "https://github.com/eyecantell/agentorc/pull/12"
+    assert reviewmod.pr_url("/b", 3) == "https://github.com/eyecantell/samscrape/pull/3"
+    assert reviewmod.pr_url("/c", 3) == "" and reviewmod.pr_url("/nope", 3) == "" and reviewmod.pr_url(None, 3) == ""
+    reviewmod._github.cache_clear()
+
+
+def test_the_team_header_counts_prs_waiting_and_an_ask_row_draws_its_pr():
+    from datetime import UTC, datetime
+
+    from agentorc.ui.app import prs_waiting, team_groups, templates
+
+    now = datetime(2026, 9, 23, 12, tzinfo=UTC)
+    seat = {"prs_waiting": {"n": 2, "oldest": "2026-09-23T10:30:00Z"}}
+    assert prs_waiting([seat, {"prs_waiting": None}, {}], now) == {"n": 2, "age": "1h 30m"}
+    assert prs_waiting([{"prs_waiting": None}, {}], now) is None  # nothing waits, or an older agent
+
+    def v(sid, **kw):
+        return {"id": sid, "name": sid, "team": "t", "state": "idle", "state_class": "idle", "state_label": "idle",
+                "scraped": False, "rank": 5, "controllers": [], "capabilities": [], **kw}  # fmt: skip
+
+    (team,) = team_groups([v("w"), v("tl", prs_waiting={"n": 1, "oldest": "2026-09-23T10:30:00Z"})])
+    head = templates.get_template("group_head.html").render(g=team)
+    assert "1 PR waiting · oldest" in head
+    (quiet,) = team_groups([v("w")])
+    assert "PR waiting" not in templates.get_template("group_head.html").render(g=quiet)
+
+    e = {"id": "m-1", "from": "ao-w", "from_name": "w", "from_open": "ao-w", "from_role": "other", "to": ["person"],
+         "at": "2026-09-23T10:00:00Z", "age": "2h", "kind": "ask", "text": "held: the doorbell", "about": None,
+         "read_at": None, "reply_to": None, "team": "t", "pr": 12,
+         "pr_url": "https://github.com/eyecantell/agentorc/pull/12"}  # fmt: skip
+    html = templates.get_template("inbox_rows.html").render(rows=[e], section="needs")
+    assert 'href="https://github.com/eyecantell/agentorc/pull/12"' in html and ">#12</a>" in html
+    html = templates.get_template("inbox_rows.html").render(rows=[{**e, "pr_url": ""}], section="needs")
+    assert ">#12</span>" in html and "/pull/12" not in html
