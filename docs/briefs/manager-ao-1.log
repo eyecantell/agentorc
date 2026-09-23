@@ -248,3 +248,4 @@
 21:55  techlead-ao-1: answered, idle 0 waiting → ao close. grinder-ao-2: TD-113 recipe → PR #460 merged, cadence pass (review recorded; no held paths). Held: #459 #461
 22:04  grinder-ao-1: TD-103 → #462 open, src/sessionorc → held. Held: #459 #461 #462. grinder-ao-2: TD-114 → #463 open (no held paths)
 22:08  grinder-ao-1: declared out of work 04:08Z, idle → finished (TD-103 stack #459→#461→#462 held for the anchor; the briefs' cut waits on TD-114 and the promote)
+22:15  #459 (TD-103 seat policy) merged 04:15Z by the anchor/Paul (grinder idle then), cadence pass (review recorded). grinder-ao-1: woken by Paul's reply to its Dismiss steer, settling the outcome it owes
