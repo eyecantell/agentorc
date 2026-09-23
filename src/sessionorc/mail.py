@@ -100,6 +100,11 @@ def _own(s: Session) -> list[str]:
     return s.controllers
 
 
+def self_decide_refusal(caller: Any) -> str:
+    """TD-119, design §4.8: whatever it holds, a session never answers its own permission prompt."""
+    return f"{caller} cannot decide itself: a session does not answer its own permission prompt (design §4.8)"
+
+
 def act_gate(
     records: Mapping[str, Session],
     caller: Any,
@@ -114,9 +119,11 @@ def act_gate(
     revoke or a membership edit takes effect on the session's next call and neither is cached.
     No caller (a person's terminal, the UI) passes; a session acting on itself passes, except
     for the two RPCs that edit authority — a session may no more hand itself a grant than
-    remove the controller watching it. A caller this agent does not know is a session (the id
-    came from `AGENTORC_SESSION`) and holds no grant. Reads are never gated; this is a guard
-    against a confused worker, not a security boundary.
+    remove the controller watching it — and `decide`, which is refused outright on oneself: a
+    permission prompt exists so that someone other than the session approves the call (TD-119).
+    A caller this agent does not know is a session (the id came from `AGENTORC_SESSION`) and
+    holds no grant. Reads are never gated; this is a guard against a confused worker, not a
+    security boundary.
 
     Third, §9 invariant 5 (TD-041): a target that is a person's session (`kind: interactive`
     and not `unattended`) is refused to every session, grant and membership notwithstanding.
@@ -124,6 +131,8 @@ def act_gate(
     Returns the refusal, or None when the call passes."""
     if is_person(caller) or method not in ACTING_RPCS:
         return None
+    if method == "decide" and params.get("id") == caller:
+        return self_decide_refusal(caller)
     if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller:
         return None
     me = records.get(str(caller))

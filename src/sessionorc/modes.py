@@ -15,6 +15,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from sessionorc.mail import self_decide_refusal
+
 # The home's, written at the home: a node's replica is overridden by the home's copy on reconnect,
 # so an edit made here would be lost, and said to have worked. **`suspend` is here for exactly
 # that reason** (§4.8a, TD-077 a2, review of PR #301): served at the node it would kill the
@@ -76,6 +78,8 @@ def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host
     if method == "create":
         return f"a session creates nothing while its host is offline — a create is gated on the org's graph: {tail}"
     if params.get("id") == caller:
+        if method == "decide":
+            return self_decide_refusal(caller)  # never served, link or no link (TD-119)
         return None  # a session acting on itself is this node's own business
     if method in ("seen", "hook"):
         return None  # not acts on another session in the gate's sense; the hook socket is the node's
