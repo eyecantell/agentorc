@@ -309,3 +309,5 @@
 14:10  grinder-ao-1: TD-117 done → PR #486 merged. Cadence pass (review recorded, ci green, ledger, worktree, pr). No src/sessionorc/briefs/org.yml paths — no anchor hold needed. grinder-ao-2 still on TD-118, pushed td118-ledger-header.
 14:10–14:14 quiet; grinder-ao-1 claimed TD-008 then TD-116; grinder-ao-2 briefly idle then back to working, no action needed (host agent's 20-min nudge, not fired)
 14:14  grinder-ao-1: TD-008 done → PR #488 merged (archive of TD-008/TD-117). Cadence pass, ledger/docs only.
+14:14–14:32 quiet, both grinders working (grinder-ao-1: TD-116, TD-096; grinder-ao-2: TD-118)
+14:32  grinder-ao-1: TD-116 built → PR #490 open 14:20Z, touches src/sessionorc/ — held for the anchor's read (TD-093 rule), not yet 2h. Also filed TD-119 (self-decide) → PR #491 merged, cadence pass, docs only.
