@@ -657,6 +657,7 @@ class HostAgent:
                     "line": over["line"],
                     "since": (s.gated or {}).get("since") or now_iso(),
                     "next": over["next"],
+                    "resets": over["resets"],  # so a card can say *resets* when `next` is the reset
                     "sent_at": (s.gated or {}).get("sent_at"),
                 }
                 if mark != s.gated:

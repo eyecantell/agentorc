@@ -757,6 +757,10 @@ def test_the_usage_gates_pause_is_a_mark_in_the_slot_and_the_focus_header(tmp_pa
     assert g["text"].startswith("paused · usage — grind week 75% ≥ 70%, line moves ")
     assert "pause sent" not in g["text"] and "waits for a clear composer" in g["full"] and "ao gate" in g["full"]
     assert gated_view({**mark, "sent_at": "2026-09-21T01:00:05Z"})["text"].endswith(" · pause sent")
+    # a line that moves only at the window's reset (a flat reserve, or the last day) says *resets*
+    at_reset = gated_view({**mark, "resets": mark["next"]})["text"]
+    assert ", resets " in at_reset and "line moves" not in at_reset
+    assert "line moves" in gated_view({**mark, "resets": "2026-09-30T07:00:00Z"})["text"]
     assert gated_view({**mark, "profile": "", "next": None})["text"] == "paused · usage — default week 75% ≥ 70%"
     # one malformed record costs its card the mark, never the grid
     assert all(
