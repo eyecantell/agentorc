@@ -70,10 +70,10 @@ person is `docs/user_attention.md`.
 - **Nothing keys on a role, a team or a project** (§9 invariant 9). They are badges. The one
   exception is mail's sideways edge between sessions that share a `team` badge (§4.10). If an
   answer would make code branch on a role's name, it is the wrong answer.
-- **Roles** (§4.8): `grinder`, `hunter`, `manager`, `techlead`, `plain`. `manager` was `lead`
-  until 2026-09-20 and `orchestrator` before that; both old words resolve to `manager` for one
-  release and are then refused for good; **bare `lead` is never given a new meaning** (§4.8 *The
-  names*, TD-076). A role has a display `label:`; nothing keys on it.
+- **Roles** (§4.8): `grinder`, `hunter`, `manager`, `techlead`, `auditor`, `plain`. `manager` was
+  `lead` until 2026-09-20 and `orchestrator` before that; both old words are unknown roles now;
+  **bare `lead` is never given a new meaning** (§4.8 *The names*, TD-076). A role has a display
+  `label:`; nothing keys on it.
 - **Identity** (§4.8a): the host agent classifies who is calling from the socket's peer — by
   ancestry, not by what the caller says. kmaster and the contractmatch node are in `enforce`. An
   *identity mismatch* is never worked around. An alarm sits on the record of the session that
@@ -85,9 +85,9 @@ person is `docs/user_attention.md`.
 ## 4. Teams, and how a run ends
 
 - **Org, team, project** (§4.9): `~/.agentorc/org.yml` defines projects (where checkouts are) and
-  teams (a `manager:` — or `manager: person` — plus members, each a role with a lane and a
-  brief). `ao team start` launches them; briefs are read from the checkout at that moment
-  (`docs/briefs/` here; presets under `src/agentorc/briefs/`).
+  teams (a `manager:` — or `manager: {role: person}`, the bare string being refused — plus
+  members, each a role with a lane and a brief). `ao team start` launches them; briefs are read
+  from the checkout at that moment (`docs/briefs/` here; presets under `src/agentorc/briefs/`).
 - **One agent per directory** (§9 invariant 2): every unattended session works in its own
   worktree under `.claude/worktrees/<name>`; the first session in the checkout is the **anchor**
   and only the anchor promotes the live install.
