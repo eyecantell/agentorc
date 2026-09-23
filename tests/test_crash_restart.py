@@ -166,3 +166,20 @@ async def test_a_node_restarts_nothing_and_a_seat_is_refused_malformed(agent, tm
         ok = await _member(person, tmp_path, name="auditor", seat={"trigger": "prs", "after": "10"})
         assert agent.sessions[ok].seat == {"trigger": "prs", "after": "10"}
         await person.call("kill", id=ok)
+
+
+async def test_a_crash_on_a_paused_profile_waits_for_the_gate(agent, tmp_path):
+    """The gate clears `gated` on an exited record, so rule 1 reads the profile's usage itself: a
+    session is not restarted into a pause (§6 *Usage gate*), and is once the profile is under."""
+    await park_ticks(agent)
+    async with LocalClient() as person:
+        sid = await _member(person, tmp_path)
+        _crash(agent, sid)
+        created = agent.sessions[sid]
+        agent._profile_gated = lambda *a: True
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[sid] is created
+        del agent._profile_gated
+        await agent._keep_running(datetime.now(UTC))
+        assert agent.sessions[sid] is not created
+        await person.call("kill", id=sid)

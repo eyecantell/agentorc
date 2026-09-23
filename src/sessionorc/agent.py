@@ -127,6 +127,12 @@ RESUME_MIN = timedelta(minutes=10)
 # exit inside the window is the person's.
 RESTART_CEILING = 3
 RESTART_WINDOW = timedelta(hours=2)
+# §6 rule 3 (TD-103 slice 3): six fills an hour over all seats sharing a controller, and how long a
+# seat must sit hook-confirmed idle with nothing due before the tick closes it — so a seat just
+# filled, idle for a moment before its prompt lands, is not closed on the tick that filled it.
+FILL_CEILING = 6
+FILL_WINDOW = timedelta(hours=1)
+SEAT_IDLE_GRACE = timedelta(minutes=2)
 REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
 # An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
 # itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
@@ -404,6 +410,8 @@ class HostAgent:
         # snapshot newer than the kill arrives, so it holds at most one tick's worth of ids.
         self._killed_at: dict[str, datetime] = {}
         self._derive_task: asyncio.Task[None] | None = None
+        self._seat_count_task: asyncio.Task[None] | None = None  # §6 rule 3's `gh` read, detached
+        self._seat_counted_at = datetime.min.replace(tzinfo=UTC)
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
         # trust dialog case — takes the classifier's verdict at once (TD-015)
@@ -700,18 +708,25 @@ class HostAgent:
 
     async def _keep_running(self, now: datetime) -> None:
         """Design §6 *Keeping a team running* (TD-103), the rules built so far: rule 1, the crash
-        restart. **The restarts run at the home** (§4.4a: policies that start run at the home), over
-        this host's records and every node's — a member on a host whose link is down is left as it
-        is and looked at again on the next tick, refused rather than queued. **Each record's pass is
-        isolated**: one's exception is logged and the tick goes on to the next."""
+        restart, and rule 3, the seats. **The restarts run at the home** (§4.4a: policies that start
+        run at the home), over this host's records and every node's — a member on a host whose link
+        is down is left as it is and looked at again on the next tick, refused rather than queued.
+        **Each record's pass is isolated**: one's exception is logged and the tick goes on to the next."""
         if self.mode != "home":
             return
         records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
         for s in records:
             try:
                 await self._crash_restart(s, now)
+                await self._seat_pass(s, now, records)
             except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
-                log.exception("%s: the crash-restart pass failed", self._address(s))
+                log.exception("%s: the keep-running pass failed", self._address(s))
+        if (
+            self._seat_count_task is None or self._seat_count_task.done()
+        ) and now - self._seat_counted_at > DERIVE_EVERY:
+            # detached, as the reports are: `gh` talks to the network, and the tick must not wait on it
+            self._seat_counted_at = now
+            self._seat_count_task = asyncio.create_task(self._count_seats(records))
 
     def _crashed(self, s: Session, now: datetime) -> bool:
         """Rule 1's test: a supervised, unattended member that is not a seat, `exited` by a
@@ -733,7 +748,18 @@ class HostAgent:
             and not s.suspended
             and not s.restart_ceiling
             and not s.superseded_by
+            and not self._profile_gated(s.profile, now)
         )
+
+    def _profile_gated(self, profile: str, now: datetime) -> bool:
+        """Whether `profile` is over a usage line now (§6 *Usage gate*): the gate's own reading, for a
+        record the gate no longer marks — it clears `gated` on an exited one — so a policy does not
+        restart or fill into a pause. No reading is no gate, as at the gate (a failure never gates)."""
+        windows = (self._usage.get(profile) or {}).get("windows")
+        if windows is None:
+            return False
+        by_label = settings_mod.reserves(settings_mod.load()).get(profile) or {}
+        return settings_mod.crossed(settings_mod.lines(by_label, windows, now)) is not None
 
     async def _crash_restart(self, s: Session, now: datetime) -> None:
         """Rule 1 (design §6 *Keeping a team running*): restart a member that crashed by replaying
@@ -755,21 +781,26 @@ class HostAgent:
             self._save(s)
             await self._push_changes()
             return
-        entry: dict[str, Any] = {"at": now_iso(), "why": "crash"}
+        log.info("%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1)
+        await self._replay(s, "crash")
+
+    async def _replay(self, s: Session, why: str, **extra: Any) -> None:
+        """One restart by the tick (§6): the record's launch record handed to `create` again — here,
+        or at its node — the attempt appended to `restarts` and the list carried onto the new record,
+        so the count survives the restart it counts. A replay that fails keeps its entry with `error`
+        and counts all the same."""
+        entry: dict[str, Any] = {"at": now_iso(), "why": why}
         history = [*s.restarts, entry]
         address = self._address(s)
         try:
-            params = self._read_launch(address)
-            log.info(
-                "%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1
-            )
+            params = {**self._read_launch(address), **extra, "supervised": True}
             if s.host == self.host:
-                view = await self.rpc_create(**params, supervised=True)
+                view = await self.rpc_create(**params)
             else:
-                view = await self._route_act("create", {**params, "supervised": True, "host": s.host}, None, s.host)
+                view = await self._route_act("create", {**params, "host": s.host}, None, s.host)
         except Exception as e:  # noqa: BLE001 — a failed replay is a restart that failed, and counts (§6)
             entry["error"] = str(e) or type(e).__name__
-            log.warning("%s: the restart failed: %s", s.id, entry["error"])
+            log.warning("%s: the %s restart failed: %s", s.id, why, entry["error"])
             s.restarts = history
             self._save(s)
             await self._push_changes()
@@ -796,6 +827,128 @@ class HostAgent:
         if isinstance(record.get("controllers"), list):
             params["controllers"] = list(record["controllers"])
         return params
+
+    async def _seat_pass(self, s: Session, now: datetime, records: list[Session]) -> None:
+        """Rule 3 (design §6 *Keeping a team running*, §4.9b): a supervised seat's `seat_due` from its
+        trigger, the fill of an ended seat that is due — `create` with `keep_mail`, so a question that
+        was waiting is still there — under `FILL_CEILING`, and the close of a seat that has run and
+        sits idle with nothing due and nothing left unpushed."""
+        if not (s.seat and s.supervised and s.unattended) or s.superseded_by or s.suspended:
+            return
+        due = self._seat_due(s, now)
+        if due != s.seat_due:
+            s.seat_due = due
+            self._save(s)
+            await self._push_changes()
+        if s.host != self.host and s.host not in self._link_muxes:
+            return  # its link is down: left as it is, looked at again next tick (§4.4a)
+        if s.state in ("exited", "closed") and s.seat_due:
+            await self._fill(s, now, records)
+        elif s.state == "idle" and not s.seat_due and self._seat_has_run(s, now):
+            log.info("%s: a seat with nothing due, idle and pushed — closing it (§6 rule 3)", s.id)
+            if s.host == self.host:
+                await self.rpc_close(s.id)
+            else:
+                await self._route_act("close", {"id": s.id}, None, s.host)
+
+    def _seat_due(self, s: Session, now: datetime) -> dict[str, Any] | None:
+        """`seat_due: {at, by}` (§6 rule 3): set once the trigger is met and kept until the fill — but
+        `asks` is a question waiting now, so it clears again if none is. `prs` reads `seat_count`,
+        which `_count_seats` keeps; `every` is the time since this record was created."""
+        seat = s.seat or {}
+        trigger = seat.get("trigger")
+        if trigger == "asks":
+            return (s.seat_due or {"at": now_iso(), "by": "asks"}) if s.asks_waiting(home=self.host) else None
+        if s.seat_due:
+            return s.seat_due
+        met = False
+        if trigger == "prs":
+            count = (s.seat_count or {}).get("prs")
+            after = str(seat.get("after") or "")
+            met = after.isdigit() and isinstance(count, int) and count >= int(after)
+        elif trigger == "every":
+            every = _duration(str(seat.get("after") or ""))
+            met = every is not None and now - _parse(s.created) >= every
+        return {"at": now_iso(), "by": trigger} if met else None
+
+    async def _fill(self, s: Session, now: datetime, records: list[Session]) -> None:
+        """A due seat, ended, is filled — unless its profile is paused, or it or its fellows are at
+        the fill ceiling: six fills an hour over all seats sharing a controller (the graph, never the
+        team badge). The seat whose fill tripped it gets `restart_ceiling` and the Inbox row; its
+        fellows are merely refused until the hour rolls. Fills never count toward `RESTART_CEILING`."""
+        if s.restart_ceiling or self._profile_gated(s.profile, now):
+            return
+        mine = set(self._ctl(s))
+        fellows = [
+            r for r in records if r.seat and not r.superseded_by and (r is s or (mine and mine & set(self._ctl(r))))
+        ]
+        fills = [
+            e
+            for r in fellows
+            for e in r.restarts
+            if isinstance(e, dict) and e.get("why") == "fill" and _recent(e.get("at"), now, FILL_WINDOW)
+        ]
+        if len(fills) >= FILL_CEILING:
+            tripped = any(
+                r is not s
+                and isinstance(r.restart_ceiling, dict)
+                and _recent(r.restart_ceiling.get("at"), now, FILL_WINDOW)
+                for r in fellows
+            )
+            if not tripped:
+                s.restart_ceiling = {"at": now_iso(), "count": len(fills), "why": "fill"}
+                log.warning(
+                    "%s: %d seat fills in %s — the ceiling; it is a person's now", s.id, len(fills), FILL_WINDOW
+                )
+                self._save(s)
+                await self._push_changes()
+            return
+        log.info("%s: the seat is due (%s) — filling it", s.id, (s.seat_due or {}).get("by"))
+        await self._replay(s, "fill", keep_mail=True)
+
+    def _seat_has_run(self, s: Session, now: datetime) -> bool:
+        """A seat to close (§6 rule 3): hook-confirmed idle for `SEAT_IDLE_GRACE`, with its git known
+        and nothing uncommitted or unpushed — a seat that left work is the board's, as today."""
+        git = s.git or {}
+        return bool(
+            s.state == "idle"
+            and s.confidence == "hook"
+            and s.since
+            and now - _parse(s.since) >= SEAT_IDLE_GRACE
+            and git
+            and not git.get("dirty")
+            and not git.get("unpushed")
+            and not s.pending
+        )
+
+    async def _count_seats(self, records: list[Session]) -> None:
+        """`seat_count` for every supervised `prs:` seat (§6 rule 3): the PRs merged to the seat's repo
+        since its record was created, one `gh` read per repo, run at the home in the seat's checkout
+        — a node's is at the same absolute path (§4.4a); a path that is not a directory here gives no
+        reading. A read that failed leaves the last reading: an outage is never zero merges."""
+        try:
+            seats = [
+                r
+                for r in records
+                if (r.seat or {}).get("trigger") == "prs" and r.supervised and r.unattended and not r.superseded_by
+            ]
+            where = {r.id: r.repo or r.dir for r in seats}
+            dirs = sorted(set(where.values()))
+            found = await asyncio.gather(*(asyncio.to_thread(reports.merged_prs, d) for d in dirs))
+            merged = dict(zip(dirs, found, strict=True))
+            for r in seats:
+                got = merged.get(where[r.id])
+                if got is None or r.superseded_by:
+                    continue  # no reading; or a fill or restart replaced it while `gh` was out
+                since = _parse(r.created)
+                count = {"prs": sum(1 for at in got if at > since), "at": now_iso()}
+                if (r.seat_count or {}).get("prs") != count["prs"]:
+                    r.seat_count = count
+                    self._save(r)
+        except Exception:  # noqa: BLE001 — a detached task: log it, and the next pass tries again
+            log.exception("counting the seats' PRs failed")
+        finally:
+            await self._push_changes()
 
     @staticmethod
     def _on_a_dialog(s: Session) -> bool:
@@ -6094,6 +6247,15 @@ def _stop_time(value: str | None) -> str | None:
     if when.tzinfo is None:
         raise RpcError(f"run_until: needs a timezone (got {value})")
     return when.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _duration(text: str) -> timedelta | None:
+    """A seat's `every:` as written (§4.9b: `30m`, `6h`, `1d`), or None when it is not one."""
+    m = re.fullmatch(r"([1-9]\d*)([mhd])", text.strip())
+    if not m:
+        return None
+    unit = {"m": "minutes", "h": "hours", "d": "days"}[m.group(2)]
+    return timedelta(**{unit: int(m.group(1))})
 
 
 def _recent(at: Any, now: datetime, window: timedelta) -> bool:
