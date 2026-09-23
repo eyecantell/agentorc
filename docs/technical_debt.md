@@ -181,9 +181,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 
 **Priority:** Low
 **Added:** 2026-09-06
-**Owner:** paul
-**Kind:** decision
-**Pickable:** no — decided 2026-09-23; the build half is TD-117
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — both halves decided 2026-09-23; the build is TD-117, which archives this entry
 **Status:** Open — **decided by Paul 2026-09-23: Deny with a reason, yes (TD-117 builds it); "allow for this session", no, not now.** **Design review 2026-09-22:** the deny-with-reason half endorsed as cheap and useful for unattended permission loops; "allow for this session" still not recommended.
 **Location:** `src/agentorc/ui/templates/card.html`, `focus.html`; design §10
 
