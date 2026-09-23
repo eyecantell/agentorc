@@ -17,7 +17,7 @@ A brief names no run, no date and no stop time (TD-042): the same file starts th
 time, and `ao team start` warns when one does. What used to be written into each brief is the host
 agent's now — the usage gate pauses and resumes unattended sessions against the reserves in
 `settings.yml` (design §6, `ao gate`), and a hand-launched worker gets a stop time with
-`ao new --until 06:00|+8h` (TD-026). samscrape runs its own team on its own briefs, in that repo.
+`ao new --until <time>` (TD-026; a clock time or `+8h`). samscrape runs its own team on its own briefs, in that repo.
 
 `manager-ao-1.md` is the team's manager (design §4.8): a session holding the
 `control` grant that keeps the unattended workers going and runs the cadence check
