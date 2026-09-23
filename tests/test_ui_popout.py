@@ -121,6 +121,12 @@ out.first = { call: opened[0], href: w1.location.href };
 existing = { location: { pathname: "/focus/a", href: "keep" }, focus() { this.raised = true; } };
 AO.popOut("a");
 out.second = { call: opened[1], href: existing.location.href, raised: !!existing.raised };
+// a window of that name on another origin cannot be read: it is sent to the Focus all the same
+const foreign = { location: {}, focus: noop };
+Object.defineProperty(foreign.location, "pathname", { get() { throw new Error("cross-origin"); } });
+existing = foreign;
+AO.popOut("a");
+out.foreign = foreign.location.href;
 // the cards: only a popped session's link reads *window*, and it reads back when the window goes
 AO.popped.add("a"); AO.markPopped();
 out.marked = [link.textContent, other.textContent];
@@ -153,6 +159,7 @@ def test_the_pop_out_rules_run_as_themselves():
     }
     assert got["second"]["call"] == got["first"]["call"]  # the same name, and still no URL: no reload
     assert got["second"]["href"] == "keep" and got["second"]["raised"] is True
+    assert got["foreign"] == "/focus/a?window=1"
     assert got["marked"] == ["▣ Focus window", "▣ Details"] and got["unmarked"] == "▣ Focus"
 
 

@@ -100,7 +100,8 @@
     const w = window.open("", name, AO.popFeatures(store.get(`win.${id}`, null)));
     if (!w) { AO.toast("the browser blocked the window — allow pop-ups for this page"); return; }
     let blank = true;
-    try { blank = !w.location.pathname.startsWith("/focus/"); } catch (e) { blank = false; }  // cross-origin: it is ours already
+    // a window of that name showing another origin cannot be read: it is not our Focus, so send it there
+    try { blank = !w.location.pathname.startsWith("/focus/"); } catch (e) { blank = true; }
     if (blank) w.location.href = `/focus/${encodeURIComponent(id)}?window=1`;
     try { w.focus(); } catch (e) { /* the browser decides */ }
   };
