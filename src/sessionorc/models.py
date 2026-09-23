@@ -92,6 +92,9 @@ HOME_OWNED = frozenset(
         "supervised",
         "restarts",
         "restart_ceiling",
+        "restart_blocked",
+        "restart_blocked_sent_at",
+        "nudged_at",
         "seat",
         "seat_due",
         "seat_count",
@@ -644,13 +647,22 @@ class Session:
     # restart replays; the policies that act on it key on it and on `unattended` together.
     supervised: bool = False
     # What the tick's restarts made of it (design §6 *Keeping a team running* rule 1, TD-103 slice 2):
-    # `restarts` is every restart of this session, `[{at, why, error?}]` — `why` is `crash` or `fill` (rule 3), and
-    # `error` the text of a replay that failed, which counts all the same — carried across the tick's
+    # `restarts` is every restart of this session, `[{at, why, error?}]` — `why` is `crash`, `wanted`
+    # (rule 2) or `fill` (rule 3), and `error` the text of a replay that failed, which counts all the
+    # same — carried across the tick's
     # own supersede so the count survives the restart it counts, and empty on any other create (a
     # person's Resume starts it again). `restart_ceiling` is `{at, count}` once `RESTART_CEILING` is
     # reached: the tick stops and the session is a person's. Both the home's (§4.4a).
     restarts: list[dict[str, Any]] = field(default_factory=list)
     restart_ceiling: dict[str, Any] | None = None
+    # Rule 2, the wanted restart (§6, TD-103 slice 4): a `restart_wanted` with work left is not
+    # restarted. `restart_blocked_sent_at` is when the one fixed send naming what is left was typed,
+    # and `restart_blocked` is `{at, dirty, unpushed}` once the git fields still show work
+    # `IDLE_NUDGE` later — transient: the restart that runs once the work is pushed clears it.
+    # `nudged_at` is rule 4's: when the idle nudge was typed, once per idle stretch. All the home's.
+    restart_blocked: dict[str, Any] | None = None
+    restart_blocked_sent_at: str | None = None
+    nudged_at: str | None = None
     # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it, written by `ao team
     # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
     # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.

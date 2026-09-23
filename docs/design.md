@@ -2729,7 +2729,7 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
   `create` under its name is refused anyway, so its controller leaves it alone and says so in
   its log — its `restart_wanted` stands for the person who lifts the suspension. **It is the
   host agent's act on a supervised member** (§6 *Keeping a team running*, rule 2 — TD-103,
-  designed, not built; until it lands, its controller's, as above) and otherwise a controller's
+  built) and otherwise a controller's
   or a person's own; a restart is not a start (§6): the host agent starts nothing *new* by
   itself (*It does not replace the clock*, below, and TD-026). Whoever acts reads a structured
   field: the `why` is for the log and the person, and nothing is decided from its words.
@@ -2746,8 +2746,7 @@ fresh start would do the rest better. It is not out of work, so `none` would be 
 - **Not finished, so the team does not wind down.** A member that wants a restart is by its own
   word not out of work, so it never counts toward *every member is finished*; a manager that
   wants one is restarted by the tick as a member is, since `ao team start` supervises it too
-  (§6 *Keeping a team running*); until that lands, a manager has no controller and nothing
-  restarts it but a person or `ao team start`.
+  (§6 *Keeping a team running*).
 - **A summary is not a declaration.** A worker's brief ends a run with **one of the three
   words** — `done` on what it finished and then `none` or `restart` — and only then the
   summary; a manager's brief treats a member that is `idle` with **no** declaration as merely
@@ -4054,8 +4053,8 @@ code and needs no grant; a session doing the same work does.
   (`ao until` has no page equivalent), `start_at` and the `scheduled` state, window overrides with
   an expiry, and calendar-shaped schedules (TD-026).
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
-  `supervised` and the launch record, rule 1 with the `seat` field, and rule 3 are built; rules 2
-  and 4 not yet). Four rules that lived in the manager's brief, applied by a model every
+  `supervised` and the launch record and the four rules are built; the Inbox row and the briefs'
+  cut are not). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
   says `unattended: true` and `supervised: true`.** `supervised` is a home-owned intent field
   (§4.4a), set by `ao team start` on **every session it creates — the manager, the seats and the
@@ -4117,7 +4116,9 @@ code and needs no grant; a session doing the same work does.
      the work is pushed — and restarted as rule 1 does, under the same ceiling (`why: wanted`).
      With work left it is **not** restarted: one send of fixed text naming what is left (the dirty
      files' count and the unpushed count, from the record, never a session's words), once
-     (`restart_blocked_sent_at`), and if the git fields still show work after `IDLE_NUDGE` the
+     (`restart_blocked_sent_at`) — typed only into an idle member's empty composer on the home's
+     own host, as rule 4's line is; an exited one, or a node's, gets no line and its clock runs from
+     the declaration — and if the git fields still show work after `IDLE_NUDGE` the
      record carries `restart_blocked: {at, dirty, unpushed}` and the same Inbox row lists it. The
      tick keeps looking: the moment the git fields read clean and pushed — a person or a sibling
      pushed — the restart runs and clears the mark itself, so `restart_blocked` is transient
@@ -4156,7 +4157,9 @@ code and needs no grant; a session doing the same work does.
      you have been idle 20 minutes with `<ref>` open — end the run with one of `ao progress done
      <ref> --pr N`, `ao progress drop <ref> --why`, `ao progress none --why` or `ao progress
      restart --why`*, naming the first open reference — for a seat, the number waiting: *you have N questions
-     waiting — run `ao inbox`* — and nothing a session wrote. Once per idle
+     waiting — run `ao inbox`* — and nothing a session wrote; it is recorded on `sends` as the home's
+     own (`system`). A node's member is not nudged yet: the composer is read on the member's host,
+     and no node act does that (TD-103). Once per idle
      stretch (`nudged_at`; a stretch ends when the state changes), never a second before the
      first is answered — the same rule as the doorbell's *rung only for new mail*. It spends no
      wake budget (§4.10: it is the host agent's own clock, like a lapse). After the nudge the
@@ -4170,8 +4173,9 @@ code and needs no grant; a session doing the same work does.
   briefs lose the four rules when the policies land, in force from the next team start (the
   restart ceiling, the fill ceiling and the twenty minutes leave `manager.md` for these
   constants). Built: `supervised`, the launch record, `seat` written at team start, rule 1 with
-  its ceiling and the card's ending, and rule 3 with `seat_due`, `seat_count`, the fill ceiling and
-  the card's count; not built: rules 2 and 4, the Inbox row and the briefs — TD-103's steps.
+  its ceiling and the card's ending, rule 2 with `restart_blocked`, rule 3 with `seat_due`,
+  `seat_count`, the fill ceiling and the card's count, and rule 4 with *idle · open work*; not
+  built: the Inbox row and the briefs — TD-103 slice (5).
 - **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
 - **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on
