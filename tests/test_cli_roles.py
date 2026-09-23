@@ -206,3 +206,35 @@ def test_new_supervised_is_sent_only_when_asked(repo):
     calls.clear()
     assert cli.main(["new", "loose"]) == 0
     assert "supervised" not in created(calls)
+
+
+def test_new_brief_is_a_supplement_to_the_role_and_refuses_prompt_beside_it(repo, capsys, monkeypatch):
+    """Design §4.7, §4.8 (TD-114): `ao new --brief <path>` fills the `--role` template's *This repo's
+    rules*, in place of the role's own; without a role the file is the whole brief; beside `--prompt`,
+    which fills nothing, it is refused; and a whole brief given as one is said, and started."""
+    root, calls = repo
+    (root / "mine.md").write_text("repo rule for {lane}\n")
+    assert cli.main(["new", "g1", "--role", "grinder", "--lane", "TD-1", "--brief", "mine.md"]) == 0
+    prompt = created(calls)["prompt"]
+    assert "## This repo's rules" in prompt and "repo rule for TD-1" in prompt and "**grinder**" in prompt
+
+    calls.clear()
+    assert cli.main(["new", "p1", "--brief", "mine.md"]) == 0
+    assert created(calls)["prompt"] == "repo rule for (none given)\n"
+
+    calls.clear()
+    assert cli.main(["new", "g2", "--role", "grinder", "--brief", "mine.md", "--prompt", "hi"]) != 0
+    assert "give one" in capsys.readouterr().err and not calls
+
+    # relative to the repo the session starts in, not the shell's cwd
+    elsewhere = root / "elsewhere"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    calls.clear()
+    assert cli.main(["new", "g4", "--dir", str(root), "--role", "grinder", "--brief", "mine.md"]) == 0
+    assert "repo rule for free-pick" in created(calls)["prompt"]
+    monkeypatch.chdir(root)
+
+    (root / "whole.md").write_text("## Stop\n\nthe old copy\n")
+    assert cli.main(["new", "g3", "--role", "grinder", "--brief", "whole.md"]) == 0
+    assert "repeats the template's heading 'Stop'" in capsys.readouterr().err

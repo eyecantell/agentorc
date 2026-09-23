@@ -280,20 +280,18 @@ def _reader_on(files: Files, host: str, checkout: Path) -> repoconfig.Reader:
 def _brief(
     role: repoconfig.Role,
     member: Spec,
-    checkout: Path,
     lane: list[str],
     read: repoconfig.Reader | None = None,
     techlead: str = "",
     context: str = "",
     manager: str = "",
 ) -> str | None:
-    """The role's template with `{lane}`, `{techlead}`, `{manager}` and `{context}` filled, or the member's
-    `brief:` override read from its home checkout. A lead may override its brief too — a lead's is
-    the one a repo most often keeps its own copy of (2026-09-13)."""
-    if member is not None and member.brief:
-        override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
-        return override.brief_text(lane, read=read, techlead=techlead, context=context, manager=manager)
-    return role.brief_text(lane, read=read, techlead=techlead, context=context, manager=manager)
+    """The role's template with the member's `brief:` in its `{repo}` slot — in place of the role's
+    own `roles.<name>.brief`, never beside it (design §4.8, TD-114) — and `{lane}`, `{techlead}`,
+    `{manager}` and `{context}` filled. The `brief:` is read from the home checkout, where `role`
+    was resolved."""
+    supplement = member.brief if member is not None and member.brief else None
+    return role.brief_text(lane, read=read, techlead=techlead, context=context, manager=manager, supplement=supplement)
 
 
 def _session_id(org: orgmod.Org, team: orgmod.TeamDef, name: str, home: str, host: str, here: str) -> str:
@@ -412,7 +410,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     try:
-        prompt = _brief(role, member, checkout, lane, read, techlead, context, manager)
+        prompt = _brief(role, member, lane, read, techlead, context, manager)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
@@ -567,4 +565,16 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             by_finding.setdefault(finding, []).append(x.name)
     for finding, who in by_finding.items():
         p.warnings.append(f"{', '.join(who)}: the brief names one run — {finding}")
+    # TD-114's transition (design §4.8): a repo's brief that is still a whole brief repeats the
+    # template's headings, and by the precedence rule its stale copy wins. Said, and started anyway.
+    by_heading: dict[str, list[str]] = {}
+    for x in p.launches:
+        for heading in repoconfig.repeated_headings(x.prompt or ""):
+            by_heading.setdefault(heading, []).append(x.name)
+    for heading, who in by_heading.items():
+        p.notes.append(
+            f"{', '.join(who)}: the repo's brief repeats the template's heading {heading!r} — it is a "
+            "supplement now, filled under *This repo's rules*, and where it disagrees it wins: cut it to "
+            "the repo's own rules (design §4.8, TD-114)"
+        )
     return p

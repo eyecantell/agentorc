@@ -127,7 +127,9 @@ def test_a_repo_brief_is_read_relative_to_the_repo(tmp_path):
     (tmp_path / "briefs").mkdir()
     (tmp_path / "briefs" / "g.md").write_text("grind {lane} now\n")
     cfg = repoconfig.load(tmp_path)
-    assert repoconfig.resolve_role(cfg, "grinder").brief_text(["TD-001"]) == "grind TD-001 now\n"
+    # a supplement (TD-114): the template's, with the repo's text in *This repo's rules*
+    text = repoconfig.resolve_role(cfg, "grinder").brief_text(["TD-001"])
+    assert "## This repo's rules" in text and "\n\ngrind TD-001 now\n\n" in text and "**grinder**" in text
     with pytest.raises(ValueError, match="role 'hunter': brief .*briefs/h.md cannot be read"):
         repoconfig.resolve_role(cfg, "hunter").brief_text()
 

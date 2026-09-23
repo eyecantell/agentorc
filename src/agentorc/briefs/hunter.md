@@ -2,6 +2,12 @@ You are a **hunter**: an unattended session in this repo (design §4.8) that loo
 
 First: read CLAUDE.md and docs/cadence.md; `ao --skill` and follow it; `git fetch origin`; `git status`. You run in your own worktree — never touch the main checkout or another session's worktree.
 
+## This repo's rules
+
+What follows is the repo's own part of this brief — its first reads, its gate, its standing rules, the shape of its lane — and the only part the repo wrote; the rest ships with agentorc. **Where the two disagree, the repo's rules win — except that they may add to what this brief says never to do, and never take from it.** What the host agent enforces — the usage gate, the restart ceiling, the permission gate — is not words, and no brief moves it. `none` means the repo added nothing.
+
+{repo}
+
 ## Area: {lane}
 Probe the area named above (`free` means the whole repo): run the tests, read the code against docs/design.md, measure what the design claims, try the edge cases the tests skip, read the logs. For every problem you can show — a failing probe, a measurement, a log excerpt, a line that contradicts the design — file one ledger entry (`docs/technical_debt.md`, a new `TD-NNN` with the evidence in its **Why**) on its own branch → PR → merge per `/cadence`, and declare it with `ao finding TD-NNN --priority <p>`. One entry per problem; no fix, no refactor, no "while I was there". A suspicion without evidence is a line in your end-of-run summary, not an entry.
 

@@ -362,10 +362,25 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
             role = (
                 repoconfig.resolve_role(cfg, args.role, overlay)
                 if getattr(args, "role", None)
-                else repoconfig.Role(name="")
+                else repoconfig.Role(name="", root=cfg.root)
             )
         lane = args.lane or list(role.lane)
-        prompt = args.prompt or role.brief_text(lane)
+        if args.prompt and getattr(args, "brief", None):
+            raise ValueError(
+                "--prompt is the whole opening prompt, filling nothing; --brief is a repo's part of a role's; give one"
+            )
+        brief = getattr(args, "brief", None)
+        # relative to the repo the session starts in, as every brief path is (design §4.9), not to
+        # the shell's cwd: `ao new --dir` from elsewhere must read the same file (review of PR #463)
+        supplement = brief or None
+        prompt = args.prompt or role.brief_text(lane, supplement=supplement)
+        # TD-114's transition (design §4.8): a whole brief given as a supplement repeats the template
+        for heading in repoconfig.repeated_headings(prompt or "") if supplement else []:
+            print(
+                f"the brief repeats the template's heading {heading!r} — it is a supplement now, and where "
+                "it disagrees it wins: cut it to the repo's own rules (design §4.8, TD-114)",
+                file=sys.stderr,
+            )
         if block := _project_block(getattr(args, "project", None), cfg, directory):
             prompt = block + prompt if prompt else block
     except (KeyError, ValueError) as e:
@@ -1538,6 +1553,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--role",
         help="a preset (design §4.8): fills the brief, lane, grants, profile and controllers; `ao roles` lists them",
+    )
+    p.add_argument(
+        "--brief",
+        help="a repo's brief, a path: filled into the --role template's *This repo's rules* in place of the "
+        "role's own (design §4.8 — a supplement, never a replacement); with no template it is the whole brief",
     )
     p.add_argument("--team", help="the team this session is started under (design §4.9): a badge, nothing keys on it")
     p.add_argument(
