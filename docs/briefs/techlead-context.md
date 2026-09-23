@@ -36,8 +36,10 @@ person is `docs/user_attention.md`.
 - **The host agent** (§4.4, `src/sessionorc/agent.py`): one per host, the only thing that
   creates, kills or types into an `ao-*` tmux session (§9 invariant 1). It serves RPCs on a unix
   socket, ticks, keeps each session's **record** (`src/sessionorc/models.py`) and its run log.
-  **It starts nothing by itself and does not read `org.yml`**: starting and restarting are a
-  person's act or a controller's (§4.9a), and scheduling is unbuilt (TD-026).
+  **It starts nothing new by itself and does not read `org.yml`**: a start is a person's act or
+  a controller's, and scheduling is unbuilt (TD-026). **A restart is not a start** (§6 *Keeping
+  a team running*): for a *supervised* session its tick restarts a crash, carries out a wanted
+  restart, fills a seat and nudges an idle member, by replaying the session's launch record.
 - **Home and nodes** (§4.4a): one host is the **home** and owns the org's graph, intent and mail
   (§9 invariant 15); other hosts — a laptop, a devcontainer — are **nodes** that own what they
   observe (state, tail, alarms) and forward the rest over a link. Which RPC is served where is
@@ -91,10 +93,11 @@ person is `docs/user_attention.md`.
 - **A run ends by the session's own word** (§4.9a; §9 invariant 14): `ao progress none --why` — I
   searched and there is nothing I may pick — or `ao progress restart --why` — my run is over and
   my lane is not. *Declared, never inferred*: a summary on a screen is not a declaration, quiet
-  is not empty, and an exit without a word is a crash, which a manager restarts inside a ceiling
-  (three of one session in two hours, then the board).
+  is not empty, and an exit without a word is a crash, which the host agent's tick restarts
+  inside a ceiling (three of one session in two hours, then the person's Inbox; §6 rule 1).
 - **A techlead's seat is empty or filled, never finished** (§4.9b): it makes no ending
-  declaration; its manager reads `asks_waiting` and fills it with `ao new --keep-mail`.
+  declaration; the tick fills it when a question waits (`seat_due`, from `asks_waiting`) with its
+  mail kept, and closes it once it sits idle with nothing due (§6 rule 3).
 
 ## 5. Mail
 
