@@ -13,7 +13,7 @@ session gets its own worktree and branch, per design §4.5a, New session "Where:
 pdm run ao new -d ~/agentorc -w grinder-ao-1 --unattended --prompt "$(cat docs/briefs/grinder-ao-1.md)" grinder-ao-1
 ```
 
-A brief names no run, no date and no stop time (TD-042): the same file starts the session every
+Since 2026-09-22 a repo's brief is a **supplement** (design §4.8, TD-114): `ao team start` and `ao new --role` fill it into the package template's *This repo's rules* section, so a file here says only what this repo does differently — its first reads, where it works, the gate and who merges, the lane's exclusions, its standing rules — and where it disagrees with the template it wins, except that it may add to the template's never-list and never take from it. The `--prompt` launches below hand the file over whole, with no template around it. A brief names no run, no date and no stop time (TD-042): the same file starts the session every
 time, and `ao team start` warns when one does. What used to be written into each brief is the host
 agent's now — the usage gate pauses and resumes unattended sessions against the reserves in
 `settings.yml` (design §6, `ao gate`), and a hand-launched worker gets a stop time with
