@@ -1333,7 +1333,8 @@ Screens:
    nothing could act on it meanwhile. A stop time still ahead stays. A manager never infers that
    a member was disturbed: it reads the mode, a field, and an `interactive` member is left alone
    and is not a crash, a stall or a lapse. The attach reads the mode once, when it opens, and
-   the page re-attaches when the feed shows the mode change — its own press or another tab's.
+   the page re-attaches when the feed shows the mode change — its own press or another tab's; the
+   host agent pushes a `set_mode` at once, as it does a `set_stop`.
    On a phone, Focus is the same page: read-only costs nothing there, and Take over is the same
    one press. An `interactive` session sees none of this.
 3. **New session**: pick host → repo *or* directory → adapter → checkout, new worktree, or an
