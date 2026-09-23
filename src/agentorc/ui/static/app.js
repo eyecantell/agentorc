@@ -647,7 +647,9 @@
       // A refused start created nothing (design §4.9): the agent's own message is the whole report,
       // in a toast, as every other RPC error on this page is (design §4.5 "Errors").
       if (!r.ok) throw new Error(o.detail || r.statusText);
-      AO.toast(o.text || `${name}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started`, true);
+      // a concluded team's Start closed its sessions first (TD-099): said, since the cards it drew are gone
+      const shut = (o.closed || []).length ? ` (closed ${(o.closed || []).map((c) => c.name).join(", ")} first)` : "";
+      AO.toast(o.text || `${name}: ${(o.sessions || []).length} session${(o.sessions || []).length === 1 ? "" : "s"} started${shut}`, true);
       // The same two things `ao team start|stop` says and a request could not: a member the
       // definition starts interactive is out of its manager's reach (design §9 invariant 5), and the
       // manager's own stop happens after the response (review of PR #124).

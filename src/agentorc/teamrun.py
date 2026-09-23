@@ -303,8 +303,7 @@ def start(
         for v in (call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on) for x in plan.launches)
         if v.get("verdict") in ("live", "suspended")
     ]
-    if held:
-        raise NamesHeld(name, held)
+    closed = _close_concluded(call, org, name, held) if held else []
     created: list[dict[str, Any]] = []
     notes: list[str] = list(plan.notes)  # said, and the start goes ahead (a seat without its primer, §4.9b)
     lead_id = ""
@@ -341,12 +340,40 @@ def start(
     # prose and the judgement is the author's — but it is said out loud, like `out_of_reach`.
     return plan, {
         "team": name,
+        "closed": closed,  # the concluded sessions closed before the creates (§4.9a, TD-099)
         "manager": lead_id or None,
         "sessions": created,
         "out_of_reach": out_of_reach,
         "unrepeatable": list(plan.warnings),
         "notes": notes,
     }
+
+
+def _close_concluded(call: Call, org: orgmod.Org, name: str, held: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """A person's Start on a **concluded** team (design §4.9a, §4.5a *team groups*, TD-099): the
+    names `held` are refused as on any start unless the team is concluded and every holder is one
+    of its concluded sessions. Then each of those sessions is closed — all of them, not only the
+    ones holding a name — under the wrap-up's own check, so one with uncommitted or unpushed work
+    refuses the whole start by name, and nothing is closed until every one has passed it. Returns
+    what was closed; raises `NamesHeld` or `TeamError` before anything is closed or created."""
+    team = org.teams.get(name)
+    mine = badged(name, call("list"))
+    done = concluded(mine, seat_names(team, mine)) if team is not None else None
+    up = {str(s["id"]): s for s in live(mine)} if done else {}
+    still = [v for v in held if v.get("verdict") != "live" or str(v.get("holder")) not in up]
+    if still:
+        raise NamesHeld(name, still)
+    unsafe = [f"{s.get('name') or i} has {why}" for i, s in up.items() if (why := _unsafe_to_close(s))]
+    if unsafe:
+        raise teams.TeamError(
+            f"team {name} was not started — it is concluded, but a session it would close first is not "
+            f"clean and pushed: {'; '.join(unsafe)}"
+        )
+    out = []
+    for i, s in up.items():
+        call("close", id=i)
+        out.append({**_entry(s, "concluded"), "action": "closed", "state": "closed"})
+    return out
 
 
 # ── stop ──────────────────────────────────────────────────────────────────────────────────────

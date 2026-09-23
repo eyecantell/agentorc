@@ -604,6 +604,62 @@ def test_a_live_team_is_concluded_when_every_live_session_is_idle_and_declared(w
     assert row["concluded"] is None and row["wound_down"] == out["at"]
 
 
+def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
+    """TD-099 step (1), design §4.9a *A person's Start on a concluded team*: the names its concluded
+    sessions hold do not refuse the start — each of them is closed, a seat with them, under the
+    wrap-up close's check, and then the team is created. One holding unpushed work refuses the whole
+    start by name with nothing closed; a team with one undeclared session is refused as any live
+    holder refuses, and so is a holder that is not the team's own."""
+    tmp_path, state = world
+    out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
+    clean = {"dirty": 0, "unpushed": 0}
+    names = ["orc-ao", "grind-1", "grind-2", "hunt"]
+
+    def concluded_team(**extra):
+        state["sessions"][:] = [
+            {"id": f"ao-agentorc-{n}", "name": n, "team": "ao-grind", "state": "idle", "out_of_work": out,
+             "git": dict(clean), **extra.get(n, {})}
+            for n in names
+        ]  # fmt: skip
+        state["verdicts"].clear()
+        state["verdicts"].update(
+            {n: {"name": n, "verdict": "live", "holder": f"ao-agentorc-{n}", "holder_state": "idle"} for n in names}
+        )
+        state["calls"].clear()
+
+    def closes():
+        return [p["id"] for m, p in state["calls"] if m == "close"]
+
+    # one holding unpushed work: refused whole, by name, and nothing closed or created
+    concluded_team(**{"grind-2": {"git": {"dirty": 0, "unpushed": 2, "pushed_against": "origin/td1"}}})
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert not closes() and not creates(state)
+    err = capsys.readouterr().err
+    assert "is concluded" in err and "grind-2 has 2 unpushed (vs origin/td1)" in err
+    # one that has not declared: the team is not concluded, and the start refuses as on any live holder
+    concluded_team(**{"hunt": {"out_of_work": None}})
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert not closes() and not creates(state)
+    assert "hunt is idle as ao-agentorc-hunt" in capsys.readouterr().err
+    # a holder that is not one of the team's sessions is refused, even when the team is concluded
+    concluded_team()
+    state["verdicts"]["hunt"]["holder"] = "ao-elsewhere-hunt"
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert not closes() and not creates(state)
+    capsys.readouterr()
+    # concluded and clean: every one closed — before the first create — and the team started
+    concluded_team()
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert sorted(closes()) == sorted(f"ao-agentorc-{n}" for n in names)
+    first_create = next(i for i, (m, _) in enumerate(state["calls"]) if m == "create")
+    assert all(m != "close" for m, _ in state["calls"][first_create:])
+    assert [p["name"] for p in creates(state)] == ["orc-ao", "grind-1", "grind-2", "hunt"]
+    assert capsys.readouterr().out.count("closed (concluded)") == 4
+    concluded_team()
+    assert cli.main(["--json", "team", "start", "ao-grind"]) == 0
+    assert {c["name"] for c in json.loads(capsys.readouterr().out)["closed"]} == set(names)
+
+
 # ── the profile precedence chain, and `ao new --project` ──────────────────────────────────────
 
 
