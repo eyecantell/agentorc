@@ -1751,6 +1751,13 @@ covers both and the host agent knows who is blocked and decides mail wakes (§4.
 own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (TD-069),
 `attention_snooze` and `inbox_dismiss` (TD-079).
 
+**`ao pr held <n>`** (§4.9b *The reader*, TD-093): whether PR `n` waits for this session's reader —
+the record's `review` checked against the PR's changed files, read with `gh pr view <n> --json
+files` in the record's directory. `held` globs name paths from the repo root; `**` spans
+directories, `*` and `?` stay inside one. No `review` on the record is *not held*, and `gh` is
+not asked. A PR whose files cannot be read is an error, never *not held*. `--id` asks about
+another session's record. It is the author's own check, and the host agent never makes it.
+
 **`ao gate`** (TD-100; §6 *Usage gate*, §5 `settings.yml`): with no arguments prints every
 profile's reserves and the lines they make today — *grind · 5h 30 → line 70% · week 10/day →
 line 60% (4 days left, moves Thu 07:00)*; `ao gate <profile> <label>=<reserve>…` sets them —
@@ -3030,8 +3037,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
   does, *a safety net for when I am not intimately familiar with an architecture*. A session whose
   record has no `review`, or whose PR touches no held path, merges as §3's cadence says (the
   author, on a green `scripts/check_cadence.py`). **The record's `review` is read by the author's
-  own `ao`** (which checks a PR's files against `held:`), never by the host agent, which
-  only stores it.
+  own `ao`** (`ao pr held <n>`, §4.7, which checks a PR's files against `held:`), never by the
+  host agent, which only stores it.
   **How the reader hears of a PR — the seat is filled by mail, so a PR is an `ask`**: when a held
   PR is green and carries its author's own `cadence-review:` comment, the author sends **`ao msg
   --kind ask --pr <n> {techlead} "…"`** — `pr` is a structured field on a mail entry, an integer,

@@ -976,6 +976,40 @@ def _own_session(args: argparse.Namespace) -> str | None:
     return sid
 
 
+def cmd_pr(args: argparse.Namespace) -> int:
+    """`ao pr held <n>` (design §4.9b *The reader*, TD-093): whether PR `n` waits for this
+    session's reader — its record's `review`, checked against the PR's changed files. Read by the
+    author's own `ao`, never by the host agent, which only stores the setting. `held` is the answer;
+    a PR is held when the record has a `review` and one of its files is under `held:`."""
+    from agentorc import review as reviewmod
+
+    sid = _own_session(args)
+    if sid is None:
+        return 2
+    rec = call_sync("get", id=sid)
+    setting = rec.get("review") or None
+    try:
+        files = reviewmod.pr_files(args.n, cwd=rec.get("dir") or None) if setting else []
+    except RuntimeError as e:
+        return fail(args, str(e), 1)
+    paths = reviewmod.held_paths(files, setting)
+    out = {"pr": args.n, "id": sid, "held": bool(paths), "review": setting, "paths": paths, "files": len(files)}
+
+    def prose() -> None:
+        if not setting:
+            print(f"PR #{args.n} is not held: {sid} has no review on its record, so it merges as the cadence says")
+        elif not paths:
+            print(f"PR #{args.n} is not held: none of its {len(files)} files is under {', '.join(setting['held'])}")
+        else:
+            shown = ", ".join(paths[:5]) + (f" and {len(paths) - 5} more" if len(paths) > 5 else "")
+            print(
+                f"PR #{args.n} is held for the {setting['reader']} (bound {setting['bound']}): {shown}\n"
+                f'ask it: ao msg --kind ask --pr {args.n} <reader> "<your summary>"'
+            )
+
+    return emit(args, out, prose)
+
+
 def cmd_progress(args: argparse.Namespace) -> int:
     """`ao progress claim|done|drop <ref>` (design §4.8): declare a lane item claimed before the
     first edit and its result before moving on. Ungated, and lands on this session's own record.
@@ -1816,6 +1850,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("name", help="the `nodes:` entry in hosts.yml with a `container:` block")
     p.add_argument("--purge", action="store_true", help="forget: also delete the node's volume (its run logs)")
     p.set_defaults(fn=cmd_host)
+
+    p = add("pr", help="whether a PR waits for this session's reader (design §4.9b *The reader*)")
+    p.add_argument("action", choices=["held"])
+    p.add_argument("n", type=int, metavar="N", help="the pull request's number")
+    p.add_argument("--id", help="another session's record (default: this session's own)")
+    p.set_defaults(fn=cmd_pr)
 
     p = add("service", help="systemd user units for the agent and the UI (install | uninstall | status)")
     p.add_argument("action", choices=["install", "uninstall", "status"])
