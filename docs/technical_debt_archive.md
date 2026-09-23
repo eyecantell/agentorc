@@ -1080,3 +1080,15 @@ The substrate is already there and unused by sessions: the agent's `subscribe` t
 
 **Resolved:** 2026-09-23 (PR #486, grinder-ao-1, as TD-117). Both halves decided by Paul 2026-09-23 and marked so in design §10. Deny with a reason is built — the optional *why?* box beside Deny on the card, the Focus header and the Inbox's permission row (design §4.5a); "allow for this session" is *no, not now*, so nothing is built for it and §4.5a lists no such control.
 
+## TD-116: `decide` is ungated: any session may answer another session's permission prompt
+
+**Priority:** Medium
+**Added:** 2026-09-23 (the anchor session; the board's 2026-09-12 question from `tdgrind-ao-1`, decided by Paul 2026-09-23)
+**Status:** Resolved 2026-09-23 — was: Open — decided 2026-09-23: **`decide` needs the `control` grant and membership, exactly as `send` does.** It was left ungated at TD-028 step (1) because design §4.8 listed it so and the UI answers as a person with no caller; a worker auto-approving another worker's tool call is the same class of act as typing at it.
+**Location:** `src/sessionorc/agent.py` (`_gate`, `rpc_decide`, `NODE_ACTS`), design §4.8 (the acting RPCs and what needs the grant), §9 invariant 11, `tests/test_agent.py`
+
+**Why:** the gate exists so that only a session's controllers act on it; a permission answer is an act on it.
+
+**Resolved:** 2026-09-23 (PR #490, grinder-ao-1; merged by the anchor). `decide` is in `mail.ACTING_RPCS`, so `act_gate` refuses a session without `control` or outside the target's `controllers`; `modes.offline_refusal` refuses a session's `decide` on another while the link is down. `rpc_decide` takes `caller`: only a person's answer refills the wake budget, and the trail says *by <name>* for a controller (`_answered_by`). Design §4.8 (the grant's list, §4.10's table), §4.4a's node table, §4.10 *Time and a person restore it* and §9 invariant 11 carry it; tests `test_a_session_answers_a_permission_only_as_a_controller`, `test_orchestrate_grant_gates_acting_rpcs`, `test_modes`. A session's `decide` on **itself** still passes, as its `send` does: TD-119.
+
+**Related:** TD-028 (where it was left ungated), TD-036 (membership), design §4.8, §9 invariant 11.
