@@ -910,12 +910,16 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
         assert "tell me if you want less" in text, rel  # the same kind rule as the workers', not a second one
 
 
-def test_the_manager_brief_fills_the_techlead_seat_on_its_questions():
-    """Design §4.9b (TD-075 step 4): the manager template reads the seat's `asks_waiting`, fills an
-    ended seat with its mail kept, and caps fills with a ceiling of its own."""
+def test_the_manager_brief_leaves_the_seat_the_wanted_restart_and_the_nudge_to_the_tick():
+    """TD-103 slice (5), design §6 *Keeping a team running* rules 2–4: the tick fills and closes
+    the techlead seat, carries out a wanted restart and sends the idle nudge, so the preset does
+    none of them by hand (each would race the tick); it reads the marks the tick leaves."""
     text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
-    assert "ao new --keep-mail" in text and "asks_waiting" in text and "six in an hour" in text
-    assert "never restart it" not in text  # a fill is not the crash restart, and not forbidden
+    assert "ao new --keep-mail" not in text and "ao new --supervised" not in text
+    assert "**The host agent keeps the seat**" in text and "`seat_due`" in text and "why: fill" in text
+    assert "restart_blocked" in text and "**the host agent sends it one fixed line**" in text
+    assert "ao wait --timeout 3540" in text and "run_in_background: true" in text
+    assert "**The exception is a member on another host**" in text  # the tick nudges no node's pane yet
 
 
 def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():

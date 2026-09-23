@@ -1957,12 +1957,11 @@ the tail on activity; they do not replace the timer's job of noticing absence.
   rules: a restart is **`one_for_one`** — only the session that exited, never its siblings — and
   it is **bounded: at most 3 restarts of one session in 2 hours, then stop and escalate to the
   attention board** (the ceiling OTP, systemd and Circus each arrived at). The numbers are §6's
-  `RESTART_CEILING` (*Keeping a team running*, TD-103 — the crash restart is built, the wanted
-  restart not yet; the briefs carry the numbers until the rules they count all land), so a director and a manager alike read a member's `restarts` and
+  `RESTART_CEILING` (*Keeping a team running*, TD-103), so a director and a manager alike read a member's `restarts` and
   `restart_ceiling` rather than counting. A director's managers are `supervised` like any session
-  `ao team start` creates (a nested team is started by the outer start, §4.9), so once §6 lands a
+  `ao team start` creates (a nested team is started by the outer start, §4.9), so a
   crashed manager is restarted by the tick's rule 1 and never by the director, whose part is to
-  read the marks and escalate; until then its brief performs the restart under the same two rules. A
+  read the marks and escalate. A
   manager that exits does **not** take its workers down, and its entries in their lists do not
   vanish: the workers keep running, surfaced as controlled by a session that is gone, for a person
   or the director to re-attach with `ao control`. Adoption is an explicit edit, never automatic
@@ -4053,8 +4052,7 @@ code and needs no grant; a session doing the same work does.
   (`ao until` has no page equivalent), `start_at` and the `scheduled` state, window overrides with
   an expiry, and calendar-shaped schedules (TD-026).
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
-  `supervised`, the launch record, the four rules and the Inbox row are built; the briefs' cut is
-  not). Four rules that lived in the manager's brief, applied by a model every
+  built, and the manager preset is silent on the four rules). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
   says `unattended: true` and `supervised: true`.** `supervised` is a home-owned intent field
   (§4.4a), set by `ao team start` on **every session it creates — the manager, the seats and the
@@ -4170,12 +4168,15 @@ code and needs no grant; a session doing the same work does.
   reading of the ledger before a wind-down, and escalation prose. With the four rules on the
   tick the manager's round is the fallback timer alone — `ao wait` on an hour, not ten minutes —
   and a team whose needs are mechanical runs with `manager: person` and no manager session. The
-  briefs lose the four rules when the policies land, in force from the next team start (the
-  restart ceiling, the fill ceiling and the twenty minutes leave `manager.md` for these
-  constants). Built: `supervised`, the launch record, `seat` written at team start, rule 1 with
+  briefs carry none of the four rules — a brief is read at team start, so a team started before
+  the cut keeps the old words until its next start — and the restart ceiling, the fill ceiling
+  and the twenty minutes are these constants, never numbers in `manager.md`. Built: `supervised`, the launch record, `seat` written at team start, rule 1 with
   its ceiling and the card's ending, rule 2 with `restart_blocked`, rule 3 with `seat_due`,
   `seat_count`, the fill ceiling and the card's count, rule 4 with *idle · open work*, and the
-  Inbox row; not built: the briefs' cut — TD-103 slice (5).
+  Inbox row, and the briefs' cut: the built-in manager preset reads the marks and no longer
+  performs a restart, a fill or a nudge — except the nudge to a member on a node, which rule 4
+  does not reach yet — and its round ends in `ao wait --timeout 3540`, run in the
+  background because a tool call is capped at ten minutes.
 - **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
 - **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on
