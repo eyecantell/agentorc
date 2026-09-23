@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from conftest import park_ticks, wait_for
 
-from sessionorc.agent import IDLE_NUDGE
+from sessionorc.agent import IDLE_NUDGE, RESTART_CEILING
 from sessionorc.client import LocalClient
 from sessionorc.models import ProgressEntry
 
@@ -158,4 +158,37 @@ async def test_a_wanted_restart_with_work_left_is_held_then_runs_once_pushed(age
         await agent._keep_running(now + IDLE_NUDGE + timedelta(minutes=2))
         new = agent.sessions[sid]
         assert new is not rec and new.restart_blocked is None and [r["why"] for r in new.restarts] == ["wanted"]
+        await person.call("kill", id=sid)
+
+
+async def test_a_wanted_restart_counts_toward_the_ceiling_and_a_failed_close_is_retried(
+    agent, composerstubs, tmp_path, monkeypatch
+):
+    await park_ticks(agent)
+    now = datetime.now(UTC)
+    async with LocalClient() as person:
+        sid = await _member(agent, person, tmp_path)
+        rec = agent.sessions[sid]
+        await _idle_for(agent, sid, now, timedelta(minutes=1))
+        rec.restart_wanted = {"at": _iso(now), "why": "context is long"}
+        rec.git = dict(CLEAN)
+        rec.restarts = [{"at": _iso(now - timedelta(minutes=m)), "why": "crash"} for m in (50, 30, 10)]
+        await agent._keep_running(now)
+        assert agent.sessions[sid] is rec and rec.restart_ceiling["count"] == RESTART_CEILING
+        # below the ceiling, a close whose tail fails after marking it closed is retried next tick
+        rec.restart_ceiling, rec.restarts = None, []
+        real_close = agent.rpc_close
+
+        async def close_then_fail(id):
+            await real_close(id)
+            raise RuntimeError("push failed")
+
+        monkeypatch.setattr(agent, "rpc_close", close_then_fail)
+        await agent._keep_running(now)
+        assert agent.sessions[sid] is rec and rec.state == "closed"
+        assert rec.restarts[-1]["why"] == "wanted" and "push failed" in rec.restarts[-1]["error"]
+        monkeypatch.setattr(agent, "rpc_close", real_close)
+        await agent._keep_running(now)
+        new = agent.sessions[sid]
+        assert new is not rec and [r["why"] for r in new.restarts] == ["wanted", "wanted"]
         await person.call("kill", id=sid)

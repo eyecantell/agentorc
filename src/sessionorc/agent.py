@@ -815,11 +815,7 @@ class HostAgent:
         if git["dirty"] or git["unpushed"]:
             await self._restart_held(s, now, git["dirty"], git["unpushed"])
             return
-        recent = [
-            r
-            for r in s.restarts
-            if isinstance(r, dict) and r.get("why") != "fill" and _recent(r.get("at"), now, RESTART_WINDOW)
-        ]
+        recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
         if len(recent) >= RESTART_CEILING:
             s.restart_ceiling = {"at": now_iso(), "count": len(recent)}
             log.warning("%s: %d restarts in %s — the ceiling; it is a person's now", s.id, len(recent), RESTART_WINDOW)
@@ -828,10 +824,20 @@ class HostAgent:
             return
         log.info("%s wants another run and its work is pushed: restarting it", s.id)
         if s.state == "idle":
-            if s.host == self.host:
-                await self.rpc_close(s.id)
-            else:
-                await self._route_act("close", {"id": s.id}, None, s.host)
+            try:
+                if s.host == self.host:
+                    await self.rpc_close(s.id)
+                else:
+                    await self._route_act("close", {"id": s.id}, None, s.host)
+            except Exception as e:  # noqa: BLE001 — a close that failed is a restart that failed, and counts
+                # `rpc_close` marks the record closed before its own tail runs, so a failure there
+                # leaves it `closed` with nothing replayed: the entry is what lets the next tick
+                # retry it (`closed_by_tick`) rather than strand it (review of PR #461)
+                s.restarts = [*s.restarts, {"at": now_iso(), "why": "wanted", "error": f"close: {e}"}]
+                log.warning("%s: the close before a wanted restart failed: %s", s.id, e)
+                self._save(s)
+                await self._push_changes()
+                return
         await self._replay(s, "wanted")
 
     async def _restart_held(self, s: Session, now: datetime, dirty: int, unpushed: int) -> None:
