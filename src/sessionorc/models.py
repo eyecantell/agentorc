@@ -635,7 +635,7 @@ class Session:
     wrapup_sent_at: str | None = None
     # The usage gate (design §6, TD-100): how to ask this session to pause when its profile crosses
     # a line, and to carry on when every window is back under — wording from the client, as the
-    # wrap-up's is. `gated` is the mark, `{profile, label, pct, line, since, next, sent_at}`: written
+    # wrap-up's is. `gated` is the mark, `{profile, label, pct, line, since, next, resets, sent_at}`: written
     # the tick the line is crossed, `sent_at` once the pause prompt landed, gone with the resume.
     # The node's (§4.4a: an enforcement it made from usage it fetched); the prompts are the home's.
     pause_prompt: str | None = None
