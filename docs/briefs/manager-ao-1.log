@@ -313,3 +313,5 @@
 14:32  grinder-ao-1: TD-116 built → PR #490 open 14:20Z, touches src/sessionorc/ — held for the anchor's read (TD-093 rule), not yet 2h. Also filed TD-119 (self-decide) → PR #491 merged, cadence pass, docs only.
 14:36  grinder-ao-1: TD-096 built → PR #492 open 14:31Z, also touches src/sessionorc/ — held for the anchor's read, not yet 2h. Two held PRs now: #490, #492.
 14:36  grinder-ao-1: declared out_of_work — 58 open ledger entries, only 3 pickable (TD-116/#490, TD-096/#492 held for anchor; TD-118 leased to grinder-ao-2), rest owned by anchor/paul/dev-cadence. Still `working` (turn not settled); nothing to do yet.
+14:37  grinder-ao-1 now idle + out_of_work → finished. Nothing acted on it (never, per brief). grinder-ao-2 still working TD-118.
+14:48  grinder-ao-2: TD-118 done → PR #493 merged (src/agentorc/briefs/, not docs/briefs/ — not anchor-held) plus #494 ledger update, both cadence pass.
