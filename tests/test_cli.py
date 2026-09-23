@@ -925,8 +925,8 @@ def test_the_manager_brief_leaves_the_seat_the_wanted_restart_and_the_nudge_to_t
 def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():
     """TD-113 (0), design §6 *Keeping a team running* rule 1: a supervised member that exits with no
     declaration is restarted by the host agent's tick, so the preset must not send its manager down
-    a hand `ao new` for it (which would race the tick and ship `{lane}` unfilled); what is left to the
-    manager is reading `restart_ceiling` and boarding it."""
+    a hand `ao new` for it (which would race the tick and ship `{lane}` unfilled); a member past
+    `restart_ceiling` reaches the person's Inbox by itself (TD-118 cut the board line)."""
     text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
     assert "**the host agent restarts it**" in text and "restart_ceiling" in text
     assert "restart it once with `ao new`" not in text
