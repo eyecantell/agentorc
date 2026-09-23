@@ -315,3 +315,16 @@
 14:36  grinder-ao-1: declared out_of_work — 58 open ledger entries, only 3 pickable (TD-116/#490, TD-096/#492 held for anchor; TD-118 leased to grinder-ao-2), rest owned by anchor/paul/dev-cadence. Still `working` (turn not settled); nothing to do yet.
 14:37  grinder-ao-1 now idle + out_of_work → finished. Nothing acted on it (never, per brief). grinder-ao-2 still working TD-118.
 14:48  grinder-ao-2: TD-118 done → PR #493 merged (src/agentorc/briefs/, not docs/briefs/ — not anchor-held) plus #494 ledger update, both cadence pass.
+14:48  grinder-ao-2 declared out_of_work (2 pickable: TD-096/TD-116, both held for anchor; rest anchor/paul/dev-cadence). Then idle + out_of_work → finished. Every member finished (techlead seat already closed itself). Out of work.
+
+## End-of-run summary (2026-09-23 run, 13:55Z–14:58Z)
+
+- grinder-ao-1: finished 14:37Z. Merged #486 (TD-117, Deny with a reason), #488 (TD-008 archived), #491 (TD-119 filed, self-decide a permission prompt), all cadence pass. Built #490 (TD-116) and #492 (TD-096), both held for the anchor's read (src/sessionorc/), neither hit the 2h escalation threshold at wind-down.
+- grinder-ao-2: finished 14:48Z. Merged #493 (TD-118 steps 1-2, template+briefs) and #494 (ledger update), both cadence pass, no anchor-held paths (src/agentorc/briefs/, not docs/briefs/).
+- techlead-ao-1: filled once at start (1 ask, answered), then closed itself idle/empty — host agent's own seat tick, no manager action.
+- No relays needed (last cadence change landed 09-11, before both grinders' start). No escalations beyond the wind-down board line. No outcomes owed.
+- Final cadence check --since 12h: every merged PR passes (18+ rows checked, all pass).
+- `ao team stop ao-grind --close`: both grinders closed clean (out of work, nothing sent).
+- `ao progress none` recorded. Board line → PR #495 (fact-checked SHIP by an independent agent, CI green, squash-merged) naming #490/#492 as still open for the anchor.
+- For a §6 policy: the two-hour anchor-hold escalation and the src/sessionorc/ vs src/agentorc/briefs/ path distinction both proved mechanical this run — worth codifying as a tick rule rather than brief prose.
+14:58  board line → PR #495 merged. ao close self.
