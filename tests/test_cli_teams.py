@@ -1082,6 +1082,51 @@ def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world
     assert all("techlead is `none`" in p["prompt"] for p in made)
 
 
+def test_every_members_brief_names_its_manager(world, capsys, monkeypatch):
+    """TD-113 (a): `{manager}` in a brief is the id the team's manager takes, worked out before
+    anything is created as `{techlead}` is, so a grinder's `done` line goes to it without reading
+    `under:` off its own record. Should the manager come up under another id the start says so; a
+    team a person leads, and a session started by hand, read `none`."""
+    tmp_path, state = world
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    made = creates(state)
+    grinders = [p for p in made if p["role"] == "grinder"]
+    assert len(grinders) == 2
+    for p in grinders:
+        assert 'ao msg ao-agentorc-orc-ao "done:' in p["prompt"] and "{manager}" not in p["prompt"]
+    assert "manager started as" not in capsys.readouterr().err
+
+    # the manager came up under another id: the start stands and says so
+    state["sessions"].clear()
+    state["calls"].clear()
+    real = cli.call_sync
+
+    def suffixed(method, **params):
+        rec = real(method, **params)
+        if method == "create" and params["name"] == "orc-ao":
+            rec["id"] += "-2"
+        return rec
+
+    monkeypatch.setattr(cli, "call_sync", suffixed)
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert "manager started as ao-agentorc-orc-ao-2, but the members' briefs name ao-agentorc-orc-ao" in (
+        capsys.readouterr().err
+    )
+
+    # a person leads: `none`, and the brief says what that means
+    monkeypatch.setattr(cli, "call_sync", real)
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["manager"] = {"role": "person"}
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(doc))
+    state["sessions"].clear()
+    state["calls"].clear()
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    for p in creates(state):
+        assert "{manager}" not in p["prompt"]
+        if p["role"] == "grinder":
+            assert 'ao msg none "done:' in p["prompt"] and "a person leads your team" in p["prompt"]
+
+
 def test_a_techlead_seat_reads_its_primer_first_and_the_start_warns_without_one(world, capsys):
     """TD-075 step 1b, design §4.9b *Its standing context*: `context:` on the seat is its primer —
     a path in its home checkout, filled into the seat's brief as `{context}` — and `ao team start`

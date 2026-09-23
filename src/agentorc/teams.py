@@ -166,6 +166,7 @@ class Plan:
     lead: Launch | None = None
     techlead: Launch | None = None
     techlead_id: str = ""  # the id the seat will take, which every brief's `{techlead}` names
+    manager_id: str = ""  # the id the manager will take, which every brief's `{manager}` names
     seats: list[Launch] = field(default_factory=list)  # seats with a trigger (§4.9b, TD-098)
     members: list[Launch] = field(default_factory=list)
     host: str = ""  # where the team lands when that is not the host the start runs on (§4.4a)
@@ -284,30 +285,45 @@ def _brief(
     read: repoconfig.Reader | None = None,
     techlead: str = "",
     context: str = "",
+    manager: str = "",
 ) -> str | None:
-    """The role's template with `{lane}`, `{techlead}` and `{context}` filled, or the member's
+    """The role's template with `{lane}`, `{techlead}`, `{manager}` and `{context}` filled, or the member's
     `brief:` override read from its home checkout. A lead may override its brief too — a lead's is
     the one a repo most often keeps its own copy of (2026-09-13)."""
     if member is not None and member.brief:
         override = repoconfig.Role(name=role.name, brief=member.brief, brief_source="repo", root=checkout)
-        return override.brief_text(lane, read=read, techlead=techlead, context=context)
-    return role.brief_text(lane, read=read, techlead=techlead, context=context)
+        return override.brief_text(lane, read=read, techlead=techlead, context=context, manager=manager)
+    return role.brief_text(lane, read=read, techlead=techlead, context=context, manager=manager)
+
+
+def _session_id(org: orgmod.Org, team: orgmod.TeamDef, name: str, home: str, host: str, here: str) -> str:
+    """The id a team's session will take, known before anything is created: §4.1's
+    `ao-<scope>-<name>` from its checkout, qualified `@<host>` when the team lands on another
+    host, as the home addresses that host's records. "" without a checkout (the session's own
+    launch then refuses the start, naming it)."""
+    checkout = org.checkout(project_of(org, team.projects, home), home, host)
+    if checkout is None:
+        return ""
+    checkout = Path(checkout).expanduser()
+    sid = naming.base_id(checkout, str(checkout), name)
+    return sid if host == here else f"{sid}@{host}"
 
 
 def seat_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
     """The id the team's techlead will take (design §4.9b `{techlead}`), known before anything is
-    created so the manager's brief — the first session started — can already name it: §4.1's
-    `ao-<scope>-<name>` from its checkout, qualified `@<host>` when the team lands on another
-    host, as the home addresses that host's records. "" without a seat, or without a checkout
-    (the seat's own launch then refuses the start, naming it)."""
+    created so the manager's brief — the first session started — can already name it. "" without
+    a seat, or without a checkout."""
     if team.techlead is None:
         return ""
-    checkout = org.checkout(project_of(org, team.projects, team.techlead.home), team.techlead.home, host)
-    if checkout is None:
+    return _session_id(org, team, team.techlead.name, team.techlead.home, host, here)
+
+
+def manager_id(org: orgmod.Org, team: orgmod.TeamDef, host: str, here: str) -> str:
+    """The id the team's manager will take (`{manager}`, TD-113 (a)), which every member's brief
+    names as the one its `done` lines go to. "" when a person leads the team."""
+    if team.manager.role == orgmod.PERSON:
         return ""
-    checkout = Path(checkout).expanduser()
-    sid = naming.base_id(checkout, str(checkout), team.techlead.name)
-    return sid if host == here else f"{sid}@{host}"
+    return _session_id(org, team, team.manager.name, team.manager.home, host, here)
 
 
 def _primer_missing(seat: orgmod.TechleadDef, checkout: Path, host: str, here: str, files: Files | None) -> str:
@@ -351,6 +367,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
     files: Files | None = None,
     techlead: str = "",
     context: str = "",
+    manager: str = "",
     seat: bool = False,
 ) -> Launch:
     where = f"team {team.name}: {name}"
@@ -395,7 +412,7 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         except (KeyError, ValueError) as e:
             raise TeamError(f"{where}: {str(e).strip(chr(34))}") from None
     try:
-        prompt = _brief(role, member, checkout, lane, read, techlead, context)
+        prompt = _brief(role, member, checkout, lane, read, techlead, context, manager)
     except ValueError as e:
         raise TeamError(f"{where}: {e}") from None
     if block:
@@ -439,6 +456,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
     p = Plan(team=team.name, source=team.source, host=host if host != here else "")
     reach = bool(project_block(org, team.projects, host))
     p.techlead_id = tid = seat_id(org, team, host, here)
+    p.manager_id = mid = manager_id(org, team, host, here)
     ctx = (team.techlead.context or "") if team.techlead is not None else ""  # the primer (§4.9b)
     if team.manager.role != orgmod.PERSON:
         p.lead = _launch(
@@ -456,6 +474,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             files=files,
             techlead=tid,
             context=ctx,
+            manager=mid,
         )
     seen: set[str] = {p.lead.name} if p.lead else set()
     if team.techlead is not None:
@@ -478,6 +497,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
             files=files,
             techlead=tid,
             context=ctx,
+            manager=mid,
             seat=True,
         )
         missing = _primer_missing(seat, p.techlead.dir, host, here, files)
@@ -505,6 +525,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                 files=files,
                 techlead=tid,
                 context=ctx,
+                manager=mid,
                 seat=True,
             )
         )
@@ -535,6 +556,7 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
                     files=files,
                     techlead=tid,
                     context=ctx,
+                    manager=mid,
                 )
             )
     # One line per finding, not per session: a team's members share a brief, and four copies of

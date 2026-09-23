@@ -58,6 +58,10 @@ LANE_PLACEHOLDER = "{lane}"
 # where the team has none, or the session was started by hand, so a brief reads right either way.
 TECHLEAD_PLACEHOLDER = "{techlead}"
 NO_TECHLEAD = "none"
+# The team's manager (TD-113 (a)): its session id, filled at launch as `{techlead}` is; `none` where
+# a person leads the team or the session was started by hand, so a member reports to no one it made up.
+MANAGER_PLACEHOLDER = "{manager}"
+NO_MANAGER = "none"
 # The seat's primer (design §4.9b *Its standing context*): the `context:` path, relative to the home
 # checkout, filled at launch; `none` without one, and the techlead brief then reads the repo's map.
 CONTEXT_PLACEHOLDER = "{context}"
@@ -124,10 +128,11 @@ class Role:
         read: Reader | None = None,
         techlead: str | None = None,
         context: str | None = None,
+        manager: str | None = None,
     ) -> str | None:
         """The opening prompt this role gives a session: its template with `{lane}` filled from
-        `lane` (default the role's own), `{techlead}` with the team's seat and `{context}` with the
-        seat's primer (each `none` without one).
+        `lane` (default the role's own), `{techlead}` with the team's seat, `{manager}` with its
+        manager and `{context}` with the seat's primer (each `none` without one).
         None for a role without a brief (`plain`). `read` reads a
         repo's brief file — this host's disk by default, or another host's checkout across the link
         (design §4.4a "Teams across hosts", TD-057 step 4b.3); a built-in template is always the
@@ -147,6 +152,7 @@ class Role:
             if text is None:
                 raise ValueError(f"role {self.name!r}: brief {path} cannot be read (no such file)")
         text = text.replace(TECHLEAD_PLACEHOLDER, techlead or NO_TECHLEAD)
+        text = text.replace(MANAGER_PLACEHOLDER, manager or NO_MANAGER)
         text = text.replace(CONTEXT_PLACEHOLDER, context or NO_CONTEXT)
         return text.replace(LANE_PLACEHOLDER, ", ".join(lane if lane is not None else self.lane) or "(none given)")
 
