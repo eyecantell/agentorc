@@ -460,6 +460,21 @@
   // (TD-087): a refused poll keeps the last good windows, drawn dimmed with *· stale* and, on hover,
   // when they were read and why the poll since failed; a refusal with nothing ever held is
   // `<profile>: no reading yet`. An `ok` with no windows is a tool that reports no quota: no chip.
+  // This window's row of the gate's reading (§6, TD-100), where the profile's reserve makes a line.
+  function usageLine(w, lines) {
+    const row = (Array.isArray(lines) ? lines : []).find((r) => r && typeof r === "object" && r.label === w.label);
+    return row && typeof row.line === "number" ? row : null;
+  }
+  function usageHover(w, row) {
+    if (!row) return `${w.label} ${w.pct}% (resets ${w.resets || "?"})`;
+    const r = row.reserve, ln = row.line;
+    let why;
+    if (r && typeof r === "object" && Number.isInteger(r.per_day) && r.per_day > 0) {
+      why = `reserve ${r.per_day}% a day`;
+      if (ln > 0) why += `, ${Math.floor((100 - ln) / r.per_day)} days left`;
+    } else why = `reserve ${r}%`;
+    return `${w.label} ${w.pct}% / line ${ln}% (${why}; line moves ${row.next || "?"}; resets ${w.resets || "?"})`;
+  }
   AO.usageChip = function (profile, u) {
     if (!u || typeof u !== "object") return null;
     const windows = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w.pct === "number");
@@ -470,13 +485,18 @@
       why = "the last poll was refused: " + (USAGE_WHY[reason] || reason);
       if (typeof u.retry_after === "number") why += `, which asked to be left ${Math.max(1, Math.ceil(u.retry_after / 60))} min`;
     }
-    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}`, pct: 0, cls: "stale" };
-    const ws = windows.slice().sort((a, b) => b.pct - a.pct), worst = ws[0];
-    let title = ws.map((w) => `${w.label} ${w.pct}% (resets ${w.resets || "?"})`).join(" · ");
-    let cls = worst.pct >= 100 ? "cap" : worst.pct >= NEAR_CAP ? "near" : "";
+    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}`, pct: 0, cls: "stale", near: false };
+    // worst = the smallest gap to its line, the tool's 100% where the profile has no reserve (§4.5a, TD-100)
+    const gap = ([w, r]) => (r ? r.line : 100) - w.pct;
+    const ws = windows.map((w) => [w, usageLine(w, u.lines)]).sort((a, b) => gap(a) - gap(b) || b[0].pct - a[0].pct);
+    const [worst, row] = ws[0];
+    let title = ws.map(([w, r]) => usageHover(w, r)).join(" · ");
+    const near = worst.pct >= 100 || (row ? worst.pct >= row.line - 10 : worst.pct >= NEAR_CAP);
+    let cls = worst.pct >= 100 ? "cap" : near ? "near" : "";
     let text = `${profile} · ${worst.label} ${worst.pct}%`;  // the numbers say what they are (2026-09-18)
+    if (row) text += ` / ${row.line}%`;  // *grind · week 61% / 70%* (TD-100)
     if (stale) { title = `held reading from ${u.fetched || "an unknown time"} — ${why}. ${title}`; text += " · stale"; cls = (cls + " stale").trim(); }
-    return { text, title, pct: worst.pct, cls };
+    return { text, title, pct: worst.pct, cls, near };
   };
   function onUsage(ev) {
     const chip = $("#usagechip"); if (!chip) return;
@@ -488,6 +508,7 @@
     if (!c) { if (el) { const sep = el.nextSibling; if (sep && sep.nodeType === 3) sep.remove(); el.remove(); } fitUsage(); return; }
     if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.insertBefore(el, $("#usagemore")); chip.insertBefore(document.createTextNode(" "), $("#usagemore")); }
     el.dataset.pct = c.pct;
+    el.dataset.near = c.near ? "1" : "";
     el.textContent = c.text;
     el.className = c.cls;
     el.title = c.title;
@@ -502,8 +523,9 @@
     spans.forEach((s) => s.classList.remove("hidden"));
     if (!more) return;
     more.classList.add("hidden"); more.textContent = ""; more.title = "";
-    // Hide the least important first: lowest worst-window percentage, and never one at or near a cap.
-    const droppable = spans.filter((s) => (+s.dataset.pct || 0) < NEAR_CAP).sort((a, b) => (+a.dataset.pct || 0) - (+b.dataset.pct || 0));
+    // Hide the least important first: lowest worst-window percentage, and never one at or near a cap
+    // — near its line where the profile has a reserve (TD-100), which is the chip's own `near`.
+    const droppable = spans.filter((s) => !s.dataset.near).sort((a, b) => (+a.dataset.pct || 0) - (+b.dataset.pct || 0));
     const hidden = [];
     while (chip.scrollWidth > chip.clientWidth + 1 && droppable.length) {
       const s = droppable.shift(); s.classList.add("hidden"); hidden.push(s);

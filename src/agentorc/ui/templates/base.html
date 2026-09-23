@@ -22,7 +22,7 @@
      never a field name of any one tool — with the rest on hover. `app.js` re-sorts and collapses
      them to `+n` when they stop fitting; a profile at or near a cap is never the one collapsed. A held
      reading whose last poll was refused is drawn stale, not dropped (TD-087): `usage_chip`. #}
-  <span class="mono dim" id="usagechip" title="subscription usage per profile a live session is running under: the worst quota window the tool reports, the rest on hover">{% for prof, u in (usage or {}).items() %}{% set c = usage_chip(prof, u) %}{% if c %}<span data-profile="{{ prof }}" data-pct="{{ c.pct }}"{% if c.cls %} class="{{ c.cls }}"{% endif %} title="{{ c.title }}">{{ c.text }}</span> {% endif %}{% endfor %}<span id="usagemore" class="hidden"></span></span>
+  <span class="mono dim" id="usagechip" title="subscription usage per profile a live session is running under: the worst quota window the tool reports, the rest on hover">{% for prof, u in (usage or {}).items() %}{% set c = usage_chip(prof, u) %}{% if c %}<span data-profile="{{ prof }}" data-pct="{{ c.pct }}" data-near="{{ 1 if c.near else '' }}"{% if c.cls %} class="{{ c.cls }}"{% endif %} title="{{ c.title }}">{{ c.text }}</span> {% endif %}{% endfor %}<span id="usagemore" class="hidden"></span></span>
   {# design §4.5a Org top bar **Inbox** / **Inbox page** (§4.5 screen 6, §4.10, TD-069 step 1): the
      nav item for `/inbox`, which replaced the dialog that hung here until 2026-09-19. Its number is
      that page's **Needs you** section — open questions to you plus `steer`s you have paused, minus
