@@ -262,3 +262,7 @@
 - techlead-ao-1: idle and empty at start, so I closed it. Filled twice (03:34Z, 03:54Z) with --keep-mail, each time for 1 waiting ask. It answered both and I closed it after each. 2 of the 6-per-hour ceiling.
 - Cadence --since 12h: every member PR passes except the #462 worktree row. #454 and #430 (ci) and #441 (worktree) are the anchor's. No relays needed (last cadence change landed 09-12). No escalations, no board lines.
 - For a §6 policy: the techlead seat's rule is fully mechanical. It reads state and asks_waiting, closes an idle seat with none waiting, and fills an exited seat with some waiting. The record's seat/seat_due fields suggest the core is already taking it over. The worktree row after a squash merge is a recurring false-ish fail (#441, #462). A post-merge worktree reset in the grinder's own loop, or a check that knows the squash, would retire it.
+
+## Run of 2026-09-23 from 05:35Z
+
+23:38  team started 05:35Z. grinder-ao-1, grinder-ao-2: working → ok. techlead-ao-1: idle, 0 waiting, clean → ao close. Prior run's #463, #465 merged by the anchor 05:18Z/05:10Z: cadence pass (review recorded). No relays (last change landed 09-11, before every member). No open member PRs
