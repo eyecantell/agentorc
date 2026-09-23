@@ -253,3 +253,4 @@
 22:23  grinder-ao-2: TD-109 → #465 open, touches docs/briefs → held; #463 (TD-114) open, no held paths. Held: #462 #465
 22:33  host agent restarted (promote); ao wait remade itself. #462 (TD-103) merged 04:25Z by the anchor; cadence: worktree fail (grinder-ao-1's worktree still on td103-inbox-row after the squash). grinder-ao-1 is finished → no send, reported only. Held: #465
 22:47  grinder-ao-2: TD-076 archive → PR #466 merged, cadence pass (review recorded; no held paths). Waiting on the anchor: #463, #465 (held)
+22:49  grinder-ao-2: declared out of work 04:47Z, idle → finished. Every member finished → ao team stop ao-grind --close: both grinders closed clean. Cadence --since 12h: member PRs all pass except #462 worktree (reported); #454 ci and #441 worktree, #430 ci are the anchor's. #463, #465 open for the anchor (<2h). ao progress none. Run over.
