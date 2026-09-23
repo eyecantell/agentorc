@@ -27,7 +27,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-038 | The embedded terminal is a bare xterm.js: default palette, no bundled font, no renderer addon — it reads as black-and-white next to VS Code's terminal | Medium | Built — live check pending |
 | TD-039 | Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation | Medium | Open |
 | TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Partly done |
-| TD-046 | A session cannot be popped out into its own browser window, so switching between agents needs the mouse instead of alt-tab | Medium | Designed 2026-09-23 — a grinder builds |
 | TD-050 | The cadence check's `review` row reads the verdict only on a comment's first line, so a report that ends with it counts as no review at all | Medium | Open |
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Partly done — steps 1–8 done (5 was a measurement); the second-adapter step and the live check remain |
 | TD-053 | A team never winds down when it runs out of work: build design §4.9a — the declaration, the role tests, the lead's wind-down and the board line | Medium | Partly done |
@@ -316,33 +315,6 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 **Fix:** the rule is that a brief describes the **job**, and the run-specific facts come from the definition or the record: the lane from `--lane` or `lane:`, the members from `ao status -v`, the stop from the usage gate, the lead's wrap-up or `ao team stop`, never a date. Then: (1) say it in §4.8 beside the preset table and in §4.9 beside `brief:`, so the next brief written is repeatable; (2) the three package templates under `src/agentorc/briefs/` already obey it — add a test that no template matches a date or `run \d`; (3) the samscrape prompts in `~/.tdgrind/tdgrind-*-prompt.md` are still per-run and are what `samscrape-grind` would use — they belong in that repo as `docs/briefs/` first (board item 2026-09-13), repeatable when they get there; (4) decide whether `ao team start` should warn when a brief it is about to hand out matches a date, which is cheap and catches the next one. Done when `ao team start ao-grind` twice on two different days produces two sessions that both do work.
 
 **Related:** design §4.8, §4.9; TD-040 (the team definitions this rides on), TD-026 (scheduling, which owns *when* a worker stops), TD-036.
-
-## TD-046: A session cannot be popped out into its own browser window, so switching between agents needs the mouse
-
-**Priority:** Medium
-**Added:** 2026-09-13 (raised by Paul)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-
-**Status:** Designed 2026-09-23 (the anchor) — **build it as design §4.5 screen 2 *Pop out* and the §4.5a rows **Pop out**, **Focus** (its *Focus window* reading) and **title** say; the six pieces below are decided there:** (1) Pop out in the card's *more ▾* and the Focus header, Focus itself a plain link so middle-click stays the browser's; (2) `/focus/{sid}?window=1`, the whole Focus minus nav and top bar, panels included; (3) `window.open` named `ao-focus-<id>`, size and position per session in the browser, default fits 100 columns; (4) the title `<name> · <state>`, `▲ ` while it needs you, from the feed — on every Focus, tab or window; (5) no ceiling, a tab's cost each, the window never closes itself; (6) the card reads *Focus window* and raises it in the browser that opened it, other browsers open Focus as ever. One PR for the page (`src/agentorc/ui/`: `card.html`, `focus.html`, `base.html`, `app.js`, `app.py`); no `src/sessionorc` change. Was: **the design round is next, the anchor's (Paul, 2026-09-23: *go with your recommendations*):** one OS window per Focus, the six pieces below decided in §4.5a and §4.5, then a grinder builds. Was: design task first: not to be coded before the control is in design §4.5a and the behaviour in §4.5
-
-**Location:** `src/agentorc/ui/templates/card.html` (the Focus button), `focus.html`, `base.html` (the chrome a popped-out window should not carry), `src/agentorc/ui/static/app.js` (the events websocket, one per tab today), `src/agentorc/ui/app.py` (`/focus/{sid}`), design §4.5 screen 2 and §4.5a
-
-**Why:** every Focus opens in the tab you were in, so moving between two working agents is Org → click a card → Focus → back → click the other. Paul (2026-09-13): *"having the ability to alt-tab between agent sessions is quite useful (instead of having to involve the mouse to click)."* That is the real requirement — **the operating system's window switcher, not a widget inside the page**. One OS window per agent makes the fleet behave like the terminals it replaces: alt-tab is muscle memory, the windows can be tiled or sent to separate monitors, and the terminal keeps its own scrollback and keyboard focus instead of being torn down and rebuilt on every navigation. It also fixes something the current shape cannot: a pane you are watching disappears the moment you look at another one, so there is no way to keep two agents visible at once on one screen.
-
-**Fix (design first, then code), the pieces that need deciding:**
-
-1. **The control.** A **pop out** button on the card's `more ▾` menu and in the Focus header, plus the obvious shortcut of middle-click or ctrl-click on Focus behaving as it already does on a link. §4.5a gains the row; a control not in that table does not exist.
-2. **A chromeless route.** `/focus/{sid}?window=1` (or a `/pane/{sid}`) rendering the Focus screen without the nav, so the window is the session and nothing else. Decide whether the side panels come with it.
-3. **The window itself.** `window.open` with a **name keyed on the session id**, so pressing pop out twice focuses the window that exists rather than opening a second one. Decide the default size and whether position is remembered per session (localStorage, like Pinned order).
-4. **The window title is the point.** It is what alt-tab shows, so it must be the session's name first and short — `tdgrind-ao-1 · working` rather than `agentorc — Focus`. It has to track the state deltas the page already receives, and say when the session needs you, since a window switcher is the only place a background window can speak.
-5. **Cost of many windows.** Each tab opens its own `/events` websocket and its own terminal pty (§4.6). Decide the ceiling, what happens when it is reached, and whether a popped-out window that loses its session (killed, closed, forgotten) closes itself or shows the exited banner — today `/focus` of a dead record still renders Details.
-6. **The opener's grid.** A card whose session is popped out should say so and offer *focus that window* rather than a second one, or the person ends up with two views of one pane and no way to tell them apart.
-
-Done when two agents can be open in two OS windows at once, alt-tab moves between them, each window's title names its session and its state, and popping out the same session twice raises the first window instead of opening another.
-
-**Related:** design §4.5 screen 2 (Focus), §4.5a, §4.5 (its screens intro: one pty per open terminal), §4.6 (transport and terminal mechanics), §4.5b (reachability: a popped-out window is the same origin, so the tunnel or private network carries it unchanged); TD-029 (a closed session's terminal reconnecting), TD-038 (the terminal's look).
 
 ## TD-050: The cadence check's `review` row reads the verdict only on a comment's first line
 
