@@ -55,6 +55,16 @@ def _identity_off(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(identity, "DEFAULT_MODE", "off")
 
 
+@pytest.fixture(autouse=True)
+def _no_real_repos_registry(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A host with no `repos_registry:` of its own reads dev-cadence's machine roster in the
+    person's home — and from TD-069 step 3 the Inbox runs the board reader over every repo on it.
+    A test never reads the person's roster: it gets an empty one unless it writes its own."""
+    from sessionorc import hosts
+
+    monkeypatch.setattr(hosts, "DEFAULT_REPOS_REGISTRY", str(tmp_path / "no-roster" / "repos.txt"))
+
+
 CHILD = HERE / "_agent_child.py"
 FAST_TICK = 0.3
 

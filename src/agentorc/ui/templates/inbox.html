@@ -15,7 +15,7 @@
    with no inline markup, because half of its two uses is an attribute. #}
 {% block body %}
 {% set info = {
-  'needs': 'Sessions that stopped for you — a permission, a question, a cap, a stall, work that was never pushed, an identity alarm — questions a session cannot go on without, and steering you have paused. What is on the tool’s clock first, then oldest first. This section is the number in the top bar; the Org’s “needs you” counts the session states alone. A state row is the session’s own: its controls are the card’s, and a mark that is not a control never looks like one. Reading this page marks nothing and rings nothing — a person is not the session; and anything with a date on it belongs on the board.',
+  'needs': 'Sessions that stopped for you — a permission, a question, a cap, a stall, work that was never pushed, an identity alarm — questions a session cannot go on without, steering you have paused, and board items due today or overdue. What is on the tool’s clock first, then oldest first. This section is the number in the top bar; the Org’s “needs you” counts the session states alone. A state row is the session’s own: its controls are the card’s, and a mark that is not a control never looks like one. Reading this page marks nothing and rings nothing — a person is not the session; and anything with a date on it belongs on the board.',
   'steering': 'Each says what it will do unless you say otherwise, and when. Soonest first. Doing nothing is a valid answer: at the time shown the sender goes with its default, and nothing has failed. Reply says otherwise; Go with it closes it now; Pause stops the clock.',
   'waiting': 'Questions you have answered whose asker still owes you the outcome — what came of your answer (§4.10). Never counted: it waits on a session, not on you. Dismiss says you do not need to hear back — the debt ends and the asker is told. When an asker exits without reporting, or reports that it is blocked, that row is under Needs you instead, because only you or its manager can move it.',
   'answered': 'Questions a teammate answered for you from the record — the design, the ledger, a brief, a decision of yours — each with the question, who asked, the answer, who answered and where it is written down. Never counted: nothing waits on you. It is here so a confident wrong answer cannot steer a team unseen. Overrule sends your word to the one who asked, on the question’s own thread, with a copy to the one who answered; it outranks theirs, and the asker owes you what came of it. Dismiss removes the row. Newest first.',
@@ -27,7 +27,7 @@
 <div class="page inboxpage">
   <div class="row gap wrap">
     <span class="h1">Inbox</span>
-    <span class="pill s-needs{% if not sections.count %} hidden{% endif %}" id="needspill" title="what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you and steering you paused, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference, and due board items join this one later (TD-069 step 3)."><span class="dot"></span><span id="needsn">{{ sections.count }}</span> needs you</span>
+    <span class="pill s-needs{% if not sections.count %} hidden{% endif %}" id="needspill" title="what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you, steering you paused and board items due today or overdue, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference."><span class="dot"></span><span id="needsn">{{ sections.count }}</span> needs you</span>
     <span class="grow"></span>
     <input class="input" id="ifilter" placeholder="filter… (team:name)" style="width: 220px;" title="team:name shows one team, team: shows what carries none; anything else matches sender, text and about">
   </div>
@@ -45,6 +45,8 @@
   <section class="isec" id="sec-needs">
     <div class="row gap wrap sechead"><span class="h2">Needs you</span><span class="meta" id="n-needs"></span>{{ imark('needs', 'Needs you') }}</div>
     <p class="note secinfo" id="info-needs" hidden>{{ info['needs'] }}</p>
+    {#- the board reader could not be read (TD-069 step 3): said, never shown as a clear board -#}
+    <div class="note warn{% if not board_note %} hidden{% endif %}" id="boardnote">{{ board_note }}</div>
     <div class="inboxrows" id="rows-needs">{% with rows = sections.needs, section = 'needs' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing is waiting on you.</div>
   </section>

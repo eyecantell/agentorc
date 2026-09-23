@@ -862,6 +862,9 @@
     // …and nothing else changes while it is down: an empty `html` would blank every section and a
     // `needs` of 0 would claim nothing is waiting, which is precisely what is not known (§4.5)
     if (!got || got.agent_down || !got.html) return;
+    // the board reader's note (TD-069 step 3): a board that could not be read is said, not blank
+    const bn = $("#boardnote");
+    if (bn) { bn.textContent = got.board_note || ""; bn.classList.toggle("hidden", !got.board_note); }
     IN_SECS.forEach((k) => {
       const el = $("#rows-" + k);
       if (el && AO.maySwapSection(el, document.activeElement)) el.innerHTML = got.html[k] || "";
