@@ -65,9 +65,22 @@ WAKES_KEEP = 50  # wake decisions a record keeps (`wakes`): what step 5 measures
 # RPCs that act on a session (design §4.8): a caller that is a session needs the `control`
 # grant to run one of these on a session other than itself (§9 invariant 11). `create` targets a
 # session that is by definition not the caller; `set_grants` is gated so a session cannot grant
-# itself. Reads are never listed here, and neither is `msg`: messaging is not acting (§4.10).
+# itself. `decide` answers another session's permission prompt, the same class of act as typing
+# at it (TD-116). Reads are never listed here, and neither is `msg`: messaging is not acting (§4.10).
 ACTING_RPCS = frozenset(
-    {"send", "keys", "kill", "close", "set_mode", "remove", "create", "set_grants", "set_controllers", "set_stop"}
+    {
+        "send",
+        "keys",
+        "kill",
+        "close",
+        "set_mode",
+        "remove",
+        "create",
+        "decide",
+        "set_grants",
+        "set_controllers",
+        "set_stop",
+    }
 )
 
 

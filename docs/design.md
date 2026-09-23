@@ -711,7 +711,7 @@ the home instead (*Mail across hosts*).
 | Call | From a person | From a session |
 |---|---|---|
 | reads — `list`, `get`, `tail`, `explain`, `occupancy`, `name_check`, `recent_dirs`, `usage`, `adapters`, `ping`, `wait` | served: this host's sessions only | served; a `wait` sees only this host's records and no mail |
-| node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served. On another session, and any `create`: **refused** — except `seen`, `decide` and `hook`, which the gate has never covered (§4.8) and which are the node's own socket |
+| node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served. On another session, and any `create`: **refused** — except `seen` and `hook`, which the gate does not cover (§4.8) and which are the node's own socket |
 | home-owned edits — `set_controllers`, `set_grants`, `set_stop`, `set_mode` | **refused**: they wait for the link | refused |
 | `set_settings` (§5 `settings.yml`, TD-100) | **served**: the file is this host's own, and the gate that reads it runs here | refused — a person's own, link or no link |
 | the mailbox — `msg`, `inbox`, `inbox_delete`, and the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (§4.10, TD-069) | **refused**: the mailbox is at the home | refused |
@@ -1888,8 +1888,9 @@ repo's `.agentorc.yml` names where its ledger lives (§5). Lanes are references,
 acting RPC. One exists:
 
 - `control` (`orchestrate`, its old name, is an unknown grant — TD-107): the session may act on *other* sessions — `send`, `keys`, wrap-up,
-  `kill`, `close`, `mode`, `new`, `remove`, and `set_grants` (gated on every target, so a session
-  cannot grant itself). Without it, an acting RPC whose caller is a session and whose target is a
+  `kill`, `close`, `mode`, `new`, `remove`, `decide` (`ao allow` / `ao deny`: answering another
+  session's permission prompt is the same class of act as typing at it — TD-116), and `set_grants`
+  (gated on every target, so a session cannot grant itself). Without it, an acting RPC whose caller is a session and whose target is a
   different session is refused with "needs the control grant"; reads (`status`, `tail`,
   `explain`) are never gated. The caller is what the channel says, not what the envelope says
   (§4.8a): under `enforce` a request from outside every pane that names a session is refused,
@@ -3165,6 +3166,7 @@ determines behaviour and loose where the recipient's judgement mediates:
 | a message that lands | puts an attributed entry in an inbox | the recipient's next look | §4.10's graph |
 | a message that wakes | the same, and starts a turn to read it | the recipient's brief and judgement, and the wake budget below | §4.10's graph |
 | `send` / `keys` | supplies the next turn verbatim | nothing | `control` + `controllers` |
+| `decide` | answers the session's pending permission through the hook | nothing | `control` + `controllers` |
 | `kill`, `close`, `set_mode`, `set_grants`, `set_controllers`, `set_stop`, `create`, `remove` | changes the session or its record without its participation | nothing | `control` + `controllers` |
 
 The thinnest point is the third row against the fourth: both cause a turn. What separates them is
@@ -3266,7 +3268,7 @@ only a session already blocked in `ao wait` would serve managers and nobody else
   rolls, and in full when a person acts toward the session — a send, a reply to its mail, or an
   answer to its permission or question. Opening Focus, reading its Inbox or glancing at its card
   refills nothing: a person looking at a looping team must not refuel the loop. It is **not**
-  restored by a controller's send or by a turn mail did not start: a rule a session can satisfy by
+  restored by a controller's send or `decide`, or by a turn mail did not start: a rule a session can satisfy by
   its own traffic is not a bound. A team doing its job spends a few wakes an hour and never meets the limit; a team talking to itself
   meets it within the window.
 - **It counts turns, not messages.** A message that wakes nobody costs nothing and is not metered,
@@ -3592,13 +3594,14 @@ follow, and they bind every row kind, mail and state alike:
    entry id of its own (`t-<hex>`, as mail's is `m-<hex>`; the entry id is what `inbox_dismiss`
    takes) to a small **attention trail** persisted beside the person inbox, the newest 100, each
    kept for `MAIL_RETENTION`. `how` is what the home can tell: *allowed by you*, *denied by you*
-   (the `decide` RPC from a person), *answered in the terminal* (the pending thing cleared with no
+   (the `decide` RPC from a person; *allowed by `<name>`* when a controller answered it, §4.8 —
+   and, not being a person's, a quick one leaves no trail — below), *answered in the terminal* (the pending thing cleared with no
    `decide`), *resumed*, *pushed*, *forgotten*, *the session exited* or *the session was closed*
    (the record's own state says so, beneath any word an act wrote; an `unpushed` row is a row of an
    exited record, so only a close ends it this way — TD-088), *the limit reset*, *dismissed by you*
    (an identity alarm, §4.8a; beside *logged by you → `<controller>`*; a suspension ends
    no row and writes nothing here), and plain *resolved* when it cannot tell (for a node's session
-   the home knows its own `decide`s, so *by you* is always known). `text` is cleaned and capped as
+   the home knows its own `decide`s, so who answered is always known). `text` is cleaned and capped as
    a `doing` line is. FYI lists the trail; **Dismiss** removes an entry early; a row offers
    **Open** only while the record it names still exists — after a resume the trail names the record
    that ended, and says *resumed*. **Bounded like the identity alarms (§4.8a):** a repeat of the
@@ -4393,7 +4396,7 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
     the records on every call, so a revoke or a membership edit takes effect on the session's
     next call and neither is cached. Reads are never gated, and a person at a terminal or the
     UI is not a session. Acting is what changes a session — the host agent's `ACTING_RPCS`:
-    `send`, `keys`, `kill`, `close`, `set_mode`, `create`, `remove`, `set_grants`,
+    `send`, `keys`, `kill`, `close`, `set_mode`, `create`, `remove`, `decide`, `set_grants`,
     `set_controllers` and `set_stop` (`ao until`, §6). **Messaging is not acting** and does not
     pass through this gate: its own, weaker rule is §4.10's graph (my controllers, my members,
     my team, a shared target), it needs no grant, and it is refused by naming that rule rather

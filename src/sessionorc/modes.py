@@ -77,6 +77,6 @@ def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host
         return f"a session creates nothing while its host is offline — a create is gated on the org's graph: {tail}"
     if params.get("id") == caller:
         return None  # a session acting on itself is this node's own business
-    if method in ("seen", "decide", "hook"):
+    if method in ("seen", "hook"):
         return None  # not acts on another session in the gate's sense; the hook socket is the node's
     return f"{caller} cannot {method} {params.get('id', '?')}: acting on another session is gated at the home: {tail}"

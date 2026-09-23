@@ -69,7 +69,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
 | TD-114 | A repo's brief replaces the whole template, so three repos carry copies of agentorc's mechanics that go stale together: make it a supplement filled into a `{repo}` slot | High | Partly done — step (1) built, awaiting the anchor with (2) and (3) |
 | TD-115 | A session's own exit hook can be judged outside and refused, and the refusal is applied anyway through the events queue | Medium | Open |
-| TD-116 | `decide` is ungated: any session may answer another session's permission prompt | Medium | Open — decided 2026-09-23 |
 | TD-118 | Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose | High | Partly done — (1) and (2) built 2026-09-23; (3) is dev-cadence's |
 | TD-119 | A session may answer its own permission prompt: the gate passes every acting RPC a session makes on itself, `decide` included | Medium | Open — needs a decision |
 
@@ -1248,22 +1247,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix, in order — the design first (§4.8a, a small change: a hook is its session's for a short grace after its pane ends):** (1) `_id_channel` keeps each record's last pane (its session id and tty) for a grace after it leaves the list (`PANE_GONE_GRACE`; ten seconds is plenty, the alarm followed the pane by less than three), and a `hook` naming a record whose pane is inside that grace is judged *session* by its session id or tty against the gone pane, the walk unchanged; a test that a `SessionEnd` from a pane that closed reads as its session, and one that a hook naming a record whose pane left a minute ago is still *outside*. (2) `hook.py`: an `error` reply is a refusal, never an outage — log it to stderr and return, and never queue it; the queue stays what it is for, an agent that was down. (3) Once (1) is live, dismiss the two alarms and note it here; the events queue's remaining hole (a file any local process can write) is a sentence under §4.8a's *What this does not stop, so nobody reads it as more*, not a build.
 
 **Related:** TD-077 (identity), TD-106 (identity finished as built), TD-103 (the tick's closes), TD-113 (9) (the seat filled by hand that these runs were: no `supervised`, no `seat`), TD-111 (`ao doctor`).
-
-## TD-116: `decide` is ungated: any session may answer another session's permission prompt
-
-**Priority:** Medium
-**Added:** 2026-09-23 (the anchor session; the board's 2026-09-12 question from `tdgrind-ao-1`, decided by Paul 2026-09-23)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — decided 2026-09-23: **`decide` needs the `control` grant and membership, exactly as `send` does.** It was left ungated at TD-028 step (1) because design §4.8 listed it so and the UI answers as a person with no caller; a worker auto-approving another worker's tool call is the same class of act as typing at it.
-**Location:** `src/sessionorc/agent.py` (`_gate`, `rpc_decide`, `NODE_ACTS`), design §4.8 (the acting RPCs and what needs the grant), §9 invariant 11, `tests/test_agent.py`
-
-**Why:** the gate exists so that only a session's controllers act on it; a permission answer is an act on it.
-
-**Fix:** design first, in the same PR — §4.8 moves `decide` into the gated list and §4.4a's node table keeps it as a node-owned act; `_gate` covers `decide` (a person's `decide` from the page has no caller and is served as today); a test that a session without the grant, or with it but not in the target's `controllers`, is refused with the standard line.
-
-**Related:** TD-028 (where it was left ungated), TD-036 (membership), design §4.8, §9 invariant 11.
 
 ## TD-118: Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose
 
