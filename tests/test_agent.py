@@ -1702,3 +1702,24 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
         }
         assert USAGE_EVERY == 300.0  # five minutes: the shortest window the endpoint reports is five hours
         await c.call("kill", id=s["id"])
+
+
+async def test_a_mode_change_is_pushed_at_the_press(agent, tmp_path, monkeypatch):
+    """TD-096 (review of PR #403): `set_mode` pushes its change as `set_stop` does, so another tab's
+    Focus re-attaches read-only, or with the keyboard, at the press rather than on the next tick.
+    Called on the agent directly: nothing in the method awaits but the push, so no tick runs inside
+    it, and a push counted during the call is the method's own."""
+    async with LocalClient() as c:
+        sid = (await c.call("create", name="m", dir=str(tmp_path), adapter="shell"))["id"]
+    pushed = []
+    push = agent._push_changes
+
+    async def counted() -> None:
+        pushed.append(1)
+        await push()
+
+    monkeypatch.setattr(agent, "_push_changes", counted)
+    view = await agent.rpc_set_mode(sid, unattended=True)
+    assert view["unattended"] is True and pushed
+    monkeypatch.setattr(agent, "_push_changes", push)
+    await agent.rpc_kill(sid)

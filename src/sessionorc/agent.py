@@ -2524,6 +2524,9 @@ class HostAgent:
         if resume_prompt is not None:
             s.resume_prompt = str(resume_prompt).strip() or None
         self._save(s)
+        # pushed now, as `set_stop` is: another tab's Focus re-attaches read-only or with the keyboard
+        # at the press, not on the next tick (§4.6, TD-096)
+        await self._push_changes()
         return self._view(s)
 
     async def rpc_set_stop(
