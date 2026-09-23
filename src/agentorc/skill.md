@@ -64,7 +64,7 @@ Mutating — each one is a decision, so check the state first:
   `prompt-stalled` (nothing started), `timeout`, `removed`.
 - `ao allow|deny <id> [reason]` — the pending permission, through the hook channel.
 - `ao mode <id> unattended|interactive`; `ao kill <id>` (worktree kept); `ao close <id>`.
-- Acting on a session other than your own (`send`, `keys`, `kill`, `close`, `mode`, `new`) needs
+- Acting on a session other than your own (`send`, `keys`, `allow`, `deny`, `kill`, `close`, `mode`, `new`) needs
   **two** things (design §4.8): the `control` grant on your record, and your id in *that
   session's* `controllers` (`ao status --json` → `capabilities` and `controllers`). The refusals
   differ — "needs the control grant", or "not in its controllers" saying whether the list is

@@ -101,6 +101,41 @@ async def test_permission_roundtrip(agent, hookstub, tmp_path):
         assert (await c.call("get", id=sid))["state"] == "working"
 
 
+async def test_a_session_answers_a_permission_only_as_a_controller(agent, hookstub, tmp_path):
+    """TD-116, design §4.8: `decide` is an act, gated like `send` — a session without the grant,
+    or with it and not in the target's `controllers`, is refused with the standard line and the
+    hook keeps waiting; a controller's answer reaches the hook, and its trail word names it rather
+    than *you*, and it refills nothing (§4.10: a controller's act never restores the wake budget).
+    A person's answer, no caller, is served as ever (`test_permission_roundtrip`)."""
+    async with LocalClient() as person:
+        lead = (await person.call("create", name="lead", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))[
+            "id"
+        ]
+        w = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True))["id"]
+
+        async def hook():
+            async with LocalClient() as h:
+                return await h.call(
+                    "hook", session=w, kind="permission", text="Bash: git push", tool_use_id="tu1", wait_seconds=5
+                )
+
+        task = asyncio.create_task(hook())
+        await wait_state(person, w, "needs-you")
+        async with LocalClient(caller=lead) as other:
+            with pytest.raises(AgentError, match="needs the control grant"):
+                await other.call("decide", id=w, tool_use_id="tu1", behavior="allow")
+            await person.call("set_grants", id=lead, add=["control"])
+            with pytest.raises(AgentError, match="not in its controllers"):
+                await other.call("decide", id=w, tool_use_id="tu1", behavior="allow")
+            assert not task.done() and (await person.call("get", id=w))["state"] == "needs-you"
+            await person.call("set_controllers", id=w, add=[lead])
+            refilled = (await person.call("get", id=w)).get("wake_refilled_at")
+            await other.call("decide", id=w, tool_use_id="tu1", behavior="deny", reason="not from here")
+        assert await task == {"behavior": "deny", "reason": "not from here"}
+        assert agent._attention_how[f"{w}|state"] == "denied by lead"
+        assert (await person.call("get", id=w)).get("wake_refilled_at") == refilled
+
+
 async def test_permission_timeout_falls_to_terminal(agent, hookstub, tmp_path):
     async with LocalClient() as c:
         s = await c.call("create", name="t", dir=str(tmp_path), adapter=hookstub.name)
@@ -505,6 +540,7 @@ async def test_orchestrate_grant_gates_acting_rpcs(agent, tmp_path):
                 ("close", {"id": b}),
                 ("set_mode", {"id": b, "unattended": True}),
                 ("remove", {"id": b}),
+                ("decide", {"id": b, "tool_use_id": "tu", "behavior": "allow"}),  # TD-116
                 ("create", {"name": "c", "dir": str(tmp_path), "adapter": "shell"}),
                 ("set_grants", {"id": a, "add": ["control"]}),  # no self-grant
                 ("set_grants", {"id": b, "add": ["control"]}),
