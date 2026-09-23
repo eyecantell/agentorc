@@ -203,6 +203,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-21 (Paul, TD-099): *if a team is fully idle, does hitting Wind down wake them up?* — it would, to find nothing. 2026-09-22: a concluded team is drawn like a stopped one, with **Start** alone, and from this date `ao team start` closes each concluded session before it creates under its name.
 - 2026-09-22 (TD-100, §6 *Usage gate*): the **usage** chip's reserve line and the *paused · usage* mark designed; Claude Code's `week` label was *wk* until 2026-09-22 (TD-095 (h): short for no reason).
 - 2026-09-22 (TD-099 step 2, PR #433, grinder-ao-2): `teamrun.concluded`, `concluded` on `teamrun.rows`, and the page drawing a concluded team as stopped with Start alone; step (1), the host agent's close-then-start behind that Start, still unbuilt.
+- 2026-09-22 (TD-099 step 1, PR #448, grinder-ao-1): the close-then-start behind a concluded team's Start built, in `teamrun.start` (`_close_concluded`) rather than as a verdict of the host agent's: every concluded session passes the wrap-up close's check, then all are closed, then the creates run.
 - 2026-09-22 (TD-100 slice 3, PR #436, grinder-ao-2): the *paused · usage* mark on the card's slot and the Focus header (`gated_view`); the chip's line waits on slice 1.
 
 ## 4.5b Reachability, and the shape of a hosted service
