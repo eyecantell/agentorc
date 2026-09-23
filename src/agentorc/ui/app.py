@@ -557,6 +557,12 @@ def view(
     seats = seats or {}
     d["seat"] = state in DEAD and s.get("id") in seats
     d["seat_when"] = seats.get(s.get("id") or "", "") if d["seat"] else ""
+    if d["seat"] and d["seat_when"] and (due := s.get("seat_due")):
+        # the host agent's reading of the trigger (§4.9b, TD-104): the count toward `prs:`, or due
+        if due.get("met_at"):
+            d["seat_when"] += " · due now"
+        elif "count" in due:
+            d["seat_when"] += f" · {due['count']} so far"
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
     d["age"] = _age(s.get("since"), now)

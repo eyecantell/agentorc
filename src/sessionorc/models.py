@@ -60,6 +60,30 @@ SYSTEM = "system"  # the third sender (design §4.10): the home saying what beca
 # reaching its bound, where nothing failed.
 CLOSED_REASONS = ("replied", "declined", "asker_gone", "lapsed", "go_with_it", "expired", "asked_person")
 
+# A seat's `every:` duration (design §4.9b): a whole number from 1, then `m`, `h` or `d`.
+DURATION_RE = re.compile(r"[1-9]\d*[mhd]")
+_DURATION_UNIT = {"m": 60, "h": 3600, "d": 86400}
+
+
+def duration_seconds(text: str) -> int:
+    return int(text[:-1]) * _DURATION_UNIT[text[-1]]
+
+
+def seat_trigger(raw: Any) -> dict[str, Any] | None:
+    """A create's `trigger`, checked (design §4.9b): `{"prs": n}` with n a whole number from 1, or
+    `{"every": "<n>m|h|d"}`; None or `{}` is no trigger. Anything else is a `ValueError` naming it."""
+    if not raw:
+        return None
+    if not isinstance(raw, dict) or len(raw) != 1:
+        raise ValueError(f"a trigger is {{prs: n}} or {{every: <duration>}}, not {raw!r}")
+    ((kind, value),) = raw.items()
+    if kind == "prs" and isinstance(value, int) and not isinstance(value, bool) and value >= 1:
+        return {"prs": value}
+    if kind == "every" and isinstance(value, str) and DURATION_RE.fullmatch(value):
+        return {"every": value}
+    raise ValueError(f"a trigger is {{prs: n}} (n from 1) or {{every: <n>m|h|d}}, not {raw!r}")
+
+
 # Who owns which field of a record (design §4.4a, §9 invariant 15): the node observes and enforces
 # on its host, the home holds the graph and intent, and identity is set once at create. Merges go
 # by owner, never by last write, so a field belongs to exactly one set — `test_models` pins that
@@ -87,6 +111,7 @@ NODE_OWNED = frozenset(
         "previous_run",
         "supersedes",
         "closed_at",
+        "seat_due",
     }
 )
 HOME_OWNED = frozenset(
@@ -121,7 +146,7 @@ HOME_OWNED = frozenset(
     }
 )
 IDENTITY = frozenset(
-    {"id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "created", "host"}
+    {"id", "name", "kind", "adapter", "dir", "profile", "repo", "worktree", "adapter_id", "created", "host", "trigger"}
 )
 
 # Urgent-first order (design §4.5). Lower sorts first. `unreachable` is placed by the UI
@@ -641,6 +666,16 @@ class Session:
     pause_prompt: str | None = None
     resume_prompt: str | None = None
     gated: dict[str, Any] | None = None
+    # A seat's trigger (design §4.9b *Seats with a trigger*, TD-104): `{"prs": n}` or
+    # `{"every": "6h"}`, from the team definition at create, and carried to the next record of the
+    # name when a create does not give one — so a manager's fill need not repeat it. `seat_due` is
+    # what the host agent makes of it on the slow report cadence: `{trigger, since, count | due_at,
+    # met_at}` — `since` is the record's `created` (when the seat last came), `count` the PRs merged
+    # to its repo since then, `due_at` the time an `every` comes due, and `met_at` when the trigger
+    # was met, None until it is. The manager fills on `met_at`; it keeps no clock and counts nothing.
+    # Observed where the checkout is, so the node's, like `git`.
+    trigger: dict[str, Any] | None = None
+    seat_due: dict[str, Any] | None = None
     # The other wrap-up (design §4.10 "A pending stop beats mail", TD-052 step 7): when a `send`
     # marked `wrapup` typed the wrap-up prompt — the card's Wrap up, `ao team stop` and a
     # manager's wind-down (§4.9a) — which this package cannot tell from any other send by its

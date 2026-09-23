@@ -685,6 +685,13 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
     audit = view(_card(state="exited", exit_code=0, git=clean, pane=False), seats={"ao-w": "runs after 10 PRs"})
     assert audit["slot"]["text"] == "on call — runs after 10 PRs"
     assert audit["slot"]["caption"].startswith("last ran") and audit["next_act"] == "message"
+    # the host agent's reading of it (TD-104): the count so far, then *due now*
+    due = {"trigger": {"prs": 10}, "since": "2026-09-22T12:00:00Z", "count": 3, "met_at": None}
+    counted = view(_card(state="exited", pane=False, seat_due=due), seats={"ao-w": "runs after 10 PRs"})
+    assert counted["slot"]["text"] == "on call — runs after 10 PRs · 3 so far"
+    met = {**due, "count": 10, "met_at": "2026-09-22T15:00:00Z"}
+    ripe = view(_card(state="exited", pane=False, seat_due=met), seats={"ao-w": "runs after 10 PRs"})
+    assert ripe["slot"]["text"] == "on call — runs after 10 PRs · due now"
 
 
 def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):

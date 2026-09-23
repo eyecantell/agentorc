@@ -65,6 +65,7 @@ from sessionorc.models import (
     normalize_ref,
     now_iso,
     report_line,
+    seat_trigger,
 )
 from sessionorc.store import (
     AttentionStore,
@@ -403,6 +404,7 @@ class HostAgent:
         # snapshot newer than the kill arrives, so it holds at most one tick's worth of ids.
         self._killed_at: dict[str, datetime] = {}
         self._derive_task: asyncio.Task[None] | None = None
+        self._seat_due_at = datetime.min.replace(tzinfo=UTC)  # the last `seat_due` pass (TD-104)
         # when a hook last reported on a session: a screen-rule verdict never outranks a hook
         # state fresher than STALL_AFTER (design §4.2); a session no hook has reported on yet — the
         # trust dialog case — takes the classifier's verdict at once (TD-015)
@@ -758,6 +760,10 @@ class HostAgent:
             await self._derive_reports_inner(now)
         except Exception:  # noqa: BLE001
             log.exception("deriving reports failed")
+        try:
+            await self._refresh_seat_due(now)
+        except Exception:  # noqa: BLE001
+            log.exception("reading seat triggers failed")
         finally:
             await self._push_changes()
 
@@ -834,6 +840,24 @@ class HostAgent:
             changed = any(applied) | live.retire_branch_claims(retire)
             if changed:
                 self.store.save(live)
+
+    async def _refresh_seat_due(self, now: datetime) -> None:
+        """`seat_due` on every record of this host that holds a seat's trigger (design §4.9b, TD-104):
+        the host agent counts and keeps the clock, and the manager reads a field — the rule §4.9a
+        already has for `restart_wanted.early`. On the reports' cadence, one `gh` read per repo for
+        the `prs` triggers; a record another has superseded is no longer the seat and is skipped."""
+        if now - self._seat_due_at <= DERIVE_EVERY:
+            return
+        self._seat_due_at = now
+        seats = [s for s in self.sessions.values() if s.trigger and not s.superseded_by]
+        repos = sorted({s.repo or s.dir for s in seats if "prs" in s.trigger})
+        found = await asyncio.gather(*(asyncio.to_thread(reports._prs_or_none, r) for r in repos))
+        prs = dict(zip(repos, found, strict=True))
+        for s in seats:
+            due = reports.seat_due(s.trigger or {}, _parse(s.created), now, prs.get(s.repo or s.dir))
+            if due is not None and due != s.seat_due:
+                s.seat_due = due
+                self.store.save(s)
 
     async def _refresh_model(self, now: datetime) -> None:
         """The model each live agent session is running (TD-031, design §4.2a). The hook reports it
@@ -1315,8 +1339,12 @@ class HostAgent:
         host: str | None = None,
         caller: str | None = None,
         keep_mail: bool = False,
+        trigger: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """`keep_mail` (design §4.9b, TD-075 step 4): a fresh start under a name moves the mail of
+        """`trigger` (design §4.9b, TD-104): a seat's `{prs: n}` or `{every: <duration>}`; a create
+        that gives none under the name of a record that had one keeps it, so a fill need not repeat it.
+
+        `keep_mail` (design §4.9b, TD-075 step 4): a fresh start under a name moves the mail of
         the record it supersedes — inbox, outbox, tallies, wake decisions — as a resume does, and
         resumes nothing of its conversation. It is how a techlead seat is filled without forgetting
         the questions that caused the fill. Handing a record's mailbox to a successor is an act on
@@ -1329,6 +1357,10 @@ class HostAgent:
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
+        try:
+            seat = seat_trigger(trigger)
+        except ValueError as e:
+            raise RpcError(str(e)) from None
         # Create adds the creator (design §4.8): a session that starts another may act on what it
         # started, without a second call and without a person in the loop. `caller` is the request
         # envelope's, injected by the dispatcher — a person's create has none, and then the new
@@ -1458,6 +1490,7 @@ class HostAgent:
                 resume_prompt=(str(resume_prompt).strip() or None) if resume_prompt else None,
                 previous_run=previous_run,
                 host=self.host,
+                trigger=seat or (holder.trigger if isinstance(holder, Session) else None),
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)

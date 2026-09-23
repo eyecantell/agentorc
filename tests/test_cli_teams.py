@@ -1110,6 +1110,8 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     audit = made[2]
     # neither the role's grants nor its lane (the hunter preset has both): a seat's area is its brief's
     assert audit["role"] == "hunter" and audit["capabilities"] == [] and audit["lane"] == []
+    # its trigger rides the create, for the host agent to time (TD-104); nobody else sends one
+    assert audit["trigger"] == {"every": "6h"} and not [p for p in made if p is not audit and "trigger" in p]
     assert "(none given)" in audit["prompt"]
     assert audit["controllers"] == ["ao-agentorc-orc-ao"] and audit["team"] == "ao-grind"
     assert "`ao-agentorc-techlead-ao`" in audit["prompt"]

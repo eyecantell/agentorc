@@ -976,3 +976,15 @@ The substrate is already there and unused by sessions: the agent's `subscribe` t
 **Related:** TD-032 (the Remote-Control stand-down, the same *idle under a modal* shape), TD-041 (interactive sessions out of reach), §4.10 (mail).
 
 **Resolved:** 2026-09-22 (PR #430, folded into TD-064) — nothing was built under this number; the screen rule and the briefs' sentence were built under TD-064 by PR #431.
+
+## TD-104: A seat's trigger is timed and counted by the manager, against the design's own rule
+
+**Priority:** Medium
+**Added:** 2026-09-22 (the anchor session; the design review)
+**Resolved:** 2026-09-22 (PR #PRNUM) — design §4.9b *Seats with a trigger* (the record's `trigger`, the tick's `seat_due`), §4.5 (the card's count); the manager's fill rule on `seat_due.met_at` stays TD-098 step (2).
+**Status:** Resolved 2026-09-22 (grinder-ao-1): `trigger` on the record (sent by `ao team start`, validated by `models.seat_trigger`, kept by the next create of the name that gives none), `seat_due` written by `HostAgent._refresh_seat_due` on the derived reports' cadence from `reports.seat_due` (one `gh` read per repo, an outage keeping the last reading), and *· 3 so far* / *· due now* on the on-call card. Was: Open. §4.9b has the manager count merged PRs with `gh` for `prs: n` and keep the clock for `every: 6h`, on the ground that *the home times nothing*; §4.9a says the opposite for `restart_wanted.early` — *the host agent applies the bound, since it holds the start time, and the controller reads a field, not a clock.* The second rule is the right one everywhere: a model keeping time and counting PRs is the expensive and unreliable component, and the reports tick already asks GitHub on a five-minute cadence (§4.8, derived reports). Fix: the tick computes **`seat_due: {trigger, since, met_at}`** on the seat's record the way it computes `asks_waiting`, from the record's `created` (or the team start), `gh` for a `prs:` trigger and the clock for `every:`; the manager (or TD-103's policy) fills on the field; the card's *on call — runs after 10 PRs* can then draw the count, which §4.9b today says it cannot. The seat's own `after` in `ao team list --json` stays as the definition's word.
+**Location:** design §4.9b (*Seats with a trigger*), §4.9a (*Inside the ceiling*), `src/sessionorc/agent.py` (the tick), `src/agentorc/briefs/manager.md`
+
+**Why:** the design contradicts itself on where a clock lives, and the cheaper answer is also the one it already argued for.
+
+**Related:** TD-098 (seats), TD-103 (policies on the tick), TD-075 (the techlead seat).

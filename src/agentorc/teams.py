@@ -122,6 +122,7 @@ class Launch:
     seat: bool = False  # a seat of the team: its techlead, or one with a trigger (§4.9b)
     ledger: str | None = None
     host: str = ""  # the host this session lands on; "" is the host the start runs on
+    trigger: dict[str, Any] | None = None  # a seat's `{prs: n}` / `{every: 6h}`, kept on its record (TD-104)
 
     def create_params(self, controllers: list[str]) -> dict[str, Any]:
         """The `create` RPC's arguments. `worktree=name` is §4.9 "Home and reach": every team
@@ -148,6 +149,7 @@ class Launch:
             "team": self.team,
             "project": self.project,
             **gate_prompts(self.unattended),
+            **({"trigger": dict(self.trigger)} if self.trigger else {}),
         }
 
 
@@ -475,25 +477,29 @@ def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, f
         if trig.name in seen:
             raise TeamError(f"team {team.name}: two sessions would be called {trig.name!r} — a name is one session")
         seen.add(trig.name)
-        p.seats.append(
-            _launch(
-                org=org,
-                team=team,
-                name=trig.name,
-                role_name=trig.role,
-                home=trig.home,
-                host=host,
-                here=here,
-                profile_override=profile or trig.profile,
-                member=trig,
-                lead=False,
-                block=project_block(org, team.projects, host, trig.home) if reach else "",
-                files=files,
-                techlead=tid,
-                context=ctx,
-                seat=True,
-            )
+        launch = _launch(
+            org=org,
+            team=team,
+            name=trig.name,
+            role_name=trig.role,
+            home=trig.home,
+            host=host,
+            here=here,
+            profile_override=profile or trig.profile,
+            member=trig,
+            lead=False,
+            block=project_block(org, team.projects, host, trig.home) if reach else "",
+            files=files,
+            techlead=tid,
+            context=ctx,
+            seat=True,
         )
+        # what the host agent counts toward and times (§4.9b, TD-104); `asks` is the techlead's
+        if trig.trigger == "prs":
+            launch.trigger = {"prs": int(trig.after)}
+        elif trig.trigger == "every":
+            launch.trigger = {"every": trig.after}
+        p.seats.append(launch)
     for member in team.members:
         if member.team is not None:
             raise TeamError(

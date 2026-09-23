@@ -1223,7 +1223,8 @@ Screens:
    (§4.9b; by name, as `teamrun.wound_down` keys, never by role; keyed on `teamrun.seat_ids`) is
    drawn with the grey pill *◇ on call*; the state stays `exited` or `closed` in every payload;
    the slot says what would make it come — *on call — comes on the next question*, *on call —
-   runs after 10 PRs*, *on call — runs every 6h*, from the seat's trigger; the caption is *last
+   runs after 10 PRs · 3 so far*, *on call — runs every 6h*, from the seat's trigger and the
+   record's `seat_due` (§4.9b; *· due now* once met); the caption is *last
    came · `<age>`* (*last ran* for a trigger seat) from the record's `since`; the report is the
    record's own report line (*3 answered*, *2 filed*); the foot's first button is **Message…**
    (the same control as *more*'s and the Focus header's, §4.5a) — asking it is how it comes —
@@ -2775,9 +2776,16 @@ team has one, the techlead answers it or passes it up, and the person is the top
   trigger, brief, profile, home}`, a session and never `person`; a seat's role is never `person`,
   `manager` or `techlead`; `trigger` is required and one of **`asks`** (the techlead's:
   `asks_waiting` leaves zero), **`prs: <n>`** (a whole number from 1: n PRs merged to the team's
-  repo since the seat last came — its record's `created`, or the team start when it never has — a
-  count the manager reads from `gh`, as it reads the merge queue), or **`every: <duration>`** (in
-  `m`, `h` or `d`; since it last came, on the manager's clock, since the home times nothing):
+  repo since the seat last came — its record's `created`), or **`every: <duration>`** (in `m`,
+  `h` or `d`; since it last came). **The host agent times and counts, and the manager reads a
+  field** (TD-104), the rule §4.9a has for `restart_wanted.early`: the seat's record carries its
+  **`trigger`** (`{prs: n}` or `{every: 6h}`, sent by `ao team start` and kept by the next create
+  of that name that gives none, so a fill need not repeat it), and on the derived reports'
+  five-minute cadence (§4.8) the host where the checkout is writes **`seat_due`** —
+  `{trigger, since, count | due_at, met_at}`: `count` the PRs `gh` says merged to the repo since
+  `since`, `due_at` when an `every` comes due, `met_at` when the trigger was met and null until
+  then. A `gh` that cannot be asked leaves the last reading, never a count of zero. The node's
+  field, like `git` (§4.4a):
 
   ```yaml
   techlead: {name: techlead-ao-1, context: docs/briefs/techlead-context.md}   # the first seat: trigger `asks`
@@ -2786,7 +2794,8 @@ team has one, the techlead answers it or passes it up, and the person is the top
     - {name: test-audit-ao-1, role: auditor, brief: docs/briefs/test-audit.md, trigger: {every: 6h}}
   ```
 
-  **The manager's seat rule is the same for every seat**: when a seat's trigger is met and it is
+  **The manager's seat rule is the same for every seat**: when a seat's trigger is met — `asks_waiting`
+  above zero for the techlead, `seat_due.met_at` set for the rest — and it is
   `exited` or `closed`, fill it (`ao new --keep-mail`, so a question that was waiting is still
   there); the ceiling of six fills an hour is the team's, over all its seats; a seat that is
   `idle` with its trigger unmet is closed as the techlead is. A seat runs its brief and ends on
@@ -2794,14 +2803,14 @@ team has one, the techlead answers it or passes it up, and the person is the top
   which is not an act on a session), and is not counted in a wind-down. `ao team start` starts
   each seat after the techlead with the manager as its controller and no grants;
   `teamrun.seat_names` names every seat, not only the techlead; `ao team list --json` carries
-  each seat's `trigger` and `after`, which is what the manager fills them by. **`auditor`** is a
+  each seat's `trigger` and `after`, the definition's word (the record's `seat_due` is what the
+  manager fills by). **`auditor`** is a
   preset like any other, with a built-in brief — hunter-shaped by default (finds and files with
   evidence, its `findings` on its record, never fixes; a brief may make it grinder-shaped and open
   the PR); the area (docs, tests) is the brief's, and a repo's area briefs (*docs-audit*,
   *test-audit*) are its own to write; the label is drawn as *Auditor · docs* from the preset's
   `label:` and the definition's name. What a seat's card says while on call is in §4.5 (*on call —
-  runs after 10 PRs*); **the count toward a `prs:` trigger is not drawn**, since the home does not
-  watch GitHub and the manager's number is a scraped one. Not built: the manager's rule for
+  runs after 10 PRs · 3 so far*, *· due now* once `seat_due.met_at` is set). Not built: the manager's rule for
   filling a seat (TD-098 step 2); the manager's brief states the fill ceiling for the techlead
   alone until then. Not designed: a seat whose trigger is another seat's findings, and a trigger a
   person presses (a seat is asked by mail, which is the person's way in already).

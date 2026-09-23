@@ -15,10 +15,11 @@ import os
 import re
 import subprocess
 from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from sessionorc.models import FindingEntry, ProgressEntry, normalize_ref
+from sessionorc.models import FindingEntry, ProgressEntry, duration_seconds, normalize_ref
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sessionorc.models import Session
@@ -161,6 +162,12 @@ def _prs(directory: Path | str, limit: int = 100, timeout: float = 20.0) -> list
     One page, newest first: a claim on a PR older than that window never resolves to `done` from
     here, which is the sort of gap `derived` is allowed to have. No `gh`, no auth, no network, not
     a GitHub repo: an empty list, and nothing is derived."""
+    return _prs_or_none(directory, limit, timeout) or []
+
+
+def _prs_or_none(directory: Path | str, limit: int = 100, timeout: float = 20.0) -> list[dict[str, Any]] | None:
+    """`_prs`, with **None when `gh` could not be asked** — for a count, where "no PRs" and "could
+    not look" must not read the same (a seat's `prs:` trigger, TD-104)."""
     try:
         cp = subprocess.run(
             [
@@ -175,14 +182,39 @@ def _prs(directory: Path | str, limit: int = 100, timeout: float = 20.0) -> list
             cwd=str(directory),
         )  # fmt: skip
     except (OSError, subprocess.TimeoutExpired):
-        return []
+        return None
     if cp.returncode != 0:
-        return []
+        return None
     try:
         out = json.loads(cp.stdout or "[]")
     except json.JSONDecodeError:
-        return []
-    return [p for p in out if isinstance(p, dict)] if isinstance(out, list) else []
+        return None
+    return [p for p in out if isinstance(p, dict)] if isinstance(out, list) else None
+
+
+def seat_due(trigger: dict[str, Any], since: datetime, now: datetime, prs: list[dict[str, Any]] | None) -> dict | None:
+    """What a seat's trigger comes to (design §4.9b, TD-104): `{trigger, since, met_at}` with
+    `count` for `prs: n` — the PRs merged since `since`, `met_at` the merge that made the n-th — or
+    `due_at` for `every: <duration>`, met once `now` reaches it. None for a `prs` trigger when `prs`
+    is None (`gh` could not be asked): the caller keeps what it had rather than reading an outage as
+    zero merges."""
+    at = since.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    if "every" in trigger:
+        due = since + timedelta(seconds=duration_seconds(trigger["every"]))
+        due_at = due.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+        return {"trigger": dict(trigger), "since": at, "due_at": due_at, "met_at": due_at if now >= due else None}
+    if prs is None:
+        return None
+    merged = sorted(
+        m for p in prs if (m := p.get("mergedAt")) and datetime.fromisoformat(str(m).replace("Z", "+00:00")) > since
+    )
+    n = int(trigger["prs"])
+    return {
+        "trigger": dict(trigger),
+        "since": at,
+        "count": len(merged),
+        "met_at": merged[n - 1] if len(merged) >= n else None,
+    }
 
 
 def _prs_for_head(directory: Path | str, branch: str, timeout: float = 10.0) -> list[dict[str, Any]] | None:
