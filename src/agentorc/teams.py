@@ -120,6 +120,7 @@ class Launch:
     unattended: bool = True
     lead: bool = False
     seat: bool = False  # a seat of the team: its techlead, or one with a trigger (§4.9b)
+    trigger: dict[str, str] | None = None  # a seat's `{trigger, after?}`, written on its record (§6, TD-103)
     ledger: str | None = None
     host: str = ""  # the host this session lands on; "" is the host the start runs on
 
@@ -150,6 +151,8 @@ class Launch:
             **gate_prompts(self.unattended),
             # every session a team start creates is one someone chose to keep running (§6, TD-103)
             "supervised": True,
+            # a seat's ending is its own: the record says it is one, so no crash restart acts on it
+            **({"seat": dict(self.trigger)} if self.trigger else {}),
         }
 
 
@@ -411,9 +414,18 @@ def _launch(  # noqa: PLR0913 — every argument is a distinct part of one defin
         unattended=member.unattended if member is not None else True,  # a lead may ask to be watched
         lead=lead,
         seat=seat,
+        trigger=_trigger(member) if seat else None,
         ledger=cfg.ledger,
         host=host if host != here else "",
     )
+
+
+def _trigger(member: Spec) -> dict[str, str]:
+    """A seat's trigger as its record carries it (design §4.9b, §6 rule 3): a seat with a trigger
+    gives its own, `{trigger, after}`; the techlead's is a question landing, `asks`."""
+    if isinstance(member, orgmod.SeatDef):
+        return {"trigger": member.trigger, **({"after": member.after} if member.after else {})}
+    return {"trigger": "asks"}
 
 
 def plan(org: orgmod.Org, name: str, host: str, *, profile: str | None = None, files: Files | None = None) -> Plan:

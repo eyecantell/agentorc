@@ -123,6 +123,11 @@ WRAPUP_GRACE = timedelta(minutes=10)
 # The usage gate (design §6, TD-100) resumes a paused session no sooner than this after the pause:
 # a reading that flickers across the line must not type pause and resume at a session every minute.
 RESUME_MIN = timedelta(minutes=10)
+# The crash restart's ceiling (design §6 *Keeping a team running* rule 1, §4.8 — OTP's, systemd's
+# and Circus's numbers): three restarts of one session inside two hours, `one_for_one`. The fourth
+# exit inside the window is the person's.
+RESTART_CEILING = 3
+RESTART_WINDOW = timedelta(hours=2)
 REPORT_WRITE = 5.0  # seconds a node's report may take to write before the link is given up
 # An act routed to a node (§4.4a, step 4a) is answered within this, on top of any wait the act
 # itself carries (`send --wait --timeout N`): a `create` runs a worktree add and a tmux start.
@@ -566,6 +571,7 @@ class HostAgent:
             self._usage_task = asyncio.create_task(self._refresh_usage())
         await self._enforce_stop_times(snapshot_at)
         await self._enforce_usage_gate(snapshot_at)
+        await self._keep_running(snapshot_at)
         await self._sweep_mail(snapshot_at)
         self._poke_waits()  # the wake decision is re-taken every tick for a session blocked in `wait`
         self._ring_doorbells()
@@ -695,6 +701,105 @@ class HostAgent:
             changed = True
         if changed:
             await self._push_changes()
+
+    async def _keep_running(self, now: datetime) -> None:
+        """Design §6 *Keeping a team running* (TD-103), the rules built so far: rule 1, the crash
+        restart. **The restarts run at the home** (§4.4a: policies that start run at the home), over
+        this host's records and every node's — a member on a host whose link is down is left as it
+        is and looked at again on the next tick, refused rather than queued. **Each record's pass is
+        isolated**: one's exception is logged and the tick goes on to the next."""
+        if self.mode != "home":
+            return
+        records = [*self.sessions.values(), *(r for recs in self.remote.values() for r in recs.values())]
+        for s in records:
+            try:
+                await self._crash_restart(s, now)
+            except Exception:  # noqa: BLE001 — one record's failure is never the tick's (§6)
+                log.exception("%s: the crash-restart pass failed", self._address(s))
+
+    def _crashed(self, s: Session, now: datetime) -> bool:
+        """Rule 1's test: a supervised, unattended member that is not a seat, `exited` by a
+        **natural exit** — `pane` true, the tool left on its own; a kill takes the pane and is a
+        person's or a controller's act, never undone — with no declaration, no wrap-up asked, no
+        stop time passed, not gated, not suspended, and not already at its ceiling or superseded."""
+        return bool(
+            s.supervised
+            and s.unattended
+            and s.seat is None
+            and s.state == "exited"
+            and s.pane
+            and not s.out_of_work
+            and not s.restart_wanted
+            and not s.wrapup_at
+            and not s.wrapup_sent_at
+            and not (s.run_until and now >= _parse(s.run_until))
+            and not s.gated
+            and not s.suspended
+            and not s.restart_ceiling
+            and not s.superseded_by
+        )
+
+    async def _crash_restart(self, s: Session, now: datetime) -> None:
+        """Rule 1 (design §6 *Keeping a team running*): restart a member that crashed by replaying
+        its launch record — `create` again with what the last supervised create was handed, never
+        the definition re-read — which supersedes the record in place under its name (§4.1). Each
+        attempt is appended to `restarts` and the list is carried onto the new record, so the count
+        survives the restart it counts; a replay that fails keeps its entry with `error` and counts
+        all the same, so an unrepairable record reaches the ceiling within three ticks. At
+        `RESTART_CEILING` inside `RESTART_WINDOW` the tick writes `restart_ceiling` and stops: the
+        session is a person's."""
+        if not self._crashed(s, now):
+            return
+        if s.host != self.host and s.host not in self._link_muxes:
+            return  # its link is down: left as it is, looked at again next tick (§4.4a)
+        recent = [r for r in s.restarts if isinstance(r, dict) and _recent(r.get("at"), now, RESTART_WINDOW)]
+        if len(recent) >= RESTART_CEILING:
+            s.restart_ceiling = {"at": now_iso(), "count": len(recent)}
+            log.warning("%s: %d restarts in %s — the ceiling; it is a person's now", s.id, len(recent), RESTART_WINDOW)
+            self._save(s)
+            await self._push_changes()
+            return
+        entry: dict[str, Any] = {"at": now_iso(), "why": "crash"}
+        history = [*s.restarts, entry]
+        address = self._address(s)
+        try:
+            params = self._read_launch(address)
+            log.info(
+                "%s exited on its own with nothing declared: restarting it (%d in the window)", s.id, len(recent) + 1
+            )
+            if s.host == self.host:
+                view = await self.rpc_create(**params, supervised=True)
+            else:
+                view = await self._route_act("create", {**params, "supervised": True, "host": s.host}, None, s.host)
+        except Exception as e:  # noqa: BLE001 — a failed replay is a restart that failed, and counts (§6)
+            entry["error"] = str(e) or type(e).__name__
+            log.warning("%s: the restart failed: %s", s.id, entry["error"])
+            s.restarts = history
+            self._save(s)
+            await self._push_changes()
+            return
+        rid, _h = naming.split_address(str((view or {}).get("id") or ""))
+        new = self.sessions.get(rid) if s.host == self.host else self.remote.get(s.host, {}).get(rid)
+        if new is not None:
+            new.restarts = history
+            self._save(new)
+            await self._push_changes()
+
+    def _read_launch(self, address: str) -> dict[str, Any]:
+        """A launch record as `create`'s arguments (design §6): what `_write_launch` kept, less its own
+        bookkeeping. Raises when there is none — a supervised record written before its launch record
+        existed has nothing to replay, and that is a failed restart, said as one."""
+        path = paths.launch_dir() / f"{address}.json"
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            raise RpcError(f"no launch record for {address}: nothing to replay (design §6)") from None
+        if not isinstance(record, dict):
+            raise RpcError(f"the launch record of {address} is not a record")
+        params = {k: record[k] for k in LAUNCH_KEYS if k in record}
+        if isinstance(record.get("controllers"), list):
+            params["controllers"] = list(record["controllers"])
+        return params
 
     @staticmethod
     def _on_a_dialog(s: Session) -> bool:
@@ -1343,6 +1448,7 @@ class HostAgent:
         caller: str | None = None,
         keep_mail: bool = False,
         supervised: bool = False,
+        seat: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """`supervised` (design §6 *Keeping a team running*, TD-103 slice 1): kept on the record,
         and a resume of a supervised record stays supervised whether or not it says so — the field
@@ -1362,6 +1468,10 @@ class HostAgent:
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
+        if seat is not None and not (
+            isinstance(seat, dict) and isinstance(seat.get("trigger"), str) and seat["trigger"]
+        ):
+            raise RpcError("seat is {trigger, after?}: the trigger its team definition gives it (design §4.9b)")
         # Create adds the creator (design §4.8): a session that starts another may act on what it
         # started, without a second call and without a person in the loop. `caller` is the request
         # envelope's, injected by the dispatcher — a person's create has none, and then the new
@@ -1495,6 +1605,7 @@ class HostAgent:
                 supervised=bool(supervised)
                 or bool(resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.supervised)
                 or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
+                seat=dict(seat) if seat else None,
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
@@ -5740,6 +5851,7 @@ def _prune_tallies(r: Session) -> None:
 LAUNCH_KEYS = (
     "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
     "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
+    "seat",
 )  # fmt: skip
 
 
@@ -6002,6 +6114,15 @@ def _stop_time(value: str | None) -> str | None:
     if when.tzinfo is None:
         raise RpcError(f"run_until: needs a timezone (got {value})")
     return when.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def _recent(at: Any, now: datetime, window: timedelta) -> bool:
+    """Whether an instant off a record falls inside `window` before `now`. An unreadable one is not
+    recent: a restart entry is the host agent's own, so one it cannot read was never written by it."""
+    try:
+        return now - _parse(str(at)) < window
+    except (TypeError, ValueError):
+        return False
 
 
 def _parse(iso: str) -> datetime:

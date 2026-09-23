@@ -1287,6 +1287,31 @@ async def test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_hom
             await person.call("kill", id=auto["id"])
 
 
+async def test_the_home_restarts_a_nodes_member_that_keeps_crashing_until_the_ceiling(home, tmp_path, monkeypatch):
+    """TD-103 slice (2), design §6 *Keeping a team running* rule 1, end to end: the restarts run at
+    the home, replay the launch record the home holds, execute on the node, and carry the count
+    onto each new record — so a member whose tool exits on its own every time is restarted three
+    times and then left, marked, for a person."""
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        crashing = dict(
+            name="w",
+            dir=str(tmp_path),
+            adapter="shell",
+            argv=["bash", "--norc", "--noprofile", "-c", "sleep 0.3; exit 3"],
+            unattended=True,
+            supervised=True,
+            host="laptop",
+        )
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            address = (await person.call("create", **crashing))["id"]
+            v = await until(home, address, lambda r: r is not None and r.get("restart_ceiling"), timeout=40.0)
+            assert v["state"] == "exited" and v["restart_ceiling"]["count"] == 3
+            assert [r["why"] for r in v["restarts"]] == ["crash"] * 3
+            assert not any(r.get("error") for r in v["restarts"])
+            await person.call("remove", id=address)
+
+
 async def test_a_suspension_outlives_a_supersession_on_a_node_and_a_persons_create_at_the_home_lifts_it(
     home, hookstub, tmp_path, monkeypatch
 ):

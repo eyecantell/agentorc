@@ -1173,6 +1173,11 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "techlead-ao", "audit-ao", "grind-1", "grind-2", "hunt"]
     assert all(p["supervised"] is True for p in made)  # every session a team start creates (§6, TD-103)
+    # a seat says so on its record, with its trigger, so no crash restart acts on one (§6 rule 1)
+    seats = {p["name"]: p.get("seat") for p in made}
+    assert seats["techlead-ao"] == {"trigger": "asks"}
+    assert seats["audit-ao"]["trigger"] == "every" and seats["audit-ao"]["after"]  # as the definition gives it
+    assert all(seats[n] is None for n in ("orc-ao", "grind-1", "grind-2", "hunt"))  # never sent unset
     audit = made[2]
     # neither the role's grants nor its lane (the hunter preset has both): a seat's area is its brief's
     assert audit["role"] == "hunter" and audit["capabilities"] == [] and audit["lane"] == []
