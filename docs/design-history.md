@@ -206,7 +206,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-22 (TD-099 step 1, PR #448, grinder-ao-1): the close-then-start behind a concluded team's Start built, in `teamrun.start` (`_close_concluded`) rather than as a verdict of the host agent's: every concluded session passes the wrap-up close's check, then all are closed, then the creates run.
 - 2026-09-22 (TD-100 slice 3, PR #436, grinder-ao-2): the *paused · usage* mark on the card's slot and the Focus header (`gated_view`); the chip's line waits on slice 1.
 - 2026-09-22 (TD-100 slice 3, PR #449, grinder-ao-1): the **usage** chip's line — the page reads the `gate` RPC beside `usage` and attaches each profile's lines (`with_lines`), on the render and on each pushed `usage` event; worst by the gap to the line, *near* within ten points of it.
-- 2026-09-22 (TD-100 slice 3, PR #PRNUM, grinder-ao-1): `gated` gained `resets`, so the *paused · usage* mark says *resets* when its line moves only at the window's reset; it said *line moves* always until then.
+- 2026-09-22 (TD-100 slice 3, PR #450, grinder-ao-1): `gated` gained `resets`, so the *paused · usage* mark says *resets* when its line moves only at the window's reset; it said *line moves* always until then.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
