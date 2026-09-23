@@ -598,7 +598,7 @@ link. The home is also a node for its own host's sessions (one process, both rol
   usage gate's mark, §6, TD-100), the two a `send` or a ring leaves on its pane (§4.10, TD-052):
   `wrapup_at` and `doorbell_failed` — and `supersedes` (below). **The home owns the graph and
   intent:** `controllers`, `capabilities`, `team`, `project`, `role`, `lane`, `unattended`,
-  `run_until`, `supervised`, `seat`, `seat_due`, `restarts`, `restart_ceiling`, `restart_blocked`,
+  `run_until`, `supervised`, `seat`, `seat_due`, `seat_count`, `restarts`, `restart_ceiling`, `restart_blocked`,
   `nudged_at` and `restart_blocked_sent_at` (§6 *Keeping a team running* — the last two mark a
   send the home decided, as `wrapup_at` does; the node's `wrapup_sent_at` pattern is not used), the wrap-up, pause and resume prompts, reports, the
   inbox, `sends` (§4.10: written at the gate, with its verdict), tallies, wake budgets and
@@ -1226,7 +1226,10 @@ Screens:
    (§4.9b; by name, as `teamrun.wound_down` keys, never by role; keyed on `teamrun.seat_ids`) is
    drawn with the grey pill *◇ on call*; the state stays `exited` or `closed` in every payload;
    the slot says what would make it come — *on call — comes on the next question*, *on call —
-   runs after 10 PRs*, *on call — runs every 6h*, from the seat's trigger; the caption is *last
+   runs after 10 PRs*, *on call — runs every 6h*, from the seat's trigger, with the tick's count
+   toward a `prs:` trigger after it (*· 4 of 10*, from `seat_count`, §6 rule 3 — nothing when
+   there is no reading, never *0 of 10*); a seat at the fill ceiling reads *fills exhausted · 6 in
+   1 h* instead, an ending; the caption is *last
    came · `<age>`* (*last ran* for a trigger seat) from the record's `since`; the report is the
    record's own report line (*3 answered*, *2 filed*); the foot's first button is **Message…**
    (the same control as *more*'s and the Focus header's, §4.5a) — asking it is how it comes —
@@ -2834,7 +2837,7 @@ team has one, the techlead answers it or passes it up, and the person is the top
   ```
 
   **The seat rule is the same for every seat, and it is the tick's** (§6 *Keeping a team running*,
-  rule 3 — TD-103, designed, not built; the manager's brief holds it until then): `ao team start`
+  rule 3 — TD-103, built; the manager's brief still states it until slice 5 cuts it): `ao team start`
   writes the trigger on the seat's record as `seat: {trigger}`, the tick computes `seat_due` from
   it, a seat that is `exited` or `closed` with `seat_due` set is filled (`create` with
   `keep_mail`, so a question that was waiting is still there), the ceiling of six fills an hour
@@ -2844,16 +2847,14 @@ team has one, the techlead answers it or passes it up, and the person is the top
   which is not an act on a session), and is not counted in a wind-down. `ao team start` starts
   each seat after the techlead with the manager as its controller and no grants;
   `teamrun.seat_names` names every seat, not only the techlead; `ao team list --json` carries
-  each seat's `trigger` and `after`, which is what the manager fills them by. **`auditor`** is a
+  each seat's `trigger` and `after`, as its record's `seat` does, which is what the tick fills them by. **`auditor`** is a
   preset like any other, with a built-in brief — hunter-shaped by default (finds and files with
   evidence, its `findings` on its record, never fixes; a brief may make it grinder-shaped and open
   the PR); the area (docs, tests) is the brief's, and a repo's area briefs (*docs-audit*,
   *test-audit*) are its own to write; the label is drawn as *Auditor · docs* from the preset's
   `label:` and the definition's name. What a seat's card says while on call is in §4.5 (*on call —
-  runs after 10 PRs*); the count toward a `prs:` trigger is drawn from `seat_due` once the tick computes it (§6 rule 3;
-  until then it is not drawn, since the manager's number would be a scraped one). Not built: the
-  seat policy (TD-103 step 3, which is TD-098 step 2 and TD-104 in one); the manager's brief
-  states the fill ceiling for the techlead alone until then. Not designed: a seat whose trigger is another seat's findings, and a trigger a
+  runs after 10 PRs*), and the count toward a `prs:` trigger is drawn from the tick's
+  `seat_count` (*· 4 of 10*, §6 rule 3). Not designed: a seat whose trigger is another seat's findings, and a trigger a
   person presses (a seat is asked by mail, which is the person's way in already).
 - **It answers cold, and is filled on demand.** A techlead is **started per batch of questions
   and ends when it has answered them**: no context piles up, an idle team costs nothing, and composing
@@ -4053,8 +4054,8 @@ code and needs no grant; a session doing the same work does.
   (`ao until` has no page equivalent), `start_at` and the `scheduled` state, window overrides with
   an expiry, and calendar-shaped schedules (TD-026).
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
-  `supervised` and the launch record built — slice 1 — rule 1 and the `seat` field — slice 2 —
-  and rules 2–4 not yet). Four rules that lived in the manager's brief, applied by a model every
+  `supervised` and the launch record, rule 1 with the `seat` field, and rule 3 are built; rules 2
+  and 4 not yet). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
   says `unattended: true` and `supervised: true`.** `supervised` is a home-owned intent field
   (§4.4a), set by `ao team start` on **every session it creates — the manager, the seats and the
@@ -4126,19 +4127,26 @@ code and needs no grant; a session doing the same work does.
      neither does the tick.
   3. **Seats.** `ao team start` writes each seat's trigger on its record as **`seat: {trigger}`**
      (home-owned, set at create like `review`, §4.9b), and the tick computes **`seat_due: {at,
-     by}`** from it: for `asks`, when `asks_waiting` leaves zero; for `prs: n`, when the derived
-     reports tick (§4.8, its five-minute `gh` cadence) counts `n` PRs merged to the seat's repo's
-     default branch since the seat's record was created; for `every: <d>`, when `d` has passed
-     since it was created. A supervised seat that is `exited` or `closed` with `seat_due` set, not suspended, on a profile that
+     by}`** from it — set only once the trigger is met, `by` naming what met it (`asks`, `prs`,
+     `every`), and kept until the fill: for `asks`, when `asks_waiting` leaves zero (and cleared
+     again if it returns to zero before a fill — the question was answered elsewhere); for
+     `prs: n`, when **`seat_count: {prs, at}`** (home-owned) reaches `n` — the PRs merged to the
+     seat's repo's default branch since the seat's record was created, read with `gh` on the
+     reports' five-minute cadence, one read per repo, at the home in the seat's checkout (a
+     node's is at the same absolute path, §4.4a; a path the home cannot see gives no reading), a
+     read that failed leaving the last reading rather than zero; for `every: <d>`, when `d` has
+     passed since it was created. A supervised seat that is `exited` or `closed` with `seat_due` set, not suspended, on a profile that
      is not gated, is filled: `create` with `keep_mail` (§4.9b), the launch record, and `seat_due` cleared; a seat
-     that is `idle` with no `seat_due`, hook-confirmed, with nothing dirty or unpushed, is closed
+     that is `idle` with no `seat_due`, hook-confirmed for two minutes (`SEAT_IDLE_GRACE`, so a
+     fill is not closed before its prompt lands), with nothing dirty or unpushed, is closed
      (a seat that left work is the board's, as today). **The fill ceiling**: `FILL_CEILING` — six
      fills an hour over all seats sharing a controller (the graph, not the team badge), then
-     `restart_ceiling` on the seat whose fill tripped it and the Inbox row as for a crash, its
+     `restart_ceiling` (with `why: fill`; the card says *fills exhausted · 6 in 1 h*) on the seat
+     whose fill tripped it and the Inbox row as for a crash, its
      siblings merely refused fills until the hour rolls; fills are not crash restarts and do not
      count toward `RESTART_CEILING`. The card draws the count toward a `prs:` trigger from
-     `seat_due`'s progress (*on call — 4 of 10 PRs*), which §4.9b could not while the number was
-     the manager's. (This is TD-104, folded here.)
+     `seat_count` (*on call — runs after 10 PRs · 4 of 10*), which §4.9b could not while the
+     number was the manager's. (This is TD-104, folded here.)
   4. **The idle nudge.** A supervised member that has been hook-confirmed `idle` for `IDLE_NUDGE`
      (twenty minutes) with **open work on its record** — a `lane` reference with no `done` or
      `dropped` entry, a declared `claimed` entry with no `done` or `dropped`, or, for a seat,
@@ -4161,9 +4169,9 @@ code and needs no grant; a session doing the same work does.
   and a team whose needs are mechanical runs with `manager: person` and no manager session. The
   briefs lose the four rules when the policies land, in force from the next team start (the
   restart ceiling, the fill ceiling and the twenty minutes leave `manager.md` for these
-  constants). Built: `supervised`, the launch record, `seat` written at team start, and rule 1 with
-  its ceiling and the card's ending; not built: rules 2–4, `seat_due`, the Inbox row and the briefs —
-  TD-103's steps.
+  constants). Built: `supervised`, the launch record, `seat` written at team start, rule 1 with
+  its ceiling and the card's ending, and rule 3 with `seat_due`, `seat_count`, the fill ceiling and
+  the card's count; not built: rules 2 and 4, the Inbox row and the briefs — TD-103's steps.
 - **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
 - **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on

@@ -730,6 +730,22 @@ def test_a_seat_with_nobody_in_it_reads_on_call_and_its_first_button_is_message(
     audit = view(_card(state="exited", exit_code=0, git=clean, pane=False), seats={"ao-w": "runs after 10 PRs"})
     assert audit["slot"]["text"] == "on call — runs after 10 PRs"
     assert audit["slot"]["caption"].startswith("last ran") and audit["next_act"] == "message"
+    # the tick's count toward it (§6 rule 3, TD-103 slice 3), drawn until the seat is due
+    prs = {"trigger": "prs", "after": "10"}
+    counted = {"seat": prs, "seat_count": {"prs": 4, "at": "2026-09-22T20:00:00Z"}}
+    on = view(_card(state="exited", pane=False, **counted), seats={"ao-w": "runs after 10 PRs"})
+    assert on["slot"]["text"] == "on call — runs after 10 PRs · 4 of 10"
+    due = view(
+        _card(state="exited", pane=False, seat_due={"at": "x", "by": "prs"}, **counted),
+        seats={"ao-w": "runs after 10 PRs"},
+    )
+    assert due["slot"]["text"] == "on call — runs after 10 PRs"
+    # the fill ceiling: an ending, as the crash ceiling's is
+    full = view(
+        _card(state="exited", pane=False, seat=prs, restart_ceiling={"at": "x", "count": 6, "why": "fill"}),
+        seats={"ao-w": "runs after 10 PRs"},
+    )["slot"]
+    assert full["text"] == "fills exhausted · 6 in 1 h" and full["kind"] == "bad"
 
 
 def test_unseen_is_drawn_only_on_an_interactive_session(tmp_path, monkeypatch):

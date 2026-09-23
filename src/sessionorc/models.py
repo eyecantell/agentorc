@@ -93,6 +93,8 @@ HOME_OWNED = frozenset(
         "restarts",
         "restart_ceiling",
         "seat",
+        "seat_due",
+        "seat_count",
         "wrapup_prompt",
         "pause_prompt",
         "resume_prompt",
@@ -642,7 +644,7 @@ class Session:
     # restart replays; the policies that act on it key on it and on `unattended` together.
     supervised: bool = False
     # What the tick's restarts made of it (design §6 *Keeping a team running* rule 1, TD-103 slice 2):
-    # `restarts` is every restart of this session, `[{at, why, error?}]` — `why` is `crash`, and
+    # `restarts` is every restart of this session, `[{at, why, error?}]` — `why` is `crash` or `fill` (rule 3), and
     # `error` the text of a replay that failed, which counts all the same — carried across the tick's
     # own supersede so the count survives the restart it counts, and empty on any other create (a
     # person's Resume starts it again). `restart_ceiling` is `{at, count}` once `RESTART_CEILING` is
@@ -653,6 +655,15 @@ class Session:
     # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
     # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.
     seat: dict[str, Any] | None = None
+    # What the tick makes of a seat's trigger (§6 rule 3, TD-103 slice 3). `seat_due` is `{at, by}`,
+    # set only once the trigger is met — `by` is what met it: `asks` (a question waiting, cleared
+    # again if none is by the fill), `prs` (n merged to the seat's repo since this record was
+    # created) or `every` (that long since it was created) — and it is what fills the seat; the
+    # fill's new record starts without it. `seat_count` is the count toward a `prs:` trigger as last
+    # read, `{prs, at}`, so a card can say how far along it is; a `gh` outage leaves the last
+    # reading and never reads as zero. Both the home's, computed at the home.
+    seat_due: dict[str, Any] | None = None
+    seat_count: dict[str, Any] | None = None
     # The other wrap-up (design §4.10 "A pending stop beats mail", TD-052 step 7): when a `send`
     # marked `wrapup` typed the wrap-up prompt — the card's Wrap up, `ao team stop` and a
     # manager's wind-down (§4.9a) — which this package cannot tell from any other send by its

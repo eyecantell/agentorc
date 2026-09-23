@@ -611,6 +611,10 @@ def view(
     seats = seats or {}
     d["seat"] = state in DEAD and s.get("id") in seats
     d["seat_when"] = seats.get(s.get("id") or "", "") if d["seat"] else ""
+    trig, counted = s.get("seat") or {}, (s.get("seat_count") or {}).get("prs")
+    if d["seat_when"] and trig.get("trigger") == "prs" and isinstance(counted, int) and not s.get("seat_due"):
+        # the tick's count toward it (§6 rule 3, TD-103): *on call — runs after 10 PRs · 4 of 10*
+        d["seat_when"] += f" · {counted} of {trig.get('after')}"
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
     d["age"] = _age(s.get("since"), now)
@@ -913,6 +917,15 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         # the usage gate's pause explains a stop (§4.5a **paused · usage**, TD-100); it waits behind
         # a permission, a question, a limit or a stall above, which are a person's to answer
         kind, text, full = "lim", d["gated"]["text"], d["gated"]["full"]
+    elif d.get("seat") and isinstance(d.get("restart_ceiling"), dict):
+        # §6 rule 3's fill ceiling (TD-103): the seats sharing its controller were filled six times
+        # in the hour, and this one's fill tripped it — an ending, as the crash ceiling's is
+        n = d["restart_ceiling"].get("count")
+        kind, text = "bad", f"fills exhausted · {n if isinstance(n, int) else '?'} in 1 h"
+        full = (
+            f"{text}: the host agent filled this seat and the ones beside it as often as it will "
+            "(design §6) — it is yours now: Resume it, or Forget it"
+        )
     elif d.get("seat"):
         # what would make it come (§4.5): the techlead's trigger is a question landing (§4.9b)
         # (§4.9b) — or a seat's own trigger: after n PRs, every so often (TD-098)
@@ -920,7 +933,7 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
         full = (
             f"{text}: a question to it fills the seat, and it ends again once it has answered (design §4.9b)"
             if not d.get("seat_when") or d["seat_when"] == "comes on the next question"
-            else f"{text}: its manager fills the seat when that comes due, and it ends once it has run (§4.9b)"
+            else f"{text}: the host agent fills the seat when that comes due, and it ends once it has run (§6)"
         )
     elif state == "exited" and isinstance(d.get("restart_ceiling"), dict):
         # an ending (§4.5 row 5 (b), §6 *Keeping a team running* rule 1, TD-103): the tick restarted

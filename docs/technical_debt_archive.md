@@ -989,3 +989,14 @@ The substrate is already there and unused by sessions: the agent's `subscribe` t
 **Why:** compatibility code is a promise to a user base that does not exist yet, and each table is a rule the briefs and the fact-checks have to know.
 
 **Related:** TD-055, TD-076 (the renames), TD-060 (the project rename).
+
+## TD-104: A seat's trigger is timed and counted by the manager, against the design's own rule
+
+**Priority:** Medium
+**Added:** 2026-09-22 (the anchor session; the design review)
+**Status:** Resolved 2026-09-22 by TD-103 slice (3) (PR #PRNUM): design §6 *Keeping a team running* rule 3 and `src/sessionorc/agent.py` (`_seat_pass`, `_count_seats`) carry it. Was: **Folded into TD-103 (design 2026-09-22): §6 *Keeping a team running*, rule 3** — `ao team start` writes `seat: {trigger}` on the seat's record, the tick computes `seat_due: {at, by}` (from `asks_waiting`, the derived reports tick's `gh` count of PRs merged to the repo's default branch since the record was created, or the clock), the card draws the count from it, and the fill is the tick's; the build is TD-103 slice (3). Kept open only until that slice lands.
+**Location:** design §4.9b (*Seats with a trigger*), §4.9a (*Inside the ceiling*), `src/sessionorc/agent.py` (the tick), `src/agentorc/briefs/manager.md`
+
+**Why:** the design contradicts itself on where a clock lives, and the cheaper answer is also the one it already argued for.
+
+**Related:** TD-098 (seats), TD-103 (policies on the tick), TD-075 (the techlead seat).

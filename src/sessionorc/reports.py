@@ -15,6 +15,7 @@ import os
 import re
 import subprocess
 from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -183,6 +184,51 @@ def _prs(directory: Path | str, limit: int = 100, timeout: float = 20.0) -> list
     except json.JSONDecodeError:
         return []
     return [p for p in out if isinstance(p, dict)] if isinstance(out, list) else []
+
+
+def merged_prs(directory: Path | str, limit: int = 100, timeout: float = 20.0) -> list[datetime] | None:
+    """When each of the repo's recent PRs merged to its **default branch** (design §6 rule 3, a seat's
+    `prs:` trigger), newest page only — or **None when `gh` could not be asked**, since for a count
+    "no merges" and "could not look" must not read the same. A `directory` that is not one here (a
+    node's checkout the home cannot see) is a failure to ask, not zero."""
+    if not Path(directory).is_dir():
+        return None
+    try:
+        cp = subprocess.run(
+            ["gh", "repo", "view", "--json", "defaultBranchRef", "--jq", ".defaultBranchRef.name"],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+        base = cp.stdout.strip() if cp.returncode == 0 else ""
+        if not base:
+            return None
+        cp = subprocess.run(
+            [
+                "gh", "pr", "list",
+                "--state", "merged",
+                "--base", base,
+                "--json", "mergedAt",
+                "--limit", str(limit),
+            ],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if cp.returncode != 0:
+        return None
+    try:
+        out = json.loads(cp.stdout or "[]")
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(out, list):
+        return None
+    times: list[datetime] = []
+    for p in out:
+        m = p.get("mergedAt") if isinstance(p, dict) else None
+        try:
+            times.append(datetime.fromisoformat(str(m).replace("Z", "+00:00")))
+        except ValueError:
+            continue
+    return times
 
 
 def _prs_for_head(directory: Path | str, branch: str, timeout: float = 10.0) -> list[dict[str, Any]] | None:
