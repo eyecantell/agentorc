@@ -39,7 +39,8 @@ person is `docs/user_attention.md`.
   **It starts nothing new by itself and does not read `org.yml`**: a start is a person's act or
   a controller's, and scheduling is unbuilt (TD-026). **A restart is not a start** (§6 *Keeping
   a team running*): for a *supervised* session its tick restarts a crash, carries out a wanted
-  restart, fills a seat and nudges an idle member, by replaying the session's launch record.
+  restart and fills a seat, each by replaying the session's launch record, and sends one fixed
+  nudge to a member idle with work open.
 - **Home and nodes** (§4.4a): one host is the **home** and owns the org's graph, intent and mail
   (§9 invariant 15); other hosts — a laptop, a devcontainer — are **nodes** that own what they
   observe (state, tail, alarms) and forward the rest over a link. Which RPC is served where is
