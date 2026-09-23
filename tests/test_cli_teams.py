@@ -611,14 +611,17 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     start by name with nothing closed; a team with one undeclared session is refused as any live
     holder refuses, and so is a holder that is not the team's own."""
     tmp_path, state = world
+    doc = org_doc(tmp_path)
+    doc["teams"]["ao-grind"]["techlead"] = {"name": "techlead-ao"}  # a seat: idle and undeclared, closed too
+    write_org(tmp_path, doc)
     out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
     clean = {"dirty": 0, "unpushed": 0}
-    names = ["orc-ao", "grind-1", "grind-2", "hunt"]
+    names = ["orc-ao", "techlead-ao", "grind-1", "grind-2", "hunt"]
 
     def concluded_team(**extra):
         state["sessions"][:] = [
-            {"id": f"ao-agentorc-{n}", "name": n, "team": "ao-grind", "state": "idle", "out_of_work": out,
-             "git": dict(clean), **extra.get(n, {})}
+            {"id": f"ao-agentorc-{n}", "name": n, "team": "ao-grind", "state": "idle", "git": dict(clean),
+             **({} if n == "techlead-ao" else {"out_of_work": out}), **extra.get(n, {})}
             for n in names
         ]  # fmt: skip
         state["verdicts"].clear()
@@ -641,6 +644,12 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     assert cli.main(["team", "start", "ao-grind"]) == 1
     assert not closes() and not creates(state)
     assert "hunt is idle as ao-agentorc-hunt" in capsys.readouterr().err
+    # a suspended holder is refused as on any start (§4.8a), even when the team is concluded
+    concluded_team()
+    state["verdicts"]["hunt"] = {"name": "hunt", "verdict": "suspended", "holder": "ao-agentorc-hunt"}
+    assert cli.main(["team", "start", "ao-grind"]) == 1
+    assert not closes() and not creates(state)
+    assert "hunt is suspended as ao-agentorc-hunt" in capsys.readouterr().err
     # a holder that is not one of the team's sessions is refused, even when the team is concluded
     concluded_team()
     state["verdicts"]["hunt"]["holder"] = "ao-elsewhere-hunt"
@@ -653,8 +662,8 @@ def test_a_start_on_a_concluded_team_closes_its_sessions_first(world, capsys):
     assert sorted(closes()) == sorted(f"ao-agentorc-{n}" for n in names)
     first_create = next(i for i, (m, _) in enumerate(state["calls"]) if m == "create")
     assert all(m != "close" for m, _ in state["calls"][first_create:])
-    assert [p["name"] for p in creates(state)] == ["orc-ao", "grind-1", "grind-2", "hunt"]
-    assert capsys.readouterr().out.count("closed (concluded)") == 4
+    assert [p["name"] for p in creates(state)] == names
+    assert capsys.readouterr().out.count("closed (concluded)") == 5
     concluded_team()
     assert cli.main(["--json", "team", "start", "ao-grind"]) == 0
     assert {c["name"] for c in json.loads(capsys.readouterr().out)["closed"]} == set(names)

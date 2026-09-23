@@ -303,6 +303,8 @@ def start(
         for v in (call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir), **on) for x in plan.launches)
         if v.get("verdict") in ("live", "suspended")
     ]
+    # Only when a name is held: a concluded team's declared sessions hold its members' names, so a
+    # concluded team whose names are all free would be one whose definition renamed every member.
     closed = _close_concluded(call, org, name, held) if held else []
     created: list[dict[str, Any]] = []
     notes: list[str] = list(plan.notes)  # said, and the start goes ahead (a seat without its primer, §4.9b)
