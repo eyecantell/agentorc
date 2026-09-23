@@ -1352,7 +1352,7 @@ Screens:
    session in the browser as a team's fold is, defaulting to a window that fits a 100-column
    terminal; nothing about a window is written to the record. **The title is the point** — it is
    what the switcher shows — so every Focus, popped out or in a tab, is titled `<name> · <state>`
-   (today every page is titled by the app's name), the name first because it is what the eye
+   (today a Focus is titled `<name> · ShiftLead`, and nothing tracks the state), the name first because it is what the eye
    looks for, with `▲ ` in front while the session needs the person, since a background window
    can speak nowhere else; it tracks the state deltas the page already receives. A popped-out
    window costs what a tab costs, one `/events` socket and one pty (§4.6), and the page sets no
