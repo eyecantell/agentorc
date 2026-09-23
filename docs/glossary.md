@@ -107,7 +107,7 @@ not mix:
 - **grinder** — a role: resolves each lane item to a merged PR. — *proposed*.
 - **hunter** — a role: finds problems and files them with evidence, never fixes them. —
   *proposed*.
-- **brief** — the job description a session is started with, written from its role's template.
+- **brief** — the job description a session is started with, written from its role's template. The template holds agentorc's mechanics and ships with the package; a repo's brief is a **supplement** filled into the template's `{repo}` slot (design §4.8, TD-114), never a replacement.
   Describes the job, not the run (TD-042). — *proposed*.
 - **lane** — the list of references a worker was handed, or `free-pick`. — *proposed*.
 - **profile** — `(adapter, account, model)` a session runs under (design §4.2a). — *proposed*.
