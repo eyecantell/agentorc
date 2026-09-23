@@ -539,6 +539,9 @@ def test_the_slot_holds_one_text_the_first_that_applies_and_a_caption(tmp_path, 
     # (b) an ending: exited, and a declaration — its first line, the rest on hover
     ex = view(_card(state="exited", exit_code=2, doing=doing))["slot"]
     assert ex["text"] == "exited · code 2" and ex["kind"] == "bad"
+    # the crash restart's ceiling (§6 *Keeping a team running* rule 1, TD-103): an ending of its own
+    ceil = view(_card(state="exited", exit_code=1, restart_ceiling={"at": "2026-09-22T20:00:00Z", "count": 3}))["slot"]
+    assert ceil["text"] == "restarts exhausted · 3 in 2 h" and ceil["kind"] == "bad" and "Resume" in ceil["full"]
     said = view(_card(out_of_work=oow, doing=doing))["slot"]
     assert said["text"] == "out of work — the ledger is empty" and "second line" in said["full"]
     assert not said["caption"].startswith("says")  # an ending hides the line that caption would date

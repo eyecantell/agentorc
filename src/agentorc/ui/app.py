@@ -922,6 +922,15 @@ def card_slot(d: dict[str, Any]) -> dict[str, Any]:
             if not d.get("seat_when") or d["seat_when"] == "comes on the next question"
             else f"{text}: its manager fills the seat when that comes due, and it ends once it has run (§4.9b)"
         )
+    elif state == "exited" and isinstance(d.get("restart_ceiling"), dict):
+        # an ending (§4.5 row 5 (b), §6 *Keeping a team running* rule 1, TD-103): the tick restarted
+        # it as often as it will, and the session is a person's now
+        n = d["restart_ceiling"].get("count")
+        kind, text = "bad", f"restarts exhausted · {n if isinstance(n, int) else '?'} in 2 h"
+        full = (
+            f"{text}: it exited on its own each time and the host agent restarted it, up to its ceiling "
+            "(design §6) — it is yours now: Resume it, or Forget it"
+        )
     elif state == "exited":
         code = d.get("exit_code")
         kind, text = ("bad" if code else ""), "exited" + (f" · code {code}" if code is not None else "")

@@ -100,6 +100,9 @@ HOME_OWNED = frozenset(
         "unattended",
         "run_until",
         "supervised",
+        "restarts",
+        "restart_ceiling",
+        "seat",
         "wrapup_prompt",
         "pause_prompt",
         "resume_prompt",
@@ -648,6 +651,18 @@ class Session:
     # it, every create writes the session's launch record (`launch/<id>.json`), which is what a
     # restart replays; the policies that act on it key on it and on `unattended` together.
     supervised: bool = False
+    # What the tick's restarts made of it (design §6 *Keeping a team running* rule 1, TD-103 slice 2):
+    # `restarts` is every restart of this session, `[{at, why, error?}]` — `why` is `crash`, and
+    # `error` the text of a replay that failed, which counts all the same — carried across the tick's
+    # own supersede so the count survives the restart it counts, and empty on any other create (a
+    # person's Resume starts it again). `restart_ceiling` is `{at, count}` once `RESTART_CEILING` is
+    # reached: the tick stops and the session is a person's. Both the home's (§4.4a).
+    restarts: list[dict[str, Any]] = field(default_factory=list)
+    restart_ceiling: dict[str, Any] | None = None
+    # A seat of its team (§4.9b), `{trigger, after?}` as the definition gives it, written by `ao team
+    # start` at create: a seat's ending is its own, so the crash restart never acts on one (§6 rule 1,
+    # and rule 3 — the seat policy, TD-103 slice 3 — is what fills one). The home's.
+    seat: dict[str, Any] | None = None
     # The other wrap-up (design §4.10 "A pending stop beats mail", TD-052 step 7): when a `send`
     # marked `wrapup` typed the wrap-up prompt — the card's Wrap up, `ao team stop` and a
     # manager's wind-down (§4.9a) — which this package cannot tell from any other send by its

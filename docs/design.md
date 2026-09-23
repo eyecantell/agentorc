@@ -1956,8 +1956,8 @@ the tail on activity; they do not replace the timer's job of noticing absence.
   rules: a restart is **`one_for_one`** — only the session that exited, never its siblings — and
   it is **bounded: at most 3 restarts of one session in 2 hours, then stop and escalate to the
   attention board** (the ceiling OTP, systemd and Circus each arrived at). The numbers are §6's
-  `RESTART_CEILING` (*Keeping a team running*, TD-103 — designed, not built; the briefs carry them
-  until it lands), so a director and a manager alike read a member's `restarts` and
+  `RESTART_CEILING` (*Keeping a team running*, TD-103 — the crash restart is built, the wanted
+  restart not yet; the briefs carry the numbers until the rules they count all land), so a director and a manager alike read a member's `restarts` and
   `restart_ceiling` rather than counting. A director's managers are `supervised` like any session
   `ao team start` creates (a nested team is started by the outer start, §4.9), so once §6 lands a
   crashed manager is restarted by the tick's rule 1 and never by the director, whose part is to
@@ -4020,7 +4020,8 @@ code and needs no grant; a session doing the same work does.
   (`ao until` has no page equivalent), `start_at` and the `scheduled` state, window overrides with
   an expiry, and calendar-shaped schedules (TD-026).
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
-  `supervised` and the launch record built — slice 1 — and the four rules not yet). Four rules that lived in the manager's brief, applied by a model every
+  `supervised` and the launch record built — slice 1 — rule 1 and the `seat` field — slice 2 —
+  and rules 2–4 not yet). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
   says `unattended: true` and `supervised: true`.** `supervised` is a home-owned intent field
   (§4.4a), set by `ao team start` on **every session it creates — the manager, the seats and the
@@ -4127,7 +4128,9 @@ code and needs no grant; a session doing the same work does.
   and a team whose needs are mechanical runs with `manager: person` and no manager session. The
   briefs lose the four rules when the policies land, in force from the next team start (the
   restart ceiling, the fill ceiling and the twenty minutes leave `manager.md` for these
-  constants). Not built: all of it — TD-103's steps.
+  constants). Built: `supervised`, the launch record, `seat` written at team start, and rule 1 with
+  its ceiling and the card's ending; not built: rules 2–4, `seat_due`, the Inbox row and the briefs —
+  TD-103's steps.
 - **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
 - **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on
