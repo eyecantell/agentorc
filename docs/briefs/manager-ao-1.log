@@ -218,3 +218,4 @@
 17:45  grinder-ao-2: corrected itself — #437 merged 23:45Z (rebased past #434, #439; no src/sessionorc in it, merged on the anchor's word) → cadence pass (review recorded)
 17:51  grinder-ao-2: idle with its 22:51Z out_of_work still on the record → finished by the rule, not sent to (its own note calls the chip line pickable now: the declaration may be stale). grinder-ao-1: TD-107
 17:58  host agent restarted (the anchor's promote); ao wait remade itself. grinder-ao-1: TD-107 step 1 → PR #440 merged, cadence pass (review recorded; no held paths); step 2 → #442 open 23:53Z, touches src/sessionorc → held for the anchor. #441 is the anchor's. grinder-ao-2: idle, finished
+18:04  grinder-ao-1: TD-109 (1) → #443 open, touches docs/briefs → held for the anchor; now TD-104
