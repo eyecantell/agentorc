@@ -2640,7 +2640,9 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             if e.status_code != 503:
                 raise
             got, states, agent_down = {"entries": []}, [], True  # the banner + Retry, never a bare 503
-        boards, board_note = await board_items()
+        # with the host agent down nothing is claimed as waiting — the Org's top bar and the poll say
+        # the same — so the board is left unread rather than counted on this page alone (review of #472)
+        boards, board_note = ([], "") if agent_down else await board_items()
         sections = inbox_sections(
             got["entries"],
             states=states,

@@ -315,3 +315,32 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
         assert got["board_note"] == "a note from the reader" and "decide the thing" in got["html"]["needs"]
         assert 'id="personneeds">1</span>' in c.get("/").text
     assert len(calls) == 1  # read once for all three: the page and the top bar poll every few seconds
+
+
+@pytest.mark.unit
+def test_with_the_host_agent_down_no_surface_counts_the_board(tmp_path, monkeypatch):
+    """The three surfaces agree while the host agent is down (review of PR #472): the Org's top bar
+    and the poll claim nothing, so the Inbox page does not count the board rows alone."""
+    host(tmp_path, monkeypatch)
+    from agentorc.ui import app as uiapp
+    from sessionorc.client import AgentUnavailable
+
+    root = tmp_path / "proj"
+    rows = uiapp.board_rows(report(root, item(3, "decide the thing", "2026-09-20", "2d overdue")))
+    monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (rows, ""))
+
+    class Down:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            raise AgentUnavailable("down")
+
+        async def __aexit__(self, *a):
+            return False
+
+    monkeypatch.setattr(uiapp, "LocalClient", Down)
+    with TestClient(uiapp.create_app()) as c:
+        page = c.get("/inbox").text
+        assert "decide the thing" not in page and '<span id="needsn">0</span>' in page
+        assert c.get("/api/person/inbox").json()["needs"] is None
