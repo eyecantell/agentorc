@@ -57,3 +57,8 @@ brief names it (none does yet — TD-075 step 5) — the
 project in a few thousand words, an index and never a source. The PR that changes the architecture,
 a standing decision or the merge rules updates it; `tests/test_primer.py` holds its pointers to ones
 that exist.
+
+`archive/` holds the briefs of one-off step workers that are finished: the `td052-step*.md` set,
+whose steps merged, and `td036-migration.md`, a migration never run because `ao team start`
+(TD-040) superseded it. Kept for the record, never started again. A new one-off brief moves there
+when its step merges.
