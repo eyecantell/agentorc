@@ -196,6 +196,8 @@
       // kind** — the home has no mail entry to hang it on — and no `until` is the clear.
       if (action === "attention_snooze") {
         body = { id: b.dataset.sid, kind: b.dataset.row };
+        // the restart row's **Dismiss** (§4.5a, TD-103): the store keeps `dismissed:<the mark's at>`
+        if (b.dataset.until) body.until = b.dataset.until;
         if (b.dataset.when) {
           const until = snoozeUntil(b.dataset.when);
           if (!until) return;
@@ -243,7 +245,8 @@
       if (action === "identity_log") AO.toast(`logged → ${(res.to && (res.to.name || res.to.id)) || b.dataset.to || "its controller"}: it owes you an outcome on them`, true);  // `to` is {id, name}
       if (action === "suspend") AO.toast(`${b.dataset.name || "it"} is suspended — only you lift it, by resuming it or forgetting it`, true);
       if (action === "dismiss") AO.toast(`dismissed ${(res.dismissed || body.msg || []).length || 1} — the sender is told where one was owed`, true);
-      if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
+      if (action === "attention_snooze" && String(res.snoozed_until || "").startsWith("dismissed:")) AO.toast("dismissed — the mark stays on the record, and a new one comes back as a new row", true);
+      else if (action === "attention_snooze") AO.toast(res.snoozed_until ? "snoozed — the row comes back at that time; the state itself is untouched" : "back in its section", true);
       // the state is answered, so the row is gone: it is taken out here rather than waited for, and
       // the refresh below puts back whatever the record actually says. **Suspend is the exception**
       // (§4.8a): it acts on the session and *leaves the row standing* — the alarm is still there to

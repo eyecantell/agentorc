@@ -3806,8 +3806,10 @@ class HostAgent:
         other. No `until` clears it. A person's only, as every act on the person's Inbox is."""
         if not mail.is_person(caller):
             raise RpcError(f"{caller} cannot snooze the person's rows: a snooze is the person's own (design §4.10)")
-        if kind not in (*ATTENTION_KINDS, "alarm"):
-            raise RpcError(f"unknown row kind {kind!r}; the state rows are: {', '.join(ATTENTION_KINDS)}, alarm")
+        if kind not in (*ATTENTION_KINDS, "alarm", "restart"):
+            raise RpcError(
+                f"unknown row kind {kind!r}; the state rows are: {', '.join(ATTENTION_KINDS)}, alarm, restart"
+            )
         key = f"{self._addr(id)}|{kind}"
         if until:
             self.attention_snoozed[key] = str(until)

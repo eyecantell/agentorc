@@ -730,6 +730,7 @@ def view(
             "why": str(rw.get("why") or "").strip(),
             "age": _age(rw.get("at"), now),
             "early": bool(rw.get("early")),
+            "at": str(rw.get("at")),  # the Inbox's restart row is keyed on it (§4.5a, TD-103)
         }
         if rw.get("at")
         else None
@@ -1266,6 +1267,37 @@ def state_kind(v: dict[str, Any]) -> str:
     return ""
 
 
+def restart_mark(v: dict[str, Any]) -> tuple[str, str] | None:
+    """Design §4.5a **Inbox row: restart** (§6 *Keeping a team running*, TD-103 slice 5): `(the
+    mark's own time, the row's words)` for a record the tick could not restart — at a ceiling,
+    held by work left, or an `early` `restart_wanted` that neither a controller nor the tick acts
+    on (§4.9a) — else None. The words are fixed, from the record's fields; the `why` of an early
+    one is the session's own sentence and is shown as such, never acted on."""
+    if v.get("superseded_by"):
+        return None
+    ceiling, held, wanted = v.get("restart_ceiling"), v.get("restart_blocked"), v.get("restart_wanted")
+    if isinstance(ceiling, dict):
+        n = ceiling.get("count")
+        n = n if isinstance(n, int) else "?"
+        if ceiling.get("why") == "fill":
+            return str(ceiling.get("at") or ""), (
+                f"fills exhausted · {n} in 1 h — the seats beside it were filled as often as the host agent will"
+            )
+        return str(ceiling.get("at") or ""), (
+            f"restarts exhausted · {n} in 2 h — it exited on its own each time and the host agent restarted it "
+            "up to its ceiling"
+        )
+    if isinstance(held, dict):
+        return str(held.get("at") or ""), (
+            f"restart held: {held.get('dirty')} uncommitted and {held.get('unpushed')} unpushed in its checkout "
+            "— it is restarted by itself the moment they are pushed"
+        )
+    if isinstance(wanted, dict) and wanted.get("early") and v.get("state") in ("idle", "exited"):
+        why = _first_line(wanted.get("why") or "") or "no reason given"
+        return str(wanted.get("at") or ""), f"restart wanted · early — asked inside its first half hour: {why}"
+    return None
+
+
 def state_rows(
     views: Collection[dict[str, Any]],
     *,
@@ -1339,6 +1371,10 @@ def state_rows(
         elif kind == "unpushed":
             unmet = [name for name, ok in (v.get("ready") or []) if not ok]
             rows.append(base(v, kind, f"{v['flag']} — {', '.join(unmet)}", extra=v.get("where") or ""))
+        if mark := restart_mark(v):
+            # its own row beside any state row, as an alarm is: a crashed record at its ceiling can
+            # also be exited with unpushed work, and the two are answered differently
+            rows.append({**base(v, "restart", mark[1]), "at": mark[0] or v.get("since") or "", "age": ""})
         if alarms := v.get("alarms"):
             row = base(v, "alarm", alarm_note(alarms))
             # an alarm row is as old as its newest alarm, not as its session: what the order is
@@ -1535,6 +1571,12 @@ def inbox_sections(
     snoozed_rows = attention_snoozed or {}
     for r in states:
         raw = snoozed_rows.get(f"{r.get('sid') or ''}|{r.get('row') or ''}")
+        if isinstance(raw, str) and raw.startswith("dismissed:"):
+            # the restart row's **Dismiss** (§4.5a, TD-103): that one mark's row is gone from every
+            # section; a new mark carries a new `at` and raises a new row
+            if raw == f"dismissed:{r.get('at') or ''}":
+                continue
+            raw = None
         until = _iso(raw)
         if until and until > at:
             out["snoozed"].append({**r, "snoozed_until": str(raw), "until_words": _left(str(raw), at)})
