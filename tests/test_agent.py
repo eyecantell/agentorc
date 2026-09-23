@@ -136,6 +136,30 @@ async def test_a_session_answers_a_permission_only_as_a_controller(agent, hookst
         assert (await person.call("get", id=w)).get("wake_refilled_at") == refilled
 
 
+async def test_a_session_never_answers_its_own_permission(agent, hookstub, tmp_path):
+    """TD-119, design §4.8: a session acting on itself passes the gate, but not `decide` — a
+    permission prompt exists so that someone other than the session approves the call. Refused
+    with the grant and as its own controller too; the hook keeps waiting for a person."""
+    async with LocalClient() as person:
+        w = (await person.call("create", name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True))["id"]
+        await person.call("set_grants", id=w, add=["control"])
+
+        async def hook():
+            async with LocalClient() as h:
+                return await h.call(
+                    "hook", session=w, kind="permission", text="Bash: git push", tool_use_id="tu1", wait_seconds=5
+                )
+
+        task = asyncio.create_task(hook())
+        await wait_state(person, w, "needs-you")
+        async with LocalClient(caller=w) as me:
+            with pytest.raises(AgentError, match="does not answer its own permission prompt"):
+                await me.call("decide", id=w, tool_use_id="tu1", behavior="allow")
+        assert not task.done() and (await person.call("get", id=w))["state"] == "needs-you"
+        await person.call("decide", id=w, tool_use_id="tu1", behavior="allow", reason="ok")
+        assert await task == {"behavior": "allow", "reason": "ok"}
+
+
 async def test_permission_timeout_falls_to_terminal(agent, hookstub, tmp_path):
     async with LocalClient() as c:
         s = await c.call("create", name="t", dir=str(tmp_path), adapter=hookstub.name)

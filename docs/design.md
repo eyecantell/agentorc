@@ -711,7 +711,7 @@ the home instead (*Mail across hosts*).
 | Call | From a person | From a session |
 |---|---|---|
 | reads — `list`, `get`, `tail`, `explain`, `occupancy`, `name_check`, `recent_dirs`, `usage`, `adapters`, `ping`, `wait` | served: this host's sessions only | served; a `wait` sees only this host's records and no mail |
-| node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served. On another session, and any `create`: **refused** — except `seen` and `hook`, which the gate does not cover (§4.8) and which are the node's own socket |
+| node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served, except `decide` (a session does not answer its own permission prompt, TD-119). On another session, and any `create`: **refused** — except `seen` and `hook`, which the gate does not cover (§4.8) and which are the node's own socket |
 | home-owned edits — `set_controllers`, `set_grants`, `set_stop`, `set_mode` | **refused**: they wait for the link | refused |
 | `set_settings` (§5 `settings.yml`, TD-100) | **served**: the file is this host's own, and the gate that reads it runs here | refused — a person's own, link or no link |
 | the mailbox — `msg`, `inbox`, `inbox_delete`, and the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (§4.10, TD-069) | **refused**: the mailbox is at the home | refused |
@@ -1924,7 +1924,12 @@ acting RPC. One exists:
 - `control` (`orchestrate`, its old name, is an unknown grant — TD-107): the session may act on *other* sessions — `send`, `keys`, wrap-up,
   `kill`, `close`, `mode`, `new`, `remove`, `decide` (`ao allow` / `ao deny`: answering another
   session's permission prompt is the same class of act as typing at it — TD-116), and `set_grants`
-  (gated on every target, so a session cannot grant itself). Without it, an acting RPC whose caller is a session and whose target is a
+  (gated on every target, so a session cannot grant itself). A session acting on *itself* needs
+  no grant — it may type into, change the mode of, or close its own pane — except for
+  `set_grants` and `set_controllers`, which edit authority, and `decide`, which is refused on
+  oneself whatever the session holds: a permission prompt exists so that someone other than the
+  session approves the call, and a session answering its own from a background task or a subagent
+  is the prompt defeated — *a session does not answer its own permission prompt* (TD-119). Without it, an acting RPC whose caller is a session and whose target is a
   different session is refused with "needs the control grant"; reads (`status`, `tail`,
   `explain`) are never gated. The caller is what the channel says, not what the envelope says
   (§4.8a): under `enforce` a request from outside every pane that names a session is refused,
@@ -2068,7 +2073,7 @@ the tail on activity; they do not replace the timer's job of noticing absence.
   call: `controllers` entries are not dropped, merely inert, live again when a person flips it
   back — only a person can, since a controller's `mode` onto an interactive session is itself
   refused. A `kind: command` run stays reachable to its controllers; a session acting on itself
-  is not gated. For briefs: a session that starts a worker without `--unattended` has started a
+  is not gated, `decide` apart (§4.8 *Grants*). For briefs: a session that starts a worker without `--unattended` has started a
   session it cannot act on.
 
 Being scheduled is **not** a capability and a grant carries no schedule: everything time-shaped

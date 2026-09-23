@@ -1136,3 +1136,19 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Related:** design §4.5 screen 2 (Focus), §4.5a, §4.5 (its screens intro: one pty per open terminal), §4.6 (transport and terminal mechanics), §4.5b (reachability: a popped-out window is the same origin, so the tunnel or private network carries it unchanged); TD-029 (a closed session's terminal reconnecting), TD-038 (the terminal's look).
 
 **Resolved:** 2026-09-23 (PR #500, `grinder-ao-2`) — built as §4.5 screen 2 *Pop out* and the §4.5a rows say: `/focus/{sid}?window=1` renders Focus without the top bar and the Org link; **Pop out** in the card's *more ▾* and the Focus header opens `window.open("", "ao-focus-<id>")`, so a second press raises the window without a reload; size and position per session in `localStorage`; every Focus titled `<name> · <state>` with `▲ ` while it needs you (`AO.focusTitle`); a `BroadcastChannel` between the browser's tabs makes the card read **Focus window**; a forgotten record's window says so and stays. `tests/test_ui_popout.py`. The *done when* (two windows, alt-tab, the title) is Paul's live look after the next promote, on `docs/user_attention.md`.
+
+## TD-119: A session may answer its own permission prompt: the gate passes every acting RPC a session makes on itself, `decide` included
+
+**Priority:** Medium
+**Added:** 2026-09-23 (`grinder-ao-1`, found building TD-116, PR #490)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-23 — was: Decided 2026-09-23 (the anchor): **refuse.** A permission prompt exists so that someone other than the session approves the call; a session answering its own is the prompt defeated, the same class as `set_grants` on oneself, which the gate already carves out. Build the *Fix* below as written: `decide` joins the self-exclusion tuple in `act_gate` and `offline_refusal`'s self branch, the refusal reads *a session does not answer its own permission prompt (design §4.8)*, a test beside `test_a_session_answers_a_permission_only_as_a_controller`, and §4.8's self-case sentence says it — design first, in the same PR. `src/sessionorc`, so the anchor merges it (TD-093). Was: Open — needs a decision: refuse `decide` on the caller's own record, or leave it as `send` to oneself is
+**Location:** `src/sessionorc/mail.py` (`act_gate`: `if method not in ("create", "set_grants", "set_controllers") and params.get("id") == caller: return None`), `src/sessionorc/modes.py` (`offline_refusal`, the same self rule), design §4.8 (the gate), §9 invariant 11
+
+**Why:** TD-116 made `decide` an acting RPC "exactly as `send` does", and `act_gate` passes any acting RPC a session makes on **itself**: that is right for `send`, `set_mode` or `close` (a session may type into, or close, its own pane). But a permission prompt exists so that someone other than the session approves the call: a session whose main turn is blocked on the hook can still run `ao allow $AGENTORC_SESSION` from a background task or a subagent and approve its own tool call. The gate already carves out the two RPCs that edit authority (`set_grants`, `set_controllers`) for the same reason; a permission answer is arguably a third. Not changed in PR #490 because the decision said "exactly as `send`".
+
+**Resolved:** 2026-09-23 (PR #498, grinder-ao-1; `src/sessionorc`, so merged by the anchor). `mail.act_gate` refuses `decide` on the caller's own record before the self-pass, whatever the caller holds, and `modes.offline_refusal` refuses it in its self branch, both with `mail.self_decide_refusal`'s line; design §4.8 *Grants* states the self case. Tests: `test_a_session_never_answers_its_own_permission` (`tests/test_agent.py`), the self-case assertion in `tests/test_modes.py`.
+
+**Related:** TD-116 (the gate on `decide`), TD-117 (Deny with a reason), design §4.8, §9 invariant 11.

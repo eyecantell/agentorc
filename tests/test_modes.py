@@ -80,7 +80,9 @@ def test_a_session_acts_on_itself_and_on_nobody_else_and_creates_nothing():
     assert "creates nothing" in refusal("create", "ao-x-lead", name="w2")
     assert refusal("hook", "ao-x-w", id="ao-x-w") is None  # the hook socket is the node's
     # answering another session's permission is an act gated at the home, like a send (TD-116)
-    assert refusal("decide", "ao-x-w", id="ao-x-w", tool_use_id="t", behavior="allow") is None
+    # ...and a session never answers its own prompt, link or no link (TD-119)
+    r = refusal("decide", "ao-x-w", id="ao-x-w", tool_use_id="t", behavior="allow")
+    assert r and "does not answer its own permission prompt" in r
     r = refusal("decide", "ao-x-lead", id="ao-x-w", tool_use_id="t", behavior="allow")
     assert r and "ao-x-lead cannot decide ao-x-w" in r and "gated at the home" in r
 
