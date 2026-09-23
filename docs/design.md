@@ -4487,10 +4487,10 @@ A dated log. Each entry: the question, the decision, and where the reasoning liv
       control names the worktree and reuses one of that name; the only list shown is the
       directory-occupancy answer as the person types. §4.5a is the authority; a control not in
       that table does not exist.
-- [ ] **Deny with a reason?** The hook decision can carry a message Claude reads; a one-line
+- [x] **Deny with a reason?** (decided 2026-09-23: **yes** — TD-117 builds it) The hook decision can carry a message Claude reads; a one-line
       optional "why" next to Deny (card and Focus, the phone too) would steer the next attempt
       better than a bare refusal. Cost: one input box.
-- [ ] **"Allow for this session"?** The hook can update the session's permission rules so the
+- [x] **"Allow for this session"?** (decided 2026-09-23: **no, not now**) The hook can update the session's permission rules so the
       same tool does not ask again. If added, it must be a third, smaller button and never the
       default — it is how a permission prompt stops being an alert.
 - [x] **Build on, or beside, herdr?** (2026-09-09; decided 2026-09-10): **independent** —
