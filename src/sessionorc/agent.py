@@ -276,6 +276,9 @@ class HostAgent:
         self.identity_mode = identity.mode_of(identity_mode or hosts.local_host().identity)
         self.proc: identity.ProcReader = proc or identity.LinuxProc()
         self._id_panes: list[identity.Pane] = []
+        # A record's pane that left the list, and when (monotonic): a hook of its ending process may
+        # still arrive (TD-115, `identity.PANE_GONE_GRACE`).
+        self._id_gone: dict[str, tuple[identity.Pane, float]] = {}
         self._id_conns: dict[Any, identity.Channel] = {}  # a connection's classification, for its life
         self._id_dirty: set[str] = set()  # records whose alarm counts moved since their last write
         self._id_listed_at = 0.0
@@ -5357,12 +5360,30 @@ class HostAgent:
     def _id_note_panes(self, panes: dict[str, PaneInfo]) -> None:
         """The live panes of this host's records, as the classification reads them. On the loop,
         from a pane list a thread already took."""
+        was = self._id_panes
         self._id_panes = [
             identity.Pane(sid, p.pane_pid, identity.tty_nr_of(p.tty) if p.tty else 0)
             for sid, p in panes.items()
             if not p.dead and sid in self.sessions
         ]
-        self._id_listed_at = time.monotonic()
+        now = self._id_listed_at = time.monotonic()
+        listed = {p.session for p in self._id_panes}
+        for p in was:
+            if p.session not in listed:
+                self._id_gone[p.session] = (p, now)
+        self._id_gone = {
+            sid: (p, at)
+            for sid, (p, at) in self._id_gone.items()
+            if sid not in listed and now - at < identity.PANE_GONE_GRACE
+        }
+
+    def _id_gone_channel(self, peer: int, session: str | None) -> identity.Channel | None:
+        """A `hook` that matched no live pane, against the pane of the record it names if that pane
+        left the list inside the grace (§4.8a *A hook just after its pane ended*, TD-115)."""
+        gone = self._id_gone.get(session) if session else None
+        if gone is None or time.monotonic() - gone[1] >= identity.PANE_GONE_GRACE:
+            return None
+        return identity.classify_gone(peer, gone[0], self.proc)
 
     async def _id_read_detached(self, tmux_pid: int | None) -> None:
         """Compute the detached-process check against the tmux server now running. `None` while
@@ -5451,7 +5472,12 @@ class HostAgent:
         named = None if mail.is_person(claimed) else self._addr(claimed)
         params = req.get("params")
         hooked = params.get("session") if rpc == "hook" and isinstance(params, dict) else None
-        verdict = identity.judge(ch, named, rpc, hook_session=self._addr(hooked) if hooked else None)
+        hook_session = self._addr(hooked) if hooked else None
+        if rpc == "hook" and ch.kind != "session" and (late := self._id_gone_channel(peer, hook_session)):
+            # For this judgement only: the connection's classification stays what it was.
+            log.info("hook for %s after its pane ended, matched by %s", hook_session, late.signal)
+            ch = late
+        verdict = identity.judge(ch, named, rpc, hook_session=hook_session)
         if verdict.alarm is not None:
             self._id_alarm(verdict.alarm, verdict.about)
         if self.identity_mode != "enforce":

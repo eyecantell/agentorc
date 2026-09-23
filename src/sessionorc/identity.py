@@ -24,6 +24,9 @@ MODES = ("off", "observe", "enforce")
 # suite patches this to `off` (its fixtures call the socket from pytest, under no pane, as sessions).
 DEFAULT_MODE = "observe"
 WALK_LIMIT = 64  # hops of the `ppid` chain
+# How long a record's pane is still matched, for a `hook` naming that record, after it left the
+# tick's list (TD-115): a tool's last hooks can connect a few seconds after its pane is gone.
+PANE_GONE_GRACE = 10.0
 ALARMS_KEEP = 20
 
 # Never-gated reads (§4.4a's first table row, less `wait`, which answers *for* a caller): served on
@@ -219,6 +222,20 @@ def classify(peer_pid: int, panes: Collection[Pane], reader: ProcReader, *, deta
     if detached and reader.cgroup(peer_pid) == detached:
         return Channel("unknown", signal="cgroup")
     return OUTSIDE
+
+
+def classify_gone(peer_pid: int, pane: Pane, reader: ProcReader) -> Channel | None:
+    """`pane`'s session when the peer still carries its POSIX session id or its terminal — the two
+    signals an orphan keeps once the pane's first process has exited — else None (§4.8a *A hook
+    just after its pane ended*, TD-115). No walk: the pane pid is gone, so no ancestor can be it."""
+    peer = reader.stat(peer_pid)
+    if peer is None:
+        return None
+    if pane.pid > 1 and peer.sid == pane.pid:
+        return Channel("session", pane.session, "sid")
+    if pane.tty_nr and peer.tty_nr == pane.tty_nr:
+        return Channel("session", pane.session, "tty")
+    return None
 
 
 @dataclass(frozen=True)

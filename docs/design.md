@@ -243,7 +243,10 @@ need them without agentorc; only the wiring for agentorc's own sessions lives he
 The hook script (`agentorc-hook`) knows its session from `AGENTORC_SESSION` and its agent from
 `AGENTORC_HOME`; the host agent sets both on the tmux session at creation, explicitly, because the
 tmux server may predate the host agent and carry another environment
-([ADR](decisions/2026-09-06-adopt-dev-cadence.md)). agentorc chooses Claude Code's session uuid
+([ADR](decisions/2026-09-06-adopt-dev-cadence.md)). An event it cannot deliver because nothing
+answers on the socket is appended to `events/<session>.jsonl`, and the tick applies the file on its
+next pass; **an error in the reply is the host agent answering** — a refusal (§4.8a) or a bug —
+never an outage, so it goes to the hook's stderr and is never queued (TD-115). agentorc chooses Claude Code's session uuid
 at launch (`--session-id`), so `adapter_id` is known from birth; a resume passes `--resume <id>`.
 **First-run quirk**: no hook reports the "trust this folder?" dialog, so the adapter marks the
 directory trusted in the tool's `.claude.json` before launch.
@@ -2201,7 +2204,15 @@ become whatever reuses its pid. A connection is one of:
   known, a peer that matched none is under none, so the person's terminal and the UI never wait);
   a connection that arrives while one is in flight, or inside that second, **waits for the next
   list rather than being judged against the old one**. Only a connection that matches nothing
-  once a fresh list has landed is *outside* or *unknown*.
+  once a fresh list has landed is *outside* or *unknown*. **A hook just after its pane ended**
+  is its session's too (TD-115): a tool's last hooks — Claude Code's `Stop` or `SessionEnd` —
+  can connect after the tick has seen the pane go, when the walk meets no pane pid. So the host
+  agent keeps each record's pane for `PANE_GONE_GRACE` (ten seconds) after it leaves the list,
+  and a `hook` RPC that matched no live pane is matched against **the pane of the record it
+  names**, if that pane is inside the grace, by the POSIX session id and then the controlling
+  terminal — the two signals an orphaned child keeps. The grace is for `hook` alone and for the
+  record the hook names; every other request, and a hook naming a record whose pane left longer
+  ago, is classified as above.
 - **outside** — no ancestor is a pane of ours: a person's terminal, the UI's process, a systemd
   unit, a test harness.
 - **unknown** — the ancestry could not be read (the peer exited before the walk, `/proc` refused),
@@ -2303,7 +2314,11 @@ reading a detached process as the person, it is what `observe` and `ao identity`
 host is turned, and it is not to be fixed by loosening the clause. A process that leaves the
 agent's cgroup as well as its pane — `systemd-run --user`, a timer, a cron line — is *outside*,
 and with no `caller` it is the person. A process of another session on the same host can read
-that session's files; identity here is about *requests to the host agent* and nothing else.
+that session's files; identity here is about *requests to the host agent* and nothing else. **The
+hook's queue** (§4.2) is one of those files: a line appended to `events/<session>.jsonl` by any
+process of the person's user is applied by the tick as that session's hook, judged by nothing and
+logged nowhere — it is how an event outlives a host agent that was down, and it is not a channel
+this section classifies (TD-115).
 
 **An alarm's answers.** An alarm is a bug of ours or a session misbehaving; the first wants
 filing and the second wants stopping, and clearing the list is the least useful answer. So the
