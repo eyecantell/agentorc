@@ -1031,6 +1031,40 @@ def test_the_recipe_does_not_tell_anyone_to_write_what_the_planner_refuses(tmp_p
     assert "not\n  built" in text  # the sentence wraps in the file; the claim is what matters
 
 
+def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
+    """TD-113 (b): the recipe lists the keys `.agentorc.yml` takes, so a second repo does not learn
+    them from samscrape's files. Each it names is accepted by `repoconfig._apply`, `projects` —
+    which it says is never one — is refused, and the list is the whole of what the loader takes."""
+    import re
+
+    from agentorc import repoconfig
+    from agentorc.cli import team_skill_text
+
+    text = team_skill_text()
+    para = text[text.index("`.agentorc.yml` takes these keys") :].split("\n\n")[0]
+    named = set(re.findall(r"`(\w+)`", para)) - {"projects"}
+    accepted = {
+        "adapter": "claude-code",
+        "worktrees": ".claude/worktrees",
+        "anchor": "main",
+        "ledger": "docs/technical_debt.md",
+        "unattended": {},
+        "roles": {},
+        "controllers": [],
+        "ready_when": [],
+        "commands": [],
+        "teams": {},
+    }
+    assert named == set(accepted)
+    for key, value in accepted.items():
+        repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), key, value, tmp_path / ".agentorc.yml")
+    with pytest.raises(ValueError, match="is not a `.agentorc.yml` key"):
+        repoconfig._apply(repoconfig.RepoConfig(root=tmp_path), "projects", {}, tmp_path / ".agentorc.yml")
+    src = Path(repoconfig.__file__).read_text(encoding="utf-8")
+    body = src[src.index("def _apply(") : src.index("def _mapping(")]
+    assert set(re.findall(r'"(\w+)"', body)) == set(accepted)  # nothing the loader takes is left out
+
+
 def test_a_techlead_seat_starts_under_the_manager_and_every_brief_names_it(world, capsys, monkeypatch):
     """TD-075 step 1, design §4.9b *The seat*: a definition's `techlead:` starts after the manager
     and before the members, as the `techlead` preset — no lane, no grants — with the manager as its

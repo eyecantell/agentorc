@@ -107,11 +107,28 @@ teams:
   built** (design §4.9: the flat case ships first). Write the teams flat and start each on its own
   until it is. The trap is that `ao team list` accepts it and only `ao team start` refuses it,
   which is the one place in this recipe where a file that reads fine is not one.
-- Both take `lane:` — the references that member works, in order — and `unattended:` (default
-  true).
+- Both take `lane:` and `unattended:` (default true). **`lane:` is one word or a list.**
+  `free-pick` means *choose from the ledger by priority*; anything else is a named lane, the
+  references that member works — `lane: [TD-041, TD-054]`, or `lane: TD-041,TD-054` — which its
+  brief reads as `TD-041, TD-054` (`{lane}`) and works **in that order, stopping at its end**
+  rather than free-picking past it. A member with a named lane is out of work when every item
+  on it is `done` or `dropped`.
 
 A team whose only project is one repo can live in **that repo's** `.agentorc.yml` under `teams:`
-instead, and travels with the checkout. The org file wins a name collision.
+instead, and travels with the checkout. The org file wins a name collision. **Which file:** the
+repo's, when the team works that one repo from its checkout on the machine you start it from —
+its `projects:` defaults to the repo, and the project is made from the checkout it was read in;
+`org.yml`, when the team spans repos, runs on another host (`host:`) or in a container node, or
+its repo's checkout is not where you start it, because only `org.yml` says where a checkout is
+on a host.
+
+`.agentorc.yml` takes these keys and refuses any other: `adapter`, `worktrees`, `anchor`,
+`ledger`, `unattended`, `roles`, `controllers`, `ready_when`, `commands` and `teams` — **never
+`projects`**, which is the org's (design §5).
+
+**Ignore `.claude/worktrees/`** in the repo's `.gitignore` before the first start: every team
+session works in `<repo>/.claude/worktrees/<name>`, and a repo that does not ignore it leaves
+nested checkouts that a `git add -A` in the main checkout stages as gitlinks.
 
 ## 4. Say what the roles are
 
@@ -140,7 +157,9 @@ ledger: docs/technical_debt.md
 Resolution is lowest first: the package's built-ins, then an org-wide `roles:` overlay in
 `org.yml`, then the repo's own — each overriding **per key**, so a repo that sets only `brief`
 keeps the built-in's grants. A `brief:` path is relative to the repo root; a built-in name is the
-package's own file. `{lane}` in a brief is replaced with the member's lane.
+package's own file. At the start a brief's placeholders are filled: `{lane}` with the member's lane,
+`{techlead}` and `{manager}` with the ids those sessions take, `{context}` with the seat's primer —
+each `none` where there is nothing to name (an empty lane reads `(none given)`).
 
 **A `profile:` must already exist**, in `~/.agentorc/profiles.yml` — it is an account of a tool,
 not a word you may invent, and `ao team start` refuses a name that is not declared:
@@ -182,8 +201,10 @@ of any size cannot be read per fill. So the seat reads a primer first — this r
   and its fact-check reads the primer against the change.
 - **Who:** a session of **that** repo with its design in front of it, or the person — never a
   session reaching across from another repo, which knows neither its decisions nor its never-list.
-- **Held to its pointers by a test** where the repo can: every section, path and ledger id it
-  names must exist (`tests/test_primer.py` in agentorc).
+- **Held to its pointers by a test** where the repo can — agentorc's is `tests/test_primer.py`,
+  four checks, each a few lines in any language: every design section the primer names is a
+  heading in the design; every invariant it names is in the design's invariant list; every path
+  it names exists in the repo; every ledger id it names is an entry in the ledger or its archive.
 
 ## 5. Start it, and read it
 
