@@ -38,6 +38,17 @@ def test_a_role_preset_carries_review_to_the_create(tmp_path):
     (tmp_path / ".agentorc.yml").write_text("roles:\n  grinder:\n    review: {reader: nobody}\n")
     with pytest.raises(ValueError, match=r"grinder\.review: reader is one of"):
         repoconfig.load(tmp_path)
+    # `org.yml`'s layer reaches `resolve_role` unchecked by the loader: the same check applies there
+    (tmp_path / ".agentorc.yml").write_text("")
+    with pytest.raises(ValueError, match=r"org roles\.grinder\.review: reader is one of"):
+        repoconfig.resolve_role(repoconfig.load(tmp_path), "grinder", {"grinder": {"review": {"reader": "x"}}})
+    assert repoconfig.resolve_role(
+        repoconfig.load(tmp_path), "grinder", {"grinder": {"review": {"reader": "person"}}}
+    ).review == {
+        "reader": "person",
+        "held": ["**"],
+        "bound": "2h",
+    }
     launch = teams.Launch(
         name="g", role="grinder", home="r", dir=tmp_path, team="t", project="p", review=dict(role.review or {})
     )

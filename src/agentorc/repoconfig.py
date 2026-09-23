@@ -426,7 +426,11 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
         if "label" in block:
             role.label = block["label"]
         if "review" in block:
-            role.review = block["review"]
+            # every layer through the one check: `org.yml`'s `roles:` reaches here unchecked
+            try:
+                role.review = normalize_review(block["review"])
+            except ValueError as e:
+                raise ValueError(f"{src} roles.{name}.{e}") from None
         if "controllers" in block:
             role.controllers, role.controllers_set = list(block["controllers"]), True
     return role

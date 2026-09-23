@@ -540,6 +540,8 @@ def cmd_roles(args: argparse.Namespace) -> int:
                 f"brief: {r.brief or '-'}",
                 f"label: {r.display}",  # what the page shows for it (design §4.8 *The names*)
             ]
+            if r.review:  # who reads its PRs (design §4.9b *The reader*)
+                bits.append(f"review: {r.review['reader']} on {', '.join(r.review['held'])}, {r.review['bound']}")
             print(f"{r.name:<{w}}  [{r.source}]  " + "  ".join(bits))
 
     return emit(args, result, prose)
