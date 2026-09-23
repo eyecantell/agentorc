@@ -1052,3 +1052,16 @@ The substrate is already there and unused by sessions: the agent's `subscribe` t
 **Resolved:** 2026-09-23 (grinder-ao-1). (a) and (c) landed in #125. (b) is design §6 *Keeping a team running* rule 4, *the idle nudge* (TD-103 slice (4), #461, live since the 2026-09-23 promote). The design settled it differently from the sketch above: it covers every *supervised* session, which is every one `ao team start` makes, and not every `unattended` one. It reads open work from the record's lane and declared claims, not from an open PR. It waits twenty minutes, sends one fixed line, and then shows *idle · open work* on the card rather than `stalled?`. It never wraps a session up by itself; what a session still idle after the nudge needs is its manager's or the person's judgement. The 20-hour case, a team worker idle with a claim, is caught on the tick. A hand-started unattended session with no `--supervised` is not: that is TD-026's ground, sessions that nothing keeps running.
 
 **Related:** design §4.2 (idle is not an alert), §6 stall, §4.8 orchestrator, TD-015, TD-026 (no stopper for hand-started unattended sessions), TD-028 step (1) (PR #63, the run this happened to).
+
+## TD-117: Deny with a reason: the permission row's Deny carries no words for the session to read
+
+**Priority:** Low
+**Added:** 2026-09-23 (the anchor session; design §10's question since 2026-09-06, decided by Paul 2026-09-23)
+**Status:** Resolved 2026-09-23 — was: Open — decided 2026-09-23: **yes to Deny with a reason; no, for now, to "allow for this session".** The hook decision already carries a `reason` (`rpc_decide(behavior, reason)`, and the hook script prints it back to Claude Code); what is missing is the words: an optional one-line *why* beside Deny on the card, the Focus header and the Inbox's permission row; `ao deny <id> [reason]` already carries one.
+**Location:** design §4.5a (the permission row, the card's Deny), §4.2, §10 (the question, marked decided); `src/agentorc/ui/templates/card.html`, `inbox_row.html`, `focus.html`, `static/app.js`, `src/agentorc/cli.py` (`ao deny`), `src/sessionorc/agent.py` (`rpc_decide` already takes `reason`)
+
+**Why:** a bare refusal makes an unattended session try the same call another way; one sentence steers its next attempt, and the hook already carries it for free.
+
+**Resolved:** 2026-09-23 (PR #486, grinder-ao-1). An optional *why?* box (`input.denywhy`) sits beside Deny on the card, the Focus header and the Inbox's permission row; `AO.denyBody` sends a filled one as the decision's `reason`, and `AO.denyWhys` / `AO.restoreDenyWhys` keep typed text through redraws. Design §4.5a (card, Focus, Inbox rows) and §10 carry it; test `test_deny_carries_an_optional_reason_from_every_place_it_is_offered`, with `test_ui.py`'s permission round trip for the hook half. "Allow for this session" stays *no, not now* in §10.
+
+**Related:** TD-008 (the permission questions), TD-116 (who may decide), design §10.
