@@ -71,3 +71,21 @@ async def test_a_resume_stays_supervised_whether_or_not_it_says_so(agent, hookst
         fresh = await c.call("create", name="conv", dir=str(tmp_path), adapter="hookstub")
         assert fresh["supervised"] is False and not _launch(fresh["id"]).exists()
         await c.call("kill", id=fresh["id"])
+
+
+async def test_a_resume_under_another_supervised_records_name_does_not_take_its_mark(agent, hookstub, tmp_path):
+    """Review of PR #447: the mark comes with the *conversation* resumed, never with a name that an
+    unrelated supervised record happened to hold."""
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    async with LocalClient() as c:
+        kept = await c.call("create", name="seat", dir=str(tmp_path / "a"), adapter="hookstub", supervised=True)
+        await c.call("hook", session=kept["id"], adapter_id="cc-kept")
+        loose = await c.call("create", name="loose", dir=str(tmp_path / "b"), adapter="hookstub")
+        await c.call("hook", session=loose["id"], adapter_id="cc-loose")
+        for s in (kept, loose):
+            await c.call("kill", id=s["id"])
+        got = await c.call("create", name="seat", dir=str(tmp_path / "a"), adapter="hookstub", resume="cc-loose")
+        assert got["supervised"] is False
+        assert stat.S_IMODE(paths.launch_dir().stat().st_mode) == 0o700
+        await c.call("kill", id=got["id"])

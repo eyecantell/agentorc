@@ -1269,6 +1269,7 @@ async def test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_hom
             assert address.endswith("@laptop")
             rec = json.loads((launch / f"{address}.json").read_text())
             assert rec["id"] == address and rec["prompt"] == "brief" and rec["supervised"] is True
+            assert rec["name"] == "w" and "worktree" not in rec  # as the node made it
             from sessionorc import paths
 
             assert paths.launch_dir() != launch  # this process's AGENTORC_HOME is the node's now
@@ -1278,6 +1279,12 @@ async def test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_hom
             await until(home, address, lambda r: r is not None and r["state"] == "exited")
             await person.call("remove", id=address)
             assert not (launch / f"{address}.json").exists()
+            # an unnamed create is named by the node: the record keeps that name, not the empty one sent
+            (tmp_path / "x").mkdir()
+            auto = await person.call("create", supervised=True, **{**seat, "name": "", "dir": str(tmp_path / "x")})
+            named = json.loads((launch / f"{auto['id']}.json").read_text())["name"]
+            assert named and named == auto["name"]
+            await person.call("kill", id=auto["id"])
 
 
 async def test_a_suspension_outlives_a_supersession_on_a_node_and_a_persons_create_at_the_home_lifts_it(

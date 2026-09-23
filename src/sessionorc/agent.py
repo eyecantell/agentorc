@@ -1124,6 +1124,7 @@ class HostAgent:
         path = paths.launch_dir() / f"{address}.json"
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
+            path.parent.chmod(0o700)  # as the launch scripts beside it have it (tmux.py)
             tmp = path.with_suffix(".json.tmp")
             fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # owner-only from the start
             with os.fdopen(fd, "w", encoding="utf-8") as f:
@@ -1491,7 +1492,7 @@ class HostAgent:
                 host=self.host,
                 # a resume carries it — of the name's record or the conversation's (§6: Forget alone clears it)
                 supervised=bool(supervised)
-                or bool(resume and isinstance(holder, Session) and holder.supervised)
+                or bool(resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.supervised)
                 or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
             )
             if isinstance(holder, Session):
@@ -4588,7 +4589,10 @@ class HostAgent:
             self._take_records(host, [reply["record"]], whole=False)
             held = self.remote.get(host, {}).get(str(reply["record"].get("id"))) if method == "create" else None
             if held is not None and held.supervised:  # the home holds a node session's launch record (§6)
-                self._write_launch(f"{held.id}@{host}", held, launch_params(params))
+                # what the node made of the call — an auto-name, a worktree's resolved repo — so a
+                # replay recreates this session, not a new one (review of PR #447)
+                made = {**launch_params(params), "name": held.name, "repo": held.repo, "worktree": held.worktree}
+                self._write_launch(f"{held.id}@{host}", held, {k: v for k, v in made.items() if v is not None})
             if method == "create" and mail.is_person(caller):
                 self._lift_by_person(host, str(reply["record"].get("id") or ""))
         elif reply.get("gone") and rid:
