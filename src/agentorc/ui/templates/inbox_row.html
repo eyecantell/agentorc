@@ -337,7 +337,7 @@
    the row kind, because a session's permission and its stalled row are two rows. A permission, a
    question and `limited` are never offered one: something is waiting on the tool's own clock. #}
 {% macro state_snooze(e) -%}
-{%- if e.row in ('stalled', 'unpushed') %}
+{%- if e.row in ('stalled', 'unpushed', 'restart') %}
 <details class="more"><summary class="btn sm ghost" title="set this row aside until later; the state itself is untouched">Snooze</summary>
   <div class="menu">
     <button data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="{{ e.row }}" data-when="1h">in 1 hour</button>
@@ -370,6 +370,16 @@
   <span class="st">nothing here clears a cap (§4.2) — Switch profile… / Wait are unbuilt on the card too</span>
   <span class="grow"></span>
   {{ open_btn(e, 'Open') }}
+  {%- elif e.row == 'restart' %}
+  {#- §4.5a **Inbox row: restart** (§6 *Keeping a team running*, TD-103): what the tick could not
+      restart. **Resume** is the banner's one-press Resume — the session comes back attended, and a
+      person restarting past the ceiling is the person's word. -#}
+  <span class="st">the host agent will not restart it — yours now</span>
+  <span class="grow"></span>
+  {{ state_snooze(e) }}
+  <button class="btn sm" data-act="resume" data-id="{{ e.sid }}">Resume</button>
+  {{ open_btn(e, 'Open') }}
+  <button class="btn sm ghost" data-act="attention_snooze" data-id="person" data-sid="{{ e.sid }}" data-row="restart" data-until="dismissed:{{ e.at }}" title="remove this row: the mark stays on the record and its card, and a new mark raises a new row">Dismiss</button>
   {%- elif e.row == 'unpushed' %}
   {#- §4.5a **Inbox row: state** (TD-081): the row had only **Details**, which is not an answer to
       it. **Reopen and push** is the one-press Resume with a first prompt **the page wrote** —

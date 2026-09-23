@@ -569,6 +569,52 @@ def test_each_state_row_kind_carries_its_own_controls_and_no_others(tmp_path, mo
 
 
 @pytest.mark.unit
+def test_the_restart_row_names_what_the_tick_could_not_restart(tmp_path, monkeypatch):
+    """§4.5a **Inbox row: restart** (§6 *Keeping a team running*, TD-103 slice 5): a record at the
+    crash or the fill ceiling, one whose wanted restart is held by work left, and an `early`
+    `restart_wanted` each raise one row — as old as the mark, beside any state row the record also
+    has — with **Resume**, **Open** and **Snooze**. A superseded record raises none."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    at = "2026-09-19T11:00:00Z"
+    records = [
+        rec("ao-c", "exited", exit_code=1, git=_ahead3, restart_ceiling={"at": at, "count": 3}),
+        rec("ao-f", "exited", restart_ceiling={"at": at, "count": 6, "why": "fill"}),
+        rec(
+            "ao-h",
+            "idle",
+            restart_wanted={"at": at, "why": "long"},
+            restart_blocked={"at": at, "dirty": 2, "unpushed": 1},
+        ),
+        rec("ao-e", "idle", restart_wanted={"at": at, "why": "context full\nmore", "early": True}),
+        rec("ao-x", "exited", restart_ceiling={"at": at, "count": 3}, superseded_by="ao-y"),
+        rec("ao-n", "idle", restart_wanted={"at": at, "why": "long"}),  # not early: the tick's to act on
+    ]
+    got = state_rows_of(records)
+    restart = {r["sid"]: r for r in got if r["row"] == "restart"}
+    assert sorted(restart) == ["ao-c", "ao-e", "ao-f", "ao-h"]
+    assert {r["row"] for r in got if r["sid"] == "ao-c"} == {"restart", "unpushed"}, "beside its state row"
+    assert restart["ao-c"]["text"].startswith("restarts exhausted · 3 in 2 h") and restart["ao-c"]["at"] == at
+    assert restart["ao-f"]["text"].startswith("fills exhausted · 6 in 1 h")
+    assert "2 uncommitted and 1 unpushed" in restart["ao-h"]["text"]
+    assert restart["ao-e"]["text"] == "restart wanted · early — asked inside its first half hour: context full"
+    html = rows("needs", [restart["ao-c"]])
+    assert 'data-act="resume" data-id="ao-c"' in html and ">Open<" in html
+    assert 'data-act="attention_snooze"' in html and 'data-row="restart"' in html and 'data-act="allow"' not in html
+    assert f'data-until="dismissed:{at}"' in html and ">Dismiss<" in html
+    # **Dismiss** hides that one mark's row; a new mark (a new `at`) raises a new row
+    from agentorc.ui.app import inbox_sections
+
+    gone = inbox_sections([], states=[restart["ao-c"]], attention_snoozed={"ao-c|restart": f"dismissed:{at}"})
+    assert all(restart["ao-c"] not in rows_ for rows_ in gone.values() if isinstance(rows_, list))
+    again = inbox_sections(
+        [],
+        states=[{**restart["ao-c"], "at": "2026-09-19T15:00:00Z"}],
+        attention_snoozed={"ao-c|restart": f"dismissed:{at}"},
+    )
+    assert [r["sid"] for r in again["needs"]] == ["ao-c"]
+
+
+@pytest.mark.unit
 def test_a_state_row_carries_the_cards_own_marks_and_none_of_them_is_pressable(tmp_path, monkeypatch):
     """§4.5 screen 6: the row shows the session's name, team, role badge, its `title` and its
     `doing` line with age — the card's own view, so the two cannot drift. TD-071 item 8: the state
