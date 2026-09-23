@@ -81,6 +81,8 @@
          without it (review of PR #251) #}
       <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>
       <button class="btn sm next" data-act="deny" data-id="{{ s.id }}">Deny</button>
+      {# Deny's optional reason (§4.5a, TD-117): one line the session reads with the refusal #}
+      <input class="denywhy" type="text" maxlength="200" data-id="{{ s.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
     {% elif s.next_act == 'forget' %}
       <button class="btn sm next" data-act="remove" data-id="{{ s.id }}">Forget</button>
     {% elif s.next_act == 'message' %}

@@ -2212,3 +2212,89 @@ def test_the_poll_carries_each_answered_rows_team_and_time_and_nothing_it_says(c
     at = [e["at"] for e in got["entries"] if e["id"] == fyi][0]
     assert got["answered_marks"] == [{"team": "ao-t3", "at": at}]
     assert 'data-answered-team="ao-t3"' in client.get("/").text  # the team's header carries the mark
+
+
+# -- TD-117: Deny with a reason (design §4.5a) ---------------------------------------------------
+
+
+DENY_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = (o) => Object.assign({
+  dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false,
+}, o);
+const document = { documentElement: el(), body: el(), activeElement: null,
+  querySelector: () => null, querySelectorAll: () => [], addEventListener: noop, createElement: () => el() };
+const window = {};
+global.window = window; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/inbox", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO;
+const box = (id, value) => {
+  const i = { dataset: { id }, value, focused: false };
+  i.focus = () => { i.focused = true; };
+  return i;
+};
+const typed = box("ao-a", "use the fixture instead"), empty = box("ao-b", ""), mid = box("ao-c", "");
+document.activeElement = mid;  // the person is in a box they have not typed in yet
+const kept = AO.denyWhys(el({ querySelectorAll: () => [typed, empty, mid] }));
+const a = box("ao-a", ""), b = box("ao-b", ""), c = box("ao-c", ""), d = box("ao-d", "");
+AO.restoreDenyWhys(el({ querySelectorAll: () => [a, b, c, d] }), kept);
+console.log(JSON.stringify({
+  typed: AO.denyBody("  use the fixture instead  "),
+  blank: AO.denyBody("   "),
+  none: AO.denyBody(undefined),
+  kept,
+  after: [a, b, c, d].map((i) => [i.value, i.focused]),
+}));
+"""
+
+
+@pytest.mark.unit
+def test_deny_carries_an_optional_reason_from_every_place_it_is_offered(tmp_path, monkeypatch):
+    """§4.5a **Allow / Deny** (TD-117): beside every Deny — the card, the Focus header, the Inbox's
+    permission row — one optional line the session reads with the refusal. Never required: an empty
+    box is a bare Deny, and the body then carries no `reason` at all. The box survives the redraws a
+    pushed delta or a poll makes, so a half-typed reason is not taken from under the person. That
+    the reason reaches the hook's decision is `test_ui.py`'s permission round trip."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates, view
+
+    card = templates.get_template("card.html").render(s=view(rec("ao-p", "needs-you", pending=PERMISSION)))
+    (row,) = state_rows_of([rec("ao-p", "needs-you", pending=PERMISSION)])
+    perm = rows("needs", [row])
+    for html in (card, perm):
+        deny = html.index('data-act="deny" data-id="ao-p"')
+        assert html.index('<input class="denywhy"', deny) - deny < 200, "the box sits beside Deny"
+        assert 'class="denywhy" type="text" maxlength="200" data-id="ao-p"' in html and "optional" in html
+    # no box where there is no Deny: a permission without a hook id, and a plain question
+    for pending in ({**PERMISSION, "tool_use_id": None}, {"kind": "question", "text": "which branch?"}):
+        html = templates.get_template("card.html").render(s=view(rec("ao-q", "needs-you", pending=pending)))
+        assert "denywhy" not in html
+
+    js = (UI / "static" / "app.js").read_text()
+    # the Focus header draws the same box, and every press and every redraw goes through the helpers
+    assert 'data-act="deny" data-id="${id}">Deny</button> <input class="denywhy"' in js
+    assert "body = AO.denyBody(w && w.value)" in js
+    assert js.count("AO.restoreDenyWhys(") == 3  # the card's delta, the Focus header, the Inbox poll
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    probe = pathlib.Path(tempfile.mkdtemp()) / "deny_probe.js"
+    probe.write_text(DENY_PROBE)
+    out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    assert got["typed"] == {"reason": "use the fixture instead"}
+    assert got["blank"] == {} and got["none"] == {}
+    # what was typed, and the box the person was in, come back; an untouched box stays untouched
+    assert got["kept"] == {"ao-a": {"value": "use the fixture instead", "focused": False},
+                           "ao-c": {"value": "", "focused": True}}  # fmt: skip
+    assert got["after"] == [["use the fixture instead", False], ["", False], ["", True], ["", False]]

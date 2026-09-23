@@ -130,6 +130,8 @@
       if (action === "mode") body = { unattended: "unattended" in b.dataset ? b.dataset.unattended !== "1" : !b.classList.contains("on") };
       // design §4.5a: **Drop** on a claimed progress item, and the grants chip (§4.8, TD-028 step 4)
       if (action === "drop") body = { ref: b.dataset.ref };
+      // design §4.5a **Deny** (TD-117): the reason box beside this Deny, if one was filled
+      if (action === "deny") { const w = b.parentElement && b.parentElement.querySelector("input.denywhy"); body = AO.denyBody(w && w.value); }
       if (action === "grants") body = b.classList.contains("off") ? { add: [b.dataset.grant] } : { remove: [b.dataset.grant] };
       // design §4.5a Focus **controllers** chip (§4.8, TD-036): remove one by clicking it, add one
       // by id. The agent decides what is allowed; a refusal comes back as the toast below.
@@ -241,7 +243,7 @@
       const res = await act(id, action2 || action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/")) location.href = "/"; }
-      if (action === "allow" || action === "deny") AO.toast(`${action}: sent through the hook`, true);
+      if (action === "allow" || action === "deny") AO.toast(`${action}${body.reason ? " with your reason" : ""}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
       if (action === "answer") AO.toast(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
@@ -851,6 +853,34 @@
     return { retry: true, final: false, delay: Math.min(delay * 2, 10000), why };
   };
 
+  // Deny's optional reason (design §4.5a, TD-117): one line beside Deny that goes back with the
+  // refusal through the hook, for the session to read. Never required, so an empty box is a bare
+  // Deny — the body carries no `reason` at all rather than an empty one.
+  AO.denyBody = function (value) {
+    const why = (value || "").trim();
+    return why ? { reason: why } : {};
+  };
+  // The card, the Focus header and an Inbox row are redrawn from pushed deltas and polls, and a
+  // redraw must not take a half-typed reason from under the person: read the boxes before it (by
+  // session id), put them back after it.
+  AO.denyWhys = function (root) {
+    const kept = {};
+    if (!root) return kept;
+    root.querySelectorAll("input.denywhy").forEach((i) => {
+      if (i.value || i === document.activeElement) kept[i.dataset.id] = { value: i.value, focused: i === document.activeElement };
+    });
+    return kept;
+  };
+  AO.restoreDenyWhys = function (root, kept) {
+    if (!root) return;
+    root.querySelectorAll("input.denywhy").forEach((i) => {
+      const k = kept[i.dataset.id];
+      if (!k) return;
+      i.value = k.value;
+      if (k.focused) i.focus();
+    });
+  };
+
   // Whether the poll may replace this section's rows now. It may not while the person is inside
   // them: an open Snooze menu would close under the press, and a swap would take the focus of
   // someone tabbing through a row's controls. Neither is worth a few seconds' freshness — the next
@@ -892,7 +922,11 @@
     if (bn) { bn.textContent = got.board_note || ""; bn.classList.toggle("hidden", !got.board_note); }
     IN_SECS.forEach((k) => {
       const el = $("#rows-" + k);
-      if (el && AO.maySwapSection(el, document.activeElement)) el.innerHTML = got.html[k] || "";
+      if (el && AO.maySwapSection(el, document.activeElement)) {
+        const kept = AO.denyWhys(el);
+        el.innerHTML = got.html[k] || "";
+        AO.restoreDenyWhys(el, kept);
+      }
     });
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has
     // something — like the snoozed box (§4.5a **Inbox section: Waiting on them**).
@@ -984,7 +1018,7 @@
         const old = $(`#card-${CSS.escape(ev.id)}`);
         const tpl = document.createElement("template"); tpl.innerHTML = ev.html.trim();
         const fresh = tpl.content.firstElementChild;
-        if (old) old.replaceWith(fresh);
+        if (old) { const kept = AO.denyWhys(old); old.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept); }
         else {
           const grid = $(".tgroup .grid");  // syncGroups below moves it into its own group
           grid.appendChild(fresh);
@@ -1246,7 +1280,7 @@
       let head = `<span class="pill s-${cls}${scraped}"><span class="dot"></span>${v.state_label}</span>`;
       const p = v.pending;
       if (v.state === "needs-you" && p && p.kind === "permission") {
-        head += ` <button class="btn sm primary" data-act="allow" data-id="${id}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}">Deny</button> <span class="meta">${esc(p.text)}</span> <span class="meta countdown" data-deadline="${p.deadline || ""}"></span>`;
+        head += ` <button class="btn sm primary" data-act="allow" data-id="${id}">Allow</button> <button class="btn sm" data-act="deny" data-id="${id}">Deny</button> <input class="denywhy" type="text" maxlength="200" data-id="${id}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it"> <span class="meta">${esc(p.text)}</span> <span class="meta countdown" data-deadline="${p.deadline || ""}"></span>`;
         compose.disabled = true; $("#composehint").textContent = "a permission is pending: answer above";
       } else if (v.state === "needs-you" && p) {
         head += ` <span class="meta">${esc(p.kind)}: ${esc(p.text)}</span>`;
@@ -1290,7 +1324,9 @@
           : steering ? "steers the turn in flight — this session is working, and Claude Code queues what you type"
           : "starts a new turn";
       }
+      const kept = AO.denyWhys($("#fstate"));
       $("#fstate").innerHTML = head;
+      AO.restoreDenyWhys($("#fstate"), kept);
       // The mode toggle, named for what it does, and what it governs (design §4.5a, TD-096): the
       // composer is closed on an unattended session — it types, and typing is the disruption.
       const ma = $("#fmodeact");

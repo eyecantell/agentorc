@@ -363,6 +363,7 @@
   <span class="meta countdown" data-deadline="{{ e.deadline }}">{{ e.left or 'via hook' }}</span>
   <button class="btn sm primary" data-act="allow" data-id="{{ e.sid }}">Allow</button>
   <button class="btn sm" data-act="deny" data-id="{{ e.sid }}">Deny</button>
+  <input class="denywhy" type="text" maxlength="200" data-id="{{ e.sid }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
   {%- elif e.row == 'limited' %}
   {#- §4.5a gives this row **Switch profile… / Wait**, which are the card's controls — and neither
       is built on the card. Until they are, the row says what the cap is doing and opens the
