@@ -351,3 +351,26 @@
 23:47  grinder-ao-2: TD-046 done → PR #500 merged, cadence pass (review FIXED · sonnet · 1 finding,
        ci green, ledger named). Still working (next pick). PR #498 (TD-119, src/sessionorc/) still
        open, ~27 min old — not yet at the 2h TD-093 threshold.
+23:50  grinder-ao-2 now idle + out_of_work → finished (nothing acted on it; why: TD-119 already
+       claimed by grinder-ao-1 and in its lane; 55 other entries excluded — anchor eval/design-
+       first/build/live-check/decision, paul's, dev-cadence's). Every member finished. Final sweep
+       check_cadence --since 12h: 22 PRs, all pass (review recorded, not verified). `ao team stop
+       ao-grind --close --timeout 90`: both grinders closed clean, nothing unpushed, no outcome
+       owed. `ao progress none` recorded. Board line → PR #502 (fact-checked SHIP by an
+       independent Sonnet agent, squash-merged as 213000b) naming #498 as still open for the
+       anchor. For a §6 policy: nothing new this run beyond what's already noted — the two-hour
+       anchor-hold clock and the git-author-is-always-eyecantell gotcha (above) are the two things
+       worth carrying forward mechanically.
+
+## End of run (2026-09-23 run, 23:08Z–23:50Z)
+
+- grinder-ao-1: finished 23:34Z. Merged #499 (TD-071 items 1-2). Built #498 (TD-119), held for the
+  anchor's read (src/sessionorc/), well under the 2h threshold at wind-down.
+- grinder-ao-2: finished 23:50Z. Merged #500 (TD-046).
+- techlead-ao-1: filled once at start, closed itself idle/empty — host agent's own seat tick, no
+  manager action.
+- No relays needed (last cadence change landed 09-12, before both grinders' start). No
+  escalations beyond the wind-down board line. No outcomes owed.
+- Final cadence check --since 12h: every merged PR passes.
+- Board line → PR #502 merged, fact-checked SHIP.
+23:50  ao close self.
