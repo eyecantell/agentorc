@@ -1753,9 +1753,12 @@ own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it
 
 **`ao pr held <n>`** (§4.9b *The reader*, TD-093): whether PR `n` waits for this session's reader —
 the record's `review` checked against the PR's changed files, read with `gh pr view <n> --json
-files` in the record's directory. `held` globs name paths from the repo root; `**` spans
-directories, `*` and `?` stay inside one. No `review` on the record is *not held*, and `gh` is
-not asked. A PR whose files cannot be read is an error, never *not held*. `--id` asks about
+files,changedFiles` in the record's directory. `held` globs name paths from the repo root; `**`
+spans directories, `*` and `?` stay inside one, a trailing `/` is everything under it, and
+nothing else is special. The setting's defaults (`held` every PR, `bound` two hours) are filled
+in here too, and an empty `held:` is refused. No `review` on the record is *not held*, and `gh`
+is not asked. A PR whose files cannot be read, or whose list `gh` returns short of its
+`changedFiles` (one page of a large PR), is an error, never *not held*. `--id` asks about
 another session's record. It is the author's own check, and the host agent never makes it.
 
 **`ao gate`** (TD-100; §6 *Usage gate*, §5 `settings.yml`): with no arguments prints every

@@ -2,8 +2,9 @@
 reads its record's `review` and checks the PR's changed files against `held:`. The host agent only
 stores the setting; this is the one place it is applied.
 
-`held:` is a list of path globs as a person writes them in a `.gitignore`-ish way: `**` spans any
-number of directories, `*` and `?` stay inside one, and a pattern names paths from the repo root.
+`held:` is a list of path globs: a pattern names paths from the repo root, `**` spans any number
+of directories, `*` and `?` stay inside one, and a pattern ending in `/` names everything under
+that directory. Nothing else is special — `[abc]` is those five characters, not a class.
 """
 
 from __future__ import annotations
@@ -20,7 +21,10 @@ GH_TIMEOUT = 30.0
 
 @lru_cache(maxsize=256)
 def _pattern(glob: str) -> re.Pattern[str]:
-    out, i, g = [], 0, glob.strip().lstrip("/")
+    g = glob.strip().lstrip("/")
+    if g.endswith("/"):
+        g = g.rstrip("/") + "/**"  # `src/` and `src/**/` both mean everything under src
+    out, i = [], 0
     while i < len(g):
         if g.startswith("**/", i):
             out.append("(?:.*/)?")  # any number of directories, none included
@@ -45,6 +49,22 @@ def matches(path: str, glob: str) -> bool:
     return _pattern(glob).fullmatch(path.lstrip("/")) is not None
 
 
+def setting(review: Any) -> dict[str, Any] | None:
+    """A record's `review` with the design's defaults filled in — `held` every PR, `bound` two
+    hours — whatever wrote it. A `ValueError` for a shape that holds nothing and says nothing: an
+    empty `held:` is not *hold everything*, and not *hold nothing* either."""
+    if not review:
+        return None
+    if not isinstance(review, dict) or not review.get("reader"):
+        raise ValueError(f"review is not a setting: {review!r}")
+    held = review.get("held", ["**"])
+    if isinstance(held, str):
+        held = [held]
+    if not held or not all(isinstance(g, str) and g.strip() for g in held):
+        raise ValueError(f"review: held is a list of path globs, not {held!r}")
+    return {"reader": str(review["reader"]), "held": list(held), "bound": str(review.get("bound") or "2h")}
+
+
 def held_paths(files: Iterable[str], review: dict[str, Any] | None) -> list[str]:
     """The PR's changed files that its record's `review` holds — empty when there is no `review`,
     which is the case §4.9b says merges as the cadence does."""
@@ -59,7 +79,7 @@ def pr_files(pr: int, cwd: str | None = None) -> list[str]:
     when `gh` cannot say: *not held* is never guessed from a failed read."""
     try:
         cp = subprocess.run(
-            ["gh", "pr", "view", str(pr), "--json", "files"],
+            ["gh", "pr", "view", str(pr), "--json", "files,changedFiles"],
             capture_output=True,
             text=True,
             cwd=cwd,
@@ -72,6 +92,12 @@ def pr_files(pr: int, cwd: str | None = None) -> list[str]:
         why = (cp.stderr or cp.stdout).strip().splitlines()
         raise RuntimeError(f"gh could not read PR #{pr}: {why[-1] if why else cp.returncode}")
     try:
-        return [str(f["path"]) for f in json.loads(cp.stdout).get("files") or []]
+        got = json.loads(cp.stdout)
+        files = [str(f["path"]) for f in got.get("files") or []]
+        total = int(got.get("changedFiles") or 0)
     except (ValueError, KeyError, TypeError, AttributeError):
         raise RuntimeError(f"gh gave PR #{pr}'s files in a shape this does not read") from None
+    if total > len(files):
+        # `gh` returns one page of a large PR's files: a held path past it would read as *not held*
+        raise RuntimeError(f"gh listed {len(files)} of PR #{pr}'s {total} files: too many to judge; ask the reader")
+    return files

@@ -987,7 +987,10 @@ def cmd_pr(args: argparse.Namespace) -> int:
     if sid is None:
         return 2
     rec = call_sync("get", id=sid)
-    setting = rec.get("review") or None
+    try:
+        setting = reviewmod.setting(rec.get("review"))
+    except ValueError as e:
+        return fail(args, f"{sid}'s {e}", 1)
     try:
         files = reviewmod.pr_files(args.n, cwd=rec.get("dir") or None) if setting else []
     except RuntimeError as e:
