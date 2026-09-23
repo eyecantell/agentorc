@@ -71,6 +71,10 @@ def test_a_stopped_team_offers_forget_all_but_never_on_a_card_with_unpushed_work
     assert "Forget 2 sessions of t: a, b?" in html and "c (dirty · 3 unpushed)" in html
     (live,) = team_groups([a, {**sess("ao-w", "w", team="t", state="working"), "flag": ""}])
     assert live["forget"] == [] and "Forget all" not in head.render(g=live)
+    # an on-call seat is never forgotten — its card offers no Forget while the definition names it
+    seat = {**sess("ao-s", "s", team="t", state="exited"), "flag": "", "seat": True}
+    (seated,) = team_groups([a, seat])
+    assert [m["id"] for m in seated["forget"]] == ["ao-a"] and seated["forget_kept"] == []
     (flagged,) = team_groups([c])
     assert "Forget all" not in head.render(g=flagged)
     # *No team* is not a team: no Forget all there, whatever it holds

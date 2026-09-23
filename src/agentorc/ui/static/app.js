@@ -652,6 +652,7 @@
     });
     // a header re-rendered for a delta must not re-arm a request in flight
     $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
+    $$("#groups .ghead [data-forget-all]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.forgetAll)));
     syncAnsweredMarks();  // …nor lose the answered-for-you mark the browser counted (§4.9b)
   }
   // design §4.5a team card **Forget all** (TD-071 item 1): the Forget each card carries, one after

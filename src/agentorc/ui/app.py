@@ -1156,6 +1156,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
         # the definition's rows read the raw records; a view that disagrees about what is live (a
         # delta between the two reads) is not drawn concluded — Wind down is the safe offer then
         concluded = c if live and isinstance(c, dict) and len(c.get("names") or ()) == live else None
+        dead = [m for m in members if not m.get("seat")] if team != NO_TEAM and not live else []
         groups.append(
             {
                 "team": team,
@@ -1193,9 +1194,11 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 # design §4.5a team card **Forget all** (TD-071 item 1): on a team with nothing live,
                 # the Forget each card carries, on every card but those with the dirty / unpushed
                 # flag — Forget drops the record that points at the worktree, and unpushed work would
-                # lose its only pointer, so those are named apart and forgotten one at a time
-                "forget": [m for m in members if not m.get("flag")] if team != NO_TEAM and not live else [],
-                "forget_kept": [m for m in members if m.get("flag")] if team != NO_TEAM and not live else [],
+                # lose its only pointer, so those are named apart and forgotten one at a time. A seat
+                # with nobody in it is neither: its card never offers Forget while the definition
+                # names it (`next_act`), and Forget all does not go round that
+                "forget": [m for m in dead if not m.get("flag")],
+                "forget_kept": [m for m in dead if m.get("flag")],
                 # design §4.5a team header **✉ n** (TD-071 item 2): what the fold hides of the cards'
                 # unread chips — display only, the mail stays where it is (§4.10)
                 "unread": sum(int(m.get("unread") or 0) for m in members),
