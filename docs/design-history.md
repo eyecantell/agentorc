@@ -248,6 +248,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-20 (TD-079 step 1a): `--outcome` and `--thread` designed and built the same day, with the debt, the line on every `ao` reply, the refused `ao progress none` and the Ready to close row; step 1b added the attention trail, `attention_snooze` and `inbox_dismiss`.
 - 2026-09-20 (TD-083, design; built 2026-09-21 by its step 1): `ao progress restart --why` — the session's run is over and its lane is not (§4.9a *A run that ends with work left*).
 - 2026-09-22 (TD-100, design): `ao gate` — print and set per-profile reserves through the `set_settings` RPC (§6 *Usage gate*, §5 `settings.yml`).
+- 2026-09-23 (TD-093 slice 2, grinder-ao-1): `ao pr held <n>` was added, the author's own check of a PR against its record's `review.held`. The design had said only *path globs*. The build fixed their reading: from the repo root, `**` across directories, `*` within one. It also made a PR whose files `gh` cannot read an error rather than *not held*, since a failed read would otherwise let a held PR merge unread.
 
 ## 4.8 Capabilities, report channels, and role presets
 
