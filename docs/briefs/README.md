@@ -13,12 +13,13 @@ session gets its own worktree and branch, per design §4.5a, New session "Where:
 pdm run ao new -d ~/agentorc -w grinder-ao-1 --unattended --prompt "$(cat docs/briefs/grinder-ao-1.md)" grinder-ao-1
 ```
 
-There are no policies for these yet (design §6 usage gate and the run-window policy are
-phase 3), so each brief carries its own stop time and usage rule. Edit the date and stop time
-in the brief before relaunching. The samscrape workers still run under samscrape's
-`scripts/tdgrind.sh` supervisor; moving them into agentorc is the phase 3 work.
+A brief names no run, no date and no stop time (TD-042): the same file starts the session every
+time, and `ao team start` warns when one does. What used to be written into each brief is the host
+agent's now — the usage gate pauses and resumes unattended sessions against the reserves in
+`settings.yml` (design §6, `ao gate`), and a hand-launched worker gets a stop time with
+`ao new --until <time>` (TD-026; a clock time or `+8h`). samscrape runs its own team on its own briefs, in that repo.
 
-`manager-ao-1.md` is the first lead (design §4.8): a session holding the
+`manager-ao-1.md` is the team's manager (design §4.8): a session holding the
 `control` grant that keeps the unattended workers going and runs the cadence check
 (`scripts/check_cadence.py`, cadence §4) on what they call done. **By hand** — which is what this
 file is about — launch it **after** the workers and attach it to them in the same step; see
@@ -35,7 +36,7 @@ empty list means nobody may. A person's `ao new` sets no controller — there is
 **every worker launched by hand needs attaching**, in the same step as the grant:
 
 ```
-ao control manager-ao-1 add grinder-ao-1 tdgrind-1 tdgrind-2 tdgrind-3
+ao control manager-ao-1 add grinder-ao-1 grinder-ao-2
 ao status -v            # each worker's `under:`, and the lead's `members:`
 ```
 
@@ -44,17 +45,15 @@ lead: every send it makes is refused, and its own log is the only place that say
 The one case that needs nothing is a worker the **lead itself** started — a session lists
 its creator from birth (§4.8), which is what the brief's restart rule relies on.
 
-The samscrape workers now launch from agentorc too (`ao new -d ~/samscrape …` from their
-`~/.tdgrind/tdgrind-N-prompt.md` briefs, since 2026-09-10); `scripts/tdgrind.sh` is paused.
-
 Two briefs are written but **not launchable yet**, so that their rules are decided before the day
 they are needed: `guardians-orchestrator.md` (blocked — the repos are not on this host, and the
 devcontainer question in design §10 is open) and `director.md` (needs two leads before
 it is worth running). Both carry the restart ceiling and `one_for_one` scope from TD-036.
 
-`techlead-context.md` is the techlead's **primer** (design §4.9b): meant as its first read on every fill, once a techlead
-brief names it (none does yet — TD-075 step 5) — the
-project in a few thousand words, an index and never a source. The PR that changes the architecture,
+`techlead-context.md` is the techlead's **primer** (design §4.9b): its first read on every fill —
+the team definition's `techlead: {…, context: docs/briefs/techlead-context.md}` names it and the
+preset brief reads it as `{context}` — the project in a few thousand words, an index and never a
+source. The PR that changes the architecture,
 a standing decision or the merge rules updates it; `tests/test_primer.py` holds its pointers to ones
 that exist.
 
