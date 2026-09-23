@@ -336,3 +336,8 @@
        the prior run were merged by the anchor at 22:29/22:33Z, before this run started; #496 just
        merged is the anchor's design PR, not a member's). No relays due (last cadence-changes
        entry landed 2026-09-12, before both grinders' start). No outcomes owed. Nothing to do.
+23:09–23:32 quiet (techlead-ao-1 seat closed itself, host agent's own tick, no action; grinder-ao-1
+       moved TD-119→TD-071; #497/#498 seen open, both the anchor's own PRs, not a member's)
+23:33  grinder-ao-1: TD-071 items 1-2 done → PR #499 merged, cadence pass (review FIXED · sonnet ·
+       2 findings, ci green, ledger named). Item 8 stays Paul's canvas per its note. grinder-ao-2
+       still working TD-046.
