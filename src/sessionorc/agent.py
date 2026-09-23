@@ -63,6 +63,7 @@ from sessionorc.models import (
     attention_kind,
     has_control,
     normalize_ref,
+    normalize_review,
     now_iso,
     report_line,
 )
@@ -1738,8 +1739,12 @@ class HostAgent:
         keep_mail: bool = False,
         supervised: bool = False,
         seat: dict[str, Any] | None = None,
+        review: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """`supervised` (design §6 *Keeping a team running*, TD-103 slice 1): kept on the record,
+        """`review` (design §4.9b *The reader*, TD-093): the role preset's `{reader, held, bound}`,
+        checked and kept on the record, read afterwards by the author's own `ao`.
+
+        `supervised` (design §6 *Keeping a team running*, TD-103 slice 1): kept on the record,
         and a resume of a supervised record stays supervised whether or not it says so — the field
         is cleared by nothing but Forget. With it, the create writes the session's launch record
         (`_write_launch`), here unless this is a node, whose home writes it when it routes the create.
@@ -1757,6 +1762,7 @@ class HostAgent:
         if not directory.is_dir():
             raise RpcError(f"not a directory: {directory}")
         grants, references = _grants(capabilities or []), _lane(lane or [])  # validate before anything starts
+        reading = _review(review)
         if seat is not None and not (
             isinstance(seat, dict) and isinstance(seat.get("trigger"), str) and seat["trigger"]
         ):
@@ -1895,6 +1901,7 @@ class HostAgent:
                 or bool(resume and isinstance(holder, Session) and holder.adapter_id == resume and holder.supervised)
                 or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
                 seat=dict(seat) if seat else None,
+                review=reading,
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
@@ -2779,6 +2786,7 @@ class HostAgent:
         nonce: str | None = None,
         caller: Any = None,
         source: str | None = None,
+        pr: Any = None,
     ) -> dict[str, Any]:
         """`ao msg <to>… "…" [--kind] [--about] [--reply-to]` (design §4.10): put an attributed
         entry in each addressee's inbox. Nothing is typed anywhere. Gated by §4.10's graph, never
@@ -2817,6 +2825,7 @@ class HostAgent:
                 for_,
                 thread,
                 source,
+                pr,
             )
         except RpcError as e:
             if key:
@@ -2914,6 +2923,7 @@ class HostAgent:
         for_: str | None = None,
         thread: str | None = None,
         source: str | None = None,
+        pr: Any = None,
     ) -> dict[str, Any]:
         """One message, every rule of §4.10 in the order it applies. Long on purpose: the order is
         the design (validate, resolve the thread, forward, gate all-or-nothing, cap, count, land).
@@ -2922,6 +2932,12 @@ class HostAgent:
         records = self._graph()
         if kind not in MAIL_KINDS:
             raise RpcError(f"unknown message kind {kind!r}; kinds are: {', '.join(MAIL_KINDS)}")
+        if pr is not None:
+            # §4.9b *The reader* (TD-093): a PR put in front of its reader is a question
+            if kind != "ask":
+                raise RpcError(f"a PR number rides only on an `ask` (design §4.9b *The reader*), not a {kind}")
+            if isinstance(pr, bool) or not isinstance(pr, int) or pr < 1:
+                raise RpcError(f"`pr` is a pull request's number, a positive integer, not {pr!r}")
         text = str(text or "").strip()
         if not text:
             raise RpcError("a message needs a body")
@@ -3213,6 +3229,7 @@ class HostAgent:
         entry.source = src
         entry.answers = list(picks)  # data the sender proposed, on the envelope (§4.10, TD-070)
         entry.answer = picked
+        entry.pr = pr
         entry.team = (me.team or None) if me is not None else None  # the envelope carries its sender's team (§4.10)
         if kind in ASK_KINDS and not (kind == "ask" and PERSON in named):
             # `bound` is None exactly when the addressee is the person and the kind is `ask`: that
@@ -5766,8 +5783,10 @@ class HostAgent:
         if s.host == self.host:
             if self.mode == "node":
                 v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)
+                v["prs_waiting"] = None  # the home's to count: a node holds no inbox (§4.4a)
             return v
         v["asks_waiting"] = s.asks_waiting(home=self.host)  # a bare `to` here names this host's session
+        v["prs_waiting"] = s.prs_waiting(home=self.host)
         v["id"] = f"{s.id}@{s.host}"
         v["controllers"] = self._ctl(s)  # as this home addresses them
         state = self.links.get(s.host) or {"up": False, "since": None, "why": "not connected since the home started"}
@@ -6163,7 +6182,7 @@ def _prune_tallies(r: Session) -> None:
 LAUNCH_KEYS = (
     "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
     "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
-    "seat",
+    "seat", "review",
 )  # fmt: skip
 
 
@@ -6277,6 +6296,14 @@ def _lane(refs: list[str]) -> list[str]:
     # deduped after canonicalisation: `--lane TD-027,td-27` is one item, or the lane count the card
     # shows (*1 of 2*) would be a lie about how much work there is (review 2026-09-11)
     return list(dict.fromkeys(_ref(r) for r in refs))
+
+
+def _review(review: Any) -> dict[str, Any] | None:
+    """A role preset's `review:` as the record keeps it (design §4.9b *The reader*, TD-093)."""
+    try:
+        return normalize_review(review)
+    except ValueError as e:
+        raise RpcError(str(e)) from None
 
 
 def _ref(ref: str) -> str:
