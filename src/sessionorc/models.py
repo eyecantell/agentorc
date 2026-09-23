@@ -99,6 +99,7 @@ HOME_OWNED = frozenset(
         "lane",
         "unattended",
         "run_until",
+        "supervised",
         "wrapup_prompt",
         "pause_prompt",
         "resume_prompt",
@@ -641,6 +642,12 @@ class Session:
     pause_prompt: str | None = None
     resume_prompt: str | None = None
     gated: dict[str, Any] | None = None
+    # *Someone chose to keep this session running* (design §6 *Keeping a team running*, TD-103):
+    # set by `ao team start` on every session it creates and by `ao new --supervised`, carried by
+    # every resume of the record, cleared by nothing but Forget. The home's intent (§4.4a). With
+    # it, every create writes the session's launch record (`launch/<id>.json`), which is what a
+    # restart replays; the policies that act on it key on it and on `unattended` together.
+    supervised: bool = False
     # The other wrap-up (design §4.10 "A pending stop beats mail", TD-052 step 7): when a `send`
     # marked `wrapup` typed the wrap-up prompt — the card's Wrap up, `ao team stop` and a
     # manager's wind-down (§4.9a) — which this package cannot tell from any other send by its

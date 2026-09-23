@@ -1113,10 +1113,35 @@ class HostAgent:
         for key in [k for k in self._attention if k.split("|", 1)[0] == sid]:
             del self._attention[key]  # belt and braces: `_attention_gone` wrote these out already
 
+    def _write_launch(self, address: str, s: Session, params: dict[str, Any]) -> None:
+        """The launch record of a supervised create (design §6 *Keeping a team running*): what the
+        create was handed — adapter, profile, the prompt as handed, lane, name, directory, worktree,
+        role, badges — with the record's own `controllers` (the creator added), written at the home
+        as `launch/<address>.json`, which a restart replays rather than re-reading any definition.
+        Written at every such create, so a resume with changes leaves the person's latest choices;
+        owner-only, since it holds the brief. A failure to write is logged, never the create's."""
+        record = {**params, "controllers": list(s.controllers), "supervised": True, "id": address, "at": now_iso()}
+        path = paths.launch_dir() / f"{address}.json"
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(".json.tmp")
+            fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)  # owner-only from the start
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(record, f, indent=1)
+            tmp.replace(path)
+        except OSError as e:
+            log.warning("%s: could not write its launch record: %s", address, e)
+
+    @staticmethod
+    def _drop_launch(address: str) -> None:
+        with contextlib.suppress(OSError):
+            (paths.launch_dir() / f"{address}.json").unlink(missing_ok=True)
+
     def _forget(self, sid: str) -> None:
         gone = self.sessions.get(sid)
         if gone is None:
             return  # already forgotten (two removes of one id in flight): nothing more to announce
+        self._drop_launch(sid)  # the launch record goes with the record on Forget (§6)
         # Its open `ask`s expire with it (design §4.10 lifecycle): the record and its inbox go, and
         # every other holder of those asks — the askers — is told so. Done while it is still in the
         # map so `_mark` reaches it, harmlessly, along with the rest. A `steer` is the exception:
@@ -1315,8 +1340,14 @@ class HostAgent:
         host: str | None = None,
         caller: str | None = None,
         keep_mail: bool = False,
+        supervised: bool = False,
     ) -> dict[str, Any]:
-        """`keep_mail` (design §4.9b, TD-075 step 4): a fresh start under a name moves the mail of
+        """`supervised` (design §6 *Keeping a team running*, TD-103 slice 1): kept on the record,
+        and a resume of a supervised record stays supervised whether or not it says so — the field
+        is cleared by nothing but Forget. With it, the create writes the session's launch record
+        (`_write_launch`), here unless this is a node, whose home writes it when it routes the create.
+
+        `keep_mail` (design §4.9b, TD-075 step 4): a fresh start under a name moves the mail of
         the record it supersedes — inbox, outbox, tallies, wake decisions — as a resume does, and
         resumes nothing of its conversation. It is how a techlead seat is filled without forgetting
         the questions that caused the fill. Handing a record's mailbox to a successor is an act on
@@ -1458,6 +1489,10 @@ class HostAgent:
                 resume_prompt=(str(resume_prompt).strip() or None) if resume_prompt else None,
                 previous_run=previous_run,
                 host=self.host,
+                # a resume carries it — of the name's record or the conversation's (§6: Forget alone clears it)
+                supervised=bool(supervised)
+                or bool(resume and isinstance(holder, Session) and holder.supervised)
+                or any(r.supervised for r in self.sessions.values() if resume and r.adapter_id == resume),
             )
             if isinstance(holder, Session):
                 # the record of this name it replaced, for the home, which holds the mail (§4.4a)
@@ -1471,6 +1506,11 @@ class HostAgent:
             elif keep_mail and isinstance(holder, Session):
                 self._move_mail(holder, s)  # the seat's mail, to the seat's next holder (§4.9b)
                 self.store.save(s)
+            if self.mode != "node":
+                if s.supervised:
+                    self._write_launch(s.id, s, launch_params(locals()))
+                else:
+                    self._drop_launch(s.id)  # a fresh start that took a supervised record's id is not it
         return s.view()
 
     def _check_keep_mail(self, holder: Session | str | None, caller: Any, resume: str | None) -> None:
@@ -2177,8 +2217,7 @@ class HostAgent:
             return await self._ending(s, status, why, source, caller)
         if status not in PROGRESS_STATUSES:
             raise RpcError(
-                f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, "
-                "none, restart"
+                f"unknown progress status {status!r}; statuses are: {', '.join(PROGRESS_STATUSES)}, none, restart"
             )
         entry = ProgressEntry(ref=_ref(ref), status=status, pr=_pr(pr), why=why, source=_source(source))
         holder = self._lease_holder(s, entry) if status == "claimed" and entry.source == "declared" else None
@@ -2229,8 +2268,7 @@ class HostAgent:
         if mail.is_person(caller) or str(caller) != s.id:
             said = "declare itself out of work" if status == "none" else "declare a restart of itself"
             raise RpcError(
-                f"only {s.id} may {said}: it is the session's own word about its own run "
-                "(design §9 invariant 14)"
+                f"only {s.id} may {said}: it is the session's own word about its own run (design §9 invariant 14)"
             )
         if not (why or "").strip():
             reason = "the search that came up empty" if status == "none" else "why this run is over"
@@ -2642,9 +2680,7 @@ class HostAgent:
         taken: MailEntry | None = None  # the caller's own open question to a session, taken to the person
         state = str(outcome or "").strip()
         if state and not for_:
-            raise RpcError(
-                'an outcome names the question it settles: --for <ask id> (design §4.10 *Outcomes*)'
-            )
+            raise RpcError("an outcome names the question it settles: --for <ask id> (design §4.10 *Outcomes*)")
         if for_ and not state:
             raise RpcError(
                 "--for names the question an outcome settles: give it one, --outcome done|blocked|dropped "
@@ -2738,7 +2774,7 @@ class HostAgent:
                 if len(owed) >= mail.OUTCOMES_OWED_MAX:
                     raise RpcError(
                         f"you owe {len(owed)} outcomes to the person: report them first "
-                        f"(ao msg person --outcome done|blocked|dropped \"<one line>\" --for <id>): "
+                        f'(ao msg person --outcome done|blocked|dropped "<one line>" --for <id>): '
                         f"{', '.join(owed[: mail.OUTCOMES_OWED_MAX])} (design §4.10 *Outcomes*)",
                         owed=owed,
                     )
@@ -4550,6 +4586,9 @@ class HostAgent:
         reply = reply if isinstance(reply, dict) else {}
         if reply.get("record"):
             self._take_records(host, [reply["record"]], whole=False)
+            held = self.remote.get(host, {}).get(str(reply["record"].get("id"))) if method == "create" else None
+            if held is not None and held.supervised:  # the home holds a node session's launch record (§6)
+                self._write_launch(f"{held.id}@{host}", held, launch_params(params))
             if method == "create" and mail.is_person(caller):
                 self._lift_by_person(host, str(reply["record"].get("id") or ""))
         elif reply.get("gone") and rid:
@@ -4820,9 +4859,7 @@ class HostAgent:
                 # suspended while the link was down, the name retaken there, the link back. A person's
                 # own create through the home lifts it (`_route_act`), as it does on one host.
                 new.suspended = dict(old.suspended)
-                log.warning(
-                    "link from %s: %s took the name of suspended %s — the mark stands on it", host, rid, old_id
-                )
+                log.warning("link from %s: %s took the name of suspended %s — the mark stands on it", host, rid, old_id)
             if x.get("mail"):
                 self._move_mail(old, new)
             elif old is held:
@@ -4859,6 +4896,7 @@ class HostAgent:
     def _forget_remote(self, host: str, rid: str) -> None:
         if self.remote.get(host, {}).pop(rid, None) is None:
             return
+        self._drop_launch(f"{rid}@{host}")
         self._remote_store(host).delete(rid)
         address = f"{rid}@{host}"
         for last in self._subscribers.values():
@@ -4909,9 +4947,7 @@ class HostAgent:
         was = self._id_detached
         self._id_detached = identity.detached_check(self.proc, agent_pid=os.getpid(), tmux_pid=tmux_pid) or ""
         if (was or "") != self._id_detached:
-            log.info(
-                "detached-process check %s (tmux server pid %s)", "on" if self._id_detached else "off", tmux_pid
-            )
+            log.info("detached-process check %s (tmux server pid %s)", "on" if self._id_detached else "off", tmux_pid)
 
     async def _id_recheck_detached(self) -> None:
         """A tmux server can be **replaced** while the agent runs — kmaster's was, on 2026-09-20 —
@@ -5696,6 +5732,19 @@ def _prune_tallies(r: Session) -> None:
         del r.threads[key]
 
 
+LAUNCH_KEYS = (
+    "name", "dir", "adapter", "profile", "repo", "worktree", "argv", "unattended", "prompt", "capabilities",
+    "lane", "role", "ledger", "team", "project", "run_until", "wrapup_prompt", "pause_prompt", "resume_prompt",
+)  # fmt: skip
+
+
+def launch_params(given: dict[str, Any]) -> dict[str, Any]:
+    """The create's own arguments a launch record keeps (design §6): what a replay hands to `create`
+    again, taken from the call as it arrived — never the conversation (`resume`), the caller, or
+    the mail hand-over, which are the start's own and not the session's."""
+    return {k: given[k] for k in LAUNCH_KEYS if k in given and given[k] is not None}
+
+
 def _renamed_grants(s: Session, where: str) -> bool:
     """A copy that arrived with a renamed grant's old name (TD-055) was normalised as it was read;
     say so, as the loader does, and tell the caller to save it. True when there was one."""
@@ -5759,7 +5808,7 @@ def _alarm_report(s: Session, mode: str | None) -> str:
         lines.append(f"its report line: {line}")
     lines.append(
         "This is either a bug of ours or a session misbehaving. File it where work is picked up, "
-        "then report the outcome: ao msg person --outcome done|blocked|dropped \"<one line>\" --for <this id>."
+        'then report the outcome: ao msg person --outcome done|blocked|dropped "<one line>" --for <this id>.'
     )
     return "\n".join(lines)
 

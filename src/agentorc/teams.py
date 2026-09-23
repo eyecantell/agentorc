@@ -148,6 +148,8 @@ class Launch:
             "team": self.team,
             "project": self.project,
             **gate_prompts(self.unattended),
+            # every session a team start creates is one someone chose to keep running (§6, TD-103)
+            "supervised": True,
         }
 
 

@@ -1252,6 +1252,34 @@ async def test_a_fresh_start_on_a_node_is_a_new_record_at_the_home_and_keep_mail
             await person.call("kill", id=address)
 
 
+async def test_a_supervised_create_on_a_node_leaves_its_launch_record_at_the_home(
+    home, hookstub, tmp_path, monkeypatch
+):
+    """TD-103 slice (1), design §6: the restarts run at the home, so the launch record of a node's
+    supervised session is written by the home under the record's address — never by the node —
+    and goes when the home forgets the record."""
+    import json
+
+    async with node_agent(tmp_path, monkeypatch, home.dial_command()) as node:
+        assert await wait_for(node.home_reachable, timeout=10.0, step=0.05)
+        launch = home.dir / "launch"  # the home's, whatever this process's AGENTORC_HOME now says
+        seat = dict(name="w", dir=str(tmp_path), adapter=hookstub.name, unattended=True, host="laptop")
+        async with LocalClient(sock=home.dir / "agent.sock") as person:
+            address = (await person.call("create", supervised=True, prompt="brief", **seat))["id"]
+            assert address.endswith("@laptop")
+            rec = json.loads((launch / f"{address}.json").read_text())
+            assert rec["id"] == address and rec["prompt"] == "brief" and rec["supervised"] is True
+            from sessionorc import paths
+
+            assert paths.launch_dir() != launch  # this process's AGENTORC_HOME is the node's now
+            assert not (paths.launch_dir() / f"{address.removesuffix('@laptop')}.json").exists()  # the node wrote none
+            assert (await at_home(home, address))["supervised"] is True
+            await person.call("kill", id=address)
+            await until(home, address, lambda r: r is not None and r["state"] == "exited")
+            await person.call("remove", id=address)
+            assert not (launch / f"{address}.json").exists()
+
+
 async def test_a_suspension_outlives_a_supersession_on_a_node_and_a_persons_create_at_the_home_lifts_it(
     home, hookstub, tmp_path, monkeypatch
 ):

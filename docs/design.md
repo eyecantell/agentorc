@@ -4020,7 +4020,7 @@ code and needs no grant; a session doing the same work does.
   (`ao until` has no page equivalent), `start_at` and the `scheduled` state, window overrides with
   an expiry, and calendar-shaped schedules (TD-026).
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
-  designed, not built). Four rules that lived in the manager's brief, applied by a model every
+  `supervised` and the launch record built — slice 1 — and the four rules not yet). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
   says `unattended: true` and `supervised: true`.** `supervised` is a home-owned intent field
   (§4.4a), set by `ao team start` on **every session it creates — the manager, the seats and the
