@@ -938,8 +938,8 @@ class HostAgent:
             merged = dict(zip(dirs, found, strict=True))
             for r in seats:
                 got = merged.get(where[r.id])
-                if got is None:
-                    continue
+                if got is None or r.superseded_by:
+                    continue  # no reading; or a fill or restart replaced it while `gh` was out
                 since = _parse(r.created)
                 count = {"prs": sum(1 for at in got if at > since), "at": now_iso()}
                 if (r.seat_count or {}).get("prs") != count["prs"]:
