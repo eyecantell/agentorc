@@ -1,6 +1,6 @@
 ---
 name: agentorc-td-grind-mechanics
-description: "Gotchas for scripted ledger edits, PR comments and merging in agentorc (template headed TD-001, never guess a PR number, the cadence verdict goes on the comment's first line, archive-tail conflicts)"
+description: "Gotchas for scripted ledger edits, PR comments and merging in agentorc (template headed TD-001, never guess a PR number, the cadence verdict goes on the comment's first line, archive-tail conflicts, the **Resolved:** label)"
 metadata: 
   node_type: memory
   type: project
@@ -21,6 +21,11 @@ Learned running the 2026-09-09/10 unattended TD grind in agentorc (session tdgri
 - Every TD PR appends to `docs/technical_debt_archive.md`, so consecutive merges conflict on the
   archive tail (and on the ledger when two PRs delete neighbouring entries). Rebase each branch
   right before its merge; keep-both is always the right archive resolution.
+- An archived entry needs the literal `**Resolved:** <date> …` label; `tests/test_ledger.py`
+  fails CI on anything else (`**Resolved 2026-09-23**` failed PR #475). Run that test before
+  pushing even a doc-only ledger PR. The cadence comment's first line is
+  `cadence-review: SHIP | FIXED | BLOCK · <model> · <code|docs> · <n> findings`, and a comment
+  is never edited: a malformed one is superseded by a new one.
 - `pkill -f <pattern>` kills the wrapping shell when the pattern appears in the command line
   itself; kill by pid. (Run 2 hit it again: exit 144 on the whole Bash tool call.)
 - A probe script that starts a child agent must put `AGENTORC_HOME` under a *short* path: the
