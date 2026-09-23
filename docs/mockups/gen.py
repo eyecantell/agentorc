@@ -212,7 +212,7 @@ TAIL = "</x-dc>\n</body>\n</html>\n"
 def topbar(active="Org", narrow=False):
     tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in ["Org", "Inbox 4 · 2", "Resumable", "Commands", "Attention"])
     return f'''<div class="topbar">
-  <span class="wordmark">agent<b>orc</b></span>
+  <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;">{tabs}</div>
   <div style="flex-grow: 1;"></div>
   {"" if narrow else '<span class="mono" style="font-size: 11px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>'}
@@ -580,7 +580,7 @@ def team_phone():
     for host, repo, r in ordered:
         cards += card(host, repo, r)
     return head("Phone") + f'''<div style="width: 390px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
-<div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">agent<b>orc</b></span><span style="flex-grow: 1;"></span><span class="mono" style="font-size: 11px; color: #aab3bf;">5h 41%</span><span class="btn primary" style="height: 32px; width: 32px; padding: 0; justify-content: center;">{ICON["plus"]}</span></div>
+<div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">Shift<b>Lead</b></span><span style="flex-grow: 1;"></span><span class="mono" style="font-size: 11px; color: #aab3bf;">5h 41%</span><span class="btn primary" style="height: 32px; width: 32px; padding: 0; justify-content: center;">{ICON["plus"]}</span></div>
 <div style="padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 10px;">
   <div style="display: flex; gap: 6px; overflow: hidden;"><span class="btn" style="height: 32px;">needs you 1</span><span class="btn" style="height: 32px;">due 6</span><span class="btn" style="height: 32px;">all 12</span></div>
   {due_strip(compact=True)}

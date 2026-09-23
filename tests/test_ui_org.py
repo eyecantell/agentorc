@@ -147,7 +147,7 @@ def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
         volatile=False,
         usage={},
     )
-    assert '<span class="h1">Org</span>' in html and "Org · agentorc" in html
+    assert '<span class="h1">Org</span>' in html and "Org · ShiftLead" in html
     assert 'data-team="ao-grind"' in html and "No team" in html
     # the card's team badge: drawn, and marked for the stylesheet to hide inside its own group (TD-095)
     assert 'class="badge team ingroup"' in html
