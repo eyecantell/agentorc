@@ -226,3 +226,4 @@
 19:14  grinder-ao-1: TD-099 (1) → PR #448 merged, cadence exit 0 (review recorded; no held paths — the teamrun side, not src/sessionorc); TD-100 chip line → #449 open (no held paths)
 19:23  grinder-ao-1: TD-100 chip line → PR #449 merged, cadence pass (review recorded; no held paths)
 19:27  grinder-ao-1: #450 (TD-100 gated resets, src/sessionorc) and #451 (TD-109, docs/briefs) open → held. Held for the anchor now: #442 #443 #447 #450 #451
+19:41  grinder-ao-1: TD-108 dropped, its finding folded → PR #452 merged, cadence pass (review recorded; no held paths); TD-103 crash restart → #453 open, src/sessionorc → held. Held: #442 #443 #447 #450 #451 #453
