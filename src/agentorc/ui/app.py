@@ -1190,6 +1190,15 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 "concluded": concluded,
                 "concluded_age": row.get("concluded_age") if concluded else "",
                 "stopped": not live or concluded is not None,
+                # design §4.5a team card **Forget all** (TD-071 item 1): on a team with nothing live,
+                # the Forget each card carries, on every card but those with the dirty / unpushed
+                # flag — Forget drops the record that points at the worktree, and unpushed work would
+                # lose its only pointer, so those are named apart and forgotten one at a time
+                "forget": [m for m in members if not m.get("flag")] if team != NO_TEAM and not live else [],
+                "forget_kept": [m for m in members if m.get("flag")] if team != NO_TEAM and not live else [],
+                # design §4.5a team header **✉ n** (TD-071 item 2): what the fold hides of the cards'
+                # unread chips — display only, the mail stays where it is (§4.10)
+                "unread": sum(int(m.get("unread") or 0) for m in members),
             }
         )
     # what is running is read first; *No team* is never "stopped" — nothing there starts as one

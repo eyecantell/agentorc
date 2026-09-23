@@ -654,6 +654,25 @@
     $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
     syncAnsweredMarks();  // …nor lose the answered-for-you mark the browser counted (§4.9b)
   }
+  // design §4.5a team card **Forget all** (TD-071 item 1): the Forget each card carries, one after
+  // another — the same route and the same `remove` — so a record the agent refuses (a suspended one,
+  // §4.8a) is refused in its own words and the rest go on. The cards leave as the removals land.
+  async function forgetAll(btn) {
+    const team = btn.dataset.forgetAll, ids = (btn.dataset.ids || "").split(" ").filter(Boolean);
+    if (pendingTeams.has(team)) return;
+    pendingTeams.add(team); btn.disabled = true;
+    let gone = 0;
+    try {
+      for (const id of ids) {
+        try {
+          await AO.act(id, "remove", {});
+          gone++;
+          const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove();
+        } catch (err) { AO.toast(`${id}: ${err.message}`); }
+      }
+    } finally { pendingTeams.delete(team); btn.disabled = false; }
+    AO.toast(`${team}: forgot ${gone} of ${ids.length}`, gone === ids.length);
+  }
   // A stop returns before its manager does (design §4.9: the members settle first, which is minutes).
   // Nothing pushes that outcome, so the page asks for it — bounded, and only while one is pending —
   // rather than leaving a failure nobody ever sees (design §4.5 "Errors"; review of PR #124).
@@ -1009,6 +1028,8 @@
       const b = e.target.closest("[data-team-act]");
       // a concluded team's Start closes its sessions first, and its confirm names them (TD-099)
       if (b) return b.dataset.confirm && !confirm(b.dataset.confirm) ? undefined : teamAct(b.dataset.team, b.dataset.teamAct, b);
+      const fa = e.target.closest("[data-forget-all]");
+      if (fa) return confirm(fa.dataset.confirm) ? forgetAll(fa) : undefined;
       const f = e.target.closest("[data-fold]");
       if (f) { store.set(foldKey(f.dataset.fold), !store.get(foldKey(f.dataset.fold), true)); syncTeams(); }
     });

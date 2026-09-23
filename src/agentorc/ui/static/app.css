@@ -226,6 +226,7 @@ input.denywhy { height: 24px; font-size: 11px; padding: 0 6px; border: 1px solid
 .ghead .btn[hidden] { display: none; }
 /* a team with nothing live: its cards folded behind the header's count, and the card itself quieter */
 .tgroup.folded:not(.filtering) .grid { display: none; } .tgroup.folded:not(.filtering) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.tgroup:not(.folded) .ghead .foldmail, .tgroup.filtering .ghead .foldmail { display: none; }  /* ✉ n: what the fold hides (TD-071) */
 .tgroup[data-live="0"]:not([data-team=""]) { background: transparent; border-style: dashed; }
 .tgroup:not(:has(.sc)) .grid { display: none; } .tgroup:not(:has(.sc)) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }  /* a definition nothing carries yet */
 /* one scale with the cards (TD-095 i): the header sits on the body's 13 px and its title is no
