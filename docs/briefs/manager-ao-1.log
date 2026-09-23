@@ -341,3 +341,10 @@
 23:33  grinder-ao-1: TD-071 items 1-2 done → PR #499 merged, cadence pass (review FIXED · sonnet ·
        2 findings, ci green, ledger named). Item 8 stays Paul's canvas per its note. grinder-ao-2
        still working TD-046.
+23:34  grinder-ao-1 now idle + out_of_work → finished (nothing acted on it). Its why: TD-119 built
+       as PR #498 (td119-no-self-decide, opened 23:20:34Z), reviewed SHIP, touches src/sessionorc/
+       — held for the anchor per TD-093, not yet 2h; the archive rides in that PR. TD-046 leased to
+       grinder-ao-2, rest of the ledger anchor/paul/dev-cadence/design-first/live-check. (Note:
+       gh's author field on every PR here reads "eyecantell" regardless of which session opened
+       it — the shared git identity on this box — so PR ownership must be read from headRefName /
+       the member's own report, never from `author`.) grinder-ao-2 still working TD-046.
