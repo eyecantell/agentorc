@@ -301,3 +301,7 @@
 - No relays needed (last cadence change landed 09-11). No escalations beyond the wind-down board line. No outcomes owed.
 - For a §6 policy: the seat's idle-and-empty close. The host agent now does the fill, but it left a seat that read `stalled?` after /exit open. Treating "stalled?, 0 waiting, composer empty after /exit" as idle for the seat rule is mechanical. So is the hand rule's two-hour board line: open PR × held path × createdAt.
 01:25  board line → PR #482 merged 07:25Z (cadence-review: SHIP, Sonnet, docs; CI green). ao close self.
+
+## New run (2026-09-23, started ~13:55Z)
+
+13:56  New manager-ao-1 instance. Team ao-grind restarted: grinder-ao-1 (working, TD-117), grinder-ao-2 (working), techlead-ao-1 seat idle/empty. Inbox empty. No relays due (last cadence change landed 09-11, before both grinders' 13:55Z start). No open member PRs. No outcomes owed.
