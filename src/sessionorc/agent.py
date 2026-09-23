@@ -35,6 +35,7 @@ from pathlib import Path
 from typing import Any
 
 from sessionorc import adapters, build, containers, hosts, identity, link, mail, modes, naming, paths, reports, waits
+from sessionorc import board as board_mod
 from sessionorc import settings as settings_mod
 from sessionorc.gitinfo import WorktreeError, ensure_worktree, git_info, worktree_path
 from sessionorc.mail import ACTING_RPCS  # noqa: F401 — re-exported: callers read it from the agent
@@ -3817,6 +3818,28 @@ class HostAgent:
             self.attention_snoozed.pop(key, None)
         self.attention_store.save(self.trail, self.attention_snoozed)
         return {"id": PERSON, "row": key, "snoozed_until": self.attention_snoozed.get(key)}
+
+    async def rpc_board_edit(
+        self, board: str, line: int, text: str, action: str, due: str | None = None, caller: Any = None
+    ) -> dict[str, Any]:
+        """**Snooze** or **Done** on a board item (design §4.4 *Board write-back*, TD-069 step 3):
+        the one line edited in the repo's main checkout and committed there with the fixed message,
+        never pushed. `board` must be the board of a checkout this host's repos registry names;
+        `line` and `text` are what dev-cadence's reader gave the Inbox, and the edit is refused
+        unless the line still holds that text. A person's only, as every act on the Inbox is."""
+        if not mail.is_person(caller):
+            raise RpcError(f"{caller} cannot edit the board: Snooze and Done are the person's own (design §4.4)")
+        want = Path(board).resolve()
+        roots = [Path(r) for r in hosts.local_host().repos()]
+        root = next((r for r in roots if (r / board_mod.BOARD).resolve() == want), None)
+        if root is None:
+            raise RpcError(f"{board} is not the board of a repo this host knows (its repos registry)")
+        try:
+            done = await asyncio.to_thread(board_mod.write_back, root, line, text, action, due)
+        except board_mod.Refused as e:
+            raise RpcError(str(e)) from None
+        log.info("board %s: %s", root, done["message"])
+        return {"board": str(want), "line": line, "action": action, "due": due, **done}
 
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
         """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer
