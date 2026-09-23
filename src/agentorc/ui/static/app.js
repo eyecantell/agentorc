@@ -77,6 +77,73 @@
   }
   AO.act = act;
 
+  // ---- Pop out (design §4.5 screen 2 *Pop out*, §4.5a **Pop out** / **Focus** / **title**, TD-046) ----
+  // A session's Focus in its own browser window, for the OS window switcher. Client-side only:
+  // nothing about a window is written to the record. The window is named for the session, so a
+  // second press finds it by name and raises it instead of opening another.
+  AO.popName = (id) => `ao-focus-${id}`;
+  // `<name> · <state>`, `▲ ` in front while it needs the person: the switcher's one line.
+  AO.focusTitle = (v) => `${v.state === "needs-you" ? "▲ " : ""}${v.name} · ${v.state_label || v.state}`;
+  // The window's size and position are the person's, remembered per session in this browser; the
+  // default fits a 100-column terminal beside the 320px side column (13px mono is ~7.8px a column).
+  AO.popFeatures = function (saved) {
+    const w = saved && saved.w > 200 ? saved.w : Math.round(100 * 7.8) + 320 + 14 + 40 + 30;
+    const h = saved && saved.h > 200 ? saved.h : 860;
+    let f = `popup,width=${w},height=${h}`;
+    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) f += `,left=${saved.x},top=${saved.y}`;
+    return f;
+  };
+  AO.popOut = function (id) {
+    const name = AO.popName(id);
+    // An empty URL finds a window of that name without reloading it; a new one comes back blank and
+    // is sent to the session's chromeless Focus.
+    const w = window.open("", name, AO.popFeatures(store.get(`win.${id}`, null)));
+    if (!w) { AO.toast("the browser blocked the window — allow pop-ups for this page"); return; }
+    let blank = true;
+    // a window of that name showing another origin cannot be read: it is not our Focus, so send it there
+    try { blank = !w.location.pathname.startsWith("/focus/"); } catch (e) { blank = true; }
+    if (blank) w.location.href = `/focus/${encodeURIComponent(id)}?window=1`;
+    try { w.focus(); } catch (e) { /* the browser decides */ }
+  };
+  // Which sessions this browser holds popped out: each popped window says so on a channel between
+  // this browser's own tabs, and answers when a tab asks. Another browser, or a phone, knows nothing
+  // and opens Focus as it does (§4.5 *Pop out*).
+  // Opened by the pages that use it (the Org, a popped Focus), not at load: every page loads this file.
+  let popChanOpen;
+  function popChan() {
+    if (popChanOpen !== undefined) return popChanOpen;
+    popChanOpen = typeof BroadcastChannel === "function" ? new BroadcastChannel("ao-popped") : null;
+    if (popChanOpen) {
+      popChanOpen.onmessage = (m) => {
+        const d = m.data || {};
+        if (d.open) AO.popped.add(d.open);
+        if (d.closed) AO.popped.delete(d.closed);
+        if (d.open || d.closed) AO.markPopped();
+        if (d.who && AO.poppedId) popChanOpen.postMessage({ open: AO.poppedId });
+      };
+    }
+    return popChanOpen;
+  }
+  AO.popped = new Set();
+  // Relabel every card Focus link whose session is popped out here: *Focus window*, and back.
+  AO.markPopped = function (root) {
+    $$("a[data-focus]", root).forEach((a) => {
+      const on = AO.popped.has(a.dataset.focus);
+      if (!a.dataset.label) a.dataset.label = a.textContent;
+      a.textContent = on ? `${a.dataset.label} window` : a.dataset.label;
+      a.classList.toggle("popped", on);
+    });
+  };
+  // A plain click on *Focus window* raises the window; a modifier or a middle click stays the
+  // browser's, a new tab with the full page (§4.5a **Focus**).
+  document.addEventListener("click", (ev) => {
+    const a = ev.target.closest("a[data-focus]");
+    if (!a || !AO.popped.has(a.dataset.focus)) return;
+    if (ev.button !== 0 || ev.ctrlKey || ev.metaKey || ev.shiftKey || ev.altKey) return;
+    ev.preventDefault();
+    AO.popOut(a.dataset.focus);
+  });
+
   // the editor button (vscode://, or the person's own `open_in:` scheme, design §5): hand the URL to
   // the protocol handler without navigating this tab away (a plain click replaced the Org with a
   // blank page when the handler declined — first-use finding).
@@ -118,6 +185,7 @@
     // a board row (TD-069 step 3) goes the way a state row does: out on the answer, back on a refusal
     const staterow = b.closest(".staterow, .boardrow");
     if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
+    if (action === "popout") { const m = b.closest("details.more"); if (m) m.open = false; AO.popOut(id); return; }
     // A choice made in a row's *more ▾* or *Snooze* menu folds that menu — and only a menu: the
     // nearest `<details>` of any kind used to be closed, and a control that sits in no menu (an FYI
     // row's Dismiss, the snoozed list's Unsnooze) has the *section* as its nearest one, so dismissing
@@ -237,12 +305,12 @@
         const r = await act(id, "resume", { push: action === "reopen-push" });
         if (r.form) { AO.toast(`resume needs the form: ${r.why}`, true); location.href = r.form; return; }
         AO.toast("resumed — same name, same record, its mail came with it", true);
-        location.href = `/focus/${r.id}`;
+        location.href = `/focus/${r.id}${AO.poppedId ? "?window=1" : ""}`;
         return;
       }
       const res = await act(id, action2 || action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
-      if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/")) location.href = "/"; }
+      if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/") && !AO.poppedId) location.href = "/"; }
       if (action === "allow" || action === "deny") AO.toast(`${action}${body.reason ? " with your reason" : ""}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
@@ -1035,6 +1103,7 @@
       if (f) { store.set(foldKey(f.dataset.fold), !store.get(foldKey(f.dataset.fold), true)); syncTeams(); }
     });
     layout();
+    if (popChan()) popChan().postMessage({ who: true });  // the popped windows answer with their ids
     connectEvents((ev) => {
       if (ev.event === "session") {
         const old = $(`#card-${CSS.escape(ev.id)}`);
@@ -1046,6 +1115,7 @@
           grid.appendChild(fresh);
         }
         if (ev.groups !== undefined) syncGroups(ev.groups);
+        AO.markPopped(fresh);
         layout();
       } else if (ev.event === "gone") {
         const c = $(`#card-${CSS.escape(ev.id)}`); if (c) c.remove();
@@ -1192,8 +1262,19 @@
   };
 
   // ---- Focus ----
-  AO.focus = function (s) {
+  AO.focus = function (s, popped) {
     const id = s.id;
+    document.title = AO.focusTitle(s);
+    if (popped) {
+      // design §4.5 *Pop out* (TD-046): say so to this browser's other tabs, and keep the size and
+      // position the person gives the window, per session, as a team's fold is kept.
+      AO.poppedId = id;
+      if (popChan()) popChan().postMessage({ open: id });
+      const keep = () => store.set(`win.${id}`, { w: window.outerWidth, h: window.outerHeight, x: window.screenX, y: window.screenY });
+      let t = null;
+      window.addEventListener("resize", () => { clearTimeout(t); t = setTimeout(keep, 500); });
+      window.addEventListener("pagehide", () => { keep(); if (popChan()) popChan().postMessage({ closed: id }); });
+    }
     // scrollback: 0 — tmux owns the history (TD-022). The bridge sets `mouse on` on the session, so
     // tmux asks for mouse tracking and xterm.js forwards the wheel to it (copy mode, its history);
     // a local buffer would only ever hold stale repaints for the wheel to land on when tmux is not
@@ -1298,6 +1379,7 @@
 
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }
     function render(v) {
+      document.title = AO.focusTitle(v);
       const cls = v.state_class, scraped = v.scraped ? " scraped" : "";
       let head = `<span class="pill s-${cls}${scraped}"><span class="dot"></span>${v.state_label}</span>`;
       const p = v.pending;
@@ -1561,7 +1643,17 @@
       } else if (ev.event === "session" || ev.event === "gone") {
         refreshMembership();  // another session changed: it may be a controller or a member of ours
       }
-      if (ev.event === "gone" && ev.id === id) banner("session removed");
+      if (ev.event === "gone" && ev.id === id) {
+        // A window never closes itself: closing what a person opened is the person's act (§4.5
+        // *Pop out*). A popped one keeps saying why it is empty; a tab's banner fades as it did.
+        if (!popped) banner("session removed");
+        else {
+          const b = $("#fbanner");
+          b.textContent = "This session was forgotten: its record is gone. Close this window when you are done with it.";
+          b.classList.remove("hidden");
+          document.title = `${s.name} · forgotten`;
+        }
+      }
     });
   };
   // The top bar is on every page and its chips are rendered server-side, so the fit is set up here

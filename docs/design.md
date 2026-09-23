@@ -1352,7 +1352,7 @@ Screens:
    session in the browser as a team's fold is, defaulting to a window that fits a 100-column
    terminal; nothing about a window is written to the record. **The title is the point** — it is
    what the switcher shows — so every Focus, popped out or in a tab, is titled `<name> · <state>`
-   (today a Focus is titled `<name> · ShiftLead`, and nothing tracks the state), the name first because it is what the eye
+   (`AO.focusTitle`, set at load and on every pushed delta), the name first because it is what the eye
    looks for, with `▲ ` in front while the session needs the person, since a background window
    can speak nowhere else; it tracks the state deltas the page already receives. A popped-out
    window costs what a tab costs, one `/events` socket and one pty (§4.6), and the page sets no
@@ -1360,7 +1360,8 @@ Screens:
    of them. A window whose session exits shows the exited banner and its Details as a tab
    would, and never closes itself; one whose record is forgotten says so and stays, because
    closing a window a person opened is the person's act. The browser that popped a session out
-   knows it (the open handle, or a channel between its own tabs — the build's choice), so that
+   knows it — each popped window says so on a `BroadcastChannel` between that browser's own tabs,
+   and answers an Org tab that asks on load — so that
    session's card reads **Focus window** where **Focus** was and raises the window rather than
    opening a second view in the tab; another browser, and a phone, know nothing and open Focus
    as they do — a second view of one pane is allowed, and only the accidental one is prevented.

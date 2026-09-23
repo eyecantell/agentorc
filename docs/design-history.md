@@ -160,6 +160,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-22: *on call* built for the techlead seat, keyed on `teamrun.seat_ids`, and the same day for a seat with a trigger, whose slot words and *last ran* come from its trigger (TD-098), the report being the record's report line as on any card.
 - 2026-09-23 (TD-069 step 3, grinder-ao-2, on the techlead's answer): board items joined the Inbox's *Needs you*, counted, with Snooze and Done on §4.4's write-back (grinder-ao-1's `board_edit`). The read half was built first and held back: a counted row a person cannot clear from the page breaks *a row leaves only by an answer*, so the rows waited for the write-back. The Inbox's +1 day and +1 week count from today, not from the item's old date, since an overdue item snoozed a day from its old date would still be overdue.
 - 2026-09-23 (TD-046, the anchor): screen 2 gained *Pop out*: the window switcher is the requirement, a Focus can be its own OS window, its title names the session and its state.
+- 2026-09-23 (TD-046, `grinder-ao-2`, later): *Pop out* built as designed; the build's choice of how a browser knows what it popped out is a `BroadcastChannel` between its own tabs (a popped window announces itself and answers an Org tab's ask), and the window raise is `window.open` by name with an empty URL, so the existing window is found without a reload.
 - Phone layout: planned for phase 2 with the phone's route in (WireGuard or the tunnel); until then the UI is reachable only over `ssh -L`.
 
 ## 4.5a Controls

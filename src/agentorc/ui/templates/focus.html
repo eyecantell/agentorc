@@ -1,11 +1,13 @@
 {% extends "base.html" %}
-{% block title %}{{ s.name }} · ShiftLead{% endblock %}
+{# design §4.5a Focus **title** (TD-046): `<name> · <state>`, `▲ ` while it needs you — what a window
+   switcher shows. `AO.focusTitle` keeps it current from the feed; this is the first paint. #}
+{% block title %}{% if s.state == 'needs-you' %}▲ {% endif %}{{ s.name }} · {{ s.state_label }}{% endblock %}
 {% block head %}<link rel="stylesheet" href="/static/vendor/xterm.css">{% endblock %}
 {% block body %}
 <div class="page focus" data-id="{{ s.id }}">
   <div class="main">
     <div class="row gap" id="fhead">
-      <a class="muted" href="/">← Org</a>
+      {% if not popped %}<a class="muted" href="/">← Org</a>{% endif %}
       <span class="mono title">{{ s.place }} / {{ s.name }}</span>
       {# design §4.5a Focus header **title** (§4.3 `title()`, TD-074): the session's name as its tool
          holds it, beside agentorc's own name for it. Display only — it is set in the tool, and
@@ -64,6 +66,8 @@
         <button class="btn sm ghost" data-act="control-add" data-id="{{ s.id }}" title="add a controller">+</button>
       </span>
       <span class="grow"></span>
+      {# design §4.5a **Pop out** (TD-046): this Focus in its own browser window, raised if it is open #}
+      {% if not popped %}<button class="btn" data-act="popout" data-id="{{ s.id }}" title="open this session in its own browser window, for alt-tab — a second press raises it">⇱ Pop out</button>{% endif %}
       <button class="btn" data-act="shell-here" data-id="{{ s.id }}">⌘ Open shell here</button>
       {% if s.editor %}<a class="btn editor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}
       <button class="btn ghost" id="tcopy" title="copy the terminal selection — Shift+drag to select (Ctrl+Shift+C, or Ctrl+C with a selection). Wheel or Shift+PageUp scrolls history; Shift+PageDown, q or Esc returns">⧉ Copy</button>
@@ -142,5 +146,5 @@
 <script src="/static/vendor/xterm.js"></script>
 <script src="/static/vendor/addon-fit.js"></script>
 <script src="/static/vendor/addon-webgl.js"></script>
-<script>AO.focus({{ s | tojson }});</script>
+<script>AO.focus({{ s | tojson }}, {{ 'true' if popped else 'false' }});</script>
 {% endblock %}

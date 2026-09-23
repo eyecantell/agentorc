@@ -7,8 +7,9 @@
 <link rel="stylesheet" href="/static/app.css">
 {% block head %}{% endblock %}
 </head>
-<body data-host="{{ host }}">
-<div class="topbar">
+<body data-host="{{ host }}"{% if popped %} class="popped"{% endif %}>
+{# design §4.5a **Pop out** (TD-046): a popped-out Focus is the session and nothing else — no top bar #}
+{% if not popped %}<div class="topbar">
   <a class="wordmark" href="/">Shift<b>Lead</b></a>
   <div class="tabs">
     <a class="tab{% if active == 'Org' %} on{% endif %}" href="/">Org</a>
@@ -36,7 +37,7 @@
     <button class="btn light" type="button" id="shellbtn" title="a shell: host + directory, nothing else">⌘ Shell</button>
   </form>
   <a class="btn primary" href="/new">+ New session</a>
-</div>
+</div>{% endif %}
 <div id="toasts"></div>
 {# design §4.5a **Message** and Focus Inbox **Reply** (§4.10): one mail composer for both. Mail
    lands in an inbox and types nothing — the Focus composer's **Send** is the act that types. #}

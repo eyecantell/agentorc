@@ -2134,7 +2134,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
 
     @app.get("/focus/{sid}", response_class=HTMLResponse)
-    async def focus(request: Request, sid: str):
+    async def focus(request: Request, sid: str, window: str = ""):
         try:
             s = await call("seen", id=sid)  # opening Focus is the "seen" (TD-017); returns the record
         except HTTPException as e:
@@ -2153,6 +2153,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "s": view(s, fleet, fleet_known=known, icons=await role_icons([s]), seats=await seats_of([s])),
                 "host": host_name(),
                 "active": "Org",
+                # design §4.5a **Pop out** (TD-046): the same Focus, without the nav and the top bar
+                "popped": window == "1",
             },
         )
 
