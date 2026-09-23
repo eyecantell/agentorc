@@ -1711,7 +1711,7 @@ for another's, since the channels are ungated:
 - `ao status -v` prints the same report line the card will, and `--json` the entries.
 
 **Presets and grants.** `ao new --role grinder --lane TD-027,TD-019` (TD-028, TD-040,
-`agentorc.repoconfig`): the preset fills the brief from its template with `{lane}` filled and, once TD-114 is built, `--brief <path>` in its `{repo}` slot (§4.8; `--prompt` is raw text and fills nothing), the
+`agentorc.repoconfig`): the preset fills the brief from its template with `{lane}` filled and `--brief <path>` in its `{repo}` slot (§4.8; `--prompt` is raw text and fills nothing, and is refused beside `--brief`), the
 lane's default, its grants, its `profile` unless `-p` is given, and its `controllers:` — else the
 repo's — when `--controller` is not, resolved from names to ids in the session's directory (a
 configured name that is not running is skipped with one line naming it and the file, never an
@@ -2022,12 +2022,11 @@ not vary by role** — that would be the first thing to key on one — and the c
 by role without a rule, because it draws whichever channels are non-empty. The built-ins ship
 with the package; a repo may redefine any of them or add its own (§5, TD-040):
 `agentorc.repoconfig` reads the file, the templates are `agentorc/briefs/<role>.md` with the
-`{lane}`, `{techlead}` and `{manager}` placeholders (`{context}` in the techlead's; `{repo}` once TD-114 is built), a repo's `roles.<name>` overrides per key over the built-in, and the record
+`{lane}`, `{techlead}` and `{manager}` placeholders (`{context}` in the techlead's; `{repo}` in every one), a repo's `roles.<name>` overrides per key over the built-in, and the record
 carries `role` and the repo's `ledger:` (so the derived-report tick reads the right file without
 `sessionorc` knowing the config).
 
-**A repo's brief is a supplement, never a replacement** (TD-114; designed, not built — until it
-lands a `brief:` replaces the template whole, TD-040's rule). A template holds the mechanics of
+**A repo's brief is a supplement, never a replacement** (TD-114). A template holds the mechanics of
 agentorc — the round and `ao wait`, the declarations a run ends with, the crash-restart ceiling and
 the seat rules, the usage gate's pause, mail's kinds and outcomes, permission triage, the never-list
 of `ao` verbs — and it ships in the package, so a promote changes every team's rules at once, as it
@@ -2052,9 +2051,10 @@ template's current ones — so `ao team start` **warns, naming them, and starts 
 supplement carries a Markdown heading whose text, after the `#` marks, is one of the template's — a
 heuristic read, the same shape as the repeatable-brief warning below, not a guarantee against a
 re-worded duplicate; the three repos' briefs are cut the day the build is promoted (TD-114). The recipe
-(`ao team --skill`) says what a supplement contains (TD-114, with the build). A template's slot
+(`ao team --skill`) says what a supplement contains (TD-114 step 3, not written yet). A template's slot
 reads *none* when a repo gives nothing, and the template then stands alone, as a plain `ao new --role
-grinder` starts one today. The techlead's `context:` is the same idea for that seat — its primer is
+grinder` starts one. A role the package ships no template for (a repo's own role) has nothing to
+supplement, so its `brief:` is the whole brief. The techlead's `context:` is the same idea for that seat — its primer is
 its supplement, filled as `{context}` — and a techlead may carry a `brief:` supplement as well.
 A supplement is repeatable under the same rule as a template (*A brief describes the job, not the
 run*, below): the start warns on a clock time or a run number in the text it is about to hand over,
@@ -2502,8 +2502,8 @@ get an empty `controllers` list plus the team badge), `name` (default `<team>-le
 repo name from the team's projects — required when the projects list more than one repo,
 defaulted to the only one otherwise), `profile` (overrides the role's), and the same `lane`,
 `brief`, `grants` and `unattended` a member may carry — a manager's brief is the one a repo most
-often supplements (§4.8: once TD-114 is built a repo's brief fills the template's `{repo}` slot
-instead of replacing the template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
+often supplements (§4.8: a repo's brief fills the template's `{repo}` slot and never replaces the
+template). Unsaid, `grants` means the role's; an explicit `grants: []` on a
 manager means *none*, which leaves it unable to act on its own members, and is written only on
 purpose. **A key nobody reads is an error naming it**, in a team, a manager or a member: silence
 about a typo is how a manager's `brief:` disappears into a file that looks right. A `brief:`
@@ -2539,7 +2539,7 @@ exited or closed holders are superseded as §4.1 says, which makes `ao team star
 after a night's exit the restart too. Then it creates the manager (its grants, profile and mode —
 the role's `control`, the host's profile and unattended, unless the definition overrides any of
 them — in a worktree), and each member with `controllers: [lead id]`, its role, lane, brief (the
-role's template with `{lane}`, `{techlead}` and `{manager}` filled — `{manager}` the id the manager takes, worked out before anything starts as `{techlead}` is, said by the start should it come up under another, and `none` where a person leads or the session was started by hand — the Project block in front — and once TD-114 is built a `brief:` in its `{repo}` slot rather than in place of the template),
+role's template with `{lane}`, `{techlead}` and `{manager}` filled — `{manager}` the id the manager takes, worked out before anything starts as `{techlead}` is, said by the start should it come up under another, and `none` where a person leads or the session was started by hand — the Project block in front — and a `brief:` in its `{repo}` slot rather than in place of the template),
 profile and worktree. A person runs it, so no attenuation applies (§4.8 create rule); a manager
 running it is subject to it as for any create. It prints one line per session with the id,
 `--json` the records. The manager is started with an empty `controllers` list: the definition,

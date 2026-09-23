@@ -5,6 +5,7 @@ What the agent does with `create` is tested against the agent elsewhere."""
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -374,15 +375,61 @@ def test_stop_degrades_per_member_when_one_is_refused(world, capsys):
     assert out.count("wrap-up sent") == 3 and "still working" not in out  # the refused one is not waited on
 
 
-def test_a_members_brief_override_replaces_the_roles_template(world):
+def test_a_members_brief_is_a_supplement_in_the_templates_repo_slot(world, capsys):
+    """Design §4.8 *A repo's brief is a supplement, never a replacement* (TD-114): a member's `brief:`
+    is filled into the role template's *This repo's rules*, the template's mechanics survive it, and
+    its own placeholders are filled as the template's are. It takes the slot in place of the role's
+    `roles.<name>.brief`, never beside it. A supplement that repeats a template heading — a whole
+    brief not yet cut — is said by the start, which goes ahead."""
     tmp_path, state = world
-    (tmp_path / "agentorc" / "docs").mkdir()
-    (tmp_path / "agentorc" / "docs" / "b.md").write_text("mine: {lane}\n")
+    docs = tmp_path / "agentorc" / "docs"
+    docs.mkdir()
+    (docs / "b.md").write_text("mine: {lane}, ask {techlead}\n")
+    (docs / "role.md").write_text("the role's own supplement\n")
+    (tmp_path / "agentorc" / ".agentorc.yml").write_text(
+        yaml.safe_dump({"roles": {"grinder": {"brief": "docs/role.md"}}})
+    )
     doc = org_doc(tmp_path)
     doc["teams"]["ao-grind"]["members"][0]["brief"] = "docs/b.md"
     write_org(tmp_path, doc)
     assert cli.main(["team", "start", "ao-grind"]) == 0
-    assert creates(state)[1]["prompt"] == "mine: free-pick\n"
+    made = creates(state)
+    prompt = made[1]["prompt"]
+    assert "## This repo's rules" in prompt and "mine: free-pick, ask none" in prompt
+    assert prompt.index("## This repo's rules") < prompt.index("mine: free-pick") < prompt.index("## Rules")
+    assert "**grinder**" in prompt and "ao progress claim" in prompt  # the template's mechanics survive
+    assert "the role's own supplement" not in prompt  # in place of the role's, never beside it
+    assert "{repo}" not in prompt
+    assert "mine: free-pick" in made[2]["prompt"]  # one member definition, both of its sessions
+    assert "repeats the template's heading" not in capsys.readouterr().err
+
+    # a whole brief, not yet cut: its heading is the template's, and the start says so
+    (docs / "b.md").write_text("## Rules\n\nold copy of the mechanics\n")
+    state["sessions"].clear()
+    state["calls"].clear()
+    assert cli.main(["team", "start", "ao-grind"]) == 0
+    assert "grind-1, grind-2: the repo's brief repeats the template's heading 'Rules'" in capsys.readouterr().err
+
+
+def test_a_template_with_no_supplement_reads_none_and_a_role_without_one_takes_the_brief_whole(tmp_path):
+    """The slot reads `none` when the repo gives nothing (design §4.8); a role the package ships no
+    template for takes the repo's brief as the whole brief, as before."""
+    from agentorc import repoconfig
+
+    cfg = repoconfig.RepoConfig(root=tmp_path)
+    text = repoconfig.resolve_role(cfg, "grinder").brief_text()
+    assert "## This repo's rules" in text and "\n\nnone\n\n" in text and "{repo}" not in text
+    (tmp_path / "r.md").write_text("reviewer: {lane}\n")
+    cfg.roles = {"reviewer": {"brief": "r.md"}}
+    assert repoconfig.resolve_role(cfg, "reviewer").brief_text(["TD-1"]) == "reviewer: TD-1\n"
+    assert repoconfig.resolve_role(cfg, "plain").brief_text() is None
+    # a repo's `roles.grinder.brief` fills the slot, and a definition's `brief:` takes it instead
+    (tmp_path / "g.md").write_text("the role's own\n")
+    cfg.roles["grinder"] = {"brief": "g.md"}
+    role = repoconfig.resolve_role(cfg, "grinder")
+    assert "\n\nthe role's own\n\n" in role.brief_text()
+    given = role.brief_text(supplement=str(tmp_path / "r.md"))
+    assert "reviewer: free-pick" in given and "the role's own" not in given and "**grinder**" in given
 
 
 def test_a_repos_own_teams_are_folded_in_and_the_org_file_wins(world):
@@ -784,7 +831,8 @@ def test_a_team_start_says_when_a_brief_names_one_run_and_starts_it_anyway(world
     assert cli.main(["team", "start", "ao-grind"]) == 0  # started, not refused
     assert len(creates(state)) == 4  # the whole team started
     err = capsys.readouterr().err
-    assert "line 3" in err and "TD-042" in err
+    # the line is the handed-over brief's: the supplement sits inside the template now (TD-114)
+    assert re.search(r"grind-1, grind-2: the brief names one run — line \d+", err) and "TD-042" in err
     assert "a clock time" in err and "a run number" in err
 
 

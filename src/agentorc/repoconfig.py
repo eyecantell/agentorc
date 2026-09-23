@@ -25,6 +25,7 @@ repo's own `roles:`, each overriding per key.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib import resources
@@ -66,6 +67,10 @@ NO_MANAGER = "none"
 # checkout, filled at launch; `none` without one, and the techlead brief then reads the repo's map.
 CONTEXT_PLACEHOLDER = "{context}"
 NO_CONTEXT = "none"
+# A repo's brief (design §4.8 *A repo's brief is a supplement*, TD-114): filled into the template's
+# *This repo's rules* section; `none` where the repo gives nothing, and the template stands alone.
+REPO_PLACEHOLDER = "{repo}"
+NO_REPO = "none"
 
 # The built-in presets (design §4.8's table): each a brief template shipped with the package
 # (`agentorc/briefs/<role>.md`, `{lane}` filled at launch), a default lane shape, and its grants.
@@ -86,6 +91,27 @@ DEFAULT_ROLE = "plain"
 # Reads one file by its absolute path and returns its text, or None when there is no such file;
 # raises `OSError` when it exists and cannot be read. `_read_here` is this host's disk.
 Reader = Callable[[Path], "str | None"]
+
+
+_HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
+_FENCE_LINE = re.compile(r"^\s*(```|~~~)")
+
+
+def repeated_headings(text: str) -> list[str]:
+    """The Markdown headings a filled brief carries twice (design §4.8, TD-114 *Transition*): a
+    repo's brief that is still a whole brief repeats the template's own headings, and by the
+    precedence rule its stale copy would win — so a start names them and goes ahead. A heuristic
+    read of the text, never a guarantee against a re-worded duplicate; fenced code is skipped."""
+    seen: dict[str, int] = {}
+    fenced = False
+    for line in text.split("\n"):
+        if _FENCE_LINE.match(line):
+            fenced = not fenced
+            continue
+        if not fenced and (m := _HEADING.match(line)):
+            key = m.group(2).strip()
+            seen[key] = seen.get(key, 0) + 1
+    return [h for h, n in seen.items() if n > 1]
 
 
 def _read_here(path: Path) -> str | None:
@@ -121,6 +147,26 @@ class Role:
         """`built-in`, `repo`, `built-in + repo` …: for `ao roles` and the form's note."""
         return " + ".join(self.sources) or "built-in"
 
+    @property
+    def template(self) -> str | None:
+        """The package template this role's brief is built on (design §4.8, TD-114): the built-in
+        preset's of the same name, whatever layer spoke last — a repo's brief is a supplement to it,
+        never a replacement. None for a role the package does not ship (the repo's brief is then the
+        whole brief) and for `plain`."""
+        return (PRESETS.get(self.name) or {}).get("brief")
+
+    def _read(self, brief: str, read: Reader | None) -> str:
+        path = Path(brief).expanduser()
+        if not path.is_absolute():
+            path = (self.root or Path.cwd()) / path
+        try:
+            text = (read or _read_here)(path)
+        except OSError as e:
+            raise ValueError(f"role {self.name!r}: brief {path} cannot be read ({e.strerror or e})") from None
+        if text is None:
+            raise ValueError(f"role {self.name!r}: brief {path} cannot be read (no such file)")
+        return text
+
     def brief_text(
         self,
         lane: list[str] | None = None,
@@ -129,28 +175,28 @@ class Role:
         techlead: str | None = None,
         context: str | None = None,
         manager: str | None = None,
+        supplement: str | None = None,
     ) -> str | None:
-        """The opening prompt this role gives a session: its template with `{lane}` filled from
-        `lane` (default the role's own), `{techlead}` with the team's seat, `{manager}` with its
-        manager and `{context}` with the seat's primer (each `none` without one).
-        None for a role without a brief (`plain`). `read` reads a
-        repo's brief file — this host's disk by default, or another host's checkout across the link
-        (design §4.4a "Teams across hosts", TD-057 step 4b.3); a built-in template is always the
-        package's own."""
-        if not self.brief:
-            return None
-        if self.brief_source == "built-in":
-            text = resources.files("agentorc").joinpath("briefs", self.brief).read_text(encoding="utf-8")
+        """The opening prompt this role gives a session: its template with `{repo}` filled from the
+        repo's brief (design §4.8 *A repo's brief is a supplement*, TD-114) — `supplement`, a path,
+        when a team definition or `ao new --brief` gives one, in place of the role's own
+        `roles.<name>.brief`, never beside it — then `{lane}` from `lane` (default the role's own),
+        `{techlead}` with the team's seat, `{manager}` with its manager and `{context}` with the
+        seat's primer (each `none` without one), in the supplement's text as in the template's.
+        A role the package ships no template for takes the repo's brief as the whole brief; None
+        for one with neither (`plain`). `read` reads a repo's file — this host's disk by default, or
+        another host's checkout across the link (design §4.4a "Teams across hosts", TD-057 step
+        4b.3); a template is always the package's own."""
+        own = self.brief if self.brief and self.brief_source not in ("", "built-in") else None
+        extra = supplement or own
+        if self.template is None:
+            if not extra:
+                return None
+            text = self._read(extra, read)
         else:
-            path = Path(self.brief).expanduser()
-            if not path.is_absolute():
-                path = (self.root or Path.cwd()) / path
-            try:
-                text = (read or _read_here)(path)
-            except OSError as e:
-                raise ValueError(f"role {self.name!r}: brief {path} cannot be read ({e.strerror or e})") from None
-            if text is None:
-                raise ValueError(f"role {self.name!r}: brief {path} cannot be read (no such file)")
+            text = resources.files("agentorc").joinpath("briefs", self.template).read_text(encoding="utf-8")
+            added = self._read(extra, read).strip() if extra else ""
+            text = text.replace(REPO_PLACEHOLDER, added or NO_REPO)
         text = text.replace(TECHLEAD_PLACEHOLDER, techlead or NO_TECHLEAD)
         text = text.replace(MANAGER_PLACEHOLDER, manager or NO_MANAGER)
         text = text.replace(CONTEXT_PLACEHOLDER, context or NO_CONTEXT)

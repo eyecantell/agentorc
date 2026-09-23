@@ -276,6 +276,7 @@ decisions; this file points at them rather than repeating them.
 - The first manager was described as "a session, not code" running "for a few evenings" before any rule became a §6 policy.
 
 - 2026-09-22: a repo's brief became a **supplement** filled into the template's `{repo}` slot, never a whole-file replacement (TD-114; Paul's question that evening: *is there a reason all of the boilerplate ao information is kept in each repo vs being kept here?*). Motivation: three repos (agentorc, samscrape, dev-cadence) each carried a 2,000–4,000-word copy of the manager and grinder mechanics, and three defects found the same night — the hand `ao new` crash restart made stale by TD-103, the seat fill that cannot carry `{context}`, the temporary 95% usage sentence — had to be fixed in every copy. The whole-file override had existed since TD-040 because the repo briefs predate the presets; its one remaining case, prototyping a mechanics change before a promote, is served by the supplement's precedence (*the repo's rules win where they disagree*). Paul asked whether to keep a full override; the design says no.
+- 2026-09-22 (TD-114 step 1, grinder-ao-2): the supplement built — `{repo}` and *This repo's rules* in the five templates, `brief_text(supplement=…)`, a definition's `brief:` and `ao new --brief` filling the slot, the start's repeated-heading note; until then a `brief:` replaced the template whole (TD-040's rule).
 
 ## 4.8a Who is calling: identity on one host
 
