@@ -4174,7 +4174,8 @@ code and needs no grant; a session doing the same work does.
   its ceiling and the card's ending, rule 2 with `restart_blocked`, rule 3 with `seat_due`,
   `seat_count`, the fill ceiling and the card's count, rule 4 with *idle · open work*, and the
   Inbox row, and the briefs' cut: the built-in manager preset reads the marks and no longer
-  performs a restart, a fill or a nudge, and its round ends in `ao wait --timeout 3540`, run in the
+  performs a restart, a fill or a nudge — except the nudge to a member on a node, which rule 4
+  does not reach yet — and its round ends in `ao wait --timeout 3540`, run in the
   background because a tool call is capped at ten minutes.
 - **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.

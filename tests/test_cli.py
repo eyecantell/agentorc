@@ -919,6 +919,7 @@ def test_the_manager_brief_leaves_the_seat_the_wanted_restart_and_the_nudge_to_t
     assert "**The host agent keeps the seat**" in text and "`seat_due`" in text and "why: fill" in text
     assert "restart_blocked" in text and "**the host agent sends it one fixed line**" in text
     assert "ao wait --timeout 3540" in text and "run_in_background: true" in text
+    assert "**The exception is a member on another host**" in text  # the tick nudges no node's pane yet
 
 
 def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():
