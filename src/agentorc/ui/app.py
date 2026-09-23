@@ -850,7 +850,9 @@ def gated_view(raw: Any) -> dict[str, str] | None:
     prof = str(raw.get("profile") or "default")
     text = f"paused · usage — {prof} {raw.get('label') or '?'} {pct:g}% ≥ {line:g}%"
     if nxt := _clock(raw.get("next")):
-        text += f", line moves {nxt}"
+        # a flat reserve's line moves only at the reset, where the honest word is *resets* (§4.5a)
+        same = _instant(raw.get("next")) is not None and _instant(raw.get("next")) == _instant(raw.get("resets"))
+        text += f", {'resets' if same else 'line moves'} {nxt}"
     if raw.get("sent_at"):
         text += " · pause sent"
     since = _clock(raw.get("since"))

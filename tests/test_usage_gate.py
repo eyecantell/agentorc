@@ -94,6 +94,7 @@ async def test_a_crossed_line_pauses_by_a_send_and_the_resume_follows(agent, tmp
         await agent._enforce_usage_gate(now)
         g = rec.gated
         assert g and (g["profile"], g["label"], g["pct"], g["line"]) == ("", "wk", 75, 70) and g["sent_at"]
+        assert "resets" in g and g["resets"] is None  # the window's reset, for the card's *resets* word
         assert rec.state not in ("exited", "closed"), "a pause is a send, never a kill"
         assert await wait_for(lambda: _typed(agent, sid, "PAUSE-NOW"), timeout=10)
         # the pause is typed once: a second tick over the line types nothing more and keeps `since`
