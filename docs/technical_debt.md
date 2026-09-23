@@ -69,6 +69,7 @@ IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never
 | TD-110 | A night report: one generated summary per team at wind-down, from the records, in place of the manager's prose round log | Medium | Open |
 | TD-111 | `ao doctor`: one command that checks what the ledger keeps finding live — hooks, tmux, identity, usage, links, build | Medium | Open |
 | TD-112 | The adapter contract has grown Claude-shaped and neutrality is untested: a scraped second-adapter spike now, not in phase 5 | Medium | Open |
+| TD-113 | `ao team --skill` sends a second repo to samscrape's files: the recipe is silent on what the built-in briefs assume, the list-shaped lane, a brief's skeleton, the primer's three checks, `.agentorc.yml`'s keys, and there is no `{manager}` placeholder | Medium | Open |
 
 ---
 
@@ -1107,3 +1108,16 @@ Two things are missing, and the design round chooses between them or takes both:
 **Why:** every Claude-shaped feature built before a second adapter exists is a feature that may have to be unbuilt, and the claim the product is sold on has not been tested.
 
 **Related:** TD-015 (the classifier), TD-052 (mail's adapter step), design §4.3.
+
+## TD-113: `ao team --skill` sends a second repo to samscrape's files
+
+**Priority:** Medium
+**Added:** 2026-09-22 (the anchor session; from the dev-cadence session standing up `dc-grind` cold from the recipe, and samscrape's the same day)
+**Status:** Open. Two repos in one day followed `ao team --skill` and had to learn the same things from `~/samscrape/docs/briefs/` instead of the recipe: **(1)** the built-in briefs (`src/agentorc/briefs/*.md`) assume this repo's layout — `scripts/check_cadence.py`, `pdm run test`, `docs/design.md`, the never-list — so a repo with another gate, layout or standing rules needs its own briefs (samscrape's README records that lesson: a team *defined and deliberately never started* for that reason); **(2)** step 3 shows `lane: free-pick` only, while a named lane is a YAML list rendered by `Role.brief_text` as `TD-041, TD-054, …` and worked in order; **(3)** no skeleton says what a brief must contain (first reads, where it works, the gate, the lane loop, asking, standing rules, the ending declarations) — writing one is a 2,000-word port instead of a fill-in; **(4)** the primer's *held to its pointers by a test where the repo can* names `tests/test_primer.py` and not the three checks (paths exist, ledger ids exist, placeholders), so a repo without Python tests writes its own blind; **(5)** the org.yml examples do not say which keys `.agentorc.yml` takes (`roles`, `controllers`, `ready_when`, `commands`, `teams` — never `projects`; `repoconfig._apply_key`) or give a criterion for team-in-repo against team-in-org beyond *travels with the checkout*; **(6)** there is no `{manager}` placeholder (`repoconfig.py` fills `{lane}`, `{techlead}`, `{context}`), so every grinder brief carries a paragraph telling the member to read `under:` off its record — the launcher knows the manager's id when it fills a member's brief (`teams.plan`, the manager's `create_params` come first), so filling `{manager}` removes the paragraph. The crash-restart line the same feedback raised is answered by TD-103 slice (2): the tick restarts from the launch record, and a manager brief that still says `ao new … --prompt "$(cat brief)"` is stale.
+**Location:** `src/agentorc/team_skill.md` (steps 3–4, the primer paragraph), `src/agentorc/repoconfig.py` (`MANAGER_PLACEHOLDER` beside `TECHLEAD_PLACEHOLDER`, `brief_text(manager=…)`), `src/agentorc/teams.py` (`plan` passes the manager's id), `src/agentorc/briefs/grinder.md`, `docs/briefs/README.md`
+
+**Why:** the recipe's *done when* is a fresh session standing a team up without reading design.md (TD-067); two sessions did, and both went to another repo's files for the half the recipe leaves out.
+
+**Fix:** (a) `{manager}` in `repoconfig.brief_text` and `teams.plan`, filled with the manager's session id (or *none* for `manager: person`), with a test; the built-in grinder and hunter briefs use it. (b) The recipe: one paragraph in step 4 on what the built-in briefs assume and when a repo needs its own; the list lane in step 3; the `.agentorc.yml` key list and one sentence on the criterion; the primer's three checks in words. (c) A brief skeleton — the section list above with one line each — in the recipe or as `src/agentorc/briefs/SKELETON.md`, printed by `ao team --skill`. Pickable; (a) touches nothing under `src/sessionorc`.
+
+**Related:** TD-067 (the operator's guide), TD-103 (the crash restart on the tick), TD-075 (the primer), TD-109 (the briefs README).
