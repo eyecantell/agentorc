@@ -348,3 +348,6 @@
        gh's author field on every PR here reads "eyecantell" regardless of which session opened
        it — the shared git identity on this box — so PR ownership must be read from headRefName /
        the member's own report, never from `author`.) grinder-ao-2 still working TD-046.
+23:47  grinder-ao-2: TD-046 done → PR #500 merged, cadence pass (review FIXED · sonnet · 1 finding,
+       ci green, ledger named). Still working (next pick). PR #498 (TD-119, src/sessionorc/) still
+       open, ~27 min old — not yet at the 2h TD-093 threshold.
