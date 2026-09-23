@@ -194,3 +194,14 @@ def test_new_keep_mail_is_sent_only_when_asked(repo):
     calls.clear()
     assert cli.main(["new", "seat2"]) == 0
     assert "keep_mail" not in created(calls)
+
+
+def test_new_supervised_is_sent_only_when_asked(repo):
+    """TD-103 slice (1), design §6: `ao new --supervised` marks the session as one to keep running;
+    without the flag the parameter is not sent at all."""
+    _, calls = repo
+    assert cli.main(["new", "kept", "--supervised"]) == 0
+    assert created(calls)["supervised"] is True
+    calls.clear()
+    assert cli.main(["new", "loose"]) == 0
+    assert "supervised" not in created(calls)

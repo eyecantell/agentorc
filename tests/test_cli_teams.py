@@ -1172,6 +1172,7 @@ def test_a_seat_with_a_trigger_starts_with_the_team_and_is_a_seat_everywhere(wor
     assert cli.main(["team", "start", "ao-grind"]) == 0
     made = creates(state)
     assert [p["name"] for p in made] == ["orc-ao", "techlead-ao", "audit-ao", "grind-1", "grind-2", "hunt"]
+    assert all(p["supervised"] is True for p in made)  # every session a team start creates (§6, TD-103)
     audit = made[2]
     # neither the role's grants nor its lane (the hunter preset has both): a seat's area is its brief's
     assert audit["role"] == "hunter" and audit["capabilities"] == [] and audit["lane"] == []
