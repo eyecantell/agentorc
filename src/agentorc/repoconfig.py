@@ -25,7 +25,6 @@ repo's own `roles:`, each overriding per key.
 
 from __future__ import annotations
 
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from importlib import resources
@@ -34,7 +33,7 @@ from typing import Any
 
 import yaml
 
-from sessionorc.models import GRANT_ALIASES, GRANTS
+from sessionorc.models import GRANTS
 
 FILE = ".agentorc.yml"
 DEFAULT_ADAPTER = "claude-code"
@@ -80,18 +79,6 @@ PRESETS: dict[str, dict[str, Any]] = {
     "plain": {"brief": None, "lane": [], "grants": [], "icon": None},
 }
 DEFAULT_ROLE = "plain"
-_warned: set[str] = set()
-
-
-def deprecated_grant(old: str, where: str) -> None:
-    if f"grant:{old}" not in _warned:
-        _warned.add(f"grant:{old}")
-        print(
-            f"{where}: grant `{old}` is now `{GRANT_ALIASES[old]}` (TD-055); `{old}` is still accepted for one release",
-            file=sys.stderr,
-        )
-
-
 # Reads one file by its absolute path and returns its text, or None when there is no such file;
 # raises `OSError` when it exists and cannot be read. `_read_here` is this host's disk.
 Reader = Callable[[Path], "str | None"]
@@ -333,9 +320,7 @@ def _role_block(name: str, raw: Any, where: str) -> dict[str, Any]:
             out[k] = v.strip() if isinstance(v, str) else None
         elif k == "grants":
             grants = _str_list(v, f"{here}.grants")
-            for old in dict.fromkeys(g for g in grants if g in GRANT_ALIASES):
-                deprecated_grant(old, f"{here}.grants")
-            grants = list(dict.fromkeys(GRANT_ALIASES.get(g, g) for g in grants))
+            grants = list(dict.fromkeys(grants))
             if bad := [g for g in grants if g not in GRANTS]:
                 raise ValueError(f"{here}.grants: unknown grant {bad[0]!r} (known: {', '.join(GRANTS)})")
             out[k] = grants

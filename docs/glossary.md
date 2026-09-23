@@ -28,7 +28,7 @@ not mix:
   product, package and command names (`agentorc`, `sessionorc`, `cmdorc`, `ao`), never for a
   session or a position.
 - **Record fields, state names and `ao` verbs do not change** for a word's sake; the one
-  exception is the `orchestrate` grant, renamed `control` with an alias (TD-055).
+  exception is the `orchestrate` grant, renamed `control` (TD-055; no alias since TD-107).
 
 ---
 
@@ -114,7 +114,7 @@ not mix:
 - **grant** — a capability on a session record (the field is `capabilities`; prose says
   *grant*). **`control`** is the one that lets a session act on its members, so one word names the
   whole authority mechanism: the `control` grant, the `controllers` list, `ao control`. *Not:*
-  `orchestrate`, accepted as an alias for one release. — **decided** 2026-09-16 (Paul); renamed 2026-09-17
+  `orchestrate`, now an unknown grant (TD-107). — **decided** 2026-09-16 (Paul); renamed 2026-09-17
   (TD-055 step 3).
 - **home** — the one checkout an agent lives in; **reach** — other repos a project lets it read or
   change without moving it. *reach* means only that: a manager's members are its *members*, not its
@@ -234,7 +234,7 @@ not mix:
 1. **run** — keep *run log* and *run window*; *command session* for the noun; *run N* retired, a
    start is named by its time.
 2. **tick** — the host agent's loop; a manager's or director's loop is a **round**.
-3. **`orchestrate` grant** — renamed **`control`**, with `orchestrate` as a one-release alias.
+3. **`orchestrate` grant** — renamed **`control`**; `orchestrate` was an alias until TD-107 removed it.
 4. **nudge** — retired; it is a **send**. *supervisor* (→ manager, or policies) and *fleet* (→ org)
    retired with it, in prose and UI only.
 5. **fleet** — retired, as above.

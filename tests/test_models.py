@@ -195,15 +195,15 @@ def test_mail_survives_the_store_roundtrip_and_stays_out_of_the_view():
     assert not ask.open and s.mail_marks()["open_asks"] == []
 
 
-def test_has_control_reads_either_name():
-    """TD-055 step 3: a client newer than the running host agent still sees `orchestrate` records."""
-    from sessionorc.models import canonical_grants, has_control
+def test_has_control_reads_the_one_name():
+    """TD-107: `orchestrate` is no longer read as `control` — on a record or anywhere else."""
+    from sessionorc.models import has_control
 
-    assert has_control(["orchestrate"]) and has_control(["control"]) and not has_control([]) and not has_control(None)
-    assert canonical_grants(["orchestrate", "control"]) == ["control"]
+    assert has_control(["control"]) and not has_control(["orchestrate"]) and not has_control([])
+    assert not has_control(None)
     assert Session.from_dict(
         {"id": "x", "name": "x", "kind": "interactive", "adapter": "shell", "dir": "/", "capabilities": ["orchestrate"]}
-    ).capabilities == ["control"]
+    ).capabilities == ["orchestrate"]  # kept as stored; it grants nothing
 
 
 def test_an_entry_written_before_suggested_answers_loads_with_none_of_them():

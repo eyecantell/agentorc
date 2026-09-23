@@ -976,3 +976,16 @@ The substrate is already there and unused by sessions: the agent's `subscribe` t
 **Related:** TD-032 (the Remote-Control stand-down, the same *idle under a modal* shape), TD-041 (interactive sessions out of reach), §4.10 (mail).
 
 **Resolved:** 2026-09-22 (PR #430, folded into TD-064) — nothing was built under this number; the screen rule and the briefs' sentence were built under TD-064 by PR #431.
+
+## TD-107: Three compatibility tables for a tool that has never been released
+
+**Priority:** Medium
+**Added:** 2026-09-22 (the anchor session; the design review)
+**Resolved:** 2026-09-22 (PR #440, PR #442) — design §4.8 (*Grants*, *Role names*) and §4.9 carry the lasting content.
+**Status:** Resolved 2026-09-22 (grinder-ao-1). Step 1, PR #440: `ROLE_ALIASES`, `RESERVED_ROLES` and the `lead:` team key gone. Step 2: `GRANT_ALIASES`, `canonical_grants`, the `renamed_grants` rewrite on load and over the link, and the `orchestrate` choice and warnings in the CLI, `roles:` and `org.yml` gone; `orchestrate` is an unknown grant everywhere. The lasting content is design §4.8 (*Grants*, *Role names*) and §4.9.
+**Was:** Partly done. **Step 1 (2026-09-22, grinder-ao-1):** `ROLE_ALIASES`, `RESERVED_ROLES` and the `lead:` team key deleted from `repoconfig.py` and `org.py`, the §4.8 *Role names* tables and §4.9's `lead` sentence from the design; `orchestrator` and `lead` are unknown roles, `lead:` a stray key. **Step 2, left:** `GRANT_ALIASES` in `src/sessionorc/models.py`, the `renamed_grants` rewrite on load and over a link (`agent.py` `_renamed_grants`), `canonical_grants`/`has_control`'s alias reading (`mail.py`, `ui/app.py`), the `orchestrate` choice and warnings in `cli.py`, `repoconfig.py` and `org.py` (`deprecated_grant`), and design §4.8's `control` sentence — a `src/sessionorc` PR, so the anchor merges it. Was: the renamed-roles table (`ROLE_ALIASES`: `orchestrator → manager`, `lead → manager`), the retired-words table (design only, no code yet), the reserved-words table (`RESERVED_ROLES`, empty), `GRANT_ALIASES` (`orchestrate → control`) and the `lead:` team key still read as `manager:` (`org.py`, `deprecated_team_key`) — each with its one-line-per-process warning. "For one release" has no meaning yet: there has been no release and one user. Fix: delete the aliases and the tables, let an unknown role be an unknown role and an unknown key an error, and drop the paragraphs from §4.8 and §4.9. A record badged `orchestrator` or `lead` keeps its badge as text, since nothing keys on it. The project rename (TD-060) will want the same clean cut, and should not inherit these.
+**Location:** `src/agentorc/repoconfig.py` (`ROLE_ALIASES`, `RESERVED_ROLES`; the retired-words table of §4.8 is design only and has no code), `src/sessionorc/models.py` (`GRANT_ALIASES`), `src/agentorc/org.py` (`lead:`), design §4.8 *The names*, §4.9
+
+**Why:** compatibility code is a promise to a user base that does not exist yet, and each table is a rule the briefs and the fact-checks have to know.
+
+**Related:** TD-055, TD-076 (the renames), TD-060 (the project rename).

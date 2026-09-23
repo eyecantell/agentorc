@@ -24,7 +24,7 @@ from sessionorc import mail as mailmod
 from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable
 from sessionorc.client import call_sync as _call_sync
-from sessionorc.models import GRANT_ALIASES, GRANTS, STATE_RANK, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, report_line, stop_note
 from sessionorc.tmux import attach_argv
 
 
@@ -394,7 +394,7 @@ def _launch_defaults(args: argparse.Namespace) -> dict[str, Any]:
     return {
         "profile": args.profile or role.profile or "",
         "prompt": prompt,
-        "capabilities": list(dict.fromkeys([*role.grants, *grant_names(args.grant or [])])),
+        "capabilities": list(dict.fromkeys([*role.grants, *(args.grant or [])])),
         "controllers": ids,
         "lane": lane,
         "role": role.name,
@@ -817,21 +817,10 @@ def cmd_mode(args: argparse.Namespace) -> int:
     return emit(args, s, lambda: print(f"{s['id']}: {'unattended' if s['unattended'] else 'interactive'}"))
 
 
-def grant_names(names: list[str]) -> list[str]:
-    """Grants as typed, with a renamed one under its current name and one stderr line saying so
-    (TD-055: `orchestrate` is `control`, accepted for one release)."""
-    for old in dict.fromkeys(n for n in names if n in GRANT_ALIASES):
-        print(
-            f"grant `{old}` is now `{GRANT_ALIASES[old]}` (TD-055); `{old}` is still accepted for one release",
-            file=sys.stderr,
-        )
-    return list(dict.fromkeys(GRANT_ALIASES.get(n, n) for n in names))
-
-
 def cmd_grants(args: argparse.Namespace) -> int:
     """`ao grant <id> control` / `ao revoke <id> control` (design §4.8): edit the record's
     `capabilities`; the host agent applies it on the session's next call."""
-    grants = grant_names(args.grants)
+    grants = list(dict.fromkeys(args.grants))
     edit = {"add": grants} if args.cmd == "grant" else {"remove": grants}
     s = call_sync("set_grants", id=args.id, **edit)
     return emit(args, s, lambda: print(f"{s['id']}: grants {', '.join(s['capabilities']) or 'none'}"))
@@ -1531,7 +1520,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--grant",
         action="append",
-        choices=[*GRANTS, *GRANT_ALIASES],
+        choices=GRANTS,
         help="a grant the session starts with (design §4.8); `control` lets it act on other sessions",
     )
     p.add_argument(
@@ -1695,7 +1684,7 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         p = add(name, help=help_)
         p.add_argument("id")
-        p.add_argument("grants", nargs="+", choices=[*GRANTS, *GRANT_ALIASES], metavar="grant")
+        p.add_argument("grants", nargs="+", choices=GRANTS, metavar="grant")
         p.set_defaults(fn=cmd_grants)
 
     p = add("control", help="say which sessions a controller (a lead) may act on (design §4.8)")

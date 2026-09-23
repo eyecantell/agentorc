@@ -1602,33 +1602,6 @@ async def test_the_homes_tick_takes_the_tarball_and_a_nodes_does_not(agent):
     agent.mode = "home"
 
 
-async def test_a_copy_with_a_renamed_grant_is_rewritten_and_said_so_at_either_end(agent, caplog):
-    """*Left for step 4* (TD-055 × step 2): a record crossing the link with `orchestrate` is
-    normalised to `control` — and, as the loader does, saved and logged rather than silently."""
-    import json as jsonmod
-    import logging
-
-    from sessionorc.models import Session
-
-    caplog.set_level(logging.WARNING, logger="agentorc.agent")
-    agent._take_records("laptop", [record(capabilities=["orchestrate"])], whole=True)
-    assert agent.remote["laptop"]["ao-x-w"].capabilities == ["control"]
-    stored = jsonmod.loads(paths.remote_dir("laptop").joinpath("ao-x-w.json").read_text())
-    assert stored["capabilities"] == ["control"] and "grant orchestrate is now `control`" in caplog.text
-    caplog.clear()
-    agent.mode, agent.home = "node", "kmaster"
-    s = Session(id="ao-x-n", name="n", kind="interactive", adapter="claude-code", dir="/tmp", host=agent.host)
-    s.capabilities = ["control"]
-    agent.sessions[s.id] = s
-    try:
-        await agent._take_intent([{"id": s.id, "host": agent.host, "capabilities": ["orchestrate"]}])
-        assert s.capabilities == ["control"] and "grant orchestrate is now `control`" in caplog.text
-        assert not hasattr(s, "renamed_grants")
-    finally:
-        agent.sessions.pop(s.id)
-        agent.mode, agent.home = "home", agent.host
-
-
 async def test_a_nodes_record_is_acknowledged_at_that_node(home, hookstub, tmp_path, monkeypatch):
     """§4.8a (TD-077 step 2, review of PR #251): identity alarms are **node-owned** — observed
     where the socket is — so **Acknowledge** on a node's record is routed to that node, which

@@ -181,13 +181,11 @@ def test_techlead_placeholder_names_the_seat_or_says_none():
         assert "`ao-agentorc-techlead-ao-1`" in role.brief_text(techlead="ao-agentorc-techlead-ao-1")
 
 
-def test_grants_orchestrate_in_a_role_is_read_as_control(tmp_path, capsys, monkeypatch):
-    """TD-055 step 3: `grants: [orchestrate]` in a `roles:` block still loads, as `control`, and says so."""
-    monkeypatch.setattr(repoconfig, "_warned", set())
+def test_grants_orchestrate_in_a_role_is_an_unknown_grant(tmp_path):
+    """TD-107: `grants: [orchestrate]` in a `roles:` block is refused like any unknown grant."""
     (tmp_path / ".agentorc.yml").write_text("roles:\n  reviewer: {grants: [orchestrate, control]}\n")
-    role = repoconfig.resolve_role(repoconfig.load(tmp_path), "reviewer")
-    assert role.grants == ["control"]
-    assert "grant `orchestrate` is now `control`" in capsys.readouterr().err
+    with pytest.raises(ValueError, match="unknown grant 'orchestrate'"):
+        repoconfig.load(tmp_path)
 
 
 def test_a_role_has_a_display_label_and_the_default_is_its_name_raised(tmp_path):

@@ -33,7 +33,7 @@ from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
-from sessionorc.models import GRANTS, STATE_RANK, canonical_grants, has_control, report_head, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, has_control, report_head, report_line, stop_note
 
 from . import uiconf
 from .icons import role_svg
@@ -2104,7 +2104,7 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # The Grants checkboxes were ticked from the preset when the page loaded and as the
             # Role changed (design §4.5a), so what is ticked is what was meant — including an
             # untick, which is a person deciding this session does not get the grant.
-            capabilities=[g for g in canonical_grants(grant) if g in GRANTS],
+            capabilities=[g for g in dict.fromkeys(grant) if g in GRANTS],
             lane=refs or (list(preset.lane) if preset else []),
             role=preset.name if preset else "",
             ledger=ledger,
