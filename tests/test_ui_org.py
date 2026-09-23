@@ -56,6 +56,45 @@ def test_a_team_with_nothing_live_keeps_its_card_below_the_live_ones_and_no_team
     assert "Tech Lead" not in templates.get_template("group_head.html").render(g=idle)
 
 
+def test_a_stopped_team_offers_forget_all_but_never_on_a_card_with_unpushed_work():
+    """Design §4.5a team card **Forget all** (TD-071 item 1): on a team with nothing live, one
+    confirm, then each card's Forget — never a card with the dirty / unpushed flag, which the confirm
+    names apart. Absent while anything of the team is live, and when every card is flagged."""
+    head = templates.get_template("group_head.html")
+    a = {**sess("ao-a", "a", team="t", state="exited"), "flag": ""}
+    b = {**sess("ao-b", "b", team="t", state="closed"), "flag": ""}
+    c = {**sess("ao-c", "c", team="t", state="exited"), "flag": "dirty · 3 unpushed"}
+    (g,) = team_groups([a, b, c])
+    assert [m["id"] for m in g["forget"]] == ["ao-a", "ao-b"] and [m["id"] for m in g["forget_kept"]] == ["ao-c"]
+    html = head.render(g=g)
+    assert 'data-forget-all="t" data-ids="ao-a ao-b"' in html and ">Forget all</button>" in html
+    assert "Forget 2 sessions of t: a, b?" in html and "c (dirty · 3 unpushed)" in html
+    (live,) = team_groups([a, {**sess("ao-w", "w", team="t", state="working"), "flag": ""}])
+    assert live["forget"] == [] and "Forget all" not in head.render(g=live)
+    # an on-call seat is never forgotten — its card offers no Forget while the definition names it
+    seat = {**sess("ao-s", "s", team="t", state="exited"), "flag": "", "seat": True}
+    (seated,) = team_groups([a, seat])
+    assert [m["id"] for m in seated["forget"]] == ["ao-a"] and seated["forget_kept"] == []
+    (flagged,) = team_groups([c])
+    assert "Forget all" not in head.render(g=flagged)
+    # *No team* is not a team: no Forget all there, whatever it holds
+    groups = team_groups([a, {**sess("ao-n", "n", state="exited"), "flag": ""}])
+    assert [g["forget"] for g in groups if not g["team"]] == [[]]
+
+
+def test_a_folded_team_says_how_much_unread_mail_its_cards_hold():
+    """Design §4.5a team header **✉ n** (TD-071 item 2): the sum of the folded cards' unread chips,
+    nothing at zero, and only on a team that folds — a live team's cards show their own."""
+    head = templates.get_template("group_head.html")
+    mailed = {**sess("ao-a", "a", team="t", state="exited"), "unread": 19}
+    (g,) = team_groups([mailed, sess("ao-b", "b", team="t", state="exited")])
+    assert g["unread"] == 19 and 'class="badge unread foldmail"' in head.render(g=g) and "✉ 19" in head.render(g=g)
+    (quiet,) = team_groups([sess("ao-a", "a", team="t", state="exited")])
+    assert "foldmail" not in head.render(g=quiet)
+    (live,) = team_groups([{**sess("ao-a", "a", team="t", state="working"), "unread": 2}])
+    assert "foldmail" not in head.render(g=live)
+
+
 def test_two_teams_each_with_a_lead():
     views = [
         sess("ao-orc", "orchestrator-ao-1", team="ao-grind", project="agentorc", caps=["control"]),
