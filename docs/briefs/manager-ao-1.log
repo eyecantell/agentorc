@@ -380,3 +380,8 @@
 02:44  grinder-ao-1: note "done: TD-121 — PR #506 merged" but PR #506 is actually still OPEN/CONFLICTING, not merged — grinder-ao-1 is actively working (force-push + watching checks), not idle, so no send needed; watching next round.
 02:49  grinder-ao-1: TD-121 PR #506 now actually merged (self-corrected earlier premature note; conflict with #507 resolved) → cadence check: all rows pass.
 02:55  ao-grind out of work: both grinders finished, ao team stop --close closed both clean. Board line posted (docs/user_attention.md) via branch orch-board-ao-grind-winddown-0924 → PR #509, fact-checked SHIP by sonnet, cadence pass, squash-merged. Winding down.
+
+## New run (team restarted 2026-09-24 03:42Z — new manager session)
+
+03:42–04:01 quiet: grinder-ao-1, grinder-ao-2, techlead-ao-1 all (re)started; grinder-ao-1 claimed TD-122, grinder-ao-2 claimed TD-124; techlead seat cycled idle/closed/refilled twice on its own (host agent's tick, no action taken); PR #517 (TD-122, touches src/sessionorc) opened and correctly routed to the techlead seat as a held PR — grinder-ao-1 waited, did not merge it itself; no unread inbox throughout, no relay needed (all cadence-changes entries landed before members' created time).
+04:02  techlead-ao-1 merged #517 (TD-122) after its read, idle again → cadence check PR #517: pass (pr/review/ledger/worktree pass, ci unknown-still-running, deploy n/a). grinder-ao-1 meanwhile claimed and opened #518 (TD-125, not a held path) — in review.
