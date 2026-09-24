@@ -150,8 +150,9 @@ every agent is a batch job and every continuation has to be reconstructed.
 The anchor re-read the code for every claim above. Two agent claims were wrong and are corrected
 here: the size (reported as ~64k lines of TypeScript; it is ~1.2M excluding tests) and *"the org
 chart is not enforced"* (`allow_manager_chain` enforces it for checkouts). A third was overstated:
-*"a warm process persists across wakes by default"*, when `warmHandleIdleMs` defaults to 0. The
-founder's identity, the star history and the praise and criticism in secondary coverage are not
+*"a warm process persists across wakes by default"*, when `warmHandleIdleMs` defaults to 0. A fourth
+was the anchor's own, corrected the same day on a closer read: the first draft of item 4 said the
+decision queues learn from the person's past decisions, and they do not. The founder's identity, the star history and the praise and criticism in secondary coverage are not
 verified and are left out.
 
 ## What this ADR does not do
