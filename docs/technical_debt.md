@@ -69,7 +69,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-114 | A repo's brief replaces the whole template, so three repos carry copies of agentorc's mechanics that go stale together: make it a supplement filled into a `{repo}` slot | High | Partly done — step (1) built, awaiting the anchor with (2) and (3) |
 | TD-118 | Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose | High | Partly done — (1) and (2) built 2026-09-23; (3) is dev-cadence's |
 | TD-120 | The anchor's jobs go to the team: the techlead reads the held PRs, promotion is a person's press or a policy, and a designer seat holds the design conversation | Medium | Open — decided 2026-09-23; the designer role is in org.yml, its team seat waits on §4.9a |
-| TD-121 | A card's more ▾ menu is clipped by the card: the fixed-height card hides overflow and the menu is positioned inside it | Medium | Open — pickable |
 | TD-122 | The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account | High | Open — design first |
 | TD-124 | The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse | Medium | Map approved 2026-09-23 — §4.5a rows next (the designer) |
 | TD-125 | A team's wind-down report is a counted board line for the person, most of it a diagnostic and a pointer at a PR that waits on the reader, not on the person | Medium | Open — design first (the designer) |
@@ -1240,22 +1239,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** (1) TD-093 slice 4, then the `review:` line in `org.yml` and the hand rule's retirement in TD-093, `techlead-context.md` and CLAUDE.md. (2) Design the `promote:` block (§5, the repo's own), the policy (§6) and its Inbox row (§4.5a), then a grinder builds it (`src/sessionorc`, the reader merges); this repo's `.agentorc.yml` gets its block, and each other repo writes its own. (3) Design the on-demand interactive member (§4.9, §4.9a, §4.5a's header button), build the definition key, the concluded test's change and the button, add the designer to `ao-grind`. Every piece is a repo's declaration or a rule about mode, never about this repo or a role name.
 
 **Related:** TD-093 (the reader), TD-062 (the live copy is promoted), TD-096 (an interactive member is left alone), TD-075 (the techlead), design §4.9a, §4.9b.
-
-## TD-121: A card's more ▾ menu is clipped by the card: the fixed-height card hides overflow and the menu is positioned inside it
-
-**Priority:** Medium
-**Added:** 2026-09-23 (Paul, from the Org page; the anchor session)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open
-**Location:** `src/agentorc/ui/static/app.css` (`.sc { overflow: hidden }` from TD-095's one-height card; `details.more .menu { position: absolute }`), `src/agentorc/ui/templates/card.html` (`details.more`)
-
-**Why:** pressing **more ▾** on a card at the bottom of its row shows a sliver of the menu's border and nothing else — the card clips it, so the mode toggle, Pop out and the rest are unreachable there. A control that cannot be reached is worse than one that is absent (design §4.5a).
-
-**Fix:** let the menu escape the card without giving up the card's fixed height: `overflow: visible` on the card with the row-clipping moved to the rows that need it (`.sc-body > .row` already clips), or the menu drawn as a popover outside the card's box (`position: fixed` placed from the summary's rect, or the `popover` attribute). Check every card position — the bottom row of a team's group, a folded team's *show*, the Inbox rows that carry a menu — and the Focus header's menu. One page PR, no design change (the control exists; only its drawing is wrong).
-
-**Related:** TD-095 (the card's one height), TD-046 (Pop out lives in this menu).
 
 ## TD-122: The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account
 
