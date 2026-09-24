@@ -73,6 +73,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-122 | The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account | High | Open — design first |
 | TD-123 | Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1 | Low | Decided 2026-09-23: remove all three — pickable |
 | TD-124 | The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse | Medium | Map approved 2026-09-23 — §4.5a rows next (the designer) |
+| TD-125 | A team's wind-down report is a counted board line for the person, most of it a diagnostic and a pointer at a PR that waits on the reader, not on the person | Medium | Open — design first (the designer) |
 
 
 ---
@@ -1306,3 +1307,20 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix, design first — the map is the decision:** (1) **Moving**: `j` / `k` (and the arrows) move a ring between cards on Org and rows on the Inbox, in the page's own order (the manager first, then urgency); `g` then a team's initial, or a number, jumps to a team; `/` focuses the filter box, `Esc` leaves it. (2) **Acting on the ringed thing**: `Enter` opens Focus (`o` the same; `Shift+Enter` pops it out, TD-046); on an Inbox row `a` / `d` are Allow and Deny, `r` opens Reply, `s` Snooze, `x` Dismiss or Done — each the row's own button, pressed. (3) **Pages**: `1` Org, `2` Inbox, `n` New session, `?` the overlay, which lists every key beside the control it presses and closes on `?` or `Esc`. (4) Rules: a key fires only when nothing editable has focus (a composer, the filter, a reply box) — so the Focus terminal, which takes every key, is untouched; a key that would act on something not ringed does nothing; the overlay's text is generated from the same table the handler reads, so the two cannot drift. (5) The §4.5a rows first; then one page PR builds the handler, the ring and the overlay; the mockups gain the ring. Not in scope: remapping, chords, and keys inside the terminal.
 
 **Related:** TD-046 (Pop out, alt-tab), TD-069 (the Inbox's rows), TD-095 (the card's anatomy — the ring must fit it), TD-070 (suggested answers, which keys could pick by number).
+
+## TD-125: A team's wind-down report is a counted board line for the person, most of it a diagnostic and a pointer at a PR that waits on the reader, not on the person
+
+**Priority:** Medium
+**Added:** 2026-09-23 (Paul, reading the 23:47Z line: *is all of this text just to point me to a PR?*; the anchor session)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — §4.9a and the two manager briefs change together, the designer's round; then a grinder edits the preset
+
+**Status:** Open — **found 2026-09-23.** Design §4.9a tells a manager that winds down to leave *one board line naming what each member searched*, and `docs/briefs/manager-ao-1.md` adds the PRs held for the anchor's read (TD-093). The 23:47Z line was the result: two hundred words on the person's counted board, of which the only act for anyone was a PR waiting on the anchor — which is not the person, and whose wait is already a structured field (`prs_waiting`, TD-093 slice 1; its header count is slice 3, #479) — and the rest a diagnostic of why two grinders found nothing pickable, which is worth reading once by whoever writes the next entries and never worth a Due date. Three such lines landed on 2026-09-23 alone, each closed by the anchor after doing the thing it pointed at.
+**Location:** design §4.9a (*Done when*: the board line), §4.10 (*answered for you*, the FYI shape), §4.5a **Inbox row: `note` and the rest of FYI**, `src/agentorc/briefs/manager.md` (the wind-down paragraph), `docs/briefs/manager-ao-1.md` (*Escalation lines*, the hand rule), TD-093 (the reader)
+
+**Why:** a counted item the person must clear teaches the person to clear without reading (the same lesson as TD-115's alarm). The board is for what waits on the person; everything else has a quieter place already.
+
+**Fix, design first:** (1) §4.9a: the wind-down report is an **FYI `note` to the person inbox** (uncounted, Dismiss deletes; §4.10) — two lines: what was merged this run, and what each member looked for and did not find, in one sentence each — and **a board line only when something waits on the person** (a question passed up and unanswered, a member closed with unpushed work, a start refused). (2) A PR held for its reader is **never on the board**: it is `prs_waiting` on the seat (the header count, §4.5a) and the reader's own mail; the manager's brief says so and stops naming PRs in wind-down text. (3) The manager preset and this repo's supplement say the same in the same words; the samscrape and dev-cadence supplements are told the day it lands (as TD-114 was). (4) The 23:47Z line and its two siblings are the evidence; nothing to build in `src/`.
+
+**Related:** TD-093 (the reader; `prs_waiting`), TD-118 (token spend — the report was one of its findings' cousins), TD-120 (the reader takes the hand), TD-069 (the Inbox), §4.9a.
