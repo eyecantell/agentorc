@@ -1168,3 +1168,19 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Resolved:** 2026-09-23 (PR #507, `grinder-ao-2`) — `base.html`'s top bar draws only built pages; design §4.5 screens 4 and 5 say *not built, a tab when it exists*, screen 7 (Attention) is struck in favour of the Inbox's board rows and `/attention`, §4.5a's *Due strip / Attention* rows are *Due strip / Inbox board row* or *Due strip*, §7 phase 4 restated, the Attention mockup removed; `tests/test_ui_org.py` asserts no dead tab renders.
 
 **Related:** TD-069 (the Inbox), TD-081 (Resume on a card — what Resumable's *running one* case became), design §7.
+
+## TD-121: A card's more ▾ menu is clipped by the card: the fixed-height card hides overflow and the menu is positioned inside it
+
+**Priority:** Medium
+**Added:** 2026-09-23 (Paul, from the Org page; the anchor session)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-23
+**Location:** `src/agentorc/ui/static/app.css` (`.sc { overflow: hidden }` from TD-095's one-height card; `details.more .menu { position: absolute }`), `src/agentorc/ui/templates/card.html` (`details.more`)
+
+**Why:** pressing **more ▾** on a card at the bottom of its row shows a sliver of the menu's border and nothing else — the card clips it, so the mode toggle, Pop out and the rest are unreachable there. A control that cannot be reached is worse than one that is absent (design §4.5a).
+
+**Resolved:** 2026-09-23 (PR #506, `grinder-ao-1`) — `details.more .menu` is `position: fixed`, placed by `AO.placeMenu` from its summary's rect when it opens (right-aligned under it, flipped above when the space below is short, kept 8px inside the viewport) and re-placed on scroll and resize; `.sc` keeps its `overflow: hidden`. The one rule covers the cards, the Inbox rows' *Snooze* menus and the Focus header's menu; a delta that redraws a card reopens the menu that was open on it. Test: `tests/test_ui_menu.py`.
+
+**Related:** TD-095 (the card's one height), TD-046 (Pop out lives in this menu).
