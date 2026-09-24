@@ -1332,8 +1332,8 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Priority:** Low
 **Added:** 2026-09-24 (numbered TD-126 until the rebase found main's TD-126; Paul, reading the Paperclip survey: *make a note to handle API (pay per token) budgets at some point, especially as open source models gain traction*; session `research_paperclip`)
-**Owner:** unassigned
-**Kind:** design
+**Owner:** designer
+**Kind:** design-first
 **Pickable:** no — design first; nothing runs on a metered profile today
 
 **Status:** Open. Every profile today is a subscription login, whose binding budget is the adapter's usage windows (§4.2a, §6 *Usage gate*, TD-100). A profile on an API key (`ANTHROPIC_API_KEY`), on a hosted open-weights model behind an OpenAI-compatible endpoint, or on a second adapter (TD-112) billed the same way reports no window: the chip draws nothing, the gate never trips, and a night's unattended run has no bound but the card on file.
