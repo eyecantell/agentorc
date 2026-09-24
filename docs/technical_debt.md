@@ -71,7 +71,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-120 | The anchor's jobs go to the team: the techlead reads the held PRs, promotion is a person's press or a policy, and a designer seat holds the design conversation | Medium | Open — decided 2026-09-23; the designer role is in org.yml, its team seat waits on §4.9a |
 | TD-121 | A card's more ▾ menu is clipped by the card: the fixed-height card hides overflow and the menu is positioned inside it | Medium | Open — pickable |
 | TD-122 | The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account | High | Open — design first |
-| TD-123 | Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1 | Low | Open — Paul's decision, recommendation recorded |
+| TD-123 | Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1 | Low | Decided 2026-09-23: remove all three — pickable |
+| TD-124 | The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse | Medium | Open — design first (the designer) |
 
 
 ---
@@ -1277,14 +1278,31 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Priority:** Low
 **Added:** 2026-09-23 (Paul's question; the anchor session)
-**Owner:** paul
-**Kind:** decision
-**Pickable:** no — Paul decides; the recommendation is below
-**Status:** Open — **recommendation (the anchor, 2026-09-23): remove all three from the bar now.** They are `<span class="tab off" title="phase 4">` in `base.html` — not links, pressable by nothing — and each one's job has moved or never started: **Attention** is the Inbox's board rows since TD-069 step 3 (2026-09-23), so the screen is struck from §4.5 in favour of the Inbox; **Commands**' visible half is the Org filter's *show command runs*, and its command specs (§4.5 screen 5, cmdorc-shaped) were never built; **Resumable** (§4.5 screen 4, conversations agentorc did not start, with Adopt) is the one still worth building — it stays in §4.5 as an unbuilt phase-4 screen, reached from New session's *resume* when it comes, and gets a tab when it exists. A tab that does nothing teaches the person that the bar lies. If Paul agrees: one page PR removes the three spans and §4.5's screen list says where each went (design first, the dated fact to the history).
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Decided by Paul 2026-09-23 (*yes, remove the three tabs*): **remove all three from the bar; one page PR, design first** — `base.html` loses the three spans, §4.5's screen list says where each went (Attention: struck, the Inbox's board rows; Commands: the Org filter's *show command runs*, the specs unbuilt; Resumable: kept as an unbuilt phase-4 screen, a tab when it exists), §7's phase 4 keeps the two, the dated fact to the history. Was: **recommendation (the anchor, 2026-09-23): remove all three from the bar now.** They are `<span class="tab off" title="phase 4">` in `base.html` — not links, pressable by nothing — and each one's job has moved or never started: **Attention** is the Inbox's board rows since TD-069 step 3 (2026-09-23), so the screen is struck from §4.5 in favour of the Inbox; **Commands**' visible half is the Org filter's *show command runs*, and its command specs (§4.5 screen 5, cmdorc-shaped) were never built; **Resumable** (§4.5 screen 4, conversations agentorc did not start, with Adopt) is the one still worth building — it stays in §4.5 as an unbuilt phase-4 screen, reached from New session's *resume* when it comes, and gets a tab when it exists. A tab that does nothing teaches the person that the bar lies. If Paul agrees: one page PR removes the three spans and §4.5's screen list says where each went (design first, the dated fact to the history).
 **Location:** `src/agentorc/ui/templates/base.html` (the three `tab off` spans), design §4.5 screens 4 and 5, §7 (phase 4)
 
 **Why:** three of the bar's five tabs are dead; on a phone they take the width the live ones need.
 
-**Fix:** Paul's yes, then the page PR above.
+**Fix:** the page PR above.
 
 **Related:** TD-069 (the Inbox), TD-081 (Resume on a card — what Resumable's *running one* case became), design §7.
+
+## TD-124: The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse
+
+**Priority:** Medium
+**Added:** 2026-09-23 (Paul's question; the anchor session)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — the key map is a design decision (§4.5a) before a grinder builds it
+
+**Status:** Open — **asked 2026-09-23 (Paul: *many people do not like to have to use the mouse; would that be browser specific?*).** The anchor's answer, recorded here: **not browser-specific.** A page's own key handling (`keydown` on the document) works the same in every browser; the only keys a page cannot take are the browser's and the operating system's own (a new tab, closing one, the address bar, alt-tab), and a page never wants those. The shape that works, and that people already know from mail clients and code hosts: **single keys when focus is not in a text field**, a **`?` overlay** listing them, and every key a name for a control that already exists in §4.5a — a key does nothing a button cannot. Nothing is stored; a person's own remapping is a later question.
+**Location:** design §4.5a (a **keys** row per page, or one row per key naming the control it presses), §4.5 screens 1, 2 and 6, `src/agentorc/ui/static/app.js` (one `keydown` handler, a focus ring on the selected card or row), `app.css` (the ring), the `?` overlay template
+
+**Why:** every act on the Org page and the Inbox is a click, and the person who runs a fleet from the keyboard is the person the pages are for (TD-046 came from the same place: alt-tab, not the mouse).
+
+**Fix, design first — the map is the decision:** (1) **Moving**: `j` / `k` (and the arrows) move a ring between cards on Org and rows on the Inbox, in the page's own order (the manager first, then urgency); `g` then a team's initial, or a number, jumps to a team; `/` focuses the filter box, `Esc` leaves it. (2) **Acting on the ringed thing**: `Enter` opens Focus (`o` the same; `Shift+Enter` pops it out, TD-046); on an Inbox row `a` / `d` are Allow and Deny, `r` opens Reply, `s` Snooze, `x` Dismiss or Done — each the row's own button, pressed. (3) **Pages**: `1` Org, `2` Inbox, `n` New session, `?` the overlay, which lists every key beside the control it presses and closes on `?` or `Esc`. (4) Rules: a key fires only when nothing editable has focus (a composer, the filter, a reply box) — so the Focus terminal, which takes every key, is untouched; a key that would act on something not ringed does nothing; the overlay's text is generated from the same table the handler reads, so the two cannot drift. (5) The §4.5a rows first; then one page PR builds the handler, the ring and the overlay; the mockups gain the ring. Not in scope: remapping, chords, and keys inside the terminal.
+
+**Related:** TD-046 (Pop out, alt-tab), TD-069 (the Inbox's rows), TD-095 (the card's anatomy — the ring must fit it), TD-070 (suggested answers, which keys could pick by number).
