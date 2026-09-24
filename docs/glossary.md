@@ -208,6 +208,7 @@ not mix:
   *proposed*.
 - **run log** — a session's recorded pane output from its first byte (invariant 3). — *proposed*.
 - **run window** — the hours unattended sessions may work (design §6). — *proposed*.
+- **promote** — make a repo's `main` the live copy: for this repo, install the checkout into the live venv and restart the units (CLAUDE.md); for any repo, its `promote.run` (design §5 `promote:`, §6 *Promote*, TD-120). A person's press (`ao promote`, the Inbox row) or the home's policy under `auto: true`; never a session's. *Not:* deploy (a repo's own word for its `run`), release, upgrade. — *proposed* 2026-09-24.
 - **reserve** — the usage gate's setting (design §6, TD-100, 2026-09-22): what the person keeps back of a quota window for their own interactive work — a flat percent (`30` of a session window) or a percent per day (`{per_day: 10}` of a weekly one). Per profile, per window label, in the host's `settings.yml`; the gate computes the **line** from it. — *proposed 2026-09-22*
 - **line** — the percentage at which the usage gate pauses a profile's unattended sessions: `100 − reserve` for a flat reserve, `100 − per_day × days left` (today counted whole) for a per-day one, so a weekly line rises as the week goes. Shown beside the number on the top bar's chip; a session paused at it carries the *paused · usage* mark, not a state. — *proposed 2026-09-22*
 - **command session** — a session running a predefined shell command. *Not:* command run (as a

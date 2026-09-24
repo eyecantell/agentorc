@@ -568,7 +568,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   `origin/main` in that directory (as last fetched) holds that the build does not (*not live
   until the next promote*), or why that cannot be said — measured on the caller's side, where the
   checkout is. A build with no record (an editable install, a wheel from an sdist, an older
-  agent) is *unknown*, never left out.
+  agent) is *unknown*, never left out. That line is this repo's own instance of the general
+  **`check`** (§5 `promote:`, §6 *Promote*): a repo declares how its live commit is read, and the
+  home reads it as one of the promote's three readings.
 - Board write-back (the RPC is built, TD-069 step 3; no page offers it yet). **Snooze** (edit the
   `Due:` date, or add one) and **Done** (`- [ ]` → `- [x]`) on a dev-cadence `user_attention.md`
   item are one-line edits the host agent makes and commits with a fixed message naming the item's
@@ -1620,6 +1622,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox: section heading, the **i** mark | **i** (one per section) | a section is its name, its count and an **i** mark holding the paragraph that says what the section is and what it counts (§4.5 screen 6 *Layout*, TD-082): a tooltip on hover and keyboard focus, and pressed it opens that paragraph in place under the heading (pressed again, it closes); which are open is remembered in the browser. It is a `<button>` — Enter and Space press it — carrying `aria-expanded` and `aria-controls` naming the paragraph, labelled *About <section>*; the tooltip is the same text as the button's description (`aria-describedby`), so a screen reader hears it without pressing — which needs the paragraph in the page always, closed by the `hidden` attribute and never removed. Touch has no hover: a tap opens it in place. Fixed text in the source |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** with the card's optional *why?* beside Deny (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Open** (not built: **Switch profile… / Wait** here, since neither is built on the card; the row gains them when the card does); exited with unpushed work: what Ready to close says (§4.2) and the ref it was measured against, **Reopen and push**, **Resume**, **Open** (details). *Reopen and push* (TD-081) is the banner's one-press **Resume** plus a first prompt the page wrote — *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); offered only where Resume would be silent; the session is attended, so a `git push` the tool asks about arrives as an Allow / Deny row, and the result returns as an outcome (§4.10 *Outcomes*); it depends on `--outcome` (TD-079). A state row leaves the list when the state does; only `stalled?` and unpushed work can be snoozed, being off the tool's clock: their **Snooze** (TD-079) is the home-owned store `attention_snooze` writes, keyed on the record and the row kind, so a session's permission and its stalled row are set aside separately; no `until` clears it, and a snoozed row is in no section and no count until its time. The row is built from the card's own view (pill, `title`, `doing` line, badges); the pill is a `<span>` and a state mark never looks pressable (TD-071 item 8). One predicate (`state_kind`) answers for the rows and the Org's needs-you badge, so every session the Org counts has exactly one row; a `needs-you` record whose `pending` is empty, not a dict, or of an unknown kind is a plain **needs you** row with **Open** and no Allow / Deny — a control built from what is not there is what §4.2 forbids |
 | Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words. It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is never lifted by the tick |
+| Inbox row: promote | **Promote**, **Snooze ▾**, **Dismiss** | designed (TD-120 step 2; not built — TD-132; §5 `promote:`, §6 *Promote*): one row per repo in the home's registry whose `.agentorc.yml` carries `promote:`, drawn only while live is not main or a promote failed — *`<repo>` · live `<sha7>` · main `<sha7>`, n commits ahead · checks green / pending / failed / unknown*, aged from when main moved, every part a structured reading of the home's (`promotes` on `host`), never text a session wrote. Under **Needs you**, counted, when `auto: false` and main is ahead — the press is what stands between merged and live — and on a **failure** whatever `auto` says, with the reason and the log's last lines as text; while a promote is **in flight** it moves to FYI, uncounted, reading *promoting `<sha7>` · started <t>* with its Promote disabled, and the `system` note *promoted …* replaces it (§4.10). Under `auto: true` nothing is drawn but a failure: the normal flow is the note alone. **Promote** presses the `promote` RPC with main's head (a person's, refused to a session; a rollback to an older commit is `ao promote --sha`, §4.7, not the page); refused in place, naming the precondition (§6: the checkout on a branch or with changes, one in flight, a failure standing), and offered through `pending`, `failed` or `unknown` checks with the verdict beside it. **Snooze ▾** as on the board rows — +1 day · +1 week · pick a date — kept in the attention store by time alone, so more merges do not wake a snoozed row (a person who promotes in batches asks to be left alone until then). **Dismiss** is drawn on a failure row only and clears the failure — the mark is the home's own file, not re-derived, so clearing it is real where the restart row's is not — after which promoting goes on; a row that is not a failure leaves when live catches up |
 | Inbox row: identity alarm | **Suspend**, **Log TD**, **Open**, **Dismiss** | §4.8a *An alarm's answers* is the full text (TD-077). One row per record whose `identity_alarms` is non-empty and one for the host's own list (§4.8a), under *Needs you* and counted: an alarm is a bug of ours or a session misbehaving, and a person should know which. Not built: under *Steering*, uncounted, while a techlead holds it (§4.8a *Who answers first*). The row lists the alarms in words — channel, what was claimed, the rpc, the count, first–last in the person's clock, *(others)* as *and n more distinct claims* — and the host's identity mode, since *observe* records what *enforce* would refuse. Two of the four are answers and only an answer ends the row (§4.10 *The Inbox is a queue*): **Dismiss** (wire name `identity_ack`) clears that list, the record's or the host's; trail *dismissed by you*. **Log TD** (`identity_log`) hands the alarm, in words the home composes from its fields, to the record's first live controller — read from the control graph, never a badge (`alarm_to`, the home's answer, which the RPC reads too) — as mail from the person that owes an outcome (§4.8a, TD-079's debt), clears the list; trail *logged by you → `<controller>`*. Drawn only where such a session exists — not on the host's row, not on a record with no live controller (a manager's own is one); elsewhere the row reads *no session answers for this one* (or *for the host's own list*); its confirm names that session and the outcome owed; a controller gone between draw and press is the agent's refusal, in words, as the toast, and the refreshed row says nobody answers. The other two act on the session and leave the row standing: **Open** focuses it while its record is here; **Suspend** (`rpc_suspend`) stops it at once — no wrap-up — keeps worktree and conversation, and marks the record *suspended*, which only a person lifts and which refuses every session's `create` under that name, a whole `ao team start` included (§4.8a); offered only on a record's row while that session is live — not the host's row, not a record already suspended, `exited` or `closed`; its confirm says what it does. A suspended record's row says so in a flat mark — its only record, since a suspension ends no row and writes no trail; the mark is drawn wherever the record is (card, Focus header, Inbox state row), never pressable, with the when, who and why on hover, tolerant of a record another build wrote (it costs that card its mark, never the grid). No Unsuspend control anywhere, by design: a person's **Resume** and **Forget** lift it. The New session form's `suspended` verdict keeps Start enabled, since a person's create *is* the lift; the form prints the agent's sentence and adds what pressing Start does. All four are a person's own acts, caller-less and refused to every session as `inbox_delete` is (one exception, not built and never on a host that carries a person: a techlead's `identity_ack` and `suspend` for a record it controls, §4.8a *Who answers first*), and none is a never-gated read — a session that could clear the list could erase evidence of its own forgery, one that could suspend could stop its rival. The host agent's log keeps every alarm, a line each. On the card the alarm is a mark and nothing more, as is *suspended*. A node's record is answered at that node: alarms are node-owned, an `id` naming another host is routed there (§4.4a step 4a), the node clears its list and the home takes the cleared record from the reply. **Suspend** is the home's act — `suspended` is the home's field — and only its `kill` is routed. The host's own list is whichever host was asked, and never travels |
 | Inbox row: `ask` | **Reply**, **Delete**, **Snooze** | the whole text, sender, `about`, age — no countdown: an `ask` to the person does not expire (§4.10). **Reply** sends a `reply` into the sender's inbox; **Delete** confirms, closes it as `declined` and the asker is told by a `system` note (§4.10); **Snooze** sets `snoozed_until` (1 h · tomorrow 08:00 · a date), a person's own bookkeeping the sender is not told of — the snoozed entry is listed behind *n snoozed — show* with **Unsnooze**, which clears it. Suggested answers, when the envelope carries them, are the row below |
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*, TD-070; up to four, 80 characters each, format characters stripped). Drawn apart from the row's own controls — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm |
@@ -1877,6 +1880,19 @@ line 60% (4 days left, moves Thu 07:00)*; `ao gate <profile> <label>=<reserve>�
 are the adapter's (§4.3): a label no adapter of that profile reports is refused and the reported
 ones are named, so a typo is not a silent no-op. A change takes effect on the next tick, with no
 restart; under `--json` the reply is the file's key as written and the computed lines.
+
+**`ao promote`** (TD-120 step 2; §5 `promote:`, §6 *Promote*; designed, not built — TD-132): the
+press from a terminal. `ao promote [<repo>] [--sha <commit>]` promotes the registered checkout —
+the current directory's repo when none is named — to main's head, or to `--sha` for a rollback or
+a hotfix, through the `promote` RPC at the home, **refused to a session** (a person's own, as
+`set_settings` is; a worker never promotes, CLAUDE.md) and refused, naming which, on §6's
+preconditions (1) and (3); on (2) it says what the checks read and goes on, since the press is the
+person's word. It returns once the run is started, with the log's path: the outcome is `check`'s
+on a later tick, as §6 says, and for this repo the command's own host agent goes away under it.
+`ao promote status` prints every promotable repo's readings — *agentorc · live 485d28b · main
+9c1e0f2, 3 ahead · checks green · auto off*, in flight or failed with the log — and `--json` the
+`promotes` field of `host`. `ao status -v`'s build line stays: it is this repo's `check` read from
+the client's side, and the one line a session may read.
 
 ### 4.8 Capabilities, report channels, and role presets
 
@@ -4161,7 +4177,27 @@ commands:
   - name: test        ; run: pdm run test
   - name: cluster     ; run: ./scripts/cluster-status.sh
   - name: attention   ; run: python scripts/nudge_user_attention.py --report
+promote:                              # §6 *Promote* (TD-120): how a merge to `main` becomes the live copy
+  run: scripts/promote.sh             # makes `main` live from this checkout; run at the home, in the checkout
+  check: scripts/live_sha.sh          # prints the commit that is live now, or fails saying why
+  auto: false                         # true: the home promotes on its own once `main` moves and its checks are green
 ```
+
+  **`promote:`** (TD-120 step 2, designed 2026-09-24; not built — TD-132) is the repo's own
+  answer to *how does `main` become what is running*, and nothing in agentorc names pip, a venv,
+  systemd, skaffold or wrangler: this repo's `run` is the pip pair of CLAUDE.md and its `check`
+  prints the installed build's commit (`sessionorc.build.info()`); samscrape's would be its
+  skaffold run and the deployed image's tag; contractmatch's a wrangler deploy and the deployment's
+  commit; dev-cadence's its sync. Both are commands run **in the checkout, at the home** (§6
+  *Promote* says when): `run` makes the checkout's `main` live and is judged by what `check` says
+  afterwards, never by its exit code; `check` prints one full commit on stdout and exits 0, or
+  exits non-zero with the reason on stderr (*not deployed*, *no cluster*), which the row shows as
+  *live: unknown — <reason>*. `auto` is `false` when absent: the row offers a press. A repo with no
+  block has no promote, no row and no `ao promote`. It is **the one key of this file the host agent
+  reads** (`sessionorc.promote`, the key alone, from each checkout in the home's registry — the
+  rest of the file is the clients' and the agent still resolves no role and no brief), because a
+  policy that acts needs its declaration where the policy runs; `ledger:` travels on the record
+  instead because it is a session's.
 
 - Org (§4.9): `~/.agentorc/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
   roster that sits between the package's built-ins and a repo's own. Read by the clients on every
@@ -4348,6 +4384,48 @@ code and needs no grant; a session doing the same work does.
   performs a restart, a fill or a nudge — except the nudge to a member on a node, which rule 4
   does not reach yet — and its round ends in `ao wait --timeout 3540`, run in the
   background because a tool call is capped at ten minutes.
+- **Promote** (TD-120 step 2; designed 2026-09-24, not built — TD-132): a repo's live copy — the
+  host agent and every session's `ao` for this repo, a cluster for samscrape — is made from `main`
+  by **a person's press or this policy, never by a session** (CLAUDE.md: a worker never promotes;
+  the `promote` RPC is refused to a session as `set_settings` is, §4.7). It runs **at the home**
+  (§4.4a: policies that act run at the home), for each checkout in the home's registry
+  (`hosts.yml` `repos_registry`) whose `.agentorc.yml` carries `promote:` (§5); a repo whose
+  checkout is on a node only has no promote yet, as rule 4's nudge does not reach a node. On the
+  reports' cadence (five minutes, one read per repo, each detached from the tick as the `gh`
+  reads are) the home takes **three readings** and keeps them on `host` under `promotes`:
+  **live**, `check`'s commit, a failed read keeping the last good one with its reason; **main**,
+  `origin/main` of the checkout after the home's own `git fetch origin main` (a policy that acts
+  is not hostage to whoever last fetched); **checks**, the CI verdict on main's head read with
+  `gh` — `green` when every check run has concluded and none failed, `pending`, `failed`, or
+  `unknown` with why (no `gh`, no remote, a rate limit). **Three preconditions** stand between
+  the readings and a promote: **(1) the checkout is on main's head with a clean tree** —
+  `HEAD == origin/main` and `git status --porcelain` empty — because `run` installs from the tree,
+  and a branch checked out there or a change left in it would go live (the tree is a person's, so
+  the policy reads this and never makes it: no checkout, no reset, nothing beyond the fetch);
+  **(2) checks green**; **(3) nothing in flight and no failure standing** for that repo. With
+  **`auto: true`** the home promotes when live ≠ main, the three hold, and main has stood still
+  for `PROMOTE_SETTLE` (ten minutes) — a burst of merges is one promote, since for this repo every
+  promote restarts the host agent. With **`auto: false`** the Inbox row (§4.5a *Inbox row:
+  promote*) and `ao promote` (§4.7) are the press: refused, naming it, on (1) or (3); on (2) a
+  person may press through `pending`, `failed` or `unknown` — a rollback (`--sha`) or a hotfix past
+  a flaky check is the person's word — with the row saying what the checks said. **The run is
+  detached** from the agent's own process group, its output to
+  `~/.agentorc/promotes/<repo>/<sha>.log` (pruned with the run logs, `runs_keep_days`), and an
+  intent file `~/.agentorc/promotes/<repo>/inflight.json` — `{sha, at, pid, log, by}`, `by` being
+  `auto` or the person — is written **before** the start, because for this repo the run restarts
+  the host agent that started it: **the outcome is read from `check` on later ticks, never from
+  the run's exit code**, and the agent that judges it need not be the one that started it (a
+  restart mid-run finds the file and carries on — which is exactly how this repo's own promote
+  concludes). Live reads the wanted commit → done: the file cleared and a `system` note to the
+  person inbox, *promoted `<repo>` `<sha>` — n commits* (FYI, uncounted, §4.10); the wheel and the
+  nodes follow §4.4a as today. The process gone with live still elsewhere, or `PROMOTE_BOUND`
+  (twenty minutes) passed — the process killed at the bound as the stop time kills — → **failed**:
+  `failed.json` `{sha, at, log, exit, why}` beside it, the Inbox row under *Needs you*, and
+  **nothing further is promoted for that repo, auto or press, until the person clears it** — the
+  row's Dismiss, or a press that succeeds. Sessions are never told: no send, no state change; they
+  live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
+  contract, and a blocked `wait` ends with the socket as §4.7 says. Until built, the anchor
+  promotes by hand as CLAUDE.md says.
 - **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
 - **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on
