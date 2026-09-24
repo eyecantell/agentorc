@@ -72,7 +72,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-121 | A card's more ▾ menu is clipped by the card: the fixed-height card hides overflow and the menu is positioned inside it | Medium | Open — pickable |
 | TD-122 | The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account | High | Open — design first |
 | TD-123 | Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1 | Low | Decided 2026-09-23: remove all three — pickable |
-| TD-124 | The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse | Medium | Open — design first (the designer) |
+| TD-124 | The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse | Medium | Map approved 2026-09-23 — §4.5a rows next (the designer) |
 
 
 ---
@@ -1298,7 +1298,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Kind:** design-first
 **Pickable:** no — the key map is a design decision (§4.5a) before a grinder builds it
 
-**Status:** Open — **asked 2026-09-23 (Paul: *many people do not like to have to use the mouse; would that be browser specific?*).** The anchor's answer, recorded here: **not browser-specific.** A page's own key handling (`keydown` on the document) works the same in every browser; the only keys a page cannot take are the browser's and the operating system's own (a new tab, closing one, the address bar, alt-tab), and a page never wants those. The shape that works, and that people already know from mail clients and code hosts: **single keys when focus is not in a text field**, a **`?` overlay** listing them, and every key a name for a control that already exists in §4.5a — a key does nothing a button cannot. Nothing is stored; a person's own remapping is a later question.
+**Status:** Open — **the key map below approved by Paul 2026-09-23 (*I like the plan for the hotkeys*): the designer writes its §4.5a rows next, then a grinder builds.** Asked 2026-09-23 (Paul: *many people do not like to have to use the mouse; would that be browser specific?*). The anchor's answer, recorded here: **not browser-specific.** A page's own key handling (`keydown` on the document) works the same in every browser; the only keys a page cannot take are the browser's and the operating system's own (a new tab, closing one, the address bar, alt-tab), and a page never wants those. The shape that works, and that people already know from mail clients and code hosts: **single keys when focus is not in a text field**, a **`?` overlay** listing them, and every key a name for a control that already exists in §4.5a — a key does nothing a button cannot. Nothing is stored; a person's own remapping is a later question.
 **Location:** design §4.5a (a **keys** row per page, or one row per key naming the control it presses), §4.5 screens 1, 2 and 6, `src/agentorc/ui/static/app.js` (one `keydown` handler, a focus ring on the selected card or row), `app.css` (the ring), the `?` overlay template
 
 **Why:** every act on the Org page and the Inbox is a click, and the person who runs a fleet from the keyboard is the person the pages are for (TD-046 came from the same place: alt-tab, not the mouse).
