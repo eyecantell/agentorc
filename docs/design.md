@@ -441,6 +441,9 @@ class Adapter(Protocol):
                                                           # a per-model one labelled by the adapter with the model
                                                           # (`week · Fable`), so the chip's worst-window rule sees it
     def usage_for(self, profile: str) -> dict | None      # the same by profile name, for the core (it cannot build a Profile)
+    def account_for(self, profile: str) -> str | None     # optional: the account a profile runs under, which the core keys
+                                                          # the usage poll, its cache and its back-off on (§4.2a, TD-122);
+                                                          # an adapter without it, or None, keys on the profile itself
     def composer(self, tail_raw: list[str]) -> str | None  # optional: the text painted in the tool's input line ("" empty,
                                                            # None when no composer is on screen); lets `send` confirm a submit (TD-027)
     def title(self, pane_title: str) -> str | None   # optional: the session's name as the tool holds it, from the terminal
