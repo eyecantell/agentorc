@@ -103,7 +103,9 @@ def pr_files(pr: int, cwd: str | None = None) -> list[str]:
     return files
 
 
-_REMOTE = re.compile(r"^(?:https://|ssh://git@|git@)github\.com[:/](?P<slug>[^/\s]+/[^/\s]+?)(?:\.git)?/?$")
+_REMOTE = re.compile(
+    r"^(?:https://(?:[^@/\s]+@)?|ssh://git@|git@)github\.com[:/](?P<slug>[^/\s]+/[^/\s]+?)(?:\.git)?/?$"
+)
 
 
 @lru_cache(maxsize=64)

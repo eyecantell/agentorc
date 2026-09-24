@@ -91,6 +91,7 @@ def test_a_github_origin_makes_a_pr_link_and_anything_else_draws_it_bare(monkeyp
         "/a": "git@github.com:eyecantell/agentorc.git\n",
         "/b": "https://github.com/eyecantell/samscrape\n",
         "/c": "https://gitlab.com/x/y.git\n",
+        "/d": "https://x-access-token@github.com/eyecantell/agentorc.git\n",  # a CI-style clone
     }
 
     def git(argv, **_kw):
@@ -101,6 +102,7 @@ def test_a_github_origin_makes_a_pr_link_and_anything_else_draws_it_bare(monkeyp
     monkeypatch.setattr(reviewmod.subprocess, "run", git)
     assert reviewmod.pr_url("/a", 12) == "https://github.com/eyecantell/agentorc/pull/12"
     assert reviewmod.pr_url("/b", 3) == "https://github.com/eyecantell/samscrape/pull/3"
+    assert reviewmod.pr_url("/d", 7) == "https://github.com/eyecantell/agentorc/pull/7"
     assert reviewmod.pr_url("/c", 3) == "" and reviewmod.pr_url("/nope", 3) == "" and reviewmod.pr_url(None, 3) == ""
     reviewmod._github.cache_clear()
 
@@ -114,6 +116,8 @@ def test_the_team_header_counts_prs_waiting_and_an_ask_row_draws_its_pr():
     seat = {"prs_waiting": {"n": 2, "oldest": "2026-09-23T10:30:00Z"}}
     assert prs_waiting([seat, {"prs_waiting": None}, {}], now) == {"n": 2, "age": "1h 30m"}
     assert prs_waiting([{"prs_waiting": None}, {}], now) is None  # nothing waits, or an older agent
+    two = [seat, {"prs_waiting": {"n": 1, "oldest": "2026-09-23T09:00:00Z"}}]
+    assert prs_waiting(two, now) == {"n": 3, "age": "3h 0m"}  # the sum, and the oldest across records
 
     def v(sid, **kw):
         return {"id": sid, "name": sid, "team": "t", "state": "idle", "state_class": "idle", "state_label": "idle",
