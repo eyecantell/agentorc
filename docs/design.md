@@ -3871,8 +3871,33 @@ writer); later replies count as `note`s; an addressee that exits leaves it pendi
 pruned while open. What differs is only its delivery shape: several addressees named by the
 worker, one entry with one id in each of their inboxes. Its **escalation** is not a mechanism of
 its own: it is the thread's `bound_hit`, or the bound expiring, either of which the asker turns
-into a board line — the generic path below, of which TD-039 keeps only the conflict-specific
-judgement.
+into an `ask` to the person — the generic path below.
+
+**A conflict, worked** (TD-039; the conflict-specific judgement, decided 2026-09-24). **While it
+waits**, the worker does what it does on any `ask`: it stops on the contested step and nothing
+else — the work that does not depend on the answer goes on, as its brief already says of any open
+question — and ends its turn in `ao wait`, never picking one instruction to be going on with:
+a guess is the failure this exists to prevent, and a stalled worker is the one TD-032 recorded.
+**The first `reply` from either controller is the ruling**: the home closes every copy at that
+moment and the worker acts on it; the other controller learns of it by the copy rule (*Copies to
+other controllers*, below) and, if it still disagrees, takes that up with the first controller in
+the same thread — the worker is never the arbiter and is never asked twice. Where the two cannot
+settle it, or the bound stops them, **either controller asks the person** — `ao msg person
+--kind ask --about <the worker>`, the conflict's id and the two `sends` named in the text — a
+question under *Needs you* on the Inbox (§4.5a) and not a board line: since 2026-09-20 what waits
+on the person is the Inbox's queue, and the board is for dated items (TD-069, TD-125). The
+person's reply reaches the asker, who writes the ruling as a `reply` on the conflict's own thread,
+where the copy rule carries it to the other controller and the worker; `--thread` is not the
+road, since it takes only the caller's own question to the person (*Outcomes*, below). The worker
+asks the person itself only when its bound expires with **no** reply at all — both controllers
+gone or silent — with the same words; a controller that has exited leaves the entry pending until
+then (above). **A resolved conflict is not a `finding`**: a finding names a problem in the repo,
+and a settled instruction is a thread, kept as every thread is, with the `sends` on the record
+and the run log saying who typed what. What a conflict *reveals* — a brief that contradicts a
+lane, a convention two managers read differently — goes up as a `finding` against the entry or
+the brief it concerns (`ao finding`, §4.8), never as work a manager creates (§4.8 *manager*:
+it relays conventions and never creates work). Nobody writes a board line for a conflict; the host agent
+never did (board write-back, §4.4, edits a pressed item and adds none).
 
 **A `send` is recorded on the record it lands on, so a `conflict` can say who said what.**
 Keystrokes carry no envelope, so the session cannot tell one controller's `send` from another's
@@ -3922,9 +3947,12 @@ The evidence to re-read is the same: the records of a night's team.
   bound the host agent **refuses the next send**, naming the bound and the thread, and writes a
   **`bound_hit`** mark on the thread that both cards and every participant's `ao` replies show — so
   the other side learns the exchange stopped, not only the refused sender. The refused sender
-  writes the `user_attention.md` line itself, with the thread attached; the host agent never
-  commits to a board on a session's behalf (board write-back, §4.4, edits an existing item at a
-  person's press and nothing else). The person is
+  asks the person itself — an `ask` to the person inbox naming the thread's root, the ruling
+  then written by the asker as a `reply` on that thread — and never a board line: what waits on the person is the
+  Inbox's queue (§4.5a, TD-079), a board line is a dated item (TD-069 step 4), and the host agent
+  commits to a board on nobody's behalf (board write-back, §4.4, edits an existing item at a
+  person's press and nothing else). Until 2026-09-24 this read *writes the `user_attention.md`
+  line itself*; the Inbox as a queue made that the wrong shelf. The person is
   the tie-break (§10). **A person's message into a thread is never counted, and resets that
   thread**: it clears `bound_hit` and the thread's tally on every record holding it, so the
   sessions may reply to the person's ruling under the same root — the same rule as the wake budget,

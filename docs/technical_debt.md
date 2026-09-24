@@ -25,7 +25,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-035 | Adapters without a session-start hook still run dev-cadence's SessionStart set | Low | Open |
 | TD-036 | Orchestrator membership: `controllers` on the target, the gate's second half, `set_controllers`, and the surface | Medium | Open |
 | TD-038 | The embedded terminal is a bare xterm.js: default palette, no bundled font, no renderer addon — it reads as black-and-white next to VS Code's terminal | Medium | Built — live check pending |
-| TD-039 | Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation | Medium | Open |
+| TD-039 | Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation | Medium | Open — designed; the test is TD-134, and this entry archives with it |
 | TD-042 | A brief that names a run number, a date or a fleet cannot be started twice: role templates must be repeatable and the run-specific facts must come from the definition | Medium | Partly done |
 | TD-050 | The cadence check's `review` row reads the verdict only on a comment's first line, so a report that ends with it counts as no review at all | Medium | Open |
 | TD-052 | Messages between sessions: the mailbox, the graph that gates it, the bounds, and the surfaces — build design §4.10 | High | Partly done — steps 1–8 done (5 was a measurement); the second-adapter step and the live check remain |
@@ -80,6 +80,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
 | TD-132 | Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row | Medium | Open — designed, pickable |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
+| TD-134 | A test drives two controllers to contradict one worker, and the grinder preset says what a worker does with a contradiction | Low | Open — designed, pickable |
 
 
 ---
@@ -297,10 +298,10 @@ Done when: a hand-started unattended session shows when it will stop and stops t
 
 **Priority:** Medium
 **Added:** 2026-09-13
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — the conflict-specific judgement is a design question
-**Status:** Open — design task, raised by Paul 2026-09-13 with the TD-036 go. **Its general half was answered 2026-09-14 by design §4.10** (TD-052): the gap was not a conflict feature but a missing concept — sessions could act on each other and never message each other — so the conflict report is a `conflict` message to both controllers, the exchange is `reply` traffic in one thread, the escalation is §4.10's exchange bound, and "not double-nudging" stops being a matter for briefs, since a controller's message about a session is copied to that session's other controllers. What stays here: the conflict-specific judgement — what a worker does *while* it waits, whether a resolved conflict becomes a `finding`, and who writes the board line. Not to be coded before TD-052 step 6 sets the bounds
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — designed 2026-09-24; the test its *done when* asks for is TD-134, and this entry archives with it
+**Status:** Open — **the conflict-specific half designed 2026-09-24 (the designer, PR #527):** §4.10 *A conflict, worked* — the worker stops on the contested step and waits in `ao wait`, never guessing; the first `reply` from either controller is the ruling and the worker is never the arbiter; a resolved conflict is a thread, not a `finding` (what it reveals is the manager's ledger entry); nobody writes a board line — the escalation on a `bound_hit` or an expired bound is an `ask` to the person carrying the thread, which also changes the bounded-exchange rule's *the refused sender writes the board line itself* (steered to Paul as a default, bound one night). The worker asks the person only when its bound expires with no reply at all. Left to build: the test and the grinder preset's one line — TD-134. Was: design task, raised by Paul 2026-09-13 with the TD-036 go. **Its general half was answered 2026-09-14 by design §4.10** (TD-052): the gap was not a conflict feature but a missing concept — sessions could act on each other and never message each other — so the conflict report is a `conflict` message to both controllers, the exchange is `reply` traffic in one thread, the escalation is §4.10's exchange bound, and "not double-nudging" stops being a matter for briefs, since a controller's message about a session is copied to that session's other controllers. What stays here: the conflict-specific judgement — what a worker does *while* it waits, whether a resolved conflict becomes a `finding`, and who writes the board line. Not to be coded before TD-052 step 6 sets the bounds
 **Location:** design §4.8 (membership, report channels), §10 (the 2026-09-13 question); later `src/sessionorc/agent.py` (`_gate`, a new report kind), `src/agentorc/cli.py`, the orchestrator brief
 
 **Why:** TD-036 deliberately allows several controllers per session with no privileged member, and says keeping them from double-nudging "is a matter for their briefs". That is fine for nudges and useless for contradictions: a ui orc says "ship the chip now", a backend orc says "wait for the RPC", and the worker has no move but to pick one or stall. Paul's rule is the one a team would use — the worker puts it to both leads, they settle it between themselves, and a person hears about it only if they cannot. Nothing in agentorc supports that today. Upward, a worker has `ao progress` and `ao finding`, which declare claims on references and are read by whoever looks at the card, not delivered to a controller. Sideways, an orchestrator may `ao send` to another only because the `orchestrate` grant is not yet narrowed by membership; once TD-036's gate lands, two peers over a shared worker control neither each other nor anything but their own members, so even that accidental path closes. There is no conflict object, no delivery, no bound, and no escalation.
@@ -1441,3 +1442,22 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** ao-grind, wound down on a Wednesday night with `ao schedule ao-grind reset --profile grind --window week` set, is running again within one tick of Thursday's reset with the manager, both grinders, the designer and the seats as they were last started, each card's `restarts` carrying `why: schedule`; the same team live at the reset is untouched; the team card read *wound down 6 h · starts at the reset · Thu 07:00* before and shows the sessions after; a session's `ao schedule … reset` is refused; TD-026 is closed or re-scoped by Paul's answer.
 
 **Related:** TD-026 (the design and the open scope question), TD-103 (the launch record and the replay this reuses), TD-100 (`settings.yml`, the settings page that would also set this), TD-122 (the account's `resets`), TD-101 (the override shape that stays not wanted).
+
+## TD-134: A test drives two controllers to contradict one worker, and the grinder preset says what a worker does with a contradiction
+
+**Priority:** Low
+**Added:** 2026-09-24 (the designer; TD-039's design round, PR #527)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — designed, nothing built. Design: §4.10 *A conflict, worked* and *A bounded exchange, counted by thread* (the escalation is an `ask` to the person, not a board line).
+
+**Location:** `tests/test_mail.py` (beside `test_sends_are_recorded_with_who_typed_and_a_conflict_cites_them` and `test_a_conflicts_answers_reach_every_controllers_copy`), `src/agentorc/briefs/grinder.md` (one line under the mail rules), nothing in `src/agentorc/cli.py`: the escalation names the conflict's id in the text of a plain `ask` to the person, and the asker writes the ruling as a `reply` on the conflict's thread (`--thread` takes only the caller's own question to the person and is not the road).
+
+**Why:** TD-039's *done when* — a test that drives two controllers to contradict one worker and ends in a recorded resolution or a question to the person, never a stalled worker — has no test, and the grinder preset does not say what a worker does when two `send`s contradict each other. The mechanics exist (the `conflict` kind, `sends`, the first reply closing every copy, `bound_hit`); the path through them is untested end to end.
+
+**Fix:** (1) one test: two controllers `send` contradicting instructions to one worker; the worker raises a `conflict` citing both `sends`; the first controller's `reply` closes every copy and the worker's `ao wait` returns with it; a second reply counts as a `note`. (2) A second test: no reply until the bound expires — the worker's `ask` to the person, naming the conflict's id and the two `sends` in its text, lands in the person inbox, `ao progress none` is refused while it is owed (§4.10 *Outcomes*), and the person's reply, written by the worker as a `reply` on the conflict's thread, reaches both controllers' copies. (3) The grinder preset (`src/agentorc/briefs/grinder.md`): one line — *two controllers contradicting each other: `ao msg --kind conflict --cites <send> <send>` to both, stop on that step, `ao wait`; the first reply is the ruling* — and `tests/test_cli.py`'s brief test holds it, as it holds the manager's out-of-work words (TD-125). Nothing in `src/sessionorc`.
+
+**Done when** the two tests pass on the suite, the grinder preset carries the line and its test, and TD-039 is archived with a pointer at §4.10 *A conflict, worked*.
+
+**Related:** TD-039 (the design), TD-052 (the mail this rides on), TD-032 (the stalled worker this must not reproduce), TD-125 (the brief-test pattern).
