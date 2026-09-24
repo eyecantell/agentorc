@@ -559,7 +559,7 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   other file. The host agent is the only writer to those files from this system; it never pushes.
   A bounded carve-out from cadence §4's branch → PR rule (cadence §4, *tool-made board edits*).
   The items, with the board line each sits on, come from `nudge_user_attention.py --report
-  --json`; the Inbox, the Due strip, the Attention tab and the edits all key on that line number,
+  --json`; the Inbox, the Due strip and the edits all key on that line number,
   **and on the item's text**: the edit is refused unless that line still holds that item, open,
   word for word — a board edited since the read has moved its lines. **It is refused, touching
   nothing, whenever the checkout cannot take the commit cleanly**: the checkout on any branch but
@@ -1377,11 +1377,15 @@ Screens:
    `list_sessions.py`-style index over `~/.claude/projects`), grouped by host/repo, name first
    and adapter id under it, with Resume (prefills New session) or Switch to (a running one), and
    Adopt for a hand-started session. Closed sessions are filed here after their day on the Org.
+   **Not built** (phase 4), and the top bar has no tab for it until it is (TD-123): a tab that
+   does nothing teaches the person that the bar lies. A running conversation is resumed from its
+   card today (§4.5a *Focus (exited / closed)*, TD-081).
 5. **Commands**: per-repo buttons from `.agentorc.yml` (cmdorc command specs where cmdorc fits);
    each press starts an `ao-<repo>-cmd-<name>` session of kind `command` with running/exited
    state, exit code, and a log; a recent-runs list; Focus on a run opens its terminal. The
    attention report's refresh *is* the repo's `attention` command — there is no second way to
-   run a script.
+   run a script. **Not built** (phase 4): the specs, the page and its tab (TD-123); what shows
+   of command runs today is the Org's *show command runs* filter.
 6. **Inbox** (`/inbox`; TD-069 — the one place to work from): one centred column (*Layout*,
    below), a **view over three sources, none copied into another** — sessions' states (on their
    records), the person inbox (§4.10), and board items overdue or due today (in their repos' git
@@ -1454,10 +1458,10 @@ Screens:
    memory, as the fold is — nothing on the entry or at the home changes, so reading still changes
    no row) — the same comparison that opens the section by itself (§4.5a *the FYI count*), a
    mark and never a control. None of this adds, removes or renames a control of any row.
-7. **Attention**: the full dev-cadence board, every repo, undated items included, with the
-   stale-sweep warning the report prints; clicking an item focuses the session that left it
-   (via `adapter_id`); Snooze and Done as on the Due strip. No sessions column — the Org is the
-   sessions view.
+7. ~~**Attention**~~ — struck (TD-123): a board item that needs the person is a row on the
+   Inbox (screen 6), with Snooze and Done on §4.4's write-back, and the whole board, undated
+   items and the stale-sweep warning included, is dev-cadence's own `/attention` report. There
+   is no Attention page and no tab for one.
 
 Security: the UI can type into a shell as you, so it is root-equivalent. **Never a bare public
 port.** The UI is reached over a private network or through an authenticated tunnel, and holds
@@ -1532,11 +1536,11 @@ noted). If a control is not in this table it does not exist.
 | card | **VS Code** — the **editor** button | `vscode://` link for the session's directory on its host (browser-handled). Configurable and removable: the label and the link's template are the person's (§5 *The person's own*, `open_in:`); `none` draws no button, here and on Focus (TD-095) |
 | card | **more ▾** | Wrap up · Kill (confirms) · Close (as above) · Open shell here · Copy tmux command · **Switch to interactive / unattended** (the mode's toggle, TD-095) |
 | card / Focus header | **unattended / interactive** badge | a toggle: click flips the session's mode in its record (host-agent RPC); policies pick the change up on their next tick. On a card the mode is a plain word beside the role, never pressable; the toggle is the *more* entry *Switch to interactive* / *Switch to unattended* (TD-095) — a control that changes whether policies may act on a session is not a one-click target on a card being scanned, and *unattended* (nobody sits at it, agentorc may act on it, its tool launched with the profile's `unattended_args`, which for Claude Code skip its permission prompts) is the common case. The Focus header always shows the toggle under the name of what it does (TD-096): **Take over** on an `unattended` session; on an `interactive` one **Hand back** where `controllers` is non-empty or `team` is set — the list as written, not its liveness; an entry stays whether or not that session is alive (§4.9a: adoption is an explicit edit, never automatic) — else *Switch to unattended*. Flipping to interactive is how a person takes over a worker and takes it out of its controllers' reach on their next call (§9 invariant 5); flipping to unattended hands it to the run window and usage gate — and, when `supervised`, to §6's supervision rules — and needs the repo's `unattended:` block |
-| Due strip / Attention | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
-| Due strip / Attention | **Done** | agent checks the item off and commits |
-| Due strip / Attention | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
-| Due strip / Attention | session link / **Focus session** | opens the session that left the item (by adapter id); a closed one opens in Resumable |
-| Due strip | **full board →** / **▾** | jumps to the Attention tab / collapses the strip to its count |
+| Due strip / Inbox board row | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
+| Due strip / Inbox board row | **Done** | agent checks the item off and commits |
+| Due strip | item text | expands the row: full text, context links, and *open board in VS Code* at that line; no separate Open button |
+| Due strip | session link / **Focus session** | opens the session that left the item (by adapter id); a closed one opens in Resumable |
+| Due strip | **▾** | collapses the strip to its count. Not built, as the strip is not; the whole board is dev-cadence's `/attention` report, not a page here (TD-123) |
 | Focus | **Allow / Deny** | same hook channel as the card, with the same optional *why?* beside Deny |
 | Focus (unattended) | **Take over** | *Focus watches* (§4.5 screen 2, TD-096). The state it sits in, not a control: on an `unattended` session the terminal is read-only (the attach forwards no keys) and the composer is closed. **Take over** flips the mode to `interactive` (the same `set_mode` as the toggle; a person's act) and re-attaches with the keyboard; nothing else on the record changes. Allow / Deny, Message…, Wrap up, Kill and Open shell here work from a read-only Focus, since none of them is a keystroke |
 | Focus (interactive, with controllers or a team) | **Hand back** | the same toggle the other way: `set_mode` to `unattended`, the attach returns to read-only; a stop time that fell due while the person held the session is cleared with it (`set_stop`, no time — the resume's rule), one still ahead stays; needs the repo's `unattended:` block as any flip to unattended does |
@@ -1609,7 +1613,6 @@ noted). If a control is not in this table it does not exist.
 | Org top bar | **filter…** text box | matches name, repo, directory, branch; client-side |
 | Resumable | **search transcripts…**, Recent / Closed / With board items, date range | filters over the transcript index — *phase 4 polish; phases 1–3 ship the plain list* |
 | Commands | host / repo filters | client-side filters — *phase 4* |
-| Attention | repo filter, overdue · today · this week · undated | client-side filters — *phase 4* |
 
 ### 4.5b Reachability, and the shape of a hosted service
 
@@ -4380,8 +4383,10 @@ The plan, re-baselined against what runs. Each phase states what is built and wh
    credential-lapse, exit-reap and stranded-work policies; tdgrind's cron still runs, so the
    side-by-side window has not started.
 4. **Commands + board.** `.agentorc.yml` buttons (cmdorc where it fits), command-kind sessions
-   and the Commands tab, the Due strip on the Org and the Attention tab with Snooze/Done
-   write-back, stranded-work flags. **Not started.**
+   and the Commands page, the Resumable page (§4.5 screen 4), the Due strip on the Org,
+   stranded-work flags; each page gets its top-bar tab when it is built (TD-123). **Not
+   started**, except the board's Snooze / Done write-back, built for the Inbox's board rows
+   (TD-069 step 3); the Attention tab is struck (§4.5 screen 7).
 5. **Second adapter.** Gemini CLI (hook-fed if the OSC 9 / hooks story verifies) or a scraped
    plain-shell adapter, whichever proves the contract better. Publish to PyPI, write the
    adapter-author guide. **Not started**, except that `ao --skill` and `ao team --skill` are

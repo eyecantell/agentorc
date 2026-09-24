@@ -210,7 +210,9 @@ def head(title):
 TAIL = "</x-dc>\n</body>\n</html>\n"
 
 def topbar(active="Org", narrow=False):
-    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in ["Org", "Inbox 4 · 2", "Resumable", "Commands", "Attention"])
+    # a tab exists only for a built page (TD-123); an unbuilt screen's own mockup draws its tab, active
+    live = ["Org", "Inbox 4 · 2"] + ([] if active in ("Org", "Inbox 4 · 2") else [active])
+    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in live)
     return f'''<div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;">{tabs}</div>
@@ -846,7 +848,7 @@ def direction_b():
 </div>
 ''' + TAIL
 
-# ---------------- Resumable / Commands / Attention (round 4) ----------------
+# ---------------- Resumable / Commands (round 4; the Attention screen struck, TD-123) ----------------
 
 def page_head(title, summary, right=""):
     return f'''<div style="display: flex; align-items: center; gap: 10px;">
@@ -986,55 +988,7 @@ def commands():
     <div class="grp" style="padding: 0;"><span>Recent runs</span><span class="path">each run is a session of kind command — same tmux, same log, same Focus; hidden from the Org unless "show command runs" is on</span></div>
     <div class="card"><table><tbody>{rows}</tbody></table></div>
   </div>
-  <div class="note">Buttons come from each repo's checked-in <span class="mono">.agentorc.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Org and out of the urgency sort. The Attention tab's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
-</div>
-</div>
-''' + TAIL
-
-BOARD = [
-    ("samscrape", "/home/kmaster/samscrape/docs/user_attention.md", "swept 2026-09-04 03:00 · 26 open · 5 due/overdue", "", [
-        ("over", "14d overdue", "2026-08-18", "tdgrind-1", "Get the TD-259 keep-half snapshot off this array — it is the only copy.", "TD-259"),
-        ("over", "7d overdue", "2026-08-21", "tdgrind-2", "Decide TD-196 per tool: delete or port. A judgement call, so not done unattended.", "TD-196"),
-        ("over", "2d overdue", "2026-08-27", "2fb13646", "Decide whether to turn the signup → CM board writer ON. PAT in Doppler, PR merged, migration applied.", "PR #343"),
-        ("today", "due today", "2026-09-01", "tdgrind-2", "Deploy TD-296, then un-flag and republish the two DARPA notices.", "PR #437"),
-        ("today", "due today", "2026-08-28", "tdgrind-1", "Deploy TD-036 step 2 (merged after the 05:00 UTC rollout, so not live).", "PR #410"),
-        ("soon", "due 09-05", "2026-09-02", "tdgrind-1", "Deploy the R3 consumer migrations — three deployments, fold into the next skaffold run.", "PR #512"),
-        ("soon", "due 09-06", "2026-09-04", "tdgrind-2", "PR #577 needs an independent review and a full-suite run before it merges.", "PR #577"),
-    ]),
-    ("dev-cadence", "/home/kmaster/dev-cadence/docs/user_attention.md", "swept 2026-08-12 · 1 open · 1 overdue", "last sweep 23d ago — run /stranded-work in this repo", [
-        ("over", "2d overdue", "2026-08-26", "3168de4c", "Add --fetch to the SessionStart hook line in samscrape, contractmatch and pneuma-ops settings.json (SEED files, sync does not carry it).", "TD-030 · PR #76"),
-    ]),
-]
-
-def attention():
-    dcls = {"over": "s-stalled", "today": "s-needs", "soon": "s-ended"}
-    right = ""
-    for repo, path, meta, warn, items in BOARD:
-        warn_html = f'<div class="warn" style="padding: 6px 10px;">{ICON["warn"]}<span>{warn}</span></div>' if warn else ""
-        rows = ""
-        for kind, due, date, sess, text, ctx in items:
-            rows += f'''<div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill plain {dcls[kind]}" style="justify-self: start;">{due}</span>
-  <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;"><div style="font-size: 12.5px;">{text}</div><div class="meta">{date} · session <a href="#">{sess}</a> · {ctx}</div></div>
-  <div style="display: flex; gap: 4px;"><span class="btn sm ghost">{ICON["focus"]}Focus session</span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
-</div>'''
-        if repo == "samscrape":
-            rows += '''<div style="display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid #eceef1;">
-  <span class="pill plain s-ended" style="justify-self: start;">undated</span>
-  <div class="muted" style="font-size: 12.5px;">19 more items with no Due date — surfaced only here, never on the Org strip.</div>
-  <span class="btn sm ghost">show ▾</span>
-</div>'''
-        right += f'''<div class="card" style="padding: 10px 12px 2px; display: flex; flex-direction: column; gap: 6px;">
-  <div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600;">{repo}</span><span class="mono muted" style="font-size: 11px;">{meta}</span><span style="flex-grow: 1;"></span><a href="#" class="mono" style="font-size: 11px;">user_attention.md</a></div>
-  {warn_html}
-  <div style="display: flex; flex-direction: column;">{rows}</div>
-</div>'''
-    return head("Attention") + f'''<div style="width: 1440px; min-height: 860px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Attention")}
-<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
-  {page_head("Attention", "2 boards · 27 open items · 6 due/overdue · the full dev-cadence board, undated items included", '<span class="mono muted" style="font-size: 11px;">attention command last ran 03:00 MDT</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">overdue · today · this week · undated ▾</span>')}
-  {right}
-  <div class="note">The Org shows only what is overdue or due today, in its Due strip. This tab is the whole board: every repo, undated items too, the same rows the repo's <span class="mono">nudge_user_attention.py --report</span> prints. <b>Focus session</b> opens the session that left the item (matched by adapter id; a closed one opens in Resumable). <b>Snooze</b> and <b>Done</b> are one-line edits the host agent makes to user_attention.md and commits with a message naming the session, so the checkout never sits dirty. Sessions that need you are not repeated here — that is the Org.</div>
+  <div class="note">Buttons come from each repo's checked-in <span class="mono">.agentorc.yml</span> (cmdorc command specs where cmdorc fits). A press starts <span class="mono">ao-&lt;repo&gt;-cmd-&lt;name&gt;</span> in tmux on that host, so the run gets the same Focus, running/exited state and run log as any session, but as kind: command it stays off the Org and out of the urgency sort. The attention report's refresh is the attention command here — no second way to run a script. State is scraped (dashed pill): running while the pane has a process, exited with the exit code from the marker.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1148,7 +1102,6 @@ files = {
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
     "Commands.dc.html": commands(),
-    "Attention.dc.html": attention(),
     "Inbox.dc.html": inbox(),
 }
 for n, s in files.items():
@@ -1166,7 +1119,6 @@ LAYOUT = [
     ("FocusOrc.dc.html", "Focus — orchestrator", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
-    ("Attention.dc.html", "Attention", 0),
     ("Phone.dc.html", "Org — phone", 1),
     ("NewSession.dc.html", "New session", 1),
     ("Commands.dc.html", "Commands", 1),

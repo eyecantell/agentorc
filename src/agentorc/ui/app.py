@@ -1484,7 +1484,7 @@ def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
 
 
 def board_rows(report: Any, teams: Mapping[str, str] | None = None) -> list[dict[str, Any]]:
-    """design §4.5a **Due strip / Attention** rows, as the Inbox draws them (TD-069 step 3): one
+    """design §4.5a **Due strip / Inbox board row** rows, as the Inbox draws them (TD-069 step 3): one
     per item the report says is due today or overdue — its repo, its due words, the whole text, and
     the board at that line in the editor. `at` is the due date, so *oldest first* in **Needs you**
     puts the longest overdue first among the states and the mail. The text is the board's, shown as
@@ -2766,7 +2766,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 got = await call(PERSON_ACTS[action], msg=ref)
             return JSONResponse({"ok": True, **got})
         if action == "board":
-            # design §4.5a **Due strip / Attention** → **Snooze ▾** and **Done** on a board row
+            # design §4.5a **Due strip / Inbox board row** → **Snooze ▾** and **Done** on a board row
             # (§4.4 *Board write-back*, TD-069 step 3): the host agent edits the one line and commits
             # it in the repo's main checkout. The row hands back what the reader gave it — the board,
             # the line and its text — and the agent refuses the edit when that line has moved on.

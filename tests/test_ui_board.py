@@ -139,7 +139,7 @@ def test_due_board_items_are_counted_in_needs_you_oldest_first_among_the_mail(tm
 
 @pytest.mark.unit
 def test_a_board_row_is_text_and_its_two_answers_carry_what_the_reader_gave(tmp_path, monkeypatch):
-    """§4.5a *Due strip / Attention*: the item's text, *open board in VS Code* at that line, **Snooze ▾**
+    """§4.5a *Due strip / Inbox board row*: the item's text, *open board in VS Code* at that line, **Snooze ▾**
     (+1 day · +1 week · a date) and **Done** (confirms). Each control carries the board, the line and
     the text, which the agent re-checks. The text is the board's, escaped: nothing on the page is a
     control made from it (TD-071 item 8) — it rides only as an attribute value."""
