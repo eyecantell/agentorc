@@ -69,6 +69,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-114 | A repo's brief replaces the whole template, so three repos carry copies of agentorc's mechanics that go stale together: make it a supplement filled into a `{repo}` slot | High | Partly done — step (1) built, awaiting the anchor with (2) and (3) |
 | TD-118 | Where a team-run-day spends tokens that buy nothing: the machine-wide board at every start, one model for every role, the out-of-work triage in prose | High | Partly done — (1) and (2) built 2026-09-23; (3) is dev-cadence's |
 | TD-120 | The anchor's jobs go to the team: the techlead reads the held PRs, promotion is a person's press or a policy, and a designer seat holds the design conversation | Medium | Open — decided 2026-09-23; the designer role is in org.yml, its team seat waits on §4.9a |
+| TD-121 | A card's more ▾ menu is clipped by the card: the fixed-height card hides overflow and the menu is positioned inside it | Medium | Open — pickable |
+| TD-122 | The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account | High | Open — design first |
+| TD-123 | Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1 | Low | Open — Paul's decision, recommendation recorded |
 
 
 ---
@@ -1237,3 +1240,51 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-093 (the reader), TD-062 (the live copy is promoted), TD-096 (an interactive member is left alone), TD-075 (the techlead), design §4.9a, §4.9b.
 
+## TD-121: A card's more ▾ menu is clipped by the card: the fixed-height card hides overflow and the menu is positioned inside it
+
+**Priority:** Medium
+**Added:** 2026-09-23 (Paul, from the Org page; the anchor session)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open
+**Location:** `src/agentorc/ui/static/app.css` (`.sc { overflow: hidden }` from TD-095's one-height card; `details.more .menu { position: absolute }`), `src/agentorc/ui/templates/card.html` (`details.more`)
+
+**Why:** pressing **more ▾** on a card at the bottom of its row shows a sliver of the menu's border and nothing else — the card clips it, so the mode toggle, Pop out and the rest are unreachable there. A control that cannot be reached is worse than one that is absent (design §4.5a).
+
+**Fix:** let the menu escape the card without giving up the card's fixed height: `overflow: visible` on the card with the row-clipping moved to the rows that need it (`.sc-body > .row` already clips), or the menu drawn as a popover outside the card's box (`position: fixed` placed from the summary's rect, or the `popover` attribute). Check every card position — the bottom row of a team's group, a folded team's *show*, the Inbox rows that carry a menu — and the Focus header's menu. One page PR, no design change (the control exists; only its drawing is wrong).
+
+**Related:** TD-095 (the card's one height), TD-046 (Pop out lives in this menu).
+
+## TD-122: The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account
+
+**Priority:** High
+**Added:** 2026-09-23 (Paul, comparing the chip with the account's usage page; the anchor session)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — design first (§4.2, §4.5a), then a grinder builds; `src/sessionorc`, so the reader merges
+
+**Status:** Open — **found 2026-09-23.** Since the profiles were split by role (`grind`, `grind-sonnet`, `grind-fable`, and `default`, all `account: paul`), the host agent's usage poll (`_poll_usage`, `USAGE_EVERY` five minutes) asks the endpoint once **per profile**, four calls where one would do; the endpoint answered `rate_limited` to every call from 16:10Z on and asked for an hour (`retry_after: 3600`), so the chip holds the 16:10Z reading dimmed with *· stale* — `5h 12% · week 21%` when the account's page read 7% and 24% — and prints it four times, once per profile, as *week 21% · stale grind · week 21% / 40% · stale +1*. Two faults: the poll and the chip are keyed on the profile when the quota is the **account's** (§4.2a: one login, one usage window, however many profiles share it); and the chip never names the tool or the account, so *grind · week 21%* reads as nothing to the person who knows their account as *Claude, paul* (Paul 2026-09-23; TD-071 item 8 said the same of the older chip). A third: the endpoint reports a per-model weekly window beside *All models* (the account page shows *Fable 17%*) that the reading does not carry.
+**Location:** `src/sessionorc/agent.py` (`_poll_usage`, `_usage`, `_usage_wait`, `USAGE_EVERY`; the `usage` and `gate` RPCs), `src/agentorc/adapters/claude_code/__init__.py` (`usage`, `UsageRefused`, `_retry_after`), design §4.2 (*usage*), §4.2a (accounts), §4.5a **usage** chip, §6 *Usage gate* (its reserves are per profile today), `src/agentorc/ui/static/app.js` (`#usagechip`)
+
+**Why:** a stale number at the moment it is looked at is the failure the chip exists to prevent, and this one is self-inflicted: the fourth profile turned a working poll into a refused one. The gate (§6) reads the same readings, so a stale reading also holds every unattended session against a line that moved an hour ago.
+
+**Fix, design first:** (1) §4.2a: **the reading is the account's** — the adapter's `usage(profile)` is called once per `(adapter, account)` among the profiles live sessions use, and every profile sharing the account carries the same reading (`fetched`, `reason`, `retry_after` included); the gate's reserves stay per profile (a reserve is a policy, a reading is a fact), each read against the account's reading. (2) §4.5a: **one chip per account**, `<tool> · <account> · <label> n%` — *Claude · paul · week 24%* — the tool's display name from the adapter (§4.3), the profiles sharing it and each one's line on hover, the rest of the row as today (worst window, the line after the number, *· stale*, red at a cap). (3) The adapter carries every window the endpoint reports, the per-model weekly ones labelled by the model (*week · Fable 17%*), and the chip's worst-window rule takes them in. (4) Tests: two profiles on one account poll once; a `rate_limited` reply backs off the account, not the profile. Then a grinder builds it.
+
+**Related:** TD-087 (a failure says why; stale readings), TD-100 (the gate's lines), TD-073 (the adapter's windows), TD-071 item 8 (the chip reads as nothing), TD-118 (profiles split by role — the change that exposed this).
+
+## TD-123: Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1
+
+**Priority:** Low
+**Added:** 2026-09-23 (Paul's question; the anchor session)
+**Owner:** paul
+**Kind:** decision
+**Pickable:** no — Paul decides; the recommendation is below
+**Status:** Open — **recommendation (the anchor, 2026-09-23): remove all three from the bar now.** They are `<span class="tab off" title="phase 4">` in `base.html` — not links, pressable by nothing — and each one's job has moved or never started: **Attention** is the Inbox's board rows since TD-069 step 3 (2026-09-23), so the screen is struck from §4.5 in favour of the Inbox; **Commands**' visible half is the Org filter's *show command runs*, and its command specs (§4.5 screen 5, cmdorc-shaped) were never built; **Resumable** (§4.5 screen 4, conversations agentorc did not start, with Adopt) is the one still worth building — it stays in §4.5 as an unbuilt phase-4 screen, reached from New session's *resume* when it comes, and gets a tab when it exists. A tab that does nothing teaches the person that the bar lies. If Paul agrees: one page PR removes the three spans and §4.5's screen list says where each went (design first, the dated fact to the history).
+**Location:** `src/agentorc/ui/templates/base.html` (the three `tab off` spans), design §4.5 screens 4 and 5, §7 (phase 4)
+
+**Why:** three of the bar's five tabs are dead; on a phone they take the width the live ones need.
+
+**Fix:** Paul's yes, then the page PR above.
+
+**Related:** TD-069 (the Inbox), TD-081 (Resume on a card — what Resumable's *running one* case became), design §7.
