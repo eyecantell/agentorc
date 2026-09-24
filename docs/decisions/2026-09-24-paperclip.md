@@ -109,12 +109,28 @@ differentiator is the **live, consented, git-native** session. §4.5c should say
 3. **Budget policy as one generic row** (scope, metric, window, warn at 80 %, hard stop, notify).
    agentorc's reserves (§6 *Usage gate*, TD-100) are per-profile fields. The generic shape, with a
    *utilisation of a usage window* metric instead of cents, would let a team or a project carry a
-   reserve without new fields. *Candidate TD, for Paul.*
-4. **Decision queues with training examples.** Paperclip records the person's past decisions as
-   `decision_training_examples` and has agent-raised option prompts with expiry and auto-answer rules
-   (`decisions`, `decision_queues`, `DecisionQueuePage.tsx`). This is the §4.9b techlead's problem,
-   which is what to answer without the person, solved with an explicit record of precedent. *Read
-   only at the schema level here; worth a deeper read before the techlead's next change.*
+   reserve without new fields. *Filed with metered billing as TD-128.*
+4. **Decisions: propose instead of act.** Shipped as Decisions v1 in `v2026.817.0`
+   (`server/src/services/decisions.ts`, `decision-queues.ts`; `DecisionQueuePage.tsx`). An agent
+   that would take an action with consequences instead files a *decision*: a title, a body, typed
+   *options*, each carrying the *effects* the server will run if it is chosen (`comment_on_issue`,
+   `assign_issue`, `create_issue`, `cancel_issue_tree`), optional typed *inputs*, and an `expiresAt`.
+   Three details matter. **The spec is signed at creation** (`decision-signing.ts`), so what the
+   person approves is exactly what runs. **Each effect runs only if both the proposing agent and the
+   deciding person may perform it** (`deny_decision_intersection`, `decisions.ts:458`), so approving
+   never widens anyone's authority. **The targets are snapshotted when proposed**; a `strict` effect
+   whose target changed since then is skipped as `target_changed` (`decisions.ts:460`) rather than
+   run against a world the person never saw. *Decision queues* group them and fill themselves from
+   three seed signals (a PR on the issue, a plan waiting for confirmation, an agent's questions).
+   Triage gives each a `decide_by` date, a snooze and a responsible person, and the attention feed
+   ranks *decide now* first. *Not what it first looked like:* `decision_training_examples` is a
+   snapshot library for reviewing how agents decided. It auto-answers nothing, was experimental, and
+   its UI was removed in `v2026.824.0`. **For agentorc:** a worker's `ask` today is prose, answered in
+   prose, and whatever follows is the worker's to do (§4.10). A structured ask whose options carry
+   the `ao` act a press performs (merge #N, close the member, restart it) would make an Inbox answer
+   one press on a phone (goal 10). The intersection rule is our grants, applied to the pair. The
+   staleness check is what stops a *merge #512* pressed after #512 was pushed again. *Candidate TD,
+   for Paul.*
 5. **Credential ownership stated per adapter.** Each Paperclip adapter doc says
    whether the host owns the login or a snapshot carries it into the sandbox. agentorc meets the
    same question for container nodes (§4.4a) and profiles (§4.2a). *One table in §4.2a, when the
@@ -140,5 +156,5 @@ verified and are left out.
 
 ## What this ADR does not do
 
-It approves nothing. The §3 table gains one row pointing here. Items 3 and 4 are candidates Paul
-may file or strike; items 1, 2, 5 and 6 are notes for whoever next edits those sections.
+It approves nothing. The §3 table gains one row pointing here. Item 3 is part of TD-128 (Paul, 2026-09-24:
+budgets for pay-per-token profiles); item 4 is a candidate Paul may file or strike; items 1, 2, 5 and 6 are notes for whoever next edits those sections.
