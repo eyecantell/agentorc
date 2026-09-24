@@ -1136,7 +1136,12 @@
         const old = $(`#card-${CSS.escape(ev.id)}`);
         const tpl = document.createElement("template"); tpl.innerHTML = ev.html.trim();
         const fresh = tpl.content.firstElementChild;
-        if (old) { const kept = AO.denyWhys(old); old.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept); }
+        if (old) {
+          // a delta redraws the card; a menu the person has open stays open (TD-121), as a Deny reason stays typed
+          const kept = AO.denyWhys(old), menu = !!$("details.more[open]", old);
+          old.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);
+          const d = menu && $("details.more", fresh); if (d) d.open = true;
+        }
         else {
           const grid = $(".tgroup .grid");  // syncGroups below moves it into its own group
           grid.appendChild(fresh);

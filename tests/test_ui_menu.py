@@ -62,10 +62,12 @@ def test_a_menu_is_placed_under_its_button_and_kept_on_screen():
 @pytest.mark.unit
 def test_the_menu_is_fixed_and_the_card_still_clips():
     """The card's one height (TD-095) stands — `.sc` keeps `overflow: hidden` — and the menu no
-    longer lives inside that box: fixed, placed by the page on `toggle`, re-placed on scroll and resize."""
+    longer lives inside that box: fixed, placed by the page on `toggle`, re-placed on scroll and resize,
+    and reopened on the fresh card when a delta redraws the card it was open on."""
     css = (UI / "static" / "app.css").read_text()
     assert re.search(r"^\.sc \{[^}]*overflow: hidden", css, re.M)
     menu = re.search(r"^details\.more \.menu \{([^}]*)\}", css, re.M).group(1)
     assert "position: fixed" in menu and "position: absolute" not in menu
     js = (UI / "static" / "app.js").read_text()
     assert 'document.addEventListener("toggle"' in js and 'document.addEventListener("scroll", placeOpen, true)' in js
+    assert 'menu = !!$("details.more[open]", old)' in js and "if (d) d.open = true;" in js
