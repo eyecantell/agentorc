@@ -65,9 +65,7 @@ not mix:
   tells the person what needs them. Spelled as one word with two capitals in prose; the command
   is `ao`, and `agentorc` remains the name of the packages, the state directory, the units and
   the config file until TD-060's machine-side step. — **decided** 2026-09-21 (Paul).
-- **designer** — the person's design seat on a team: an `interactive` session that writes the design and the
-  pickable ledger entries, and merges nothing on a held path (design §4.8 *Role names*, TD-120). Defined by a repo
-  or `org.yml`, not a built-in preset. — **decided** 2026-09-23
+- **designer** — a team's design member: an `unattended` session whose lane is the ledger's `design-first` entries. It writes the design and the entries the grinders pick, merges nothing on a held path, and shows the person only what needs them — an obvious design is merged and noted, a defensible default is a bounded `steer`, taste is an `ask` with answers (design §4.8 *Role names*, TD-120; decided 2026-09-24, an interactive seat from 2026-09-23 until then).
 - **director** — the session that coordinates managers: its members are managers, not workers.
   Agentorc does not treat it specially (design §4.8); the word names a position in the graph, not
   a kind of session. Director > manager > worker. *Not:* conductor (decided and replaced the same
