@@ -17,7 +17,7 @@
 - [pdm run fmt sweeps other sessions' files](pdm-run-fmt-sweeps-other-sessions-files.md) — it formats the whole repo; `git add -A` after it steals a sibling's merged files into your PR
 - [gh comment bodies go in a file](gh-comment-bodies-go-in-a-file.md) — `--body "…"` lets bash run its backticks; use `--body-file`
 - [Dates are local, PR numbers are real](dates-and-pr-numbers-are-local-and-real.md) — `date` before a dated ledger edit; open the PR before writing its number
-- [Read inbox before merging](read-inbox-before-merging.md) — the anchor merges src/sessionorc PRs; mail changes merge rights mid-run
+- [Read inbox before merging](read-inbox-before-merging.md) — merge rights change by mail; since 2026-09-23 a held-path PR waits for the techlead seat (`ao pr held N`), not the anchor
 - [No checks means conflicting](no-checks-means-conflicting.md) — `gh pr checks` empty after a push: the PR conflicts with main, so no pull_request run; rebase
 - [Gate a merge on the check's exit code](gate-a-merge-on-the-checks-exit-code.md) — `check_cadence.py | head` hides a FAIL; capture the exit code, then merge
 - [Reviewer prompts keep out of the anchor](reviewer-prompts-keep-out-of-the-anchor.md) — a reviewer given `git -C /home/kmaster/agentorc` ran a checkout there; worktree paths only
