@@ -185,7 +185,7 @@ FILE_CAP = 256 * 1024
 BACKUP_KEEP = 7
 BACKUP_MEMBERS = ("sessions", "remote", "person_inbox.json", "org.yml", "hosts.yml", "profiles.yml")
 REPORT_EVERY = 5.0  # seconds between a node's reports of one record whose state did not move (§4.4a)
-# Seconds between usage polls per profile (TD-001): a slow cadence, never per tick. **Five
+# Seconds between usage polls per account (TD-001, TD-122): a slow cadence, never per tick. **Five
 # minutes, not one** (TD-087): the shortest window the endpoint reports is five hours, so a
 # minute buys nothing and spends an allowance shared with the tool itself.
 USAGE_EVERY = 300.0
@@ -433,14 +433,19 @@ class HostAgent:
         # The last good reading per profile, kept across a restart (TD-087) — with, beside the
         # windows, why the *last poll* failed, which the page draws as a stale chip rather than
         # as nothing at all. `_usage_wait` is the backoff a 429 sets and a success clears.
+        # **The reading is the account's** (§4.2a, TD-122): `_usage_acct` holds one reading per
+        # `(adapter, account)` key and the poll, its clock and its backoff are keyed on that;
+        # `_usage` is the same reading copied under every live profile sharing the account, with
+        # the account and the tool's display name beside it, which is what the gate, `limited`,
+        # the `usage` RPC and the chip read.
         self.usage_store = UsageStore()
         self._usage: dict[str, dict[str, Any]] = self.usage_store.load()
+        self._usage_acct: dict[str, dict[str, Any]] = {}
         # …and the **allowance** survives with it (anchor's read of PR #307): a held reading is as
         # good as a poll made at its `fetched`, so the first poll after a promote waits until
         # `fetched + USAGE_EVERY`, never sooner. A reading with no readable time is polled at once.
-        self._usage_checked: dict[str, float] = {
-            prof: mono for prof, r in self._usage.items() if (mono := _usage_checked_at(r)) is not None
-        }
+        # Seeded per account on the first refresh, from its profiles' held readings.
+        self._usage_checked: dict[str, float] = {}
         self._usage_wait: dict[str, float] = {}
         self._usage_task: asyncio.Task[None] | None = None
         self._pre_limited: dict[str, State] = {}  # what a `limited` session was before the cap
@@ -1267,8 +1272,9 @@ class HostAgent:
                 self.store.save(live)
 
     async def _refresh_usage(self) -> None:
-        """Ask each live agent session's adapter for its profile's usage once a minute, in a
-        thread; a fetch failure keeps the last answer and never gates anything (design §6).
+        """Ask each account a live agent session's profile names for its usage every
+        `USAGE_EVERY`, once per account (§4.2a, TD-122), in a thread; a fetch failure keeps the
+        last answer and never gates anything (design §6).
         Then the `limited` rule: an interactive session on a profile at 100% of a window shows
         `limited` with the reset time, and goes back to what it was once the window resets."""
         try:
@@ -1285,32 +1291,60 @@ class HostAgent:
             if s.kind == "interactive" and s.adapter != "shell" and s.state not in ("exited", "closed")
         ]
         mono = time.monotonic()
-        due: dict[str, Any] = {}
+        # One poll per account, never per profile (§4.2a, TD-122): four profiles split by role on
+        # one login asked four times, and the endpoint answered `rate_limited` to all of them.
+        groups: dict[str, list[str]] = {}  # account key → the live profiles sharing it
+        meta: dict[str, dict[str, str]] = {}  # account key → what the chip names it by
+        ask: dict[str, tuple[Any, str]] = {}  # account key → (usage_for, the profile asked through)
         for s in live:
-            fn = getattr(adapters.get(s.adapter), "usage_for", None)
-            wait = self._usage_wait.get(s.profile, USAGE_EVERY)
-            if fn and s.profile not in due and mono - self._usage_checked.get(s.profile, -wait) >= wait:
-                due[s.profile] = fn
+            ad = adapters.get(s.adapter)
+            fn = getattr(ad, "usage_for", None)
+            if not fn:
+                continue
+            key, account = _usage_key(ad, s.adapter, s.profile)
+            profs = groups.setdefault(key, [])
+            if s.profile not in profs:
+                profs.append(s.profile)
+            meta.setdefault(key, {"account": account, "tool": str(getattr(ad, "label", "") or s.adapter)})
+            ask.setdefault(key, (fn, s.profile))
+        for key, profs in groups.items():
+            self._usage_seed(key, profs)
+        due: dict[str, tuple[Any, str]] = {}
+        for key in groups:
+            wait = self._usage_wait.get(key, USAGE_EVERY)
+            if mono - self._usage_checked.get(key, -wait) >= wait:
+                due[key] = ask[key]
+        changed = False
         if due:
             results = await asyncio.gather(
-                *(asyncio.to_thread(fn, prof) for prof, fn in due.items()), return_exceptions=True
+                *(asyncio.to_thread(fn, prof) for fn, prof in due.values()), return_exceptions=True
             )
-            changed = False
-            for prof, r in zip(due, results, strict=True):
-                self._usage_checked[prof] = mono
-                if (merged := self._usage_reading(prof, r)) is not None:
-                    self._usage[prof] = merged
+            for key, r in zip(due, results, strict=True):
+                self._usage_checked[key] = mono
+                if (merged := self._usage_reading(key, r)) is not None:
+                    self._usage_acct[key] = merged
+        # every profile sharing an account carries its reading — windows, `fetched`, `reason` alike
+        for key, profs in groups.items():
+            if (acct := self._usage_acct.get(key)) is None:
+                continue
+            reading = {**acct, **meta[key]}
+            for prof in profs:
+                if self._usage.get(prof) != reading:
+                    self._usage[prof] = reading
                     changed = True
-                    await self._broadcast({"event": "usage", "profile": prof, "usage": merged})
-            if changed:
-                self.usage_store.save(self._usage)  # once for the batch: the file is whole either way
+                    await self._broadcast({"event": "usage", "profile": prof, "usage": reading})
+        if changed:
+            self.usage_store.save(self._usage)  # once for the batch: the file is whole either way
         # Only profiles a live session is running under are shown (TD-073, Paul 2026-09-19): one
-        # tool in use is one chip, and last night's profile does not sit in the top bar all day.
-        if dropped := [p for p in self._usage if p not in {s.profile for s in live}]:
+        # account in use is one chip, and last night's profile does not sit in the top bar all day.
+        for key in [k for k in self._usage_acct if k not in groups]:
+            self._usage_acct.pop(key, None)
+            self._usage_checked.pop(key, None)
+            self._usage_wait.pop(key, None)
+        shown = {p for profs in groups.values() for p in profs}
+        if dropped := [p for p in self._usage if p not in shown]:
             for prof in dropped:
                 self._usage.pop(prof, None)
-                self._usage_checked.pop(prof, None)
-                self._usage_wait.pop(prof, None)
                 await self._broadcast({"event": "usage", "profile": prof, "usage": None})
             self.usage_store.save(self._usage)
         for s in live:
@@ -1325,9 +1359,22 @@ class HostAgent:
                 s.set_state(self._pre_limited.pop(s.id, "working"), confidence="hook")
                 self.store.save(s)
 
-    def _usage_reading(self, prof: str, r: Any) -> dict[str, Any] | None:
-        """One poll's answer folded into what this profile already had (TD-087), or None when
-        nothing changed and nothing need be said.
+    def _usage_seed(self, key: str, profs: list[str]) -> None:
+        """An account the poll has not met since the agent started takes its reading, and its
+        poll's allowance, from the newest reading its profiles hold (TD-087, TD-122): a restart
+        keeps the chip and does not ask sooner than `fetched + USAGE_EVERY`. A reading with no
+        readable time is polled at once."""
+        held = [self._usage[p] for p in profs if isinstance(self._usage.get(p), dict)]
+        if key not in self._usage_acct and held:
+            newest = max(held, key=lambda r: str(r.get("fetched") or ""))
+            self._usage_acct[key] = {k: v for k, v in newest.items() if k not in ("account", "tool")}
+        if key not in self._usage_checked and (seen := [m for r in held if (m := _usage_checked_at(r)) is not None]):
+            self._usage_checked[key] = max(seen)
+
+    def _usage_reading(self, key: str, r: Any) -> dict[str, Any] | None:
+        """One poll's answer folded into what this account already had (TD-087, TD-122: `key` is
+        the account's, so a backoff holds every profile on it), or None when nothing changed and
+        nothing need be said.
 
         An adapter now answers with a **reason** rather than a silence: `ok` with the windows,
         or `rate_limited` / `no_credentials` / `no_profile` / `error` with none. A reading is
@@ -1342,19 +1389,19 @@ class HostAgent:
         reason = str(r.get("reason") or ("ok" if r.get("windows") is not None else "error"))
         if reason == "rate_limited":
             after = r.get("retry_after")
-            prev = self._usage_wait.get(prof, USAGE_EVERY)
+            prev = self._usage_wait.get(key, USAGE_EVERY)
             # the endpoint's own word is floored at the ordinary cadence and **not** capped: a
             # server saying *an hour and a half* is telling us something our ceiling is guessing
             # at. The ceiling is for our own doubling, which has no such word behind it.
-            self._usage_wait[prof] = (
+            self._usage_wait[key] = (
                 max(float(after), USAGE_EVERY) if isinstance(after, int | float) else min(prev * 2, USAGE_BACKOFF_MAX)
             )
         else:
-            self._usage_wait.pop(prof, None)
-        was = self._usage.get(prof) or {}
+            self._usage_wait.pop(key, None)
+        was = self._usage_acct.get(key) or {}
         if was.get("reason") != reason:
             # once per change of reason, never per poll: a 429 every five minutes is one line
-            log.info("usage for profile %s: %s (was %s)", prof, reason, was.get("reason") or "no reading yet")
+            log.info("usage for account %s: %s (was %s)", key, reason, was.get("reason") or "no reading yet")
         if reason == "ok":
             out = {"windows": r.get("windows"), "fetched": r.get("fetched"), "reason": "ok"}
         else:
@@ -6505,6 +6552,19 @@ def _recent(at: Any, now: datetime, window: timedelta) -> bool:
 
 def _parse(iso: str) -> datetime:
     return datetime.fromisoformat(iso.replace("Z", "+00:00"))
+
+
+def _usage_key(adapter: Any, name: str, profile: str) -> tuple[str, str]:
+    """The key a profile's usage is polled, cached and backed off under, and the account's name
+    for the chip (§4.2a, TD-122): `(adapter, account)`, the account from the adapter's optional
+    `account_for` — this package cannot read a profile. An adapter without it, or one that cannot
+    say, keys on the profile, which is the per-profile poll as it was."""
+    try:
+        account = (getattr(adapter, "account_for", None) or (lambda _p: None))(profile)
+    except Exception:  # noqa: BLE001 — an adapter's lookup never stops the poll
+        account = None
+    account = str(account or profile or "default")
+    return f"{name}:{account}", account
 
 
 def _usage_checked_at(reading: dict[str, Any]) -> float | None:

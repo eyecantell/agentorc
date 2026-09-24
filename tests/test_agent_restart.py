@@ -343,6 +343,8 @@ async def test_a_restart_keeps_the_polls_allowance_too(tmp_path, monkeypatch):
         a._usage[prof] = {"windows": [], "fetched": fetched}
     a.usage_store.save(a._usage)
     a2 = HostAgent(tmux=tmux)
+    for prof in ("fresh", "old", "ahead", "odd"):
+        a2._usage_seed(prof, [prof])  # the first refresh seeds each account from its profiles (TD-122)
     mono = time.monotonic()
 
     def due(prof):

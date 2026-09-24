@@ -190,6 +190,9 @@ def test_launch_argv_and_env(tmp_path, monkeypatch):
     assert dashed.argv[-2:] == ["--", "-1 is the answer"]
     with pytest.raises(KeyError, match="unknown profile"):
         ad.launch(profile="nope", resume=None, prompt=None, unattended=False, cwd=tmp_path)
+    # the account a profile runs under, for the once-per-account usage poll (§4.2a, TD-122)
+    assert (ad.account_for("grind"), ad.account_for(""), ad.account_for("nope")) == ("grind", "paul", None)
+    assert ad.label == "Claude"
 
 
 def test_pretrust_writes_once_and_keeps_other_state(tmp_path):
@@ -282,6 +285,19 @@ def test_parse_usage_and_credentials(tmp_path):
     assert u and [(w.label, w.pct) for w in u.windows] == [("5h", 42), ("week", 9)]
     assert u.windows[0].resets.startswith("2026") and u.windows[1].resets is None
     assert parse_usage({}) is None
+    # TD-122: a per-model weekly window beside *All models* is carried, labelled by the model; an
+    # empty one, and a `seven_day_*` key that is not a model, are not windows
+    u = parse_usage(
+        {
+            "five_hour": {"utilization": 7, "resets_at": None},
+            "seven_day": {"utilization": 24, "resets_at": None},
+            "seven_day_fable": {"utilization": 17.4, "resets_at": "2026-09-30T00:00:00Z"},
+            "seven_day_opus": None,
+            "seven_day_sonnet": {"utilization": None},
+            "seven_day_oauth_apps": {"utilization": 3},
+        }
+    )
+    assert u and [(w.label, w.pct) for w in u.windows] == [("5h", 7), ("week", 24), ("week · Fable", 17)]
     prof = profiles.Profile(name="t", config_dir=tmp_path)
     ad = ClaudeCodeAdapter()
     assert ad.credentials_ok(prof) is None
@@ -473,7 +489,11 @@ def test_a_429_is_read_as_rate_limited_with_its_retry_after(tmp_path, monkeypatc
         for err, reason, after in (
             (urllib.error.HTTPError("u", 429, "rate_limit_error", {"Retry-After": "120"}, None), "rate_limited", 120.0),
             (urllib.error.HTTPError("u", 429, "rate_limit_error", {}, None), "rate_limited", None),
-            (urllib.error.HTTPError("u", 429, "x", {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}, None), "rate_limited", None),  # noqa: E501
+            (
+                urllib.error.HTTPError("u", 429, "x", {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}, None),
+                "rate_limited",
+                None,
+            ),  # noqa: E501
             (urllib.error.HTTPError("u", 500, "boom", {}, None), "error", None),
             (OSError("no route to host"), "error", None),
         ):

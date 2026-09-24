@@ -244,6 +244,7 @@ def _undecorated(pane_title: str) -> str:
 
 class ClaudeCodeAdapter:
     name = "claude-code"
+    label = "Claude"  # the tool's display name: the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence = "hook"
 
     def __init__(self, binary: str | None = None, rules: Path | None = None):
@@ -426,6 +427,16 @@ class ClaudeCodeAdapter:
             return True
         return datetime.fromtimestamp(int(exp) / 1000, UTC) > datetime.now(UTC)
 
+    def account_for(self, profile: str) -> str | None:
+        """The account a profile runs under (§4.2a, TD-122): the core polls usage once per
+        account, since one login has one quota however many profiles share it. A profile that
+        names no account is its own; an unknown profile says nothing."""
+        try:
+            prof = profiles_mod.get(profile or None)
+        except (KeyError, ValueError):
+            return None
+        return prof.account or prof.name
+
     def usage_for(self, profile: str) -> dict | None:
         """The core-facing form of `usage()`: by profile name, as a plain dict —
         `{"windows": [{"label", "pct", "resets"}, ...], "fetched", "reason": "ok"}` (TD-001,
@@ -500,15 +511,28 @@ def _pid_alive(pid: int, proc_start: object) -> bool:
         return True
 
 
+# `seven_day_<x>` keys the endpoint reports that are not a model's weekly window
+NOT_A_MODEL = {"oauth_apps"}
+
+
 def parse_usage(d: dict) -> Usage | None:
+    """The endpoint's windows as labelled entries: `5h`, `week` (all models), and every per-model
+    weekly window it reports as `week · <Model>` (TD-122) — the account page shows *Fable 17%*
+    beside *All models*, and the chip's worst-window rule must see it. A per-model window the
+    endpoint sends empty (`null`, or no number) is not one."""
     try:
         f, w = d["five_hour"], d["seven_day"]
-        return Usage(
-            windows=[
-                Window(label="5h", pct=int(f["utilization"]), resets=f.get("resets_at")),
-                Window(label="week", pct=int(w["utilization"]), resets=w.get("resets_at")),
-            ],
-            fetched=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-        )
+        windows = [
+            Window(label="5h", pct=int(f["utilization"]), resets=f.get("resets_at")),
+            Window(label="week", pct=int(w["utilization"]), resets=w.get("resets_at")),
+        ]
     except (KeyError, TypeError, ValueError):
         return None
+    for key, v in d.items():
+        model = key.removeprefix("seven_day_")
+        if model == key or not model or model in NOT_A_MODEL or not isinstance(v, dict):
+            continue
+        u = v.get("utilization")
+        if isinstance(u, int | float) and not isinstance(u, bool):
+            windows.append(Window(label=f"week · {model.capitalize()}", pct=int(u), resets=v.get("resets_at")))
+    return Usage(windows=windows, fetched=datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z"))

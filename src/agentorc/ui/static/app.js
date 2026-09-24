@@ -557,10 +557,11 @@
     }
     open();
   }
-  // ---- usage chip: one span per profile, its **worst** window, the rest on hover (TD-001, TD-073) ----
+  // ---- usage chip: one span per account, its **worst** window, the rest on hover (TD-001, TD-073, TD-122) ----
   // The windows and their labels are the adapter's — this file names no window of any one tool, so a
-  // tool with one daily window or three windows prints what it has. `usage: null` means that profile
-  // has no live session any more (the core prunes it): its chip goes.
+  // tool with one daily window or three windows prints what it has. The server regroups each pushed
+  // profile reading into its account (`usage_accounts`) and sends `{account, usage}`; `usage: null`
+  // means no live session's profile names that account any more: its chip goes.
   const NEAR_CAP = 80;  // "at or near a cap": never collapsed into +n, whatever the room (Paul 2026-09-19)
   // Why the last poll gave no reading: the adapter's `reason` word in words (§4.2, TD-087). Keyed on
   // the word, never on text; a word this table does not know is printed as itself.
@@ -568,7 +569,7 @@
     rate_limited: "rate-limited by the usage endpoint", no_credentials: "no credentials for this profile",
     no_profile: "no such profile", error: "the usage endpoint could not be read",
   };
-  // One profile's chip, or null for none — `usage_chip` in app.py is the same rule for the server's
+  // One account's chip, or null for none — `usage_chip` in app.py is the same rule for the server's
   // render, and the tests hold the two to the same cases. **A held reading goes stale, not out**
   // (TD-087): a refused poll keeps the last good windows, drawn dimmed with *· stale* and, on hover,
   // when they were read and why the poll since failed; a refusal with nothing ever held is
@@ -588,6 +589,20 @@
     } else why = `reserve ${r}%`;
     return `${w.label} ${w.pct}% / line ${ln}% (${why}; line moves ${row.next || "?"}; resets ${w.resets || "?"})`;
   }
+  // The profiles sharing the account, each with its lines and live sessions, for the hover (TD-122).
+  function usageProfiles(u) {
+    const parts = [];
+    for (const p of Array.isArray(u.profiles) ? u.profiles : []) {
+      if (!p || typeof p !== "object") continue;
+      const lines = (Array.isArray(p.lines) ? p.lines : []).filter((r) => r && typeof r === "object" && typeof r.line === "number").map((r) => `${r.label} line ${r.line}%`);
+      const names = (Array.isArray(p.sessions) ? p.sessions : []).map(String);
+      let part = String(p.name);
+      if (lines.length) part += ` (${lines.join(", ")})`;
+      if (names.length) part += `: ${names.join(", ")}`;
+      parts.push(part);
+    }
+    return parts.length ? `profiles on this account: ${parts.join("; ")}` : "";
+  }
   AO.usageChip = function (profile, u) {
     if (!u || typeof u !== "object") return null;
     const windows = (Array.isArray(u.windows) ? u.windows : []).filter((w) => w && typeof w.pct === "number");
@@ -598,7 +613,8 @@
       why = "the last poll was refused: " + (USAGE_WHY[reason] || reason);
       if (typeof u.retry_after === "number") why += `, which asked to be left ${Math.max(1, Math.ceil(u.retry_after / 60))} min`;
     }
-    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}`, pct: 0, cls: "stale", near: false };
+    const sharing = usageProfiles(u);
+    if (!windows.length) return { text: `${profile}: no reading yet`, title: `no usage reading for ${profile} yet — ${why}` + (sharing ? `. ${sharing}` : ""), pct: 0, cls: "stale", near: false };
     // worst = the smallest gap to its line, the tool's 100% where the profile has no reserve (§4.5a, TD-100)
     const gap = ([w, r]) => (r ? r.line : 100) - w.pct;
     const ws = windows.map((w) => [w, usageLine(w, u.lines)]).sort((a, b) => gap(a) - gap(b) || b[0].pct - a[0].pct);
@@ -606,20 +622,21 @@
     let title = ws.map(([w, r]) => usageHover(w, r)).join(" · ");
     const near = worst.pct >= 100 || (row ? worst.pct >= row.line - 10 : worst.pct >= NEAR_CAP);
     let cls = worst.pct >= 100 ? "cap" : near ? "near" : "";
-    let text = `${profile} · ${worst.label} ${worst.pct}%`;  // the numbers say what they are (2026-09-18)
+    let text = `${profile} · ${worst.label} ${worst.pct}%`;  // *Claude · paul · week 24%* (TD-122)
     if (row) text += ` / ${row.line}%`;  // *grind · week 61% / 70%* (TD-100)
     if (stale) { title = `held reading from ${u.fetched || "an unknown time"} — ${why}. ${title}`; text += " · stale"; cls = (cls + " stale").trim(); }
+    if (sharing) title += `. ${sharing}`;
     return { text, title, pct: worst.pct, cls, near };
   };
   function onUsage(ev) {
     const chip = $("#usagechip"); if (!chip) return;
-    let el = chip.querySelector(`[data-profile="${CSS.escape(ev.profile)}"]`);
-    const c = AO.usageChip(ev.profile, ev.usage);
-    // The chip and the space after it were added together, so they go together: a profile that
+    let el = chip.querySelector(`[data-account="${CSS.escape(ev.account)}"]`);
+    const c = AO.usageChip(ev.account, ev.usage);
+    // The chip and the space after it were added together, so they go together: an account that
     // comes and goes all day would otherwise leave a text node behind each time, and those widths
     // are what `fitUsage` measures against (review of PR #279).
     if (!c) { if (el) { const sep = el.nextSibling; if (sep && sep.nodeType === 3) sep.remove(); el.remove(); } fitUsage(); return; }
-    if (!el) { el = document.createElement("span"); el.dataset.profile = ev.profile; chip.insertBefore(el, $("#usagemore")); chip.insertBefore(document.createTextNode(" "), $("#usagemore")); }
+    if (!el) { el = document.createElement("span"); el.dataset.account = ev.account; chip.insertBefore(el, $("#usagemore")); chip.insertBefore(document.createTextNode(" "), $("#usagemore")); }
     el.dataset.pct = c.pct;
     el.dataset.near = c.near ? "1" : "";
     el.textContent = c.text;
@@ -627,17 +644,17 @@
     el.title = c.title;
     fitUsage();
   }
-  // Chips side by side while they fit; past that the worst profiles and `+n`, which shows the rest
+  // Chips side by side while they fit; past that the worst accounts and `+n`, which shows the rest
   // on hover. No rotation: a display that rotates hides the number at the moment it is looked at,
   // and the one that matters may be the one off screen (TD-073, decided by Paul 2026-09-19).
   function fitUsage() {
     const chip = $("#usagechip"); if (!chip) return;
-    const more = $("#usagemore"), spans = [...chip.querySelectorAll("[data-profile]")];
+    const more = $("#usagemore"), spans = [...chip.querySelectorAll("[data-account]")];
     spans.forEach((s) => s.classList.remove("hidden"));
     if (!more) return;
     more.classList.add("hidden"); more.textContent = ""; more.title = "";
     // Hide the least important first: lowest worst-window percentage, and never one at or near a cap
-    // — near its line where the profile has a reserve (TD-100), which is the chip's own `near`.
+    // — near its line where a profile on the account has a reserve (TD-100), which is the chip's own `near`.
     const droppable = spans.filter((s) => !s.dataset.near).sort((a, b) => (+a.dataset.pct || 0) - (+b.dataset.pct || 0));
     const hidden = [];
     while (chip.scrollWidth > chip.clientWidth + 1 && droppable.length) {

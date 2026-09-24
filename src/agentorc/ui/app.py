@@ -113,8 +113,66 @@ def _usage_hover(w: dict[str, Any], row: dict[str, Any] | None) -> str:
     )
 
 
+def _usage_profiles(u: dict[str, Any]) -> str:
+    """The profiles sharing an account, for its chip's hover (§4.5a **usage**, TD-122): each with
+    the lines its reserves make and the live sessions running under it."""
+    parts = []
+    for p in u.get("profiles") or []:
+        if not isinstance(p, dict):
+            continue
+        lines = [
+            f"{r.get('label')} line {r['line']:g}%"
+            for r in p.get("lines") or []
+            if isinstance(r, dict) and isinstance(r.get("line"), int | float) and not isinstance(r.get("line"), bool)
+        ]
+        names = [str(x) for x in p.get("sessions") or []]
+        part = str(p.get("name"))
+        if lines:
+            part += f" ({', '.join(lines)})"
+        if names:
+            part += f": {', '.join(names)}"
+        parts.append(part)
+    return f"profiles on this account: {'; '.join(parts)}" if parts else ""
+
+
+def usage_accounts(usage: Any, sessions: Any = None) -> dict[str, Any]:
+    """The host agent's per-profile readings as **one per account** (design §4.2a, §4.5a **usage**,
+    TD-122), keyed by the chip's name — `<tool> · <account>`, *Claude · paul* — which is what the
+    person knows the quota by; never a profile's name, which said nothing (TD-071 item 8). Every
+    profile of an account carries the same reading, so the first one's stands for it; the chip's
+    `lines` are the lowest line per window among its profiles, and `profiles` lists each with its
+    own lines and the live sessions running under it, for the hover. A reading from an agent
+    before TD-122 names no account and stays its profile's own chip."""
+    live: dict[str, list[str]] = {}
+    for s in sessions or []:
+        if isinstance(s, dict) and s.get("state") not in ("exited", "closed"):
+            live.setdefault(str(s.get("profile") or ""), []).append(str(s.get("name") or s.get("id")))
+    out: dict[str, Any] = {}
+    for prof, u in (usage or {}).items():
+        if not isinstance(u, dict):
+            continue
+        name = f"{u['tool']} · {u['account']}" if u.get("tool") and u.get("account") else prof
+        acc = out.get(name)
+        if acc is None:
+            acc = out[name] = {**{k: v for k, v in u.items() if k != "lines"}, "lines": [], "profiles": []}
+        lines = [r for r in u.get("lines") or [] if isinstance(r, dict)]
+        acc["profiles"].append({"name": prof, "lines": lines, "sessions": live.get(prof, [])})
+        for row in lines:
+            ln = row.get("line")
+            if not isinstance(ln, int | float) or isinstance(ln, bool):
+                continue
+            have = next((i for i, r in enumerate(acc["lines"]) if r.get("label") == row.get("label")), None)
+            if have is None:
+                acc["lines"].append(row)
+            elif ln < acc["lines"][have]["line"]:
+                acc["lines"][have] = row
+    return out
+
+
 def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
-    """One profile's top-bar chip (design §4.5a **usage**, TD-073, TD-087), or None for no chip.
+    """One account's top-bar chip (design §4.5a **usage**, TD-073, TD-087, TD-122), or None for no
+    chip. `prof` is the chip's name — `<tool> · <account>` from `usage_accounts`, a bare profile
+    for an agent that names no account.
 
     The worst window is printed, every window on hover, red at a cap. **Worst** is the window with
     the smallest gap to its line — the line the profile's reserve makes (§6, TD-100: `u["lines"]`,
@@ -146,8 +204,11 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
         why = "the last poll was refused: " + USAGE_WHY.get(reason, reason)
         if isinstance(u.get("retry_after"), int | float):
             why += f", which asked to be left {max(1, math.ceil(u['retry_after'] / 60))} min"
+    sharing = _usage_profiles(u)
     if not windows:
         title = f"no usage reading for {prof} yet — {why}"
+        if sharing:
+            title += f". {sharing}"
         return {"text": f"{prof}: no reading yet", "title": title, "pct": 0, "cls": "stale", "near": False}
     rows = [(w, _usage_line(w, u.get("lines"))) for w in windows]
     ws = sorted(rows, key=lambda x: ((x[1]["line"] if x[1] else 100) - x[0]["pct"], -x[0]["pct"]))
@@ -155,13 +216,15 @@ def usage_chip(prof: str, u: Any) -> dict[str, Any] | None:
     title = " · ".join(_usage_hover(w, r) for w, r in ws)
     near = worst["pct"] >= 100 or (worst["pct"] >= row["line"] - 10 if row else worst["pct"] >= NEAR_CAP)
     cls = "cap" if worst["pct"] >= 100 else "near" if near else ""
-    text = f"{prof} · {worst.get('label')} {worst['pct']}%"  # *grind · week 89%* (TD-095 h)
+    text = f"{prof} · {worst.get('label')} {worst['pct']}%"  # *Claude · paul · week 24%* (TD-122)
     if row:
         text += f" / {row['line']:g}%"  # *grind · week 61% / 70%* (§4.5a, TD-100)
     if stale:
         title = f"held reading from {u.get('fetched') or 'an unknown time'} — {why}. {title}"
         text += " · stale"
         cls = f"{cls} stale".strip()
+    if sharing:
+        title += f". {sharing}"
     return {"text": text, "title": title, "pct": worst["pct"], "cls": cls, "near": near}
 
 
@@ -179,6 +242,7 @@ def with_lines(usage: Any, gate: Any) -> dict[str, Any]:
 
 
 templates.env.globals["usage_chip"] = usage_chip
+templates.env.globals["usage_accounts"] = usage_accounts
 
 # The New session form's `controller` field when nothing is ticked: an empty list means nobody may
 # act on the session, which is design §4.8's explicit default. Module-level so the signature keeps
@@ -2093,6 +2157,7 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
             usage = await call("usage")
             with contextlib.suppress(Exception):  # an agent before TD-100 slice 1 has no `gate`: no lines
                 usage = with_lines(usage, await call("gate"))
+            usage = usage_accounts(usage, sessions)  # one chip per account (§4.5a, TD-122)
             info = await call("host")
             try:
                 # the top bar's number: the Inbox page's **Needs you** section, and not unread mail
@@ -2910,6 +2975,11 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
             known: dict[str, dict[str, Any]] = {}
             with contextlib.suppress(Exception):
                 known = {o["id"]: o for o in await call("list")}
+            acct_of: dict[str, str] = {}  # profile → the account chip it is drawn on (TD-122)
+            with contextlib.suppress(Exception):
+                for name, acc in usage_accounts(await call("usage")).items():
+                    for p in acc["profiles"]:
+                        acct_of[p["name"]] = name
             async for ev in c.subscribe():
                 if ev.get("event") == "session":
                     s = ev["session"]
@@ -2963,13 +3033,25 @@ def _stream_routes(app: FastAPI, h: SimpleNamespace) -> None:
                                     )
                                 )
                         continue
-                    if isinstance(ev.get("usage"), dict):
-                        # the chip's line (§4.5a **usage**, TD-100) is the gate's reading, which the
-                        # event does not carry: read it now, since the agent took this poll first
-                        with contextlib.suppress(Exception):
-                            prof = str(ev.get("profile"))
-                            ev["usage"] = with_lines({prof: ev["usage"]}, await call("gate"))[prof]
-                    await ws.send_text(json.dumps(ev))
+                    # The agent pushes a profile's reading; the page draws **one chip per account**
+                    # (§4.5a **usage**, TD-122), with the lowest line among the account's profiles and
+                    # each profile's sessions on hover — so the account is regrouped here from the
+                    # whole reading, the gate's lines and the fleet this loop already keeps. A profile
+                    # that went (`usage: null`) redraws the account it was on, or takes its chip off.
+                    prof = str(ev.get("profile"))
+                    was = acct_of.pop(prof, prof)
+                    readings: dict[str, Any] = {}
+                    with contextlib.suppress(Exception):
+                        readings = await call("usage")
+                    with contextlib.suppress(Exception):
+                        readings = with_lines(readings, await call("gate"))
+                    grouped = usage_accounts(readings, list(known.values()))
+                    for name, acc in grouped.items():
+                        for p in acc["profiles"]:
+                            acct_of[p["name"]] = name
+                    now = acct_of.get(prof)
+                    for name in {was, now} - {None}:
+                        await ws.send_text(json.dumps({"event": "usage", "account": name, "usage": grouped.get(name)}))
 
         try:
             async with LocalClient() as c:

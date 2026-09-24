@@ -86,6 +86,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-14 (§4.10): `mail()` added to the adapter protocol; when an adapter has no native delivery path the core falls back to a pane write (a `send`), and §4.10's message/control line becomes a convention the adapter's brief keeps rather than a gate the host agent enforces.
 - The adapter status table was written "at design time", each row to be verified before its adapter is built; Claude Code and `shell` were phase 1.
 - 2026-09-23 (TD-122): `label` added to the contract (the tool's display name, for the chip), and `usage()` said to be called once per account and to carry every window the endpoint reports, a per-model weekly one labelled with the model.
+- 2026-09-23 (TD-122, the build): `account_for(profile)` added to the contract as an optional method — the core cannot read a profile, so the adapter says which account the poll keys on; without it the poll keys on the profile, as before.
 
 ## 4.4 Host agent
 

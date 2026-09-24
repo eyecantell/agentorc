@@ -1719,12 +1719,15 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
     from sessionorc.store import UsageStore
 
     monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    K = "hookstub:p9"  # the account key (TD-122): the stub names no account, so the profile's
     async with LocalClient() as c:
         s = await c.call("create", name="u", dir=str(tmp_path), adapter="hookstub", profile="p9")
         hookstub.usage_value = {"windows": [{"label": "5h", "pct": 40, "resets": None}], "fetched": "t1"}
         assert await wait_for(lambda: bool(agent._usage.get("p9")), timeout=5.0, step=0.1)
         assert agent._usage["p9"] == {"windows": [{"label": "5h", "pct": 40, "resets": None}], "fetched": "t1"} | {
-            "reason": "ok"
+            "reason": "ok",
+            "account": "p9",  # the stub names no account for p9: it keys on the profile (TD-122)
+            "tool": "Stub",
         }
         assert UsageStore().load()["p9"]["fetched"] == "t1"  # and it is on disk, for the next promote
 
@@ -1733,35 +1736,83 @@ async def test_usage_says_why_it_has_no_reading_backs_off_and_keeps_the_last_one
         assert await wait_for(lambda: agent._usage["p9"].get("reason") == "rate_limited", timeout=5.0, step=0.1)
         assert agent._usage["p9"]["windows"] == [{"label": "5h", "pct": 40, "resets": None}]  # not lost
         assert agent._usage["p9"]["fetched"] == "t1" and agent._usage["p9"]["retry_after"] == 900.0
-        assert agent._usage_wait["p9"] == 900.0
+        assert agent._usage_wait[K] == 900.0
 
         # with no Retry-After it doubles instead, to a ceiling — and the old `retry_after` goes
         # with the poll that gave it, rather than standing as this refusal's word on when
-        agent._usage_wait["p9"] = USAGE_BACKOFF_MAX
-        again = agent._usage_reading("p9", {"reason": "rate_limited"})
+        agent._usage_wait[K] = USAGE_BACKOFF_MAX
+        again = agent._usage_reading(K, {"reason": "rate_limited"})
         assert again is not None and "retry_after" not in again and again["reason"] == "rate_limited"
-        assert agent._usage_wait["p9"] == USAGE_BACKOFF_MAX  # already at the ceiling
-        agent._usage["p9"] = again
-        assert agent._usage_reading("p9", {"reason": "rate_limited"}) is None  # now nothing changed to say
-        agent._usage_wait["p9"] = 100.0
-        agent._usage_reading("p9", {"reason": "rate_limited"})
-        assert agent._usage_wait["p9"] == 200.0
+        assert agent._usage_wait[K] == USAGE_BACKOFF_MAX  # already at the ceiling
+        agent._usage_acct[K] = again
+        assert agent._usage_reading(K, {"reason": "rate_limited"}) is None  # now nothing changed to say
+        agent._usage_wait[K] = 100.0
+        agent._usage_reading(K, {"reason": "rate_limited"})
+        assert agent._usage_wait[K] == 200.0
 
         # any other answer is the ordinary cadence again — only a 429 says *ask less often*
-        agent._usage["p9"] = agent._usage_reading("p9", {"reason": "error"})
-        assert "p9" not in agent._usage_wait
-        assert agent._usage["p9"]["reason"] == "error" and agent._usage["p9"]["windows"]
+        agent._usage_acct[K] = agent._usage_reading(K, {"reason": "error"})
+        assert K not in agent._usage_wait
+        assert agent._usage_acct[K]["reason"] == "error" and agent._usage_acct[K]["windows"]
         # an adapter that raises is an error too, never a crash in the poll
-        assert agent._usage_reading("p9", RuntimeError("boom")) is None  # already `error`: nothing new to say
+        assert agent._usage_reading(K, RuntimeError("boom")) is None  # already `error`: nothing new to say
 
         # a good reading replaces it and clears the reason
-        assert agent._usage_reading("p9", {"windows": [], "fetched": "t2", "reason": "ok"}) == {
+        assert agent._usage_reading(K, {"windows": [], "fetched": "t2", "reason": "ok"}) == {
             "windows": [],
             "fetched": "t2",
             "reason": "ok",
         }
         assert USAGE_EVERY == 300.0  # five minutes: the shortest window the endpoint reports is five hours
         await c.call("kill", id=s["id"])
+
+
+async def test_usage_is_polled_once_per_account_and_backed_off_as_one(agent, hookstub, tmp_path, monkeypatch):
+    """TD-122. Four profiles split by role on one login were polled four times a tick, and the
+    endpoint answered `rate_limited` to every one. The reading is the **account's** (§4.2a): two
+    profiles on one account are asked through one of them, both carry the same reading and
+    `fetched`, and a 429 backs the account off rather than the profile it happened to ask
+    through. A profile on another account is its own poll."""
+    monkeypatch.setattr("sessionorc.agent.USAGE_EVERY", 0.0)
+    monkeypatch.setattr(hookstub, "accounts", {"pa": "paul", "pb": "paul", "pc": "other"})
+    monkeypatch.setattr(hookstub, "usage_asked", [])
+    async with LocalClient() as c:
+        ids = [
+            (await c.call("create", name=f"u{p}", dir=str(tmp_path / p), adapter="hookstub", profile=p))["id"]
+            for p in ("pa", "pb", "pc")
+            if (tmp_path / p).mkdir() is None
+        ]
+        hookstub.usage_value = {"windows": [{"label": "week", "pct": 24, "resets": None}], "fetched": "t1"}
+        assert await wait_for(lambda: all(p in agent._usage for p in ("pa", "pb", "pc")), timeout=5.0, step=0.1)
+        assert agent._usage["pa"] == agent._usage["pb"]
+        assert agent._usage["pa"]["fetched"] == "t1" and agent._usage["pa"]["account"] == "paul"
+        assert agent._usage["pa"]["tool"] == "Stub" and agent._usage["pc"]["account"] == "other"
+        assert set(agent._usage_acct) == {"hookstub:paul", "hookstub:other"}
+        # each account is asked through one of its profiles, round after round — never pa and pb
+        # both (the ticker may run rounds of its own meanwhile; the set is what holds)
+        hookstub.usage_asked.clear()
+        await agent._refresh_usage_inner()
+        assert "pc" in hookstub.usage_asked and not {"pa", "pb"} <= set(hookstub.usage_asked)
+
+        # a 429 through one profile backs the whole account off: nothing asks through the other
+        hookstub.usage_value = {"reason": "rate_limited", "retry_after": 900.0}
+        await agent._refresh_usage_inner()
+        assert agent._usage_wait["hookstub:paul"] == 900.0 and "hookstub:pa" not in agent._usage_wait
+        assert agent._usage["pa"]["reason"] == agent._usage["pb"]["reason"] == "rate_limited"
+        assert agent._usage["pb"]["windows"] == [{"label": "week", "pct": 24, "resets": None}]  # kept
+        hookstub.usage_value = {"windows": [{"label": "week", "pct": 25, "resets": None}], "fetched": "t2"}
+        agent._usage_wait.pop("hookstub:other", None)  # `other` was refused too; let it be asked again
+        hookstub.usage_asked.clear()
+        await agent._refresh_usage_inner()
+        assert set(hookstub.usage_asked) == {"pc"}  # `paul` waits its fifteen minutes, both profiles with it
+
+        # the account goes when no live profile names it
+        hookstub.usage_value = None
+        for sid in ids[:2]:
+            await c.call("kill", id=sid)
+        assert await wait_for(lambda: "hookstub:paul" not in agent._usage_acct, timeout=5.0, step=0.1)
+        assert "pa" not in agent._usage and "pb" not in agent._usage and "hookstub:paul" not in agent._usage_wait
+        await c.call("kill", id=ids[2])
 
 
 async def test_a_mode_change_is_pushed_at_the_press(agent, tmp_path, monkeypatch):
