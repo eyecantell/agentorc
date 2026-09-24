@@ -119,7 +119,7 @@ differentiator is the **live, consented, git-native** session. §4.5c should say
    person approves is exactly what runs. **Each effect runs only if both the proposing agent and the
    deciding person may perform it** (`deny_decision_intersection`, `decisions.ts:458`), so approving
    never widens anyone's authority. **The targets are snapshotted when proposed**; a `strict` effect
-   whose target changed since then is skipped as `target_changed` (`decisions.ts:460`) rather than
+   whose target changed since then is skipped as `target_changed` (`decisions.ts:465`) rather than
    run against a world the person never saw. *Decision queues* group them and fill themselves from
    three seed signals (a PR on the issue, a plan waiting for confirmation, an agent's questions).
    Triage gives each a `decide_by` date, a snooze and a responsible person, and the attention feed
