@@ -929,6 +929,7 @@ def test_the_manager_brief_announces_a_wind_down_as_a_note_and_boards_only_what_
     waiting on its reader, which is never on the board and never in the note."""
     text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
     assert "ran out of work at <t>. Merged this run: #a, #b (or: nothing)." in text
+    assert "<member>: <what it looked for and did not find, from the `why` on its record>; <member>: …" in text
     assert "a `note`, two lines, nothing else in it" in text
     assert "a question you passed up that nobody answered" in text
     assert "a member you left open with uncommitted or unpushed work" in text
