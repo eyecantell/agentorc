@@ -334,10 +334,10 @@ def test_usage_chip_prints_each_profiles_worst_window(tmp_path, monkeypatch):
         person_needs=0, node_banner="", identity_note="",
     )  # fmt: skip
     assert "grind · week 88%" in html and "5h 19%" not in html.split("grind · week 88%")[1].split("</span>")[0]
-    assert 'data-profile="grind" data-pct="88" data-near="1" class="near"' in html
+    assert 'data-account="grind" data-pct="88" data-near="1" class="near"' in html
     assert "week 88% (resets 2026-09-24T00:00:00Z) · 5h 19% (resets 2026-09-20T22:00:00Z)" in html
-    assert 'data-profile="openai" data-pct="100" data-near="1" class="cap"' in html and "openai · day 100%" in html
-    assert 'data-profile="quietly"' not in html  # no windows, no chip
+    assert 'data-account="openai" data-pct="100" data-near="1" class="cap"' in html and "openai · day 100%" in html
+    assert 'data-account="quietly"' not in html  # no windows, no chip
     assert "five_hour" not in html and "weekly" not in html
 
 
@@ -366,6 +366,13 @@ USAGE_CASES = {
                  "lines": [{"label": "week", "line": 100, "next": "n", "reserve": 0}, {"label": "5h", "line": 1}]},
     "no_line_made": {"windows": [{"label": "week", "pct": 85}], "reason": "ok",
                      "lines": [{"label": "week", "line": None, "reserve": {"per_day": 10}}]},
+    # one account's chip (TD-122): the profiles sharing it, their lines and sessions, on hover
+    "shared": {"windows": [{"label": "week", "pct": 24, "resets": "r8"}], "reason": "ok", "account": "paul",
+               "tool": "Claude", "lines": [{"label": "week", "line": 70.5, "next": None, "reserve": 20}],
+               "profiles": [{"name": "grind", "lines": [{"label": "week", "line": 70.5}],
+                             "sessions": ["grinder-ao-1", "grinder-ao-2"]},
+                            {"name": "default", "lines": [], "sessions": []}, "junk"]},
+    "shared_unread": {"reason": "rate_limited", "profiles": [{"name": "grind", "sessions": ["g1"]}]},
 }  # fmt: skip
 
 
@@ -430,6 +437,49 @@ def test_the_usage_chip_prints_the_line_its_reserve_makes_and_ranks_by_the_gap()
     assert with_lines(usage, None) == usage and with_lines(None, gate) == {}
 
 
+def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
+    """design §4.5a **usage** chip, §4.2a (TD-122). Four profiles split by role on one login drew
+    four chips named by profile — *grind · week 21% / 40% · stale +1* — where the person knows the
+    quota as *Claude, paul*. The readings are grouped by account: one chip, `<tool> · <account>`,
+    the lowest line among the profiles sharing it, and each profile with its line and sessions on
+    hover. A reading from an agent that names no account stays its profile's own chip."""
+    from agentorc.ui.app import usage_accounts, usage_chip
+
+    reading = {"windows": [{"label": "week", "pct": 24, "resets": "r"}], "fetched": "f", "reason": "ok",
+               "account": "paul", "tool": "Claude"}  # fmt: skip
+    usage = {
+        "grind": {**reading, "lines": [{"label": "week", "line": 70, "reserve": 30}]},
+        "grind-sonnet": {**reading, "lines": [{"label": "week", "line": 60, "reserve": 40}]},
+        "default": reading,
+        "old": {"windows": [{"label": "5h", "pct": 3}], "fetched": "f"},  # an agent before TD-122
+        "gone": None,
+    }
+    sessions = [
+        {"id": "a", "name": "grinder-ao-1", "profile": "grind", "state": "working"},
+        {"id": "b", "name": "grinder-ao-2", "profile": "grind", "state": "idle"},
+        {"id": "c", "name": "done", "profile": "grind", "state": "exited"},
+        {"id": "d", "name": "paul", "profile": "default", "state": "idle"},
+    ]
+    got = usage_accounts(usage, sessions)
+    assert list(got) == ["Claude · paul", "old"]
+    acc = got["Claude · paul"]
+    assert acc["windows"] == reading["windows"] and acc["lines"] == [{"label": "week", "line": 60, "reserve": 40}]
+    assert [(p["name"], p["sessions"]) for p in acc["profiles"]] == [
+        ("grind", ["grinder-ao-1", "grinder-ao-2"]),
+        ("grind-sonnet", []),
+        ("default", ["paul"]),
+    ]
+    c = usage_chip("Claude · paul", acc)
+    assert c["text"] == "Claude · paul · week 24% / 60%"
+    assert c["title"].endswith(
+        ". profiles on this account: grind (week line 70%): grinder-ao-1, grinder-ao-2;"
+        " grind-sonnet (week line 60%); default: paul"
+    )
+    assert "grind" not in c["text"]  # never a profile's name in the chip
+    assert usage_chip("old", got["old"])["text"] == "old · 5h 3%"
+    assert usage_accounts(None) == {}
+
+
 def test_the_usage_chip_rule_is_the_same_in_the_page_and_in_app_js(tmp_path):
     """The chip is drawn twice — server-side at page load, and by `app.js` on each pushed `usage`
     event — so the rule lives twice, and a rule kept in two places is held to one set of cases here
@@ -450,7 +500,7 @@ def test_the_usage_chip_rule_is_the_same_in_the_page_and_in_app_js(tmp_path):
                          capture_output=True, text=True, timeout=30)  # fmt: skip
     assert out.returncode == 0, out.stderr
     assert json.loads(out.stdout) == {k: usage_chip("grind", u) for k, u in USAGE_CASES.items()}
-    assert "AO.usageChip(ev.profile, ev.usage)" in app_js.read_text()  # and the push really uses it
+    assert "AO.usageChip(ev.account, ev.usage)" in app_js.read_text()  # and the push really uses it
 
 
 USAGE_PROBE = """

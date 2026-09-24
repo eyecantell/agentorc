@@ -24,9 +24,16 @@ class HookFedStub:
         return self.rules.explain(tail) if self.rules else None
 
     usage_value = None  # set by a test: what `usage_for` reports for every profile (TD-001)
+    usage_asked: list = []  # the profiles `usage_for` was asked through, in order (TD-122)
+    accounts: dict = {}  # set by a test: profile → account; one it does not name keys on the profile
+    label = "Stub"  # the tool's display name (design §4.3, TD-122)
 
     def usage_for(self, profile):
+        self.usage_asked.append(profile)
         return self.usage_value
+
+    def account_for(self, profile):
+        return self.accounts.get(profile)
 
     external = []  # set by a test: `ExternalSession`s the stub sees outside agentorc (TD-010 a)
 

@@ -30,6 +30,7 @@ class LaunchSpec:
 @runtime_checkable
 class Adapter(Protocol):
     name: str
+    label: str  # the tool's display name ("Claude"): the usage chip's first word, never a key (§4.3, TD-122)
     state_source: Confidence
 
     def launch(
@@ -58,6 +59,10 @@ class Adapter(Protocol):
     #                                                      says anywhere (TD-031); None = cannot tell. Keyed by
     #                                                      the profile *name*, like `usage_for`
     #   short_model(model: str) -> str                     that name as a display shortens it
+    #   account_for(profile: str) -> str | None           the account the profile runs under (§4.2a, TD-122):
+    #                                                      usage is polled, cached and backed off once per
+    #                                                      `(adapter, account)`; None, or no method, keys on
+    #                                                      the profile itself
     #   usage_for(profile: str) -> dict | None            {"windows": [{"label", "pct", "resets"}, ...],
     #                                                      "fetched", "reason": "ok"} — every quota window this
     #                                                      account has, the labels the adapter's and printed by
@@ -117,6 +122,7 @@ class ShellAdapter:
     when the pane is dead. Scraped by definition (design §4.1)."""
 
     name = "shell"
+    label = "Shell"  # a display name like any adapter's; a shell reports no quota, so it draws no chip
     state_source: Confidence = "scraped"
 
     def launch(
