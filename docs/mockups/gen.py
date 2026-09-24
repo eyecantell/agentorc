@@ -1000,6 +1000,7 @@ INBOX_BLURB = {
     "Needs you": "Counted — the top bar's first number is exactly this list. A pending permission or question, a limited or stalled session, an exited session with unpushed work, an open ask, a paused steer, an outcome reported blocked. What is on a tool's clock first, then oldest first.",
     "Steering": "Not counted. Open steers whose clock is running, soonest first, each with the default it will take. Doing nothing is a valid answer: at its bound the session goes with its default.",
     "Waiting on them": "Not counted — these wait on a session, not on you. Questions you answered whose asker has not yet said what came of it. Dismiss says you do not need to hear back.",
+    "Answered for you": "Not counted. Questions a teammate answered for you from the record, each with its source. Overrule sends your word to the asker.",
     "FYI": "The second number, never added to the first. Notes, what resolved itself (the trail), and closed questions, kept for 12 hours. Nothing here has to be acted on; it opens itself when there is something new.",
 }
 
@@ -1019,6 +1020,13 @@ def mcard(bar, kind, name, team, age, body, controls, cls="", state=None):
 </div>'''
 
 
+def fold(summary, open_=False, body=""):
+    """TD-127: the *details* disclosure under a row's first paragraph — a quiet unbordered line, never a button."""
+    mark = "▾" if open_ else "▸"
+    inner = f'<div class="txt" style="margin-top: 6px; color: #374151;">{body}</div>' if open_ else ""
+    return f'<div style="margin-top: 2px;"><span class="muted" style="font-size: 12px; cursor: default;"><span style="font-size: 9px;">{mark}</span> {summary}</span>{inner}</div>'
+
+
 def inbox_rows():
     """The rows every Inbox artboard draws (needs, steering, waiting, fyi), in the page's order."""
     b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
@@ -1028,8 +1036,9 @@ def inbox_rows():
               '<div class="txt">Permission · <span class="mono">Bash</span> · <span class="mono">git push origin td073-usage-chips</span></div><div class="meta">doing 3m ago: TD-073: usage chips side by side — pushing for review</div>',
               b("Allow", "primary") + b("Deny") + gap + b(ICON["focus"] + "Open", "ghost"), cls="hover", state=("needs", "permission")),
         mcard(BAR["needs"], "ask", "tdgrind-ao-1", "ao-grind", "18m ago · about TD-079",
-              '<div class="txt">The trail coalesces by <span class="mono">{sid, kind, how}</span>. A permission answered from Focus and one answered from the Inbox within five seconds are two <i>hows</i> — two trail rows, or one? The design text supports either reading; going on with the wrong one means a migration later.</div>'
-              '<div class="sugg"><span class="lbl">suggested by tdgrind-ao-1</span>' + b("“Two rows — the how is the point”") + b("“One row, the later how wins”") + '</div>',
+              '<div class="txt">TD-079: a permission answered from Focus and again from the Inbox within five seconds — <b>two trail rows, or one?</b> I will go with two unless you say otherwise; the fixture changes either way.</div>'
+              + fold("details")
+              + '<div class="sugg"><span class="lbl">suggested by tdgrind-ao-1</span>' + b("“Two rows — the how is the point”") + b("“One row, the later how wins”") + '</div>',
               b("Reply", "primary") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost"), cls="focus"),
         mcard(BAR["exited"], "", "push", "", "exited 2h ago",
               '<div class="txt">Exited with unpushed work — <b>2 commits only on this machine</b>, measured against <span class="mono">origin/td068-prompt-refused</span>.</div><div class="meta">Ready to close: tree clean ✓ · pushed ✗ · PR none</div>',
@@ -1052,35 +1061,45 @@ def inbox_rows():
               '<div class="quoted">You answered “Rebase, do not merge main in” to: <i>#269 conflicts with main since #267 — rebase or merge?</i></div><div class="meta">doing 4m ago: TD-079 1b: rebased, re-running the suite before the review</div>',
               b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
     ]
+    answered = [
+        mcard("#cbd0d6", "answered for you · source", "techlead-ao-1", "ao-grind", "24m ago · answered grinder-ao-1",
+              '<div class="quoted">grinder-ao-1 asked: <i>#517 is ready — read it against the usage design and merge?</i></div>'
+              '<div class="txt"><b>Merged #517</b> — read against §4.2a; one gap left, not a blocker (a follow-up in TD-122).</div>'
+              + fold("details", open_=True, body=
+                     'Measured against §4.2a <i>Profiles</i> and §4.5a <i>usage chip</i>: one chip per account, the poll once per account, <span class="mono">rate_limited</span> gone from the log.'
+                     '<ul style="margin: 6px 0 0 18px; padding: 0;"><li>the gate reads the account, not the profile — as designed</li><li><b>gap</b>: the per-model window is read but not drawn; TD-122 (3)</li><li>the ledger line says 09-22, the PR 09-23 — the PR is right</li></ul>'
+                     'Source: design §4.2a, §4.5a <i>usage chip</i>; <a href="#" style="color: #1f5fa8;">the review comment</a> <span class="muted" style="font-size: 11px;">github.com</span>'),
+              b("Overrule") + b("Dismiss", "ghost")),
+    ]
     fyi = [
         mcard("#cbd0d6", "trail · new", "tdgrind-ao-2", "ao-grind", "12m ago",
               '<div class="txt muted">A permission (<span class="mono">Bash · pdm run test</span>) was <b style="color: #374151;">allowed from Focus</b>.</div>', b("Dismiss", "ghost")),
         mcard("#cbd0d6", "note · new", "tdgrind-ao-1", "ao-grind", "31m ago",
               '<div class="txt">done: TD-068 — PR #272 merged</div>', b("Dismiss", "ghost")),
     ]
-    return needs, steering, waiting, fyi
+    return needs, steering, waiting, answered, fyi
 
 
 def inbox(picks=False):
     """Screen 6 with the rail (TD-129). `picks=True` is `InboxRail.dc.html`: ao-grind and *Needs you* pressed."""
-    needs, steering, waiting, fyi = inbox_rows()
+    needs, steering, waiting, answered, fyi = inbox_rows()
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     if not picks:
-        secs = [("Needs you", 5, False), ("Steering", 1, False), ("Waiting on them", 1, False), ("FYI", 14, False)]
+        secs = [("Needs you", 5, False), ("Steering", 1, False), ("Waiting on them", 1, False), ("Answered for you", 1, False), ("FYI", 14, False)]
         teams = [("ao-grind", 2, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
         kinds = [("questions", 1, False), ("steering", 1, False), ("session states", 3, False), ("board items", 0, False), ("notes", 3, False), ("trail", 6, False)]
         body = (isec("Needs you", 5, opened=True) + "".join(needs) + isec("Steering", 1) + "".join(steering)
-                + isec("Waiting on them", 1) + "".join(waiting) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
+                + isec("Waiting on them", 1) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
         summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): under the title, which has the top line to itself; left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
-                "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks.")
+                "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks. <b>A message has one shape</b> (TD-127): its first paragraph is the whole of what you need, the rest folds under <i>details</i> — closed on the ask row, open on the <i>answered for you</i> row, where the reading is a rendered list from the closed markdown subset and the one link carries its host after its text.")
     else:
-        secs = [("Needs you", "2 of 5", True), ("Steering", "0 of 1", False), ("Waiting on them", "0 of 1", False), ("FYI", "0 of 14", False)]
+        secs = [("Needs you", "2 of 5", True), ("Steering", "0 of 1", False), ("Waiting on them", "0 of 1", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
         teams = [("ao-grind", "2 of 2", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 2", False)]
         kinds = [("questions", "1 of 1", False), ("steering", "0 of 1", False), ("session states", "1 of 3", False), ("board items", "0 of 0", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
         body = (isec("Needs you", "2 of 5") + "".join(needs[:2])
-                + '<div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them and FYI are not picked — press them in the rail, or <b>Clear filters</b>.</div>')
+                + '<div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them, Answered for you and FYI are not picked — press them in the rail, or <b>Clear filters</b>.</div>')
         summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 5</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
                 "Not designed: a preview pane (TD-129 option b) — at any width a row's text opens its page (<i>Inbox — message</i>).")
@@ -1131,8 +1150,8 @@ def inbox_message():
     b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
     gap = '<span style="flex-grow: 1;"></span>'
     entry = mcard(BAR["needs"], "ask", "tdgrind-ao-1", "ao-grind", "18m ago · about TD-079 · asked in Needs you",
-        '<div class="txt">The trail coalesces by <span class="mono">{sid, kind, how}</span>. A permission answered from Focus and one answered from the Inbox within five seconds are two <i>hows</i> — two trail rows, or one? The design text supports either reading; going on with the wrong one means a migration later.</div>'
-        '<div class="txt" style="color: #374151;"><b style="font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280;">details</b><br>What I looked at: §4.10 <i>The trail</i> says a row per <span class="mono">{sid, kind, how}</span> and that two answers to one permission are one event; <span class="mono">sessionorc/trail.py</span> coalesces on the three-tuple as written, so today two <i>hows</i> are two rows. The TD-079 test fixture assumes one. My default is two rows — the <i>how</i> is the point of the trail — and the fixture changes. Cost of the other reading: the coalesce key loses <span class="mono">how</span> and the row says <i>answered from Focus and the Inbox</i>.</div>',
+        '<div class="txt">TD-079: a permission answered from Focus and again from the Inbox within five seconds — <b>two trail rows, or one?</b> I will go with two unless you say otherwise; the fixture changes either way.</div>'
+        + fold("details", open_=True, body='What I looked at: §4.10 <i>The trail</i> says a row per <span class="mono">{sid, kind, how}</span> and that two answers to one permission are one event; <span class="mono">sessionorc/trail.py</span> coalesces on the three-tuple as written, so today two <i>hows</i> are two rows. The TD-079 test fixture assumes one. My default is two rows — the <i>how</i> is the point of the trail — and the fixture changes. Cost of the other reading: the coalesce key loses <span class="mono">how</span> and the row says <i>answered from Focus and the Inbox</i>.'),
         "", cls="")
     thread = [
         mcard("#cbd0d6", "ask → techlead-ao-1", "tdgrind-ao-1", "ao-grind", "41m ago",
