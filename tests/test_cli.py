@@ -922,6 +922,21 @@ def test_the_manager_brief_leaves_the_seat_the_wanted_restart_and_the_nudge_to_t
     assert "**The exception is a member on another host**" in text  # the tick nudges no node's pane yet
 
 
+def test_the_manager_brief_announces_a_wind_down_as_a_note_and_boards_only_what_waits_on_the_person():
+    """TD-125, design §4.9a *A wind-down is announced*: the report is an FYI `note` to the person
+    inbox, two lines — what the run merged, and each member's search — and the board carries only
+    what waits on the person. The 23:47Z line was two hundred counted words whose one act was a PR
+    waiting on its reader, which is never on the board and never in the note."""
+    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/manager.md").read_text()
+    assert "ran out of work at <t>. Merged this run: #a, #b (or: nothing)." in text
+    assert "a `note`, two lines, nothing else in it" in text
+    assert "a question you passed up that nobody answered" in text
+    assert "a member you left open with uncommitted or unpushed work" in text
+    assert "a start or a close the host agent refused" in text
+    assert "A PR held for its reader is never on the board and never in the note" in text
+    assert "for each member what it looked for" not in text  # the old board line is gone
+
+
 def test_the_manager_brief_leaves_the_crash_restart_to_the_tick():
     """TD-113 (0), design §6 *Keeping a team running* rule 1: a supervised member that exits with no
     declaration is restarted by the host agent's tick, so the preset must not send its manager down
