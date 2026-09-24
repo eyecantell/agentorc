@@ -1,8 +1,8 @@
 # ADR 2026-09-24: Paperclip — the "AI company" neighbour, read from its code
 
 Status: survey (2026-09-24, session `research_paperclip`, at Paul's request). **Nothing here changes
-the design by itself.** It says what Paperclip is, where agentorc differs, and six things worth
-weighing; none is filed as a TD until Paul picks.
+the design by itself.** It says what Paperclip is, where agentorc differs, and seven things worth
+weighing; one is filed (TD-128, at Paul's word), the rest wait on Paul.
 
 ## Context
 
@@ -83,15 +83,23 @@ agentorc's unit is a live session and a ticket is whatever the repo's ledger say
 4. **The subscription is the budget.** Paperclip counts cents. Its Claude adapter does detect *5-hour*
    and *weekly limit reached* wording (`parse.ts:24`), but only as a run failure, not as a window to
    plan work around.
-5. **Machines the person owns, sessions that outlive the server.** A Paperclip restart ends its
-   runs and reconstructs them from the database. An agentorc restart leaves every tmux session
-   running.
+5. **Sessions that outlive the server.** Both run on machines the person owns; that is not a
+   difference. A Paperclip restart ends its runs and reconstructs them from the database. An
+   agentorc restart leaves every tmux session running, mid-thought.
 
-**What is *not* a differentiator any more:** §4.5c names *"one neutral view across tools"* as the
-moat. Paperclip already drives twelve runtimes. Against it, neutrality is table stakes; the
-differentiator is the **live, consented, git-native** session. §4.5c should say so if Paul agrees.
+**What §4.5c claims, read against Paperclip.** §4.5c says what no model vendor sells is *"one
+neutral view across tools, on machines you own, with policies and a working cadence that never
+strands work"*, and that *"neutrality is the moat"* — in plain words, that working with any vendor's
+tool is the thing nobody else offers. Paperclip is not a model vendor, and it offers the first three
+of those four: twelve runtimes, self-hosted, budgets and approvals. Its cadence is the fourth, and
+differs in kind: work that never strands because a database reconciler re-wakes it, against work that
+never strands because it is a commit, a branch and a ledger line. So against Paperclip, being
+tool-neutral is necessary and not distinctive; what it cannot offer by construction is the five
+points above — a **live** session, **consent** before an act, and work that lands **in git**. §4.5c
+was written against the vendors' runtimes and is right about them; whether it should also name this
+is Paul's call, and this ADR changes no design text.
 
-## What to learn — six things worth weighing
+## What to learn — seven things worth weighing
 
 1. **Continuation reconstructed from records, with a written postmortem.** Paperclip keeps no
    intent in memory. Every tick, a reconciler finds *assigned + in progress + no live run + no wait*
@@ -125,12 +133,27 @@ differentiator is the **live, consented, git-native** session. §4.5c should say
    Triage gives each a `decide_by` date, a snooze and a responsible person, and the attention feed
    ranks *decide now* first. *Not what it first looked like:* `decision_training_examples` is a
    snapshot library for reviewing how agents decided. It auto-answers nothing, was experimental, and
-   its UI was removed in `v2026.824.0`. **For agentorc:** a worker's `ask` today is prose, answered in
-   prose, and whatever follows is the worker's to do (§4.10). A structured ask whose options carry
-   the `ao` act a press performs (merge #N, close the member, restart it) would make an Inbox answer
-   one press on a phone (goal 10). The intersection rule is our grants, applied to the pair. The
-   staleness check is what stops a *merge #512* pressed after #512 was pushed again. *Candidate TD,
-   for Paul.*
+   its UI was removed in `v2026.824.0`. **For agentorc — a narrower lesson than it first read.**
+   An `ask` or a `steer` already carries up to four **suggested answers** beside free-text Reply
+   (§4.10 *Suggested answers*, TD-070, the Inbox half built 2026-09-20; the board half waits on
+   dev-cadence), so "one press on a phone" is not the gap. The difference is **what a press does**:
+   here it sends *that text* as a `reply` to the sender, which reads it and acts — the same RPC, gate
+   and wake as a typed reply, so a button can say nothing Reply could not (§4.5a: nothing on the page
+   is built from a session's text except as text); in Paperclip a press runs server-side *effects*
+   with no agent in between. Ours is the more robust choice and stays: the sender keeps the context,
+   free text is always open, and no act rides a label. Of Paperclip's three details, the intersection
+   rule has no work here (a reply is not an act of control; the acts are gated by grants already),
+   `expiresAt` is declined by design (an `ask` to the person does not expire, §4.10), and only the
+   **staleness check** carries over: an `ask` whose `about` names a PR or a branch that moved after
+   it was sent could say so on the row (*#512 has new commits since this was asked*), so an answer
+   is never given to a question the world has overtaken. *A line for TD-070's step 4 or the Inbox
+   rows, for Paul to file or strike; not a new mechanism.*
+7. **Two layers in a message to the person.** Paperclip's `v2026.817.0` rewrote its system notices
+   as *compact rows with evidence on demand* and moved review, recovery and blocked notices to
+   plain language; its attention feed ranks *decide now* and *new today* first and shelves what has
+   aged. That is TD-127's ask (Paul, 2026-09-24: the basic context and the decision, the gritty
+   details behind a *details* control) arrived at by another road. *A pointer on TD-127, nothing
+   more; the shape rule there is already the right one.*
 5. **Credential ownership stated per adapter.** Each Paperclip adapter doc says
    whether the host owns the login or a snapshot carries it into the sandbox. agentorc meets the
    same question for container nodes (§4.4a) and profiles (§4.2a). *One table in §4.2a, when the
@@ -150,12 +173,18 @@ every agent is a batch job and every continuation has to be reconstructed.
 The anchor re-read the code for every claim above. Two agent claims were wrong and are corrected
 here: the size (reported as ~64k lines of TypeScript; it is ~1.2M excluding tests) and *"the org
 chart is not enforced"* (`allow_manager_chain` enforces it for checkouts). A third was overstated:
-*"a warm process persists across wakes by default"*, when `warmHandleIdleMs` defaults to 0. A fourth
-was the anchor's own, corrected the same day on a closer read: the first draft of item 4 said the
-decision queues learn from the person's past decisions, and they do not. The founder's identity, the star history and the praise and criticism in secondary coverage are not
+*"a warm process persists across wakes by default"*, when `warmHandleIdleMs` defaults to 0. Two more
+were the anchor's own, corrected the same day: the first draft of item 4 said the decision queues
+learn from the person's past decisions, and they do not; the second draft said an `ask` here is
+answered only in prose, and Paul pointed at TD-070's suggested answers — item 4 is now the narrower
+lesson. Paperclip's one terminal (`environment-custom-image-terminal-ws.ts`) is a shell into a sandbox
+image while it is being set up, not onto a running agent, so *no terminal to attach to* stands. The
+founder's identity, the star history and the praise and criticism in secondary coverage are not
 verified and are left out.
 
 ## What this ADR does not do
 
-It approves nothing. The §3 table gains one row pointing here. Item 3 is part of TD-128 (Paul, 2026-09-24:
-budgets for pay-per-token profiles); item 4 is a candidate Paul may file or strike; items 1, 2, 5 and 6 are notes for whoever next edits those sections.
+It approves nothing. The §3 table gains one row pointing here. Item 3 is part of TD-128 (Paul,
+2026-09-24: budgets for pay-per-token profiles); item 4's staleness line is for Paul to file on
+TD-070 or strike; item 7 is a pointer for TD-127's designer; items 1, 2, 5 and 6 are notes for
+whoever next edits those sections. The §4.5c reading above is an argument, not an edit.
