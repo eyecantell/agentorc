@@ -71,7 +71,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-120 | The anchor's jobs go to the team: the techlead reads the held PRs, promotion is a person's press or a policy, and a designer seat holds the design conversation | Medium | Open — decided 2026-09-23; the designer role is in org.yml, its team seat waits on §4.9a |
 | TD-121 | A card's more ▾ menu is clipped by the card: the fixed-height card hides overflow and the menu is positioned inside it | Medium | Open — pickable |
 | TD-122 | The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account | High | Open — design first |
-| TD-123 | Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1 | Low | Decided 2026-09-23: remove all three — pickable |
 | TD-124 | The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse | Medium | Map approved 2026-09-23 — §4.5a rows next (the designer) |
 
 
@@ -1273,22 +1272,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix, design first:** (1) §4.2a: **the reading is the account's** — the adapter's `usage(profile)` is called once per `(adapter, account)` among the profiles live sessions use, and every profile sharing the account carries the same reading (`fetched`, `reason`, `retry_after` included); the gate's reserves stay per profile (a reserve is a policy, a reading is a fact), each read against the account's reading. (2) §4.5a: **one chip per account**, `<tool> · <account> · <label> n%` — *Claude · paul · week 24%* — the tool's display name from the adapter (§4.3), the profiles sharing it and each one's line on hover, the rest of the row as today (worst window, the line after the number, *· stale*, red at a cap). (3) The adapter carries every window the endpoint reports, the per-model weekly ones labelled by the model (*week · Fable 17%*), and the chip's worst-window rule takes them in. (4) Tests: two profiles on one account poll once; a `rate_limited` reply backs off the account, not the profile. Then a grinder builds it.
 
 **Related:** TD-087 (a failure says why; stale readings), TD-100 (the gate's lines), TD-073 (the adapter's windows), TD-071 item 8 (the chip reads as nothing), TD-118 (profiles split by role — the change that exposed this).
-
-## TD-123: Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1
-
-**Priority:** Low
-**Added:** 2026-09-23 (Paul's question; the anchor session)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Decided by Paul 2026-09-23 (*yes, remove the three tabs*): **remove all three from the bar; one page PR, design first** — `base.html` loses the three spans, §4.5's screen list says where each went (Attention: struck, the Inbox's board rows; Commands: the Org filter's *show command runs*, the specs unbuilt; Resumable: kept as an unbuilt phase-4 screen, a tab when it exists), §7's phase 4 keeps the two, the dated fact to the history. Was: **recommendation (the anchor, 2026-09-23): remove all three from the bar now.** They are `<span class="tab off" title="phase 4">` in `base.html` — not links, pressable by nothing — and each one's job has moved or never started: **Attention** is the Inbox's board rows since TD-069 step 3 (2026-09-23), so the screen is struck from §4.5 in favour of the Inbox; **Commands**' visible half is the Org filter's *show command runs*, and its command specs (§4.5 screen 5, cmdorc-shaped) were never built; **Resumable** (§4.5 screen 4, conversations agentorc did not start, with Adopt) is the one still worth building — it stays in §4.5 as an unbuilt phase-4 screen, reached from New session's *resume* when it comes, and gets a tab when it exists. A tab that does nothing teaches the person that the bar lies. If Paul agrees: one page PR removes the three spans and §4.5's screen list says where each went (design first, the dated fact to the history).
-**Location:** `src/agentorc/ui/templates/base.html` (the three `tab off` spans), design §4.5 screens 4 and 5, §7 (phase 4)
-
-**Why:** three of the bar's five tabs are dead; on a phone they take the width the live ones need.
-
-**Fix:** the page PR above.
-
-**Related:** TD-069 (the Inbox), TD-081 (Resume on a card — what Resumable's *running one* case became), design §7.
 
 ## TD-124: The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse
 

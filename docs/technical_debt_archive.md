@@ -1152,3 +1152,19 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Resolved:** 2026-09-23 (PR #498, grinder-ao-1; `src/sessionorc`, so merged by the anchor). `mail.act_gate` refuses `decide` on the caller's own record before the self-pass, whatever the caller holds, and `modes.offline_refusal` refuses it in its self branch, both with `mail.self_decide_refusal`'s line; design §4.8 *Grants* states the self case. Tests: `test_a_session_never_answers_its_own_permission` (`tests/test_agent.py`), the self-case assertion in `tests/test_modes.py`.
 
 **Related:** TD-116 (the gate on `decide`), TD-117 (Deny with a reason), design §4.8, §9 invariant 11.
+
+## TD-123: Three dead tabs on the top bar — Resumable, Commands, Attention — disabled placeholders since phase 1
+
+**Priority:** Low
+**Added:** 2026-09-23 (Paul's question; the anchor session)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-23 — was: Decided by Paul 2026-09-23 (*yes, remove the three tabs*): **remove all three from the bar; one page PR, design first** — `base.html` loses the three spans, §4.5's screen list says where each went (Attention: struck, the Inbox's board rows; Commands: the Org filter's *show command runs*, the specs unbuilt; Resumable: kept as an unbuilt phase-4 screen, a tab when it exists), §7's phase 4 keeps the two, the dated fact to the history. Was: **recommendation (the anchor, 2026-09-23): remove all three from the bar now.** They are `<span class="tab off" title="phase 4">` in `base.html` — not links, pressable by nothing — and each one's job has moved or never started: **Attention** is the Inbox's board rows since TD-069 step 3 (2026-09-23), so the screen is struck from §4.5 in favour of the Inbox; **Commands**' visible half is the Org filter's *show command runs*, and its command specs (§4.5 screen 5, cmdorc-shaped) were never built; **Resumable** (§4.5 screen 4, conversations agentorc did not start, with Adopt) is the one still worth building — it stays in §4.5 as an unbuilt phase-4 screen, reached from New session's *resume* when it comes, and gets a tab when it exists. A tab that does nothing teaches the person that the bar lies. If Paul agrees: one page PR removes the three spans and §4.5's screen list says where each went (design first, the dated fact to the history).
+**Location:** `src/agentorc/ui/templates/base.html` (the three `tab off` spans), design §4.5 screens 4 and 5, §7 (phase 4)
+
+**Why:** three of the bar's five tabs are dead; on a phone they take the width the live ones need.
+
+**Resolved:** 2026-09-23 (PR #507, `grinder-ao-2`) — `base.html`'s top bar draws only built pages; design §4.5 screens 4 and 5 say *not built, a tab when it exists*, screen 7 (Attention) is struck in favour of the Inbox's board rows and `/attention`, §4.5a's *Due strip / Attention* rows are *Due strip / Inbox board row* or *Due strip*, §7 phase 4 restated, the Attention mockup removed; `tests/test_ui_org.py` asserts no dead tab renders.
+
+**Related:** TD-069 (the Inbox), TD-081 (Resume on a card — what Resumable's *running one* case became), design §7.
