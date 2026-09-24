@@ -1073,7 +1073,7 @@ def inbox(picks=False):
                 + isec("Waiting on them", 1) + "".join(waiting) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
         summary, title = "", "Inbox"
-        note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
+        note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): under the title, which has the top line to itself; left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
                 "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks.")
     else:
         secs = [("Needs you", "2 of 5", True), ("Steering", "0 of 1", False), ("Waiting on them", "0 of 1", False), ("FYI", "0 of 14", False)]
@@ -1087,10 +1087,10 @@ def inbox(picks=False):
     return head(title) + f'''<div style="width: 1440px; min-height: {1960 if not picks else 1000}px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Inbox 5 · 2")}
 <div style="padding: 16px 20px 28px;">
+<div style="max-width: 1324px; margin: 0 auto 12px;">{page_head(title, summary)}</div>
 <div style="display: flex; gap: 24px; align-items: flex-start; max-width: 1324px; margin: 0 auto;">
 {rail(secs, teams, kinds, all_on=picks)}
 <div class="inboxcol" style="margin: 0; flex: 1 1 auto; min-width: 0;">
-  {page_head(title, summary)}
   {body}
   <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">{note}</div>
 </div>
