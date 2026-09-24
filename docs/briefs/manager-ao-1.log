@@ -376,3 +376,4 @@
 23:50  ao close self.
 02:19  round 1: grinder-ao-1, grinder-ao-2, techlead-ao-1 all working (just started); no open member PRs; no unread inbox; no relay needed (all cadence-changes entries landed before members' created time) → ok
 02:41  grinder-ao-2: note "done: TD-123 — PR #507 merged" → cadence check PR #507: all rows pass. grinder-ao-1/2 still working.
+02:41  grinder-ao-2: finished (out of work) — swept ledger after #507, nothing pickable left (TD-121 leased by grinder-ao-1, rest live-check/eval/design-first/decision/Paul's/phase2/synced/anchor/open-PR). Clean tree. grinder-ao-1 still working.
