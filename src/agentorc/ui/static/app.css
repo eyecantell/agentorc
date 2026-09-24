@@ -291,7 +291,9 @@ details.more .menu button:disabled { opacity: .45; cursor: default; } details.mo
 .term { background: var(--term); color: var(--termfg); font-family: "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; padding: 10px 12px; border-radius: 4px; white-space: pre; overflow: hidden; }
 .term.tail { font-size: 11px; line-height: 1.55; padding: 6px 9px; color: var(--tail); min-height: 54px; }
 details.more { position: relative; } details.more summary { list-style: none; } details.more summary::-webkit-details-marker { display: none; }
-details.more .menu { position: absolute; right: 0; top: 28px; z-index: 5; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 4px; display: flex; flex-direction: column; min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
+/* fixed to the viewport, placed by `AO.placeMenu` when it opens (TD-121): an absolute menu was
+   clipped by the card's `overflow: hidden`, which the card's one height needs */
+details.more .menu { position: fixed; z-index: 40; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 4px; display: flex; flex-direction: column; min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
 details.more .menu button { text-align: left; background: none; border: 0; padding: 6px 8px; color: var(--fg); font: inherit; cursor: pointer; border-radius: 3px; } details.more .menu button:hover { background: var(--hover); }
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
 .toast { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--stalled); padding: 8px 12px; border-radius: 4px; font-size: 12px; max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15); } .toast.ok { border-left-color: var(--done); }

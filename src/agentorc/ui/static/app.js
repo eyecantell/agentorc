@@ -144,6 +144,33 @@
     AO.popOut(a.dataset.focus);
   });
 
+  // A *more ▾* or *Snooze* menu is drawn fixed to the viewport, placed from its summary's rect
+  // (TD-121): drawn inside the card, the card's `overflow: hidden` clipped it to a sliver of border.
+  // Right-aligned under the summary; above it where the space below is short; kept on screen.
+  AO.placeMenu = function (r, w, h, vw, vh) {
+    const gap = 4, edge = 8;
+    const top = r.bottom + gap + h > vh - edge && r.top - gap - h >= edge ? r.top - gap - h : r.bottom + gap;
+    const left = Math.max(edge, Math.min(r.right - w, vw - edge - w));
+    return { top: Math.round(top), left: Math.round(left) };
+  };
+  // `toggle` does not bubble: caught on the way down. Opening one menu folds any other; a scroll
+  // anywhere (a terminal's included) or a resize moves an open one with its button.
+  const placeMenu = (d) => {
+    const m = $(".menu", d), s = $("summary", d);
+    if (!m || !s) return;
+    const p = AO.placeMenu(s.getBoundingClientRect(), m.offsetWidth, m.offsetHeight, window.innerWidth, window.innerHeight);
+    m.style.top = `${p.top}px`; m.style.left = `${p.left}px`;
+  };
+  document.addEventListener("toggle", (ev) => {
+    const d = ev.target;
+    if (!d.matches || !d.matches("details.more[open]")) return;
+    $$("details.more[open]").forEach((o) => { if (o !== d) o.open = false; });
+    placeMenu(d);
+  }, true);
+  const placeOpen = () => $$("details.more[open]").forEach(placeMenu);
+  document.addEventListener("scroll", placeOpen, true);
+  window.addEventListener?.("resize", placeOpen);  // `?.`: the node probes have no real window
+
   // the editor button (vscode://, or the person's own `open_in:` scheme, design §5): hand the URL to
   // the protocol handler without navigating this tab away (a plain click replaced the Org with a
   // blank page when the handler declined — first-use finding).
