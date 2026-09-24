@@ -53,7 +53,9 @@ person is `docs/user_attention.md`.
   account caps every session on it.
 - **The UI** (§4.5, `src/agentorc/ui/`): Org, Focus, the Inbox (a queue — *Needs you*,
   *Steering*, *Waiting on them*, FYI; §4.10 *The Inbox is a queue*; its filters are the rail and
-  one entry opens as a page, §4.5 screen 6 *The rail* and *The message page*, TD-129). **State and alarm marks are
+  one entry opens as a page, §4.5 screen 6 *The rail* and *The message page*, TD-129; a message to
+  the person has one shape, its first paragraph the whole of what they need, §4.10 *How a message
+  to a person is written*, TD-127). **State and alarm marks are
   never pressable, colours are tokens, and nothing on a page is a control built from what a
   session wrote** — text a session wrote is only ever text; a control comes from a structured
   field. The ledger records the person's constraint in these words: *nothing on a page is a
