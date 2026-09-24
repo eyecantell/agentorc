@@ -1033,6 +1033,9 @@ def inbox():
         mcard(BAR["exited"], "", "push", "", "exited 2h ago",
               '<div class="txt">Exited with unpushed work — <b>2 commits only on this machine</b>, measured against <span class="mono">origin/td068-prompt-refused</span>.</div><div class="meta">Ready to close: tree clean ✓ · pushed ✗ · PR none</div>',
               b(ICON["resume"] + "Reopen and push", "primary") + b("Resume") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost"), state=("exited", "exited")),
+        mcard(BAR["needs"], "promote", "agentorc", "", "main moved 12m ago",
+              '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto off</div><div class="meta">the checkout is on main with a clean tree — the press makes it live; a rollback is <span class="mono">ao promote --sha</span></div>',
+              b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
         mcard(BAR["stalled"], "outcome · blocked", "lead-cm-1", "cm-grind", "reported 6m ago",
               '<div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>',
               b("Reply", "primary") + b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
@@ -1057,11 +1060,11 @@ def inbox():
     filters = '<div class="input" style="width: 260px; height: 28px; color: #6b7280;">filter — sender, text, about</div><span class="btn ghost">team: all ▾</span>'
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     return head("Inbox") + f'''<div style="width: 1440px; min-height: 1640px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Inbox 4 · 2")}
+{topbar("Inbox 5 · 2")}
 <div style="padding: 16px 20px 28px;">
 <div class="inboxcol">
-  {page_head("Inbox", "4 need you · 2 new in FYI", filters)}
-  {isec("Needs you", 4, opened=True)}
+  {page_head("Inbox", "5 need you · 2 new in FYI", filters)}
+  {isec("Needs you", 5, opened=True)}
   {"".join(needs)}
   {isec("Steering", 1)}
   {"".join(steering)}
