@@ -101,3 +101,32 @@ def pr_files(pr: int, cwd: str | None = None) -> list[str]:
         # `gh` returns one page of a large PR's files: a held path past it would read as *not held*
         raise RuntimeError(f"gh listed {len(files)} of PR #{pr}'s {total} files: too many to judge; ask the reader")
     return files
+
+
+_REMOTE = re.compile(
+    r"^(?:https://(?:[^@/\s]+@)?|ssh://git@|git@)github\.com[:/](?P<slug>[^/\s]+/[^/\s]+?)(?:\.git)?/?$"
+)
+
+
+@lru_cache(maxsize=64)
+def _github(directory: str) -> str:
+    try:
+        cp = subprocess.run(
+            ["git", "-C", directory, "remote", "get-url", "origin"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    m = _REMOTE.match(cp.stdout.strip()) if cp.returncode == 0 else None
+    return f"https://github.com/{m.group('slug')}" if m else ""
+
+
+def pr_url(directory: str | None, pr: int) -> str:
+    """The web link of PR `pr` in the checkout at `directory` — its `origin` on GitHub — or "" when
+    that cannot be said (no directory, no origin, another forge): the Inbox then draws `#<n>` bare
+    (design §4.5a, TD-093). The remote is read once per directory."""
+    base = _github(str(directory)) if directory else ""
+    return f"{base}/pull/{int(pr)}" if base else ""

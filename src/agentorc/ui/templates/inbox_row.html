@@ -16,6 +16,9 @@
   {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
   <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-{{ e.kind }}">{{ e.kind }}</span>
+  {#- §4.5a *PRs waiting* (§4.9b *The reader*, TD-093): the PR a held author put in front of you, a
+      structured field drawn as a link — the text stays the author's text #}
+  {%- if e.pr is number %} {% if e.pr_url %}<a class="ref" href="{{ e.pr_url }}" target="_blank" rel="noopener" title="the pull request this asks you to read (design §4.9b)">#{{ e.pr }}</a>{% else %}<span class="ref" title="the pull request this asks you to read (design §4.9b)">#{{ e.pr }}</span>{% endif %}{% endif %}
   {%- if e.about %} <span class="st">re {{ e.about }}</span>{% endif %}
   {%- if e.reply_to %} <span class="st">reply to {{ e.reply_to }}</span>{% endif %}
   <span class="grow"></span>
