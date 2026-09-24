@@ -385,3 +385,5 @@
 
 03:42–04:01 quiet: grinder-ao-1, grinder-ao-2, techlead-ao-1 all (re)started; grinder-ao-1 claimed TD-122, grinder-ao-2 claimed TD-124; techlead seat cycled idle/closed/refilled twice on its own (host agent's tick, no action taken); PR #517 (TD-122, touches src/sessionorc) opened and correctly routed to the techlead seat as a held PR — grinder-ao-1 waited, did not merge it itself; no unread inbox throughout, no relay needed (all cadence-changes entries landed before members' created time).
 04:02  techlead-ao-1 merged #517 (TD-122) after its read, idle again → cadence check PR #517: pass (pr/review/ledger/worktree pass, ci unknown-still-running, deploy n/a). grinder-ao-1 meanwhile claimed and opened #518 (TD-125, not a held path) — in review.
+04:05–04:19 quiet: techlead seat cycled idle/closed/exited again on its own (host agent tick); grinder-ao-1 moved to a new TD-122 step (branch td122-hover-reserves) after #518.
+04:20  grinder-ao-2: note "done: TD-124 — PR #519 merged" → cadence check PR #519: pass. grinder-ao-1 still working (td122-hover-reserves).
