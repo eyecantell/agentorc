@@ -148,12 +148,6 @@ is Paul's call, and this ADR changes no design text.
    it was sent could say so on the row (*#512 has new commits since this was asked*), so an answer
    is never given to a question the world has overtaken. *A line for TD-070's step 4 or the Inbox
    rows, for Paul to file or strike; not a new mechanism.*
-7. **Two layers in a message to the person.** Paperclip's `v2026.817.0` rewrote its system notices
-   as *compact rows with evidence on demand* and moved review, recovery and blocked notices to
-   plain language; its attention feed ranks *decide now* and *new today* first and shelves what has
-   aged. That is TD-127's ask (Paul, 2026-09-24: the basic context and the decision, the gritty
-   details behind a *details* control) arrived at by another road. *A pointer on TD-127, nothing
-   more; the shape rule there is already the right one.*
 5. **Credential ownership stated per adapter.** Each Paperclip adapter doc says
    whether the host owns the login or a snapshot carries it into the sandbox. agentorc meets the
    same question for container nodes (§4.4a) and profiles (§4.2a). *One table in §4.2a, when the
@@ -161,6 +155,12 @@ is Paul's call, and this ADR changes no design text.
 6. **Named deploy modes.** `local_trusted` / `authenticated+private` / `authenticated+public` puts
    what §4.5b describes in prose into three names a user can pick. *Adopt the naming when §4.5b is
    next edited.*
+7. **Two layers in a message to the person.** Paperclip's `v2026.817.0` rewrote its system notices
+   as *compact rows with evidence on demand* and moved recovery and blocked notices to
+   plain language, and its attention feed ranks *decide now* and *new today* first and shelves what has
+   aged. That is TD-127's ask (Paul, 2026-09-24: the basic context and the decision, the gritty
+   details behind a *details* control) arrived at by another road. *A pointer on TD-127, nothing
+   more; the shape rule there is already the right one.*
 
 **Not wanted:** the org chart as the organising noun (the Org/Team ADR's reasoning stands), dollar
 budgets (the neighbours ADR's reasoning), per-issue database tickets replacing the repo ledger, and
