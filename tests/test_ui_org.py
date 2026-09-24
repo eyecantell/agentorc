@@ -369,7 +369,8 @@ USAGE_CASES = {
     # one account's chip (TD-122): the profiles sharing it, their lines and sessions, on hover
     "shared": {"windows": [{"label": "week", "pct": 24, "resets": "r8"}], "reason": "ok", "account": "paul",
                "tool": "Claude", "lines": [{"label": "week", "line": 70.5, "next": None, "reserve": 20}],
-               "profiles": [{"name": "grind", "lines": [{"label": "week", "line": 70.5}],
+               "profiles": [{"name": "grind", "lines": [{"label": "week", "line": 70.5, "next": "n1",
+                                                  "reserve": {"per_day": 10}}, {"label": "5h", "line": 50}],
                              "sessions": ["grinder-ao-1", "grinder-ao-2"]},
                             {"name": "default", "lines": [], "sessions": []}, "junk"]},
     "shared_unread": {"reason": "rate_limited", "profiles": [{"name": "grind", "sessions": ["g1"]}]},
@@ -472,10 +473,15 @@ def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
     c = usage_chip("Claude · paul", acc)
     assert c["text"] == "Claude · paul · week 24% / 60%"
     assert c["title"].endswith(
-        ". profiles on this account: grind (week line 70%): grinder-ao-1, grinder-ao-2;"
-        " grind-sonnet (week line 60%); default: paul"
+        ". profiles on this account: grind [week line 70% (reserve 30%; line moves ?)]: grinder-ao-1, grinder-ao-2;"
+        " grind-sonnet [week line 60% (reserve 40%; line moves ?)]; default: paul"
     )
     assert "grind" not in c["text"]  # never a profile's name in the chip
+    # a per-day reserve on a fractional line: the days left are whole in the page as in `app.js`
+    assert usage_chip("Claude · paul", USAGE_CASES["shared"])["title"].endswith(
+        "grind [week line 70.5% (reserve 10% a day, 2 days left; line moves n1),"
+        " 5h line 50% (reserve ?; line moves ?)]: grinder-ao-1, grinder-ao-2; default"
+    )
     assert usage_chip("old", got["old"])["text"] == "old · 5h 3%"
     assert usage_accounts(None) == {}
 
