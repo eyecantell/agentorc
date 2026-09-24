@@ -387,3 +387,6 @@
 04:02  techlead-ao-1 merged #517 (TD-122) after its read, idle again → cadence check PR #517: pass (pr/review/ledger/worktree pass, ci unknown-still-running, deploy n/a). grinder-ao-1 meanwhile claimed and opened #518 (TD-125, not a held path) — in review.
 04:05–04:19 quiet: techlead seat cycled idle/closed/exited again on its own (host agent tick); grinder-ao-1 moved to a new TD-122 step (branch td122-hover-reserves) after #518.
 04:20  grinder-ao-2: note "done: TD-124 — PR #519 merged" → cadence check PR #519: pass. grinder-ao-1 still working (td122-hover-reserves).
+04:21  grinder-ao-2: idle + out_of_work (04:20:01Z; ledger re-read after #519, 1 pickable (TD-125) claimed by grinder-ao-1, rest live-check/eval/Paul's/anchor/design-first) → finished, nothing. grinder-ao-1 still working; team not out of work.
+04:22–04:32 quiet
+04:33  grinder-ao-1: two notes — "done: TD-122 — #517 (techlead-merged) and follow-up #520 merged" and "done: TD-125 — #518 merged (samscrape/dev-cadence relay left to the anchor per ledger)" → cadence check #520: pass; cadence check #518: pass (docs review, 4 findings fixed). grinder-ao-1 still working.
