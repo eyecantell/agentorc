@@ -1652,6 +1652,7 @@ noted). If a control is not in this table it does not exist.
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line (TD-053). On a card it moves into the slot (TD-095): the fixed words, then the first line of the reason as text, clamped, the whole of it and the time of the declaration on hover — and no age of its own, since a card has one clock; the Focus header keeps the chip. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a). The words are fixed and the reason is the hover: a `why` names every entry the session looked at and what gates each, which a card cannot hold. The row is drawn for a declaration even when neither report channel has anything in it |
 | card / Focus header | **restart wanted** chip | when the record carries `restart_wanted` (TD-083): fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a mark, never pressable, and not a state — the session still reads `idle` or `exited`. On a card it moves into the slot with *out of work*, as an ending (TD-095; §4.5 *The card's anatomy*) — the Focus header keeps the chip. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). An `early` one says so on the chip and in its hover: the home marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller does not act on one — so it is drawn as wanting a person instead |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a, TD-053); on the team's card, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
+| Org | team card: **starts** note | display only (TD-026, §6 *Schedule*; not built — TD-133): on a team card with nothing live whose name carries a rule in `settings.yml`, beside *stopped* or *wound down <t>*: *starts at the reset · Thu 07:00*, the instant from the account's reading, in the reader's clock, by the formatter the *stops* note uses. Nothing on a live team's card. Not a control: the rule is set by `ao schedule` or the settings page |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team. Not drawn inside that team's own group (TD-095); drawn in *No team*, and in a filtered or flat grid |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
@@ -1893,6 +1894,14 @@ on a later tick, as §6 says, and for this repo the command's own host agent goe
 9c1e0f2, 3 ahead · checks green · auto off*, in flight or failed with the log — and `--json` the
 `promotes` field of `host`. `ao status -v`'s build line stays: it is this repo's `check` read from
 the client's side, and the one line a session may read.
+
+**`ao schedule`** (TD-026; §6 *Schedule*, §5 `settings.yml`; designed, not built — TD-133): with no
+arguments prints every team's rule and when it next fires — *ao-grind · starts at the reset of
+grind's week — Thu 07:00*, or *no schedule*; `ao schedule <team> reset --profile <p> --window
+<label>` sets one and `ao schedule <team> off` clears it, through `set_settings`, refused to a
+session as `ao gate` is. The client checks the team is defined (`org.yml` or a repo's `teams:`,
+which the host agent does not read) and that an adapter of the profile reports the label, and
+refuses naming which; the rule takes effect on the next tick.
 
 ### 4.8 Capabilities, report channels, and role presets
 
@@ -4141,7 +4150,10 @@ usage_gate:
   grind: {"5h": 30, week: {per_day: 10}}   # line 70% on the session window; 100 − 10 × days left on the weekly
 ```
 
-  A profile absent here has no line on any window. On a node the file is the node's own, as its
+  A profile absent here has no line on any window. Its second key is **`schedules:`** (§6
+  *Schedule*; designed, not built — TD-133): one entry per team name, `{start: reset, profile,
+  window}`, the standing press that restarts a wound-down team when that profile's window
+  resets; a team not listed has none. On a node the file is the node's own, as its
   `hosts.yml` is, and `ao gate` run there writes it (§4.4a's offline table: served, link or no
   link — policies that stop run on the node, from its replica). The settings page, when built,
   edits the home's file; a node's is edited at the node until the replica carries settings.
@@ -4257,7 +4269,8 @@ code and needs no grant; a session doing the same work does.
   nothing will act on is the same failure inverted. The card and the Focus header show it, and the
   New session form takes one (§4.5a). Not built: editing a stop time after the start from the page
   (`ao until` has no page equivalent), `start_at` and the `scheduled` state, window overrides with
-  an expiry, and calendar-shaped schedules (TD-026).
+  an expiry, and calendar-shaped schedules (TD-026; the one start rule designed is *Schedule*,
+  below).
 - **Keeping a team running** (TD-103; decided by Paul 2026-09-22, option 1 of the design review;
   built, and the manager preset is silent on the four rules). Four rules that lived in the manager's brief, applied by a model every
   round, are policies of the host agent's tick. **Scope: a session is *supervised* when its record
@@ -4426,6 +4439,39 @@ code and needs no grant; a session doing the same work does.
   live in tmux and survive a restart of the home, an attached Focus reconnects under §4.6's
   contract, and a blocked `wait` ends with the socket as §4.7 says. Until built, the anchor
   promotes by hand as CLAUDE.md says.
+- **Schedule: a team start at the reset** (TD-026; decided by Paul 2026-09-22 — *configurable,
+  off by default, not vital*; designed 2026-09-24, not built — TD-133, unscheduled until the person
+  says): the one start the host agent makes that no person pressed at the time, and the general
+  form the run window (below) reduces to. **A schedule is a person's standing press, kept in
+  `settings.yml`** (§5: the person's own, read on every tick, written only by `set_settings`, so
+  a session cannot set one):
+
+```yaml
+schedules:
+  ao-grind: {start: reset, profile: grind, window: week}   # start ao-grind when grind's weekly window resets
+```
+
+  The window is named by its label as the adapter reports it (§4.3), refused when no adapter of
+  that profile reports it, as `ao gate` refuses; the instant is that window's `resets` in the
+  account's reading (§4.2a, TD-122), so nothing here knows a tool's week by name. **A scheduled
+  start is a replay, never a definition re-read** (*Keeping a team running*: a restart replays the
+  launch record, and the host agent does not read `org.yml`). At the reset, for every record
+  carrying that team's badge that is `exited` or `closed` **by the team's own ending** — an
+  `out_of_work` declaration, or the manager's own close after a wind-down (§4.9a) — not suspended
+  and not at a restart ceiling, the tick replays its launch record as rule 2 does for a wanted
+  restart, `why: schedule`, under `RESTART_CEILING` as every restart is, the seats included (a
+  replayed seat is on call again, its trigger standing). A team with anything live at the reset is
+  left alone. One with no launch records — never started by a person on this home, or its cards
+  forgotten, which deletes them — starts nothing: **a schedule restarts a team a person once
+  started and never invents one**, so the briefs a scheduled team runs are the ones its last
+  person-pressed start read, and a brief change is a person's `ao team start`. A kill or a
+  person's Close is never undone, as rule 1 says. What it costs when the ledger is still empty:
+  each member runs once, declares `none`, and the team winds down again — the run the designer's
+  overnight entries are for. The team card says it (§4.5a *starts* note); `ao schedule` (§4.7)
+  and, once built, the settings page (TD-100 (4)) set and clear it. **Not designed**: a start
+  time for one session (`start_at`, a `scheduled` state), window overrides with an expiry
+  (TD-101: not wanted yet), calendar-shaped windows and one-off runs — TD-026 holds them for the
+  person's word on scope.
 - **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
 - **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on
