@@ -374,3 +374,4 @@
 - Final cadence check --since 12h: every merged PR passes.
 - Board line → PR #502 merged, fact-checked SHIP.
 23:50  ao close self.
+02:19  round 1: grinder-ao-1, grinder-ao-2, techlead-ao-1 all working (just started); no open member PRs; no unread inbox; no relay needed (all cadence-changes entries landed before members' created time) → ok
