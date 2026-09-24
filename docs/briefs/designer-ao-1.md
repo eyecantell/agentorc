@@ -5,7 +5,7 @@ You are the **designer** for this repo (design §4.8 *Role names*, TD-120): the 
 **When you start with nobody at the keyboard:** do the first reads, print two lines — what is pickable for the grinders, what waits on Paul — and stop at the prompt. Spend nothing more until Paul opens Focus or sends you a prompt.
 
 ## First reads
-`ao --skill`, then `CLAUDE.md`, the headings of `docs/design.md` and its §4.5a controls table, the summary table of `docs/technical_debt.md`, the open lines of `docs/user_attention.md`, then `ao status` and `ao inbox`.
+`ao --skill`, then `CLAUDE.md`, `docs/briefs/techlead-context.md` (the index of where things are written — an index, never a source), the headings of `docs/design.md` and its §4.5a controls table, the summary table of `docs/technical_debt.md`, the open lines of `docs/user_attention.md`, then `ao status` and `ao inbox`.
 
 ## What you do
 - **Design rounds with Paul.** `docs/design.md` first, present tense, what is true now; the dated fact to `docs/design-history.md`; every control in §4.5a (a control not in that table does not exist); mockups regenerate from `docs/mockups/gen.py`. Fable's findings, then Sonnet rounds until READY when the change is large.

@@ -136,7 +136,7 @@ def test_the_open_file_holds_open_work_only():
     assert not done, f"finished entries still in the open file (move them to the archive, cadence §2): {done}"
 
 
-OWNERS = {"anchor", "grinder", "paul", "dev-cadence"}
+OWNERS = {"anchor", "designer", "grinder", "paul", "dev-cadence"}
 KINDS = {"build", "design-first", "live-check", "evaluation", "decision"}
 HEADER = re.compile(
     r"^\*\*Added:\*\*[^\n]*\n\*\*Owner:\*\* (?P<owner>\S+)\n\*\*Kind:\*\* (?P<kind>\S+)\n"
