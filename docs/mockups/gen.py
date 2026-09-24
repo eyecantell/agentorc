@@ -89,6 +89,8 @@ CSS = """
   .ac .foot .lk { white-space: nowrap; min-width: 0; overflow: hidden; display: inline-flex; align-items: center; gap: 4px; color: #1c2128; font-size: 12px; }
   .ac .foot svg { width: 13px; height: 13px; }
   .ac.ring { box-shadow: 0 0 0 2px #f59e0b; border-color: #f59e0b; }
+  /* the keyboard's ring (TD-124): the browser's focus ring on the card, blue and offset, apart from the amber needs-you one */
+  .ac.kring { outline: 2px solid #1f5fa8; outline-offset: 2px; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
   .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
@@ -301,7 +303,7 @@ EXTRA = {
     "tdgrind-1": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-301 → #811 · 1/3 done", "findings": "2 filed",
                   "doing": ("TD-301: pushing the branch for review", "14s"), "title": "DIU fetcher", "stops": "stops 06:00"},
     "tdgrind-2": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-296 → #437 · 2/2 done", "derived": True,
-                  "doing": ("TD-296: waiting on CI for #437", "39m")},
+                  "doing": ("TD-296: waiting on CI for #437", "39m"), "kring": True},
     # no `doing` on tdgrind-3 on purpose: it is `limited`, and the slot shows the cap — what needs
     # a person comes first (§4.5a), so a line here would be data no branch draws (review of PR #288)
     "tdgrind-3": {"team": "samscrape-grind", "role": "grinder", "under": "orc-1", "report": "TD-290 · 0/2 done", "findings": "1 filed", "mail": 2},
@@ -449,7 +451,7 @@ def team_desktop():
         else:
             first, rest = f'<span class="next">{ICON["focus"]}Focus</span>', ""
         editor = f'<span class="lk">{ICON["code"]}VS Code</span>' if state != "done" else ""
-        ring = " ring" if state == "needs" else ""
+        ring = (" ring" if state == "needs" else "") + (" kring" if e.get("kring") else "")
         off = " off" if state == "unreachable" else ""
         bar = BAR["idle"] if unseen else BAR[state]
         return f'''<div class="card ac{ring}{off}">
@@ -545,7 +547,7 @@ def team_desktop():
   {due_strip()}
   <div class="warn" style="background: #f3f4f6; border-color: #cbd0d6; color: #374151; align-items: center;">{ICON["warn"]}<span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
   <div style="display: flex; flex-direction: column; gap: 22px;">{cards}</div>
-  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (idle · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>, by the pills' own glyphs: the manager's card first, then {ORDER_PILLS}, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab.</div>
+  <div class="note"><b>The card's anatomy</b> (design §4.5, TD-095): six rows, the same six on every card, at one height — (1) name, the tool's title only where it differs, the state pill; (2) role, mode (<i>unattended</i> quiet, <b>interactive</b> with the person mark — the person's own stand out), marks, the stops note, and the one clock: how long in this state; (3) where — <span class="mono">branch</span>, <span class="mono">wt/</span> only when the worktree is not the session's name, and outside a team's own group <span class="mono">host / repo</span> in front; (4) tool · account · model, and the report with a reference shown once; (5) the slot, one text and a caption — what needs a person, an ending, what it says it is doing, the last line — with <i>ready to close ✓</i> as the caption; (6) the foot, whose first button is the next act by state, outlined; the rest plain; only <b>Allow</b> is filled. <b>Colour</b>: working green, idle blue (idle · unseen too), everything over or out of reach one grey; amber <i>needs you</i> (ringed) and red <i>stalled?</i> stay the loudest. <b>Order</b>, by the pills' own glyphs: the manager's card first, then {ORDER_PILLS}, and within one urgency an interactive session ahead of an unattended one. A team's header carries its place, its counts by state and <b>Wind down</b> / <b>Stop now</b> — not its manager, whose card is first. A dashed outline on a state pill means the state was guessed from the screen. Command runs are on the Commands tab. <b>Keys</b> (§4.5a <b>keys</b>, TD-124): <span class="mono">j</span> / <span class="mono">k</span> move the keyboard's ring — the blue focus ring on <span class="mono">tdgrind-2</span>, apart from the amber <i>needs you</i> one — through the cards in this order; <span class="mono">g</span> then a team's initial or a group's number jumps; <span class="mono">Enter</span> opens the ringed card's Focus, <span class="mono">a</span> / <span class="mono">d</span> answer its permission; <span class="mono">?</span> lists every key.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1068,7 +1070,7 @@ def inbox():
   {isec("FYI", "2 new · 14", fyi_extra)}
   {"".join(fyi)}
   <div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>
-  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>One centred column</b> (1100 px at most) on a wide window — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb — a tooltip on hover and focus, and pressed it opens in place under the heading, pushing the rows down rather than covering one (drawn open on <i>Needs you</i>); the browser remembers which are open. <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second), and its text runs the card’s width. The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. A session’s name is printed once — the tool’s title is left out when it only repeats it. Suggested answers stay in their own dashed group, in quotation marks.</div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>One centred column</b> (1100 px at most) on a wide window — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb — a tooltip on hover and focus, and pressed it opens in place under the heading, pushing the rows down rather than covering one (drawn open on <i>Needs you</i>); the browser remembers which are open. <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — the ring <span class="mono">j</span> / <span class="mono">k</span> move, on which <span class="mono">Enter</span>, <span class="mono">a</span>, <span class="mono">d</span>, <span class="mono">r</span>, <span class="mono">s</span> and <span class="mono">x</span> press the row’s own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124) — and its text runs the card’s width. The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. A session’s name is printed once — the tool’s title is left out when it only repeats it. Suggested answers stay in their own dashed group, in quotation marks.</div>
 </div>
 </div>
 </div>

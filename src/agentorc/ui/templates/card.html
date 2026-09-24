@@ -3,7 +3,9 @@
    at one height** (design §4.5 *The card's anatomy*, TD-095): a row with nothing to say stays,
    empty, rather than moving what is below it. What a team's group already says is marked `ingroup`
    and hidden inside that group by the stylesheet — the card cannot know where it is drawn. #}
-<div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}" id="card-{{ s.id }}"
+{# `tabindex="0"`: a card is a tab stop, and the keyboard's ring is the browser's focus ring on it
+   (§4.5a Org **keys**: the ring, TD-124) — apart from the amber *needs you* ring #}
+<div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}" id="card-{{ s.id }}" tabindex="0"
      data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
      data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}"{% if s.unseen %} data-unseen="1"{% endif %}{% if not s.unattended %} data-mine="1"{% endif %}>
   <div class="sbar"></div>
