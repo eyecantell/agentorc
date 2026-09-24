@@ -389,7 +389,14 @@ People run more than one account of one tool, and more than one tool. A **profil
 `(adapter, account, model)`, e.g. `claude-code · paul (max) · opus` and
 `claude-code · grind (pro) · sonnet`. Every session carries one; the card shows it as a line.
 Commands, policies, and the usage gate key on the profile, so two accounts of one tool are gated
-and reported separately, and a `limited` session can be re-launched under another profile. For
+and reported separately, and a `limited` session can be re-launched under another profile.
+**The usage reading is the account's, not the profile's** (TD-122): one login has one quota,
+however many profiles share it, so the adapter's `usage()` is asked **once per `(adapter,
+account)`** among the profiles live sessions run under, and every profile sharing that account
+carries the same reading — windows, `fetched`, `reason` and `retry_after` alike — and the same
+back-off. A reserve (§6 *Usage gate*) stays the profile's: a reserve is a policy and a reading is
+a fact, so two profiles on one account may keep different lines against one number. Four
+profiles split by role on one account are one poll and one chip, not four of each. For
 Claude Code the adapter maps an account to its own config directory (`CLAUDE_CONFIG_DIR`) and a
 model to the `--model` flag; other adapters map their own equivalents. Profiles are declared once
 per host in `~/.agentorc/profiles.yml`.
@@ -417,6 +424,7 @@ names outside the adapter. The `shell` adapter is the degenerate case and ships 
 ```python
 class Adapter(Protocol):
     name: str                         # "claude-code"
+    label: str                        # "Claude" — the tool's display name, for the usage chip and nowhere it is keyed on (TD-122)
     def launch_cmd(self, *, profile: Profile, resume: str | None, prompt_file: Path | None, unattended: bool) -> list[str]
     def launch(...) -> LaunchSpec                     # argv + env + adapter_id; writes the per-profile hooks layer
     def state_source(self) -> Literal["hook", "scraped"]
@@ -427,7 +435,11 @@ class Adapter(Protocol):
                                                           # resets), ...], fetched). The labels are the adapter's; nothing
                                                           # above reads them — one window, three or none are all legal, and
                                                           # no tool's field name leaves this file (TD-073). A tool with no
-                                                          # quota endpoint reports None: no chip
+                                                          # quota endpoint reports None: no chip. Called once per account
+                                                          # (§4.2a, TD-122): the profile names the credentials, the reading
+                                                          # is the account's. Every window the endpoint reports is carried,
+                                                          # a per-model one labelled by the adapter with the model
+                                                          # (`week · Fable`), so the chip's worst-window rule sees it
     def usage_for(self, profile: str) -> dict | None      # the same by profile name, for the core (it cannot build a Profile)
     def composer(self, tail_raw: list[str]) -> str | None  # optional: the text painted in the tool's input line ("" empty,
                                                            # None when no composer is on screen); lets `send` confirm a submit (TD-027)
@@ -482,23 +494,28 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
 - Policies (§6), run on a tick from the same process — no cron, no fd-9 lock inheritance.
-- Usage: each live agent session's profile is asked its adapter's `usage_for` **every five
-  minutes** in a thread, never per tick: a shorter cadence buys nothing against a five-hour
-  window while spending an allowance the tool itself shares (TD-087). `limited` is read from the
+- Usage: each **account** a live agent session's profile names is asked its adapter's `usage_for`
+  **every five minutes** in a thread, never per tick — once per `(adapter, account)`, through one
+  profile of that account (§4.2a, TD-122), never once per profile: a shorter cadence buys nothing
+  against a five-hour window while spending an allowance the tool itself shares (TD-087), and
+  four profiles on one account asking four times is how the endpoint came to answer
+  `rate_limited` to all of them. `limited` is read from the
   same poll, so a session at its cap may show it up to five minutes late; the pane's own limit
-  message marks it within a tick regardless (§4.2). The last answer is cached, served by `usage`,
-  streamed as a `usage` event for the top bar's per-profile figure, and drives the `limited` rule
+  message marks it within a tick regardless (§4.2). The last answer is cached **per account** and
+  served by `usage` under every profile that shares it — the same windows, `fetched`, `reason`
+  and back-off on each — streamed as a `usage` event for the top bar's per-account chip, and drives the `limited` rule
   of §4.2 (an interactive session on a profile with **any** reported window at 100% shows
   `limited` with that window's label and reset time, `working` again once the window resets —
   the core iterates the adapter's list and names no window of any tool, TD-073). A fetch failure
-  keeps the last answer (TD-001). A profile no live session runs under is dropped from the cache
-  and a `usage` event with `usage: null` takes its chip off the top bar: one tool in use is one
-  chip.
+  keeps the last answer (TD-001). An account no live session's profile names is dropped from the cache
+  and a `usage` event with `usage: null` for each of its profiles takes its chip off the top bar:
+  one account in use is one chip.
   **A failure says why** (TD-087): the adapter answers `ok` with the windows, or `rate_limited`
   (with the endpoint's `Retry-After` when it is a number; the HTTP date form is legal and not
   parsed, and an unreadable one doubles instead of guessing), `no_credentials`, `no_profile` or
   `error` — a word the core keys on, never prose. The core does three things with it and no more.
-  It **logs a change of reason once**, not per poll. It **backs off on `rate_limited` alone**:
+  It **logs a change of reason once**, not per poll. It **backs off on `rate_limited` alone**, and
+  backs the account off, not the one profile it happened to ask through:
   the `Retry-After`, floored at the ordinary cadence and **not** capped; else its own doubling,
   which stops at an hour; any other answer returns to the cadence, since only a 429 is the
   endpoint asking to be asked less often. It **keeps the last good reading** with the reason
@@ -1611,7 +1628,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox: the FYI count, **Dismiss all** | the top bar's second number; one button | *Inbox 1 · 5*: the second number is FYI's entries, never added to the first (§4.10 *The Inbox is a queue*, TD-079). The FYI section opens itself when its count is higher than this browser last saw. **Dismiss all** confirms once and dismisses the ids this browser has on screen — the trail and closed questions included, never an open question, never mail that arrived after the page was drawn |
 | Inbox row: `note` and the rest of FYI | **Dismiss** | the text; Dismiss deletes. Lapsed `steer`s, declined `ask`s and late replies are listed for the retention window (`MAIL_RETENTION`, 12 h) and then pruned, as every closed entry is. No Reply here — an FYI row has the one control, and a `system` note could not be replied to in any case (§4.10) |
 | Org top bar | **Inbox** | the org's person inbox (§4.10), labelled **Inbox** on the page — *person inbox* is the design's word for whose it is, and on a page only a person reads it says nothing. A link to the Inbox page (TD-069): its number is that page's **Needs you** section and says so on hover. The Focus **Inbox** panel and the card's **unread** chip are a session's mailbox, not the person's. Sessions reach it with `ao msg person`, ungated. Rings nothing; the count is polled from the `inbox` RPC, since the pushed stream carries session records and the person inbox belongs to none (TD-052) |
-| Org top bar | **usage** chip | display only: one chip per profile a live session runs under, printing that profile's worst window — `<profile> · <label> n%`, *grind · week 89%* — and, where the profile has a reserve for that window (§6, TD-100), its line after the number, *grind · week 61% / 70%*, with the reserve, the days left and when the line next moves on hover. *Worst* is the window with the smallest gap to its line, a window without a line counting the tool's 100% as its line (an unreserved window at 97% outranks a reserved one at 40% of a 70% line). Label and number are the adapter's (§4.3; Claude Code's are `5h` and `week`, TD-001, TD-073), every window and its reset time on hover, red at a cap. A profile whose adapter reports no quota has no chip, nor has one no live session uses. Chips sit side by side while they fit; the rest collapse to **+n**, listed on hover, and a profile at or near a cap is never the one collapsed — *near* meaning within ten points of its line where it has one, and 80% where it has none. No rotation: a display that rotates hides the number at the moment it is looked at. A held reading goes stale, not out (TD-087): when the last poll was refused (§4.2 — the adapter's `reason` is not `ok`), the chip keeps the last good reading, dimmed, with *· stale* after the number, and its hover says when it was taken and why the poll since failed (*rate-limited by the usage endpoint*, and how long it asked to be left; *no credentials for this profile*; *no such profile*; *the usage endpoint could not be read*); a refusal with no reading ever held draws *`<profile>`: no reading yet* the same way. A stale chip at a cap is still red; a mark, not a state, nothing pressable. The page keys on the `reason` word, never on text |
+| Org top bar | **usage** chip | display only: **one chip per account** a live session's profile names (§4.2a, TD-122), printing the tool's display name (the adapter's `label`, §4.3), the account and that account's worst window — `<tool> · <account> · <label> n%`, *Claude · paul · week 24%* — and, where a profile sharing the account has a reserve for that window (§6, TD-100), its line after the number, *Claude · paul · week 61% / 70%*, the lowest line among those profiles when they differ, with each profile's reserve and line, the days left and when the line next moves on hover; the hover also lists the profiles sharing the account and the live sessions on each. Never a profile's name in the chip: the person knows the account as *Claude, paul*, and *grind · week 21%* said nothing (TD-071 item 8). *Worst* is the window with the smallest gap to its line, a window without a line counting the tool's 100% as its line (an unreserved window at 97% outranks a reserved one at 40% of a 70% line). Label and number are the adapter's (§4.3; Claude Code's are `5h` and `week`, and a per-model weekly window is `week · <model>`, TD-001, TD-073, TD-122), every window and its reset time on hover, red at a cap. An account whose adapter reports no quota has no chip, nor has one no live session uses. Chips sit side by side while they fit; the rest collapse to **+n**, listed on hover, and an account at or near a cap is never the one collapsed — *near* meaning within ten points of its line where it has one, and 80% where it has none. No rotation: a display that rotates hides the number at the moment it is looked at. A held reading goes stale, not out (TD-087): when the last poll was refused (§4.2 — the adapter's `reason` is not `ok`), the chip keeps the last good reading, dimmed, with *· stale* after the number, and its hover says when it was taken and why the poll since failed (*rate-limited by the usage endpoint*, and how long it asked to be left; *no credentials for this profile*; *no such profile*; *the usage endpoint could not be read*); a refusal with no reading ever held draws *`<tool>` · `<account>`: no reading yet* the same way. A stale chip at a cap is still red; a mark, not a state, nothing pressable. The page keys on the `reason` word, never on text |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `control` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands (TD-036, TD-040) |
 | New session | **Where**: this directory / new worktree | for a git repo, the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there |
 | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
@@ -4306,7 +4323,9 @@ code and needs no grant; a session doing the same work does.
   window; wrap-up-then-kill outside, by setting a stop time.
 - **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on
   a profile when **any** of its reported windows reaches that window's **line**, and resume them
-  when every window is back under its line; a fetch failure never pauses — the last good reading
+  when every window is back under its line — the windows being the **account's** reading, the
+  one poll every profile on that account shares (§4.2a, TD-122), read against this profile's own
+  lines; a fetch failure never pauses — the last good reading
   stands, as the chip's does (§4.5a, TD-087). The windows and their labels are the adapter's
   (§4.3, TD-073); the gate knows none of them by name. **The line is computed from a reserve,
   never typed as a percentage.** What a person keeps back is some of each session, and some of
