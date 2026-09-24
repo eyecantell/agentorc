@@ -72,6 +72,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-122 | The usage chip polls once per profile, so four profiles on one account rate-limit the endpoint and every chip holds a stale reading; the chip names the profile, never the tool or the account | High | Built 2026-09-23 (PR #517) — live look pending |
 | TD-124 | The pages have no keyboard: picking a team or a card, opening Focus, answering an Inbox row all take the mouse | Medium | Built — live look pending |
 | TD-125 | A team's wind-down report is a counted board line for the person, most of it a diagnostic and a pointer at a PR that waits on the reader, not on the person | Medium | Preset done (PR #518); telling samscrape and dev-cadence is the anchor's |
+| TD-126 | A board line has Open board, Done and Snooze but no Reply: an instruction back to the sender means editing the file and waiting for a session to read it | Medium | Design first (the designer) — asked by Paul 2026-09-24 |
 
 
 ---
@@ -1289,3 +1290,21 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix, design first:** (1) §4.9a: the wind-down report is an **FYI `note` to the person inbox** (uncounted, Dismiss deletes; §4.10) — two lines: what was merged this run, and what each member looked for and did not find, in one sentence each — and **a board line only when something waits on the person** (a question passed up and unanswered, a member closed with unpushed work, a start refused). (2) A PR held for its reader is **never on the board**: it is `prs_waiting` on the seat (the header count, §4.5a) and the reader's own mail; the manager's brief says so and stops naming PRs in wind-down text. (3) The manager preset and this repo's supplement say the same in the same words; the samscrape and dev-cadence supplements are told the day it lands (as TD-114 was). (4) The 23:47Z line and its two siblings are the evidence; nothing to build in `src/`.
 
 **Related:** TD-093 (the reader; `prs_waiting`), TD-118 (token spend — the report was one of its findings' cousins), TD-120 (the reader takes the hand), TD-069 (the Inbox), §4.9a.
+
+## TD-126: A board line has Open board, Done and Snooze but no Reply: an instruction back to the sender means editing the file and waiting for a session to read it
+
+**Priority:** Medium
+**Added:** 2026-09-24 (Paul: *would it make sense to have a "reply" option on the inbox items so that the sending agent can interpret and make appropriate changes? … being able to reply to the sending agent with instructions (and not having to edit the board and wait for an agent to pick it up) might be more efficient*; the anchor session)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — design first (§4.5a's board row, §4.4's write-back, §4.10), then a grinder builds
+
+**Status:** Open — **asked 2026-09-24.** A mail row (`ask`, `steer`) has **Reply**, which is a `reply` into the sender's inbox (§4.5a *Focus Inbox → Reply*, *Inbox row: ask*). A **board row** — a due line of `docs/user_attention.md`, read by dev-cadence's `nudge_user_attention.py` — has **Open board**, **Snooze ▾** and **Done** (§4.5a, §4.4's write-back) and no Reply, because a board line outlives its sender: its point is to hold an item after the session that wrote it is gone, and most senders are (the line names `session `x` on kmaster`, usually an exited grinder). So Paul's instruction on a board item today is an edit to the file, which the next session started in that repo reads through the SessionStart hook, or a message to a session he has to find.
+
+**What the design round has to settle:** (a) **who a board reply reaches** — the sender when it is live (the line's session name resolves against the fleet; a `reply` carrying the board line's text and Paul's words), else the repo's team manager when the repo has a live team (an `ask` from the person, which the manager assigns or answers), else **the board itself**: the reply is appended under the line as `— Paul, <date>: …` and the line stays due, so the next session in that repo gets it from the hook, which is the edit Paul makes by hand today with one press instead; (b) **the row says which of the three it did** (*replied to grinder-ao-2* / *asked manager-ao-1* / *written under the line*), since the three mean different waits; (c) **the write-back is dev-cadence's** — a reply written into the file goes through the same script the row's Done and Snooze use (§4.4), never a second writer, so the file half is a dev-cadence change and the row half is ours; (d) **a reply is not Done**: the line stays counted until the instruction is carried out, and the session that carries it out closes the line as any board line is closed.
+
+**Location:** design §4.5a (board row; *Focus Inbox → Reply*), §4.4 (the board's write-back), §4.10 (mail kinds), `src/agentorc/ui/templates/inbox_row.html` (the board row), `src/agentorc/ui/app.py` (the board reader and the write-back), dev-cadence's `nudge_user_attention.py` (the file writer, SYNCED — asked for, never edited here)
+
+**Why:** the board is where a session leaves what needs Paul, and the Inbox is where Paul acts on it; every other row's act goes back to a session with a press, and this one's goes back through a text editor.
+
+**Related:** TD-125 (the board only for what waits on the person), TD-069 (the Inbox page), TD-120 (the designer's lane), the SessionStart hook (cadence §3).
