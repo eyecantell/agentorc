@@ -146,8 +146,8 @@ is Paul's call, and this ADR changes no design text.
    `expiresAt` is declined by design (an `ask` to the person does not expire, §4.10), and only the
    **staleness check** carries over: an `ask` whose `about` names a PR or a branch that moved after
    it was sent could say so on the row (*#512 has new commits since this was asked*), so an answer
-   is never given to a question the world has overtaken. *A line for TD-070's step 4 or the Inbox
-   rows, for Paul to file or strike; not a new mechanism.*
+   is never given to a question the world has overtaken. *Struck by Paul 2026-09-24; recorded here
+   only.*
 5. **Credential ownership stated per adapter.** Each Paperclip adapter doc says
    whether the host owns the login or a snapshot carries it into the sandbox. agentorc meets the
    same question for container nodes (§4.4a) and profiles (§4.2a). *One table in §4.2a, when the
@@ -185,6 +185,6 @@ verified and are left out.
 ## What this ADR does not do
 
 It approves nothing. The §3 table gains one row pointing here. Item 3 is part of TD-128 (Paul,
-2026-09-24: budgets for pay-per-token profiles); item 4's staleness line is for Paul to file on
-TD-070 or strike; item 7 is a pointer for TD-127's designer; items 1, 2, 5 and 6 are notes for
+2026-09-24: budgets for pay-per-token profiles); item 4's staleness line was struck by Paul the same
+day, and §4.5c is left as it is until the relay is nearer (Paul, 2026-09-24); item 7 is a pointer for TD-127's designer; items 1, 2, 5 and 6 are notes for
 whoever next edits those sections. The §4.5c reading above is an argument, not an edit.
