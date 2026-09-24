@@ -953,7 +953,7 @@ def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_r
     assert 'if (action === "identity_log") body = { id: b.dataset.who || "" };' in js
     assert "res.to.name || res.to.id" in js  # the RPC answers `to` as {id, name}, never a bare string
     # an answer, so the row goes (only Suspend leaves it standing), and a refusal names the control
-    assert 'if (staterow && action !== "suspend") staterow.remove();' in js
+    assert 'if (staterow && action !== "suspend") { AO.handRing(staterow); staterow.remove(); }' in js
     assert '${action === "identity_log" ? "Log TD" : action} failed' in js
 
 
@@ -1799,7 +1799,7 @@ def test_suspend_is_offered_only_where_there_is_something_to_stop_and_leaves_the
 
     js = (UI / "static" / "app.js").read_text()
     # it is the one act on this page that does **not** take its row away
-    assert 'if (staterow && action !== "suspend") staterow.remove();' in js
+    assert 'if (staterow && action !== "suspend") { AO.handRing(staterow); staterow.remove(); }' in js
     assert 'if (action === "suspend") body = { id: b.dataset.who || "" };' in js
     assert "why:" not in js.split('action === "suspend"')[1][:200]  # the agent composes the reason
 
