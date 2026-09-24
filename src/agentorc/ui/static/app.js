@@ -263,7 +263,7 @@
       // an outcome debt or a trail entry leaves. A list of ids, because *Dismiss all* sends the
       // ones on screen; one press sends a list of one, through the same route and the same RPC.
       if (action === "dismiss") body = { msg: [b.dataset.msg] };
-      // design §4.5a **Due strip / Attention** → **Snooze ▾** / **Done** on a board row (§4.4, TD-069
+      // design §4.5a **Due strip / Inbox board row** → **Snooze ▾** / **Done** on a board row (§4.4, TD-069
       // step 3): the host agent's one-line edit, committed in that repo. The row sends back what the
       // reader gave it — board, line, text — so the agent can refuse a line that has moved on.
       if (action === "board") {

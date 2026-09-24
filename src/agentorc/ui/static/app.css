@@ -53,7 +53,7 @@ a { color: var(--link); text-decoration: none; } a:hover { text-decoration: unde
 .note { font-size: 12px; color: var(--muted); }
 .topbar { display: flex; align-items: center; gap: 14px; height: 48px; padding: 0 20px; background: var(--top); color: var(--topfg); }
 .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 15px; color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
-.tabs { display: flex; gap: 2px; } .tab { padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; } .tab.on { background: var(--tab-on); color: #fff; } .tab.off { opacity: .45; cursor: default; }
+.tabs { display: flex; gap: 2px; } .tab { padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; } .tab.on { background: var(--tab-on); color: #fff; }
 #hostchip { font-size: 11px; color: var(--topdim); } #hostdot.down { color: var(--stalled); }
 /* The chips sit side by side and are measured against this width to decide what still fits
    (TD-073): `max-width` plus `overflow: hidden` is what makes scrollWidth > clientWidth mean
