@@ -1621,12 +1621,12 @@ noted). If a control is not in this table it does not exist.
 | Inbox row: suggested answers | one button per answer, in a group of their own | on an `ask` or a `steer` whose envelope carries `answers` (§4.10 *Suggested answers*, TD-070; up to four, 80 characters each, format characters stripped). Drawn apart from the row's own controls — a group labelled *suggested by <sender>*, each label in quotation marks — so a sender's chosen words (*Delete*, *Allow*) never sit among the controls a person reads as the page's; a label too long for its button is cut with an ellipsis and whole on hover, never wrapped into the row. The label is escaped text, never parsed from the message; a press sends exactly that text as the `reply`, with its index — the free-text Reply's own RPC, which checks the two agree. On a `steer` an answer that is the `default` word for word is marked *default*; pressing it is a reply like any other. Present wherever **Reply** is, absent wherever only **Dismiss** is. No confirm |
 | Inbox row: answered for you | **Overrule**, **Dismiss** | an FYI the home files when a reply carries a `source` (§4.9b, TD-075): the question, the answer, the source, who asked and who answered — all text. The group is a fold under *Waiting on them* and above FYI, uncounted, newest first, open until the person folds it (remembered in the browser) and drawn only when it holds something. The row keys on the FYI's `answered` (which carries the `source`), never on who sent it; names the asker by the name it is known by and opens it; draws the question set off as a quotation. **Overrule** is the page's Reply to that entry with the compose naming the asker — a reply to the asker on the question's own thread, a copy to the answerer, marked `[person]` (the home's reply-path branch does the addressing); **Dismiss** ends the row. Neither is offered on anything but this kind |
 | Inbox row: passed up | the row's own kind's controls (**Reply** and **suggested answers**; a `steer`'s **Pause** and ***Go with it***) | the asker's question, from the asker, under its own heading (§4.9b, TD-075) — an `ask` in *Needs you*, a `steer` in *Steering* with the time it has left — with one addition: *`<techlead>` recommends: `<line>`*, labelled and drawn as text, and the techlead's suggested answers as the row's answer buttons, its recommendation first. A reply goes to the asker. The line keys on `passed_up` with a structured `recommend` and names the passer by the name it is known by; the suggested-answers group reads *suggested by `<passer>`* on such a row, since the answers are the passer's |
-| team header | **PRs waiting** count | Not drawn yet; its field is built (TD-093, §4.9b *The reader*): *`n` PRs waiting · oldest `<age>`* from the seat's `prs_waiting: {n, oldest}` — a count and a time, never the entries; display only, not pressable (the entries are `ao inbox <seat>`'s). Absent without a seat, or when no session of the team carries `review`. And on the person's Inbox, an `ask` that carries `pr` (a `reader: person` repo) draws `#<n>` as a link to the PR beside its text — the number is a structured field, the text stays text |
+| team header | **PRs waiting** count | built (TD-093 slice 3, #479; the field slice 1; §4.9b *The reader*): *`n` PRs waiting · oldest `<age>`* from the seat's `prs_waiting: {n, oldest}` — a count and a time, never the entries; display only, not pressable (the entries are `ao inbox <seat>`'s), and never a board line — a held PR's wait is here and in the reader's inbox, nowhere else (§4.9a, TD-125). Absent without a seat, or when no session of the team carries `review`. And on the person's Inbox, an `ask` that carries `pr` (a `reader: person` repo) draws `#<n>` as a link to the PR beside its text — the number is a structured field, the text stays text |
 | team header | **answered for you** count | the number of *answered for you* entries from this team's sessions since the person last opened that group (TD-075) — a mark, never pressable; the group is reached from the Inbox. *Since the person last opened that group* is this browser's memory, as FYI's *new* mark is — the newest row seen while the Inbox's group is open and the tab in view — so the home keeps no read state for it; the poll gives each row's team and time (`answered_marks`), never its text, and the header's mark is filled in by the page (the Org reads the poll at load for it) |
 | Inbox row: `steer` | **Reply**, **Go with it**, **Pause / Resume** | the text, the default it will take, and the time left; **Reply** says otherwise; **Go with it** closes it now — `closed_reason: go_with_it`, a fixed outcome and not text for the sender to weigh, told to it by a `system` note that wakes it as a person's reply does — so it need not wait out the bound; doing nothing lets it lapse to the same end. **Pause** stops the clock and tells the sender not to take its default yet; the row moves to *Needs you* and is counted while paused — a session is held on the person; **Resume** gives back the time that was left (§4.10 *Pause*). No Snooze on a `steer`. Not counted unless paused |
 | Inbox section: **Waiting on them** | **Dismiss** | answered questions that owe an outcome (§4.10 *Outcomes*, TD-079) and whose asker is still live: the question, the answer given, how long ago, the asker's name and `doing` line. Never counted — it waits on a session, not on the person. **Dismiss** says *I do not need to hear back*, ends the debt and tells the asker by a `system` note (`inbox_dismiss`, person-only). When the asker has exited without reporting, or reported `blocked`, the row is under *Needs you* instead, counted, with **Open** / **Reply** and **Dismiss**. The answer given is what the person inbox still holds: a pressed suggested answer is in the entry itself (§4.10 *Suggested answers*), a typed reply is not — it went to the asker's inbox — so the row says *you answered* or *you let it go with its default* rather than inventing words the person did not write |
 | Inbox: the FYI count, **Dismiss all** | the top bar's second number; one button | *Inbox 1 · 5*: the second number is FYI's entries, never added to the first (§4.10 *The Inbox is a queue*, TD-079). The FYI section opens itself when its count is higher than this browser last saw. **Dismiss all** confirms once and dismisses the ids this browser has on screen — the trail and closed questions included, never an open question, never mail that arrived after the page was drawn |
-| Inbox row: `note` and the rest of FYI | **Dismiss** | the text; Dismiss deletes. Lapsed `steer`s, declined `ask`s and late replies are listed for the retention window (`MAIL_RETENTION`, 12 h) and then pruned, as every closed entry is. No Reply here — an FYI row has the one control, and a `system` note could not be replied to in any case (§4.10) |
+| Inbox row: `note` and the rest of FYI | **Dismiss** | the text; Dismiss deletes. A manager's wind-down report is one such `note` — two lines, what the run merged and what each member did not find (§4.9a, TD-125) — and is drawn as any note, from its sender. Lapsed `steer`s, declined `ask`s and late replies are listed for the retention window (`MAIL_RETENTION`, 12 h) and then pruned, as every closed entry is. No Reply here — an FYI row has the one control, and a `system` note could not be replied to in any case (§4.10) |
 | Org top bar | **Inbox** | the org's person inbox (§4.10), labelled **Inbox** on the page — *person inbox* is the design's word for whose it is, and on a page only a person reads it says nothing. A link to the Inbox page (TD-069): its number is that page's **Needs you** section and says so on hover. The Focus **Inbox** panel and the card's **unread** chip are a session's mailbox, not the person's. Sessions reach it with `ao msg person`, ungated. Rings nothing; the count is polled from the `inbox` RPC, since the pushed stream carries session records and the person inbox belongs to none (TD-052) |
 | Org top bar | **usage** chip | display only: **one chip per account** a live session's profile names (§4.2a, TD-122), printing the tool's display name (the adapter's `label`, §4.3), the account and that account's worst window — `<tool> · <account> · <label> n%`, *Claude · paul · week 24%* — and, where a profile sharing the account has a reserve for that window (§6, TD-100), its line after the number, *Claude · paul · week 61% / 70%*, the lowest line among those profiles when they differ, with each profile's reserve and line, the days left and when the line next moves on hover; the hover also lists the profiles sharing the account and the live sessions on each. Never a profile's name in the chip: the person knows the account as *Claude, paul*, and *grind · week 21%* said nothing (TD-071 item 8). *Worst* is the window with the smallest gap to its line, a window without a line counting the tool's 100% as its line (an unreserved window at 97% outranks a reserved one at 40% of a 70% line). Label and number are the adapter's (§4.3; Claude Code's are `5h` and `week`, and a per-model weekly window is `week · <model>`, TD-001, TD-073, TD-122), every window and its reset time on hover, red at a cap. An account whose adapter reports no quota has no chip, nor has one no live session uses. Chips sit side by side while they fit; the rest collapse to **+n**, listed on hover, and an account at or near a cap is never the one collapsed — *near* meaning within ten points of its line where it has one, and 80% where it has none. No rotation: a display that rotates hides the number at the moment it is looked at. A held reading goes stale, not out (TD-087): when the last poll was refused (§4.2 — the adapter's `reason` is not `ok`), the chip keeps the last good reading, dimmed, with *· stale* after the number, and its hover says when it was taken and why the poll since failed (*rate-limited by the usage endpoint*, and how long it asked to be left; *no credentials for this profile*; *no such profile*; *the usage endpoint could not be read*); a refusal with no reading ever held draws *`<tool>` · `<account>`: no reading yet* the same way. A stale chip at a cap is still red; a mark, not a state, nothing pressable. The page keys on the `reason` word, never on text |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `control` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands (TD-036, TD-040) |
@@ -2809,7 +2809,7 @@ same up to the last step: the members get the wrap-up and are waited on (a finis
 no prompt — it has nothing to wrap up, from anyone's stop), each one that settled clean and
 pushed is closed, and the manager — which cannot be typed at in the middle of its own command,
 and would take the command with it if killed — is told what is left instead: its last acts (the
-declaration, the board line), then `ao close` on its own id, which a session may always run on
+declaration, the report), then `ao close` on its own id, which a session may always run on
 itself (§4.8). A member left open because it holds unpushed work is a board item, not a reason
 to keep the round going.
 
@@ -2829,12 +2829,25 @@ reads *concluded · restart wanted* and a person's Start after the reset is one 
 gate pauses and resumes sessions itself, a usage stop is no ending and no declaration is made
 for it.
 
-**A wind-down is announced.** An empty ledger is a fact about the project, not about the org,
-and a team that dissolves quietly is harder to notice than one that says so. The manager's last
-act before its own exit is a line on `docs/user_attention.md`: the team ran out of work at
-`<t>`, and what each member looked for and did not find, taken from the `why` on each record.
-That line is the point of the whole mechanism — the org has finished the work a person defined,
-and the next move is a person's.
+**A wind-down is announced — as an FYI, and on the board only what waits on the person
+(TD-125).** An empty ledger is a fact about the project, not about the org, and a team that
+dissolves quietly is harder to notice than one that says so. The manager's last act before its
+own exit is **the report: one `note` to the person inbox** (`ao msg person`; §4.10 *FYI — a
+`note` to the person*, never counted, listed under *FYI* until retention prunes it, Dismiss
+deletes it), **two lines**: what this run merged — the PR numbers, from `gh`, or *nothing* — and,
+for each member, in one sentence, what it looked for and did not find, taken from the `why` on
+its record. That is the whole report, and it is read once by whoever writes the next entries.
+**A line on `docs/user_attention.md` is written only when something waits on the person**, one
+line per thing, `Due:` today: a question a member passed up that nobody answered, a member left
+open because it holds uncommitted or unpushed work, a start or a close the host agent refused
+naming a session. Each is an act the person must take; the report is not one. **A PR held for
+its reader is never on the board**: its wait is `prs_waiting` on the seat and the reader's own
+inbox (§4.9b *The reader*), and the reader is not the person — a held PR in wind-down text is
+the same pointer twice. A board line is a counted item the person must clear, and a counted
+item that asks for nothing teaches the person to clear without reading (TD-115's lesson,
+again). The report is the point of the whole mechanism — the org has finished the work a person
+defined, and the next move is a person's — and it says so where a person reads without owing
+anything back.
 
 **A run that ends with work left** (TD-083). The third ending beside *finished* and *crashed*:
 a worker whose context is long and whose lane is not done ends its run on purpose because a
@@ -2923,12 +2936,14 @@ what a ledger row means in a repo whose config only tells it a filename, and it 
 with confidence. *An exit code says "no work"* — a tool's exit code belongs to the tool, and the
 fact has to survive on the record for the manager's next round, not in a process that has gone.
 *Treat an empty ledger as an error* — it is the successful end of a run, and the only thing it
-asks for is a person's attention, which the board line already gets.
+asks for is a person's attention, which the report already gets — and the board, where something
+waits on the person.
 
 **Done when** a free-pick grinder with nothing left to pick declares it and stops, its manager
 leaves it alone rather than restarting it, and — once every member has done the same — the
-manager runs the same stop sequence `ao team stop` runs, leaves one board line naming what each
-member searched, and exits; `ao team start ao-grind` then brings the team back.
+manager runs the same stop sequence `ao team stop` runs, files its two-line report as a `note`
+to the person, writes a board line only for what waits on the person, and exits; `ao team start
+ao-grind` then brings the team back.
 
 ### 4.9b The techlead: a go-between for what would reach the person (TD-075)
 
@@ -3190,7 +3205,9 @@ team has one, the techlead answers it or passes it up, and the person is the top
   set — counted in `asks_waiting`, and in a second structured field on the seat's view,
   **`prs_waiting: {n, oldest}`** (a number and a time, never their text, §4.10), which the team's
   header draws as **`n` PRs waiting · oldest `<age>`**. The entries themselves are read with
-  `ao inbox <seat>`, which a person may always run; the person's own Inbox page draws none of it. **The bound** is the repo's `review.bound` (two
+  `ao inbox <seat>`, which a person may always run; the person's own Inbox page draws none of it,
+  and **no board line names a held PR** — a manager's wind-down report and its escalation lines
+  leave the reader's queue where it is (§4.9a, TD-125). **The bound** is the repo's `review.bound` (two
   hours unless said): **an `ask` that carries `pr` is bounded by it and not by `TECHLEAD_WAIT`** —
   a read of a diff takes longer than a question. Past it the author asks the person on the same
   thread (`--thread`, which closes the seat's copy as `asked_person`), and the PR is the person's —
