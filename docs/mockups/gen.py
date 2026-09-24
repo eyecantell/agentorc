@@ -1067,22 +1067,22 @@ def inbox(picks=False):
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     if not picks:
         secs = [("Needs you", 5, False), ("Steering", 1, False), ("Waiting on them", 1, False), ("FYI", 14, False)]
-        teams = [("ao-grind", 2, False), ("cm-grind", 1, False), ("guardians", "·", False), ("no team", 2, False)]
-        kinds = [("questions", 1, False), ("steering", 1, False), ("session states", 3, False), ("board items", "·", False), ("notes", 3, False), ("trail", 6, False)]
+        teams = [("ao-grind", 2, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
+        kinds = [("questions", 1, False), ("steering", 1, False), ("session states", 3, False), ("board items", 0, False), ("notes", 3, False), ("trail", 6, False)]
         body = (isec("Needs you", 5, opened=True) + "".join(needs) + isec("Steering", 1) + "".join(steering)
                 + isec("Waiting on them", 1) + "".join(waiting) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
-        summary, title = "5 need you · 2 new in FYI", "Inbox"
+        summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
                 "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks.")
     else:
-        secs = [("Needs you", "2 of 5", True), ("Steering", "1 of 1", False), ("Waiting on them", "·", False), ("FYI", "9 of 14", False)]
-        teams = [("ao-grind", "2 of 2", True), ("cm-grind", "1 of 1", False), ("guardians", "·", False), ("no team", "2 of 2", False)]
-        kinds = [("questions", "1 of 1", False), ("steering", "·", False), ("session states", "1 of 3", False), ("board items", "·", False), ("notes", "·", False), ("trail", "·", False)]
+        secs = [("Needs you", "2 of 5", True), ("Steering", "0 of 1", False), ("Waiting on them", "0 of 1", False), ("FYI", "0 of 14", False)]
+        teams = [("ao-grind", "2 of 2", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 2", False)]
+        kinds = [("questions", "1 of 1", False), ("steering", "0 of 1", False), ("session states", "1 of 3", False), ("board items", "0 of 0", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
         body = (isec("Needs you", "2 of 5") + "".join(needs[:2])
                 + '<div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them and FYI are not picked — press them in the rail, or <b>Clear filters</b>.</div>')
-        summary, title = "5 need you · showing ao-grind · Needs you", "Inbox"
-        note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. The counts follow the picks: the sections read ao-grind's numbers, each team's number is what it needs from the person under <i>Needs you</i>, the kinds are counted inside both; a line whose count is nothing stays, dimmed, so a pick can be undone. <i>Needs you</i> reads <i>2 of 5</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count on the page reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
+        summary, title = "", "Inbox"
+        note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 5</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
                 "Not designed: a preview pane (TD-129 option b) — at any width a row's text opens its page (<i>Inbox — message</i>).")
     return head(title) + f'''<div style="width: 1440px; min-height: {1960 if not picks else 1000}px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Inbox 5 · 2")}
@@ -1103,7 +1103,7 @@ def inbox(picks=False):
 def rail(secs, teams, kinds, all_on=False, find=""):
     """The Inbox rail (design §4.5 screen 6 *The rail*, TD-129): three groups of toggles and the find box."""
     def line(label, n, on):
-        dim = n == "·"
+        dim = n == 0 or str(n).startswith("0 ")
         st = "display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default;"
         if on:
             st += " background: #e6e9ee; font-weight: 600; box-shadow: inset 3px 0 0 #1f5fa8;"
@@ -1188,7 +1188,7 @@ def inbox_phone():
 <div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">Shift<b>Lead</b></span><span class="tab on" style="height: 28px;">Inbox 5 · 2</span><span style="flex-grow: 1;"></span><span class="btn primary" style="height: 32px; width: 32px; padding: 0; justify-content: center;">{ICON["plus"]}</span></div>
 <div style="padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 10px;">
   <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px; font-weight: 600;">Inbox</span><span class="muted" style="font-size: 12px;">5 need you</span></div>
-  <div style="display: flex; gap: 6px;">{chip("Filters ▾", "2")}<div style="display: flex; gap: 6px; overflow: hidden; min-width: 0;">{chip("ao-grind", "2 of 2", on=True)}{chip("cm-grind", "1 of 1")}{chip("no team", "2 of 2")}{chip("guardians", "·")}</div></div>
+  <div style="display: flex; gap: 6px;">{chip("Filters ▾", "2")}<div style="display: flex; gap: 6px; overflow: hidden; min-width: 0;">{chip("ao-grind", "2 of 2", on=True)}{chip("cm-grind", "0 of 1")}{chip("no team", "0 of 2")}{chip("guardians", "0 of 0")}</div></div>
   {isec("Needs you", "2 of 5")}
   {"".join(cards)}
   <div class="muted" style="padding: 4px 2px 0; font-size: 12px;">Steering · Waiting on them · FYI are not picked — <a href="#">Filters ▾</a> or <a href="#">Clear filters</a>.</div>
