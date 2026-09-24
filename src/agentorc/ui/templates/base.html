@@ -30,6 +30,8 @@
   <a class="btn light{% if active == 'Inbox' %} on{% endif %}" href="/inbox" id="personinbox" title="what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you and steering you paused, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference.">✉ Inbox<span class="badge needs{% if not person_needs %} hidden{% endif %}" id="personneeds">{{ person_needs or '' }}</span><span class="badge fyin{% if not person_fyi %} hidden{% endif %}" id="personfyi" title="what is in FYI: notes, outcomes, the trail, closed questions. It is never added to the number beside it — that one is what needs you (design §4.10)">· {{ person_fyi or '' }}</span></a>
   <span class="mono dim" id="hostchip">{{ host }} <span id="hostdot">●</span></span>
   <button class="btn ghost light" id="theme" title="dark / light">◐</button>
+  {# design §4.5a **?** overlay (TD-124): the same panel `?` opens, for the mouse and for a phone #}
+  <button class="btn ghost light" id="keyhelpbtn" type="button" title="keys on this page (?)" aria-haspopup="dialog">?</button>
   <form method="post" action="/shell" class="inline" id="shellform">
     <input type="hidden" name="dir" value="">
     <button class="btn light" type="button" id="shellbtn" title="a shell: host + directory, nothing else">⌘ Shell</button>
@@ -58,6 +60,16 @@
 </dialog>
 {# The `personbox` dialog stood here until 2026-09-19: a fixed-width column at `max-height: 60vh`
    that sessions wrote paragraphs into. It is retired with the Inbox page (§4.5a, TD-069 step 1). #}
+{# design §4.5a **?** overlay (TD-124): every key of this page beside the control it presses,
+   filled by `app.js` from the one table its `keydown` handler reads — never written here #}
+<dialog id="keyhelp" class="card pad keydlg" aria-labelledby="keyhelptitle">
+  <form method="dialog" class="col gap">
+    <div class="row gap"><span class="h2" id="keyhelptitle">Keys</span><span class="grow"></span><button class="btn sm ghost" value="close">Close</button></div>
+    <table class="keys"><tbody id="keyrows"></tbody></table>
+    <div class="note">Single keys, live while nothing you type into has focus — a composer, the filter, a reply box, the terminal. Each presses a button the page already draws, and does nothing where that button is absent.</div>
+    <div class="note" id="keynote">The ring is the keyboard's focus ring — <kbd>Tab</kbd> reaches the same places. It is nowhere until a key moves it.</div>
+  </form>
+</dialog>
 {% block body %}{% endblock %}
 <script src="/static/app.js"></script>
 {% block scripts %}{% endblock %}

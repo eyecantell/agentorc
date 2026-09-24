@@ -337,7 +337,7 @@
       }
       const res = await act(id, action2 || action, body);
       if (action === "shell-here" && res.id) location.href = `/focus/${res.id}`;
-      if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove(); if (location.pathname.startsWith("/focus/") && !AO.poppedId) location.href = "/"; }
+      if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) { AO.handRing(c); c.remove(); } if (location.pathname.startsWith("/focus/") && !AO.poppedId) location.href = "/"; }
       if (action === "allow" || action === "deny") AO.toast(`${action}${body.reason ? " with your reason" : ""}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
@@ -361,7 +361,7 @@
       // the refresh below puts back whatever the record actually says. **Suspend is the exception**
       // (§4.8a): it acts on the session and *leaves the row standing* — the alarm is still there to
       // be answered — so the row is refreshed in place rather than taken out from under the person.
-      if (staterow && action !== "suspend") staterow.remove();
+      if (staterow && action !== "suspend") { AO.handRing(staterow); staterow.remove(); }
       if ((staterow || id === "person") && typeof AO.refreshInboxPage === "function") {
         // the control that was pressed is about to go with its row, and while it holds the focus
         // the refresh below would politely decline to redraw the section it sits in
@@ -380,7 +380,7 @@
       // the refresh below shows what it is now (design §4.5a **Inbox row: state**).
       if (staterow && /no pending permission/i.test(e.message)) {
         AO.toast("already answered — nothing was sent twice", true);
-        staterow.remove();
+        AO.handRing(staterow); staterow.remove();
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
@@ -780,7 +780,7 @@
         try {
           await AO.act(id, "remove", {});
           gone++;
-          const c = $(`#card-${CSS.escape(id)}`); if (c) c.remove();
+          const c = $(`#card-${CSS.escape(id)}`); if (c) { AO.handRing(c); c.remove(); }
         } catch (err) { AO.toast(`${id}: ${err.message}`); }
       }
     } finally { pendingTeams.delete(team); btn.disabled = false; }
@@ -1054,10 +1054,18 @@
     if (bn) { bn.textContent = got.board_note || ""; bn.classList.toggle("hidden", !got.board_note); }
     IN_SECS.forEach((k) => {
       const el = $("#rows-" + k);
-      if (el && AO.maySwapSection(el, document.activeElement)) {
-        const kept = AO.denyWhys(el);
+      // A row that is merely ringed (TD-124) — the focus on the row, not on a control inside it —
+      // does not hold the swap back: the ring is put back on the same row, or on the one that took
+      // its place when a key's press ended it.
+      const on = document.activeElement, ring = on && on.matches && on.matches(".mailrow") && el && el.contains(on) ? on : null;
+      if (el && AO.maySwapSection(el, ring ? null : on)) {
+        const kept = AO.denyWhys(el), at = ring ? $$(".mailrow", el).indexOf(ring) : -1;
         el.innerHTML = got.html[k] || "";
         AO.restoreDenyWhys(el, kept);
+        if (ring) {
+          const rows = $$(".mailrow", el), back = rows.find((r) => r.dataset.msg === ring.dataset.msg) || rows[at] || rows[rows.length - 1];
+          if (back) back.focus({ preventScroll: true });
+        }
       }
     });
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has
@@ -1155,8 +1163,10 @@
         const fresh = tpl.content.firstElementChild;
         if (old) {
           // a delta redraws the card; a menu the person has open stays open (TD-121), as a Deny reason stays typed
-          const kept = AO.denyWhys(old), menu = !!$("details.more[open]", old);
+          // and a ringed card stays ringed (TD-124)
+          const kept = AO.denyWhys(old), menu = !!$("details.more[open]", old), ring = document.activeElement === old;
           old.replaceWith(fresh); AO.restoreDenyWhys(fresh, kept);
+          if (ring) fresh.focus({ preventScroll: true });
           const d = menu && $("details.more", fresh); if (d) d.open = true;
         }
         else {
@@ -1167,7 +1177,7 @@
         AO.markPopped(fresh);
         layout();
       } else if (ev.event === "gone") {
-        const c = $(`#card-${CSS.escape(ev.id)}`); if (c) c.remove();
+        const c = $(`#card-${CSS.escape(ev.id)}`); if (c) { AO.handRing(c); c.remove(); }
         if (ev.groups !== undefined) syncGroups(ev.groups);
         layout();
       } else if (ev.event === "error") AO.toast(ev.text);
@@ -1705,6 +1715,130 @@
       }
     });
   };
+  // ---- keys (design §4.5a **keys** and **?** overlay, §4.5 *Keys on every page*, TD-124) ----
+  // One table of (keys, page, control), read by one `keydown` handler and by the `?` overlay, so
+  // the two cannot drift. A key is a name for a control the page already draws: it presses that
+  // control's element — the same click handler — and does nothing where the control is absent.
+  // `sel` finds the control (inside the ringed card or row when `ring`), `text` narrows it to the
+  // button whose label is one of those words; `move`, `g`, `focus` and `help` are the few keys
+  // that press nothing: moving the ring, the team jump, the filter box, and this list.
+  AO.KEYS = [
+    { keys: ["1"], page: "all", control: "Org", sel: '.topbar .tab[href="/"]' },
+    { keys: ["2"], page: "all", control: "Inbox", sel: "#personinbox" },
+    { keys: ["n"], page: "all", control: "New session", sel: '.topbar a[href="/new"]' },
+    { keys: ["/"], page: "all", control: "the filter box (Esc leaves it)", sel: "#filter, #ifilter", focus: true },
+    { keys: ["?"], page: "all", control: "this list (? or Esc closes it)", help: true },
+    { keys: ["j", "ArrowDown"], page: "org", control: "ring the next card", move: 1 },
+    { keys: ["k", "ArrowUp"], page: "org", control: "ring the previous card", move: -1 },
+    { keys: ["g"], page: "org", control: "then a team's initial, or a group's number 1–9: jump to that team", g: true },
+    { keys: ["Enter", "o"], page: "org", ring: true, control: "Focus (Details, or Focus window)", sel: "a[data-focus]" },
+    { keys: ["Shift+Enter"], page: "org", ring: true, control: "Pop out", sel: '[data-act="popout"]' },
+    { keys: ["a"], page: "org", ring: true, control: "Allow its permission", sel: '[data-act="allow"]' },
+    { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]' },
+    { keys: ["j", "ArrowDown"], page: "inbox", control: "ring the next row", move: 1 },
+    { keys: ["k", "ArrowUp"], page: "inbox", control: "ring the previous row", move: -1 },
+    { keys: ["Enter", "o"], page: "inbox", ring: true, control: "Open (Open board)", sel: "a.btn", text: ["Open", "Open board"] },
+    { keys: ["a"], page: "inbox", ring: true, control: "Allow", sel: '[data-act="allow"]' },
+    { keys: ["d"], page: "inbox", ring: true, control: "Deny", sel: '[data-act="deny"]' },
+    { keys: ["r"], page: "inbox", ring: true, control: "Reply", sel: '[data-act="reply"]', text: ["Reply"] },
+    { keys: ["s"], page: "inbox", ring: true, control: "Snooze ▾ (opens the menu)", sel: "details.more > summary", text: ["Snooze"] },
+    { keys: ["x"], page: "inbox", ring: true, control: "Dismiss, Done or Unsnooze", sel: "button", text: ["Dismiss", "Done", "Unsnooze"] },
+  ];
+  AO.keyPage = (path) => (path === "/" ? "org" : path === "/inbox" ? "inbox" : path.startsWith("/focus/") ? "focus" : "other");
+  const RINGS = { org: "#groups .sc", inbox: ".inboxpage .mailrow" };
+  // The event's name in the table, or null when the page must not take it: focus in anything
+  // editable (a composer, the filter, a reply box, the *why?* box, the terminal's own textarea), or
+  // a modifier other than Shift held — those keys are the browser's and the terminal's.
+  AO.keyName = function (ev) {
+    if (ev.ctrlKey || ev.altKey || ev.metaKey) return null;
+    const t = ev.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || "") || (t.closest && t.closest(".xterm")))) return null;
+    return ev.key === "Enter" && ev.shiftKey ? "Shift+Enter" : ev.key;
+  };
+  AO.keyEntry = (page, name) => AO.KEYS.find((k) => (k.page === "all" || k.page === page) && k.keys.includes(name)) || null;
+  const shown = (el) => el.getClientRects().length > 0;
+  const ringables = (page) => (RINGS[page] ? $$(RINGS[page]).filter(shown) : []);
+  const ringed = (page) => (RINGS[page] && document.activeElement && document.activeElement.closest ? document.activeElement.closest(RINGS[page]) : null);
+  const ringTo = (el) => { if (!el) return; el.focus({ preventScroll: true }); el.scrollIntoView({ block: "nearest" }); };
+  // A ringed card or row that is about to leave the page hands the ring to its neighbour.
+  AO.handRing = function (el) {
+    const page = AO.keyPage(location.pathname);
+    if (!el || !RINGS[page] || !el.contains(document.activeElement)) return;
+    const all = ringables(page), i = all.indexOf(el);
+    const next = all[i + 1] || all[i - 1];
+    if (next && next !== el) ringTo(next);
+  };
+  // The ringed thing's own control, or nothing: a key does nothing where the button is absent.
+  // `label` is the button's words without its icon or ▾; `within` keeps a row's control its own,
+  // never one of a row drawn inside it.
+  AO.keyLabel = (t) => (t || "").replace(/[▾\s]+$/, "").replace(/^[^A-Za-z]+/, "");
+  AO.keyControl = function (root, k, within) {
+    return $$(k.sel, root).find((el) => !el.disabled
+      && (!within || el.closest(within) === root)
+      && (!k.text || k.text.includes(AO.keyLabel(el.textContent))));
+  };
+  function keyHelp() {
+    const dlg = $("#keyhelp"); if (!dlg) return;
+    if (dlg.open) { dlg.close(); return; }
+    const page = AO.keyPage(location.pathname);
+    const show = (k) => k.replace("ArrowDown", "↓").replace("ArrowUp", "↑");
+    const rows = AO.KEYS.filter((k) => (k.page === "all" || k.page === page) && (!k.sel || k.ring || k.help || $(k.sel)));
+    $("#keyrows").innerHTML = rows.map((k) => `<tr><td>${k.keys.map((x) => `<kbd>${esc(show(x))}</kbd>`).join(" ")}</td><td>${esc(k.control)}${k.ring ? ' <span class="dim">— on the ringed ' + (page === "org" ? "card" : "row") + "</span>" : ""}</td></tr>`).join("");
+    $("#keynote").hidden = !RINGS[page];
+    const back = document.activeElement;  // focus returns to where it was (§4.5a **?** overlay)
+    dlg.addEventListener("close", () => { if (back && back.focus && document.contains(back)) back.focus({ preventScroll: true }); }, { once: true });
+    dlg.showModal();
+  }
+  const helpBtn = $("#keyhelpbtn"); if (helpBtn) helpBtn.addEventListener("click", keyHelp);
+  let gUntil = 0;
+  function jumpTeam(key) {
+    const secs = sections().filter((s) => !s.hidden);
+    let dest = null;
+    if (/^[1-9]$/.test(key)) dest = secs[+key - 1];
+    else if (/^[a-z]$/i.test(key)) {
+      const cur = ringed("org"), at = cur ? secs.indexOf(cur.closest(".tgroup")) : -1;
+      const hit = (s) => (s.dataset.team || "").toLowerCase().startsWith(key.toLowerCase());
+      dest = secs.slice(at + 1).find(hit) || secs.slice(0, at + 1).find(hit);
+    }
+    if (!dest) return;
+    const card = $$(".sc", dest).find(shown);
+    if (card) ringTo(card);
+    else { const b = $(".ghead button", dest); if (b) b.focus(); dest.scrollIntoView({ block: "nearest" }); }
+  }
+  document.addEventListener("keydown", (ev) => {
+    const help = $("#keyhelp");
+    if (help && help.open) { if (ev.key === "?") { ev.preventDefault(); help.close(); } return; }  // Esc: the dialog's own
+    if (document.querySelector("dialog[open]")) return;  // the mail composer: nothing behind it takes a key
+    const page = AO.keyPage(location.pathname);
+    if (ev.key === "Escape" && ev.target && ev.target.matches && ev.target.matches("#filter, #ifilter")) { ev.target.blur(); return; }
+    const name = AO.keyName(ev);
+    if (name === null) return;
+    if (gUntil) {
+      const live = Date.now() < gUntil; gUntil = 0;
+      if (live && page === "org" && name.length === 1) { ev.preventDefault(); jumpTeam(name); return; }
+    }
+    // Enter on a focused button or link is that button's own press, never the ringed card's
+    if ((name === "Enter" || name === "Shift+Enter") && ev.target && ev.target.closest && ev.target.closest("button, a, summary")) return;
+    const k = AO.keyEntry(page, name);
+    if (!k) return;
+    ev.preventDefault();
+    if (k.help) return keyHelp();
+    if (k.g) { gUntil = Date.now() + 2000; return; }
+    if (k.move) {
+      const all = ringables(page), cur = ringed(page), i = all.indexOf(cur);
+      return ringTo(i < 0 ? all[0] : all[Math.min(Math.max(i + k.move, 0), all.length - 1)]);
+    }
+    let root = document;
+    if (k.ring) { root = ringed(page); if (!root) return; }
+    const el = k.ring ? AO.keyControl(root, k, RINGS[page]) : $(k.sel);
+    if (!el) return;
+    if (k.focus) { el.focus(); return; }
+    el.click();
+    // Snooze ▾ opens its menu; the choice is a second press, so the focus goes to its first entry
+    const menu = el.tagName === "SUMMARY" && el.parentElement;
+    if (menu && menu.open) { const first = $(".menu button", menu); if (first) first.focus(); }
+  });
+
   // The top bar is on every page and its chips are rendered server-side, so the fit is set up here
   // rather than in any one page's init (the script tag is at the end of the body: the DOM is up).
   window.addEventListener?.("resize", fitUsage);  // `?.`: the node probe of test_ui_inbox has no real window
