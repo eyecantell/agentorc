@@ -100,35 +100,42 @@ def _usage_hover(w: dict[str, Any], row: dict[str, Any] | None) -> str:
     the days left a per-day reserve counts and when the line next moves (§4.5a **usage**)."""
     if row is None:
         return f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})"
-    r, ln = row.get("reserve"), row["line"]
-    if isinstance(r, dict) and isinstance(r.get("per_day"), int) and r["per_day"] > 0:
-        why = f"reserve {r['per_day']}% a day"
-        if ln > 0:
-            why += f", {(100 - ln) // r['per_day']} days left"
-    else:
-        why = f"reserve {r}%"
     return (
-        f"{w.get('label')} {w['pct']}% / line {ln:g}% ({why}; line moves {row.get('next') or '?'}; "
+        f"{w.get('label')} {w['pct']}% / line {row['line']:g}% ({_reserve_why(row)}; "
         f"resets {w.get('resets') or '?'})"
     )
 
 
+def _reserve_why(row: dict[str, Any]) -> str:
+    """A line's reserve, the days left a per-day reserve counts, and when the line next moves —
+    the account's lowest line and each profile's own alike (§4.5a **usage**, TD-100, TD-122)."""
+    r, ln = row.get("reserve"), row["line"]
+    if isinstance(r, dict) and isinstance(r.get("per_day"), int) and r["per_day"] > 0:
+        why = f"reserve {r['per_day']}% a day"
+        if ln > 0:
+            why += f", {int((100 - ln) // r['per_day'])} days left"
+    else:
+        why = "reserve ?" if r is None else f"reserve {r}%"
+    return f"{why}; line moves {row.get('next') or '?'}"
+
+
 def _usage_profiles(u: dict[str, Any]) -> str:
     """The profiles sharing an account, for its chip's hover (§4.5a **usage**, TD-122): each with
-    the lines its reserves make and the live sessions running under it."""
+    the lines its reserves make — each with its reserve, the days left and when it next moves — and
+    the live sessions running under it."""
     parts = []
     for p in u.get("profiles") or []:
         if not isinstance(p, dict):
             continue
         lines = [
-            f"{r.get('label')} line {r['line']:g}%"
+            f"{r.get('label')} line {r['line']:g}% ({_reserve_why(r)})"
             for r in p.get("lines") or []
             if isinstance(r, dict) and isinstance(r.get("line"), int | float) and not isinstance(r.get("line"), bool)
         ]
         names = [str(x) for x in p.get("sessions") or []]
         part = str(p.get("name"))
         if lines:
-            part += f" ({', '.join(lines)})"
+            part += f" [{', '.join(lines)}]"
         if names:
             part += f": {', '.join(names)}"
         parts.append(part)

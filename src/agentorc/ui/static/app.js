@@ -581,23 +581,29 @@
   }
   function usageHover(w, row) {
     if (!row) return `${w.label} ${w.pct}% (resets ${w.resets || "?"})`;
+    return `${w.label} ${w.pct}% / line ${row.line}% (${reserveWhy(row)}; resets ${w.resets || "?"})`;
+  }
+  // A line's reserve, the days left a per-day reserve counts, and when the line next moves — the
+  // account's lowest line and each profile's own alike (TD-100, TD-122).
+  function reserveWhy(row) {
     const r = row.reserve, ln = row.line;
     let why;
     if (r && typeof r === "object" && Number.isInteger(r.per_day) && r.per_day > 0) {
       why = `reserve ${r.per_day}% a day`;
       if (ln > 0) why += `, ${Math.floor((100 - ln) / r.per_day)} days left`;
-    } else why = `reserve ${r}%`;
-    return `${w.label} ${w.pct}% / line ${ln}% (${why}; line moves ${row.next || "?"}; resets ${w.resets || "?"})`;
+    } else why = r == null ? "reserve ?" : `reserve ${r}%`;
+    return `${why}; line moves ${row.next || "?"}`;
   }
-  // The profiles sharing the account, each with its lines and live sessions, for the hover (TD-122).
+  // The profiles sharing the account, each with its lines (reserve, days left, next move) and live
+  // sessions, for the hover (TD-122).
   function usageProfiles(u) {
     const parts = [];
     for (const p of Array.isArray(u.profiles) ? u.profiles : []) {
       if (!p || typeof p !== "object") continue;
-      const lines = (Array.isArray(p.lines) ? p.lines : []).filter((r) => r && typeof r === "object" && typeof r.line === "number").map((r) => `${r.label} line ${r.line}%`);
+      const lines = (Array.isArray(p.lines) ? p.lines : []).filter((r) => r && typeof r === "object" && typeof r.line === "number").map((r) => `${r.label} line ${r.line}% (${reserveWhy(r)})`);
       const names = (Array.isArray(p.sessions) ? p.sessions : []).map(String);
       let part = String(p.name);
-      if (lines.length) part += ` (${lines.join(", ")})`;
+      if (lines.length) part += ` [${lines.join(", ")}]`;
       if (names.length) part += `: ${names.join(", ")}`;
       parts.push(part);
     }
