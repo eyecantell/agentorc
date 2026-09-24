@@ -1019,7 +1019,8 @@ def mcard(bar, kind, name, team, age, body, controls, cls="", state=None):
 </div>'''
 
 
-def inbox():
+def inbox_rows():
+    """The rows every Inbox artboard draws (needs, steering, waiting, fyi), in the page's order."""
     b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
     gap = '<span style="flex-grow: 1;"></span>'
     needs = [
@@ -1057,24 +1058,140 @@ def inbox():
         mcard("#cbd0d6", "note · new", "tdgrind-ao-1", "ao-grind", "31m ago",
               '<div class="txt">done: TD-068 — PR #272 merged</div>', b("Dismiss", "ghost")),
     ]
-    filters = '<div class="input" style="width: 260px; height: 28px; color: #6b7280;">filter — sender, text, about</div><span class="btn ghost">team: all ▾</span>'
+    return needs, steering, waiting, fyi
+
+
+def inbox(picks=False):
+    """Screen 6 with the rail (TD-129). `picks=True` is `InboxRail.dc.html`: ao-grind and *Needs you* pressed."""
+    needs, steering, waiting, fyi = inbox_rows()
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
-    return head("Inbox") + f'''<div style="width: 1440px; min-height: 1640px; background: #f4f5f7; display: flex; flex-direction: column;">
+    if not picks:
+        secs = [("Needs you", 5, False), ("Steering", 1, False), ("Waiting on them", 1, False), ("FYI", 14, False)]
+        teams = [("ao-grind", 2, False), ("cm-grind", 1, False), ("guardians", "·", False), ("no team", 2, False)]
+        kinds = [("questions", 1, False), ("steering", 1, False), ("session states", 3, False), ("board items", "·", False), ("notes", 3, False), ("trail", 6, False)]
+        body = (isec("Needs you", 5, opened=True) + "".join(needs) + isec("Steering", 1) + "".join(steering)
+                + isec("Waiting on them", 1) + "".join(waiting) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
+                + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
+        summary, title = "5 need you · 2 new in FYI", "Inbox"
+        note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
+                "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks.")
+    else:
+        secs = [("Needs you", "2 of 5", True), ("Steering", 1, False), ("Waiting on them", "·", False), ("FYI", 9, False)]
+        teams = [("ao-grind", 2, True), ("cm-grind", 1, False), ("guardians", "·", False), ("no team", 2, False)]
+        kinds = [("questions", 1, False), ("steering", "·", False), ("session states", 1, False), ("board items", "·", False), ("notes", "·", False), ("trail", "·", False)]
+        body = (isec("Needs you", "2 of 5") + "".join(needs[:2])
+                + '<div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them and FYI are not picked — press them in the rail, or <b>All</b>.</div>')
+        summary, title = "5 need you · showing ao-grind · Needs you", "Inbox"
+        note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. The counts follow the picks: the sections read ao-grind's numbers, each team's number is what it needs from the person under <i>Needs you</i>, the kinds are counted inside both; a line whose count is nothing stays, dimmed, so a pick can be undone. <i>Needs you</i> reads <i>2 of 5</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. <b>All</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
+                "Not designed: a preview pane (TD-129 option b) — at any width a row's text opens its page (<i>Inbox — message</i>).")
+    return head(title) + f'''<div style="width: 1440px; min-height: {1960 if not picks else 1000}px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Inbox 5 · 2")}
+<div style="padding: 16px 20px 28px;">
+<div style="display: flex; gap: 24px; align-items: flex-start; max-width: 1324px; margin: 0 auto;">
+{rail(secs, teams, kinds, all_on=picks)}
+<div class="inboxcol" style="margin: 0; flex: 1 1 auto; min-width: 0;">
+  {page_head(title, summary)}
+  {body}
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">{note}</div>
+</div>
+</div>
+</div>
+</div>
+''' + TAIL
+
+
+def rail(secs, teams, kinds, all_on=False, find=""):
+    """The Inbox rail (design §4.5 screen 6 *The rail*, TD-129): three groups of toggles and the find box."""
+    def line(label, n, on):
+        dim = n == "·"
+        st = "display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default;"
+        if on:
+            st += " background: #e6e9ee; font-weight: 600; box-shadow: inset 3px 0 0 #1f5fa8;"
+        col = "#9ca3af" if dim else "#1c2128"
+        ncol = "#9ca3af" if dim else ("#111418" if on else "#6b7280")
+        return f'<div style="{st} color: {col};"><span style="flex-grow: 1;">{label}</span><span class="mono" style="font-size: 11px; color: {ncol};">{n}</span></div>'
+    def group(title, lines, blurb):
+        return (f'<div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="{blurb}">{title}</div>'
+                + "".join(line(*l) for l in lines))
+    allbtn = ('<span class="btn sm" style="width: 100%; justify-content: center; margin-bottom: 6px;">All · clear the filters</span>' if all_on
+              else '<div style="height: 6px;"></div>')
+    findbox = (f'<div class="input" style="height: 28px; color: {"#1c2128" if find else "#9ca3af"}; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 0 8px; white-space: nowrap;" title="every word typed must match, in any order — a fourth pick, AND’d with the rail’s">{find or "find…"}<span style="flex-grow: 1;"></span>'
+               + (f'<span class="mono" style="font-size: 11px; color: #6b7280;">3 of 83</span>' if find else '<span class="mono" style="font-size: 11px; color: #9ca3af;">/</span>') + '</div>')
+    return f'''<div style="flex: 0 0 200px; position: sticky; top: 16px; display: flex; flex-direction: column; font-size: 13px;">
+  {allbtn}
+  {findbox}
+  {group("Sections", secs, "the page's sections, in its order — each count under the other picks")}
+  {group("Teams", teams, "every team a row carries — the count is what that team needs from you")}
+  {group("Kinds", kinds, "the coarse kind of a row")}
+</div>'''
+
+
+def inbox_message():
+    """Screen 6's message page (design §4.5 screen 6 *The message page*, TD-129): one entry, whole, with its thread and the row's controls at the foot."""
+    b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
+    gap = '<span style="flex-grow: 1;"></span>'
+    entry = mcard(BAR["needs"], "ask", "tdgrind-ao-1", "ao-grind", "18m ago · about TD-079 · asked in Needs you",
+        '<div class="txt">The trail coalesces by <span class="mono">{sid, kind, how}</span>. A permission answered from Focus and one answered from the Inbox within five seconds are two <i>hows</i> — two trail rows, or one? The design text supports either reading; going on with the wrong one means a migration later.</div>'
+        '<div class="txt" style="color: #374151;"><b style="font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280;">details</b><br>What I looked at: §4.10 <i>The trail</i> says a row per <span class="mono">{sid, kind, how}</span> and that two answers to one permission are one event; <span class="mono">sessionorc/trail.py</span> coalesces on the three-tuple as written, so today two <i>hows</i> are two rows. The TD-079 test fixture assumes one. My default is two rows — the <i>how</i> is the point of the trail — and the fixture changes. Cost of the other reading: the coalesce key loses <span class="mono">how</span> and the row says <i>answered from Focus and the Inbox</i>.</div>',
+        "", cls="")
+    thread = [
+        mcard("#cbd0d6", "ask → techlead-ao-1", "tdgrind-ao-1", "ao-grind", "41m ago",
+              '<div class="txt muted">Same question, asked of the techlead first (§4.9b). <i>Passed up</i> 18m ago with a recommendation.</div>', ""),
+        mcard("#cbd0d6", "passed up · recommendation", "techlead-ao-1", "ao-grind", "18m ago",
+              '<div class="txt">Not written down anywhere I can cite — passing it up. My recommendation: <b>two rows</b>; the trail exists to say <i>how</i> a thing resolved, and one row would have to say two hows.</div>', ""),
+        mcard("#cbd0d6", "system", "home", "", "18m ago",
+              '<div class="txt muted">Delivered to you under <i>Needs you</i>; tdgrind-ao-1 was told it waits on you (no bound — an ask to the person does not expire).</div>', ""),
+    ]
+    controls = ('<div class="sugg"><span class="lbl">suggested by techlead-ao-1</span>' + b("“Two rows — the how is the point” · recommended") + b("“One row, the later how wins”") + '</div>'
+                + '<div class="ctl">' + b("Reply", "primary") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost") + '</div>')
+    return head("Inbox — message") + f'''<div style="width: 1440px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Inbox 5 · 2")}
 <div style="padding: 16px 20px 28px;">
 <div class="inboxcol">
-  {page_head("Inbox", "5 need you · 2 new in FYI", filters)}
-  {isec("Needs you", 5, opened=True)}
-  {"".join(needs)}
-  {isec("Steering", 1)}
-  {"".join(steering)}
-  {isec("Waiting on them", 1)}
-  {"".join(waiting)}
-  {isec("FYI", "2 new · 14", fyi_extra)}
-  {"".join(fyi)}
-  <div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>
-  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>One centred column</b> (1100 px at most) on a wide window — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb — a tooltip on hover and focus, and pressed it opens in place under the heading, pushing the rows down rather than covering one (drawn open on <i>Needs you</i>); the browser remembers which are open. <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — the ring <span class="mono">j</span> / <span class="mono">k</span> move, on which <span class="mono">Enter</span>, <span class="mono">a</span>, <span class="mono">d</span>, <span class="mono">r</span>, <span class="mono">s</span> and <span class="mono">x</span> press the row’s own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124) — and its text runs the card’s width. The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. A session’s name is printed once — the tool’s title is left out when it only repeats it. Suggested answers stay in their own dashed group, in quotation marks.</div>
+  <div style="display: flex; align-items: center; gap: 10px;"><a href="#" style="font-size: 13px; color: #1f5fa8; text-decoration: none;">← Back</a><span class="muted" style="font-size: 12px;">to Inbox · ao-grind · Needs you · row 2 of 2</span><span style="flex-grow: 1;"></span><span class="muted mono" style="font-size: 11px;">k ↑ previous · j ↓ next · Esc back</span></div>
+  {entry}
+  {isec("Thread", 3)}
+  {"".join(thread)}
+  {isec("Answer", "")}
+  <div class="mcard" style="gap: 8px;">{controls}</div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>The message page</b> (<span class="mono">/inbox/&lt;id&gt;</span>, TD-129): one mail entry whole, reached from the row's text, from <span class="mono">Enter</span> on the ringed row, and from a trail row's <i>re</i>. The head is the row's head; the text is whole, with <i>details</i> open (TD-127's shape, when it lands); then <b>its thread</b> — the question it answers or the replies it drew, the outcome under the question it closes, the <i>system</i> notes about it — oldest first, each in its kind's row shape, none of it a control built from text; then <b>the row's own controls</b> again at the foot, the same RPCs, so the entry is answered here and the page returns to the list when the answer removes the row. <b>Back</b> (and <span class="mono">Esc</span>) returns to the list at the same row, ringed, with the filters as they were; <span class="mono">j</span> / <span class="mono">k</span> walk the filtered list without going back. A state row and a board row have no page: Open and Open board stay theirs. Reading marks nothing. No preview pane: at any width the entry opens as this page.</div>
 </div>
+</div>
+</div>
+''' + TAIL
+
+
+def inbox_phone():
+    """Screen 6 below 720 px (design §4.5 screen 6 *Narrow*, TD-129): the rail as a chip row and a filter sheet, 44 px controls."""
+    def chip(label, n, on=False):
+        st = "height: 32px; white-space: nowrap;" + (" background: #1c2128; color: #fff; border-color: #1c2128;" if on else "")
+        return f'<span class="btn" style="{st}">{label}<span class="mono" style="font-size: 11px; opacity: .8;">{n}</span></span>'
+    def pcard(bar, kind, name, team, age, body, buttons, state=None):
+        btns = "".join(f'<span class="btn{" primary" if i == 0 and len(buttons) > 1 else ""}" style="height: 44px; flex-grow: 1; justify-content: center;">{l}</span>' for i, l in enumerate(buttons))
+        badge = f'<span class="badge">{team}</span>' if team else '<span class="badge" style="border-style: dashed;">no team</span>'
+        who = pill(*state) if state else f'<span class="kind">{kind}</span>'
+        return f'''<div class="mcard" style="padding: 12px 12px 12px 15px;"><span class="sbar" style="background: {bar};"></span>
+  <div class="who">{who}<span class="nm" style="font-size: 13px;">{name}</span>{badge}<span style="flex-grow: 1;"></span><span class="meta">{age}</span></div>
+  {body}
+  <div style="display: flex; gap: 8px; margin-top: 2px;">{btns}</div>
+</div>'''
+    cards = [
+        pcard(BAR["needs"], "", "tdgrind-ao-2", "ao-grind", "4m 20s left",
+              '<div class="txt">Permission · <span class="mono">Bash</span> · <span class="mono">git push origin td073-usage-chips</span></div>',
+              ["Allow", "Deny", ICON["focus"]], state=("needs", "permission")),
+        pcard(BAR["needs"], "ask", "tdgrind-ao-1", "ao-grind", "18m ago",
+              '<div class="txt">The trail coalesces by <span class="mono">{sid, kind, how}</span>. A permission answered from Focus and one from the Inbox within five seconds — two trail rows, or one? <a href="#" style="color: #1f5fa8;">whole entry →</a></div>',
+              ["Reply", "Snooze ▾"]),
+    ]
+    return head("Inbox — phone") + f'''<div style="width: 390px; min-height: 900px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">Shift<b>Lead</b></span><span class="tab on" style="height: 28px;">Inbox 5 · 2</span><span style="flex-grow: 1;"></span><span class="btn primary" style="height: 32px; width: 32px; padding: 0; justify-content: center;">{ICON["plus"]}</span></div>
+<div style="padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 10px;">
+  <div style="display: flex; align-items: center; gap: 8px;"><span style="font-size: 16px; font-weight: 600;">Inbox</span><span class="muted" style="font-size: 12px;">5 need you</span></div>
+  <div style="display: flex; gap: 6px; overflow: hidden;">{chip("All", "×")}{chip("ao-grind", 2, on=True)}{chip("cm-grind", 1)}{chip("guardians", "·")}{chip("no team", 2)}{chip("filter ▾", "1")}</div>
+  {isec("Needs you", "2 of 5")}
+  {"".join(cards)}
+  <div class="muted" style="padding: 4px 2px 0; font-size: 12px;">Steering · Waiting on them · FYI are not picked — <a href="#">filter ▾</a> or <a href="#">All</a>.</div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Narrow</b> (below 720 px, TD-129): the rail is not drawn; a chip row of the teams with their <i>Needs you</i> counts, then one <i>filter ▾</i> chip that opens a sheet holding the sections and the kinds as the same toggles and <b>All</b> — the chips and the sheet are the rail's toggles drawn twice from one list. The URL is the desktop's for the same picks. One column; controls 44 px high as the phone's Org cards. A long entry's text is cut with <i>whole entry →</i>, which is the message page — there is no pane at any width.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1108,6 +1225,9 @@ files = {
     "Resumable.dc.html": resumable(),
     "Commands.dc.html": commands(),
     "Inbox.dc.html": inbox(),
+    "InboxRail.dc.html": inbox(picks=True),
+    "InboxMessage.dc.html": inbox_message(),
+    "InboxPhone.dc.html": inbox_phone(),
 }
 for n, s in files.items():
     (OUT / n).write_text(s)
@@ -1120,11 +1240,14 @@ LAYOUT = [
     # (file, title, column)
     ("Main.dc.html", "Org — desktop", 0),
     ("Inbox.dc.html", "Inbox", 0),
+    ("InboxRail.dc.html", "Inbox — filtered", 0),
+    ("InboxMessage.dc.html", "Inbox — message", 0),
     ("Focus.dc.html", "Focus — member", 0),
     ("FocusOrc.dc.html", "Focus — orchestrator", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
     ("Phone.dc.html", "Org — phone", 1),
+    ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("NewSession.dc.html", "New session", 1),
     ("Commands.dc.html", "Commands", 1),
     ("MainDark.dc.html", "Org — dark", 2),
@@ -1148,7 +1271,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
