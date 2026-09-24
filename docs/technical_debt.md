@@ -6,7 +6,7 @@ Known issues, compromises, and deferred work. Add an entry any time a problem is
 
 IDs are `TD-` plus a zero-padded three-digit number, assigned in order and never reused. Priority is a field, never part of the ID.
 
-Three header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`anchor`, `grinder`, `paul`, `dev-cadence`); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`); **Pickable** — `yes`, or `no — ` and the one clause that says why. Every open entry carries them; keep them true when the Status changes. `tests/test_ledger.py` checks their shape.
+Three header lines follow **Added:** so a worker can filter the file instead of re-reading it (TD-118): **Owner** — who moves the entry next (`anchor`, `designer`, `grinder`, `paul`, `dev-cadence`); **Kind** — what the next step is (`build`, `design-first`, `live-check`, `evaluation`, `decision`); **Pickable** — `yes`, or `no — ` and the one clause that says why. Every open entry carries them; keep them true when the Status changes. `tests/test_ledger.py` checks their shape.
 
 ---
 
