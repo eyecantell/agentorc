@@ -17,7 +17,7 @@ checked*).
 
 | | |
 |---|---|
-| Source | `paperclipai/paperclip`, MIT, commit `0f8750627f` (2026-09-24); repo created 2026-03-02; releases dated `v2026.MMDD.N`, roughly weekly, with breaking changes as late as 2026-09-21 |
+| Source | `paperclipai/paperclip`, MIT, commit `0f8750627f` (2026-09-24); repo created 2026-03-02; releases dated `v2026.MMDD.N`, roughly weekly, with breaking changes as late as 2026-09-16 (the 2026-09-21 release is a non-breaking patch) |
 | Size | ~1.19M lines of TypeScript excluding tests (2.19M with them), ~66k lines of Rust in an experimental runner, 138 Drizzle schema files; `server/src/services/heartbeat.ts` alone is 29,619 lines |
 | Shape | one Node/Express server, Postgres (embedded PGlite by default), React UI, CLI `paperclipai`; deploy modes `local_trusted` (loopback, no login), `authenticated`+`private` (LAN/Tailscale), `authenticated`+`public` |
 | Traction | GitHub API: 82,018 stars, 15,015 forks, 5,625 open issues. HN (Algolia): five paperclip.ing submissions, 1–5 points, **no comments** on any. Secondary coverage is mostly templated SEO articles that disagree about basic facts. **The stars are not evidence of use**; one maintainer (`cryppadotta`, 2,834 commits) dominates |
@@ -41,7 +41,7 @@ budgets, approvals and completion checks.
 
 **Governance.** It has a flat capability ACL (`principal_permission_grants`: principal, permission,
 scope). A manager may take over an issue checked out by anyone below it in the org chart
-(`authorization.ts:2276`, `allow_manager_chain`). Budgets are generic policies (`scope, metric,
+(`authorization.ts:2277`, `allow_manager_chain`). Budgets are generic policies (`scope, metric,
 windowKind, amount, warnPercent 80, hardStopEnabled`), with the metric defaulting to `billed_cents`.
 An `activity_log` table and per-run event logs record what happened.
 
