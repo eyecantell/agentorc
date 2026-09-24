@@ -375,3 +375,4 @@
 - Board line → PR #502 merged, fact-checked SHIP.
 23:50  ao close self.
 02:19  round 1: grinder-ao-1, grinder-ao-2, techlead-ao-1 all working (just started); no open member PRs; no unread inbox; no relay needed (all cadence-changes entries landed before members' created time) → ok
+02:41  grinder-ao-2: note "done: TD-123 — PR #507 merged" → cadence check PR #507: all rows pass. grinder-ao-1/2 still working.
