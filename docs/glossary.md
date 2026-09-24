@@ -67,7 +67,10 @@ not mix:
   the config file until TD-060's machine-side step. — **decided** 2026-09-21 (Paul).
 - **designer** — the person's design seat on a team: an `interactive` session that writes the design and the
   pickable ledger entries, and merges nothing on a held path (design §4.8 *Role names*, TD-120). Defined by a repo
-  or `org.yml`, not a built-in preset. — **decided** 2026-09-23
+  or `org.yml`, not a built-in preset; seated on a team as an **on-demand interactive member**
+  (`unattended: false, start: on-demand`, design §4.9): the team's start does not create it, its
+  ending does not count it, and the team card's button, labelled by the role, starts it or raises
+  its Focus. — **decided** 2026-09-23; the on-demand member **designed** 2026-09-23 (step 3)
 - **director** — the session that coordinates managers: its members are managers, not workers.
   Agentorc does not treat it specially (design §4.8); the word names a position in the graph, not
   a kind of session. Director > manager > worker. *Not:* conductor (decided and replaced the same

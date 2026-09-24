@@ -223,6 +223,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-23 (TD-071 items 1 and 2 built, grinder-ao-1): **Forget all** and **✉ n** as the rows say, with two details the build settled: Forget all is not drawn where every card carries the flag, since it would forget nothing, and its Forgets run one after another from the page so a refused one (a suspended record) is a toast and the rest go on; the ✉ n mark hides while the team is unfolded or a filter shows its cards, where each card's own chip is in view.
 - 2026-09-23 (TD-124, the designer; Paul's map approved the same day): the four **keys** rows (every page, the Org's ring, the Inbox's ring, the **?** overlay) designed — every key names a control already in the table and presses its element, the overlay is generated from the handler's own table, nothing is stored. Left for later: remapping, chords, digits picking a suggested answer (TD-070) and keys inside the terminal. Not built.
 - 2026-09-23 (TD-122, the designer): the **usage** chip made one per account, `<tool> · <account> · <label> n%` — *Claude · paul · week 24%* — with the sharing profiles, their lines and their sessions on hover; a per-model weekly window labelled `week · <model>`. Was one chip per profile naming the profile, which printed one account's stale reading four times as *week 21% · stale grind · week 21% / 40% · stale +1* on 2026-09-23.
+- 2026-09-23 (TD-120 step 3, the designer): **the on-demand member's button** designed on the team header, labelled by the role's `label`: starts the member under the definition's name when none is live, raises its Focus when one is; drawn on a stopped or concluded team too. Not built; Paul's look asked for on the board the same day.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
@@ -337,6 +338,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-22 (TD-107): `lead:` stopped being read; it is an unknown key.
 - TD-041: interactive members out of a manager's reach became a gate (§9 invariant 5), so the start reports it per member.
 - 2026-09-22 (TD-113 (a), grinder-ao-2): `{manager}` added beside `{techlead}`, so a member's `done` line names its manager's id instead of telling it to read `under:` off its own record; the same night the manager preset's crash-restart rule gave way to the tick's (TD-113 (0), §6 rule 1).
+- 2026-09-23 (TD-120 step 3, the designer; Paul 2026-09-23 *do we want a Designer button on a team card?* — yes, as a generic control): the on-demand interactive member designed — `start: on-demand` on a member with `unattended: false`; `ao team start` does not create it, the ending tests skip it, `ao team stop` leaves it, the tick never touches it; the record carries `start`. Rejected: a `seats:` entry for the designer (a seat is filled by its manager; a person's session is started by no session).
 
 ## 4.9a Winding down: a team that runs out of work
 
@@ -347,6 +349,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-21 (TD-083 step 1): the `restart` declaration built; step 3 the same day rewrote the briefs (in force from the next team start), dropping the exemption for *a written end-of-run summary* because it asked a manager to read a screen for meaning; step 2 built the chip.
 - 2026-09-22 (TD-099): a person's Start on a concluded team — from this date `ao team start` closes each concluded session under the wrap-up close's check and supersedes the record before any create. Until the §6 gate is built (TD-100), a manager stopping for the usage window declares `restart` so the team reads *concluded · restart wanted*.
 - TD-053: false exhaustion's three bounds have their numbers deliberately unset in the design, to be chosen against a running team; its early bound is unbuilt and may take `RESTART_EARLY` when it lands.
+- 2026-09-23 (TD-120 step 3): the manager's out-of-work test and the concluded test told to skip an on-demand interactive member, as they skip a seat. Until then a designer in `members:` would have kept its team from ever concluding, which is why the role was defined but not seated (TD-120, 2026-09-23 morning).
 
 ## 4.9b The techlead: a go-between for what would reach the person
 
