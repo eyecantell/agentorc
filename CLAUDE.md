@@ -98,6 +98,7 @@ header belong to dev-cadence: edit them there, never here.
 | Why agentorc builds its own agent messaging instead of Claude Code's or mcp_agent_mail | [docs/decisions/2026-09-16-agent-messaging-prior-art.md](docs/decisions/2026-09-16-agent-messaging-prior-art.md) |
 | Who else builds session desks and supervisors, and what was taken from them | [docs/decisions/2026-09-20-session-desk-neighbours.md](docs/decisions/2026-09-20-session-desk-neighbours.md) |
 | How Paperclip (the "AI company" control plane) compares, and what to learn from it | [docs/decisions/2026-09-24-paperclip.md](docs/decisions/2026-09-24-paperclip.md) |
+| Whether a claude.ai/code cloud session can join the org, and how its PR reaches the reader | [docs/decisions/2026-09-24-cloud-sessions.md](docs/decisions/2026-09-24-cloud-sessions.md) |
 | Mockup sources and regeneration | [docs/mockups/README.md](docs/mockups/README.md) |
 | Working cadence (sessions, reviews, TD flow) | [docs/cadence.md](docs/cadence.md) |
 | Known issues and deferred work | [docs/technical_debt.md](docs/technical_debt.md) |
