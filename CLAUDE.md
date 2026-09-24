@@ -81,6 +81,21 @@ concurrent session in this repo works in a worktree (`claude --worktree <name>` 
 Self-authored PRs get an independent cheaper-model review before merge; doc-only PRs get a
 fact-check against the repo.
 
+## If you are a cloud session (claude.ai/code)
+
+You are one when `CLAUDE_CODE_REMOTE` is set and no tmux server runs. You are a fresh clone on a
+`claude/*` branch, outside the org: no `ao`, no mail, no seat can see you, and nothing on kmaster
+can act on you ([ADR 2026-09-24](docs/decisions/2026-09-24-cloud-sessions.md)). What follows:
+
+- The cadence's SessionStart hooks run and apply. The *hooksPath not set* warning is noise here:
+  the harness pushes only to your own branch.
+- `gh` is absent; use the GitHub MCP tools. `/cadence` and the review-evidence comment run from a
+  kmaster session on your PR's number, not here.
+- **Your PR is the one signal the org can see.** Open it as soon as the work is pushable and put
+  in its body what waits on whom; a board line committed on your branch reaches nobody until the
+  merge it was meant to cause. Ledger lines are fine: they land at merge, which is when they are
+  read. Findings on your work come back as PR comments, nowhere else.
+
 Files under `scripts/`, `docs/cadence.md`, and `.claude/skills/` that open with a SYNCED FILE
 header belong to dev-cadence: edit them there, never here.
 
