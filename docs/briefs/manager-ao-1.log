@@ -378,3 +378,4 @@
 02:41  grinder-ao-2: note "done: TD-123 — PR #507 merged" → cadence check PR #507: all rows pass. grinder-ao-1/2 still working.
 02:41  grinder-ao-2: finished (out of work) — swept ledger after #507, nothing pickable left (TD-121 leased by grinder-ao-1, rest live-check/eval/design-first/decision/Paul's/phase2/synced/anchor/open-PR). Clean tree. grinder-ao-1 still working.
 02:44  grinder-ao-1: note "done: TD-121 — PR #506 merged" but PR #506 is actually still OPEN/CONFLICTING, not merged — grinder-ao-1 is actively working (force-push + watching checks), not idle, so no send needed; watching next round.
+02:49  grinder-ao-1: TD-121 PR #506 now actually merged (self-corrected earlier premature note; conflict with #507 resolved) → cadence check: all rows pass.
