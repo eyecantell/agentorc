@@ -1289,6 +1289,16 @@ Screens:
    were dragged) — team cards arrange the page, and the place to work through what needs a
    person is the Inbox (TD-069).
 
+   **The keyboard (TD-124).** Every act on the grid has a key, and the key is the button pressed:
+   `j` / `k` move **the ring** — keyboard focus, drawn as a focus ring on the card, apart from
+   the amber *needs you* ring — through the cards in the order above; `g` then a team's initial
+   or a group's number jumps between teams; `Enter` opens the ringed card's Focus, `Shift+Enter`
+   pops it out, `a` / `d` answer its permission; `1` / `2` / `n` are the pages and the New session
+   form, `/` the filter, `?` the overlay that lists all of it. Single keys, live only while
+   nothing editable has focus, each naming a control of §4.5a (its **keys** rows) — a person
+   who runs a fleet from the keyboard never needs the mouse for what the grid offers, and the
+   mouse loses nothing. Rejected: chords and a remappable map — a later question, not this one.
+
    A **Due** strip above the grid lists the dev-cadence board items overdue or due today, each
    with Snooze and Done (agent write-back, §4.4); collapsed to a count when empty. Unreachable
    hosts get one banner row. Command-kind sessions are hidden unless "show command runs" is on.
@@ -1337,6 +1347,12 @@ Screens:
    host agent pushes a `set_mode` at once, as it does a `set_stop`.
    On a phone, Focus is the same page: read-only costs nothing there, and Take over is the same
    one press. An `interactive` session sees none of this.
+
+   **The keyboard on Focus (TD-124).** The terminal takes every key while it has focus, and the
+   composer takes its own; the page keys of §4.5a (`1`, `2`, `n`, `?`) fire only while neither
+   does — focus on the header or a side panel, which `Esc` in the composer does not give (it
+   goes to the terminal, *Browser mechanics* below). There is no ring on Focus: it shows one
+   session, and its acts are the header's buttons, which `Tab` reaches.
 
    **Pop out (TD-046).** The requirement is the operating system's window switcher, not a
    widget in the page: a person moving between two working agents wants alt-tab, tiling and a
@@ -1445,7 +1461,9 @@ Screens:
    on hover and focus and, pressed, opened in place under the heading, pushing the rows down
    rather than covering one; the browser remembers which are open; the page has no closing
    paragraph. *A row is a card*: its own surface, a hover state, and a focus ring — a row is a
-   tab stop, and its controls follow it in tab order. What says *what a row is* — the state pill,
+   tab stop, and its controls follow it in tab order — and `j` / `k` move that focus row by row,
+   `Enter`, `a`, `d`, `r`, `s` and `x` pressing the ringed row's own Open, Allow, Deny, Reply,
+   Snooze and Dismiss or Done (§4.5a **keys**, TD-124). What says *what a row is* — the state pill,
    the kind label (`ask`, `steer`, `outcome · blocked`, `trail`) — is flat and unbordered and is
    never a control; everything bordered is one (a state or an alarm mark must never look
    pressable). A session's name is printed once: the tool's own title is left out when it only
@@ -1505,6 +1523,12 @@ Browser mechanics:
   in the composer moves focus to the terminal; `Tab` inside the terminal passes through to the
   pane. A pending permission or question shows a hint on the composer ("answer in the terminal
   above") instead of accepting Send.
+- **Keys on every page** (TD-124): one `keydown` handler on the document, which returns at once
+  when the event's target is editable (an input, a textarea, anything `contenteditable`, the
+  terminal's element) or a modifier other than Shift is held, and otherwise looks the key up in
+  one table of *(key, page, control)* and presses that control's element — the same click
+  handler, so a key can do nothing a button cannot and needs no second code path. The `?`
+  overlay is rendered from the same table (§4.5a **keys**, **?** overlay).
 - **Errors**: every RPC-triggered control reports failure the same way — a toast on the Org,
   an inline banner in the Focus header — with the host agent's error text and a Retry where one
   makes sense. There is no silent failure path.
@@ -1522,6 +1546,10 @@ noted). If a control is not in this table it does not exist.
 |---|---|---|
 | top bar | **New session** | opens the New session form |
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
+| every page | **keys** | single keys, when nothing editable has focus — a composer, the filter box, a reply box, the *why?* box, and the Focus terminal, which takes every key, so Focus's terminal is untouched: `1` Org, `2` Inbox, `n` New session, `/` the page's filter box (`Esc` leaves it), `?` the overlay (row below). **A key is a name for a control in this table** and does nothing a button cannot: one `keydown` handler on the document reads one table of *(key, page, control)*, and the overlay is generated from that same table, so the two cannot drift; a key whose control the page does not offer at that moment does nothing. Not browser-specific: the only keys a page cannot take are the browser's and the operating system's own (a new tab, closing one, the address bar, alt-tab), and no key here is one. Nothing is stored. Out of scope: remapping, chords, and keys inside the terminal (TD-124) |
+| Org | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — **the ring** — between cards in the page's own order (*One order, no control*, screen 1: group by group, the manager's card first, then urgency), skipping a folded team's cards; `g` then a team's initial jumps to the first card of the first team, in page order, whose name starts with that letter (the same pair again, the next such team), and `g` then a digit `1`–`9` to the *n*th group on the page, *No team* counted where it sits; `g` waits two seconds for its second key. On the ringed card: `Enter` or `o` is its **Focus** (**Details** where the foot offers that; *Focus window* raises the window as the button does); `Shift+Enter` its **Pop out** (TD-046); `a` / `d` its **Allow** / **Deny** while it holds a pending permission — the same press, hook channel, an empty *why?*. The ring is the browser's focus ring on the card: a card is a tab stop, so `Tab` reaches it too and a screen reader follows it, and the amber *needs you* ring is a different ring (§4.5 screen 1 *Colour*). It is nowhere until a key moves it; a card that leaves the page hands it to its neighbour. Client-side, nothing written (TD-124) |
+| Inbox page | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — the row's own focus ring (*Layout*, screen 6: a row is a tab stop) — between rows in the page's order: *Needs you*, *Steering*, then *FYI* when it is unfolded; snoozed rows only while *n snoozed — show* is open. On the ringed row, each key is one of the row's own buttons, pressed, and does nothing on a row that has no such button: `Enter` or `o` **Open** (**Open board** on a board row); `a` / `d` **Allow** / **Deny** on a permission row, an empty *why?*; `r` **Reply**, which opens the composer the button opens; `s` **Snooze ▾**, which opens the menu (the choice is a second press or a click); `x` **Dismiss**, or **Done** on a board row, or **Unsnooze** on a snoozed one. **Delete** confirms and has no key; the *i* mark has none, it is a button `Tab` reaches. Client-side, nothing written (TD-124) |
+| every page | **?** overlay | `?` opens a panel over the page listing every key of *this* page beside the control it presses, generated from the handler's table (row above); `?` or `Esc` closes it, and focus returns to where it was. While it is open nothing behind it takes a key. The top bar carries a small **?** that opens the same panel for the mouse and for a phone, which has no `?` to press. Display only, nothing stored (TD-124) |
 | Org | ~~**Urgent first / Pinned**~~ | dropped 2026-09-18: there is one order — the manager, then urgency, inside a team; a live team with a `needs-you` session above the other live teams — and no control for it. A `needs-you` card keeps its ring and the header its *n needs you* count; the list to work through is the Inbox (TD-069) |
 | Org | ***mine*** | one press beside the filter shows only `interactive` sessions — the person's own, a taken-over worker included; a second press shows everything again. A toggle with no value to type, remembered per browser as a team's fold is. It composes with whatever is typed, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing (TD-095) |
 | Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
