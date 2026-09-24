@@ -477,6 +477,11 @@ def test_the_usage_chip_is_one_per_account_and_names_the_tool_and_the_account():
         " grind-sonnet [week line 60% (reserve 40%; line moves ?)]; default: paul"
     )
     assert "grind" not in c["text"]  # never a profile's name in the chip
+    # a per-day reserve on a fractional line: the days left are whole in the page as in `app.js`
+    assert usage_chip("Claude · paul", USAGE_CASES["shared"])["title"].endswith(
+        "grind [week line 70.5% (reserve 10% a day, 2 days left; line moves n1),"
+        " 5h line 50% (reserve ?; line moves ?)]: grinder-ao-1, grinder-ao-2; default"
+    )
     assert usage_chip("old", got["old"])["text"] == "old · 5h 3%"
     assert usage_accounts(None) == {}
 
