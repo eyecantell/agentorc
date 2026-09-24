@@ -1053,9 +1053,9 @@ def inbox():
     ]
     fyi = [
         mcard("#cbd0d6", "trail · new", "tdgrind-ao-2", "ao-grind", "12m ago",
-              '<div class="txt muted">A permission (<span class="mono">Bash · pdm run test</span>) was <b style="color: #374151;">allowed from Focus</b>.</div>', b("Dismiss", "ghost")),
+              '<div class="txt muted">A permission (<span class="mono">Bash · pdm run test</span>) was <b style="color: #374151;">allowed from Focus</b>.</div>', b("Put on the board", "ghost") + b("Dismiss", "ghost")),
         mcard("#cbd0d6", "note · new", "tdgrind-ao-1", "ao-grind", "31m ago",
-              '<div class="txt">done: TD-068 — PR #272 merged</div>', b("Dismiss", "ghost")),
+              '<div class="txt">done: TD-068 — PR #272 merged</div>', b("Put on the board", "ghost") + b("Dismiss", "ghost")),
     ]
     filters = '<div class="input" style="width: 260px; height: 28px; color: #6b7280;">filter — sender, text, about</div><span class="btn ghost">team: all ▾</span>'
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
