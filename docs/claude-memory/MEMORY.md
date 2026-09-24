@@ -24,3 +24,4 @@
 - [Scratch-worktree tests import the main checkout](scratch-worktree-tests-import-main-checkout.md) — pull main before running a branch's tests from a scratch worktree
 - [Retarget a stacked PR with the API](retarget-a-stacked-pr-with-the-api.md) — `gh pr edit --base` fails on projectCards; PATCH pulls/N, rebase --onto, delete the base last
 - [Summary-table conflicts resolve row-wise](summary-table-conflicts-resolve-row-wise.md) — one row per id after a rebase, never both sides; `ao --json` goes before the subcommand
+- [Stacked docs PRs: rebuild, not rebase](stacked-docs-prs-rebuild-not-rebase.md) — when main takes your TD number under a stack, rebuild each branch from its original files with one exact id map

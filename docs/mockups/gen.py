@@ -1027,7 +1027,7 @@ def inbox():
               '<div class="txt">Permission · <span class="mono">Bash</span> · <span class="mono">git push origin td073-usage-chips</span></div><div class="meta">doing 3m ago: TD-073: usage chips side by side — pushing for review</div>',
               b("Allow", "primary") + b("Deny") + gap + b(ICON["focus"] + "Open", "ghost"), cls="hover", state=("needs", "permission")),
         mcard(BAR["needs"], "ask", "tdgrind-ao-1", "ao-grind", "18m ago · about TD-079",
-              '<div class="txt">The trail coalesces by <span class="mono">{sid, kind, how}</span>. A permission answered from Focus and one answered from the Inbox within five seconds are two <i>hows</i> — two trail rows, or one? The design text supports either reading; going on with the wrong one means a migration later.</div>'
+              '<div class="txt">TD-079: two trail rows or one when a permission is answered from Focus and from the Inbox within five seconds? I will go with two unless you say one.</div><div class="meta">details ▸ <span class="muted">The trail coalesces by <span class="mono">{sid, kind, how}</span>; the design text supports either reading, and the wrong one means a migration later.</span></div>'
               '<div class="sugg"><span class="lbl">suggested by tdgrind-ao-1</span>' + b("“Two rows — the how is the point”") + b("“One row, the later how wins”") + '</div>',
               b("Reply", "primary") + b("Snooze ▾") + gap + b("Delete", "ghost danger") + b(ICON["focus"] + "Open", "ghost"), cls="focus"),
         mcard(BAR["exited"], "", "push", "", "exited 2h ago",
