@@ -1454,10 +1454,10 @@ Screens:
    row renderer per kind**, so a kind joins a section without touching the rest. A mail row
    carries its sender's name and the `team` its envelope carries; a state row is built from the
    card's own view (its pill, `title`, `doing` line, team and role badge); both carry **Open** to
-   Focus on the session that needs the person, while that record still exists. **A team filter**
-   narrows all three sections — a state and a message carry their session's `team` badge; a board
-   item carries its repo, which `org.yml`'s projects map to teams; `team:name`, and `team:` for
-   what carries none — and a free-text filter covers sender, text and `about`. The Org keeps
+   Focus on the session that needs the person, while that record still exists. **The rail**
+   (below; TD-129) narrows every section — a state and a message carry their session's `team`
+   badge; a board item carries its repo, which `org.yml`'s projects map to teams — and its
+   **find** box matches every word typed against a row's whole visible text. The Org keeps
    every needs-you mark it has: the Inbox is a second way to the same things, not a replacement.
    Nothing on the page is built from text a session wrote except as text: a suggested answer
    (TD-070) is a structured field of the envelope, never parsed out of a message.
@@ -1499,10 +1499,121 @@ Screens:
    memory, as the fold is — nothing on the entry or at the home changes, so reading still changes
    no row) — the same comparison that opens the section by itself (§4.5a *the FYI count*), a
    mark and never a control. None of this adds, removes or renames a control of any row.
-7. ~~**Attention**~~ — struck (TD-123): a board item that needs the person is a row on the
-   Inbox (screen 6), with Snooze and Done on §4.4's write-back, and the whole board, undated
-   items and the stale-sweep warning included, is dev-cadence's own `/attention` report. There
-   is no Attention page and no tab for one.
+
+   **The rail (TD-129, design round 3, 2026-09-24, Paul's shape; mockups `Inbox.dc.html`,
+   `InboxRail.dc.html`).** Left of the column, sticky, 200 px, starting under the title — *Inbox*
+   has the top line to itself, and the rail's head lines up with the first section heading (Paul,
+   2026-09-24): **Clear filters**, the find box, then three groups of toggles. *Urgency* — the
+   page's own sections in the page's order, each with its count; the group is named for what orders
+   them (needs you, on a clock, waiting on them, none), not *Sections*, which names nothing a person
+   is looking for, nor *State*, which is a session's word and the name of a kind below. *Teams* —
+   every team a row on the page carries, then *no team*, each with its **Needs you** count, since
+   *which team needs me* is the question the rail answers at a glance. *Kinds* — the coarse kind of
+   a row, each with its count: *questions* (an `ask`, a passed-up question), *steering* (a `steer`),
+   *session states* (the state rows — a permission, a question, `limited`, `stalled?`, an exit with
+   unpushed work, a restart, an alarm, a promote), *board items*, *notes* (`note`, `system`,
+   replies, answered-for-you, outcomes), *trail*. Every line is a toggle, and the rule is the one
+   every faceted list uses: **within a group the picks are OR'd, across groups AND'd, and a group
+   with nothing picked means all of it.** So *grind* alone is the whole queue for one team; *grind*
+   + *FYI* is that team's FYI; *Needs you* + *questions* is what a person owes an answer to, any
+   team. **Every count is a count of rows on the page now** (Paul, 2026-09-24) — the rows that pass
+   every pick and the find — so the numbers never disagree with what is drawn: a picked line reads
+   its share of the page; an unpicked line in a group where something is picked reads *0*, dimmed,
+   because it contributes nothing until pressed; an unpicked line in a group where nothing is picked
+   reads its share of the page under the other groups' picks, which is what it would keep if pressed
+   alone. Rejected: the mail-client convention, where a line's count is taken under the *other*
+   groups' picks so it says what pressing it would add — with *grind* pressed it drew *cm-grind 1*
+   while nothing of cm-grind was on the page. **Every count on the page is written the same way: a
+   plain number while nothing is picked or typed, and *n of all* while anything is**, on every rail
+   line and every section heading alike, *all* being the line's count with no filter at all, so one
+   glance says a filter is on and what it hides; a line that reads *0* stays, dimmed, so a pick can
+   be undone and its *of all* says what pressing it would bring. Paul's way of working the page is
+   the case the rail is shaped for: press a team, work its *Needs you* rows until its count reads
+   nothing, press the next. A section not picked is not drawn; a section picked and emptied by the
+   other groups draws its heading and its empty line: the queue's order is the page's one layout
+   rule, and a filter shows or hides rows, never re-orders them. **The top bar's number is never
+   filtered**: it stays *Needs you* whole (§4.5a), which is the *all* of the rail's *Needs you*
+   line; the page's title row is the word *Inbox* alone — the needs-you pill and any *showing …*
+   line beside it went with the rail (Paul, 2026-09-24: the picks are already on the left), and what
+   the pill said on hover, what the number counts and how it differs from the Org's, is the rail's
+   *Needs you* line's hover now. One press clears — **Clear filters**, at the rail's head, drawn
+   only while anything is picked or typed, and it empties the find box too. The picks are the page's
+   URL — `/inbox?team=grind,none&sec=needs,fyi&kind=questions&find=…` — so a filtered Inbox is a
+   link and `Back` undoes a press; the browser remembers the last picks for a bare `/inbox` and
+   writes them back into the URL (`replaceState`), so a link copied from the bar is always the page
+   as seen. A row's team badge is the same press as the rail's line for its team (it typed
+   `team:name` into the box since TD-069); the typed `team:` syntax is gone, since a filter that is
+   a control is not typed. The counts come from `inbox_sections`, the split the page and the poll
+   already read, computed once per render over every row, so the rail, the headings and the top bar
+   cannot disagree; TD-131 names a rail over thousands of entries as the size that would move the
+   counts into a store. Rejected: Paul's first shape, a tree — *All*, then each team, then that
+   team's sections as leaves. Its leaves are the page's own headings a second time, and a leaf that
+   filtered to one section would hide the rest of the queue; flat groups reach every leaf in one or
+   two presses and keep the order.
+
+   **Find (TD-129).** The rail's box. Every word typed must match, in any order, as a substring of
+   the row's whole visible text, which the server lowercases once into `data-find` on every row kind
+   — a mail row's sender, team, kind, `about`, PR and text; a state row's name, pill, title, `doing`
+   and its explanation; a board row's repo and text; a trail row's name, kind, `how` and text; the
+   identity-alarm row's host and alarm words — and a word that is a number also matches `#` before
+   it (*517* finds *#517*). A match inside a folded section (FYI, the snoozed list) unfolds it for
+   the duration of the find and folds it back when the box empties, unless the person had it open;
+   the count beside the box reads *n of all*. **The find is a fourth group with one pick, AND'd with
+   the rail's** (Paul, 2026-09-24): *guardians* pressed and *jeff* typed shows the guardians' rows
+   that carry *jeff* — *jeffrey* among them, a word matching as a substring — and the rail's counts
+   follow the find as they follow every other pick. Nothing is written: it is the browser's filter
+   over the rows it has, and the poll re-applies it. `/` focuses it and `Esc` leaves it (TD-124).
+   What it replaces: one exact substring (`includes`) over sender, text and `about`, under which two
+   words in the other order, `#` before a number or a comma after one found nothing, and a match in
+   a fold stayed folded.
+
+   **The message page (TD-129; mockup `InboxMessage.dc.html`).** `/inbox/<id>`: one mail entry,
+   whole. Reached from a mail row — its text is the link, and `Enter` on the ringed row (*keys*,
+   §4.5a) — and from a trail row's *re*, which names the entry it closes. A state row and a board
+   row have no page: a state is the card's and a board item the board's, so their **Open** and
+   **Open board** stay what they are. The page is the same centred column, in three parts, in this
+   order (Paul, 2026-09-24: *the answer under the message, the thread after it, so nothing scrolls
+   unless a full review of the thread is wanted*). At its head **Back** (and `Esc`), which returns
+   to the list at the same row, ringed, with the filters as they were — the list's URL travels with
+   the page. **First the entry**: its head as on its row (sender, team, kind, `about`, `pr` as a
+   link, age, and `answered` by whom and when once it is closed); the text whole, in TD-127's shape
+   when that lands (first paragraph, then *details*, open here, since a page is for reading). **Then
+   the answer**: the row's own controls again, the same RPCs and the same confirms, the suggested
+   answers in their dashed group, so the entry is answered here and the page returns to the list
+   when the answer removes the row from the section it was in. **Then the thread**, under its own
+   heading with its count: what the entry answers and what answered it — the question it replies to,
+   the replies it drew, the person's own reply among them, the outcome under the question it closes
+   (§4.10 *Outcomes*), the pass-up with the passer's recommendation (§4.9b), and the `system` notes
+   that say what the home did with it — oldest first, each in its own kind's row shape, none of it a
+   control built from text (TD-071 item 8). The data is already on the envelope: every copy of a
+   message carries `root`, the id of the first `ask`, `conflict` or `note` its chain replies to, and
+   `reply_to`, `outcome`, `passed_up`, `recommend` and `closed_by` beside it
+   (`sessionorc.models.MailEntry`). What the person inbox does not hold is the person's own replies
+   — a reply lives in the asker's inbox and the sender's outbox, and the person inbox keeps no sent
+   list (§4.10) — so the thread is gathered **at the home, by `root`, across the person inbox and
+   every record's inbox and outbox**, one entry per id, by a person-only read that marks nothing
+   (`thread`, §4.7; the person is a party to every thread that reached their inbox, and a thread
+   that went through a techlead first is read back to its start). It reaches as far as retention
+   keeps it: an entry pruned from every mailbox is a gap the page says in one line (*earlier entries
+   pruned*), never a blank. `j` / `k` on the page move to the next and previous entry of the list as
+   it was filtered, so a team's questions read one after another without going back. An entry
+   retention has pruned reads *gone: pruned <t> ago* with **Back**, never a blank; one another host
+   holds reads the refusal in words (§4.4a). The page marks nothing read: it is the person's read,
+   as the list is (§4.10). No preview pane: TD-129's option (b) — the list narrow and the ringed
+   row's entry open beside it — is not designed; at any width the entry opens as its page, and the
+   pane, if it is ever wanted, is this page drawn beside the list.
+
+   **Narrow (TD-129; mockup `InboxPhone.dc.html`).** Below 720 px, where Focus already turns narrow
+   (*Phone layout*, below): the rail is not drawn. Under the title a chip row: first **Filters ▾**,
+   pinned, carrying the number of picks; after it, scrolling sideways, the teams from the rail's own
+   *Teams* list — every team a row carries and *no team*, each with its *Needs you* count, the
+   picked ones first so a pick never scrolls out of sight. **Filters ▾** opens the filter sheet: a
+   native `<dialog>` that fills the phone's screen and holds the three groups as the same toggles,
+   the find box and **Clear filters**, with **Done** to close it. The sheet is the filter screen in
+   practice; it is not a page of its own because the picks are the list's URL and a second URL would
+   have to carry them twice. The chips and the sheet are the rail's toggles drawn twice from one
+   list, never two lists, and the URL is the desktop's for the same picks. The list keeps one
+   column, its rows' controls 44 px high as the phone's Org cards are. The message page is the page.
 
 Security: the UI can type into a shell as you, so it is root-equivalent. **Never a bare public
 port.** The UI is reached over a private network or through an authenticated tunnel, and holds
@@ -1571,7 +1682,7 @@ noted). If a control is not in this table it does not exist.
 | top bar | **Shell** | starts a `shell` session: host + directory, nothing else asked |
 | every page | **keys** | single keys, when nothing editable has focus — a composer, the filter box, a reply box, the *why?* box, and the Focus terminal, which takes every key, so Focus's terminal is untouched: `1` Org, `2` Inbox, `n` New session, `/` the page's filter box (`Esc` leaves it), `?` the overlay (row below). **A key is a name for a control in this table** and does nothing a button cannot: one `keydown` handler on the document reads one table of *(key, page, control)*, and the overlay is generated from that same table, so the two cannot drift; a key whose control the page does not offer at that moment does nothing. Not browser-specific: the only keys a page cannot take are the browser's and the operating system's own (a new tab, closing one, the address bar, alt-tab), and no key here is one. Nothing is stored. Out of scope: remapping, chords, and keys inside the terminal (TD-124) |
 | Org | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — **the ring** — between cards in the page's own order (*One order, no control*, screen 1: group by group, the manager's card first, then urgency), skipping a folded team's cards; `g` then a team's initial jumps to the first card of the first team, in page order, whose name starts with that letter (the same pair again, the next such team), and `g` then a digit `1`–`9` to the *n*th group on the page, *No team* counted where it sits; `g` waits two seconds for its second key. On the ringed card: `Enter` or `o` is its **Focus** (**Details** where the foot offers that; *Focus window* raises the window as the button does); `Shift+Enter` its **Pop out** (TD-046); `a` / `d` its **Allow** / **Deny** while it holds a pending permission — the same press, hook channel, an empty *why?*. The ring is the browser's focus ring on the card: a card is a tab stop, so `Tab` reaches it too and a screen reader follows it, and the amber *needs you* ring is a different ring (§4.5 screen 1 *Colour*). It is nowhere until a key moves it; a card that leaves the page hands it to its neighbour. Client-side, nothing written (TD-124) |
-| Inbox page | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — the row's own focus ring (*Layout*, screen 6: a row is a tab stop) — between rows in the page's order: *Needs you*, *Steering*, then *FYI* when it is unfolded; snoozed rows only while *n snoozed — show* is open. On the ringed row, each key is one of the row's own buttons, pressed, and does nothing on a row that has no such button: `Enter` or `o` **Open** (**Open board** on a board row); `a` / `d` **Allow** / **Deny** on a permission row, an empty *why?*; `r` **Reply**, which opens the composer the button opens; `s` **Snooze ▾**, which opens the menu (the choice is a second press or a click); `x` **Dismiss**, or **Done** on a board row, or **Unsnooze** on a snoozed one. **Delete** confirms and has no key; the *i* mark has none, it is a button `Tab` reaches. Client-side, nothing written (TD-124) |
+| Inbox page | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — the row's own focus ring (*Layout*, screen 6: a row is a tab stop) — between rows in the page's order: *Needs you*, *Steering*, then *FYI* when it is unfolded; snoozed rows only while *n snoozed — show* is open. On the ringed row, each key is one of the row's own buttons, pressed, and does nothing on a row that has no such button: `Enter` the ringed row's **page** where it has one — a mail row (§4.5 screen 6 *The message page*, TD-129) — else **Open** (**Open board** on a board row); `o` **Open** always; `a` / `d` **Allow** / **Deny** on a permission row, an empty *why?*; `r` **Reply**, which opens the composer the button opens; `s` **Snooze ▾**, which opens the menu (the choice is a second press or a click); `x` **Dismiss**, or **Done** on a board row, or **Unsnooze** on a snoozed one. **Delete** confirms and has no key; the *i* mark has none, it is a button `Tab` reaches. On the message page (TD-129): `Esc` **Back**, `j` / `k` the next and previous entry of the list as it was filtered, `r`, `s`, `x` the foot's own controls. Client-side, nothing written (TD-124) |
 | every page | **?** overlay | `?` opens a panel over the page listing every key of *this* page beside the control it presses, generated from the handler's table (row above); `?` or `Esc` closes it, and focus returns to where it was. While it is open nothing behind it takes a key. The top bar carries a small **?** that opens the same panel for the mouse and for a phone, which has no `?` to press. Display only, nothing stored (TD-124) |
 | Org | ~~**Urgent first / Pinned**~~ | dropped 2026-09-18: there is one order — the manager, then urgency, inside a team; a live team with a `needs-you` session above the other live teams — and no control for it. A `needs-you` card keeps its ring and the header its *n needs you* count; the list to work through is the Inbox (TD-069) |
 | Org | ***mine*** | one press beside the filter shows only `interactive` sessions — the person's own, a taken-over worker included; a second press shows everything again. A toggle with no value to type, remembered per browser as a team's fold is. It composes with whatever is typed, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing (TD-095) |
@@ -1618,7 +1729,10 @@ noted). If a control is not in this table it does not exist.
 | card | **unread** chip | the count of unread inbox entries when there are any, click to open the Inbox panel; nothing shown at zero, the common case. A person's own session shows it too when the graph reaches it (§4.10); mail meant for the person goes to the top bar's **person inbox**, not here (TD-052) |
 | Focus Inbox | **Reply** | sends a `reply` message to the entry's sender, carrying the entry's id (host agent RPC, ungated for a person). Never types into the sender's pane — a reply is mail, not a send, and the sender reads it when it next looks (§4.10, TD-052). No Reply on an entry the person sent: a person does not answer themselves — the session's answer lands in the top bar's person inbox, where the person replies |
 | card `more ▾`, Focus header | **Message** | opens a composer that sends a `note` or `ask` from the person into this session's inbox (host agent RPC, ungated for a person; `from` is the person). Mail, not a send: it lands, may wake the session within its budget as any person's act does, and refills that budget (§4.10). Beside **Send**, which types into the pane and is the act of control (TD-052). One dialog shared with Reply; an `ask` takes the default bound |
-| Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, TD-069). The top bar's **Inbox** opens it, and its number is the **Needs you** section only — a running `steer`, a `note` and anything snoozed are never counted (a **paused** `steer` is: a session is held on the person), so the number means *what is waiting on a person*. It is not the Org's needs-you count, which is session states alone: the Inbox's number adds open `ask`s to the person, paused `steer`s and due board items, so the two may differ, and each says on hover what it counts and how it differs from the other. The count is `inbox_sections`' **Needs you** list, one computation the page and the poll both read, and the poll marks nothing read (§4.10); the state rows join *Needs you* in that same computation, so the two numbers cannot disagree. The page's mail is polled from the `inbox` RPC (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the page's own poll rather than the pushed stream, which is per record where this page is per person (§4.5 screen 6). Team filter as on the Org (`team:name`, and `team:` alone for entries whose sender carried none), remembered in the browser. Not built: due board items in the count (TD-069 step 3) |
+| Inbox page | **the count**, sections, team filter | `/inbox` (§4.5 screen 6, TD-069). The top bar's **Inbox** opens it, and its number is the **Needs you** section only — a running `steer`, a `note` and anything snoozed are never counted (a **paused** `steer` is: a session is held on the person), so the number means *what is waiting on a person*. It is not the Org's needs-you count, which is session states alone: the Inbox's number adds open `ask`s to the person, paused `steer`s and due board items, so the two may differ, and each says on hover what it counts and how it differs from the other (on the Inbox, the rail's *Needs you* line since TD-129; the title-row pill it replaced is gone). The count is `inbox_sections`' **Needs you** list, one computation the page and the poll both read, and the poll marks nothing read (§4.10); the state rows join *Needs you* in that same computation, so the two numbers cannot disagree. The page's mail is polled from the `inbox` RPC (the person inbox belongs to no session record, so the pushed stream does not carry it); its state rows ride the page's own poll rather than the pushed stream, which is per record where this page is per person (§4.5 screen 6). The filters are **the rail** (next row; TD-129), designed 2026-09-24 in place of the typed `team:name` box; due board items joined the count 2026-09-23 (TD-069 step 3) |
+| Inbox page: **the rail** | **Urgency**, **Teams**, **Kinds** — every line a toggle — **Clear filters**, **find** | §4.5 screen 6 *The rail* (TD-129; designed 2026-09-24, not built — TD-135). Left of the column, sticky, starting under the title (*Inbox* alone on the top line): **Clear filters**, the find box, then three groups of toggles: *Urgency* — the sections in the page's order, each with its count; the teams a row on the page carries and *no team*, each with its **Needs you** count; the kinds — *questions*, *steering*, *session states*, *board items*, *notes*, *trail* — each with its count. Within a group the picks are OR'd, across groups AND'd, and nothing picked means all; every count is a count of the rows on the page now — a picked line its share, an unpicked line in a group with a pick *0*, dimmed, an unpicked line in a group without one its share under the other groups' picks — written as a plain number while nothing is picked or typed and *n of all* while anything is, *all* the line's unfiltered count, on rail lines and section headings alike; a *0* line stays so a pick can be undone. A section not picked is not drawn; one picked and emptied by the other groups draws its heading and its empty line — a filter shows or hides rows and never re-orders the queue. **Clear filters**, drawn only while anything is picked or typed, clears the lot, the find box included. The picks are the URL (`team`, `sec`, `kind`, `find`), remembered per browser for a bare `/inbox` and written back with `replaceState`; the top bar's number stays the unfiltered *Needs you*; the title row is *Inbox* alone, the needs-you pill and its hover moved to the rail's *Needs you* line. A row's team badge is the same press as the rail's line for its team; the typed `team:` syntax is retired. Counts from `inbox_sections`, so the rail, the headings and the top bar cannot disagree. Below 720 px: a pinned **Filters ▾** chip with the number of picks, then the teams as chips, picked ones first; the chip opens a full-screen sheet with the three groups, the find box, Clear filters and Done (*Narrow*; TD-137). Client-side but for the counts; nothing written |
+| Inbox page: **find** | one box in the rail, its count | §4.5 screen 6 *Find* (TD-129; TD-135): every word typed must match, in any order, as a substring of the row's whole visible text (`data-find`, lowercased once by the server, on every row kind), a bare number also matching `#` before it; a match unfolds FYI or the snoozed list for the duration and folds it back when the box empties, unless the person had it open; the count reads *n of all*. A fourth group with one pick, AND'd with the rail's three (*guardians* + *jeff* is that team's rows carrying *jeff*, *jeffrey* included), and the rail's counts follow it. `/` focuses it, `Esc` leaves it (TD-124). Nothing written; the poll re-applies it. Replaces TD-069's one-substring match over sender, text and `about` |
+| Inbox message page | **Back**, the row's own controls under the entry, `j` / `k` | `/inbox/<id>` (§4.5 screen 6 *The message page*, TD-129; not built — TD-136): one mail entry whole, reached from the row's text, from `Enter` on the ringed row, and from a trail row's *re*. **Back** (and `Esc`) returns to the list at the same row, ringed, filters kept. Three parts in this order: the entry — its head as on its row (sender, team, kind, `about`, `pr` as a link, age, `answered` by whom and when once closed) and the text whole; the answer — the row's own controls again, the same RPCs and confirms, so an answer here is the answer, and the page returns to the list when it removes the row from its section; the thread, under its heading with its count — the question it answers, the replies it drew (the person's own among them), the outcome under the question it closes (§4.10 *Outcomes*), the pass-up and its recommendation, the `system` notes about it — oldest first, each in its kind's row shape and none a control built from text, gathered at the home by `root` across the person inbox and the records' mailboxes (the `thread` read, §4.7), as far as retention keeps it. `j` / `k` move to the next and previous entry of the list as it was filtered. A pruned entry reads *gone: pruned <t> ago* with **Back**; another host's, the refusal in words (§4.4a). A state row and a board row have no page: **Open** and **Open board** stay theirs. Reading marks nothing (§4.10). No preview pane, by design: the page at any width |
 | Inbox: section heading, the **i** mark | **i** (one per section) | a section is its name, its count and an **i** mark holding the paragraph that says what the section is and what it counts (§4.5 screen 6 *Layout*, TD-082): a tooltip on hover and keyboard focus, and pressed it opens that paragraph in place under the heading (pressed again, it closes); which are open is remembered in the browser. It is a `<button>` — Enter and Space press it — carrying `aria-expanded` and `aria-controls` naming the paragraph, labelled *About <section>*; the tooltip is the same text as the button's description (`aria-describedby`), so a screen reader hears it without pressing — which needs the paragraph in the page always, closed by the `hidden` attribute and never removed. Touch has no hover: a tap opens it in place. Fixed text in the source |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** with the card's optional *why?* beside Deny (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Open** (not built: **Switch profile… / Wait** here, since neither is built on the card; the row gains them when the card does); exited with unpushed work: what Ready to close says (§4.2) and the ref it was measured against, **Reopen and push**, **Resume**, **Open** (details). *Reopen and push* (TD-081) is the banner's one-press **Resume** plus a first prompt the page wrote — *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); offered only where Resume would be silent; the session is attended, so a `git push` the tool asks about arrives as an Allow / Deny row, and the result returns as an outcome (§4.10 *Outcomes*); it depends on `--outcome` (TD-079). A state row leaves the list when the state does; only `stalled?` and unpushed work can be snoozed, being off the tool's clock: their **Snooze** (TD-079) is the home-owned store `attention_snooze` writes, keyed on the record and the row kind, so a session's permission and its stalled row are set aside separately; no `until` clears it, and a snoozed row is in no section and no count until its time. The row is built from the card's own view (pill, `title`, `doing` line, badges); the pill is a `<span>` and a state mark never looks pressable (TD-071 item 8). One predicate (`state_kind`) answers for the rows and the Org's needs-you badge, so every session the Org counts has exactly one row; a `needs-you` record whose `pending` is empty, not a dict, or of an unknown kind is a plain **needs you** row with **Open** and no Allow / Deny — a control built from what is not there is what §4.2 forbids |
 | Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words. It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is never lifted by the tick |
@@ -1857,7 +1971,11 @@ permits it — the caller's controllers, its members, or a session sharing its t
 target. An `ask` to the person takes no `--bound` (TD-069). `--outcome` and `--thread` are TD-079;
 `--answer` and `--pick` are TD-070. `--pr` puts a PR in front of its reader and rides only on an `ask` (§4.9b *The reader*, TD-093). `ao msg person "…"` addresses the org's person inbox,
 ungated. `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because
-it is its own. `ao wait` is a thin call to the host agent's `wait` RPC: it blocks on a member's
+it is its own. **`ao inbox --thread <id>`** (TD-129; not built — TD-136) is the person's read of one
+thread whole: the `thread` RPC, person-only, gathers every entry sharing the named entry's `root`
+across the person inbox and every record's inbox and outbox, one per id, oldest first, marking
+nothing — the person's own replies included, which the person inbox does not keep (§4.10). The
+Inbox's message page draws it (§4.5 screen 6 *The message page*). `ao wait` is a thin call to the host agent's `wait` RPC: it blocks on a member's
 state change (§4.8 "Waking a manager") and returns on new mail as a second thing, so one wait
 covers both and the host agent knows who is blocked and decides mail wakes (§4.10). The person's
 own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (TD-069),

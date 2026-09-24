@@ -219,6 +219,10 @@ not mix:
   board and ledger entries keep theirs.
 
 ---
+- **rail** — the Inbox's left column of filters: the sections, the teams and the kinds as
+  toggles, each with its count, and the find box (design §4.5 screen 6 *The rail*, TD-129). On a
+  phone it is a chip row and a sheet. *Not:* sidebar, facets, tree. — *proposed* 2026-09-24
+  (Paul's shape).
 
 ## Collisions with the tools' own words
 
