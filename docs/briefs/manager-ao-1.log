@@ -390,3 +390,11 @@
 04:21  grinder-ao-2: idle + out_of_work (04:20:01Z; ledger re-read after #519, 1 pickable (TD-125) claimed by grinder-ao-1, rest live-check/eval/Paul's/anchor/design-first) → finished, nothing. grinder-ao-1 still working; team not out of work.
 04:22–04:32 quiet
 04:33  grinder-ao-1: two notes — "done: TD-122 — #517 (techlead-merged) and follow-up #520 merged" and "done: TD-125 — #518 merged (samscrape/dev-cadence relay left to the anchor per ledger)" → cadence check #520: pass; cadence check #518: pass (docs review, 4 findings fixed). grinder-ao-1 still working.
+
+## End of run (2026-09-24, team started 03:42Z)
+
+04:34  grinder-ao-1: idle + out_of_work (ledger re-read after #517/#518/#520, 0 pickable of 58) — finished. Both members now finished (grinder-ao-2 finished at 04:21Z) → ao-grind out of work.
+04:34  ao team stop ao-grind --close --timeout 90: both grinders closed clean (nothing unpushed, no outcome owed). ao progress none --why (both members' why, above). Final cadence check --since 12h across every merged PR: overall verdict pass, 0 failing.
+04:37  Announced wind-down per the just-merged TD-125 convention (PR #518, live mid-run): `ao msg person` note naming the merge list (#517 #518 #519 #520) and each member's search, not a board line — nothing this run waits on the person (no held PR pending, no uncommitted/unpushed work, no refused start/close, no unanswered passed-up question), so no `docs/user_attention.md` entry. This is the first wind-down under the new shape; the old long-paragraph board-line convention this file used on 2026-09-23 is retired.
+Note worth carrying forward: TD-125 landed *during* this run (merged by grinder-ao-1's own PR) and changed my own wind-down procedure before I reached it — a live design/preset change mid-round is not covered by the relay-convention-changes step (that's for `docs/cadence-changes.md`, not the repo's own ledger/preset), so I read `src/agentorc/briefs/manager.md`'s diff directly to confirm the new words before acting. Worth a §6 policy note: relay-convention detection could be widened to catch preset text changes in-repo, not just dev-cadence's synced file.
+04:37  ao close self.
