@@ -70,6 +70,9 @@ Added 2026-09-22 (grinder-ao-1):
   `cadence-review: PASS` produces a comment the check reads as no review at all. Ask the
   reviewer for its findings, then write the verdict line yourself. Post a corrected comment
   rather than editing the old one.
+- A TD number is taken on main between your write and your merge (2026-09-24: TD-126 filed by the
+  anchor while a PR carrying its own TD-126 was open). Before pushing a new entry, and again at the
+  rebase, read `origin/main`'s highest `## TD-` and renumber; keep main's rows and yours row-wise.
 
 **Why:** these cost real time and one wrong PR state on the first run.
 **How to apply:** when scripting ledger moves or chaining merges in this repo, reuse these rules;
