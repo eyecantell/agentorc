@@ -74,6 +74,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-125 | A team's wind-down report is a counted board line for the person, most of it a diagnostic and a pointer at a PR that waits on the reader, not on the person | Medium | Preset done (PR #518); telling samscrape and dev-cadence is the anchor's |
 | TD-126 | A board line has Open board, Done and Snooze but no Reply: an instruction back to the sender means editing the file and waiting for a session to read it | Medium | Design first (the designer) — asked by Paul 2026-09-24 |
 | TD-127 | Inbox entries to the person are written for another agent: dense, dry, the decision buried under the reading; the row draws the whole text as one block | Medium | Design first (the designer) — asked by Paul 2026-09-24 |
+| TD-128 | A profile billed per token (an API key, a hosted open model) has no usage window, so the usage gate and the chip have nothing to read and nothing bounds its spend | Low | Open — design first |
 
 
 ---
@@ -1327,3 +1328,19 @@ Two things are missing, and the design round chooses between them or takes both:
 **Why:** the Inbox's one job is to let a person act on what waits on them in a press; text written for the record makes the person do the reading a session already did.
 
 **Related:** TD-125 (the wind-down report as a two-line note — the same shape rule, applied once), TD-069 (the Inbox page), TD-070 (suggested answers — the press), TD-126 (the board reply), TD-093 (*answered for you* on a held PR).
+## TD-128: A profile billed per token (an API key, a hosted open model) has no usage window, so the usage gate and the chip have nothing to read and nothing bounds its spend
+
+**Priority:** Low
+**Added:** 2026-09-24 (numbered TD-126 until the rebase found main's TD-126; Paul, reading the Paperclip survey: *make a note to handle API (pay per token) budgets at some point, especially as open source models gain traction*; session `research_paperclip`)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — design first; nothing runs on a metered profile today
+
+**Status:** Open. Every profile today is a subscription login, whose binding budget is the adapter's usage windows (§4.2a, §6 *Usage gate*, TD-100). A profile on an API key (`ANTHROPIC_API_KEY`), on a hosted open-weights model behind an OpenAI-compatible endpoint, or on a second adapter (TD-112) billed the same way reports no window: the chip draws nothing, the gate never trips, and a night's unattended run has no bound but the card on file.
+**Location:** design §4.2a (profiles), §4.3 (the adapter's `usage()`), §6 *Usage gate*, §4.5a (the usage chip)
+
+**Why:** open models and API billing are where a second tool is most likely to come from, and an unattended team on a metered profile is the case where a runaway costs real money rather than a window.
+
+**Fix, design first:** (1) a profile says how it is billed — `subscription` (today's windows) or `metered`, with a price per million tokens in and out where the adapter cannot report cost itself. (2) The adapter reports spend per turn where it can (Claude Code's transcript `usage` records; the endpoint's own response for others). The home sums spend per profile per window (day, week, month), in the same shape as a usage reading, so the chip and the gate read one kind of thing. (3) A reserve on a metered profile is an amount per window, with a warning line and a hard stop, the same pause the usage gate sends today. Paperclip's generic budget row (`scope, metric, window, amount, warnPercent, hardStop`; ADR 2026-09-24 item 3) is the shape to weigh, keyed on the profile and optionally the team. (4) A self-hosted model has no price. Its limit is throughput or GPU time, so `metered` with a zero price must still show tokens, and a reserve may be in tokens rather than money.
+
+**Related:** TD-100 (the usage gate), TD-122 (one reading per account), TD-112 (the second adapter), [ADR 2026-09-24](decisions/2026-09-24-paperclip.md) item 3, [ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md) (dollars at list price were not wanted *on a subscription*; this is the case where they are the bill).
