@@ -123,7 +123,8 @@ def test_every_key_names_a_control_the_page_draws(monkeypatch, tmp_path):
     the Inbox's row controls are read from the row templates, which draw every kind of row."""
     got = _probe()
     org = _org_html(monkeypatch, tmp_path)
-    inbox = "".join((UI / "templates" / f).read_text() for f in ("base.html", "inbox.html", "inbox_row.html"))
+    parts = ("base.html", "inbox.html", "inbox_rail.html", "inbox_row.html")
+    inbox = "".join((UI / "templates" / f).read_text() for f in parts)
     # the overlay, and its ? for the mouse
     assert 'id="keyhelp"' in org and 'id="keyrows"' in org and 'id="keyhelpbtn"' in org
     assert 'class="card sc' in org and 'tabindex="0"' in org  # a card is a tab stop: the ring is its focus ring

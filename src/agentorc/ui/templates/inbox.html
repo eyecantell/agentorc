@@ -21,16 +21,24 @@
   'answered': 'Questions a teammate answered for you from the record — the design, the ledger, a brief, a decision of yours — each with the question, who asked, the answer, who answered and where it is written down. Never counted: nothing waits on you. It is here so a confident wrong answer cannot steer a team unseen. Overrule sends your word to the one who asked, on the question’s own thread, with a copy to the one who answered; it outranks theirs, and the asker owes you what came of it. Dismiss removes the row. Newest first.',
   'fyi': 'Notes, what the home reported about your own messages, late replies, outcomes under the questions they close, the trail of rows that resolved without you, and what lapsed or was declined — kept for 12 hours and then pruned. Its own number is never added to the one beside it: that one is what needs you. This section opens itself when it holds something this browser has not seen. Newest first. Dismiss removes an entry, and Dismiss all removes the ones on screen — never mail that arrived after the page was drawn.',
 } %}
+{% import "inbox_rail.html" as rl %}
+{%- set picks = picks or rail_picks({}) %}
+{%- set rail = rail or rail_counts(rail_rows(sections), picks) %}
+{#- a section heading's count, the rail's rule (§4.5 screen 6 *The rail*): *n of all* while
+    anything is picked or typed, a plain number otherwise, and nothing for an empty section -#}
+{% macro headn(sec) -%}
+{%- set c = rail.heads[sec] -%}{%- if rail.filtered %}{{ c.shown }} of {{ c.all }}{% elif c.all %}{{ c.all }}{% endif -%}
+{%- endmacro %}
 {% macro imark(sec, name) -%}
 <button class="imark" type="button" data-info="info-{{ sec }}" id="i-{{ sec }}" aria-controls="info-{{ sec }}" aria-expanded="false" aria-describedby="info-{{ sec }}" aria-label="About {{ name }}" title="{{ info[sec] }}">i</button>
 {%- endmacro %}
 <div class="page inboxpage">
-  <div class="row gap wrap">
-    <span class="h1">Inbox</span>
-    <span class="pill s-needs{% if not sections.count %} hidden{% endif %}" id="needspill" title="what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you, steering you paused and board items due today or overdue, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference."><span class="dot"></span><span id="needsn">{{ sections.count }}</span> needs you</span>
-    <span class="grow"></span>
-    <input class="input" id="ifilter" placeholder="filter… (team:name)" style="width: 220px;" title="team:name shows one team, team: shows what carries none; anything else matches sender, text and about">
-  </div>
+  {#- §4.5 screen 6 *The rail*: *Inbox* has the title line to itself — the needs-you pill and the
+      typed filter went with the rail, whose *Needs you* line carries the pill's hover now. -#}
+  <div class="row gap wrap"><span class="h1">Inbox</span></div>
+  <div class="inboxwrap">
+  {{ rl.rail_html(rail, picks, "what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you, steering you paused and board items due today or overdue, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference. The top bar's number is this line's whole, never filtered.") }}
+  <div class="inboxcol">
   {# Always drawn, hidden until it is true: the page's poll turns it on when the host agent goes
      away under it, so the rows on screen are not silently frozen (design §4.5 *no silent failure
      path*, TD-069). The poll's own words go in `#agentdownwhy`. #}
@@ -43,7 +51,7 @@
   </details>
 
   <section class="isec" id="sec-needs">
-    <div class="row gap wrap sechead"><span class="h2">Needs you</span><span class="meta" id="n-needs"></span>{{ imark('needs', 'Needs you') }}</div>
+    <div class="row gap wrap sechead"><span class="h2">Needs you</span><span class="meta" id="n-needs">{{ headn('needs') }}</span>{{ imark('needs', 'Needs you') }}</div>
     <p class="note secinfo" id="info-needs" hidden>{{ info['needs'] }}</p>
     {#- the board reader could not be read (TD-069 step 3): said, never shown as a clear board -#}
     <div class="note warn{% if not board_note %} hidden{% endif %}" id="boardnote">{{ board_note }}</div>
@@ -52,7 +60,7 @@
   </section>
 
   <section class="isec" id="sec-steering">
-    <div class="row gap wrap sechead"><span class="h2">Steering</span><span class="meta" id="n-steering"></span>{{ imark('steering', 'Steering') }}</div>
+    <div class="row gap wrap sechead"><span class="h2">Steering</span><span class="meta" id="n-steering">{{ headn('steering') }}</span>{{ imark('steering', 'Steering') }}</div>
     <p class="note secinfo" id="info-steering" hidden>{{ info['steering'] }}</p>
     <div class="inboxrows" id="rows-steering">{% with rows = sections.steering, section = 'steering' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing is steering.</div>
@@ -62,25 +70,27 @@
      *Steering*, in neither number, and empty for most people most of the time — so it draws only
      when it has something, like the snoozed box above. #}
   <section class="isec{% if not sections.waiting %} hidden{% endif %}" id="sec-waiting">
-    <div class="row gap wrap sechead"><span class="h2">Waiting on them</span><span class="meta" id="n-waiting"></span>{{ imark('waiting', 'Waiting on them') }}</div>
+    <div class="row gap wrap sechead"><span class="h2">Waiting on them</span><span class="meta" id="n-waiting">{{ headn('waiting') }}</span>{{ imark('waiting', 'Waiting on them') }}</div>
     <p class="note secinfo" id="info-waiting" hidden>{{ info['waiting'] }}</p>
     <div class="inboxrows" id="rows-waiting">{% with rows = sections.waiting, section = 'waiting' %}{% include "inbox_rows.html" %}{% endwith %}</div>
+    <div class="note empty" hidden>Nothing is waiting on them.</div>
   </section>
 
   {# design §4.5a **Inbox row: answered for you** (§4.9b, TD-075 step 2): under *Waiting on them*,
      uncounted, newest first — a fold whose heading is the disclosure, as FYI's is, open until the
      person folds it, and drawn only when it holds something, as *Waiting on them* is. #}
   <details class="isec{% if not sections.answered %} hidden{% endif %}" id="sec-answered" open>
-    <summary class="row gap wrap sechead"><span class="h2">Answered for you</span><span class="meta" id="n-answered"></span>{{ imark('answered', 'Answered for you') }}</summary>
+    <summary class="row gap wrap sechead"><span class="h2">Answered for you</span><span class="meta" id="n-answered">{{ headn('answered') }}</span>{{ imark('answered', 'Answered for you') }}</summary>
     <p class="note secinfo" id="info-answered" hidden>{{ info['answered'] }}</p>
     <div class="inboxrows" id="rows-answered">{% with rows = sections.answered, section = 'answered' %}{% include "inbox_rows.html" %}{% endwith %}</div>
+    <div class="note empty" hidden>Nothing was answered for you.</div>
   </details>
 
   {# FYI's fold **is** its heading (§4.5 screen 6 *Layout*): the disclosure's own ▾ before the name
      and no second fold control anywhere. The **i** inside the summary is a button, so the script
      stops its press from reaching the disclosure. #}
   <details class="isec" id="sec-fyi">
-    <summary class="row gap wrap sechead"><span class="h2">FYI</span><span class="meta" id="n-fyi"></span>{{ imark('fyi', 'FYI') }}
+    <summary class="row gap wrap sechead"><span class="h2">FYI</span><span class="meta" id="n-fyi">{{ headn('fyi') }}</span>{{ imark('fyi', 'FYI') }}
       {#- §4.10: **Dismiss all** dismisses the entries **this browser has on screen**, by id, never
           *everything FYI holds now* — mail that arrived after the page was drawn is exactly what
           must not go unseen. One confirm, written by the page with the number it is about. -#}
@@ -91,6 +101,8 @@
     <div class="inboxrows" id="rows-fyi">{% with rows = sections.fyi, section = 'fyi' %}{% include "inbox_rows.html" %}{% endwith %}</div>
     <div class="note empty" hidden>Nothing here.</div>
   </details>
+  </div>
+  </div>
 </div>
 {% endblock %}
 {% block scripts %}<script>AO.inbox();</script>{% endblock %}

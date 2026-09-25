@@ -1859,6 +1859,182 @@ def inbox_sections(
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"])}
 
 
+# -- the rail (design §4.5 screen 6 *The rail* and *Find*, §4.5a **Inbox page: the rail**; TD-129,
+# built by TD-135) ----------------------------------------------------------------------------------
+
+# *Urgency*: the page's own sections in the page's order. The snoozed list is not one of them: it
+# is in no section and no count (§4.10 *Snooze*).
+RAIL_SECTIONS = ("needs", "steering", "waiting", "answered", "fyi")
+RAIL_SECTION_NAMES = {
+    "needs": "Needs you",
+    "steering": "Steering",
+    "waiting": "Waiting on them",
+    "answered": "Answered for you",
+    "fyi": "FYI",
+}
+# *Kinds*: a row's coarse kind, one per line (§4.5 screen 6 *The rail*)
+RAIL_KINDS = ("questions", "steering", "states", "board", "notes", "trail")
+RAIL_KIND_NAMES = {
+    "questions": "questions",
+    "steering": "steering",
+    "states": "session states",
+    "board": "board items",
+    "notes": "notes",
+    "trail": "trail",
+}
+RAIL_NO_TEAM = "none"  # a row that carries no team, in the URL and on the rail's *no team* line
+_FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>"
+
+
+def rail_kind(e: Mapping[str, Any]) -> str:
+    """A row's coarse kind (§4.5 screen 6 *The rail*): *questions* (an `ask`, a `conflict`, a
+    passed-up question), *steering* (a `steer`), *session states* (every state row, alarms
+    included), *board items*, *notes* (a `note`, a `system` note, a reply, answered-for-you, an
+    outcome), *trail*."""
+    row = e.get("row")
+    if row == "board":
+        return "board"
+    if row == "trail":
+        return "trail"
+    if row:
+        return "states"
+    if e.get("kind") in PERSON_ASK_KINDS or e.get("passed_up"):
+        return "questions"
+    if e.get("kind") == "steer":
+        return "steering"
+    return "notes"
+
+
+def row_find(e: Mapping[str, Any], section: str = "") -> str:
+    """The row's whole visible text, lowercased once, which the find matches every word against
+    (§4.5 screen 6 *Find*): a mail row's sender, team, kind, `about`, PR and text; the rows the
+    home builds carry their own (`find` on a state, alarm or board row); a trail row its name,
+    kind, `how` and text. `data-find` on every row kind is this."""
+    row = e.get("row")
+    if row == "trail":
+        return _find_text(e.get("name"), e.get("team"), e.get("kind"), "trail", e.get("how"), e.get("text"))
+    if row:  # the home's own text for the row, and its team and pill, which the row draws too
+        return _find_text(e.get("find"), e.get("team"), e.get("state_label"))
+    answered = e.get("answered") if section == "answered" and isinstance(e.get("answered"), dict) else {}
+    pr = e.get("pr")
+    return _find_text(
+        e.get("from_name") or e.get("from"),
+        e.get("team"),
+        e.get("kind"),
+        e.get("about"),
+        f"#{pr}" if isinstance(pr, int) and not isinstance(pr, bool) else "",
+        e.get("text"),
+        e.get("asker_name") if answered else "",
+        answered.get("question") if answered else "",
+        answered.get("source") if answered else "",
+    )
+
+
+templates.env.globals["rail_kind"] = rail_kind
+templates.env.globals["row_find"] = row_find
+templates.env.globals["rail_sections"] = RAIL_SECTIONS
+templates.env.globals["rail_section_names"] = RAIL_SECTION_NAMES
+templates.env.globals["rail_kinds"] = RAIL_KINDS
+templates.env.globals["rail_kind_names"] = RAIL_KIND_NAMES
+
+
+def find_words(find: str) -> list[str]:
+    """The find's words (§4.5 screen 6 *Find*): lowercased, and a word's edge punctuation dropped,
+    so *517,* finds what *517* does; a `#` is kept, and a bare number finds *#517* as a substring
+    of it anyway."""
+    return [w for w in (x.strip(_FIND_EDGE) for x in str(find or "").lower().split()) if w]
+
+
+def find_matches(text: str, words: Collection[str]) -> bool:
+    """Every word must match, in any order, as a substring of the row's text."""
+    return all(w in text for w in words)
+
+
+def rail_picks(query: Mapping[str, Any]) -> dict[str, Any]:
+    """The picks a page's URL carries (§4.5 screen 6 *The rail*): `team`, `sec` and `kind` as comma
+    lists — `none` is *no team* — and `find`. An unknown section or kind is dropped, never an error:
+    a link survives a renamed line by showing a little more."""
+
+    def lst(key: str) -> list[str]:
+        return [x.strip() for x in str(query.get(key) or "").split(",") if x.strip()]
+
+    return {
+        "team": lst("team"),
+        "sec": [x for x in lst("sec") if x in RAIL_SECTIONS],
+        "kind": [x for x in lst("kind") if x in RAIL_KINDS],
+        "find": str(query.get("find") or "").strip(),
+    }
+
+
+def rail_rows(sections: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Every row on the page that the rail counts, as the four things a pick reads: its section,
+    team (`none` for no team), coarse kind and find text. The snoozed list is in no count."""
+    return [
+        {
+            "section": sec,
+            "team": str(e.get("team") or "") or RAIL_NO_TEAM,
+            "kind": rail_kind(e),
+            "find": row_find(e, sec),
+        }
+        for sec in RAIL_SECTIONS
+        for e in sections.get(sec) or ()
+    ]
+
+
+def rail_counts(rows: Collection[Mapping[str, str]], picks: Mapping[str, Any]) -> dict[str, Any]:
+    """The rail's counts and the section headings' (§4.5 screen 6 *The rail*): **every count is a
+    count of rows on the page now**. Within a group the picks are OR'd, across groups AND'd, and a
+    group with nothing picked means all of it; the find is a fourth group. For a line: a picked line
+    reads its share of the page; an unpicked line in a group with a pick reads 0; an unpicked line
+    in a group without one reads its share under the other groups' picks. `all` is the line's count
+    with no filter at all. A **team** line counts that team's *Needs you* rows — *which team needs
+    me* (TD-135's steer to the techlead, 2026-09-25). `app.js`'s `AO.railCounts` is this function
+    again, over the rows in the DOM, and a test holds the two to one answer."""
+    words = find_words(picks.get("find") or "")
+    pick = {g: set(picks.get(g) or ()) for g in ("team", "sec", "kind")}
+    key = {"team": "team", "sec": "section", "kind": "kind"}
+
+    def passes(r: Mapping[str, str], skip: str = "") -> bool:
+        for g, want in pick.items():
+            if g != skip and want and r[key[g]] not in want:
+                return False
+        return find_matches(r["find"], words)
+
+    teams = sorted({r["team"] for r in rows if r["team"] != RAIL_NO_TEAM})
+    if any(r["team"] == RAIL_NO_TEAM for r in rows):
+        teams.append(RAIL_NO_TEAM)
+    # a picked team no row carries still gets its line, so the pick can be undone
+    teams += [t for t in picks.get("team") or () if t not in teams]
+
+    def line(group: str, value: str, among: Collection[Mapping[str, str]]) -> dict[str, int]:
+        mine = [r for r in among if r[key[group]] == value]
+        shown = 0 if pick[group] and value not in pick[group] else sum(1 for r in mine if passes(r, group))
+        return {"shown": shown, "all": len(mine)}
+
+    needs = [r for r in rows if r["section"] == "needs"]
+    return {
+        "filtered": bool(pick["team"] or pick["sec"] or pick["kind"] or words),
+        "sections": {s: line("sec", s, rows) for s in RAIL_SECTIONS},
+        "teams": {t: line("team", t, needs) for t in teams},
+        "team_order": teams,
+        "kinds": {k: line("kind", k, rows) for k in RAIL_KINDS},
+        "heads": {
+            s: {
+                "shown": sum(1 for r in rows if r["section"] == s and passes(r)),
+                "all": sum(1 for r in rows if r["section"] == s),
+            }
+            for s in RAIL_SECTIONS
+        },
+    }
+
+
+# the page computes its rail from its sections when a caller did not (a test rendering the template
+# directly, as the rows are shaped by `shaped` and `suggested_answers` whoever renders them)
+templates.env.globals["rail_picks"] = rail_picks
+templates.env.globals["rail_rows"] = rail_rows
+templates.env.globals["rail_counts"] = rail_counts
+
+
 # -- app -------------------------------------------------------------------------------------------
 
 
@@ -2812,11 +2988,14 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             attention_snoozed=got.get("attention_snoozed"),
             boards=boards,
         )
+        picks = rail_picks(request.query_params)
         return templates.TemplateResponse(
             request,
             "inbox.html",
             {
                 "sections": sections,
+                "picks": picks,
+                "rail": rail_counts(rail_rows(sections), picks),
                 "origin": page_origin(request),
                 "board_note": board_note,
                 "person_needs": sections["count"],
@@ -2886,6 +3065,13 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
         got["answered_marks"] = [{"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]]
         got["html"] = inbox_html(sections, page_origin(request))
+        # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its rows,
+        # so the poll brings the group's markup as it brings the rows'; the script presses the lines
+        # the URL picks and recounts every line from the rows on the page
+        rail = rail_counts(rail_rows(sections), rail_picks({}))
+        got["html"]["rail_teams"] = str(
+            templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
+        )
         return got
 
     # design §4.5a **Inbox row** controls (§4.10): each is a person's own act on their own inbox,
