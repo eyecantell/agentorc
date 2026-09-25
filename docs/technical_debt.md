@@ -103,6 +103,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-155 | A resumed session that starts no turn reads `working` until it stalls: `SessionStart` with source `resume` lands at the composer and fires no `Stop` | Medium | Open |
 | TD-156 | UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel, and a concluded team folds the card that is ready to close | Medium | Open — design-first, Paul's interactive review |
 | TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Open — design-first |
+| TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Open — design-first |
 
 
 ---
@@ -1922,3 +1923,23 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a person at a concluded team's card can learn, without leaving the page, that Forget drops the record and keeps the worktree, and that Start closes the concluded sessions and runs the team again from its definition, and the sentence they read is §4.5a's.
 
 **Related:** §4.5a (the table; *Inbox: section heading, the i mark*; *Settings page: read-only values and the i mark*), TD-148 (the Settings page's *i* marks, the nearest built shape), TD-156 (the end-of-session review this sits beside — the same team card), TD-095 (the card's foot), §4.9a (what Start and Wind down do to a team).
+
+## TD-158: The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: a note to the on-call techlead, expecting it to wake)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+
+**Status:** Open — nothing designed. Done the same day, beside it: the composer opens on `ask` (§4.5a **Message**, the history line of 2026-09-25), so the case that prompted this — a question typed as a note — is no longer the default.
+
+**Location:** `src/agentorc/ui/templates/base.html` (the `#mailbox` dialog), `src/agentorc/ui/static/app.js` (`AO.compose`, which today knows only the addressee's name), `src/agentorc/ui/app.py` (`view`: `state`, `confidence`, `seat`, `seat_due`, `mail.wake_budget_spent`, `unattended` — everything the line needs is already on the card), design §4.5a **Message**, §4.9b *Seats with a trigger*, §4.10 (the doorbell, the wake budget, invariant 5).
+
+**Why:** the composer looks the same whoever it is addressed to, and what happens next differs by the addressee's state: an `idle` session is rung within a tick; a `working` one reads it when its turn ends; an on-call seat is filled by an `ask` and not by a `note` (the trigger counts questions, `asks_waiting`); an `exited` member's mail waits for its restart or resume (`keep_mail`); a session whose wake budget is spent takes the mail without waking; a person's session is never woken by mail (invariant 5). Paul sent *Lets check PR 545 and merge it when its ready* as a note to the exited techlead and waited for it to come. Nothing on the screen said the seat comes on a question. **Refusing the note is the wrong fix**: a note to a seat is a legitimate FYI, kept and read at the next fill — the same reason `ao msg` delivers to an exited record — and a refusal would turn information into a question just to get it delivered, which §4.10 tells sessions not to do.
+
+**What the design round has to settle:** (a) **the line** — one sentence under the kind selector, from the addressee's state, in the composer's own words: *on call — an ask fills this seat now; a note waits for its next question*; *exited — read when it is resumed or restarted*; *working — read when its turn ends*; *idle — rung within a minute*; *wake budget spent — lands, read when it next turns*; *a person's session — lands, never wakes it*; (b) **whether the line changes with the kind** as the person switches ask ↔ note (it should, for the seat); (c) **the same line on the CLI** — `ao msg`'s reply already carries a verdict; it could carry this sentence; (d) the mockup.
+
+**Done when** a person opening Message on an on-call seat reads, before typing, that a note will not fill it and an ask will, and switching the kind changes the line.
+
+**Related:** §4.5a **Message** (the row this extends), §4.9b (the seat's trigger), §4.10 (delivery, the doorbell, the budget, invariant 5), TD-157 (the *i* marks — this line is the same idea at the moment of sending), TD-153 (what a session is told about being woken; this is what a person is told).

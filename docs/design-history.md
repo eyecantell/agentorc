@@ -250,6 +250,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-143, the designer; the cloud session's recommendation confirmed): the Focus **Reports** panel grouped by state with the PR beside a claim in review, Drop behind *more ▾* on an in-progress row only with a confirm naming the consequence, the explanation as the heading's *i* mark, the session told by a `system` note. Cause: on 2026-09-24 Paul read claimed rows with open PRs as a to-do list and dropped two. An Undo on the trail row was asked of Paul, not designed. The build is TD-150.
 - 2026-09-25 (TD-128, the designer): the **usage** chip's metered form — spend over the amount, or tokens with no amount, *spend unknown* rather than nothing.
 - 2026-09-25 (TD-026, the designer): the **starts** note, the **At** field, the ◷ glyph, Start now and Cancel on a scheduled record's Focus banner and card. Also recorded: TD-143's Undo — Paul chose none (2026-09-25); the row stands as merged in #546.
+- 2026-09-25 (**Message**, the anchor with Paul): the composer opens on `ask`, not `note` — Paul mailed an on-call techlead a note, which fills no seat (§4.9b's trigger is a question), and asked for the default to change; TD-158 designs what the composer says about when a message will be read.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.

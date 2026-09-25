@@ -287,6 +287,17 @@ def test_the_retired_dialog_leaves_nothing_behind_that_still_points_at_it():
     assert "AO.refreshInboxPage" in js and 'href="/inbox"' in base
 
 
+def test_message_composer_opens_on_ask():
+    """Design §4.5a **Message** (2026-09-25): the composer's kind is `ask` unless the person picks
+    `note` — a person's message is usually a question, and only an `ask` fills an on-call seat."""
+    js = (UI / "static" / "app.js").read_text()
+    base = (UI / "templates" / "base.html").read_text()
+    assert '$("#mailkind").value = "ask"' in js
+    assert '$("#mailkind").value = "note"' not in js
+    sel = base[base.index('id="mailkind"') :]
+    assert sel.index('value="ask" selected') < sel.index('value="note"')
+
+
 SWAP_PROBE = """
 const fs = require("fs");
 const noop = () => {};
