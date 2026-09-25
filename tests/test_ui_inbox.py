@@ -1579,6 +1579,47 @@ def test_a_one_press_resume_carries_the_record_and_never_its_unattended_flag(tmp
 
 
 @pytest.mark.unit
+def test_a_resume_of_a_worktree_record_checks_the_name_in_the_records_scope(tmp_path, monkeypatch):
+    """TD-145 (2026-09-24): a techlead in `<repo>/.claude/worktrees/techlead-ao-1` was resumed with
+    `dir` alone, so the scope became the worktree's basename — `ao-techlead-ao-1-techlead-ao-1`,
+    collapsed to `ao-techlead-ao-1`, an id nobody held — and a second record appeared beside
+    `ao-agentorc-techlead-ao-1` instead of replacing it. The create must carry the record's `repo`,
+    so the id the name check computes is the record's own; and *Resume with changes…* must land on
+    the form the way the form's own Start would send it back: Where = new worktree, its name, and
+    the repo in the directory field."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import resume_create, resume_form_url
+    from sessionorc import naming
+
+    repo = tmp_path / "agentorc"
+    wt = repo / ".claude" / "worktrees" / "techlead-ao-1"
+    wt.mkdir(parents=True)
+    rec = {
+        "id": "ao-agentorc-techlead-ao-1", "name": "techlead-ao-1", "dir": str(wt), "repo": str(repo),
+        "worktree": "techlead-ao-1", "adapter": "claude-code", "profile": "grind-fable", "role": "techlead",
+        "team": "ao-grind", "project": "agentorc", "lane": [], "controllers": ["ao-agentorc-manager-ao-1"],
+        "adapter_id": "u-1", "state": "exited", "unattended": True,
+    }  # fmt: skip
+    got = resume_create(rec)
+    assert got["repo"] == str(repo) and got["dir"] == str(wt)
+    # the proof: the id the agent's name check would compute is the record's own
+    assert naming.base_id(got["dir"], got["repo"], got["name"]) == rec["id"]
+    assert naming.base_id(got["dir"], None, got["name"]) == "ao-techlead-ao-1"  # what it was without `repo`
+    # a record with no repo sends none (§4.4: a parameter never set is never sent)
+    assert "repo" not in resume_create({**rec, "repo": None, "dir": str(tmp_path)})
+    # Resume with changes…: the form's fields, the way its Start sends them back
+    url = resume_form_url(rec)
+    q = dict(x.split("=", 1) for x in url.removeprefix("/new?").split("&"))
+    from urllib.parse import unquote_plus
+
+    q = {k: unquote_plus(v) for k, v in q.items()}
+    assert q["dir"] == str(repo) and q["where"] == "worktree" and q["worktree"] == "techlead-ao-1"
+    assert "repo" not in q  # the form has no repo field; it derives it from Where
+    plain = resume_form_url({**rec, "repo": None, "dir": str(tmp_path)})
+    assert "where=" not in plain and "worktree=" not in plain
+
+
+@pytest.mark.unit
 def test_when_a_resume_cannot_be_silent_it_is_the_filled_in_form_and_not_a_guess(tmp_path):
     """§4.5a: *when it cannot be silent it is not a guess*. What the record itself settles is
     answered before anything is created; everything else is the agent's own refusal, and either
