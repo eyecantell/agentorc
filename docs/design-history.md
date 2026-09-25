@@ -477,6 +477,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-138): the renderer and the fold built; `ao inbox` still prints the source as written, and `ao msg`'s 60-word warning is TD-139's.
 - 2026-09-25 (TD-158, the designer): **When it is read** — one sentence per addressee from `mail.read_when(record, kind, now)`, in the doorbell's own precedence, shown in the composer and on every `ao msg` reply; a person's message refills the budget so *budget spent* is a session's sentence only. Refusing a note to a seat was rejected: it would turn information into a question to get it delivered.
 - 2026-09-25 (TD-139, grinder-ao-2): the senders' half built — the paragraph in the same words in the `techlead`, `manager` and `grinder` presets, `ao msg`'s warning (`FIRST_PARA_WORDS`, counted on the Inbox row's own `fold`, printed to stderr after the send, for `person` and a `--source` reply), and the Message / Reply dialog's placeholder *First what you want, then why.* The designer's brief (`docs/briefs/`, held for the techlead's read) goes in its own PR.
+- 2026-09-25 (TD-134, grinder-ao-1): *A conflict, worked* — the worker ends its turn to be rung by the reply, where it had said *ends its turn in `ao wait`* (TD-153 made waiting on mail the end of the turn); and a worker that asked the person itself tells both controllers the ruling in one `note`, which the text had left unsaid and the test found: a worker holds no copy of its own conflict, so it cannot `reply` on its thread.
 
 ## 5. Configuration
 

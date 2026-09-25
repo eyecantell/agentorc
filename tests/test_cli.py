@@ -875,6 +875,15 @@ def test_the_skill_tells_a_session_that_ao_wait_exists():
     assert "silence is not an event" in skill.lower()  # the limit, where the reader will act on it
 
 
+def test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction():
+    """TD-134 (design §4.10 *A conflict, worked*): the kind and its citations are named, the worker
+    never picks one, and the unanswered case goes to the person — never a stalled worker."""
+    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    assert "--kind conflict --cites <send> <send>" in text
+    assert "never pick one" in text and "the first reply is the ruling" in text
+    assert "ask the person yourself" in text
+
+
 def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
     """TD-079 step 3 (design §4.10 *Outcomes*): a command a session is never told to run is
     half-shipped. Every brief a session is started from — the package's role templates and this
