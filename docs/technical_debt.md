@@ -86,7 +86,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Open — designed, pickable |
 | TD-156 | UI review of the end of a session, and of the whole Focus screen: the two-line header, Close session as the next act, the side panel's folds, a concluded team never folds | Medium | Designed and built 2026-09-25 (cloud session with Paul) — live look pending; (g) not reproduced |
 | TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Designed 2026-09-25 (the designer) — the build is TD-165, TD-166; archives with them |
-| TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Open — design-first |
+| TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Designed 2026-09-25 (the designer) — the build is TD-167; archives with it |
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Designed 2026-09-25 (the designer) — the build is TD-168; archives with it |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 | TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Open — design-first |
@@ -1591,9 +1591,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul, at a concluded team's card: *questions arise with what "forget" and "start" really mean — when and why would I want to do those?*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-167
 
-**Status:** Open — nothing designed. What exists: §4.5a is the table of every control (a control not in it does not exist, CLAUDE.md), and the UI carries `title=` tooltips on some buttons (`group_head.html`'s fold and Start, the unattended badge) and *i* marks on two pages — the Inbox's section headings (§4.5a *Inbox: section heading, the i mark*: the paragraph that says what the section is and counts) and the Settings page's values (*Settings page: read-only values and the i mark*: where each comes from and when it is re-read). Nothing tells a person, at the button, what **Forget** or **Start** does to the thing it is on or when they would want it.
+**Status:** Designed 2026-09-25 (the designer): design §4.5 screen 10 *Help*, §4.5a the ***i*** mark row (team card header, Focus header, exited banner), the *Help page* row, the **?** overlay's last line, and *The help text* — the list under the table, twelve paragraphs in the shape *what it does · when you would press it · what it does not do*, the one source the marks, the `title` tooltips and the page draw, held equal to `help.py` by a test. Settled: (a) the marks per control group with the page behind them, and the paragraph's first sentence as every control's `title`; the Org card carries no mark (its foot is quiet, TD-095); (b) the source is a list in §4.5a, not a fourth column — the rows are a specification, the paragraphs are for the person; (c) the first set is Start, Wind down, Stop now, the fold, Forget, Forget all, Kill, Close, Wrap up, Resume, Message…, Switch profile…; (d) the Inbox's mark shape carries the keyboard; (e) mockups `Help.dc.html`, the marks on Main and Focus; (f) a named member's Forget stays — Forget drops a run's record, never the seat, and Start fills the seat again. The build is TD-167; this entry archives with it. The surface (marks with a page behind them, against a page alone) and (f) went to Paul as one steer, merged at its bound unless he says otherwise. **What was:** nothing designed. What exists: §4.5a is the table of every control (a control not in it does not exist, CLAUDE.md), and the UI carries `title=` tooltips on some buttons (`group_head.html`'s fold and Start, the unattended badge) and *i* marks on two pages — the Inbox's section headings (§4.5a *Inbox: section heading, the i mark*: the paragraph that says what the section is and counts) and the Settings page's values (*Settings page: read-only values and the i mark*: where each comes from and when it is re-read). Nothing tells a person, at the button, what **Forget** or **Start** does to the thing it is on or when they would want it.
 
 **Location:** design §4.5a (the table, whose third column is the source), §4.5 (*The card's anatomy*, the foot), `src/agentorc/ui/templates/card.html`, `group_head.html`, `focus.html` (the buttons and their `title=`), `src/agentorc/ui/static/app.js` (confirms), `docs/mockups/gen.py`.
 
@@ -1790,6 +1790,29 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-154 (the design), TD-165 (the RPC), TD-095 (the editor button), TD-071 (nothing on a page is a control from what a session wrote), TD-046 (a new tab beside Focus).
 
+## TD-167: Build the help: `help.py` as the one table, the *i* marks on the team card, the Focus header and the exited banner, the `title` tooltips from it, the Help page, the overlay's link, and the test that holds it to §4.5a
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-157's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.5 screen 10 *Help*, §4.5a the ***i*** mark row, the *Help page* row, the **?** overlay row's last line, and *The help text* under the table; mockups `Help.dc.html`, and the marks on `Main.dc.html` and `Focus.dc.html`.
+
+**Location:** a new `src/agentorc/ui/help.py` (the table: `(where, control) → paragraph`, plus the groups per mark and the screens' order), `src/agentorc/ui/templates/group_head.html` (Start, Wind down, Stop now, Forget all, the fold: their `title=` and the mark), `card.html` (Forget, Close session, Message…, Switch profile…: `title=`), `focus.html` (Wrap up, Kill, Message…, Close: `title=`; the header's mark; the exited banner's mark beside Forget), the Inbox's mark macro (the same `<button>` shape and script — reuse it), a new `help.html` at `/help` in `src/agentorc/ui/app.py`, `src/agentorc/ui/static/app.js` (the `?` overlay's last line; the marks' open / close remembered per browser as the Inbox's are), a new `tests/test_help.py`.
+
+**Why:** TD-157's *Why*: a person meets Forget and Start on a card whose state they are trying to change, with no way to learn the difference but the design document.
+
+**Fix:**
+1. **`help.py`**: the twelve paragraphs of §4.5a *The help text*, verbatim, keyed by control and place; each mark's group as the *i* mark row lists them; the screens' order for the page.
+2. **The `title` tooltips**: every control of the set carries its paragraph's first sentence as `title`, from `help.py` — replacing the hand-written titles on Start, Wind down, Stop now, Forget all and the fold in `group_head.html`, and adding them where a control has none (Forget, Close session, Kill, Wrap up).
+3. **The marks**: the Inbox's mark reused — `<button>` labelled *About these controls*, `aria-expanded`, `aria-controls`, `aria-describedby`; the panel in the page always, `hidden` when closed, one paragraph per control of the group, *every control → Help* last, linking to the page at the group's heading; which are open remembered in `localStorage` as the Inbox's are. Three places: after the team card header's controls, after the Focus header's Kill, after the exited banner's Forget.
+4. **The Help page** at `/help`: the paragraphs by screen in the table's order, each under a heading whose id is the control's; no controls on it; the `?` overlay's last line links to it.
+5. **`tests/test_help.py`**: parses *The help text* out of `docs/design.md` (the bullet list under that bold lead, `**Name** (where) — paragraph`) and asserts `help.py` equals it word for word and key for key; asserts every `data-help=` mark and every titled control of the set in the templates names a key in `help.py`; renders `/help` and asserts every paragraph is on it once. The test is what makes the design's list the one source.
+
+**Done when** TD-157's *Done when*: a person at a concluded team's card can learn, without leaving the page, that Forget drops the record and keeps the worktree, and that Start closes the concluded sessions and runs the team again from its definition — and the sentence they read is §4.5a's, held so by the test.
+
+**Related:** TD-157 (the design), TD-148 (the Settings page's marks, the nearest built shape), TD-162 (which session to message: its own line per role, on the Message composer), TD-124 (the `?` overlay), TD-095 (the card's quiet foot: no mark on it), TD-071 (fixed text in the source, never a session's).
 ## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
 
 **Priority:** Medium

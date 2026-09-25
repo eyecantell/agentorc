@@ -1928,6 +1928,14 @@ Screens:
    the conversation on. Forgetting a record takes its pointer with it; the file stays, for the
    Resumable list's index. The CLI's form is `ao transcript` (§4.7).
 
+10. **Help** (`/help`; TD-157, designed 2026-09-25 — the build is TD-167; mockup `Help.dc.html`):
+   every control that has a paragraph in §4.5a *The help text*, by screen, in the table's order,
+   each under its own heading — the page the *i* marks and the **?** overlay point at, and the
+   answer to *what does this button do?* asked away from the button. Nothing on it is a control,
+   and a control without a paragraph is not on it: an empty entry teaches nothing. Not a tab
+   (TD-123's rule is for tabs): the ways in are the mark beside the control and the overlay's
+   last line.
+
 Security: the UI can type into a shell as you, so it is root-equivalent. **Never a bare public
 port.** The UI is reached over a private network or through an authenticated tunnel, and holds
 no credential beyond the host ssh keys. The concrete options, any of which satisfies the rule
@@ -2022,7 +2030,7 @@ noted). If a control is not in this table it does not exist.
 | every page | **keys** | single keys, when nothing editable has focus — a composer, the filter box, a reply box, the *why?* box, and the Focus terminal, which takes every key, so Focus's terminal is untouched: `1` Org, `2` Inbox, `n` New session, `/` the page's filter box (`Esc` leaves it), `?` the overlay (row below). **A key is a name for a control in this table** and does nothing a button cannot: one `keydown` handler on the document reads one table of *(key, page, control)*, and the overlay is generated from that same table, so the two cannot drift; a key whose control the page does not offer at that moment does nothing. Not browser-specific: the only keys a page cannot take are the browser's and the operating system's own (a new tab, closing one, the address bar, alt-tab), and no key here is one. Nothing is stored. Out of scope: remapping, chords, and keys inside the terminal (TD-124) |
 | Org | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — **the ring** — between cards in the page's own order (*One order, no control*, screen 1: group by group, the manager's card first, then urgency), skipping a folded team's cards; `g` then a team's initial jumps to the first card of the first team, in page order, whose name starts with that letter (the same pair again, the next such team), and `g` then a digit `1`–`9` to the *n*th group on the page, *No team* counted where it sits; `g` waits two seconds for its second key. On the ringed card: `Enter` or `o` is its **Focus** (**Details** where the foot offers that; *Focus window* raises the window as the button does); `Shift+Enter` its **Pop out** (TD-046); `a` / `d` its **Allow** / **Deny** while it holds a pending permission — the same press, hook channel, an empty *why?*. The ring is the browser's focus ring on the card: a card is a tab stop, so `Tab` reaches it too and a screen reader follows it, and the amber *needs you* ring is a different ring (§4.5 screen 1 *Colour*). It is nowhere until a key moves it; a card that leaves the page hands it to its neighbour. Client-side, nothing written (TD-124) |
 | Inbox page | **keys**: the ring | `j` / `k` and `↓` / `↑` move keyboard focus — the row's own focus ring (*Layout*, screen 6: a row is a tab stop) — between rows in the page's order: *Needs you*, *Steering*, then *FYI* when it is unfolded; snoozed rows only while *n snoozed — show* is open. On the ringed row, each key is one of the row's own buttons, pressed, and does nothing on a row that has no such button: `Enter` the ringed row's **page** where it has one — a mail row (§4.5 screen 6 *The message page*, TD-129) — else **Open** (**Open board** on a board row); `o` **Open** always; `a` / `d` **Allow** / **Deny** on a permission row, an empty *why?*; `r` **Reply**, which opens the composer the button opens; `s` **Snooze ▾**, which opens the menu (the choice is a second press or a click); `x` **Dismiss**, or **Done** on a board row, or **Unsnooze** on a snoozed one. **Delete** confirms and has no key; the *i* mark has none, it is a button `Tab` reaches. On the message page (TD-129): `Esc` **Back**, `j` / `k` the next and previous entry of the list as it was filtered, `r`, `s`, `x` the foot's own controls. Client-side, nothing written (TD-124) |
-| every page | **?** overlay | `?` opens a panel over the page listing every key of *this* page beside the control it presses, generated from the handler's table (row above); `?` or `Esc` closes it, and focus returns to where it was. While it is open nothing behind it takes a key. The top bar carries a small **?** that opens the same panel for the mouse and for a phone, which has no `?` to press. Display only, nothing stored (TD-124) |
+| every page | **?** overlay | `?` opens a panel over the page listing every key of *this* page beside the control it presses, generated from the handler's table (row above); `?` or `Esc` closes it, and focus returns to where it was. While it is open nothing behind it takes a key. The top bar carries a small **?** that opens the same panel for the mouse and for a phone, which has no `?` to press. Its last line is **Help** — a link to the Help page (§4.5 screen 10, TD-157; not built — TD-167). Display only, nothing stored (TD-124) |
 | Org | ~~**Urgent first / Pinned**~~ | dropped 2026-09-18: there is one order — the manager, then urgency, inside a team; a live team with a `needs-you` session above the other live teams — and no control for it. A `needs-you` card keeps its ring and the header its *n needs you* count; the list to work through is the Inbox (TD-069) |
 | Org | ***mine*** | one press beside the filter shows only `interactive` sessions — the person's own, a taken-over worker included; a second press shows everything again. A toggle with no value to type, remembered per browser as a team's fold is. It composes with whatever is typed, as *show command runs* does — a card is shown when it passes both. Client-side, changing nothing (TD-095) |
 | Org | host / repo / profile filters, **show command runs** | filters; the last one reveals `kind: command` sessions |
@@ -2134,9 +2142,76 @@ noted). If a control is not in this table it does not exist.
 | Focus header | **VS Code** — the **editor** button | the same button as the card's, from the person's `open_in:` (§5 *The person's own*, TD-095) — `none` removes it here too |
 | Focus header | **Transcript** | opens the Transcript page (§4.5 screen 9, TD-154) for this record in a new tab, on any state: a read of the file the tool wrote, through the `transcript` RPC on the record's host, gated by nobody (§9 invariant 11). Absent on a record with no tool session id (a `shell`, a command run, a hook that never reported one) — nothing to read, so no button. Designed 2026-09-25, not built — TD-166 |
 | Transcript | **earlier turns** · fold toggles · **VS Code** | the page's only controls (TD-071: nothing a session wrote becomes one). *earlier turns* asks the RPC for the twenty turns before the first shown, by byte offset, and prepends them; a fold opens a tool result, a thought or a sidechain group, and is remembered nowhere; **VS Code** is the editor button's template (§5 *The person's own*) with the transcript file's path in place of the directory, on the record's host — the raw file's reader, absent when `open_in:` is `none`. Not built — TD-166 |
+| team card header · Focus header · exited banner | ***i*** mark | one mark per control group (TD-157; designed 2026-09-25, not built — TD-167), the Inbox's shape (*Inbox: section heading, the i mark*, above): a `<button>` labelled *About these controls*, a tooltip on hover and keyboard focus naming the group's controls, and pressed it opens in place, under the group, one paragraph per control of the group from *The help text* (below the table) — *what it does · when you would press it · what it does not do* — ending in *every control → Help*; pressed again it closes, and which are open is remembered in the browser. `aria-expanded`, `aria-controls` and `aria-describedby` as the Inbox's marks carry them; the panel is in the page always, closed by `hidden`. The team card's group is Start, Wind down, Stop now, Forget all, the fold, and the cards' Forget, Resume, Close and Message…; the Focus header's is Wrap up, Kill, Close and Message…; the exited banner's is Resume and Forget. The Org card carries no mark (§4.5 *The card's anatomy*: the foot is quiet) — its controls are in the team card's group, and every control of the set carries its paragraph's first sentence as its `title`, so hover answers *what* where the button is |
+| Help page | none | display only (§4.5 screen 10, TD-157; not built — TD-167): the paragraphs of *The help text*, by screen in the table's order, each under a heading whose id is the control's, so a mark's *every control → Help* lands on its group. Reached from the **?** overlay's last line and from every mark. Fixed text in the source, held equal to *The help text* by `tests/test_help.py` |
 | Org top bar | **filter…** text box | matches name, repo, directory, branch; client-side |
 | Resumable | **search transcripts…**, Recent / Closed / With board items, date range | filters over the transcript index — *phase 4 polish; phases 1–3 ship the plain list* |
 | Commands | host / repo filters | client-side filters — *phase 4* |
+
+**The help text (TD-157).** What the *i* marks, the `title` tooltips and the Help page say: one
+paragraph per control, three sentences — *what it does · when you would press it · what it does
+not do* — the third being the one a label cannot carry, and the one Paul asked for at a concluded
+team's card (*what do "forget" and "start" really mean — when and why would I want to do those?*).
+Written for the person, in the page's words; the row above each control stays the specification.
+The source in the code is one table (`src/agentorc/ui/help.py`, keyed by the control's name and
+where it sits), and `tests/test_help.py` holds it equal to this list word for word and holds every
+mark and every titled control of the set in the templates to a key in it — so this list is the one
+place the text is written and no page can drift from it. A control's `title` is the paragraph's
+first sentence; a mark's panel and the Help page carry the whole. The first set, the controls
+whose consequence is least visible:
+
+- **Start** (team card) — Runs the team again from its definition: every check first, then the
+  concluded sessions closed under the wrap-up's own safety check, then the manager and the members
+  created with their briefs. Press it to run the team again — after a wind-down, or when a run has
+  concluded and you want the next. It is not a message: a running session is mailed with Message…,
+  and a session holding uncommitted or unpushed work refuses the start instead of being closed.
+- **Wind down** (team card) — Sends the wrap-up to every member and then to the manager: each
+  finishes what it holds, pushes, and exits. Press it when the team should stop after the work in
+  hand, not in the middle of it. It kills nothing — Stop now does — and forgets nothing.
+- **Stop now** (team card) — Kills every session carrying this team's badge, at once, whatever it
+  holds. Press it when waiting for a wind-down is worse than losing the turn in flight. Worktrees
+  and unpushed work stay on disk under the cards, which read exited; Forget is a separate press.
+- **the fold** (*n sessions* on a stopped team's card) — Shows or hides a stopped team's cards,
+  which are folded away by default. Press it to read their last lines or their mail, or to Forget
+  them. It changes nothing on any record; which teams you have unfolded is remembered in this
+  browser.
+- **Forget** (a card's foot, the exited banner) — Drops this session's record: the card, its report
+  line and its mail. Press it when a finished session's card is clutter — its work merged, or pushed
+  and accounted for. It stops nothing, since a live session offers no Forget; the worktree and the
+  run log stay on disk, and the conversation stays in the tool's own files, where the Resumable
+  list finds it. On a team the seat stays: the definition names it, and Start fills it again.
+- **Forget all** (team card) — The Forget of every exited or closed card of this team, in one
+  press. Press it when the team's run is over and everything it pushed has landed. It never forgets
+  a card carrying work that exists only on this machine — those it names, and you forget them one
+  at a time with the flag in view — nor a seat on call, nor a suspended record.
+- **Kill** (Focus header, *more ▾*) — Ends this session's process now and destroys its pane; the
+  record stays, reading exited, and the worktree stays. Press it when a session is stuck or running
+  away and a Wrap up would not be read. It is not Close, which also reaps the worktree, and not
+  Forget, which drops the record; both are still there after it.
+- **Close** (*Close session* on a card's foot, the Focus side panel, *more ▾*) — Kills the session
+  and reaps its worktree; the record reads closed. Press it when the work is merged and every line
+  of Ready to close is green. It is offered only when that checklist passes — Kill always is — and
+  it is the one press that removes a worktree.
+- **Wrap up** (Focus header, *more ▾*) — Sends the wrap-up prompt — the one a policy sends before
+  a stop — so the session finishes, pushes and ledgers what it holds, then ends its turn. Press it
+  when you want the work saved rather than the process stopped. It kills nothing: the session ends
+  when it says it has, and a stop time does the same on a clock.
+- **Resume** (the exited banner, a Resumable row) — Starts the conversation again under this name,
+  on this record: the same mail, a new process at the tool's composer. Press it when you want to
+  continue a finished session's conversation. To only read it, press Transcript instead: a resume is
+  a start, which a manager may act on and which has to be closed again.
+- **Message…** (a seat's card, *more ▾*, Focus header) — Mails a question or a note into this
+  session's inbox; the session reads it when it next looks, and a question fills a seat on call.
+  Press it to ask or tell a session something without typing into its terminal. It types nothing
+  into the pane — Send does — and it starts no team: a stopped team is started by Start.
+- **Switch profile…** (a `limited` card) — Re-launches this session under another profile with its
+  conversation carried over. Press it when the account it runs on is capped and another is not. It
+  is a new process on the same record; Wait leaves the session where it is until the account resets.
+
+Which session to message, by role, is TD-162's line; the marks on the Message composer are its.
+Not in the first set, and written when a person asks at them: Take over / Hand back, Transcript,
+Pop out, the mode toggle, Allow / Deny, the New session form's fields.
+
 
 ### 4.5b Reachability, and the shape of a hosted service
 
