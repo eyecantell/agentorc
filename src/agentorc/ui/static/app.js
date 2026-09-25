@@ -186,23 +186,18 @@
   // design §4.5a **Message** / Focus Inbox **Reply** (§4.10): one composer for both, a <dialog>.
   // Resolves to what to mail, or null on Cancel / an empty body.
   // design §4.5a Focus side panel **Reports** (TD-143, built by TD-150): a record's `progress` as
-  // the panel's four groups. A claim is *in review* when it has a PR — its own `pr`, else a derived
-  // entry's on the same reference, which is then folded into it rather than listed twice — and *in
-  // progress* otherwise; anything not done or dropped is in progress. Pure, so a test can call it.
+  // the panel's four groups. A declared claim is *in review* when it has a PR — its own `pr`, or
+  // `review_pr` where the record carries its branch's (slice 3) — and *in progress* otherwise; a
+  // derived entry never shares a declared one's reference (§9 invariant 10: the upsert refuses it),
+  // so there is nothing to fold. Anything not done or dropped is in progress. Pure, for a test.
   AO.reportGroups = function (progress) {
-    const all = progress || [];
-    const declared = (p) => (p.source || "declared") === "declared";
-    const claimedRefs = new Set(all.filter((p) => declared(p) && p.status === "claimed").map((p) => String(p.ref)));
-    const derivedPr = {};
-    all.forEach((p) => { if (!declared(p) && p.pr && derivedPr[p.ref] == null) derivedPr[p.ref] = p.pr; });
     const g = { progress: [], review: [], done: [], dropped: [] };
-    all.forEach((p) => {
-      if (!declared(p) && p.status === "claimed" && claimedRefs.has(String(p.ref))) return;  // folded
+    (progress || []).forEach((p) => {
       if (p.status === "done") g.done.push(p);
       else if (p.status === "dropped") g.dropped.push(p);
       else {
-        const pr = p.pr || (declared(p) ? derivedPr[p.ref] : null);
-        if (p.status === "claimed" && pr) g.review.push({ ...p, review_pr: pr });
+        const pr = p.status === "claimed" ? p.review_pr || p.pr : null;
+        if (pr) g.review.push({ ...p, review_pr: pr });
         else g.progress.push(p);
       }
     });
@@ -1971,10 +1966,11 @@
       // Drop, behind more ▾, on a declared in-progress claim only: a claim with a PR is in review,
       // and letting go of it is not what a person reading the panel means (TD-143)
       const drops = g.progress.filter((p) => p.status === "claimed" && (p.source || "declared") === "declared");
-      const branch = (p) => p.branch || (v.git && v.git.branch) || "";
+      // a declared entry carries no branch, and the session's checked-out one may be another
+      // claim's (review of PR #586), so the confirm names none
       $("#reportsmenu").innerHTML = drops.map((p) => {
         const confirmText = `Let go of ${p.ref}'s claim? The lease ends and another session may take it; `
-          + (branch(p) ? `the branch ${branch(p)} stays; ` : "") + `only ${name} can claim it again.`;
+          + `its branch and any work on it stay; only ${name} can claim it again.`;
         return `<button data-act="drop" data-id="${id}" data-ref="${esc(p.ref)}" data-confirm="${esc(confirmText)}">Drop ${esc(p.ref)}…</button>`;
       }).join("");
       $("#reportsmore").hidden = !drops.length;

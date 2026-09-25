@@ -34,13 +34,13 @@ global.location = { pathname: "/", protocol: "http:", host: "x" };
 global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const g = window.AO.reportGroups([
-  { ref: "TD-127", status: "claimed", source: "declared" },
-  { ref: "TD-127", status: "claimed", source: "derived", pr: 532, branch: "td127-x" },
+  { ref: "TD-127", status: "claimed", source: "declared", review_pr: 532 },
   { ref: "TD-128", status: "claimed", source: "declared", pr: 540 },
   { ref: "TD-129", status: "claimed", source: "declared" },
   { ref: "TD-130", status: "done", source: "declared", pr: 541 },
   { ref: "TD-131", status: "dropped", source: "declared" },
   { ref: "TD-132", status: "claimed", source: "derived" },
+  { ref: "TD-133", status: "claimed", source: "derived", pr: 542 },
 ]);
 const refs = (xs) => xs.map((p) => [p.ref, p.review_pr || null, p.source]);
 console.log(JSON.stringify({ progress: refs(g.progress), review: refs(g.review), done: refs(g.done),
@@ -50,8 +50,8 @@ console.log(JSON.stringify({ progress: refs(g.progress), review: refs(g.review),
 
 @pytest.mark.unit
 def test_a_claim_with_a_pr_is_in_review_and_one_without_is_in_progress():
-    """TD-143: a declared claim whose PR is known — its own `pr`, else the derived entry's on the
-    same reference, which is folded into it — is *in review*; one with none is *in progress*."""
+    """TD-143: a claim whose PR is known — its own `pr`, or the branch's `review_pr` the record
+    carries (slice 3) — is *in review*; one with none is *in progress*."""
     node = shutil.which("node")
     if not node:
         pytest.skip("node is not installed: the panel's rule is JavaScript, and nothing else runs it")
@@ -60,7 +60,7 @@ def test_a_claim_with_a_pr_is_in_review_and_one_without_is_in_progress():
     out = subprocess.run([node, str(probe), str(UI / "static" / "app.js")], capture_output=True, text=True, timeout=30)
     assert out.returncode == 0, out.stderr
     got = json.loads(out.stdout)
-    assert got["review"] == [["TD-127", 532, "declared"], ["TD-128", 540, "declared"]]  # the derived one folded
+    assert got["review"] == [["TD-127", 532, "declared"], ["TD-128", 540, "declared"], ["TD-133", 542, "derived"]]
     assert got["progress"] == [["TD-129", None, "declared"], ["TD-132", None, "derived"]]
     assert got["done"] == [["TD-130", None, "declared"]] and got["dropped"] == [["TD-131", None, "declared"]]
     assert got["none"] == {"progress": [], "review": [], "done": [], "dropped": []}
@@ -74,6 +74,7 @@ def test_drop_is_behind_more_on_in_progress_claims_and_its_confirm_names_the_cos
     body = js[js.index("function renderReports(v)") : js.index("function renderInbox(v)")]
     assert 'const drops = g.progress.filter((p) => p.status === "claimed"' in body
     assert "The lease ends and another session may take it; " in body and "can claim it again." in body
+    assert "v.git.branch" not in body  # the checked-out branch may be another claim's
     assert '$("#reportsmenu").innerHTML = drops.map' in body and '$("#reportsmore").hidden = !drops.length' in body
     assert "claimed · in review ${prLink(p.review_pr)}" in body
     assert body.count('data-act="drop"') == 1  # only the menu's; the rows carry no control
