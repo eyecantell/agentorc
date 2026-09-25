@@ -1281,8 +1281,9 @@ def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
             menu = 'class="more"' in tag
             section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox"))
             fold = 'class="fold"' in tag
-            side = "data-side=" in tag  # a Focus side card (TD-156): a fold the Focus page remembers, never closed by a press
-            assert menu + section + fold + side == 1, f"{tpl.name}: {tag} is not one of a menu, a known section or a fold"
+            # …or a Focus side card (TD-156): a fold the Focus page remembers, never closed by a press
+            side = "data-side=" in tag
+            assert menu + section + fold + side == 1, f"{tpl.name}: {tag} is not a menu, a known section or a fold"
 
 
 # -- design round 2: one centred column, sections as headings, rows as cards (TD-082) -------------
