@@ -89,7 +89,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-141 | Build mail before wind-down — the refusal on unread, the *mail read* row, an unread note ages out with its run | Medium | Open — designed, pickable; a parked build exists |
 | TD-142 | Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder | Medium | Open — designed; slice 1 pickable, slice 2 waits on dev-cadence's reader fields |
 | TD-143 | The Focus Reports panel reads as a to-do list: a `claimed` row with its PR open looks like an unstarted claim, and Drop beside it lets a person let go of work in review | Medium | Open — designed; the build is TD-150, and this entry archives with it |
-| TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Open — designed, pickable |
+| TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Built 2026-09-25 (PR #559) — Paul's live look pending |
 | TD-146 | Build the one settings file — `settings.yml` home-owned with `teams`, `repos` and `person`, `ui.yml` retired, the `settings` read, the team stop time and reserve priority in the tick, `ao team until` | Medium | Open — designed, pickable |
 | TD-147 | Build the settings replica — the `settings` link frame, the node's copy, `set_settings` forwarded and refused offline | Medium | Open — designed, pickable after TD-146 |
 | TD-148 | Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab | Medium | Open — designed, pickable after TD-146 |
@@ -1654,8 +1654,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (TD-130's design, a cloud session with Paul)
 **Owner:** grinder
 **Kind:** build
-**Pickable:** yes
-**Status:** Open — designed, nothing built. Design: §4.5 *Type scale*; mockups `Type.dc.html`, `TypeDark.dc.html` and the regenerated artboards (`docs/mockups/gen.py` already carries the scale).
+**Pickable:** no — built; Paul's live look
+**Status:** **Built 2026-09-25** (PR #559, `grinder-ao-2`): the tokens, every literal replaced, the heights, `tests/test_css.py`; three calls against the map are in design-history §4.5 (`.toast` and `.keys` small, `.warn` body, the caption one `--lh` line). What is left is the *Done when*'s last clause — Paul's read of the live page after the promote (board line); then this and TD-130 archive. Was: open — designed, nothing built. Design: §4.5 *Type scale*; mockups `Type.dc.html`, `TypeDark.dc.html` and the regenerated artboards (`docs/mockups/gen.py` already carries the scale).
 
 **Location:** `src/agentorc/ui/static/app.css` (the token block on `:root`, every `font-size:` and `font:` literal, the card's row heights, the control heights), `src/agentorc/ui/templates/*.html` (any inline `font-size`), `tests/test_screen.py` or a new `tests/test_css.py` (no pixel size outside the token block).
 

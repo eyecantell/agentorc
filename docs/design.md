@@ -1833,7 +1833,7 @@ with a soft-key row (`↑ ↓ ← → Enter Esc Tab 1–9`) so menus and questio
 *through the terminal*, the composer under it, side panel collapsed. The git panel and the
 New-session form stay desktop-width.
 
-**Type scale (TD-130, 2026-09-25; mockups `Type.dc.html`, `TypeDark.dc.html`, and every artboard
+**Type scale (TD-130, 2026-09-25, built by TD-144; mockups `Type.dc.html`, `TypeDark.dc.html`, and every artboard
 regenerated at the scale).** The pages set their sizes as **six tokens on `:root`**, theme-
 independent, and no rule outside the token block names a pixel size: **`--t-body` 14 px** —
 everything a person reads: body text, a mail body, a board line, a question, a note's text, an
@@ -1850,8 +1850,8 @@ mono` 1.55**. What it replaces: a 13 px body with the text a person actually rea
 literals in `app.css` and as many in `docs/mockups/gen.py`. Heights follow the scale rather than
 fixing it: the card's rows (§4.5 *The card's anatomy*: 20 and 24 px, the slot 66, the foot 24) and
 the controls (`.btn` 28, `.btn.sm` 24, `.input` 32) become `em` or tokens beside the type tokens
-(`--row`, `--row1`, `--slot`; a button 30, a small one 26, an input 34), so a card stays six rows of
-one height and grows with its text; the six-row anatomy, the one-order sort and the column widths of
+(`--row`, `--row1`, `--slot`, `--foot`; the slot's caption one line of `--lh`; a button 30, a small one 26, an input 34), so a card stays six rows of
+one height and grows with its text; `tests/test_css.py` fails on a pixel size outside the token block; the six-row anatomy, the one-order sort and the column widths of
 screen 6 are unchanged. Checked in both themes on the regenerated artboards at 1440 and 390 px. **No
 density setting**: a *compact / comfortable* switch was weighed and turned down — a second scale
 doubles what every mockup and every later rule must be checked against, and the browser's zoom,

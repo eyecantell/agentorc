@@ -26,6 +26,15 @@
   --warn-bg: #fff7ed; --warn-line: #fdba74; --warn-fg: #7c2d12; --scraped: #d9a441;
   --alarm: #b45309; --alarm-bg: #fef3c7; --alarm-fg: #7c2d12;  /* design §4.8a: an identity alarm's mark */
   --primary: #1c2128; --primary-fg: #fff;
+  /* design §4.5 *Type scale* (TD-130, built by TD-144): six sizes and two line heights, the same in
+     both themes, and **no rule below names a pixel size** (tests/test_css.py holds it). Body is
+     everything a person reads; small is lower-case small print, never smaller; cap is uppercase
+     tracked marks only; mono and mono-s the terminal and mono small print. If the page reads too
+     large or too small, `--t-body` is the one number to move. The card's heights follow the scale
+     so a card stays six rows of one height (§4.5 *The card's anatomy*). */
+  --t-body: 14px; --t-small: 12px; --t-cap: 11px; --t-title: 16px; --t-mono: 13px; --t-mono-s: 12.5px; --t-btn: 13px;
+  --lh: 1.5; --lh-mono: 1.55;
+  --row: 22px; --row1: 26px; --slot: 72px; --foot: 26px;
 }
 html[data-theme="dark"] {
   --bg: #0f1216; --fg: #e6e9ee; --muted: #8b95a3; --strong: #c9d1db; --line: #2a313a; --line2: #222831;
@@ -41,68 +50,68 @@ html[data-theme="dark"] {
   --primary: #e6e9ee; --primary-fg: #0f1216;
 }
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.4 "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
+body { margin: 0; background: var(--bg); color: var(--fg); font: var(--t-body)/var(--lh) "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
 a { color: var(--link); text-decoration: none; } a:hover { text-decoration: underline; }
 .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
-.small { font-size: 11px; } .muted, .dim { color: var(--muted); } .strong { color: var(--strong); }
+.small { font-size: var(--t-small); } .muted, .dim { color: var(--muted); } .strong { color: var(--strong); }
 .grow { flex-grow: 1; } .hidden { display: none !important; } .inline { display: inline; margin: 0; }
 .row { display: flex; align-items: center; gap: 8px; min-width: 0; } .row.gap { gap: 10px; } .row.end { justify-content: flex-end; } .wrap { flex-wrap: wrap; }
 .col { display: flex; flex-direction: column; } .col.gap { gap: 16px; }
 .page { padding: 16px 20px; display: flex; flex-direction: column; gap: 12px; } .page.narrow { max-width: 760px; }
-.h1 { font-size: 16px; font-weight: 600; } .h2 { font-weight: 600; }
-.note { font-size: 12px; color: var(--muted); }
+.h1 { font-size: var(--t-title); font-weight: 600; } .h2 { font-weight: 600; }
+.note { font-size: var(--t-body); color: var(--muted); }
 .topbar { display: flex; align-items: center; gap: 14px; height: 48px; padding: 0 20px; background: var(--top); color: var(--topfg); }
-.wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 15px; color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
+.wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: var(--t-title); color: var(--topfg); } .wordmark b { color: #9ec5ff; font-weight: 500; }
 .tabs { display: flex; gap: 2px; } .tab { padding: 6px 10px; border-radius: 4px; color: var(--topdim); font-weight: 500; } .tab.on { background: var(--tab-on); color: #fff; }
-#hostchip { font-size: 11px; color: var(--topdim); } #hostdot.down { color: var(--stalled); }
+#hostchip { font-size: var(--t-small); color: var(--topdim); } #hostdot.down { color: var(--stalled); }
 /* The chips sit side by side and are measured against this width to decide what still fits
    (TD-073): `max-width` plus `overflow: hidden` is what makes scrollWidth > clientWidth mean
    "one too many", and inline-block is what gives a span a width to measure at all. */
-#usagechip { font-size: 11px; color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
+#usagechip { font-size: var(--t-small); color: var(--topdim); display: inline-block; max-width: min(34vw, 380px); overflow: hidden; white-space: nowrap; vertical-align: middle; }
 #usagechip .cap { color: var(--limited); } #usagechip .near { color: var(--topfg); font-weight: 600; }
 #usagechip .stale { opacity: .6; font-style: italic; }  /* a held reading whose last poll was refused (TD-087) */
 #usagemore { cursor: default; }
-.btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: 12px; font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
+.btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font-size: var(--t-btn); font-weight: 500; cursor: pointer; white-space: nowrap; text-decoration: none !important; font-family: inherit; }
 .btn.primary { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
 .btn.danger { color: var(--stalled-fg); border-color: #e5b4b4; }
 .btn.ghost { border-color: transparent; background: transparent; color: var(--strong); } .btn.ghost:hover { background: var(--hover); }
 .btn.light { background: transparent; color: var(--topfg); border-color: #4b5563; height: 26px; } .topbar .btn.primary { height: 26px; }
-.btn.sm { height: 24px; font-size: 11px; padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
+.btn.sm { height: 26px; font-size: var(--t-small); padding: 0 8px; } .btn:disabled { opacity: .45; cursor: default; }
 .btn.on { background: var(--ended-bg); color: var(--fg); }
-.input { height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: 13px; font-family: inherit; display: flex; align-items: center; }
+.input { height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); font-family: inherit; display: flex; align-items: center; }
 input.input, select.input, textarea.input { width: 100%; } textarea.input.tall { height: 96px; padding: 8px 10px; display: block; }
 /* Deny's optional reason (§4.5a, TD-117): button-height, and it gives way before a button does */
-input.denywhy { height: 24px; font-size: 11px; padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-family: inherit; flex: 0 1 11em; min-width: 5em; width: 11em; }
-.field { display: flex; flex-direction: column; gap: 5px; } .field label { font-size: 11px; font-weight: 600; color: var(--strong); text-transform: uppercase; letter-spacing: .04em; }
+input.denywhy { height: 26px; font-size: var(--t-small); padding: 0 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-family: inherit; flex: 0 1 11em; min-width: 5em; width: 11em; }
+.field { display: flex; flex-direction: column; gap: 5px; } .field label { font-size: var(--t-cap); font-weight: 600; color: var(--strong); text-transform: uppercase; letter-spacing: .04em; }
 .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
 .radio { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 4px; background: var(--card); }
-.warn { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 4px; color: var(--warn-fg); font-size: 12px; }
-.pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+.warn { display: flex; gap: 8px; align-items: center; padding: 8px 10px; background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 4px; color: var(--warn-fg); font-size: var(--t-body); }
+.pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: var(--t-cap); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
 .pill .dot { display: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
 /* design §4.5a **state icon**: a page of cards is read by shape before it is read by word */
-.pill::before { font-size: 9px; line-height: 1; }
-.pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
+.pill::before { font-size: .9em; line-height: 1; }
+.pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 1.1em; } .pill.s-stalled::before { content: "?"; font-size: 1.1em; }
 /* a state glyph must not look like something to press (2026-09-18): no play, pause or stop */
-.pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
-.pill.s-closed::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; }
-.pill.s-oncall::before { content: "◇"; font-size: 11px; }  /* a seat with nobody in it (TD-097) */
-.sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: 9px; letter-spacing: 0; }  /* not the idle glyph's tuning */
+.pill.s-working::before { content: "∿"; font-size: 1.2em; } .pill.s-idle::before { content: "›_"; font-size: 1em; letter-spacing: -.1em; } .pill.s-exited::before { content: "◌"; font-size: 1.1em; }
+.pill.s-closed::before { content: "✓"; font-size: 1.1em; } .pill.s-unreachable::before { content: "⌀"; font-size: 1.1em; }
+.pill.s-oncall::before { content: "◇"; font-size: 1.1em; }  /* a seat with nobody in it (TD-097) */
+.sc[data-unseen] .pill.s-idle::before { content: "●"; font-size: .9em; letter-spacing: 0; }  /* not the idle glyph's tuning */
 .pill.scraped { outline: 1px dashed var(--scraped); outline-offset: 1px; }
 /* the card's report line and the Focus Reports panel (design §4.5a, §4.8): a derived entry is
    dashed, the same signal a scraped state carries */
 .meta.scraped { border-bottom: 1px dashed var(--scraped); }
 .reports .rep { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
-.reports .rep .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+.reports .rep .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
 .reports .rep.derived .ref { border-bottom: 1px dashed var(--scraped); }
-.reports .rep .st { font-size: 10.5px; color: var(--muted); }
+.reports .rep .st { font-size: var(--t-mono-s); color: var(--muted); }
 .reports .rep .st.done { color: var(--done); }
 .reports .rep .st.dropped { text-decoration: line-through; }
 /* the Focus Inbox panel, the card's unread chip and the mail composer (design §4.5a, §4.10) */
 .inbox .mail { padding: 6px 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 3px; }
-.inbox .mail .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; }
+.inbox .mail .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
 .inbox .mail.unread .ref { font-weight: 600; }
-.inbox .mail .st { font-size: 10.5px; color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
-.inbox .mail .body { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+.inbox .mail .st { font-size: var(--t-mono-s); color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
+.inbox .mail .body { font-size: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
 .inbox .mail .body.md { white-space: normal; }
 .badge.unread { color: var(--new-fg); background: var(--new-bg); border-color: var(--new); text-decoration: none; }
 /* the top bar's Inbox number: what is waiting on a person, not unread mail (§4.5a, TD-069) */
@@ -112,8 +121,8 @@ input.denywhy { height: 24px; font-size: 11px; padding: 0 6px; border: 1px solid
 /* the ? overlay (§4.5a, TD-124): the page's keys, filled from the handler's own table */
 .keydlg { width: min(520px, 92vw); color: var(--fg); } .keydlg::backdrop { background: rgba(0,0,0,.35); }
 .keydlg .note[hidden] { display: none; }
-.keys { border-collapse: collapse; font-size: 12.5px; } .keys td { padding: 3px 12px 3px 0; vertical-align: top; } .keys td:first-child { white-space: nowrap; }
-kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--card); }
+.keys { border-collapse: collapse; font-size: var(--t-small); } .keys td { padding: 3px 12px 3px 0; vertical-align: top; } .keys td:first-child { white-space: nowrap; }
+kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); padding: 1px 5px; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--card); }
 #personinbox .badge { margin-left: 4px; }
 /* §4.10 *The Inbox is a queue*: FYI's own **quiet** number — *Inbox 1 · 5*. Never added to the
    first, and deliberately plainer than it: the first is what needs a person. A mark, not a
@@ -131,13 +140,13 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 1px 5p
 /* FYI's fold **is** its heading: the disclosure's own ▾ before the name, and no second control */
 .inboxpage details.isec > summary { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 10px; }
 .inboxpage details.isec > summary::-webkit-details-marker { display: none; }
-.inboxpage details.isec > summary::before { content: "▸"; color: var(--muted); font-size: 11px; }
+.inboxpage details.isec > summary::before { content: "▸"; color: var(--muted); font-size: var(--t-cap); }
 .inboxpage details.isec[open] > summary::before { content: "▾"; }
 .inboxpage .snoozedbox > summary { list-style: none; cursor: pointer; color: var(--muted); }
 .inboxpage .snoozedbox > summary::-webkit-details-marker { display: none; }
 /* the **i** mark: a real button (Enter and Space press it), small and quiet, and the one bordered
    thing in a heading — everything bordered is a control, and this is one (§4.5a) */
-.inboxpage .imark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 10px/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
+.inboxpage .imark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
 .inboxpage .imark:hover { background: var(--hover); color: var(--fg); }
 .inboxpage .imark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
 /* the paragraph it holds: always in the page (a description may point at a hidden node, never at a
@@ -159,12 +168,12 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 1px 5p
    — the browser's own memory, as the fold is. A mark and never a control: no border, no cursor,
    nothing to press; the row's own surface is what it sits on. */
 .inboxpage .mailrow.isnew { border-color: var(--new); }
-.inboxpage .mailrow.isnew .mhead::after { content: "new"; order: 99; font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--new); }
+.inboxpage .mailrow.isnew .mhead::after { content: "new"; order: 99; font-size: var(--t-cap); font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--new); }
 .inboxpage .mailrow[hidden] { display: none; }
-.inboxpage .mailrow .ref { font-family: "JetBrains Mono", monospace; font-size: 11.5px; font-weight: 600; }
-.inboxpage .mailrow .st { font-size: 10.5px; color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
+.inboxpage .mailrow .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); font-weight: 600; }
+.inboxpage .mailrow .st { font-size: var(--t-mono-s); color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
 /* the whole text, no scroll box: a 2,000-character message reads in full, and an unbroken token wraps */
-.inboxpage .mailrow .body { font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.inboxpage .mailrow .body { font-size: var(--t-body); white-space: pre-wrap; overflow-wrap: anywhere; }
 /* design §4.5a **Inbox row: details** (§4.10, TD-138): a message's text is rendered from the closed
    markdown subset, so its paragraphs are elements and `pre-wrap` would double every break. The fold
    is a quiet, unbordered *details* line — a disclosure, not one of the row's bordered controls. A
@@ -177,7 +186,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 1px 5p
 .body.md pre { white-space: pre-wrap; background: var(--line2); border-radius: 3px; padding: 6px 8px; }
 .body.md pre code { background: none; padding: 0; }
 .body.md .lhost { color: var(--muted); font-size: .85em; }
-details.fold > summary { cursor: pointer; font-size: 10.5px; color: var(--muted); width: max-content; border: 0; padding: 1px 0; }
+details.fold > summary { cursor: pointer; font-size: var(--t-small); color: var(--muted); width: max-content; border: 0; padding: 1px 0; }
 details.fold > summary:hover { color: var(--fg); }
 details.fold[open] > summary { margin-bottom: 3px; }
 /* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
@@ -210,7 +219,7 @@ details.fold[open] > summary { margin-bottom: 3px; }
 /* design §4.5a **Inbox row: state** (TD-069 step 2): a state row wears the card's own pill, which
    is a span and never a control. The alarms list is text, one line per alarm. */
 .inboxpage .staterow .pill { cursor: default; }
-.inboxpage .alarms { margin: 0; padding-left: 18px; font-size: 12px; color: var(--alarm-fg); }
+.inboxpage .alarms { margin: 0; padding-left: 18px; font-size: var(--t-body); color: var(--alarm-fg); }
 .inboxpage .alarms li { margin: 2px 0; }
 .inboxpage .staterow[data-row="alarm"], .inboxpage .staterow[data-row="alarm_host"] { border-left: 2px solid var(--alarm); padding-left: 8px; }
 /* design §4.8a: the card's identity mark — a warning, not the amber needs-you ring, and never
@@ -225,18 +234,18 @@ details.fold[open] > summary { margin-bottom: 3px; }
    rather than a restart; still flat, still nothing to press. */
 .badge.rw.early { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); }
 .badge.gated { color: var(--limited-fg); background: var(--limited-bg); border-color: var(--limited); } /* paused · usage (TD-100): the limit family, a mark */
-.badge.suspendedmark { cursor: default; color: var(--alarm-fg); background: transparent; border-color: var(--alarm); text-transform: uppercase; letter-spacing: .04em; font-size: 9.5px; }
+.badge.suspendedmark { cursor: default; color: var(--alarm-fg); background: transparent; border-color: var(--alarm); text-transform: uppercase; letter-spacing: .04em; font-size: var(--t-cap); }
 .grants .badge { margin-right: 4px; cursor: pointer; }
 .grants .badge.off { opacity: 0.55; }
 .s-working { background: var(--working-bg); color: var(--working-fg); } .s-needs { background: var(--needs-bg); color: var(--needs-fg); }
 .s-idle { background: var(--idle-bg); color: var(--idle-fg); } .s-stalled { background: var(--stalled-bg); color: var(--stalled-fg); }
 /* the shared idle / exited / unreachable rule is split (TD-095): what is over is grey, idle is not */
 .s-exited, .s-closed, .s-oncall, .s-unreachable { background: var(--ended-bg); color: var(--ended-fg); } .s-limited { background: var(--limited-bg); color: var(--limited-fg); }
-.badge { display: inline-block; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; font-size: 10px; color: var(--muted); font-family: "JetBrains Mono", monospace; background: transparent; }
+.badge { display: inline-block; padding: 1px 5px; border: 1px solid var(--border); border-radius: 3px; font-size: var(--t-cap); color: var(--muted); font-family: "JetBrains Mono", monospace; background: transparent; }
 .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
 .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; }
 .badge.toggle.on { color: var(--primary-fg); background: var(--primary); border-color: var(--primary); } .badge.toggle.on::before { background: currentColor; }
-.flag { display: inline-flex; align-items: center; gap: 4px; color: var(--stalled-fg); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.flag { display: inline-flex; align-items: center; gap: 4px; color: var(--stalled-fg); font-size: var(--t-small); font-weight: 500; white-space: nowrap; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 6px; } .card.pad { padding: 12px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; align-items: start; }
 /* Org team groups (design §4.5a, §4.9): a header row per team over its own grid; the flat page is one headerless group */
@@ -252,8 +261,8 @@ details.fold[open] > summary { margin-bottom: 3px; }
 .tgroup:not(:has(.sc)) .grid { display: none; } .tgroup:not(:has(.sc)) .ghead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }  /* a definition nothing carries yet */
 /* one scale with the cards (TD-095 i): the header sits on the body's 13 px and its title is no
    smaller than a card's name — it was 12 / 14 px from when it carried less */
-.ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; } .ghead .h2 { font-size: 16px; }
-.ghead .name { font-family: "JetBrains Mono", monospace; font-size: 13px; font-weight: 600; color: var(--fg); text-decoration: none; }
+.ghead { padding: 0 2px 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; } .ghead .h2 { font-size: var(--t-title); }
+.ghead .name { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); font-weight: 600; color: var(--fg); text-decoration: none; }
 .badge.team { cursor: pointer; color: var(--fg); }
 /* the card's *under <controller>* chip and the Focus header's controllers chips (design §4.5a,
    §4.8): one control drawn in two places, so both are `.badge` like every other chip on the page.
@@ -269,28 +278,28 @@ details.fold[open] > summary { margin-bottom: 3px; }
 /* design §4.5 *The card's anatomy* (TD-095): six rows, the same on every card, **at one height** —
    so every row is one line that never wraps, and what does not fit is clipped with the whole of it
    on hover. The name, the pill and the clock never shrink; the long derived strings do. */
-.sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { display: flex; flex-direction: column; gap: 4px; } .sc-foot { display: flex; gap: 6px; align-items: center; height: 24px; }
-.sc-body > .row { height: 20px; flex-wrap: nowrap; overflow: hidden; } .sc-body > .row.r1 { height: 24px; }
+.sc-body { display: flex; flex-direction: column; gap: 8px; } .sc-slot { display: flex; flex-direction: column; gap: 4px; } .sc-foot { display: flex; gap: 6px; align-items: center; height: var(--foot); }
+.sc-body > .row { height: var(--row); flex-wrap: nowrap; overflow: hidden; } .sc-body > .row.r1 { height: var(--row1); }
 .sc-body > .row > * { flex: 0 1 auto; min-width: 0; } .sc-body > .row > .grow { flex: 1 1 0; }
 .sc .r1 .name, .sc .r1 .pill, .sc .r2 .age, .sc .r3 .flag { flex-shrink: 0; }
 .sc .badge { white-space: nowrap; }
-.sc .r2 .mode { font-size: 11px; } .sc .r2 .mode.mine { color: var(--fg); font-weight: 600; } .sc .r2 .mode .ricon { vertical-align: -2px; margin-right: 3px; }
+.sc .r2 .mode { font-size: var(--t-small); } .sc .r2 .mode.mine { color: var(--fg); font-weight: 600; } .sc .r2 .mode .ricon { vertical-align: -2px; margin-right: 3px; }
 .sc .r3 .under { flex-shrink: 0; }
 /* what a team's group already says (its badge, host / repo, *under* its manager) is not said again
    on a card inside that group; a filter shows it, since a filtered grid reads card by card */
 .tgroup:not([data-team=""]):not(.filtering) .sc .ingroup { display: none; }
 /* the slot: two lines and a caption, whatever it holds — a longer text clamped, the whole on hover */
-.sc-slot { height: 66px; justify-content: space-between; }
+.sc-slot { height: var(--slot); justify-content: space-between; }
 .sc-slot > .status { height: calc(2 * 1.55em); padding: 0 0 0 10px; line-height: 1.55; white-space: normal; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .sc-slot > .status.tail { white-space: pre-line; color: var(--muted); }
-.sc-slot > .caption { height: 16px; } .sc-slot > .caption.ready { color: var(--fg); }
+.sc-slot > .caption { height: calc(var(--lh) * 1em); } .sc-slot > .caption.ready { color: var(--fg); }
 /* the foot (TD-095, second pass): the next act outlined at normal strength, the rest plain links at
    normal strength — never the dimmed grey a disabled control wears — and Allow the one filled button */
 .sc-foot .btn.next { background: transparent; color: var(--fg); border-color: var(--muted); }
 .sc-foot .btn.next:hover, .sc-foot .btn.link:hover { background: var(--hover); }
 .sc-foot .btn.link { background: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
 details.more .menu button:disabled { opacity: .45; cursor: default; } details.more .menu button:disabled:hover { background: none; }
-.sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: var(--fg); }
+.sc .name { font-family: "JetBrains Mono", monospace; font-size: var(--t-title); font-weight: 600; color: var(--fg); }
 .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--ended); }
 .sc.s-needs { border-color: var(--needs); } .sc.s-needs .sbar { background: var(--needs); } .sc.s-working .sbar { background: var(--working); } .sc.s-idle .sbar { background: var(--idle); }
 .sc.s-stalled .sbar { background: var(--stalled); } .sc.s-limited .sbar { background: var(--limited); }
@@ -298,8 +307,8 @@ details.more .menu button:disabled { opacity: .45; cursor: default; } details.mo
 /* the keyboard's ring (§4.5a Org **keys**, TD-124): the browser's focus ring, blue and offset
    outside the card, so it sits apart from the amber needs-you ring rather than replacing it */
 .sc:focus { outline: none; } .sc:focus-visible { outline: 2px solid var(--link); outline-offset: 3px; }
-.meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid var(--border); font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.meta { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid var(--border); font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .status.needs { border-color: var(--needs); color: var(--needs-fg); } .status.ok { border-color: var(--ended); color: var(--fg); } .status.bad { border-color: var(--stalled); } .status.lim { border-color: var(--limited); }
 /* design §4.5a **doing** line (§4.8, TD-074): what the session says it is doing. Prose rather than
    pane output, so a long line wraps instead of being clipped mid-word; no colour of its own — the
@@ -312,19 +321,19 @@ details.more .menu button:disabled { opacity: .45; cursor: default; } details.mo
 /* design §4.8 *Role presets*: the role badge's picture — `currentColor`, no fill, so it takes the
    badge's muted ink and never reads as something to press. */
 .badge .ricon { vertical-align: -2px; margin-right: 3px; }
-.term { background: var(--term); color: var(--termfg); font-family: "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5; padding: 10px 12px; border-radius: 4px; white-space: pre; overflow: hidden; }
-.term.tail { font-size: 11px; line-height: 1.55; padding: 6px 9px; color: var(--tail); min-height: 54px; }
+.term { background: var(--term); color: var(--termfg); font-family: "JetBrains Mono", "Cascadia Code", Menlo, Consolas, monospace; font-size: var(--t-mono); line-height: var(--lh-mono); padding: 10px 12px; border-radius: 4px; white-space: pre; overflow: hidden; }
+.term.tail { font-size: var(--t-small); line-height: var(--lh-mono); padding: 6px 9px; color: var(--tail); min-height: 54px; }
 details.more { position: relative; } details.more summary { list-style: none; } details.more summary::-webkit-details-marker { display: none; }
 /* fixed to the viewport, placed by `AO.placeMenu` when it opens (TD-121): an absolute menu was
    clipped by the card's `overflow: hidden`, which the card's one height needs */
 details.more .menu { position: fixed; z-index: 40; background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 4px; display: flex; flex-direction: column; min-width: 170px; box-shadow: 0 6px 20px rgba(0,0,0,.15); }
 details.more .menu button { text-align: left; background: none; border: 0; padding: 6px 8px; color: var(--fg); font: inherit; cursor: pointer; border-radius: 3px; } details.more .menu button:hover { background: var(--hover); }
 #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column; gap: 8px; z-index: 50; }
-.toast { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--stalled); padding: 8px 12px; border-radius: 4px; font-size: 12px; max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15); } .toast.ok { border-left-color: var(--done); }
+.toast { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--stalled); padding: 8px 12px; border-radius: 4px; font-size: var(--t-small); max-width: 420px; box-shadow: 0 6px 20px rgba(0,0,0,.15); } .toast.ok { border-left-color: var(--done); }
 /* Focus */
 .page.focus { flex-direction: row; align-items: flex-start; gap: 14px; }
 .focus .main { flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0; } .focus .side { width: 320px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; }
-.focus .title { font-size: 15px; font-weight: 500; }
+.focus .title { font-size: var(--t-title); font-weight: 500; }
 /* a popped-out Focus (§4.5 *Pop out*, TD-046): no top bar, so the terminal takes the room it left */
 body.popped .page { padding: 10px 12px; } body.popped .termbox { height: calc(100vh - 150px); }
 /* design §4.5a **Focus header** (TD-085). The row had no wrap, and 2026-09-19 and -20 put three
@@ -348,10 +357,10 @@ body.popped .page { padding: 10px 12px; } body.popped .termbox { height: calc(10
 .focus #fhead > .doing { max-width: 32em; }
 .termbox { height: 60vh; min-height: 360px; background: var(--term); border-radius: 6px; padding: 6px; } .termbox .xterm { height: 100%; }
 .composer { padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-.composer textarea { width: 100%; height: 72px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font: 13px/1.4 inherit; font-family: inherit; resize: vertical; }
-.inline-banner { padding: 8px 10px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-fg); font-size: 12px; }
-.kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: 12px; margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
-.gitfiles { line-height: 1.7; margin-top: 6px; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: 12px; margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
+.composer textarea { width: 100%; height: 72px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--input); color: var(--fg); font-size: var(--t-body); line-height: var(--lh); font-family: inherit; resize: vertical; }
+.inline-banner { padding: 8px 10px; border-radius: 4px; background: var(--warn-bg); border: 1px solid var(--warn-line); color: var(--warn-fg); font-size: var(--t-body); }
+.kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: var(--t-body); margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
+.gitfiles { line-height: 1.7; margin-top: 6px; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
 @media (max-width: 720px) {
   .page.focus { flex-direction: column; } .focus .side { width: 100%; } .termbox { height: 50vh; } .topbar { gap: 8px; padding: 0 10px; } #hostchip { display: none; }
   .grid { grid-template-columns: 1fr; }
