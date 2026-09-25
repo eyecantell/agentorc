@@ -35,6 +35,11 @@ SESSION_END_STILL_RUNNING = {"clear", "resume"}
 # manual `/compact` fires nothing after it, so reading it as `working` left an idle session reading
 # `stalled?` at STALL_AFTER (TD-090). An auto-compaction mid-turn is already `working`.
 SESSION_START_NOT_A_START = {"compact"}
+# SessionStart sources that land at the composer with no turn to follow: `claude --resume` prints the
+# old conversation and waits, so no Stop ever reports `idle` and `working` would read `stalled?` at
+# STALL_AFTER, never rung (TD-155). A prompt given with the resume reports `working` through its own
+# UserPromptSubmit, which fires after this.
+SESSION_START_AT_THE_COMPOSER = {"resume"}
 
 # idle_prompt (Claude idle for a minute) is deliberately absent: an idle session waiting for you is
 # `idle`, the normal state, not an alert (design §4.2, first-use finding 2026-09-06).
@@ -86,6 +91,8 @@ def translate(payload: dict[str, Any]) -> dict[str, Any] | None:
         return {**out, "state": "exited", "pending": None}
     if ev == "SessionStart" and payload.get("source") in SESSION_START_NOT_A_START:
         return out or None  # the session id and model still count; the state is what it was
+    if ev == "SessionStart" and payload.get("source") in SESSION_START_AT_THE_COMPOSER:
+        return {**out, "state": "idle", "pending": None}
     if ev == "SubagentStart":
         return {**out, "subagent_delta": 1}
     if ev == "SubagentStop":

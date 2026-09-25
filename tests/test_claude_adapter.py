@@ -54,8 +54,18 @@ def test_a_compaction_is_not_a_start():
     assert translate(ev) == {"adapter_id": "u1"}  # no state: it stays what it was
     assert translate({**ev, "model": "claude-opus-5"}) == {"adapter_id": "u1", "model": "claude-opus-5"}
     assert translate({"hook_event_name": "SessionStart", "source": "compact"}) is None
-    for source in ("startup", "resume", "clear"):
+    for source in ("startup", "clear"):
         assert translate({**ev, "source": source})["state"] == "working"
+
+
+def test_a_resume_lands_at_the_composer():
+    """TD-155: `claude --resume` prints the conversation and waits at the composer, and no Stop
+    follows, so `working` read `stalled?` at STALL_AFTER and the doorbell never rang it."""
+    ev = {"hook_event_name": "SessionStart", "session_id": "u1", "source": "resume"}
+    assert translate(ev) == {"adapter_id": "u1", "state": "idle", "pending": None}
+    # a prompt given with the resume is its own turn, reported by UserPromptSubmit after it
+    assert translate({"hook_event_name": "UserPromptSubmit", "session_id": "u1"})["state"] == "working"
+    assert translate({**ev, "source": "startup"})["state"] == "working"  # `ao new` types its prompt at once
 
 
 def test_translate_permission_and_questions():
