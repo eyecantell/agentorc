@@ -7,18 +7,18 @@ OUT = pathlib.Path(__file__).parent
 CSS = """
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-  body { margin: 0; background: #f4f5f7; color: #1c2128; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 13px; line-height: 1.4; }
+  body { margin: 0; background: #f4f5f7; color: #1c2128; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
   a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-decoration: underline; }
   .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
-  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
   .pill .dot { display: none; }
   /* design §4.5a **state icon**, as app.css draws it: a page of cards is read by shape before it is
      read by word, and a glyph never looks like something to press */
-  .pill::before { font-size: 9px; line-height: 1; }
-  .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
-  .pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
-  .pill.s-closed::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; } .pill.s-oncall::before { content: "◇"; font-size: 11px; }
-  .pill.s-idle.unseen::before { content: "●"; font-size: 9px; letter-spacing: 0; }
+  .pill::before { font-size: 11px; line-height: 1; }
+  .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 12px; } .pill.s-stalled::before { content: "?"; font-size: 12px; }
+  .pill.s-working::before { content: "∿"; font-size: 14px; } .pill.s-idle::before { content: "›_"; font-size: 12px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 12px; }
+  .pill.s-closed::before { content: "✓"; font-size: 12px; } .pill.s-unreachable::before { content: "⌀"; font-size: 12px; } .pill.s-oncall::before { content: "◇"; font-size: 12px; }
+  .pill.s-idle.unseen::before { content: "●"; font-size: 11px; letter-spacing: 0; }
   .pill.plain::before { content: none; }  /* a due date or a report's status is not a session state */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
@@ -37,18 +37,18 @@ CSS = """
   .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
   .due + .due { border-top: 1px solid #eceef1; }
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
-  .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
+  .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 12px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
   .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
   .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; vertical-align: 0; }
   .badge.toggle.on { color: #fff; background: #1c2128; border-color: #1c2128; }
   .badge.toggle.on::before { background: #fff; border-color: #fff; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 14px; font-weight: 500; white-space: nowrap; }
   .btn.primary { background: #1c2128; color: #fff; border-color: #1c2128; }
   .btn.danger { color: #991b1b; border-color: #e5b4b4; }
   .btn.ghost { border-color: transparent; background: transparent; color: #4b5563; }
   .btn.ghost:hover { background: #eef0f3; }
-  .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 14px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #374151; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
   .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
@@ -57,7 +57,7 @@ CSS = """
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
   svg { width: 14px; height: 14px; }
-  .flag { display: inline-flex; align-items: center; gap: 4px; color: #991b1b; font-size: 11px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+  .flag { display: inline-flex; align-items: center; gap: 4px; color: #991b1b; font-size: 12px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
   .card { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
   .sc { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; position: relative; }
   .sc-body { display: flex; flex-direction: column; gap: 8px; }
@@ -72,14 +72,14 @@ CSS = """
   .ac .r > * { flex-shrink: 0; } .ac .r > .fill { flex: 0 1 auto; min-width: 0; } .ac .r .grow { flex: 1; }
   .ac .name { font-family: "JetBrains Mono", monospace; font-size: 15px; font-weight: 600; color: #111418; }
   .ac .meta b { color: #374151; font-weight: 500; }
-  .mode { font-size: 11.5px; color: #6b7280; white-space: nowrap; }
+  .mode { font-size: 12.5px; color: #6b7280; white-space: nowrap; }
   .mode.mine { color: #1c2128; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
-  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10.5px; border: 1px solid #d9a441; color: #7c3d00; }
+  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; border: 1px solid #d9a441; color: #7c3d00; }
   .aslot { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 2px 0 2px 10px; border-left: 2px solid #cbd0d6; font-size: 12px; color: #1c2128; overflow: hidden; }
   .aslot .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
-  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 11px; color: #6b7280; white-space: nowrap; }
+  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 12px; color: #6b7280; white-space: nowrap; }
   .aslot.need { border-color: #f59e0b; } .aslot.need .t { color: #7c3d00; } .aslot.bad { border-color: #dc2626; } .aslot.lim { border-color: #7c3aed; }
-  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; }
+  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 12.5px; color: #4b5563; }
   /* the quiet foot (second pass, 2026-09-21): the next act outlined at the text's strength, the rest
      plain links at normal strength; dimmed means disabled and nothing else; the only filled button a
      card carries is Allow */
@@ -92,18 +92,18 @@ CSS = """
   /* the keyboard's ring (TD-124): the browser's focus ring on the card, blue and offset, apart from the amber needs-you one */
   .ac.kring { outline: 2px solid #1f5fa8; outline-offset: 2px; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
-  .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { font-family: "JetBrains Mono", monospace; font-size: 14px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
-  .btn.sm { height: 24px; font-size: 11px; padding: 0 8px; }
+  .btn.sm { height: 26px; font-size: 12px; padding: 0 8px; }
   .btn.sm svg { width: 12px; height: 12px; }
-  .term.tail { height: 100%; box-sizing: border-box; font-size: 11px; line-height: 1.55; padding: 6px 9px; color: #aab3bf; border-radius: 4px; }
+  .term.tail { height: 100%; box-sizing: border-box; font-size: 12px; line-height: 1.55; padding: 6px 9px; color: #aab3bf; border-radius: 4px; }
   .topbar { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 20px; background: #1c2128; color: #e6e9ee; }
   .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 15px; letter-spacing: -.01em; }
   .wordmark b { color: #9ec5ff; font-weight: 500; }
   .tab { padding: 6px 10px; border-radius: 4px; color: #aab3bf; font-weight: 500; }
   .tab.on { background: #2b323b; color: #fff; }
   table { border-collapse: collapse; width: 100%; }
-  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #dfe3e8; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #dfe3e8; }
   td { padding: 9px 10px; border-bottom: 1px solid #eceef1; vertical-align: middle; }
   tr.needs td { background: #fffbeb; }
   .grp { display: flex; align-items: center; gap: 10px; padding: 10px 10px 6px; font-weight: 600; font-size: 12px; color: #374151; }
@@ -114,8 +114,8 @@ CSS = """
   .term { background: #0f1419; color: #d5dbe3; font-family: "JetBrains Mono", monospace; font-size: 12px; line-height: 1.5; padding: 14px 16px; border-radius: 6px; white-space: pre; overflow: hidden; }
   .term .p { color: #9ec5ff; } .term .q { color: #fde68a; } .term .g { color: #86efac; } .term .d { color: #7d8794; }
   .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 11px; font-weight: 600; color: #4b5563; text-transform: uppercase; letter-spacing: .04em; }
-  .input { height: 32px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .field label { font-size: 12px; font-weight: 600; color: #4b5563; text-transform: uppercase; letter-spacing: .04em; }
+  .input { height: 32px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
   .radio { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #dfe3e8; border-radius: 4px; background: #fff; }
   .radio.on { border-color: #1c2128; box-shadow: inset 0 0 0 1px #1c2128; }
   .rb { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #6b7280; box-sizing: border-box; }
@@ -123,15 +123,15 @@ CSS = """
   .note { font-size: 12px; color: #6b7280; }
   .rs { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #374151; }
   .rs > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rs-k { display: inline-block; width: 52px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; }
+  .rs-k { display: inline-block; width: 52px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; }
   .switch { display: inline-flex; align-items: center; width: 34px; height: 20px; border-radius: 10px; background: #cbd0d6; padding: 2px; box-sizing: border-box; flex-shrink: 0; }
   .switch .knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
   .switch.on { background: #1c2128; justify-content: flex-end; }
   /* Inbox (design round 2, 2026-09-20, TD-082): a centred column, sections as plain headings, a row as a card */
   .inboxcol { width: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-  .isec-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 2px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; position: relative; }
+  .isec-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 2px 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; position: relative; }
   .isec-h .n { font-family: "JetBrains Mono", monospace; letter-spacing: 0; color: #374151; }
-  .info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #cbd0d6; background: #fff; color: #4b5563; font-size: 10px; font-weight: 600; text-transform: none; font-style: italic; font-family: Georgia, serif; }
+  .info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #cbd0d6; background: #fff; color: #4b5563; font-size: 11px; font-weight: 600; text-transform: none; font-style: italic; font-family: Georgia, serif; }
   .info.on { background: #1c2128; color: #fff; border-color: #1c2128; }
   .pop { flex: 0 0 100%; box-sizing: border-box; padding: 8px 12px; border-left: 2px solid #1c2128; background: #fff; color: #374151; border-radius: 0 4px 4px 0; font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.5; }
   .mcard { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 12px 17px; background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
@@ -139,12 +139,12 @@ CSS = """
   .mcard.focus { outline: 2px solid #1f5fa8; outline-offset: 1px; }
   .mcard .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .mcard .who .nm { font-family: "JetBrains Mono", monospace; font-weight: 600; color: #111418; }
-  .mcard .txt { font-size: 13px; line-height: 1.5; color: #1c2128; }
+  .mcard .txt { font-size: 14px; line-height: 1.5; color: #1c2128; }
   .mcard .ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .kind { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6b7280; }
+  .kind { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6b7280; }
   .sugg { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; border: 1px dashed #cbd0d6; border-radius: 4px; }
-  .sugg .lbl { font-size: 11px; color: #6b7280; }
-  .quoted { padding: 6px 10px; border-left: 2px solid #cbd0d6; color: #4b5563; font-size: 12.5px; }
+  .sugg .lbl { font-size: 12px; color: #6b7280; }
+  .quoted { padding: 6px 10px; border-left: 2px solid #cbd0d6; color: #4b5563; font-size: 14px; }
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 """
@@ -213,13 +213,14 @@ TAIL = "</x-dc>\n</body>\n</html>\n"
 
 def topbar(active="Org", narrow=False):
     # a tab exists only for a built page (TD-123); an unbuilt screen's own mockup draws its tab, active
-    live = ["Org", "Inbox 4 · 2"] + ([] if active in ("Org", "Inbox 4 · 2") else [active])
-    tabs = "".join(f'<span class="tab{" on" if t == active else ""}">{t}</span>' for t in live)
+    inbox = active if active.startswith("Inbox") else "Inbox 4 · 2"
+    live = ["Org", inbox] + ([] if active in ("Org", inbox) else [active])
+    tabs = "".join(f'<span class="tab{" on" if t == active or (t == inbox and active.startswith("Inbox")) else ""}">{t}</span>' for t in live)
     return f'''<div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;">{tabs}</div>
   <div style="flex-grow: 1;"></div>
-  {"" if narrow else '<span class="mono" style="font-size: 11px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>'}
+  {"" if narrow else '<span class="mono" style="font-size: 12px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 12px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>'}
   <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;">{ICON["term"]}Shell</span><span class="btn primary" style="height: 26px;">{ICON["plus"]}New session</span>
 </div>'''
 
@@ -264,7 +265,7 @@ def row(s):
   <td>{pill(state)}</td>
   <td><span class="badge{" scraped" if conf == "scraped" else ""}">{conf}</span></td>
   <td class="muted">{age}</td>
-  <td><span class="mono" style="font-size: 11px; color: #4b5563;">{where}</span></td>
+  <td><span class="mono" style="font-size: 12px; color: #4b5563;">{where}</span></td>
   <td>{flag_html}</td>
   <td>{pend}</td>
   <td><div style="display: flex; gap: 4px; justify-content: flex-end;"><span class="btn">{ICON["focus"]}Focus</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">{ICON["more"]}</span></div></td>
@@ -285,7 +286,7 @@ def due_strip(compact=False):
         if compact:
             rows += f'<div class="due" style="padding: 8px 10px; flex-wrap: wrap;"><span class="pill plain {cls}">{due}</span><span style="font-size: 12px; flex-basis: 100%;">{text}</span><span class="meta">{repo} · {sess}</span><span style="flex-grow: 1;"></span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span></div>'
         else:
-            rows += f'<div class="due"><span class="pill plain {cls}" style="width: 78px; justify-content: center;">{due}</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{text}</span><span class="meta" style="flex-shrink: 0;">{repo} · session <a href="#">{sess}</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>'
+            rows += f'<div class="due"><span class="pill plain {cls}" style="width: 78px; justify-content: center;">{due}</span><span style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{text}</span><span class="meta" style="flex-shrink: 0;">{repo} · session <a href="#">{sess}</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>'
     return f'''<div class="card" style="display: flex; flex-direction: column;">
     <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #dfe3e8;"><span style="font-weight: 600;">Due</span><span class="muted">4 overdue · 2 today · from the dev-cadence boards</span><span style="flex-grow: 1;"></span><a href="#" style="font-size: 12px;">full board →</a><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
     {rows}
@@ -584,7 +585,7 @@ def team_phone():
     for host, repo, r in ordered:
         cards += card(host, repo, r)
     return head("Phone") + f'''<div style="width: 390px; min-height: 1560px; background: #f4f5f7; display: flex; flex-direction: column;">
-<div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">Shift<b>Lead</b></span><span style="flex-grow: 1;"></span><span class="mono" style="font-size: 11px; color: #aab3bf;">5h 41%</span><span class="btn primary" style="height: 32px; width: 32px; padding: 0; justify-content: center;">{ICON["plus"]}</span></div>
+<div class="topbar" style="padding: 0 14px; gap: 10px; height: 52px;"><span class="wordmark">Shift<b>Lead</b></span><span style="flex-grow: 1;"></span><span class="mono" style="font-size: 12px; color: #aab3bf;">5h 41%</span><span class="btn primary" style="height: 32px; width: 32px; padding: 0; justify-content: center;">{ICON["plus"]}</span></div>
 <div style="padding: 12px 12px 20px; display: flex; flex-direction: column; gap: 10px;">
   <div style="display: flex; gap: 6px; overflow: hidden;"><span class="btn" style="height: 32px;">needs you 1</span><span class="btn" style="height: 32px;">due 6</span><span class="btn" style="height: 32px;">all 12</span></div>
   {due_strip(compact=True)}
@@ -638,8 +639,8 @@ def focus():
     <div class="card" style="padding: 12px;">
       <div style="font-weight: 600; margin-bottom: 8px;">Session</div>
       <dl class="kv" style="margin: 0;">
-        <dt>profile</dt><dd class="mono" style="font-size: 11px;">claude-code · grind (pro) · sonnet</dd>
-        <dt>adapter id</dt><dd class="mono" style="font-size: 11px;">1c8e0b2f…f42a</dd>
+        <dt>profile</dt><dd class="mono" style="font-size: 12px;">claude-code · grind (pro) · sonnet</dd>
+        <dt>adapter id</dt><dd class="mono" style="font-size: 12px;">1c8e0b2f…f42a</dd>
         <dt>tmux</dt><dd class="mono">ao-samscrape-tdgrind-1</dd>
         <dt>started</dt><dd>2026-09-04 20:02 MDT · 3h 14m</dd>
         <dt>last output</dt><dd>14 s ago</dd>
@@ -648,13 +649,13 @@ def focus():
       </dl>
     </div>
     <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><span style="font-weight: 600;">Git</span><span class="mono muted" style="font-size: 11px;">td301-fix · 2 ahead of origin/main</span></div>
-      <div class="mono" style="font-size: 11px; line-height: 1.7;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><span style="font-weight: 600;">Git</span><span class="mono muted" style="font-size: 12px;">td301-fix · 2 ahead of origin/main</span></div>
+      <div class="mono" style="font-size: 12px; line-height: 1.7;">
         <div><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>
         <div><span style="color: #065f46;">M</span> tests/test_scripts/test_recover_stuck_notices.py</div>
         <div><span style="color: #1f5fa8;">A</span> docs/claude-memory/project_td301.md</div>
       </div>
-      <div style="display: flex; gap: 6px; margin-top: 10px;"><span class="btn" style="height: 24px; font-size: 11px;">diff</span><span class="btn" style="height: 24px; font-size: 11px;">log</span><span class="btn" style="height: 24px; font-size: 11px;">PRs</span></div>
+      <div style="display: flex; gap: 6px; margin-top: 10px;"><span class="btn" style="height: 24px; font-size: 12px;">diff</span><span class="btn" style="height: 24px; font-size: 12px;">log</span><span class="btn" style="height: 24px; font-size: 12px;">PRs</span></div>
     </div>
     <div class="card" style="padding: 12px;">
       <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">1/3 done · 2 filed</span></div>
@@ -809,20 +810,20 @@ def legend():
         ("--stalled", "#dc2626", "stalled?", "red"),
         ("--limited", "#7c3aed", "limited", "violet"),
     ]
-    tok = "".join(f'<tr><td class="mono" style="width: 150px; font-size: 11.5px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: {c}; margin-right: 6px; vertical-align: -1px;"></span>{t}</td>'
-                  f'<td class="mono" style="font-size: 11.5px; width: 230px;">{st}</td><td>{d}</td></tr>' for t, c, st, d in tokens)
+    tok = "".join(f'<tr><td class="mono" style="width: 150px; font-size: 12.5px;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: {c}; margin-right: 6px; vertical-align: -1px;"></span>{t}</td>'
+                  f'<td class="mono" style="font-size: 12.5px; width: 230px;">{st}</td><td>{d}</td></tr>' for t, c, st, d in tokens)
     return head("Legend") + f'''<div style="width: 900px; min-height: 1180px; background: #f4f5f7; padding: 20px 24px; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px;">
   <div style="font-size: 16px; font-weight: 600;">States and badges</div>
   <div class="card"><table><tbody>{body}</tbody></table></div>
   <div class="card"><table><tbody>{tok}</tbody></table></div>
   <div class="card" style="padding: 12px; display: flex; flex-direction: column; gap: 8px;">
     <div style="display: flex; gap: 10px; align-items: center;">{pill("working", scraped=True)}<span>Dashed outline: state guessed from the last screen lines (tool without hooks, plain shells). Solid: reported by the tool's hooks.</span></div>
-    <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">claude-code · paul (max) · opus</span><span>Profile line: tool · account · model. Commands, policies, and usage gates key on the profile, so two accounts of one tool are tracked separately.</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 12px; color: #4b5563; white-space: nowrap;">claude-code · paul (max) · opus</span><span>Profile line: tool · account · model. Commands, policies, and usage gates key on the profile, so two accounts of one tool are tracked separately.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="mode" style="white-space: nowrap;">unattended</span><span class="mode mine" style="white-space: nowrap;"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="{PERSON}"></path></svg>interactive</span><span>The mode, on every card as a word, never pressable: <i>unattended</i> is quiet (run window, usage gate, wrap-up-then-kill and credential checks apply), <b>interactive</b> carries the person mark at the text's full strength — the person's own sessions are the ones that stand out (never paused, nudged, or killed by a policy). The toggle is in the card's <b>more</b> and on the Focus header. The person glyph is reserved for this mark: no role may name it.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="mark" style="white-space: nowrap;">✉ 2</span><span>Marks, on the card's second row: unread mail, an identity alarm, <i>suspended</i>. Never pressable.</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="meta" style="flex-shrink: 0;">TD-301 → #811 · 1/3 done</span><span class="meta" style="flex-shrink: 0;">#809 · 2/2 done</span><span>The report line: a reference is shown once — where the entry's reference is the PR itself it is never <span class="mono">#809 → #809</span>. Dashed underline: derived by the host agent, not declared.</span></div>
-    <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">shell</span><span>A shell is an adapter like any other: scraped state, no profile, exempt from the one-agent-per-directory rule, as are command runs. Predefined command runs are a separate kind and live on the Commands tab.</span></div>
-    <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 11px; color: #4b5563; white-space: nowrap;">kmaster ● laptop ◐</span><span>Host chips in the top bar: ● reachable, ◐ volatile host currently unreachable (asleep), ○ non-volatile host unreachable (a problem).</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 12px; color: #4b5563; white-space: nowrap;">shell</span><span>A shell is an adapter like any other: scraped state, no profile, exempt from the one-agent-per-directory rule, as are command runs. Predefined command runs are a separate kind and live on the Commands tab.</span></div>
+    <div style="display: flex; gap: 10px; align-items: center;"><span class="mono" style="font-size: 12px; color: #4b5563; white-space: nowrap;">kmaster ● laptop ◐</span><span>Host chips in the top bar: ● reachable, ◐ volatile host currently unreachable (asleep), ○ non-volatile host unreachable (a problem).</span></div>
     <div style="display: flex; gap: 10px; align-items: center;"><span class="flag">{ICON["warn"]}dirty · 2 unpushed</span><span>Stranded-work flag: idle or exited with uncommitted or unpushed changes.</span></div>
   </div>
 </div>
@@ -831,7 +832,7 @@ def legend():
 def direction_b():
     """Low-fi alternate: card grid instead of table."""
     def c(name, state, sub):
-        return f'<div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; gap: 8px; align-items: center;"><span class="mono" style="font-weight: 500;">{name}</span><span style="flex-grow: 1;"></span>{pill(state)}</div><div class="muted" style="font-size: 11px;">{sub}</div><div class="term" style="height: 54px; font-size: 11px; padding: 6px 8px; color: #aab3bf;">⏺ Bash(pdm run test)\n  412 passed\n▌</div></div>'
+        return f'<div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 6px;"><div style="display: flex; gap: 8px; align-items: center;"><span class="mono" style="font-weight: 500;">{name}</span><span style="flex-grow: 1;"></span>{pill(state)}</div><div class="muted" style="font-size: 12px;">{sub}</div><div class="term" style="height: 54px; font-size: 12px; padding: 6px 8px; color: #aab3bf;">⏺ Bash(pdm run test)\n  412 passed\n▌</div></div>'
     cards = "".join([
         c("samscrape/main", "needs", "kmaster · 2m · Permission: git push"),
         c("samscrape/tdgrind-1", "working", "kmaster · 14s"),
@@ -890,21 +891,21 @@ def resumable():
             state = ""
             act = f'<span class="btn sm primary">{ICON["resume"]}Resume</span>'
         if nm:
-            title = f'<a href="#" class="mono" style="font-weight: 500;">{nm}</a>'; slug_html = f'<span class="mono muted" style="font-size: 11px;">{sid}</span>'
+            title = f'<a href="#" class="mono" style="font-weight: 500;">{nm}</a>'; slug_html = f'<span class="mono muted" style="font-size: 12px;">{sid}</span>'
         else:
-            title = f'<a href="#" class="mono" style="font-weight: 500;">{sid}</a>'; slug_html = '<span class="muted" style="font-size: 11px;">no name yet</span>'
+            title = f'<a href="#" class="mono" style="font-weight: 500;">{sid}</a>'; slug_html = '<span class="muted" style="font-size: 12px;">no name yet</span>'
         board_html = f'<span class="flag" style="color: #7c3d00;">{ICON["warn"]}{board} on board</span>' if board else '<span class="muted">—</span>'
         return f'''<tr>
   <td style="width: 240px;"><div style="display: flex; flex-direction: column; gap: 3px;"><div style="display: flex; align-items: center; gap: 8px;">{title}{state}</div>{slug_html}</div></td>
-  <td style="width: 210px;"><span class="mono" style="font-size: 11px; color: #4b5563;">{where}</span></td>
-  <td style="width: 170px;"><span class="mono muted" style="font-size: 11px;">{span}</span></td>
+  <td style="width: 210px;"><span class="mono" style="font-size: 12px; color: #4b5563;">{where}</span></td>
+  <td style="width: 170px;"><span class="mono muted" style="font-size: 12px;">{span}</span></td>
   <td><div class="rs"><div><span class="rs-k">started</span>{started}</div><div><span class="rs-k">ended</span>{ended}</div></div></td>
   <td style="width: 100px;">{board_html}</td>
   <td style="width: 170px;"><div style="display: flex; justify-content: flex-end; gap: 4px;">{act}</div></td>
 </tr>'''
     groups = ""
     for host, repo, path, rows in RESUMABLE:
-        groups += f'<tr><td colspan="6" style="padding: 0;"><div class="grp"><span>{host} / {repo}</span><span class="path mono" style="font-size: 11px;">{path}</span><span style="flex-grow: 1;"></span><span class="badge">claude-code · ~/.claude/projects</span></div></td></tr>'
+        groups += f'<tr><td colspan="6" style="padding: 0;"><div class="grp"><span>{host} / {repo}</span><span class="path mono" style="font-size: 12px;">{path}</span><span style="flex-grow: 1;"></span><span class="badge">claude-code · ~/.claude/projects</span></div></td></tr>'
         groups += "".join(r(host, repo, path, s) for s in rows)
     right = f'''<span class="input" style="width: 200px; height: 28px; color: #9ca3af;">search transcripts…</span>
     <span class="btn ghost">host: all ▾</span><span class="btn ghost">repo: all ▾</span><span class="btn ghost">last 30 days ▾</span>
@@ -954,11 +955,11 @@ def commands():
     for host, repo, path, cmds in COMMANDS:
         cards = "".join(cmd(repo, c) for c in cmds)
         groups += f'''<div style="display: flex; flex-direction: column; gap: 8px;">
-    <div class="grp" style="padding: 0;"><span>{host} / {repo}</span><span class="path mono" style="font-size: 11px;">{path}/.agentorc.yml</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">edit yml</span></div>
+    <div class="grp" style="padding: 0;"><span>{host} / {repo}</span><span class="path mono" style="font-size: 12px;">{path}/.agentorc.yml</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">edit yml</span></div>
     <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; align-items: start;">{cards}</div>
   </div>'''
     groups += f'''<div style="display: flex; flex-direction: column; gap: 8px;">
-    <div class="grp" style="padding: 0;"><span>kmaster / contractmatch</span><span class="path mono" style="font-size: 11px;">/home/kmaster/contractmatch</span></div>
+    <div class="grp" style="padding: 0;"><span>kmaster / contractmatch</span><span class="path mono" style="font-size: 12px;">/home/kmaster/contractmatch</span></div>
     <div class="note" style="padding: 10px 12px; border: 1px dashed #cbd0d6; border-radius: 6px;">No <span class="mono">.agentorc.yml</span> in this repo. Add a <span class="mono">commands:</span> list to get buttons here; each press starts a <span class="mono">ao-contractmatch-cmd-&lt;name&gt;</span> session.</div>
   </div>'''
     runs = [
@@ -1007,7 +1008,7 @@ INBOX_BLURB = {
 
 def isec(title, count, extra="", opened=False):
     pop = f'<div class="pop">{INBOX_BLURB[title]}</div>' if opened else ""
-    mark = '<span style="font-size: 9px;">▾</span>' if title == "FYI" else ""
+    mark = '<span style="font-size: 10px;">▾</span>' if title == "FYI" else ""
     return f'''<div class="isec-h">{mark}<span>{title}</span><span class="n">{count}</span><span class="info{" on" if opened else ""}">i</span><span style="flex-grow: 1;"></span>{extra}{pop}</div>'''
 
 
@@ -1024,7 +1025,7 @@ def fold(summary, open_=False, body=""):
     """TD-127: the *details* disclosure under a row's first paragraph — a quiet unbordered line, never a button."""
     mark = "▾" if open_ else "▸"
     inner = f'<div class="txt" style="margin-top: 6px; color: #374151;">{body}</div>' if open_ else ""
-    return f'<div style="margin-top: 2px;"><span class="muted" style="font-size: 12px; cursor: default;"><span style="font-size: 9px;">{mark}</span> {summary}</span>{inner}</div>'
+    return f'<div style="margin-top: 2px;"><span class="muted" style="font-size: 12px; cursor: default;"><span style="font-size: 10px;">{mark}</span> {summary}</span>{inner}</div>'
 
 
 def inbox_rows():
@@ -1046,6 +1047,11 @@ def inbox_rows():
         mcard(BAR["needs"], "promote", "agentorc", "", "main moved 12m ago",
               '<div class="txt">live <span class="mono">485d28b</span> · main <span class="mono">9c1e0f2</span>, <b>3 commits ahead</b> · checks <b style="color: #16a34a;">green</b> · auto off</div><div class="meta">the checkout is on main with a clean tree — the press makes it live; a rollback is <span class="mono">ao promote --sha</span></div>',
               b("Promote", "primary") + b("Snooze ▾") + gap + b(ICON["focus"] + "Open", "ghost")),
+        mcard(BAR["needs"], "board", "agentorc", "ao-grind", "1d overdue",
+              '<div class="txt"><span class="muted">grinder-ao-2 on kmaster · <b style="color: #374151;">still on TD-122 — grinder-ao-2 holds it</b></span></div>'
+              '<div class="txt">Live look pending once #517 is merged and promoted: the usage chip is one per account (TD-122). On the Org the top bar should read <i>Claude · paul · week n%</i> once, not once per profile.</div>'
+              '<div class="meta">on the board — Reply writes under your name on this line and, while a session holds TD-122, mails it there too; Snooze moves its Due: date; Done checks it off</div>',
+              b("Reply", "primary") + b("Snooze ▾") + b("Done") + gap + b("Open board", "ghost")),
         mcard(BAR["stalled"], "outcome · blocked", "lead-cm-1", "cm-grind", "reported 6m ago",
               '<div class="quoted">You answered “Use the staging key” 1h ago to: <i>Which Stripe key should the worker API tests use?</i></div><div class="txt">Blocked: the staging key is not in Doppler’s <span class="mono">dev</span> config, and I cannot add one.</div>',
               b("Reply", "primary") + b("Dismiss") + gap + b(ICON["focus"] + "Open", "ghost")),
@@ -1068,7 +1074,7 @@ def inbox_rows():
               + fold("details", open_=True, body=
                      'Measured against §4.2a <i>Profiles</i> and §4.5a <i>usage chip</i>: one chip per account, the poll once per account, <span class="mono">rate_limited</span> gone from the log.'
                      '<ul style="margin: 6px 0 0 18px; padding: 0;"><li>the gate reads the account, not the profile — as designed</li><li><b>gap</b>: the per-model window is read but not drawn; TD-122 (3)</li><li>the ledger line says 09-22, the PR 09-23 — the PR is right</li></ul>'
-                     'Source: design §4.2a, §4.5a <i>usage chip</i>; <a href="#" style="color: #1f5fa8;">the review comment</a> <span class="muted" style="font-size: 11px;">github.com</span>'),
+                     'Source: design §4.2a, §4.5a <i>usage chip</i>; <a href="#" style="color: #1f5fa8;">the review comment</a> <span class="muted" style="font-size: 12px;">github.com</span>'),
               b("Overrule") + b("Dismiss", "ghost")),
     ]
     fyi = [
@@ -1085,26 +1091,26 @@ def inbox(picks=False):
     needs, steering, waiting, answered, fyi = inbox_rows()
     fyi_extra = '<span class="btn sm ghost" style="text-transform: none; letter-spacing: 0;">Dismiss all</span>'
     if not picks:
-        secs = [("Needs you", 5, False), ("Steering", 1, False), ("Waiting on them", 1, False), ("Answered for you", 1, False), ("FYI", 14, False)]
-        teams = [("ao-grind", 2, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
-        kinds = [("questions", 1, False), ("steering", 1, False), ("session states", 3, False), ("board items", 0, False), ("notes", 3, False), ("trail", 6, False)]
-        body = (isec("Needs you", 5, opened=True) + "".join(needs) + isec("Steering", 1) + "".join(steering)
+        secs = [("Needs you", 6, False), ("Steering", 1, False), ("Waiting on them", 1, False), ("Answered for you", 1, False), ("FYI", 14, False)]
+        teams = [("ao-grind", 3, False), ("cm-grind", 1, False), ("guardians", 0, False), ("no team", 2, False)]
+        kinds = [("questions", 1, False), ("steering", 1, False), ("session states", 3, False), ("board items", 1, False), ("notes", 3, False), ("trail", 6, False)]
+        body = (isec("Needs you", 6, opened=True) + "".join(needs) + isec("Steering", 1) + "".join(steering)
                 + isec("Waiting on them", 1) + "".join(waiting) + isec("Answered for you", 1) + "".join(answered) + isec("FYI", "2 new · 14", fyi_extra) + "".join(fyi)
                 + '<div class="muted" style="padding: 2px 2px 0; font-size: 12px;">12 earlier entries — <a href="#">show</a> · 1 snoozed — <a href="#">show</a></div>')
         summary, title = "", "Inbox"
         note = ("Design notes, not page text. <b>The rail</b> (TD-129, Paul's shape, 2026-09-24): under the title, which has the top line to itself; left of the column, sticky, three groups of toggles — the sections in the page's order, the teams with their <i>Needs you</i> counts, the coarse kinds — and the find box. Nothing pressed here, so every count is the whole. Within a group picks are OR'd, across groups AND'd, the find a fourth group; nothing picked means all. The first group is <i>Urgency</i> — what orders the page — not <i>Sections</i>, which names nothing a person looks for, and not <i>State</i>, a session's word and a kind below. The typed <span class=\"mono\">team:</span> box is gone: a filter that is a control is not typed. "
-                "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks. <b>A message has one shape</b> (TD-127): its first paragraph is the whole of what you need, the rest folds under <i>details</i> — closed on the ask row, open on the <i>answered for you</i> row, where the reading is a rendered list from the closed markdown subset and the one link carries its host after its text.")
+                "<b>One centred column</b> (1100 px at most) beside it — a queue reads in order, top to bottom. <b>A section is a heading</b>, not a box: its name, its count, and an <i>i</i> mark that holds the blurb (drawn open on <i>Needs you</i>). <b>A row is a card</b>: its own surface, a hover state (first card) and a keyboard focus ring (second) — <span class=\"mono\">j</span> / <span class=\"mono\">k</span> move the ring, <span class=\"mono\">Enter</span> opens a mail row's page, <span class=\"mono\">o</span>, <span class=\"mono\">a</span>, <span class=\"mono\">d</span>, <span class=\"mono\">r</span>, <span class=\"mono\">s</span>, <span class=\"mono\">x</span> press the row's own Open, Allow, Deny, Reply, Snooze and Dismiss or Done (§4.5a <b>keys</b>, TD-124). The state pill and the kind label are flat and unbordered so they never read as buttons; everything bordered is a control. Suggested answers stay in their own dashed group, in quotation marks. <b>A board row</b> (TD-126) says its sender's standing before the press — <i>still on TD-122 — grinder-ao-2 holds it</i>, <i>moved on</i> or <i>gone</i> — and carries <b>Reply</b>: the words go on the board line under Paul's name always, and to the lease holder as well while one exists; a reply is not Done. <b>A message has one shape</b> (TD-127): its first paragraph is the whole of what you need, the rest folds under <i>details</i> — closed on the ask row, open on the <i>answered for you</i> row, where the reading is a rendered list from the closed markdown subset and the one link carries its host after its text.")
     else:
-        secs = [("Needs you", "2 of 5", True), ("Steering", "0 of 1", False), ("Waiting on them", "0 of 1", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
-        teams = [("ao-grind", "2 of 2", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 2", False)]
+        secs = [("Needs you", "2 of 6", True), ("Steering", "0 of 1", False), ("Waiting on them", "0 of 1", False), ("Answered for you", "0 of 1", False), ("FYI", "0 of 14", False)]
+        teams = [("ao-grind", "2 of 3", True), ("cm-grind", "0 of 1", False), ("guardians", "0 of 0", False), ("no team", "0 of 2", False)]
         kinds = [("questions", "1 of 1", False), ("steering", "0 of 1", False), ("session states", "1 of 3", False), ("board items", "0 of 0", False), ("notes", "0 of 3", False), ("trail", "0 of 6", False)]
-        body = (isec("Needs you", "2 of 5") + "".join(needs[:2])
+        body = (isec("Needs you", "2 of 6") + "".join(needs[:2])
                 + '<div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them, Answered for you and FYI are not picked — press them in the rail, or <b>Clear filters</b>.</div>')
         summary, title = "", "Inbox"
-        note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 5</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
+        note = ("Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 6</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class=\"mono\">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class=\"mono\">/inbox</span>. "
                 "Not designed: a preview pane (TD-129 option b) — at any width a row's text opens its page (<i>Inbox — message</i>).")
     return head(title) + f'''<div style="width: 1440px; min-height: {1960 if not picks else 1000}px; background: #f4f5f7; display: flex; flex-direction: column;">
-{topbar("Inbox 5 · 2")}
+{topbar("Inbox 6 · 2")}
 <div style="padding: 16px 20px 28px;">
 <div style="max-width: 1324px; margin: 0 auto 12px;">{page_head(title, summary)}</div>
 <div style="display: flex; gap: 24px; align-items: flex-start; max-width: 1324px; margin: 0 auto;">
@@ -1123,20 +1129,20 @@ def rail(secs, teams, kinds, all_on=False, find=""):
     """The Inbox rail (design §4.5 screen 6 *The rail*, TD-129): three groups of toggles and the find box."""
     def line(label, n, on):
         dim = n == 0 or str(n).startswith("0 ")
-        st = "display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default;"
+        st = "display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default;"
         if on:
             st += " background: #e6e9ee; font-weight: 600; box-shadow: inset 3px 0 0 #1f5fa8;"
         col = "#9ca3af" if dim else "#1c2128"
         ncol = "#9ca3af" if dim else ("#111418" if on else "#6b7280")
-        return f'<div style="{st} color: {col};"><span style="flex-grow: 1;">{label}</span><span class="mono" style="font-size: 11px; color: {ncol};">{n}</span></div>'
+        return f'<div style="{st} color: {col};"><span style="flex-grow: 1;">{label}</span><span class="mono" style="font-size: 12px; color: {ncol};">{n}</span></div>'
     def group(title, lines, blurb):
-        return (f'<div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="{blurb}">{title}</div>'
+        return (f'<div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="{blurb}">{title}</div>'
                 + "".join(line(*l) for l in lines))
     allbtn = ('<span class="btn sm" style="width: 100%; justify-content: center; margin-bottom: 6px;">Clear filters</span>' if all_on
               else '<div style="height: 6px;"></div>')
     findbox = (f'<div class="input" style="height: 28px; color: {"#1c2128" if find else "#9ca3af"}; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 0 8px; white-space: nowrap;" title="every word typed must match, in any order — a fourth pick, AND’d with the rail’s">{find or "find…"}<span style="flex-grow: 1;"></span>'
-               + (f'<span class="mono" style="font-size: 11px; color: #6b7280;">3 of 83</span>' if find else '<span class="mono" style="font-size: 11px; color: #9ca3af;">/</span>') + '</div>')
-    return f'''<div style="flex: 0 0 200px; position: sticky; top: 16px; display: flex; flex-direction: column; font-size: 13px;">
+               + (f'<span class="mono" style="font-size: 12px; color: #6b7280;">3 of 83</span>' if find else '<span class="mono" style="font-size: 12px; color: #9ca3af;">/</span>') + '</div>')
+    return f'''<div style="flex: 0 0 200px; position: sticky; top: 16px; display: flex; flex-direction: column; font-size: 14px;">
   {allbtn}
   {findbox}
   {group("Urgency", secs, "the page's sections, in its order — needs you, on a clock, waiting on them, none")}
@@ -1167,7 +1173,7 @@ def inbox_message():
 {topbar("Inbox 5 · 2")}
 <div style="padding: 16px 20px 28px;">
 <div class="inboxcol">
-  <div style="display: flex; align-items: center; gap: 10px;"><a href="#" style="font-size: 13px; color: #1f5fa8; text-decoration: none;">← Back</a><span class="muted" style="font-size: 12px;">to Inbox · ao-grind · Needs you · row 2 of 2</span><span style="flex-grow: 1;"></span><span class="muted mono" style="font-size: 11px;">k ↑ previous · j ↓ next · Esc back</span></div>
+  <div style="display: flex; align-items: center; gap: 10px;"><a href="#" style="font-size: 14px; color: #1f5fa8; text-decoration: none;">← Back</a><span class="muted" style="font-size: 12px;">to Inbox · ao-grind · Needs you · row 2 of 2</span><span style="flex-grow: 1;"></span><span class="muted mono" style="font-size: 12px;">k ↑ previous · j ↓ next · Esc back</span></div>
   {entry}
   {isec("Answer", "")}
   <div class="mcard" style="gap: 8px;">{controls}</div>
@@ -1185,13 +1191,13 @@ def inbox_phone():
     """Screen 6 below 720 px (design §4.5 screen 6 *Narrow*, TD-129): the rail as a chip row and a filter sheet, 44 px controls."""
     def chip(label, n, on=False):
         st = "height: 32px; white-space: nowrap;" + (" background: #1c2128; color: #fff; border-color: #1c2128;" if on else "")
-        return f'<span class="btn" style="{st}">{label}<span class="mono" style="font-size: 11px; opacity: .8;">{n}</span></span>'
+        return f'<span class="btn" style="{st}">{label}<span class="mono" style="font-size: 12px; opacity: .8;">{n}</span></span>'
     def pcard(bar, kind, name, team, age, body, buttons, state=None):
         btns = "".join(f'<span class="btn{" primary" if i == 0 and len(buttons) > 1 else ""}" style="height: 44px; flex-grow: 1; justify-content: center;">{l}</span>' for i, l in enumerate(buttons))
         badge = f'<span class="badge">{team}</span>' if team else '<span class="badge" style="border-style: dashed;">no team</span>'
         who = pill(*state) if state else f'<span class="kind">{kind}</span>'
         return f'''<div class="mcard" style="padding: 12px 12px 12px 15px;"><span class="sbar" style="background: {bar};"></span>
-  <div class="who">{who}<span class="nm" style="font-size: 13px;">{name}</span>{badge}<span style="flex-grow: 1;"></span><span class="meta">{age}</span></div>
+  <div class="who">{who}<span class="nm" style="font-size: 14px;">{name}</span>{badge}<span style="flex-grow: 1;"></span><span class="meta">{age}</span></div>
   {body}
   <div style="display: flex; gap: 8px; margin-top: 2px;">{btns}</div>
 </div>'''
@@ -1212,6 +1218,35 @@ def inbox_phone():
   {"".join(cards)}
   <div class="muted" style="padding: 4px 2px 0; font-size: 12px;">Steering · Waiting on them · FYI are not picked — <a href="#">Filters ▾</a> or <a href="#">Clear filters</a>.</div>
   <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Narrow</b> (below 720 px, TD-129): the rail is not drawn; a chip row of the teams from the rail's own Teams list, with their <i>Needs you</i> counts, the picked ones first so a pick never scrolls out of sight, behind one pinned <b>Filters ▾</b> chip carrying the number of picks that opens a full-screen sheet holding the three groups as the same toggles, the find box, <b>Clear filters</b> and <b>Done</b> — the filter screen in practice, not a page of its own, since the picks are the list's URL. The chips and the sheet are the rail's toggles drawn twice from one list. The URL is the desktop's for the same picks. One column; controls 44 px high as the phone's Org cards. A long entry's text is cut with <i>whole entry →</i>, which is the message page — there is no pane at any width.</div>
+</div>
+</div>
+''' + TAIL
+
+
+def type_scale():
+    """The type scale (design §4.5 *Type scale*, TD-130): six tokens and where each is used, at the size it draws."""
+    rows = [
+        ("--t-body", "14 px · 1.5", "IBM Plex Sans", "Everything a person reads: body text, a mail body, a board line, a question, an input.", "font-size: 14px; line-height: 1.5;"),
+        ("--t-title", "16 px", "JetBrains Mono 600 · Plex 600", "A card's name, a page's title, a group head — tdgrind-ao-1 · Inbox", "font-size: 16px; font-weight: 600;"),
+        ("--t-btn", "13 px", "IBM Plex Sans 500", "A button's label — Reply · Snooze ▾ · Open board", "font-size: 13px; font-weight: 500;"),
+        ("--t-small", "12 px", "IBM Plex Sans", "Small print in lower case: an age, a due word, a count, a caption, a toast — never smaller than this.", "font-size: 12px;"),
+        ("--t-mono", "13 px · 1.55", "JetBrains Mono", "The terminal and mono reading text — $ pdm run test … 212 passed in 41.3s", "font-family: 'JetBrains Mono', monospace; font-size: 13px; line-height: 1.55;"),
+        ("--t-mono-s", "12.5 px", "JetBrains Mono", "Mono small print: doing 3m ago: TD-073 — pushing for review · asked 40s ago · 4m 20s left", "font-family: 'JetBrains Mono', monospace; font-size: 12.5px; color: #6b7280;"),
+        ("--t-cap", "11 px · caps", "IBM Plex Sans 600, tracked", "UPPERCASE MARKS ONLY — PERMISSION · ASK · NEEDS YOU · TEAM · KIND", "font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #6b7280;"),
+    ]
+    trs = "".join(f'<tr><td class="mono" style="font-size: 12.5px; color: #374151; white-space: nowrap; padding: 12px 16px 12px 0; vertical-align: top;">{t}</td><td style="font-size: 12px; color: #6b7280; white-space: nowrap; padding: 12px 16px 12px 0; vertical-align: top;">{px}<br><span style="font-size: 11px;">{face}</span></td><td style="{st} padding: 12px 0; border-bottom: 1px solid #eceef1;">{sample}</td></tr>' for t, px, face, sample, st in rows)
+    before = '<span style="font-size: 13px;">13 px body</span> · <span style="font-size: 12px;">12 px mail body</span> · <span style="font-size: 11px;">11 px small print</span> · <span style="font-size: 10px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600;">10 px pill</span>'
+    return head("Type scale") + f'''<div style="width: 1440px; min-height: 760px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 20px 28px 28px; max-width: 1100px;">
+  <div style="font-size: 16px; font-weight: 600;">Type scale</div>
+  <div class="muted" style="font-size: 12px; margin-top: 4px;">six tokens on <span class="mono">:root</span>, theme-independent; no rule outside the token block names a pixel size (design §4.5 <i>Type scale</i>, TD-130)</div>
+  <table style="border-collapse: collapse; margin-top: 16px; width: 100%;">{trs}</table>
+  <div style="margin-top: 20px; padding: 12px 14px; background: #fff; border: 1px solid #dfe3e8; border-radius: 6px;">
+    <div style="font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #6b7280;">before, for the eye</div>
+    <div style="margin-top: 6px;">{before}</div>
+  </div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 16px;">Design notes, not page text. The reading text moves to the base size (14) instead of sitting below it; small print is 12 and never smaller in lower case; capitals at 11 read as lower case does at 12.5, so the tracked marks keep one step down. Mono sits one pixel under the sans it shares a line with, since JetBrains Mono's x-height is the larger. Heights follow the scale in <span class="mono">em</span> — the card stays six rows of one height and grows with its text; a button is 30, a small one 26, an input 34. No density setting: the browser's zoom, remembered per site, is one already. Every other artboard on this canvas is regenerated at the scale.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1248,6 +1283,8 @@ files = {
     "InboxRail.dc.html": inbox(picks=True),
     "InboxMessage.dc.html": inbox_message(),
     "InboxPhone.dc.html": inbox_phone(),
+    "Type.dc.html": type_scale(),
+    "TypeDark.dc.html": darken(type_scale()),
 }
 for n, s in files.items():
     (OUT / n).write_text(s)
@@ -1271,6 +1308,8 @@ LAYOUT = [
     ("NewSession.dc.html", "New session", 1),
     ("Commands.dc.html", "Commands", 1),
     ("MainDark.dc.html", "Org — dark", 2),
+    ("Type.dc.html", "Type scale", 2),
+    ("TypeDark.dc.html", "Type scale — dark", 2),
 ]
 COLUMN_X = {0: 0, 1: 1540, 2: 3120}
 GUTTER = 100
@@ -1291,7 +1330,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
