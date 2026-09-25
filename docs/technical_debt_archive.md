@@ -1257,3 +1257,22 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Done when** (1) each of the four briefs carries the paragraph in those words; (2) `ao msg person` with a 90-word first paragraph prints the warning and the mail arrives; a shaped message prints nothing; a `--source` reply is checked the same way; (3) the Message / Reply dialog's placeholder reads the line; (4) the designer-brief change waited for the techlead's read or was split out; (5) `pdm run test` passes; (6) TD-127 is marked built for the senders' half.
 
 **Related:** TD-127 (the design), TD-138 (the page half), TD-125 (the wind-down report, the same rule applied once), TD-114 (the briefs' template — the paragraph goes where the mechanics live, not in a repo's supplement).
+
+## TD-135: Build the Inbox rail — sections, teams and kinds as toggles, the URL, and the find box
+
+**Priority:** Medium
+**Added:** 2026-09-24 (TD-129's design, a cloud session with Paul)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25. Was: open — designed, nothing built. Design: §4.5 screen 6 *The rail* and *Find*, §4.5a *Inbox page: the rail*, *Inbox page: find*, the **keys** row (`/`), glossary *rail*, mockups `Inbox.dc.html` and `InboxRail.dc.html`.
+
+**Location:** `src/agentorc/ui/templates/inbox.html` (the rail beside `.inboxcol`; the `#ifilter` box moves into it), `inbox_row.html` (the team badge's press; `data-find` on every row kind; `data-team` and `data-kind` for the filter), `src/agentorc/ui/app.py` (`inbox_sections` gains each row's coarse `kind` and the counts per section, team and kind under the current picks; the route reads the query and the poll echoes it), `src/agentorc/ui/static/app.js` (`AO.inbox`: the toggles, the URL, the browser's memory, the find), `app.css`, `tests/`.
+
+**Why:** the page's one filter is a typed syntax and team and kind are not visible controls; Paul's way of working the Inbox is one team's *Needs you* rows, then the next team's — a press per team, with a count that says where to go next.
+
+**Resolved:** 2026-09-25 (PR #567, `grinder-ao-2`) — `inbox_rail.html`, `rail_counts` / `rail_picks` / `rail_kind` / `row_find` in `app.py`, `AO.railCounts` and the toggles, URL and find in `app.js`, held to one answer by `test_the_script_counts_the_rail_as_the_server_does`. The design row §4.5a *Inbox page: the rail* carries the lasting content, and design-history §4.5a the four calls made in the build (counts twice, a team line's *Needs you* count, push on a press and replace on typing, Dismiss all on the rows on screen). The live look is on the board line for TD-144/TD-138's promote.
+
+**Done when** (1) with two teams' mail in the inbox, pressing one team shows that team's rows in every section and the number beside the team reads what it needs from the person; pressing a second team adds its rows; pressing *FYI* alone then shows both teams' FYI and nothing else; **All** shows everything; (2) the URL after those presses, opened in a fresh tab, is the same page, and a bare `/inbox` in the first browser remembers the last picks; (3) the top bar's number does not change under any pick, every count reads *n of all* while one is on, an unpicked team reads *0 of n* while another team is picked, and no count ever exceeds the rows on the page; (4) typing two words from a body in the other order, `#517`, and `517,` each find the row, *jeff* finds *jeffrey*, a team pressed and a word typed shows only that team's matching rows and the team counts change with the word, a word from a folded FYI entry unfolds FYI, and the count reads *n of all*; (5) `pdm run test` covers `inbox_sections`' counts under picks and the `kind` of each row kind; (6) TD-129 (2) and (3) are marked built; (7) TD-137's `Pickable` is flipped to yes in the same PR, since nothing else flips it. (7) TD-137's Pickable flipped to yes in the same PR
+
+**Related:** TD-129 (the design), TD-136 (the page, reached from this filtered list), TD-137 (narrow), TD-069 (the filter this replaces), TD-124 (`/`, `Esc`), TD-131 (the size at which the counts move into a store).
