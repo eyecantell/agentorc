@@ -77,7 +77,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
 | TD-132 | Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row | Medium | Open — designed, pickable |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
-| TD-140 | Build *Put on the board* — the write-back's one add and the FYI row's form | Low | Open — designed, pickable |
+| TD-140 | Build *Put on the board* — the write-back's one add and the FYI row's form | Low | Partly done — slice 1 (the add) built; the button remains |
 | TD-142 | Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder | Medium | Open — designed; slice 1 pickable, slice 2 waits on dev-cadence's reader fields |
 | TD-143 | The Focus Reports panel reads as a to-do list: a `claimed` row with its PR open looks like an unstarted claim, and Drop beside it lets a person let go of work in review | Medium | Open — designed; the build is TD-150, and this entry archives with it |
 | TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Built 2026-09-25 (PR #559) — Paul's live look pending |
@@ -1414,7 +1414,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open — designed, nothing built. Design: §4.5a *Inbox row: FYI · Put on the board*, §4.4 *Board write-back* (the one add).
+**Status:** Slice 1 built 2026-09-25 (PR #578, grinder-ao-1: `board.add`, `board_edit` with `action: add`, the entry dismissed after the commit); slice 2, the Inbox button and form, remains. Design: §4.5a *Inbox row: FYI · Put on the board*, §4.4 *Board write-back* (the one add).
 
 **Location:** `src/sessionorc/board.py` (`write_back` gains `action: add` — a new line at the top of the open items, in the board's format, committed as `agentorc: board <item head> (from <entry id>)`; refused on the same conditions as an edit — a checkout off its default branch or dirty — touching nothing), `src/sessionorc/agent.py` (`rpc_board_edit` takes `add` with `text`, `due`, `context`, `entry`; the person's alone; then `inbox_delete` of the entry in the same call so a failed commit deletes nothing), `src/agentorc/ui/app.py` and `inbox_row.html` (the button on FYI rows only, the form: board pick defaulting to the sender's repo, text, Due +1 day · +1 week · a date), the Inbox mockup already carries the button (`docs/mockups/gen.py`), `tests/`.
 
