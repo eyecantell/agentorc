@@ -1689,6 +1689,7 @@ async def test_a_restart_is_refused_while_an_outcome_is_owed_and_wakes_the_lead(
             with pytest.raises(AgentError, match="owes 1 outcome.*before declaring a restart"):
                 await worker.call("progress", id=w, status="restart", why="context is long")
             await worker.call("msg", to="person", text="did it", outcome="done", for_=ask["id"])
+            await worker.call("inbox")  # the person's reply, read: a restart is refused on unread mail too (TD-141)
 
         # settled: now it may. The cursor is taken first and the wait after the declaration, so
         # what is asserted is the **digest** — that `restart_wanted` is a change a lead is woken
