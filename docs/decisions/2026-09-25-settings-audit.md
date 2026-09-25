@@ -32,7 +32,7 @@ acts on it** — and six scopes. The code matches it, with the gaps listed in §
 | Per row | `attention.json`, `person_inbox.json` | state-row snoozes; entry snoozes and paused steers | Inbox RPCs, person-only | live | the Inbox |
 | Per session | the record | mode, stop time, grants, controllers | UI and CLI | live | card and Focus |
 | This browser | `localStorage` (`ao.*`) | theme, *mine*, the Inbox filter and folds, the Shell's last directory | the page | live | implicit |
-| Environment | `AGENTORC_HOME`; `AGENTORC_TICK` | the home; the tick period (an override §5 says does not exist) | the shell or the unit | start | no |
+| Environment | `AGENTORC_HOME`; `AGENTORC_TICK` | the home; the tick period (an override the design does not name — §5's *no env-var overrides* is TD-004's rule for `hosts.yml`) | the shell or the unit | start | no |
 | Service | the systemd units | bind, port, PATH, the home if set at install | `ao service install` | install | no |
 | Code | about ninety module constants | every bound and cadence (`LEASE_TTL`, `MAIL_RETENTION`, `RESTART_CEILING`, …); some twenty-five are named in the design | a PR | never | no |
 
@@ -51,8 +51,11 @@ the adapter reports them, flat or per day, grouped by account as the chip is (TD
 setting Paul moves weekly, RPC-backed today, effective next tick. (b) The **budget limits** of a
 metered profile — an amount per window with a warning line and a hard stop — once TD-128 designs
 them; the page reserves the row. (c) **Schedules** per team (TD-133; off by default). (d) The
-**person's own**: `open_in`, and the **terminal's font family and size** (new: a person who reads
-terminals all day wants it; one xterm option and a refit). (e) The **default profile**.
+**person's own**: `open_in`, and the **terminal's font size, and its face from the monospace faces
+the browser has** — JetBrains Mono bundled, ligatures off regardless (goal 12: *a pane you type
+into*), `monospace` always the fallback — a person who reads terminals all day wants it, and it is
+one xterm option and a refit. Not the default profile: `profiles.yml` has no writer and sits beside
+credentials; a `person:` override of it is a later question.
 
 **Show on the page, read-only, each value with an *i* mark saying which file it comes from, when
 it is re-read, and whether a change needs the agent restarted, and the editor button `open_in`
@@ -71,9 +74,12 @@ across two files with different write paths (`ui.yml` by hand, `settings.yml` by
 one thing a page cannot work around. **Retire `ui.yml` into `settings.yml` under a `person:` key**
 (`open_in`, the terminal font and size, later anything else that is a person's alone): one file the
 page writes, one person-only RPC that writes it (`set_settings` grows the key), one backup entry
-(today `settings.yml` is the only file the agent writes and the only config *not* in
-`BACKUP_MEMBERS`), and the agent ignores `person:`, which keeps §5's rule that nothing of the
-person's reaches a host agent. §5's reason for two files — a second person, or a UI off the home —
+(today neither `settings.yml` — the only file the agent writes — nor `ui.yml` is in
+`BACKUP_MEMBERS`; the merged file goes in, which the round's build entry names), and the agent ignores `person:`, which keeps §5's rule that nothing of the
+person's reaches a host agent. Why that is safe rather than merely asserted: the gate reads
+`usage_gate:` by key and `schedules:` by key (`sessionorc.settings.reserves`), a stanza it does not
+name is inert to it, and the UI already reads a host-agent-owned file per request (`hosts.yml`)
+without the agent knowing; the coupling is one file on one disk, not one reader. §5's reason for two files — a second person, or a UI off the home —
 is the trigger §5 already names for moving the scope when it comes. The UI runs on the home and
 reads the file as it reads `hosts.yml`. The theme stays per browser: a phone and a desk differ.
 
@@ -88,7 +94,7 @@ edits it by hand while the agent runs) and carries no comments.
 keys; `promote:` refused today; `settings.yml` not backed up; the org-level `roles:` overlay skips
 the validation the repo layer gets; `AGENTORC_TICK` undocumented; a hand edit of `home:`, the host's
 name or `identity` leaves the agent and the UI disagreeing until a restart; bind and port live in
-three places; `hosts.yml` `transport`/`ssh`/`person` in the design and not the code;
+three places; `hosts.yml` `transport` and `ssh` in the design and not the code, and `local.person` parsed but consumed by nothing;
 `AGENTORC_PROFILE` exported and read by nothing.
 
 ## 4. The page, in outline (for the design round)
@@ -96,11 +102,19 @@ three places; `hosts.yml` `transport`/`ssh`/`person` in the design and not the c
 Screen 7, **Settings**, `/settings`, a top-bar tab once built (TD-123's rule). One centred column
 as the Inbox (TD-082), sections in this order, each with its *i* mark: **Usage** (the reserves
 matrix by account → profile → window, each cell a reserve, flat or per day, with the line it
-produces; budgets per metered profile when TD-128 lands), **Schedules** (per team; TD-133),
+produces; budgets per metered profile when TD-128 lands), **Schedules** (per team; drawn disabled with *not built — TD-133* until that lands, as the budget rows wait on TD-128),
 **You** (`open_in`, terminal font and size, and this browser's theme, *mine* and folds with a
 *reset this browser*), **Hosts**, **Profiles**, **Org**, **Repos** (read-only, the file, the
 re-read rule, the editor button). Writes go through `set_settings`; nothing else on the page
-writes a file. A node's settings are the home's (§5) until the replica carries settings. Edits
+writes a file. **Nodes.** Today §5 says the page edits the home's file and *a node's is edited at
+the node until the replica carries settings*, and the gate runs on each session host reading its
+own file — so a reserve set on the home would not reach a profile's sessions on a container node,
+which is where the page's first user would be misled. The design round therefore **designs the
+replica**: `settings.yml` becomes home-owned, the home writes a node's copy over the link on every
+change and at every dial (as it writes the node's `profiles.yml` at provision, §4.4a), a hand edit
+at the node is overwritten, and the page's one file is the one file. Until that slice lands the
+page marks a profile that runs on a node with the node's name and the words *set at <node>*, and
+never pretends the home's reserve reaches it. Edits
 apply on the next tick and the page says so; a reserve's new line is shown as the chip will show
 it before the press lands.
 
@@ -112,4 +126,4 @@ it before the press lands.
 
 ## Review rounds
 
-_(filled by the Sonnet rounds below)_
+**Round 1 (Sonnet, 2026-09-25): NOT READY — 1 BLOCK, 3 FIX, 4 NOTE, all adopted.** BLOCK: the outline said a node's settings are the home's; §5 says the opposite, and the gate reads each host's own file, so a reserve set on the home would not reach a node's sessions — the round now designs the replica and the page marks node-run profiles until it lands. FIX: the default profile was listed as editable with no writer (dropped); `local.person` is parsed, not absent from the code; `ui.yml` is also outside `BACKUP_MEMBERS`. NOTE: the fold's safety argued rather than asserted; Schedules drawn disabled until TD-133; the terminal face from monospace faces with ligatures off (goal 12); `AGENTORC_TICK`'s framing. Verified correct by the round: the six-scope table, `set_settings`'s person-only rule and next-tick effect, `promote:` refused today (executed), the org `roles:` overlay unvalidated, no `/settings` route, the localStorage keys, the TOML facts, the TD quotes, screen 7 free since TD-123.
