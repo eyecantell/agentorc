@@ -2425,8 +2425,9 @@ from the tick; **scraped** — a `TD-NNN` on the screen, a TD-015 rule, fallback
 entry is never overwritten by a derived one (§9 invariant 10); a derived entry is replaced the
 moment the session declares the same reference. The one thing a derived entry leaves beside a
 declared claim is its PR: **`review_pr`**, the open PR of the branch named for the claim's
-reference, kept while that PR is open and cleared once it merges (re-checked by number, as a
-derived claim's PR is, after the session has moved to its next branch) — so the Focus panel reads
+reference, kept while that PR is open and cleared once it merges or is closed unmerged
+(re-checked by number after the session has moved to its next branch; only the tick writes it, and
+an RPC's derived entry over a declared one is refused whole, as ever) — so the Focus panel reads
 *in review* for a claim whose PR was opened without `--pr` (§4.5a *Reports*, TD-150); the claim's
 status, `pr` and `why` stay the session's. A derived claim records the branch it came from,
 and once the session has moved off that branch the claim is looked up one last time by branch

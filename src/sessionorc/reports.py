@@ -19,7 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from sessionorc.models import FindingEntry, ProgressEntry, normalize_ref
+from sessionorc.models import PR_CLOSED, FindingEntry, ProgressEntry, normalize_ref
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from sessionorc.models import Session
@@ -69,6 +69,7 @@ def derive(
     pending: list[tuple[str, int]] | None = None,
     ledger: str = LEDGER_DEFAULT,
     left: list[tuple[str, str | None]] | None = None,
+    reviews: list[tuple[str, int]] | None = None,
 ) -> tuple[list[ProgressEntry], list[FindingEntry], list[str]]:
     """Everything this session's repo can say about it, all entries `derived` (design §4.8):
 
@@ -90,6 +91,11 @@ def derive(
     nothing could ever remove. A claim with no branch
     recorded is retired too — those are the entries written before the field existed, and they are
     the immortal ones already on the records.
+
+    `reviews` is the (ref, pr) pairs a *declared* claim carries as `review_pr` (TD-150), re-checked
+    by number after the session has left the branch: merged is `done`, closed without a merge is a
+    claim whose `why` is `PR_CLOSED` — each of which clears the claim's `review_pr` — and still open
+    is nothing. A PR on the checked-out branch that was closed unmerged is marked `PR_CLOSED` too.
     """
     prs = _prs(directory)
     by_head = {p.get("headRefName"): p for p in prs if p.get("headRefName")}
@@ -103,7 +109,14 @@ def derive(
         number = pr.get("number") if pr else None
         done = bool(pr) and _merged(pr)
         progress.append(
-            ProgressEntry(ref=ref, status="done" if done else "claimed", pr=number, source="derived", branch=branch)
+            ProgressEntry(
+                ref=ref,
+                status="done" if done else "claimed",
+                pr=number,
+                source="derived",
+                branch=branch,
+                why=PR_CLOSED if pr and not done and _closed(pr) else None,
+            )
         )
         if done and isinstance(number, int):
             merged[number] = ref
@@ -134,6 +147,14 @@ def derive(
             progress.append(ProgressEntry(ref=ref, status="done", pr=number, source="derived"))
             merged[number] = ref
 
+    for ref, number in reviews or []:
+        pr = by_number.get(number)
+        if pr and _merged(pr):
+            progress.append(ProgressEntry(ref=ref, status="done", pr=number, source="derived"))
+            merged[number] = ref
+        elif pr and _closed(pr):
+            progress.append(ProgressEntry(ref=ref, status="claimed", pr=number, source="derived", why=PR_CLOSED))
+
     findings: list[FindingEntry] = []
     seen = {p.ref for p in progress}
     for number, ref in merged.items():
@@ -146,6 +167,11 @@ def derive(
 
 def _merged(pr: dict[str, Any]) -> bool:
     return bool(pr.get("mergedAt")) or str(pr.get("state", "")).upper() == "MERGED"
+
+
+def _closed(pr: dict[str, Any]) -> bool:
+    """Closed without a merge: `gh`'s `CLOSED`, which it never says of a merged PR."""
+    return str(pr.get("state", "")).upper() == "CLOSED" and not _merged(pr)
 
 
 def _git(directory: Path | str, *args: str, timeout: float = 10.0) -> str | None:

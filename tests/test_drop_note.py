@@ -42,12 +42,23 @@ def test_a_declared_claim_carries_its_branchs_open_pr_beside_it_and_nothing_else
     s = Session(id="ao-w", name="w", kind="interactive", adapter="shell", dir="/w")
     assert s.report_progress(ProgressEntry(ref="TD-901", why="mine"))
     derived = ProgressEntry(ref="TD-901", status="claimed", pr=77, source="derived", branch="td901-x")
-    assert s.report_progress(derived) is True  # changed: the record is saved
+    assert s.report_progress(derived) is False  # refused, as ever (§9 invariant 10)…
+    assert s.note_review(derived) is True  # …but the tick's note of its PR changed the record
     (e,) = s.progress
     assert (e.source, e.status, e.pr, e.why, e.branch, e.review_pr) == ("declared", "claimed", None, "mine", None, 77)
-    assert s.report_progress(derived) is False  # the same again changes nothing
+    assert s.note_review(derived) is False  # the same again changes nothing
     assert s.report_progress(ProgressEntry(ref="TD-901", why="still mine"))  # re-declared
     assert s.progress[0].review_pr == 77 and s.progress[0].why == "still mine"
-    assert s.report_progress(ProgressEntry(ref="TD-901", status="done", pr=77, source="derived")) is True
+    assert s.note_review(ProgressEntry(ref="TD-901", status="done", pr=77, source="derived")) is True
     assert s.progress[0].review_pr is None and s.progress[0].status == "claimed"  # merged: no review held
     assert ProgressEntry.from_dict(s.progress[0].to_dict()) == s.progress[0]  # it round-trips
+    # a PR closed without a merge holds no review either, and done or dropped carries none
+    from sessionorc.models import PR_CLOSED
+
+    assert s.note_review(derived) is True and s.progress[0].review_pr == 77
+    closed = ProgressEntry(ref="TD-901", status="claimed", pr=77, source="derived", why=PR_CLOSED)
+    assert s.note_review(closed) is True and s.progress[0].review_pr is None
+    assert s.note_review(derived) is True
+    assert s.report_progress(ProgressEntry(ref="TD-901", status="done")) and s.progress[0].review_pr is None
+    # an RPC's refused derived entry is refused, and says so: only the tick notes its PR
+    assert s.report_progress(ProgressEntry(ref="TD-901", status="claimed", pr=78, source="derived")) is False

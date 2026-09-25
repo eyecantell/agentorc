@@ -1224,7 +1224,7 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         monkeypatch.setattr(
             reports,
             "derive",
-            lambda directory, branch, pending=None, ledger=None, left=None: (
+            lambda directory, branch, pending=None, ledger=None, left=None, reviews=None: (
                 (ledgers.append(ledger) or [])
                 or (
                     [ProgressEntry(ref="TD-080", source="derived"), ProgressEntry(ref="TD-081", source="derived")],

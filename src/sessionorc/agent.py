@@ -1240,10 +1240,10 @@ class HostAgent:
                 continue
             branch = (s.git or {}).get("branch") if s.id in holders else None
             pending = [e for e in s.progress if e.source != "declared" and e.status == "claimed" and e.pr]
-            # …and a declared claim's `review_pr` (TD-150), re-checked by number as those are, so its
-            # merge clears it after the session has moved to its next branch
-            pending += [
-                ProgressEntry(ref=e.ref, pr=e.review_pr)
+            # …and a declared claim's `review_pr` (TD-150), re-checked by number, so a merge or a close
+            # clears it after the session has moved to its next branch
+            reviews = [
+                (e.ref, e.review_pr)
                 for e in s.progress
                 if e.source == "declared" and e.status == "claimed" and e.review_pr and not e.pr
             ]
@@ -1255,21 +1255,23 @@ class HostAgent:
                 if s.id in holders
                 else []
             )
-            if not branch and not pending and not left:
+            if not branch and not pending and not left and not reviews:
                 continue
-            due.append((s, branch, [(e.ref, e.pr) for e in pending if e.pr], left))
+            due.append((s, branch, [(e.ref, e.pr) for e in pending if e.pr], left, reviews))
         if not due:
             return
         results = await asyncio.gather(
             *(
                 # the ledger path the client read from the repo's config at create (design §5
                 # `ledger:`), else the default — this package never reads `.agentorc.yml` itself
-                asyncio.to_thread(reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT, left)
-                for s, branch, pend, left in due
+                asyncio.to_thread(
+                    reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT, left, reviews
+                )
+                for s, branch, pend, left, reviews in due
             ),
             return_exceptions=True,
         )
-        for (s, _branch, _pending, _left), result in zip(due, results, strict=True):
+        for (s, _branch, _pending, _left, _reviews), result in zip(due, results, strict=True):
             self._derived_at[s.id] = now
             live = self.sessions.get(s.id)
             if live is None:
@@ -1285,6 +1287,8 @@ class HostAgent:
             # Lists, not generators: these upserts are the write, and `any()` over a generator
             # would stop at the first change and silently drop every later entry (review 2026-09-11).
             applied = [live.report_progress(e) for e in progress] + [live.report_finding(e) for e in findings]
+            # a refused derived entry still leaves its PR beside a declared claim (TD-150)
+            applied += [live.note_review(e) for e in progress]
             changed = any(applied) | live.retire_branch_claims(retire)
             if changed:
                 self.store.save(live)
@@ -3643,8 +3647,8 @@ class HostAgent:
         `wake` is which of the section's three rules applies:
 
         - `person` — a decline, a *Go with it* or a **pause**, the three by which a person releases
-          a sender that may be blocked in `ao wait`: they wake as a person's `reply` does and
-          **refill** the budget;
+          a sender that may be blocked in `ao wait`, and a person's **drop** of its claim (TD-150),
+          news it must act on: they wake as a person's `reply` does and **refill** the budget;
         - `note` — a **resume**, ordinary: it wakes within the budget like any `note`;
         - `uncharged` — a **lapse**: outside the budget, neither spending nor refilling it, so a
           spent budget cannot hold a sender past the bound it set itself. It is carried on the note
@@ -5474,6 +5478,7 @@ class HostAgent:
         if any(e.source == "declared" for e in (*progress, *findings)):
             raise link.LinkError("a derived report is never declared: a session declares through its own `ao`")
         applied = [s.report_progress(e) for e in progress] + [s.report_finding(e) for e in findings]
+        applied += [s.note_review(e) for e in progress]  # as the home's own tick does (TD-150)
         changed = any(applied) | s.retire_branch_claims(str(r) for r in params.get("retire") or [])
         if changed:
             self._save(s)
