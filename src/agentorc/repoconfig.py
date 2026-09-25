@@ -231,6 +231,9 @@ class RepoConfig:
     ready_when: list[str] = field(default_factory=lambda: list(DEFAULT_READY_WHEN))
     commands: list[dict[str, Any]] = field(default_factory=list)
     teams: dict[str, Any] = field(default_factory=dict)  # §4.9; read by the team step, passed through here
+    # §5 `promote:` (§6 *Promote*, TD-120): `{run, check}`, accepted and checked now so writing the
+    # designed block does not break `ao new` in that repo; TD-132 is what runs it (TD-149 (2))
+    promote: dict[str, str] | None = None
 
 
 def load(repo_root: Path | str, *, read: Reader | None = None) -> RepoConfig:
@@ -300,6 +303,8 @@ def _apply(cfg: RepoConfig, key: str, value: Any, path: Path) -> None:
         cfg.commands = _commands(value, where)
     elif key == "teams":
         cfg.teams = _mapping(value, where)
+    elif key == "promote":
+        cfg.promote = _promote(value, where)
     else:
         raise ValueError(f"{where} is not a `.agentorc.yml` key (design §5)")
 
@@ -310,6 +315,32 @@ def _mapping(value: Any, where: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"{where} must be a mapping")
     return {str(k): v for k, v in value.items()}
+
+
+PROMOTE_KEYS = ("run", "check")
+
+
+def _promote(value: Any, where: str) -> dict[str, str] | None:
+    """`promote: {run, check}` (design §5): both commands, each a non-empty string. `auto` is not
+    this file's: it is the person's switch, in `settings.yml` (§5, the Settings page)."""
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError(f"{where} must be a mapping ({', '.join(PROMOTE_KEYS)})")
+    out: dict[str, str] = {}
+    for k, v in value.items():
+        k = str(k)
+        if k == "auto":
+            raise ValueError(f"{where}.auto is not this file's: it is `repos.<repo>.promote.auto` in settings.yml")
+        if k not in PROMOTE_KEYS:
+            raise ValueError(f"{where}.{k} is not a promote key ({', '.join(PROMOTE_KEYS)})")
+        if not isinstance(v, str) or not v.strip():
+            raise ValueError(f"{where}.{k} must be a command, a non-empty string")
+        out[k] = v.strip()
+    missing = [k for k in PROMOTE_KEYS if k not in out]
+    if missing:
+        raise ValueError(f"{where} needs {' and '.join(missing)} (design §5)")
+    return out
 
 
 def _str_list(value: Any, where: str) -> list[str]:

@@ -276,3 +276,20 @@ def test_the_auditor_preset_is_a_hunter_for_a_seat():
     assert "**auditor**" in text and "## Area: (none given)" in text and "`ao-x-techlead`" in text
     assert "never fix" in text and "You declare nothing" in text
     assert "{" not in text.replace("{lane}", "")  # every placeholder filled
+
+
+def test_promote_is_accepted_and_checked_ahead_of_its_build(tmp_path):
+    """TD-149 (2): writing §5's `promote:` block no longer breaks `ao new` in that repo — it is
+    read, both commands required, and `auto` refused as `settings.yml`'s (TD-132 runs it)."""
+    ok = repoconfig.load_text("promote:\n  run: scripts/promote.sh\n  check: scripts/live_sha.sh\n", tmp_path)
+    assert ok.promote == {"run": "scripts/promote.sh", "check": "scripts/live_sha.sh"}
+    assert repoconfig.load_text("adapter: claude-code\n", tmp_path).promote is None
+    for text, names in (
+        ("promote:\n  run: x\n", "needs check"),
+        ("promote:\n  run: x\n  check: y\n  auto: true\n", "is not this file's"),
+        ("promote:\n  run: x\n  check: ''\n", "must be a command"),
+        ("promote:\n  run: x\n  check: y\n  when: nightly\n", "is not a promote key"),
+        ("promote: scripts/promote.sh\n", "must be a mapping"),
+    ):
+        with pytest.raises(ValueError, match=names):
+            repoconfig.load_text(text, tmp_path)

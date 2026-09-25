@@ -4791,7 +4791,9 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   check: scripts/live_sha.sh          # prints the commit that is live now, or fails saying why
 ```
 
-  **`promote:`** (TD-120 step 2, designed 2026-09-24; not built — TD-132) is the repo's own
+  **`promote:`** (TD-120 step 2, designed 2026-09-24; not built — TD-132; the block is accepted and
+  checked already — `run` and `check`, both required, `auto` refused as `settings.yml`'s — so
+  writing it does not break `ao new`, TD-149) is the repo's own
   answer to *how does `main` become what is running*, and nothing in agentorc names pip, a venv,
   systemd, skaffold or wrangler: this repo's `run` is the pip pair of CLAUDE.md and its `check`
   prints the installed build's commit (`sessionorc.build.info()`); samscrape's would be its
@@ -4808,8 +4810,8 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   instead because it is a session's.
 
 - Org (§4.9): `~/.agentorc/org.yml` on the UI host — projects, teams, and an org-wide `roles:`
-  roster that sits between the package's built-ins and a repo's own. Read by the clients on every
-  use, never by the host agent:
+  roster that sits between the package's built-ins and a repo's own, each preset checked key by key
+  exactly as a repo's `roles:` is (TD-149). Read by the clients on every use, never by the host agent:
 
 ```yaml
 projects:
@@ -4833,6 +4835,10 @@ setting lives (window, stop times — TD-026 extends it); the usage gate's reser
 person's and live in `settings.yml` (TD-100). A `roles:` preset never carries a schedule, and a
 grant never carries one either. A directory session (no repo) reduces to `ready_when:
 [no_subagents]`.
+
+- **Test knobs, not settings**: `AGENTORC_TICK` — the host agent's tick in seconds (default 2),
+  read once at its start — exists for the test suite, which runs agents on a faster clock; nothing a
+  person sets, and no page shows it (TD-149).
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 
