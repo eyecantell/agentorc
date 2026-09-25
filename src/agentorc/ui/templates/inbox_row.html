@@ -22,6 +22,9 @@
   {%- if e.about %} <span class="st">re {{ e.about }}</span>{% endif %}
   {%- if e.reply_to %} <span class="st">reply to {{ e.reply_to }}</span>{% endif %}
   <span class="grow"></span>
+  {#- §4.5 screen 6 *The message page* (TD-136): the entry whole, with its thread — a link, so a
+      keyboard and a new tab reach it; `Enter` on the ringed row presses it. Not on the page itself. -#}
+  {%- if not fold_open %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
 {%- endmacro %}
@@ -40,7 +43,7 @@
 {%- set s = shaped(e.text, origin) %}
 <div class="body md">{{ s.lead }}</div>
 {%- if s.rest %}
-<details class="fold" data-fold="{{ e.id }}"><summary>details</summary><div class="body md">{{ s.rest }}</div></details>
+<details class="fold" data-fold="{{ e.id }}"{% if fold_open %} open{% endif %}><summary>details</summary><div class="body md">{{ s.rest }}</div></details>
 {%- endif %}
 {%- endmacro %}
 
@@ -273,6 +276,7 @@
   <span class="badge kindmark k-answered">answered for you</span>
   {%- if e.about %} <span class="st">re {{ e.about }}</span>{% endif %}
   <span class="grow"></span>
+  {%- if not fold_open %}<a class="pagelink st" href="/inbox/{{ e.id }}" title="the whole entry, with its thread (Enter)">whole entry ›</a>{% endif %}
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
 <div class="st asked"><span title="{{ a.asker or '' }}">{{ asker }}</span> asked{% if e.asker_open %} <a class="btn sm ghost" href="/focus/{{ e.asker_open }}" title="Focus on {{ asker }}">Open</a>{% endif %}</div>
@@ -518,7 +522,7 @@
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 </div>
 {%- else %}
-<div class="mailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
+<div class="mailrow" tabindex="0" data-page="/inbox/{{ e.id }}" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
 {%- if section == 'snoozed' %}{{ snoozed(e, section) }}

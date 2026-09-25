@@ -977,6 +977,18 @@
       const b = e.target.closest(".mailrow .badge.team");
       if (b) { e.preventDefault(); return toggle("team", b.dataset.team || "none"); }
     });
+    // §4.5 screen 6 *The message page* (TD-136): a mail row's text, and its *whole entry ›* link,
+    // open the entry's page — carrying the list's picks for Back, and the list's order as filtered
+    // for `j` / `k` there (this tab's own memory, `sessionStorage`)
+    document.addEventListener("click", (e) => {
+      const link = e.target.closest(".inboxpage .mailrow a.pagelink");
+      const body = !link && e.target.closest(".inboxpage .mailrow[data-page] .body");
+      if (!link && !body) return;
+      if (body && (e.target.closest("a, summary, button") || String(window.getSelection ? window.getSelection() : "").trim())) return;
+      if (link && (e.ctrlKey || e.metaKey || e.shiftKey || e.button === 1)) return;  // a new tab is the browser's
+      e.preventDefault();
+      AO.openEntry(e.target.closest(".mailrow").dataset.msg);
+    });
     $("#railclear").addEventListener("click", () => {
       rail = AO.railPicks(""); f.value = ""; save(true); inboxFilter();
     });
@@ -1009,6 +1021,10 @@
     });
     AO.refreshInboxPage = refreshInbox;
     inboxFilter();
+    // back from an entry's page: the list rings the row it came from (`#<id>`)
+    const from = location.hash.slice(1);
+    const row = from && $$(".inboxpage .mailrow").find((r) => r.dataset.msg === from && !r.hidden);
+    if (row) { row.focus({ preventScroll: true }); row.scrollIntoView({ block: "center" }); }
     refreshInbox();
   };
 
@@ -1298,6 +1314,45 @@
       else if (!words.length && findOpened.has(id)) { d.open = false; if (id !== "sec-fyi") findOpened.delete(id); }  // FYI's own toggle clears it
     });
   }
+
+  const ENTRY_ORDER = "inboxorder";
+  const sess = {
+    get: (k) => { try { return JSON.parse(sessionStorage.getItem(k) || "null"); } catch (e) { return null; } },
+    set: (k, v) => { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode: j / k then do nothing */ } },
+  };
+  AO.entryUrl = (id, back) => `/inbox/${encodeURIComponent(id)}${back ? `?back=${encodeURIComponent(back)}` : ""}`;
+  AO.openEntry = function (id) {
+    const order = $$(".inboxpage .mailrow[data-page]").filter((r) => !r.hidden).map((r) => r.dataset.msg);
+    sess.set(ENTRY_ORDER, { back: location.search, ids: order });
+    location.href = AO.entryUrl(id, location.search);
+  };
+  // `j` / `k` on the page: the next and previous entry of the list as it was filtered
+  AO.entryStep = function (step) {
+    const page = $(".msgpage"), o = sess.get(ENTRY_ORDER);
+    if (!page || !o || !Array.isArray(o.ids)) return;
+    const i = o.ids.indexOf(page.dataset.msg), next = i < 0 ? null : o.ids[i + step];
+    if (next) location.href = AO.entryUrl(next, o.back || "");
+  };
+  AO.inboxEntry = function () {
+    const page = $(".msgpage"); if (!page) return;
+    const o = sess.get(ENTRY_ORDER), i = o && Array.isArray(o.ids) ? o.ids.indexOf(page.dataset.msg) : -1;
+    if (i >= 0) $("#msgpos").textContent = `${i + 1} of ${o.ids.length} · j / k`;
+    // the row's team badge: back to the list with that team picked
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest(".msgentry .badge.team"); if (!b) return;
+      e.preventDefault();
+      location.href = `/inbox?team=${encodeURIComponent(b.dataset.team || "none")}`;
+    });
+    // an answer here is the answer (the row's own controls and RPCs); when it takes the entry out
+    // of the section it was in, the page returns to the list, and otherwise shows what it is now
+    const sec = $(".msgentry .mailrow") && $(".msgentry .mailrow").dataset.section;
+    AO.refreshInboxPage = async () => {
+      let got = null;
+      try { const r = await fetch("/api/person/inbox"); if (r.ok) got = await r.json(); } catch (e) { /* stay */ }
+      const still = got && got.sections && (got.sections[sec] || []).includes(page.dataset.msg);
+      if (got && !still) location.href = page.dataset.back; else location.reload();
+    };
+  };
 
   AO.org = function () {
     $("#filter").addEventListener("input", layout);
@@ -1911,15 +1966,26 @@
     { keys: ["d"], page: "org", ring: true, control: "Deny its permission", sel: '[data-act="deny"]' },
     { keys: ["j", "ArrowDown"], page: "inbox", control: "ring the next row", move: 1 },
     { keys: ["k", "ArrowUp"], page: "inbox", control: "ring the previous row", move: -1 },
-    { keys: ["Enter", "o"], page: "inbox", ring: true, control: "Open (Open board)", sel: "a.btn", text: ["Open", "Open board"] },
+    // `Enter` is the ringed row's page where it has one — a mail row — else Open; `o` is Open always
+    { keys: ["Enter"], page: "inbox", ring: true, control: "the row's page (else Open, Open board)", sel: "a.pagelink", alt: { sel: "a.btn", text: ["Open", "Open board"] } },
+    { keys: ["o"], page: "inbox", ring: true, control: "Open (Open board)", sel: "a.btn", text: ["Open", "Open board"] },
+    // the message page (§4.5 screen 6 *The message page*, TD-136): Back, the list's next and
+    // previous entry as it was filtered, and the entry's own controls
+    { keys: ["Escape"], page: "msg", control: "Back to the list, at this entry", sel: "#msgback" },
+    { keys: ["j", "ArrowDown"], page: "msg", control: "the next entry of the list", step: 1 },
+    { keys: ["k", "ArrowUp"], page: "msg", control: "the previous entry of the list", step: -1 },
+    { keys: ["r"], page: "msg", ring: true, control: "Reply", sel: '[data-act="reply"]', text: ["Reply", "Overrule"] },
+    { keys: ["s"], page: "msg", ring: true, control: "Snooze ▾ (opens the menu)", sel: "details.more > summary", text: ["Snooze"] },
+    { keys: ["x"], page: "msg", ring: true, control: "Dismiss, Done or Unsnooze", sel: "button", text: ["Dismiss", "Done", "Unsnooze"] },
     { keys: ["a"], page: "inbox", ring: true, control: "Allow", sel: '[data-act="allow"]' },
     { keys: ["d"], page: "inbox", ring: true, control: "Deny", sel: '[data-act="deny"]' },
     { keys: ["r"], page: "inbox", ring: true, control: "Reply", sel: '[data-act="reply"]', text: ["Reply"] },
     { keys: ["s"], page: "inbox", ring: true, control: "Snooze ▾ (opens the menu)", sel: "details.more > summary", text: ["Snooze"] },
     { keys: ["x"], page: "inbox", ring: true, control: "Dismiss, Done or Unsnooze", sel: "button", text: ["Dismiss", "Done", "Unsnooze"] },
   ];
-  AO.keyPage = (path) => (path === "/" ? "org" : path === "/inbox" ? "inbox" : path.startsWith("/focus/") ? "focus" : "other");
-  const RINGS = { org: "#groups .sc", inbox: ".inboxpage .mailrow" };
+  AO.keyPage = (path) => (path === "/" ? "org" : path === "/inbox" ? "inbox" : path.startsWith("/inbox/") ? "msg" : path.startsWith("/focus/") ? "focus" : "other");
+  // the message page's one row is its entry: its keys press that row's controls, never a thread's
+  const RINGS = { org: "#groups .sc", inbox: ".inboxpage .mailrow", msg: ".msgentry" };
   // The event's name in the table, or null when the page must not take it: focus in anything
   // editable (a composer, the filter, a reply box, the *why?* box, the terminal's own textarea), or
   // a modifier other than Shift held — those keys are the browser's and the terminal's.
@@ -1998,13 +2064,14 @@
     ev.preventDefault();
     if (k.help) return keyHelp();
     if (k.g) { gUntil = Date.now() + 2000; return; }
+    if (k.step) return AO.entryStep(k.step);
     if (k.move) {
       const all = ringables(page), cur = ringed(page), i = all.indexOf(cur);
       return ringTo(i < 0 ? all[0] : all[Math.min(Math.max(i + k.move, 0), all.length - 1)]);
     }
     let root = document;
-    if (k.ring) { root = ringed(page); if (!root) return; }
-    const el = k.ring ? AO.keyControl(root, k, RINGS[page]) : $(k.sel);
+    if (k.ring) { root = page === "msg" ? $(".msgentry") : ringed(page); if (!root) return; }
+    const el = k.ring ? AO.keyControl(root, k, RINGS[page]) || (k.alt && AO.keyControl(root, k.alt, RINGS[page])) : $(k.sel);
     if (!el) return;
     if (k.focus) { el.focus(); return; }
     el.click();

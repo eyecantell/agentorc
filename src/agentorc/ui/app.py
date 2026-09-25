@@ -3008,6 +3008,78 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             },
         )
 
+    @app.get("/inbox/{mid}", response_class=HTMLResponse)
+    async def inbox_entry_page(request: Request, mid: str):
+        """design §4.5 screen 6 *The message page*, §4.5a **Inbox message page** (TD-129, built by
+        TD-136): one mail entry whole — its row, drawn by the row's own macro in the section the
+        list has it in, so its controls, RPCs and confirms are the list's, with *details* open —
+        then its thread from the person-only `thread` read, oldest first, none of it a control.
+        **Back** returns to the list the page was opened from (`back`, the list's query) at this
+        row. An entry the person inbox no longer holds reads *gone*; a refusal (another host's id,
+        §4.4a) reads in the host agent's words. Reading marks nothing (§4.10)."""
+        back = str(request.query_params.get("back") or "")
+        back = back if back.startswith("?") else ""
+        ctx: dict[str, Any] = {
+            "host": host_name(),
+            "active": "Inbox",
+            "usage": {},
+            "volatile": hosts.local_host().volatile,
+            "mid": mid,
+            "back_url": f"/inbox{back}#{mid}",
+            "origin": page_origin(request),
+            "fold_open": True,
+            "entry": None,
+            "section": "",
+            "thread": [],
+            "pruned": False,
+            "gone": "",
+        }
+        try:
+            got, states = await person_view()
+        except HTTPException as e:
+            if e.status_code != 503:
+                raise
+            ctx["gone"] = f"{host_name()}: host agent unreachable — no mail can be read until it is back"
+            return templates.TemplateResponse(request, "inbox_entry.html", ctx)
+        sections = inbox_sections(
+            got["entries"],
+            states=states,
+            trail=got.get("trail") or (),
+            attention_snoozed=got.get("attention_snoozed"),
+        )
+        for sec in INBOX_SECTIONS:
+            e = next((x for x in sections[sec] if x.get("id") == mid and not x.get("row")), None)
+            if e is not None:
+                ctx["entry"], ctx["section"] = e, sec
+                break
+        if ctx["entry"] is None:
+            ctx["gone"] = f"gone: {mid} is no longer in the person inbox — pruned by retention, or dismissed"
+            if "@" in mid:  # another host's entry (§4.4a): the host agent says why in its own words
+                try:
+                    await call("thread", msg=mid)
+                except HTTPException as err:
+                    ctx["gone"] = str(err.detail)
+            return templates.TemplateResponse(request, "inbox_entry.html", ctx)
+        try:
+            th = await call("thread", msg=mid)
+        except HTTPException as err:
+            # an older host agent has no `thread`: the entry still reads whole, the thread says why
+            ctx["thread_error"] = str(err.detail)
+            th = {"entries": [], "pruned": False}
+        # a thread reaches senders the person inbox never heard from (a techlead's reply to its asker)
+        names = {o.get("id"): o.get("name") or o.get("id") for o in await call("list")}
+        ctx["thread"] = [
+            {
+                **t,
+                "from_name": "person" if t.get("from") == "person" else names.get(t.get("from")) or t.get("from"),
+                "age": _age(t.get("at"), datetime.now(UTC)),
+            }
+            for t in th.get("entries") or ()
+            if t.get("id") != mid
+        ]
+        ctx["pruned"] = bool(th.get("pruned"))
+        return templates.TemplateResponse(request, "inbox_entry.html", ctx)
+
     @app.get("/api/person/inbox")
     async def api_person_inbox(request: Request):
         """design §4.5a Org top bar **Inbox** and the **Inbox page** (§4.10): the entries, which

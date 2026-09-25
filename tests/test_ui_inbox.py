@@ -2639,3 +2639,52 @@ def test_below_720_the_rail_is_a_chip_row_and_a_sheet_holding_the_same_toggles(m
     narrow = css[css.index("@media (max-width: 720px)") :]
     assert ".inboxwrap > .rail { display: none; }" in narrow and ".railchips { display: flex;" in narrow
     assert ".inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }" in narrow
+
+
+# -- the message page (design §4.5 screen 6 *The message page*; TD-129, built by TD-136) ----------
+
+
+def test_the_message_page_draws_the_entry_its_answer_and_its_thread(client, tmp_path):
+    """TD-136 *Done when* (1): a 2,000-character `ask` reads whole on its page, its answer controls
+    directly under it (the row's own, so Reply is the list's Reply), then its thread, oldest first,
+    with the person's own reply in it — which the person inbox does not hold. **Back** carries the
+    list's picks and returns to this row; nothing on the page marks anything read."""
+    sid = sender_session(client, tmp_path)
+    long = ("Which branch should the fix land on? " * 60).strip()
+    ask = send(sid, text=f"merge #9?\n\n{long}", kind="ask", about="TD-136")
+    open_page = client.get(f"/inbox/{ask['id']}?back=%3Fteam%3Dgrind")
+    assert open_page.status_code == 200
+    html = open_page.text
+    assert 'id="msgback" href="/inbox?team=grind#' + ask["id"] + '"' in html
+    entry = html.split('class="msgentry"')[1].split('class="isec msgthread"')[0]
+    body = entry.split('<div class="body md">', 1)[1].split("</details>")[0]
+    assert "<p>merge #9?</p>" in body and body.count("Which branch should the fix land on?") == 60  # whole
+    assert f'data-fold="{ask["id"]}" open' in entry  # *details* open: a page is for reading
+    assert 'data-act="reply"' in entry and 'data-act="unmail"' in entry  # the answer, under the entry
+    assert "whole entry ›" not in entry  # the page does not link to itself
+    assert "Nothing else in its thread." in html
+    # the person answers; the question closes, and its page now carries the reply in its thread
+    assert client.post("/api/person/reply", json={"reply_to": ask["id"], "text": "off main, please"}).status_code == 200
+    html = client.get(f"/inbox/{ask['id']}").text
+    thread = html.split('class="isec msgthread"')[1]
+    assert "off main, please" in thread and ">person<" in thread and "data-act=" not in thread  # read, never pressed
+
+
+def test_the_message_page_of_a_gone_entry_and_of_another_hosts_reads_words(client):
+    """TD-136 *Done when* (3): an entry the person inbox no longer holds, and one another host holds,
+    read their words — never a blank page or a 500."""
+    gone = client.get("/inbox/m-000000000000")
+    assert gone.status_code == 200 and "gone: m-000000000000 is no longer in the person inbox" in gone.text
+    elsewhere = client.get("/inbox/m-000000000000@far")
+    assert elsewhere.status_code == 200 and 'class="note msggone"' in elsewhere.text
+
+
+@pytest.mark.unit
+def test_a_mail_row_links_its_page_and_a_state_or_board_row_does_not():
+    """TD-136 *Done when* (4): a mail row's text and its *whole entry ›* reach its page (`Enter` on
+    the ringed row presses the link); a permission row and a board row are unchanged — their
+    **Open** and **Open board** stay theirs."""
+    mail = rows("needs", [entry("m-1", "ask", text="merge it?")])
+    assert 'data-page="/inbox/m-1"' in mail and '<a class="pagelink st" href="/inbox/m-1"' in mail
+    state = rows("needs", state_rows_of([rec("ao-p", "needs-you", pending={"kind": "permission", "text": "x"})]))
+    assert "data-page=" not in state and "pagelink" not in state
