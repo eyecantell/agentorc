@@ -3911,15 +3911,16 @@ kind — and drawn in the composer (§4.5a **Message**), returned by `msg` per a
 | `scheduled` (§6 *Start time*, TD-152) | *read when it starts, at <time>* |
 | `unreachable` | *lands at the home; its host cannot be reached, so it is delivered when the link is back* (§4.4a) |
 | a wrap-up under way, or paused by the usage gate | *lands and waits: it is wrapping up (or paused for usage), and mail never pushes a session past a stop* |
-| `limited` | *lands and waits: its account is capped until <reset>, and it is rung after* |
+| `limited` | *lands and waits: its account is capped (<the cap, with its reset>), and it is rung after* |
 | `needs-you` | *read once its permission (or question) is answered and its turn ends* |
 | `working` or `stalled?` | *read when its turn ends: it is rung on the tick after its Stop* |
 | `idle` from a hook | *rung within a tick: the doorbell types "you have n unread" into its pane* |
+| `idle` from a hook, its tool with no composer to type into | *lands; nothing is typed into this tool's pane — read on its next look or its next `ao` reply* |
 | `idle` from the screen | *lands; its idle is a guess from the screen, so nothing is typed into it — read on its next look or its next `ao` reply* |
 
 Two things the table does not say because the sender's own act settles them. **The wake budget**:
 a person's message refills the addressee's budget (*Time and a person restore it*), so no sentence
-to a person reads *budget spent*; from a session the same function sees the budget and says *lands
+to a person reads *budget spent*; from a session the same function sees the budget and, where the doorbell would ring — hook-confirmed idle, since the budget gates the ring and not a busy session's read at its Stop — says *lands
 without waking it: its wake budget is spent, read on its next look* — the `wake_budget_spent` the
 `msg` reply already carries, as one sentence. **The kind**: the seat's sentence is the only one the
 kind changes, and it changes as the person switches `ask` ↔ `note` in the composer, before typing;

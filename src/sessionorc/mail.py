@@ -298,6 +298,7 @@ def read_when(
     seat: bool = False,
     bound: timedelta | None = None,
     unreachable: bool = False,
+    rings: bool = True,
 ) -> str:
     """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
     built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
@@ -306,7 +307,8 @@ def read_when(
     and the kind, never stored. `s` None with `seat` is a seat nobody fills (the placeholder card);
     `person` is whether the sender is a person, whose message refills the budget (*Time and a
     person restore it*), so only a session's reads *budget spent*; `unreachable` is the home's word
-    that the record's host link is down (§4.4a), which the record's own state may not say yet.
+    that the record's host link is down (§4.4a), which the record's own state may not say yet;
+    `rings` is whether its adapter has a composer the doorbell can type into (`_bell_blocked`).
     Advice, never a refusal."""
     ask = kind == "ask"
     tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask else ""
@@ -339,14 +341,18 @@ def read_when(
     if state == "limited":
         cap = s.pending.text if s.pending and s.pending.text else "a usage cap"
         return f"lands and waits: its account is capped ({cap}), and it is rung after" + tail
-    if not person and wake_budget_spent(s, now):
-        return "lands without waking it: its wake budget is spent, read on its next look" + tail
     if state == "needs-you":
         what = "question" if s.pending and s.pending.kind == "question" else "permission"
         return f"read once its {what} is answered and its turn ends" + tail
     if state in ("working", "stalled?"):
         return "read when its turn ends: it is rung on the tick after its Stop" + tail
+    if s.confidence == "hook" and not rings:
+        return "lands; nothing is typed into this tool's pane — read on its next look or its next `ao` reply" + tail
     if s.confidence == "hook":
+        # the budget gates the ring alone: a busy session reads its mail at its Stop regardless
+        # (review of PR #583)
+        if not person and wake_budget_spent(s, now):
+            return "lands without waking it: its wake budget is spent, read on its next look" + tail
         return 'rung within a tick: the doorbell types "you have n unread" into its pane' + tail
     return (
         "lands; its idle is a guess from the screen, so nothing is typed into it"

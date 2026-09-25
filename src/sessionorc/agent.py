@@ -3455,7 +3455,13 @@ class HostAgent:
             span = _parse(entry.bound) - _parse(entry.at) if entry.bound else None
         read_when = {
             sid: mail.read_when(
-                records[sid], entry.kind, now, person=sender == PERSON, bound=span, unreachable=sid in away
+                records[sid],
+                entry.kind,
+                now,
+                person=sender == PERSON,
+                bound=span,
+                unreachable=sid in away,
+                rings=getattr(adapters.get(records[sid].adapter), "composer", None) is not None,
             )
             for sid in named
             if sid != PERSON and sid in records
@@ -6118,7 +6124,8 @@ class HostAgent:
         # it — computed here so the dialog opens with it and asks nothing; a `reply` reads as a note
         now = datetime.now(UTC)
         down = s.host != self.host and not (self.links.get(s.host) or {}).get("up")
-        v["read_when"] = {k: mail.read_when(s, k, now, unreachable=down) for k in ("ask", "note")}
+        rings = getattr(adapters.get(s.adapter), "composer", None) is not None
+        v["read_when"] = {k: mail.read_when(s, k, now, unreachable=down, rings=rings) for k in ("ask", "note")}
         if s.host == self.host:
             if self.mode == "node":
                 v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)

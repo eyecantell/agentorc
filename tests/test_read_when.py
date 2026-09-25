@@ -75,6 +75,11 @@ def test_an_ask_names_its_bound_and_only_a_sessions_sender_hears_of_a_spent_budg
     assert rw(spent, "note", NOW, person=False) == (
         "lands without waking it: its wake budget is spent, read on its next look"
     )
+    # the budget gates the ring alone: busy, it reads its mail at its Stop (review of PR #583)
+    busy = rec("working", wakes=spent.wakes)
+    assert rw(busy, "note", NOW, person=False).startswith("read when its turn ends")
+    # no composer, no ring: nothing is promised to be typed (`_bell_blocked`)
+    assert rw(rec("idle"), "note", NOW, rings=False).startswith("lands; nothing is typed into this tool's pane")
 
 
 @pytest.mark.integration
