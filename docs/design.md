@@ -552,7 +552,9 @@ cache_read, cache_write, cost)`, `source` and `offset` naming the transcript and
 position in it — from the tool's own records: Claude Code: the `usage` on each `assistant` entry of
 every transcript under the profile's config directory past its cursor, sessions agentorc did not
 start included (a plain `claude` in a shell on the same key spends the same money) and subagent
-turns included (they are billed), never the whole file each tick and never a grep; an
+turns included (they are billed), never the whole file each tick and never a grep — a cursor past
+its transcript's current end means the tool rewrote the file (a compaction does), and the adapter
+reads it from offset 0 again, the home dropping what it already ledgered (§4.4); an
 OpenAI-compatible endpoint: the response's `usage`. Four token kinds, because a coding agent's
 input is mostly cache reads priced at a tenth of input: an adapter that folded them into `input`
 would report a bill several times the real one. `cost` is filled by the adapter where the tool
@@ -612,9 +614,12 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   held reading does, and a turn is counted once, because a cursor moves only after the row is
   written and a turn at or before its transcript's cursor is dropped: the test is per transcript,
   never a time, since two profiles on one account read from two directories whose turns do not
-  interleave by `at`. On the first tick that finds a profile metered the cursors start at each
-  transcript's end, so a key that ran unmetered for months does not bill its history to the first
-  day; a row's `cost` is written once, at that tick's prices, and a later
+  interleave by `at`. Beside each cursor the ledger keeps that transcript's last ledgered `at`,
+  which is monotonic within one file: a transcript read from 0 again after a rewrite (§4.3) has
+  its turns at or before that `at` dropped, so a rewrite neither re-bills nor loses a turn. On the
+  first tick that finds a profile metered the cursors start at each transcript's end, so a key that
+  ran unmetered for months does not bill its history to the first day; a transcript that first
+  appears on a later tick starts at offset 0; a row's `cost` is written once, at that tick's prices, and a later
   change to `prices:` applies from then on and rewrites nothing — the ledger is a record of what
   was charged, as the bill is. The reading is served, streamed and held as a polled one is, and it
   is never `stale`: a sum has no failed poll; and the cap rule below is skipped for it by the
@@ -1288,7 +1293,7 @@ call by call.
   caller. Refused, not queued, as the intent push is. The same road carries a metered account's
   reading, `usage {account, reading}`, home → node — on `hello` as the settings go, after the node's first `spend` for an account, and on a move —
   and the node's turns travel the other way as `spend {account, turns}`, a method with a reply that
-  carries the cursor (§4.4 *Usage*; TD-151). **Derived reports from a node.** The tick's
+  carries the cursors (§4.4 *Usage*; TD-151). **Derived reports from a node.** The tick's
   derived `progress` and `findings` are home-owned, so a node's tick sends what it derives to the
   home as `derived {id, progress, findings, retire}` — applied there exactly as the home's own tick
   applies its own (upserts under invariant 10, a moved-off branch claim retired), for a record of
