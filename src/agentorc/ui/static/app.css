@@ -152,6 +152,15 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .rail .railline.dim { color: var(--muted); }
 .rail .raillabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .inboxpage .railout { display: none !important; }  /* a section the rail does not pick is not drawn */
+/* §4.5 screen 6 *Narrow* (TD-137): the chip row and the sheet exist below 720 px only */
+.railchips, .railsheet:not([open]) { display: none; }
+.railchips .chip { border-radius: 999px; flex: none; gap: 6px; }
+.railchips .chip[aria-pressed="true"] { background: var(--hover); border-color: var(--muted); font-weight: 600; }
+.railchips .chip.dim { color: var(--muted); }
+.railsheet { color: var(--fg); background: var(--bg); border: 0; }
+.railsheet::backdrop { background: rgba(0,0,0,.35); }
+.railsheet .sheethead { align-items: center; margin-bottom: 12px; }
+.railsheet .rail { position: static; }
 .rail .railn { flex: none; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--muted); }
 .inboxpage .isec { display: flex; flex-direction: column; gap: 8px; }
 .inboxpage .sechead { align-items: baseline; }
@@ -380,8 +389,15 @@ body.popped .page { padding: 10px 12px; } body.popped .termbox { height: calc(10
 .kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: var(--t-body); margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
 .gitfiles { line-height: 1.7; margin-top: 6px; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
 @media (max-width: 720px) {
-  /* until the narrow layout lands (TD-137: a chip row and a filter sheet), the rail stacks above */
-  .inboxwrap { grid-template-columns: minmax(0, 1fr); } .rail { position: static; }
+  /* §4.5 screen 6 *Narrow* (TD-137): one column; the rail leaves the page for the sheet, a chip row
+     stands under the title, and a row's controls are 44 px high as the phone's Org cards' are */
+  .inboxwrap { grid-template-columns: minmax(0, 1fr); } .inboxwrap > .rail { display: none; }
+  .railchips { display: flex; gap: 6px; align-items: center; overflow-x: auto; scrollbar-width: none; }
+  .railchips .filterschip { position: sticky; left: 0; z-index: 1; background: var(--card); }
+  .railchips .chipteams { display: flex; gap: 6px; }
+  .railsheet[open] { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; margin: 0; padding: 16px; }
+  .railchips .chip, .railsheet .btn, .railsheet .railline, .railsheet .input { min-height: 44px; }
+  .inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }
   .page.focus { flex-direction: column; } .focus .side { width: 100%; } .termbox { height: 50vh; } .topbar { gap: 8px; padding: 0 10px; } #hostchip { display: none; }
   .grid { grid-template-columns: 1fr; }
 }

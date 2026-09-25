@@ -1276,3 +1276,22 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Done when** (1) with two teams' mail in the inbox, pressing one team shows that team's rows in every section and the number beside the team reads what it needs from the person; pressing a second team adds its rows; pressing *FYI* alone then shows both teams' FYI and nothing else; **All** shows everything; (2) the URL after those presses, opened in a fresh tab, is the same page, and a bare `/inbox` in the first browser remembers the last picks; (3) the top bar's number does not change under any pick, every count reads *n of all* while one is on, an unpicked team reads *0 of n* while another team is picked, and no count ever exceeds the rows on the page; (4) typing two words from a body in the other order, `#517`, and `517,` each find the row, *jeff* finds *jeffrey*, a team pressed and a word typed shows only that team's matching rows and the team counts change with the word, a word from a folded FYI entry unfolds FYI, and the count reads *n of all*; (5) `pdm run test` covers `inbox_sections`' counts under picks and the `kind` of each row kind; (6) TD-129 (2) and (3) are marked built; (7) TD-137's `Pickable` is flipped to yes in the same PR, since nothing else flips it. (7) TD-137's Pickable flipped to yes in the same PR
 
 **Related:** TD-129 (the design), TD-136 (the page, reached from this filtered list), TD-137 (narrow), TD-069 (the filter this replaces), TD-124 (`/`, `Esc`), TD-131 (the size at which the counts move into a store).
+
+## TD-137: Build the Inbox's narrow layout — the rail as a chip row and a filter sheet, the page as the page
+
+**Priority:** Low
+**Added:** 2026-09-24 (TD-129's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25. Was: open — designed, nothing built. Design: §4.5 screen 6 *Narrow*, §4.5a *Inbox page: the rail* (its last sentence), mockup `InboxPhone.dc.html`.
+
+**Location:** `src/agentorc/ui/templates/inbox.html` (the chip row — the rail's Teams list, picked first — and the sheet, drawn from the same counts as the rail), `app.css` (the 720 px breakpoint Focus already uses), `app.js` (the sheet's open and close; the toggle code is TD-135's).
+
+**Why:** the pages are used from a phone (§4.5 *Phone layout*), and a 200 px rail beside a 390 px column is neither a rail nor a column.
+
+**Resolved:** 2026-09-25 (PR #575, `grinder-ao-2`) — the chip row and the `<dialog>` sheet in `inbox.html`, the sheet taking the rail's own node while open (`app.js`, `AO.inbox`), the team chips from `AO.railCounts`, the 720 px rules in `app.css`; `test_below_720_the_rail_is_a_chip_row_and_a_sheet_holding_the_same_toggles`. *A mail row's text opens its page* is the page's own (TD-136). Design §4.5 screen 6 *Narrow* carries the lasting content.
+
+**Done when** at 390 px wide the Inbox shows the chip row, a team chip filters as the rail's line does, the sheet opens and its toggles work, the URL is the desktop's for the same picks, and a mail row's text opens its page; back at 1100 px the rail is drawn with the picks kept.
+
+**Related:** TD-129, TD-135 (the toggles this re-renders), TD-136 (the page), §4.5 *Phone layout*.

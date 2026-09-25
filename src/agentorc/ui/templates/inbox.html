@@ -36,6 +36,19 @@
   {#- §4.5 screen 6 *The rail*: *Inbox* has the title line to itself — the needs-you pill and the
       typed filter went with the rail, whose *Needs you* line carries the pill's hover now. -#}
   <div class="row gap wrap"><span class="h1">Inbox</span></div>
+  {#- §4.5 screen 6 *Narrow* (TD-129, built by TD-137): below 720 px the rail is not drawn beside
+      the column. Under the title a chip row — **Filters ▾** pinned first with the number of picks,
+      then the teams, picked first, each with its *Needs you* count — and the sheet the chip opens,
+      which holds **the rail itself**, moved into it while it is open: the chips and the sheet are
+      the rail's toggles drawn twice from one list, never two lists, and the URL is the desktop's. -#}
+  <div class="railchips" id="railchips" role="group" aria-label="Filters">
+    <button type="button" class="btn sm chip filterschip" id="railsheetbtn" aria-haspopup="dialog" aria-controls="railsheet">Filters ▾ <span class="railn" id="picksn"></span></button>
+    <div class="chipteams" id="chipteams"></div>
+  </div>
+  <dialog class="railsheet" id="railsheet" aria-label="Filters">
+    <div class="row gap sheethead"><span class="h2">Filters</span><span class="grow"></span><button type="button" class="btn sm" id="railsheetdone">Done</button></div>
+    <div id="railsheetbody"></div>
+  </dialog>
   <div class="inboxwrap">
   {{ rl.rail_html(rail, picks, "what is waiting on you: the session states the Org counts too (a pending permission or question, limited, stalled?, an exited session with unpushed work, an identity alarm), plus open questions sessions asked you, steering you paused and board items due today or overdue, minus anything snoozed. The Org's needs-you count is the states alone — that is the whole difference. The top bar's number is this line's whole, never filtered.") }}
   <div class="inboxcol">
