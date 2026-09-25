@@ -99,10 +99,10 @@ three places; `hosts.yml` `transport` and `ssh` in the design and not the code, 
 
 ## 4. The page, in outline (for the design round)
 
-Screen 7, **Settings**, `/settings`, a top-bar tab once built (TD-123's rule). One centred column
+Screen 8, **Settings**, `/settings` (7 stays the struck *Attention* line, TD-123), a top-bar tab once built (TD-123's rule). One centred column
 as the Inbox (TD-082), sections in this order, each with its *i* mark: **Usage** (the reserves
 matrix by account → profile → window, each cell a reserve, flat or per day, with the line it
-produces; budgets per metered profile when TD-128 lands), **Schedules** (per team; drawn disabled with *not built — TD-133* until that lands, as the budget rows wait on TD-128),
+produces; budgets per metered profile when TD-128 lands), **Teams** (per team, Paul's decision of 2026-09-25 — *agreed on the first 3*: its **schedule**, drawn disabled with *not built — TD-133* until that lands as the budget rows wait on TD-128; its **stop time**, the team-wide `until`; its **reserve priority**, a flat percent added to the profile's reserve for that team's sessions, so two teams on one profile pause at different lines — restart ceilings stay constants), **Repos** (per registered checkout: its `.agentorc.yml` read-only, and the one setting a person flips, the promote's **auto**, moved out of the checked-in file by the same reasoning TD-100 used for the wind-down figure),
 **You**, in two halves the §4.5a rows keep apart by write path: *yours everywhere* — `open_in`,
 the terminal's size and face (a typed or picked `font-family` name with the ordinary CSS fallback;
 no font enumeration), written through `set_settings` — and *this browser* — theme, *mine*, the
@@ -151,7 +151,17 @@ profile runs) carries the node's name and *set at <node>* on its row, display on
 apply on the next tick and the page says so; a reserve's new line is shown as the chip will show
 it before the press lands.
 
-## Open decisions
+## 5. Per team and per repo (Paul, 2026-09-25)
+
+The line is *definition versus setting*, not repo versus team. A definition says what a team, a
+repo, a host or a profile is and belongs in its file, by hand or by PR; a setting is a number a
+person turns without redefining anything and belongs in `settings.yml`, under a key for its
+scope: `teams.<team>.{schedule, until, reserve}` (the designed top-level `schedules:` folds in,
+unbuilt and free to move) and `repos.<repo>.promote.auto`. No override layer for settings existed;
+definitions layer already (built-in preset → org `roles:` → repo `roles:`; org `teams:` over a
+repo's), and that stays as it is.
+
+## Open decisions (Paul, 2026-09-25: *agreed on the three*)
 
 1. The `ui.yml` fold into `settings.yml`, and with it **the person's own following the home** rather
    than the machine the UI runs on (§4) — recommended yes.
@@ -168,3 +178,5 @@ it before the press lands.
 **Round 3 (Sonnet, 2026-09-25): NOT READY — 2 FIX, 1 NOTE, all adopted; both fixes were follow-ons of round 2's decisions.** FIX: the read side on a node was unpinned — decided: reads serve the node's replica as `gate` does, *set at <home>* is a disclosure, only the write forwards; the frame's scope was *a node* — decided: a broadcast to every linked node after each write, and to a node on its `hello`. NOTE: the precedent for a node acting on a replica offline is §4.4a's own *policies that stop run on the node, from its replica* line, now cited. Verified: adding `set_settings` to `modes.HOME_EDITS` yields exactly `set_controllers`'s words and touches nothing on the home, so TD-100's built behaviour stands; the paused-session race is covered by the gate's per-tick reload and `RESUME_MIN`; `rpc_gate` already returns the reserves, so the new read RPC is for the other keys only; no stale sentence remained.
 
 **Round 4 (Sonnet, 2026-09-25, confirmation): READY — 0 BLOCK, 0 FIX, 1 NOTE (adopted: the gate reads `schedules:` only once TD-133 lands).** Verified: the text is internally consistent with §4 and the Open decisions, no leftover claim from an earlier draft; the read side matches how `gate` is served today and the write's refusal is `modes.offline_refusal`'s own template; the broadcast has direct precedent in the home's per-linked-node `intent` notifications; the round record matches the body. Status of this note: converged; the design round starts from it.
+
+**Landed (2026-09-25, the same PR):** §4.5 screen 8, §4.5a's Settings rows, §5's one file, §4.4a *Settings, replicated*, §6 *Team stop time* and the team's reserve priority, §4.7's commands, goal 12; TD-146–149.

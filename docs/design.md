@@ -67,7 +67,9 @@ means cycling through VS Code windows and tmux panes by hand. Lessons from `tdgr
     carries VS Code's Dark Modern terminal palette (the sixteen ANSI colours, foreground, cursor
     and selection) as literals, not tokens, because the pane must not follow the page; the same
     output is the same colour in Focus as in the editor's terminal beside it (TD-038). Its face
-    is bundled (JetBrains Mono, OFL) with ligatures off, because it is a pane you type into; it
+    is bundled (JetBrains Mono, OFL) with ligatures off, because it is a pane you type into — the
+    person may set the face and size (§5 `person.terminal`, the Settings page), ligatures off and
+    `monospace` the fallback whatever they choose; it
     draws through xterm.js's WebGL renderer where the browser has WebGL, the DOM renderer
     otherwise (TD-038).
 13. **Local and volatile hosts**: the person's own laptop is a host too (transport `local`, no
@@ -779,7 +781,7 @@ the home instead (*Mail across hosts*).
 | reads — `list`, `get`, `tail`, `explain`, `occupancy`, `name_check`, `recent_dirs`, `usage`, `adapters`, `ping`, `wait` | served: this host's sessions only | served; a `wait` sees only this host's records and no mail |
 | node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served, except `decide` (a session does not answer its own permission prompt, TD-119). On another session, and any `create`: **refused** — except `seen` and `hook`, which the gate does not cover (§4.8) and which are the node's own socket |
 | home-owned edits — `set_controllers`, `set_grants`, `set_stop`, `set_mode` | **refused**: they wait for the link | refused |
-| `set_settings` (§5 `settings.yml`, TD-100) | **served**: the file is this host's own, and the gate that reads it runs here | refused — a person's own, link or no link |
+| `set_settings` (§5 `settings.yml`, TD-100; home-owned since 2026-09-25) | **forwarded** while the link is up; **refused** offline in the home-owned edits' words — the file is the home's, and the node's gate reads the replica it was last sent (*Settings, replicated*, below) | refused — a person's own, link or no link |
 | the mailbox — `msg`, `inbox`, `inbox_delete`, and the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (§4.10, TD-069) | **refused**: the mailbox is at the home | refused |
 | reports — `progress`, `finding`, `doing` | — | **refused** |
 
@@ -1192,6 +1194,19 @@ call by call.
   **hint**, not an inbox: a read the node serves alone carries the mail line from it.
   Refused, not queued: nothing is pushed to a link that is down, and the next snapshot pushes
   everything.
+- - **Settings, replicated** (TD-100 (4), 2026-09-25; not built — TD-147). `settings.yml` is home-
+- owned (§5), and the policies that read it — the usage gate, a team's stop time, a schedule — run
+- on the node that holds the session, so the file travels: the `settings` link method, home → node,
+- a notification carrying the whole file as the home holds it, sent to **every node whose link is up
+- after each `set_settings` write**, and to a node once **on its `hello`** at every dial. The node
+- writes its own `settings.yml` from it and reads that on every tick as the home reads its own,
+- offline included — *policies that stop run on the node, from its replica*, the rule the stop time
+- already has — so the last settings a node was sent stay in force until its next dial, and a hand
+- edit at a node is overwritten by the next frame. `set_settings` at a node is forwarded while the
+- link is up and refused offline (the table above); the reads a node serves — `gate`, `settings` —
+- answer from the replica, and the page says *set at <home>* beside each value. A write may
+- originate at the home with no node involved, so the send is a broadcast, never a reply to a
+- caller. Refused, not queued, as the intent push is.
 - **Derived reports from a node.** The tick's derived `progress` and `findings` are home-owned, so
   a node's tick sends what it derives to the home as `derived {id, progress, findings, retire}` —
   applied there exactly as the home's own tick applies its own (upserts under invariant 10, a
@@ -1661,6 +1676,47 @@ Screens:
    have to carry them twice. The chips and the sheet are the rail's toggles drawn twice from one
    list, never two lists, and the URL is the desktop's for the same picks. The list keeps one
    column, its rows' controls 44 px high as the phone's Org cards are. The message page is the page.
+7. ~~**Attention**~~ — struck (TD-123): a board item that needs the person is a row on the
+   Inbox (screen 6), with Snooze and Done on §4.4's write-back, and the whole board, undated
+   items and the stale-sweep warning included, is dev-cadence's own `/attention` report. There
+   is no Attention page and no tab for one.
+8. 8. **Settings** (`/settings`; TD-100 (4), designed 2026-09-25 with Paul — TD-146, TD-147 and
+   TD-148 build it; the reasoning is the ADR [2026-09-25 settings
+   audit](decisions/2026-09-25-settings-audit.md); mockups `Settings.dc.html`,
+   `SettingsDark.dc.html`): the one page that **writes a setting** — a value a person moves without
+   redefining anything — and shows every other configured value with where it lives. The line it
+   draws: a *definition* says what a team, a repo, a host or a profile is and stays in its file
+   (`org.yml`, `.agentorc.yml`, `hosts.yml`, `profiles.yml`), edited by hand or by PR; a *setting*
+   is a number the person turns and lives in the home's `settings.yml` (§5), written only through
+   `set_settings`. One centred column as the Inbox (TD-082): a section is a heading with its *i*
+   mark, a row is a card. Sections, in order: **Usage** — the reserves (§6 *Usage gate*), grouped by
+   account as the chip is (TD-122), a card per profile, a row per window label the adapter reports,
+   each a reserve field — flat, or *per day* — with the line it makes today beside it as `ao gate`
+   prints it, and, once TD-128 designs metered profiles, a budget row per such profile; **Teams** —
+   a card per team the org defines, holding the three things a person moves without redefining the
+   team: its **schedule** (§6 *Schedule*; drawn disabled with *not built — TD-133* until that
+   lands), its **stop time** — the team-wide `until` (§6 *Team stop time*), applied to every live
+   member and seat and to the ones a start creates — and its **reserve priority**, an extra reserve
+   on top of the profile's for this team's sessions, so two teams on one profile pause at different
+   lines (§6 *Usage gate*); **Repos** — a card per registered checkout with its `.agentorc.yml`
+   values read-only and the one setting a person flips, the promote's **auto** (§6 *Promote*), which
+   this round moves out of the checked-in file; **You** — *yours everywhere*: `open_in` and the
+   terminal's size and face (§5 `person:`), and *this browser*: theme, *mine*, the folds, with
+   **Reset this browser**; **Hosts**, **Profiles**, **Org** — read-only. **Every read-only value
+   carries an *i* mark** that says which file it comes from, when that file is re-read, and whether
+   a change needs the host agent restarted (§5; a host's name, its `home:` and its identity mode are
+   read at start), and every file card carries **Open file**, the editor button with the file's
+   path. A change lands on the next tick and the field says so; a reserve's new line is drawn as the
+   chip will draw it before the press lands. Refusals — a label no adapter reports, a session's
+   call, a node offline — are the RPC's words in place. **Nodes**: the page reads and writes only
+   through the agent — `gate`, the `settings` read, `set_settings` — never the file; on a node the
+   reads serve the node's replica, the writes forward to the home or are refused offline in the
+   words the offline table uses, and every editable value reads *set at <home>* (§4.4a *Settings,
+   replicated*). **Not on the page, by design**: the constants (§4.10: the bounds are part of the
+   design), the terminal's colours (goal 12), a density switch (§4.5 *Type scale*), live identity
+   mode (§4.8a), and any definition. A **Settings** tab in the top bar once the page is built
+   (TD-123: a tab exists only for a built page), last, after Inbox; the host chip's hover names the
+   page until then.
 
 Security: the UI can type into a shell as you, so it is root-equivalent. **Never a bare public
 port.** The UI is reached over a private network or through an authenticated tunnel, and holds
@@ -1768,7 +1824,7 @@ noted). If a control is not in this table it does not exist.
 | card | **Focus** | opens the Focus screen. A plain link, so the browser's modifiers do on it what they do on any link — a new tab, never a pop-out. Reads **Focus window**, and raises that window, while this browser holds a popped-out window for the session (row **Pop out**, TD-046) |
 | card **more ▾**, Focus header | **Pop out** | opens the session's Focus in its own browser window without the nav and top bar (`/focus/{sid}?window=1`), named `ao-focus-<id>` so a second press raises the first window; size and position remembered per session in the browser; the card's **Focus** reads *Focus window* while it is open in this browser. Client-side: nothing is written to the record (§4.5 screen 2 *Pop out*, TD-046) |
 | Focus | **title** | display only: the browser tab's or window's title is `<name> · <state>`, `▲ ` in front while the session needs you, kept current from the `/events` feed — the window switcher's one line (§4.5 screen 2 *Pop out*, TD-046). Every other page is titled by the app's name |
-| card | **VS Code** — the **editor** button | `vscode://` link for the session's directory on its host (browser-handled). Configurable and removable: the label and the link's template are the person's (§5 *The person's own*, `open_in:`); `none` draws no button, here and on Focus (TD-095) |
+| card | **VS Code** — the **editor** button | `vscode://` link for the session's directory on its host (browser-handled). Configurable and removable: the label and the link's template are the person's (§5 `settings.yml` `person.open_in`, set on the Settings page — TD-100 (4); `ui.yml` until 2026-09-25); `none` draws no button, here and on Focus (TD-095) |
 | card | **more ▾** | Wrap up · Kill (confirms) · Close (as above) · Open shell here · Copy tmux command · **Switch to interactive / unattended** (the mode's toggle, TD-095) |
 | card / Focus header | **unattended / interactive** badge | a toggle: click flips the session's mode in its record (host-agent RPC); policies pick the change up on their next tick. On a card the mode is a plain word beside the role, never pressable; the toggle is the *more* entry *Switch to interactive* / *Switch to unattended* (TD-095) — a control that changes whether policies may act on a session is not a one-click target on a card being scanned, and *unattended* (nobody sits at it, agentorc may act on it, its tool launched with the profile's `unattended_args`, which for Claude Code skip its permission prompts) is the common case. The Focus header always shows the toggle under the name of what it does (TD-096): **Take over** on an `unattended` session; on an `interactive` one **Hand back** where `controllers` is non-empty or `team` is set — the list as written, not its liveness; an entry stays whether or not that session is alive (§4.9a: adoption is an explicit edit, never automatic) — else *Switch to unattended*. Flipping to interactive is how a person takes over a worker and takes it out of its controllers' reach on their next call (§9 invariant 5); flipping to unattended hands it to the run window and usage gate — and, when `supervised`, to §6's supervision rules — and needs the repo's `unattended:` block |
 | Due strip / Inbox board row | **Snooze ▾** | +1 day · +1 week · pick a date → agent edits the item's `Due:` and commits |
@@ -1784,7 +1840,7 @@ noted). If a control is not in this table it does not exist.
 | Focus | **Open shell here** | a `shell` session in this session's directory |
 | Focus | **Wrap up** | sends the wrap-up prompt (same one the policy uses) |
 | Focus | **Kill** | confirms, then kills the tmux session; worktree kept; state `exited` with `pane: false` — unlike a natural exit, whose dead pane is kept, a kill destroys it, so the card offers Details and Focus / `ao focus` refuse without calling tmux (TD-023) |
-| Focus (exited / closed) | **Resume** / **Resume with changes…** / **New session here** / **Forget** | the exited banner. **Resume** is one press and no form (TD-081), on an `exited` or `closed` record holding a tool session id: a `create` on the record's host with its own `name`, `dir`, `adapter`, `profile`, `role`, `team`, `project`, `lane` and `controllers`, **its `repo` when it has one** — the scope the name is checked in (§4.1): a session in a worktree is scoped by its repo, and a resume that sent the worktree directory alone computed a different id, so a second record appeared beside the one being resumed (TD-145) — and `resume` = the tool's session id — the name check answers `supersede`, the new session takes the bare name and the record's id, the old record is replaced in place and its mail stays with it (§4.10 *Resume carries mail forward*); a live team finds its member by the same name. **Never carried: `unattended`** — the session a press starts is attended, whatever the record was: an unattended session answers its own permission prompts, and a press with no form is no place to grant that; its prompts come to the Inbox. To make it unattended again use **Resume with changes…**, where *Unattended* and its stop time are on the form together. Also not carried: `run_until` and `wrapup_prompt` (a passed deadline is not one; an attended session has none, §6), `prompt`, and `capabilities` — the page takes the grants of the record's `role` from the role presets, as the form does. `controllers` are carried as they were: a controller that is gone is a wake that goes nowhere; `supervised` (§6) is carried the same way and is inert while the session is attended. A person's act — no `caller`, no attenuation (§4.8 create rule); no CLI form beyond `ao new --resume`. **When it cannot be silent it is not a guess:** no tool session id (a `shell`, a command), a name a *live* record holds, a directory that is gone, a profile or role that no longer exists, or a host not connected — the press lands on the form, filled in, with the reason on it. **Resume with changes…** is that same filled-in form, asked for, *Unattended* as the record had it; a worktree record lands with **Where** = new worktree, the worktree's name and the repo in the directory field — the fields the form's own Start sends back, so the create checks the name in the record's scope. **New session here** prefills the directory only; **Forget** removes the record (pane and run log readable until then); CLI: `ao forget <id>` (the `remove` RPC; refuses a live record) |
+| Focus (exited / closed) | **Resume** / **Resume with changes…** / **New session here** / **Forget** | the exited banner. **Resume** is one press and no form (TD-081), on an `exited` or `closed` record holding a tool session id: a `create` on the record's host with its own `name`, `dir`, `adapter`, `profile`, `role`, `team`, `project`, `lane` and `controllers`, **its `repo` when it has one** — the scope the name is checked in (§4.1): a session in a worktree is scoped by its repo, and a resume that sent the worktree directory alone computed a different id, so a second record appeared beside the one being resumed (TD-146) — and `resume` = the tool's session id — the name check answers `supersede`, the new session takes the bare name and the record's id, the old record is replaced in place and its mail stays with it (§4.10 *Resume carries mail forward*); a live team finds its member by the same name. **Never carried: `unattended`** — the session a press starts is attended, whatever the record was: an unattended session answers its own permission prompts, and a press with no form is no place to grant that; its prompts come to the Inbox. To make it unattended again use **Resume with changes…**, where *Unattended* and its stop time are on the form together. Also not carried: `run_until` and `wrapup_prompt` (a passed deadline is not one; an attended session has none, §6), `prompt`, and `capabilities` — the page takes the grants of the record's `role` from the role presets, as the form does. `controllers` are carried as they were: a controller that is gone is a wake that goes nowhere; `supervised` (§6) is carried the same way and is inert while the session is attended. A person's act — no `caller`, no attenuation (§4.8 create rule); no CLI form beyond `ao new --resume`. **When it cannot be silent it is not a guess:** no tool session id (a `shell`, a command), a name a *live* record holds, a directory that is gone, a profile or role that no longer exists, or a host not connected — the press lands on the form, filled in, with the reason on it. **Resume with changes…** is that same filled-in form, asked for, *Unattended* as the record had it; a worktree record lands with **Where** = new worktree, the worktree's name and the repo in the directory field — the fields the form's own Start sends back, so the create checks the name in the record's scope. **New session here** prefills the directory only; **Forget** removes the record (pane and run log readable until then); CLI: `ao forget <id>` (the `remove` RPC; refuses a live record) |
 | Focus | **Copy / Paste** | Paste is inert on an `unattended` session's read-only Focus (TD-096, *Focus watches*: it goes through the terminal as keys do; Copy only reads, and works). Terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027). Reads **Steer** ("steers the turn in flight") while the session is `working` and **Send** ("starts a new turn") when idle (§4.3) — one control, labelled for the job it is doing. `stalled?` steers too — a `working` session that stopped producing output (§4.2) is a turn in flight; `limited` says the cap holds what you send, since nothing the person does clears a cap (§4.2; its controls are **Switch profile** and **Wait**). Closed, composer and all, on an `unattended` session (TD-096, *Focus watches*: typing is the disruption; Take over opens it). Disabled with a reason on `exited`, `closed` and `unreachable`, where there is no turn (TD-047), and the host agent refuses `send` and `keys` to an `exited` or `closed` record the same, in words with the exit code, whoever sends (TD-078) — the record's own state, not a screen rule |
@@ -1808,6 +1864,13 @@ noted). If a control is not in this table it does not exist.
 | Inbox page: **the rail** | **Urgency**, **Teams**, **Kinds** — every line a toggle — **Clear filters**, **find** | §4.5 screen 6 *The rail* (TD-129; designed 2026-09-24, not built — TD-135). Left of the column, sticky, starting under the title (*Inbox* alone on the top line): **Clear filters**, the find box, then three groups of toggles: *Urgency* — the sections in the page's order, each with its count; the teams a row on the page carries and *no team*, each with its **Needs you** count; the kinds — *questions*, *steering*, *session states*, *board items*, *notes*, *trail* — each with its count. Within a group the picks are OR'd, across groups AND'd, and nothing picked means all; every count is a count of the rows on the page now — a picked line its share, an unpicked line in a group with a pick *0*, dimmed, an unpicked line in a group without one its share under the other groups' picks — written as a plain number while nothing is picked or typed and *n of all* while anything is, *all* the line's unfiltered count, on rail lines and section headings alike; a *0* line stays so a pick can be undone. A section not picked is not drawn; one picked and emptied by the other groups draws its heading and its empty line — a filter shows or hides rows and never re-orders the queue. **Clear filters**, drawn only while anything is picked or typed, clears the lot, the find box included. The picks are the URL (`team`, `sec`, `kind`, `find`), remembered per browser for a bare `/inbox` and written back with `replaceState`; the top bar's number stays the unfiltered *Needs you*; the title row is *Inbox* alone, the needs-you pill and its hover moved to the rail's *Needs you* line. A row's team badge is the same press as the rail's line for its team; the typed `team:` syntax is retired. Counts from `inbox_sections`, so the rail, the headings and the top bar cannot disagree. Below 720 px: a pinned **Filters ▾** chip with the number of picks, then the teams as chips, picked ones first; the chip opens a full-screen sheet with the three groups, the find box, Clear filters and Done (*Narrow*; TD-137). Client-side but for the counts; nothing written |
 | Inbox page: **find** | one box in the rail, its count | §4.5 screen 6 *Find* (TD-129; TD-135): every word typed must match, in any order, as a substring of the row's whole visible text (`data-find`, lowercased once by the server, on every row kind), a bare number also matching `#` before it; a match unfolds FYI or the snoozed list for the duration and folds it back when the box empties, unless the person had it open; the count reads *n of all*. A fourth group with one pick, AND'd with the rail's three (*guardians* + *jeff* is that team's rows carrying *jeff*, *jeffrey* included), and the rail's counts follow it. `/` focuses it, `Esc` leaves it (TD-124). Nothing written; the poll re-applies it. Replaces TD-069's one-substring match over sender, text and `about` |
 | Inbox message page | **Back**, the row's own controls under the entry, `j` / `k` | `/inbox/<id>` (§4.5 screen 6 *The message page*, TD-129; not built — TD-136): one mail entry whole, reached from the row's text, from `Enter` on the ringed row, and from a trail row's *re*. **Back** (and `Esc`) returns to the list at the same row, ringed, filters kept. Three parts in this order: the entry — its head as on its row (sender, team, kind, `about`, `pr` as a link, age, `answered` by whom and when once closed) and the text whole; the answer — the row's own controls again, the same RPCs and confirms, so an answer here is the answer, and the page returns to the list when it removes the row from its section; the thread, under its heading with its count — the question it answers, the replies it drew (the person's own among them), the outcome under the question it closes (§4.10 *Outcomes*), the pass-up and its recommendation, the `system` notes about it — oldest first, each in its kind's row shape and none a control built from text, gathered at the home by `root` across the person inbox and the records' mailboxes (the `thread` read, §4.7), as far as retention keeps it. `j` / `k` move to the next and previous entry of the list as it was filtered. A pruned entry reads *gone: pruned <t> ago* with **Back**; another host's, the refusal in words (§4.4a). A state row and a board row have no page: **Open** and **Open board** stay theirs. Reading marks nothing (§4.10). No preview pane, by design: the page at any width |
+| Settings page | **Usage**: a reserve field per profile per window, **Save** per profile card | §4.5 screen 8 (TD-100 (4); not built — TD-148). Each field takes what `ao gate` takes — `30`, `10/day`, empty to clear — and shows the line it makes today beside it before the press lands; **Save** calls `set_settings {profile, reserves}` for that card, the person's alone, and the card says *applies on the next tick*. A label the adapter has not reported is refused with the reported ones named, in place, as the CLI does. Cards are grouped under their account as the chip is (TD-122); a profile absent from the file shows empty fields, not zeros. A budget row per metered profile joins here when TD-128 lands (drawn disabled with *not designed — TD-128* until then) |
+| Settings page | **Teams**: **schedule**, **until** (with **Clear**), **reserve priority**, **Save** per team card | one card per team the org defines (the client reads the definitions; the agent does not). **schedule** is TD-133's rule, drawn disabled with *not built — TD-133* until it lands; **until** takes the CLI's forms (`06:00`, `+8h`, ISO) in the reader's clock and hands the agent an instant, written to `teams.<team>.until` (§6 *Team stop time*) — the tick gives it to every live member and seat as `set_stop` does and to the ones a start creates, and **Clear** removes it; **reserve priority** is a flat percent added to the profile's reserve for the sessions carrying this team's badge (§6 *Usage gate*), `0` when absent. All three through `set_settings {teams: {<team>: {…}}}`; a team not in the org's definitions is refused, naming the defined ones |
+| Settings page | **Repos**: the promote's **auto** switch | one card per registered checkout (the host's repos registry): its `.agentorc.yml` values read-only with their *i* mark and **Open file**, and, for a repo whose file carries `promote:`, the one setting — **auto** (§6 *Promote*), written to `repos.<repo>.promote.auto` through `set_settings`; a repo with no `promote:` block shows no switch and says why |
+| Settings page | **You**: `open_in` (preset, template or none), terminal **size** and **face**; **Reset this browser** | *yours everywhere*, written to `person:` through `set_settings`: `open_in` as §5 defines it (`vscode`, `none`, or `{label, url}`, the same refusals, a bad template named in place and the default kept); the terminal's **size** (a number of pixels, bounded 10–20) and **face** (a typed or picked `font-family` name; `monospace` is always appended and ligatures stay off — goal 12), applied to every open terminal without a reload. *this browser*: the theme, *mine* and the folds as they stand, display with their own controls where they already have one, and **Reset this browser**, which clears every `ao.*` key of this browser's `localStorage` after a confirm and reloads — a new control, browser-local, writing nothing anywhere else |
+| Settings page | **Open file** | the editor button with a file's path in place of a session directory (§5 `person.open_in`): `{path}` the file, `{remote}` the host as before; drawn on every file card (hosts, profiles, org, each repo's `.agentorc.yml`, and the home's `settings.yml` itself, read-only there) and absent under `open_in: none` |
+| Settings page | read-only values and the ***i*** mark | display only: every value of `hosts.yml`, `profiles.yml`, `org.yml` and a repo's `.agentorc.yml` as the client reads it, and beside each file's heading an *i* mark whose paragraph names the file's path, when it is re-read (per request, per tick, or at the agent's start — a host's name, `home:` and identity mode are start-only, and the mark says *restart the host agent to apply*), and who edits it (by hand; by PR). A value the file does not set shows its default, marked *default*. Nothing here is a control |
+| Org top bar | **Settings** tab | a link to `/settings`, last after Inbox, drawn once the page is built (TD-123's rule); the host chip's hover names the page until then |
 | Inbox: section heading, the **i** mark | **i** (one per section) | a section is its name, its count and an **i** mark holding the paragraph that says what the section is and what it counts (§4.5 screen 6 *Layout*, TD-082): a tooltip on hover and keyboard focus, and pressed it opens that paragraph in place under the heading (pressed again, it closes); which are open is remembered in the browser. It is a `<button>` — Enter and Space press it — carrying `aria-expanded` and `aria-controls` naming the paragraph, labelled *About <section>*; the tooltip is the same text as the button's description (`aria-describedby`), so a screen reader hears it without pressing — which needs the paragraph in the page always, closed by the `hidden` attribute and never removed. Touch has no hover: a tap opens it in place. Fixed text in the source |
 | Inbox row: state | the card's own controls | a permission: what is asked, the time left, **Allow / Deny** with the card's optional *why?* beside Deny (hook channel, as on the card — nothing parsed); a question or `stalled?`: the text, **Open**; `limited`: the reset time, **Open** (not built: **Switch profile… / Wait** here, since neither is built on the card; the row gains them when the card does); exited with unpushed work: what Ready to close says (§4.2) and the ref it was measured against, **Reopen and push**, **Resume**, **Open** (details). *Reopen and push* (TD-081) is the banner's one-press **Resume** plus a first prompt the page wrote — *Push your branch and open or update its PR, then report the outcome with `ao msg person --outcome`.* — fixed text in the source, never anything a session said (§4.2); offered only where Resume would be silent; the session is attended, so a `git push` the tool asks about arrives as an Allow / Deny row, and the result returns as an outcome (§4.10 *Outcomes*); it depends on `--outcome` (TD-079). A state row leaves the list when the state does; only `stalled?` and unpushed work can be snoozed, being off the tool's clock: their **Snooze** (TD-079) is the home-owned store `attention_snooze` writes, keyed on the record and the row kind, so a session's permission and its stalled row are set aside separately; no `until` clears it, and a snoozed row is in no section and no count until its time. The row is built from the card's own view (pill, `title`, `doing` line, badges); the pill is a `<span>` and a state mark never looks pressable (TD-071 item 8). One predicate (`state_kind`) answers for the rows and the Org's needs-you badge, so every session the Org counts has exactly one row; a `needs-you` record whose `pending` is empty, not a dict, or of an unknown kind is a plain **needs you** row with **Open** and no Allow / Deny — a control built from what is not there is what §4.2 forbids |
 | Inbox row: restart | **Open**, **Resume**, **Dismiss**, **Snooze** | built (TD-103 slice 5, §6 *Keeping a team running*): a supervised member the tick could not restart — `restart_ceiling` (three in two hours, or six fills an hour), `restart_blocked` (work left uncommitted or unpushed), or an `early` `restart_wanted` — under *Needs you*, counted, with the reason in the tick's own words. It is its own row, beside any state row the record also has (a record at its ceiling can also be exited with unpushed work), as old as the mark. **Open** focuses it; **Resume** is the banner's one-press Resume (the session comes back attended, as every one-press Resume does — a person restarting past the ceiling is the person's word); **Dismiss** removes the row and not the mark — the tick would write a cleared mark again on its next pass, and an `early` one is the session's own field (§9 invariant 14) — so the attention store keeps `dismissed:<the mark's at>` under the record and `restart`, that one mark's row is in no section and no count, the card keeps its ending, and a new mark (a new `at`) raises a new row; **Snooze** as on `stalled?`. The row leaves when the mark does: a restart the person made, a Forget, or — for `restart_blocked` only — the restart the tick completes once the work is pushed; `restart_ceiling` is never lifted by the tick |
@@ -1843,7 +1906,7 @@ noted). If a control is not in this table it does not exist.
 | card / Focus header | **out of work** chip | when the record carries `out_of_work`: the words and the `why` on hover, beside the report line (TD-053). On a card it moves into the slot (TD-095): the fixed words, then the first line of the reason as text, clamped, the whole of it and the time of the declaration on hover — and no age of its own, since a card has one clock; the Focus header keeps the chip. Not a state — the session still reads `idle` or `exited` (§4.2, the unseen-idle rule) — and shown for any session that declared it, since a hand-started worker may run out too (§4.9a). The words are fixed and the reason is the hover: a `why` names every entry the session looked at and what gates each, which a card cannot hold. The row is drawn for a declaration even when neither report channel has anything in it |
 | card / Focus header | **restart wanted** chip | when the record carries `restart_wanted` (TD-083): fixed words, the `why` on hover as text, beside the report line, exactly as the *out of work* chip is and for the same reason: a mark, never pressable, and not a state — the session still reads `idle` or `exited`. On a card it moves into the slot with *out of work*, as an ending (TD-095; §4.5 *The card's anatomy*) — the Focus header keeps the chip. It goes when the record does: a restart supersedes the record in place (§4.1) and the new one carries none. Nothing on the page restarts a session from it: the restart is its controller's act, or a person's own **New session here** (§4.9a *A run that ends with work left*). An `early` one says so on the chip and in its hover: the home marks a restart asked for inside `RESTART_EARLY` of the record's own start, and a controller does not act on one — so it is drawn as wanting a person instead |
 | Org | team card: **wound down** note | a definition with nothing live whose sessions all declared `out_of_work` reads *wound down <t>* instead of *stopped*: *nothing running* and *nothing left to run* are different facts about a team (§4.9a, TD-053); on the team's card, re-rendered with the header on every delta, so it appears without a reload. All or nothing, and read from the records rather than from any count of ledger rows: one member's exhaustion is not the team's, and a single session that never declared means the team stopped for some other reason. A definition nothing has ever carried is neither. `ao team list` says the same word from the same rows, so the page and the CLI cannot disagree about one definition |
-| Org | team card: **starts** note | display only (TD-026, §6 *Schedule*; not built — TD-133): on a team card with nothing live whose name carries a rule in `settings.yml`, beside *stopped* or *wound down <t>*: *starts at the reset · Thu 07:00*, the instant from the account's reading, in the reader's clock, by the formatter the *stops* note uses. Nothing on a live team's card. Not a control: the rule is set by `ao schedule` or the settings page |
+| Org | team card: **starts** note | display only (TD-026, §6 *Schedule*; not built — TD-133): on a team card with nothing live whose name carries a rule in `settings.yml` (`teams.<team>.schedule`), beside *stopped* or *wound down <t>*: *starts at the reset · Thu 07:00*, the instant from the account's reading, in the reader's clock, by the formatter the *stops* note uses. Nothing on a live team's card. Not a control: the rule is set by `ao schedule` or the settings page |
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team. Not drawn inside that team's own group (TD-095); drawn in *No team*, and in a filtered or flat grid |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
@@ -2077,6 +2140,14 @@ are the adapter's (§4.3): a label no adapter of that profile reports is refused
 ones are named, so a typo is not a silent no-op. A change takes effect on the next tick, with no
 restart; under `--json` the reply is the file's key as written and the computed lines.
 
+**`ao team until <team> <06:00|+8h|ISO> | --clear`** and **`ao team reserve <team> <n>`** (TD-100 (4);
+§6 *Team stop time*, *Usage gate*; designed 2026-09-25, not built — TD-146): the team's stop time,
+parsed in the caller's clock as `ao until` parses it, and its reserve priority, written to
+`teams.<team>` through `set_settings`, refused to a session; a team the org does not define is
+refused, naming the defined ones. **`ao settings`** prints the home's `settings.yml` as the page
+draws it — each key with the line or instant it makes today — and, with `--where`, where every
+other configured value lives and when it is re-read, which is the page's *i* marks in text.
+
 **`ao promote`** (TD-120 step 2; §5 `promote:`, §6 *Promote*; designed, not built — TD-132): the
 press from a terminal. `ao promote [<repo>] [--sha <commit>]` promotes the registered checkout —
 the current directory's repo when none is named — to main's head, or to `--sha` for a rollback or
@@ -2093,8 +2164,8 @@ the client's side, and the one line a session may read.
 **`ao schedule`** (TD-026; §6 *Schedule*, §5 `settings.yml`; designed, not built — TD-133): with no
 arguments prints every team's rule and when it next fires — *ao-grind · starts at the reset of
 grind's week — Thu 07:00*, or *no schedule*; `ao schedule <team> reset --profile <p> --window
-<label>` sets one and `ao schedule <team> off` clears it, through `set_settings`, refused to a
-session as `ao gate` is. The client checks the team is defined (`org.yml` or a repo's `teams:`,
+<label>` sets one and `ao schedule <team> off` clears it — `teams.<team>.schedule` in
+`settings.yml` (§5) — through `set_settings`, refused to a session as `ao gate` is. The client checks the team is defined (`org.yml` or a repo's `teams:`,
 which the host agent does not read) and that an adapter of the profile reports the label, and
 refuses naming which; the rule takes effect on the next tick.
 
@@ -4392,13 +4463,44 @@ session is never woken by mail at all.
   are the node→home link of §4.4a (built for a container node; a machine node is not yet in use, TD-057). **`home:`** names the host whose agent holds the org's graph
   and mail; an agent whose file names no `home:`, or names itself, is the home. On Paul's machines
   it is `home: kmaster`.
-- **The person's own** (TD-095): **`ui.yml`**, beside `hosts.yml` and `org.yml` in the agentorc
-  home (`~/.agentorc`, or `AGENTORC_HOME` — resolved as its siblings are), read by the UI process
-  on the machine it runs on. It is the one scope that is a person's preference and nobody else's
-  business, which hosts, repos and the org are not; one UI process serves one person, and if that
-  ever changes this scope moves with the person, not the process. Its first key is **`open_in:`**,
-  the editor button of the card, the Focus header and *edit yml* (the card's and Focus's buttons
-  are built; *edit yml* waits for the Commands page):
+- - **The settings a person moves** (TD-100; one file since 2026-09-25 — the ADR [settings
+- audit](decisions/2026-09-25-settings-audit.md); TD-146 builds the file, TD-147 the replica, TD-148
+- the page): **`settings.yml`**, beside `hosts.yml` in the agentorc home **of the home** — home-
+- owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
+- written **only by its `set_settings` RPC**, a person's own, refused to a session as `inbox_pause`
+- is; `ao gate`, `ao schedule`, `ao team until` (§4.7) and the Settings page (§4.5 screen 8) all
+- write through it. Nobody edits it by hand while the agent runs, though a hand edit is read on the
+- next tick; it carries no comments, and a write rewrites it whole. **The line it draws**: a
+- *definition* — what a team, a repo, a host or a profile *is* — stays in its own file above and
+- below this bullet; a *setting* is a value the person turns without redefining anything, and every
+- such value lives here, under four keys:
+
+```yaml
+usage_gate:                                   # §6 *Usage gate* — per profile, per window label as the adapter names it
+  grind: {"5h": 30, week: {per_day: 10}}      # line 70% on the session window; 100 − 10 × days left on the weekly
+teams:                                        # per team, by the name org.yml or a repo's teams: defines
+  ao-grind:
+    schedule: {start: reset, profile: grind, window: week}   # §6 *Schedule* (TD-133)
+    until: "2026-09-26T06:00:00-06:00"        # §6 *Team stop time*: every member and seat stops here
+    reserve: 10                               # §6 *Usage gate*: added to grind's reserve for this team's sessions
+repos:                                        # per registered checkout, by its directory name
+  agentorc: {promote: {auto: false}}          # §6 *Promote*: the one switch a person flips; run and check stay in .agentorc.yml
+person:                                       # the person's own — nothing here reaches a policy
+  open_in: vscode                             # the editor button, below
+  terminal: {size: 13, face: "JetBrains Mono"}   # goal 12: ligatures off regardless, monospace always the fallback
+```
+
+  A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
+  no schedule, no stop time and no priority; a repo absent under `repos:` promotes by hand.
+  **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
+  is up after each write, and to a node on its `hello`; the node writes its replica and its gate
+  reads that, offline included — *policies that stop run on the node, from its replica* — so the
+  last settings a node was sent stay in force until its next dial; `set_settings` at a node is
+  forwarded while the link is up and refused offline in the words the home-owned edits use.
+  **`ui.yml` is retired**: its one key, `open_in:`, lives under `person:`; a `ui.yml` still on disk
+  is read once more, named on the Settings page as *migrate: ui.yml is no longer read*, and ignored
+  (TD-146). What `person.open_in` takes is what `ui.yml` took, the editor button of the card, the
+  Focus header, *edit yml* and the Settings page's **Open file**:
   - **`vscode`** — the default, and what a missing file means:
     `vscode://vscode-remote/ssh-remote+{remote}{path}?windowId=_blank` and, where the UI runs on
     the machine the person sits at, `vscode://file{path}?windowId=_blank`.
@@ -4421,30 +4523,8 @@ session is never woken by mail at all.
   scheme being the part before `://`, parsed, never a substring (`vscode://file…` is scheme
   `vscode`). One that does not parse, or is refused, is named on the page when it is served and
   the default button is drawn: a pasted bad line must not become a link that runs. The label is
-  text the person wrote, escaped. Nothing here reaches a host agent: no session and no policy
-  reads it.
-- **The host agent's settings a person moves** (TD-100): **`settings.yml`**, beside `hosts.yml`
-  in the agentorc home on **each session host**, read by that host's agent on every tick
-  (`sessionorc.settings`) and written only by its `set_settings` RPC — a person's own, refused to
-  a session as `inbox_pause` is. `ao gate` (§4.7) writes through that RPC, and a settings page
-  would once §4.5 lists one. Not built: the settings page (TD-100 (4)). Nobody edits the file by
-  hand while the agent runs, though a hand edit is read on the next tick. It is not `ui.yml`,
-  which no host agent reads, and not `hosts.yml`, which is topology. Its first key is the usage
-  gate's reserves (§6), per profile, per window label as the adapter names them (§4.3), a flat
-  percent or a percent per day:
-
-```yaml
-usage_gate:
-  grind: {"5h": 30, week: {per_day: 10}}   # line 70% on the session window; 100 − 10 × days left on the weekly
-```
-
-  A profile absent here has no line on any window. Its second key is **`schedules:`** (§6
-  *Schedule*; designed, not built — TD-133): one entry per team name, `{start: reset, profile,
-  window}`, the standing press that restarts a wound-down team when that profile's window
-  resets; a team not listed has none. On a node the file is the node's own, as its
-  `hosts.yml` is, and `ao gate` run there writes it (§4.4a's offline table: served, link or no
-  link — policies that stop run on the node, from its replica). The settings page, when built,
-  edits the home's file; a node's is edited at the node until the replica carries settings.
+  text the person wrote, escaped. Nothing under `person:` reaches a policy: the gate and the tick
+  read the file by key and never this one.
 - Repos: the dev-cadence registry (`~/.config/dev-cadence/repos.txt`) on each host — not
   duplicated. A repo without dev-cadence can still be listed there. Directories that are not
   repos are not registered anywhere: New session takes a path, and the host agent remembers recent
@@ -4480,7 +4560,6 @@ commands:
 promote:                              # §6 *Promote* (TD-120): how a merge to `main` becomes the live copy
   run: scripts/promote.sh             # makes `main` live from this checkout; run at the home, in the checkout
   check: scripts/live_sha.sh          # prints the commit that is live now, or fails saying why
-  auto: false                         # true: the home promotes on its own once `main` moves and its checks are green
 ```
 
   **`promote:`** (TD-120 step 2, designed 2026-09-24; not built — TD-132) is the repo's own
@@ -4492,7 +4571,7 @@ promote:                              # §6 *Promote* (TD-120): how a merge to `
   *Promote* says when): `run` makes the checkout's `main` live and is judged by what `check` says
   afterwards, never by its exit code; `check` prints one full commit on stdout and exits 0, or
   exits non-zero with the reason on stderr (*not deployed*, *no cluster*), which the row shows as
-  *live: unknown — <reason>*. `auto` is `false` when absent: the row offers a press. A repo with no
+  *live: unknown — <reason>*. `auto` lives in `settings.yml` (`repos.<repo>.promote.auto`, the Settings page's switch; 2026-09-25) and is `false` when absent: the row offers a press. A repo with no
   block has no promote, no row and no `ao promote`. It is **the one key of this file the host agent
   reads** (`sessionorc.promote`, the key alone, from each checkout in the home's registry — the
   rest of the file is the clients' and the agent still resolves no role and no brief), because a
@@ -4704,7 +4783,7 @@ code and needs no grant; a session doing the same work does.
   and a branch checked out there or a change left in it would go live (the tree is a person's, so
   the policy reads this and never makes it: no checkout, no reset, nothing beyond the fetch);
   **(2) checks green**; **(3) nothing in flight and no failure standing** for that repo. With
-  **`auto: true`** the home promotes when live ≠ main, the three hold, and main has stood still
+  **`auto: true`** (§5 `settings.yml` `repos.<repo>.promote.auto`, the Settings page's switch — the one part of the block a person flips, so it left the checked-in file on 2026-09-25) the home promotes when live ≠ main, the three hold, and main has stood still
   for `PROMOTE_SETTLE` (ten minutes) — a burst of merges is one promote, since for this repo every
   promote restarts the host agent. With **`auto: false`** the Inbox row (§4.5a *Inbox row:
   promote*) and `ao promote` (§4.7) are the press: refused, naming it, on (1) or (3); on (2) a
@@ -4731,12 +4810,13 @@ code and needs no grant; a session doing the same work does.
   off by default, not vital*; designed 2026-09-24, not built — TD-133, unscheduled until the person
   says): the one start the host agent makes that no person pressed at the time, and the general
   form the run window (below) reduces to. **A schedule is a person's standing press, kept in
-  `settings.yml`** (§5: the person's own, read on every tick, written only by `set_settings`, so
-  a session cannot set one):
+  `settings.yml`** under the team's own key (§5 `teams.<team>.schedule`; read on every tick, written
+  only by `set_settings`, so a session cannot set one):
 
 ```yaml
-schedules:
-  ao-grind: {start: reset, profile: grind, window: week}   # start ao-grind when grind's weekly window resets
+teams:
+  ao-grind:
+    schedule: {start: reset, profile: grind, window: week}   # start ao-grind when grind's weekly window resets
 ```
 
   The window is named by its label as the adapter reports it (§4.3), refused when no adapter of
@@ -4760,6 +4840,14 @@ schedules:
   time for one session (`start_at`, a `scheduled` state), window overrides with an expiry
   (TD-101: not wanted yet), calendar-shaped windows and one-off runs — TD-026 holds them for the
   person's word on scope.
+- - **Team stop time** (§5 `teams.<team>.until`; the Settings page and `ao team until`, §4.7;
+- 2026-09-25, not built — TD-146): the team-wide form of a session's `run_until`. On every tick,
+- each live session carrying the team's badge — members and seats — whose `run_until` is unset or
+- later than the team's takes the team's instant, exactly as `set_stop` would give it
+- (`wrapup_sent_at` reset, the wrap-up then the kill as the stop time's own rule says), and a start
+- the team makes after the instant is set stamps it on what it creates. **Clear** removes the key; a
+- session's own later `ao until` is kept as the earlier of the two. A stop time in the past is
+- refused when set, as `ao until`'s is.
 - **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
   window; wrap-up-then-kill outside, by setting a stop time.
 - **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on
@@ -4779,7 +4867,13 @@ schedules:
   is 30% on the reset day, 60% with four days left, 90% on the last day: **the line rises as the
   week goes**, so a team paused on a Wednesday at 60% resumes on the Thursday when the line moves
   to 70%, and one paused on the last day resumes at the reset, when the window empties. A window
-  with no reserve has no line and pauses nothing; the tool's own 100% shows `limited`.
+  with no reserve has no line and pauses nothing; the tool's own 100% shows `limited`. **A team's
+  reserve priority** (§5 `teams.<team>.reserve`, the Settings page; 2026-09-25, not built —
+  TD-146) is a flat percent added to the profile's reserve for the sessions carrying that team's
+  badge on every window: with grind at 30 on the session window and ao-grind at 10, ao-grind's
+  sessions pause at 60% and the profile's others at 70%, so two teams on one profile pause at
+  different lines and the one the person cares about runs longest; the chip still shows the
+  profile's line, and a session paused under its team's line says *paused · usage (ao-grind +10)*.
   **A pause is a send, not a kill** (the PAUSE flag of this section's last bullet): the host agent
   submits the record's `pause_prompt` once — *pause: finish the step in hand, commit and push what
   you have, then stop and wait for a resume* — which a working session takes as its next prompt

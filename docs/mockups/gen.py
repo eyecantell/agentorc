@@ -1252,6 +1252,83 @@ def type_scale():
 ''' + TAIL
 
 
+def settings_page():
+    """Screen 8, Settings (design §4.5, TD-100 (4), 2026-09-25): the page that writes a setting and shows every other value with where it lives."""
+    b = lambda label, c="": f'<span class="btn sm {c}">{label}</span>'
+    gap = '<span style="flex-grow: 1;"></span>'
+    imark = '<span class="info" title="where this comes from">i</span>'
+    def field(label, value, hint="", w=110):
+        h = f'<span class="muted mono" style="font-size: 12px;">{hint}</span>' if hint else ""
+        return f'<span style="display: inline-flex; align-items: center; gap: 8px; margin-right: 18px;"><span class="muted" style="font-size: 12px;">{label}</span><span class="input" style="width: {w}px; height: 28px; display: inline-flex; align-items: center; padding: 0 8px; font-size: 13px;">{value}</span>{h}</span>'
+    def ro(label, value, dflt=False):
+        d = '<span class="muted" style="font-size: 12px;">default</span>' if dflt else ""
+        return f'<div style="display: flex; gap: 10px; align-items: baseline; padding: 3px 0;"><span class="muted mono" style="font-size: 12.5px; width: 150px; flex: none;">{label}</span><span style="font-size: 14px;">{value}</span>{d}</div>'
+    def card(head, badge, body, controls, note=""):
+        return f'''<div class="mcard"><span class="sbar" style="background: #cbd0d6;"></span>
+  <div class="who"><span class="nm">{head}</span>{f'<span class="badge">{badge}</span>' if badge else ""}<span style="flex-grow: 1;"></span>{note}</div>
+  {body}
+  <div class="ctl">{controls}</div>
+</div>'''
+    def sec(title, count, open_i=False, blurb=""):
+        pop = f'<div class="pop">{blurb}</div>' if open_i else ""
+        return f'<div class="isec-h"><span>{title}</span><span class="n">{count}</span><span class="info{" on" if open_i else ""}">i</span><span style="flex-grow: 1;"></span>{pop}</div>'
+    usage = card("grind", "account paul · Claude", 
+        '<div class="txt">' + field("5h reserve", "30", "→ line 70%") + field("week reserve", "10/day", "→ line 60% · 4 days left · moves Thu 07:00") + '</div>'
+        '<div class="meta">applies on the next tick · the chip shows the line</div>',
+        b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">budget — <i>not designed, TD-128</i></span>')
+    usage2 = card("paul", "account paul · Claude",
+        '<div class="txt">' + field("5h reserve", "", "no line") + field("week reserve", "", "no line") + '</div>',
+        b("Save", "primary"))
+    teams = card("ao-grind", "team",
+        '<div class="txt">' + field("stop time", "06:00", "Fri 06:00 · every member and seat") + field("reserve priority", "10", "+10 on grind’s reserve → line 60% for this team", 60) + '</div>'
+        '<div class="txt muted" style="opacity: .6;">' + field("schedule", "at the reset of grind’s week", "not built — TD-133", 220) + '</div>',
+        b("Save", "primary") + b("Clear stop time") + gap + '<span class="muted" style="font-size: 12px;">defined in org.yml — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
+    repos = card("agentorc", "repo · /home/kmaster/agentorc",
+        '<div class="txt">' + field("promote auto", "off", "the Inbox row offers the press; on: the home promotes 10 min after main moves", 60) + '</div>'
+        + ro("ledger", "docs/technical_debt.md") + ro("roles", "grinder, techlead, manager, designer · review: techlead reads src/sessionorc/**, docs/briefs/**") + ro("promote.run", "pip install --upgrade … && ao service install") + ro("promote.check", "sessionorc.build.info()[\"commit\"]"),
+        b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">.agentorc.yml · read per call · by PR — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
+    you = card("yours everywhere", "",
+        '<div class="txt">' + field("editor", "vscode", "the card’s and Focus’s button; none removes it") + '</div>'
+        '<div class="txt">' + field("terminal size", "13", "px", 60) + field("terminal face", "JetBrains Mono", "monospace always the fallback · ligatures off", 160) + '</div>',
+        b("Save", "primary"))
+    browser = card("this browser", "",
+        ro("theme", "dark · the ◐ toggle in the top bar") + ro("mine", "off") + ro("Inbox folds", "FYI open · Answered open") + ro("shell directory", "~"),
+        b("Reset this browser", "ghost danger") + gap + '<span class="muted" style="font-size: 12px;">remembered in this browser only</span>')
+    hosts = card("kmaster", "home",
+        ro("name", "kmaster") + ro("vscode_host", "kmaster") + ro("volatile", "false", dflt=True) + ro("repos_registry", "~/.config/dev-cadence/repos.txt", dflt=True) + ro("runs_keep_days", "30", dflt=True) + ro("identity", "enforce") + ro("nodes", "contractmatch (container, volatile)"),
+        gap + '<span class="muted" style="font-size: 12px;">hosts.yml · name, home and identity read at start — <b>restart the host agent to apply</b> — the rest per request · by hand — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
+    profiles = card("grind", "default",
+        ro("adapter", "claude-code", dflt=True) + ro("account", "paul") + ro("model", "fable-5-1") + ro("config_dir", "~/.claude-grind") + ro("permission_wait", "600", dflt=True),
+        gap + '<span class="muted" style="font-size: 12px;">profiles.yml · read per call · by hand — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
+    org = card("ao-grind", "team · projects: agentorc",
+        ro("manager", "manager-ao-1 · unattended · control") + ro("techlead", "techlead-ao-1") + ro("members", "grinder ×2 · designer ×1") + ro("host", "kmaster", dflt=True),
+        gap + '<span class="muted" style="font-size: 12px;">org.yml · read per call by the clients, never the agent · by hand — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
+    return head("Settings") + f'''<div style="width: 1440px; min-height: 2320px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Settings")}
+<div style="padding: 16px 20px 28px;">
+<div class="inboxcol">
+  {page_head("Settings", "")}
+  {sec("Usage", 2, True, "The reserves the usage gate pauses a profile’s unattended sessions at: what you keep back of each window for your own work, per profile, per window as the tool names them. Grouped by account, since the reading is the account’s. A change applies on the next tick; the line beside each field is what the chip will show. Set from here, from ao gate, never by hand.")}
+  {usage}{usage2}
+  {sec("Teams", 1)}
+  {teams}
+  {sec("Repos", 1)}
+  {repos}
+  {sec("You", 2)}
+  {you}{browser}
+  {sec("Hosts", 1)}
+  {hosts}
+  {sec("Profiles", 2)}
+  {profiles}
+  {sec("Org", 1)}
+  {org}
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Screen 8, Settings</b> (TD-100 (4), 2026-09-25): the one page that writes a setting — a value a person turns without redefining anything — and shows every other configured value with where it lives. The line: a <i>definition</i> (what a team, a repo, a host or a profile is) stays in its file and is read-only here, each with an <i>i</i> mark naming the file, when it is re-read and whether a change needs the host agent restarted, and an <b>Open file</b> button through the editor setting; a <i>setting</i> lives in the home’s <span class="mono">settings.yml</span> and is written only through <span class="mono">set_settings</span>. Usage first, because the reserves are what Paul moves weekly; Teams hold the three per-team settings (schedule — disabled until TD-133 — stop time, reserve priority); Repos hold the promote’s <i>auto</i>, moved out of the checked-in file; You in two halves by write path. On a node every editable value reads <i>set at kmaster</i> and writes forward to the home. Nothing here draws a constant, the terminal’s colours, or a density switch.</div>
+</div>
+</div>
+</div>
+''' + TAIL
+
+
 DARK = [
  ("background: #f4f5f7; color: #1c2128;", "background: #0e1116; color: #d7dce3;"),
  ("#f4f5f7", "#0e1116"), ("background: #fff;", "background: #171b22;"), ("#dfe3e8", "#2a313b"), ("#eceef1", "#242a33"),
@@ -1285,6 +1362,8 @@ files = {
     "InboxPhone.dc.html": inbox_phone(),
     "Type.dc.html": type_scale(),
     "TypeDark.dc.html": darken(type_scale()),
+    "Settings.dc.html": settings_page(),
+    "SettingsDark.dc.html": darken(settings_page()),
 }
 for n, s in files.items():
     (OUT / n).write_text(s)
@@ -1307,6 +1386,8 @@ LAYOUT = [
     ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("NewSession.dc.html", "New session", 1),
     ("Commands.dc.html", "Commands", 1),
+    ("Settings.dc.html", "Settings", 1),
+    ("SettingsDark.dc.html", "Settings — dark", 2),
     ("MainDark.dc.html", "Org — dark", 2),
     ("Type.dc.html", "Type scale", 2),
     ("TypeDark.dc.html", "Type scale — dark", 2),
@@ -1330,7 +1411,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
