@@ -274,7 +274,7 @@ State transitions (Claude Code adapter):
 | `Notification` (permission / question), `PermissionRequest`, `PreToolUse` of `AskUserQuestion` | `needs-you` + pending text |
 | `Notification` `idle_prompt` (idle for a minute) | ignored — an idle session waiting for you is `idle`, not an alert |
 | `Stop` | `idle` |
-| adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time |
+| adapter `usage()` at cap, or the tool's own limit message | `limited` + reset time (a metered profile's amount is not a cap and never makes it, §4.2a) |
 | `SessionEnd`, or tmux session gone | `exited` — the record's `pane` says whether a dead pane is still there to read (natural exit: yes; killed, or the tmux server restarted: no) |
 | person clicks **Close** (kill + reap worktree) | `closed` — card kept a day, then history under Resumable |
 | host agent unreachable (a property of the **host**; every card on it flips at once) | `unreachable` — card greyed, last known state kept visible |
@@ -409,22 +409,34 @@ Claude Code the adapter maps an account to its own config directory (`CLAUDE_CON
 model to the `--model` flag; other adapters map their own equivalents. Profiles are declared once
 per host in `~/.agentorc/profiles.yml`.
 
-**How a profile is billed** (TD-128; designed 2026-09-25, not built — TD-151): a profile carries
-**`billing`** — `subscription`, the default and every profile today, whose bound is the account's
-quota windows above; or **`metered`**, an API key (`ANTHROPIC_API_KEY`), a hosted open-weights
-model behind an OpenAI-compatible endpoint, or a second adapter billed the same way, with an
-optional price per million tokens in and out (`metered: {input: 3, output: 15}`, in the account's
-currency) for an adapter that cannot report cost itself, and none for a self-hosted model, whose
-cost is throughput and whose reading is tokens. A metered profile reports no window; the adapter
-reports **spend per turn** instead (§4.3), and the home sums it per profile — never per account,
-since a key is its own bill — over three fixed windows in the home's own clock, `day`, `week`
-and `month`, into a reading of the **same shape as a usage reading** (§4.3 `Usage`): a `Window`
-per label whose `resets` is the boundary and whose `pct` is spend over the reserve's amount when
-one is set (§6 *Usage gate*), so the chip, the gate and `ao status -v` read one kind of thing and
-know neither billing by name. Rejected: a budget scoped to a team or a project (Paperclip's
-generic row, ADR 2026-09-24 item 3) — nothing keys on a team or a project (§9 invariant 9), and a
-reserve stays the profile's as every reserve is; a team that must not overspend runs on a
-profile with a reserve.
+**How a profile is billed** (TD-128; designed 2026-09-25 by the designer, #547, and reconciled the
+same day in a cloud session with Paul; not built — TD-151): a profile carries **`billing`** —
+`subscription`, the default and every profile today, whose bound is the account's quota windows
+above; or **`metered`**, an API key (`ANTHROPIC_API_KEY`), a hosted open-weights model behind an
+OpenAI-compatible endpoint, or a second adapter billed the same way, with optional **prices per
+million tokens** in the account's currency, one per token kind the adapter reports —
+`prices: {input: 3, output: 15, cache_read: 0.3, cache_write: 3.75}` — for an adapter that cannot
+report cost itself, and none for a self-hosted model, whose cost is throughput and whose reading is
+tokens. A cache kind without a price is charged at `input`, the safe side, and `profiles.yml` says
+so beside the key: on a coding agent most input is cache reads at a tenth of the input rate, so a
+profile that leaves them out sees its bill several times over and its amount trips early. Never
+guessed from the config directory or the environment: a wrong guess pauses nothing or everything.
+A metered profile is **never polled** for a quota — the usage endpoint would answer
+`no_credentials` to a key, five minutes apart, forever — and reports no window; the adapter reports
+**spend per turn** instead (§4.3), and the home sums it **per account**, as every reading is the
+account's (TD-122): a key is one bill however many profiles run on it, and two profiles that each
+summed their own would each spend the whole amount. The sum runs over three fixed windows in the
+home's own clock, `day`, `week` and `month`, into a reading of the **same shape as a usage
+reading** (§4.3 `Usage`): a `Window` per label whose `resets` is the boundary and whose `pct` is the
+account's spend over **this profile's** amount when one is set (§6 *Usage gate*) — the reading the
+account's, the amount the profile's, exactly as a reserve is — so the chip, the gate and `ao status
+-v` read one kind of thing and know neither billing by name. A metered window **never makes
+`limited`** (§4.2): that state is the tool's cap, and a key at its amount still answers — the gate
+pauses the unattended sessions, the chip goes red, and an interactive session is untouched.
+Rejected: a budget scoped to a team or a project (Paperclip's generic row, ADR 2026-09-24 item 3)
+— nothing keys on a team or a project (§9 invariant 9), and a reserve stays the profile's as every
+reserve is; a team that must not overspend runs on a profile with an amount, or carries a reserve
+priority against it (§6).
 
 The profile's `model` is an **intent**, and a `/model` mid-session changes the reality without it,
 so the card's third part is the model actually **in use** when the adapter can tell it, and says
@@ -529,16 +541,21 @@ directory (an argument form would be dev-cadence's, if a tool ever needs one). T
 launched the session, and the tool's equivalent where one exists — decided when that adapter
 lands (TD-112). `shell` runs no hooks: it is not an agent.
 
-**Spend per turn** (TD-128; designed 2026-09-25, not built — TD-151). For a `metered` profile
-(§4.2a) an adapter reports `spend(profile) -> [Turn(at, input_tokens, output_tokens, cost)]`
-from the tool's own records — Claude Code: the `usage` on each top-level `assistant` entry of the
-transcript, read on the tick as the model in use is (§4.2a), never a grep; an OpenAI-compatible
-endpoint: the response's `usage`; `cost` filled by the adapter where the tool prices its own
-turns, else by the home from the profile's prices, else absent. The core sums, the adapter
-reports, and neither knows a price list by heart: the prices are the profile's declaration.
-An adapter that cannot report spend for a metered profile says so once (`reason`), and the chip
-draws *spend unknown*, never nothing — a metered profile with no reading is the runaway this
-exists to bound.
+**Spend per turn** (TD-128; designed 2026-09-25, reconciled the same day; not built — TD-151). For
+a `metered` profile (§4.2a) an adapter reports `spend(profile, since) -> [Turn(at, model, input,
+output, cache_read, cache_write, cost)]`, the turns after `since`, from the tool's own records —
+Claude Code: the `usage` on each `assistant` entry of every transcript under the profile's config
+directory changed since `since`, sessions agentorc did not start included (a plain `claude` in a
+shell on the same key spends the same money) and subagent turns included (they are billed), read
+from a byte cursor per transcript, never the whole file each tick and never a grep; an
+OpenAI-compatible endpoint: the response's `usage`. Four token kinds, because a coding agent's
+input is mostly cache reads priced at a tenth of input: an adapter that folded them into `input`
+would report a bill several times the real one. `cost` is filled by the adapter where the tool
+prices its own turns, else by the home from the profile's prices, else absent. The core sums, the
+adapter reports, and neither knows a price list by heart: the prices are the profile's
+declaration, and the chip's hover shows tokens by kind, so a wrong price is visible. An adapter that
+cannot report spend for a metered profile says so once (`reason`), and the chip draws *spend
+unknown*, never nothing — a metered profile with no reading is the runaway this exists to bound.
 
 ### 4.4 Host agent
 
@@ -581,6 +598,22 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   is spent* are different things to a person). The reading is **held across a restart**
   (`usage.json`) and so is the allowance: the first poll after a restart waits until the held
   reading's `fetched` plus the cadence, never sooner. The reason is not held.
+  **A metered account's reading is a sum, not a poll** (§4.2a; TD-128, reconciled 2026-09-25;
+  not built — TD-151). On every tick each host asks the adapter `spend(profile, since)` (§4.3) for
+  the metered profiles its live sessions run under and adds the turns to a **daily ledger per
+  account**, `spend.json` beside `usage.json`: one row per account per day holding tokens by kind
+  and cost, `since` the last turn's `at`, kept thirteen months. The three windows are summed from
+  it on the tick, the ledger is what survives a restart as the held reading does, and a turn is
+  counted once, because the cursor moves only after the row is written. The reading is served,
+  streamed and held as a polled one is, and it is never `stale`: a sum has no failed poll. A
+  **node's turns** (§4.4a): the node reads its own transcripts and sends them home as `spend
+  {account, turns}`, a link method with a reply, the node's cursor advancing on the reply, so a
+  link down loses nothing and a turn is never counted twice; the home ledgers them and sends the
+  account's reading to every node holding a session on that account — `usage {account, reading}`,
+  a notification on the road the settings take (§4.4a *Settings, replicated*) — whenever a
+  window's `pct` moves a whole point or a window rolls. A node's gate reads that reading as it
+  reads its own poll's; offline, it adds its own turns to the last reading it holds, so its own
+  spend still counts toward the pause, and the rest is re-summed on reconnect.
 - Attachment drop: accept an uploaded file (the UI copies it over ssh) into
   `~/.agentorc/attachments/<session>/`, return the path for the UI to insert into the composer
   (Claude Code takes file paths in prompts). Drag and drop onto the terminal or composer, a file
@@ -1234,7 +1267,9 @@ call by call.
   link is up and refused offline (the table above); the reads a node serves — `gate`, `settings` —
   answer from the replica, and the page says *set at <home>* beside each value. A write may
   originate at the home with no node involved, so the send is a broadcast, never a reply to a
-  caller. Refused, not queued, as the intent push is. **Derived reports from a node.** The tick's
+  caller. Refused, not queued, as the intent push is. The same road carries a metered account's
+  reading, `usage {account, reading}`, home → node, and the node's turns travel the other way as
+  `spend {account, turns}` (§4.4 *Usage*; TD-151). **Derived reports from a node.** The tick's
   derived `progress` and `findings` are home-owned, so a node's tick sends what it derives to the
   home as `derived {id, progress, findings, retire}` — applied there exactly as the home's own tick
   applies its own (upserts under invariant 10, a moved-off branch claim retired), for a record of
@@ -1718,7 +1753,9 @@ Screens:
    mark, a row is a card. Sections, in order: **Usage** — the reserves (§6 *Usage gate*), grouped by
    account as the chip is (TD-122), a card per profile, a row per window label the adapter reports,
    each a reserve field — flat, or *per day* — with the line it makes today beside it as `ao gate`
-   prints it, and, once TD-128 designs metered profiles, a budget row per such profile; **Teams** —
+   prints it, and, on a metered profile's card (§4.2a; TD-128), an **amount** field per window in
+   place of the reserve field — `$5`, `20M tok` — with the account's spend and the percent beside
+   it; **Teams** —
    a card per team the org defines, holding the three things a person moves without redefining the
    team: its **schedule** (§6 *Schedule*; drawn disabled with *not built — TD-133* until that
    lands), its **stop time** — the team-wide `until` (§6 *Team stop time*), applied to every live
@@ -1890,7 +1927,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox page: **the rail** | **Urgency**, **Teams**, **Kinds** — every line a toggle — **Clear filters**, **find** | §4.5 screen 6 *The rail* (TD-129; designed 2026-09-24, not built — TD-135). Left of the column, sticky, starting under the title (*Inbox* alone on the top line): **Clear filters**, the find box, then three groups of toggles: *Urgency* — the sections in the page's order, each with its count; the teams a row on the page carries and *no team*, each with its **Needs you** count; the kinds — *questions*, *steering*, *session states*, *board items*, *notes*, *trail* — each with its count. Within a group the picks are OR'd, across groups AND'd, and nothing picked means all; every count is a count of the rows on the page now — a picked line its share, an unpicked line in a group with a pick *0*, dimmed, an unpicked line in a group without one its share under the other groups' picks — written as a plain number while nothing is picked or typed and *n of all* while anything is, *all* the line's unfiltered count, on rail lines and section headings alike; a *0* line stays so a pick can be undone. A section not picked is not drawn; one picked and emptied by the other groups draws its heading and its empty line — a filter shows or hides rows and never re-orders the queue. **Clear filters**, drawn only while anything is picked or typed, clears the lot, the find box included. The picks are the URL (`team`, `sec`, `kind`, `find`), remembered per browser for a bare `/inbox` and written back with `replaceState`; the top bar's number stays the unfiltered *Needs you*; the title row is *Inbox* alone, the needs-you pill and its hover moved to the rail's *Needs you* line. A row's team badge is the same press as the rail's line for its team; the typed `team:` syntax is retired. Counts from `inbox_sections`, so the rail, the headings and the top bar cannot disagree. Below 720 px: a pinned **Filters ▾** chip with the number of picks, then the teams as chips, picked ones first; the chip opens a full-screen sheet with the three groups, the find box, Clear filters and Done (*Narrow*; TD-137). Client-side but for the counts; nothing written |
 | Inbox page: **find** | one box in the rail, its count | §4.5 screen 6 *Find* (TD-129; TD-135): every word typed must match, in any order, as a substring of the row's whole visible text (`data-find`, lowercased once by the server, on every row kind), a bare number also matching `#` before it; a match unfolds FYI or the snoozed list for the duration and folds it back when the box empties, unless the person had it open; the count reads *n of all*. A fourth group with one pick, AND'd with the rail's three (*guardians* + *jeff* is that team's rows carrying *jeff*, *jeffrey* included), and the rail's counts follow it. `/` focuses it, `Esc` leaves it (TD-124). Nothing written; the poll re-applies it. Replaces TD-069's one-substring match over sender, text and `about` |
 | Inbox message page | **Back**, the row's own controls under the entry, `j` / `k` | `/inbox/<id>` (§4.5 screen 6 *The message page*, TD-129; not built — TD-136): one mail entry whole, reached from the row's text, from `Enter` on the ringed row, and from a trail row's *re*. **Back** (and `Esc`) returns to the list at the same row, ringed, filters kept. Three parts in this order: the entry — its head as on its row (sender, team, kind, `about`, `pr` as a link, age, `answered` by whom and when once closed) and the text whole; the answer — the row's own controls again, the same RPCs and confirms, so an answer here is the answer, and the page returns to the list when it removes the row from its section; the thread, under its heading with its count — the question it answers, the replies it drew (the person's own among them), the outcome under the question it closes (§4.10 *Outcomes*), the pass-up and its recommendation, the `system` notes about it — oldest first, each in its kind's row shape and none a control built from text, gathered at the home by `root` across the person inbox and the records' mailboxes (the `thread` read, §4.7), as far as retention keeps it. `j` / `k` move to the next and previous entry of the list as it was filtered. A pruned entry reads *gone: pruned <t> ago* with **Back**; another host's, the refusal in words (§4.4a). A state row and a board row have no page: **Open** and **Open board** stay theirs. Reading marks nothing (§4.10). No preview pane, by design: the page at any width |
-| Settings page | **Usage**: a reserve field per profile per window, **Save** per profile card | §4.5 screen 8 (TD-100 (4); not built — TD-148). Each field takes what `ao gate` takes — `30`, `10/day`, empty to clear — and shows the line it makes today beside it before the press lands; **Save** calls `set_settings {profile, reserves}` for that card, the person's alone, and the card says *applies on the next tick*. A label the adapter has not reported is refused with the reported ones named, in place, as the CLI does. Cards are grouped under their account as the chip is (TD-122); a profile absent from the file shows empty fields, not zeros. A budget row per metered profile joins here when TD-128 lands (drawn disabled with *not designed — TD-128* until then) |
+| Settings page | **Usage**: a reserve field per profile per window, **Save** per profile card | §4.5 screen 8 (TD-100 (4); not built — TD-148). Each field takes what `ao gate` takes — `30`, `10/day`, empty to clear — and shows the line it makes today beside it before the press lands; **Save** calls `set_settings {profile, reserves}` for that card, the person's alone, and the card says *applies on the next tick*. A label the adapter has not reported is refused with the reported ones named, in place, as the CLI does. Cards are grouped under their account as the chip is (TD-122); a profile absent from the file shows empty fields, not zeros. A **metered** profile's card (§4.2a; TD-128, reconciled 2026-09-25; not built — TD-151 slice 4) carries the same fields for `day`, `week` and `month` — the home's labels — each taking an **amount** as `ao gate` does (`$5`, `20M tok`, empty to clear) and refusing a percent by naming the billing, with the account's spend beside it as the chip draws it, *spent $3.20 · 64% · resets 00:00*; its badge reads *metered · $3 in / $15 out per M · profiles.yml* with the definition's *i* mark, a priceless profile's *metered · tokens*. Cards on one metered account share the spend and keep their own amounts, as subscription cards share a reading and keep their own reserves |
 | Settings page | **Teams**: **schedule**, **until** (with **Clear**), **reserve priority**, **Save** per team card | one card per team the org defines (the client reads the definitions; the agent does not). **schedule** is TD-133's rule, drawn disabled with *not built — TD-133* until it lands; **until** takes the CLI's forms (`06:00`, `+8h`, ISO) in the reader's clock and hands the agent an instant, written to `teams.<team>.until` (§6 *Team stop time*) — the tick gives it to every live member and seat as `set_stop` does and to the ones a start creates, and **Clear** removes it; **reserve priority** is a flat percent added to the profile's reserve for the sessions carrying this team's badge (§6 *Usage gate*), `0` when absent. All three through `set_settings {teams: {<team>: {…}}}`; a team not in the org's definitions is refused, naming the defined ones |
 | Settings page | **Repos**: the promote's **auto** switch | one card per registered checkout (the host's repos registry): its `.agentorc.yml` values read-only with their *i* mark and **Open file**, and, for a repo whose file carries `promote:`, the one setting — **auto** (§6 *Promote*), written to `repos.<repo>.promote.auto` through `set_settings`; a repo with no `promote:` block shows no switch and says why |
 | Settings page | **You**: `open_in` (preset, template or none), terminal **size** and **face**; **Reset this browser** | *yours everywhere*, written to `person:` through `set_settings`: `open_in` as §5 defines it (`vscode`, `none`, or `{label, url}`, the same refusals, a bad template named in place and the default kept); the terminal's **size** (a number of pixels, bounded 10–20) and **face** (a typed or picked `font-family` name; `monospace` is always appended and ligatures stay off — goal 12), applied to every open terminal without a reload. *this browser*: the theme, *mine* and the folds as they stand, display with their own controls where they already have one, and **Reset this browser**, which clears every `ao.*` key of this browser's `localStorage` after a confirm and reloads — a new control, browser-local, writing nothing anywhere else |
@@ -1915,7 +1952,7 @@ noted). If a control is not in this table it does not exist.
 | Inbox row: `note` and the rest of FYI | **Dismiss** | the text in its shape (first paragraph, *details*; TD-127); Dismiss deletes. A manager's wind-down report is one such `note` — two lines, what the run merged and what each member did not find (§4.9a, TD-125) — and is drawn as any note, from its sender. Lapsed `steer`s, declined `ask`s and late replies are listed for the retention window (`MAIL_RETENTION`, 12 h) and then pruned, as every closed entry is. No Reply here — an FYI row has Dismiss and, once built, **Put on the board** (the row below), and a `system` note could not be replied to in any case (§4.10) |
 | Inbox row: FYI | **Put on the board** | designed (TD-069 step 4; not built — TD-140): the one door from mail to a board, drawn on FYI rows only — a `note`, a closed question, a trail row — and never on an open `ask` or `steer`, whose *later* is **Snooze** (a session waiting on a question is in the queue, not on a file it never reads). It opens a small form: the board (the sender's repo's `docs/user_attention.md`, or a pick from the host's registered repos when the sender has none — a `system` note), the text prefilled from the entry and editable (a board line is *what's needed* in the person's words), and **Due** — +1 day · +1 week · a date, as Snooze offers. Confirm writes one line in the board's own format — `- [ ] <today> (session <sender's name> on <host>, or n/a) — <text>. Context: <about>. Due: <date>.` — at the top of the open items through the board write-back's one **add** (§4.4: committed with a fixed message naming the entry's id, never pushed), then deletes the entry as Dismiss does; the new board item is a counted row from the moment it is due, as any is. The rule sessions follow — *anything with a date on it belongs on the board* — given to the person as one press |
 | Org top bar | **Inbox** | the org's person inbox (§4.10), labelled **Inbox** on the page — *person inbox* is the design's word for whose it is, and on a page only a person reads it says nothing. A link to the Inbox page (TD-069): its number is that page's **Needs you** section and says so on hover. The Focus **Inbox** panel and the card's **unread** chip are a session's mailbox, not the person's. Sessions reach it with `ao msg person`, ungated. Rings nothing; the count is polled from the `inbox` RPC, since the pushed stream carries session records and the person inbox belongs to none (TD-052) |
-| Org top bar | **usage** chip | display only: **one chip per account** a live session's profile names (§4.2a, TD-122), printing the tool's display name (the adapter's `label`, §4.3), the account and that account's worst window — `<tool> · <account> · <label> n%`, *Claude · paul · week 24%* — and, where a profile sharing the account has a reserve for that window (§6, TD-100), its line after the number, *Claude · paul · week 61% / 70%*, the lowest line among those profiles when they differ, with each profile's reserve and line, the days left and when the line next moves on hover; the hover also lists the profiles sharing the account and the live sessions on each. Never a profile's name in the chip: the person knows the account as *Claude, paul*, and *grind · week 21%* said nothing (TD-071 item 8). *Worst* is the window with the smallest gap to its line, a window without a line counting the tool's 100% as its line (an unreserved window at 97% outranks a reserved one at 40% of a 70% line). Label and number are the adapter's (§4.3; Claude Code's are `5h` and `week`, and a per-model weekly window is `week · <model>`, TD-001, TD-073, TD-122), every window and its reset time on hover, red at a cap. An account whose adapter reports no quota has no chip, nor has one no live session uses. Chips sit side by side while they fit; the rest collapse to **+n**, listed on hover, and an account at or near a cap is never the one collapsed — *near* meaning within ten points of its line where it has one, and 80% where it has none. No rotation: a display that rotates hides the number at the moment it is looked at. A held reading goes stale, not out (TD-087): when the last poll was refused (§4.2 — the adapter's `reason` is not `ok`), the chip keeps the last good reading, dimmed, with *· stale* after the number, and its hover says when it was taken and why the poll since failed (*rate-limited by the usage endpoint*, and how long it asked to be left; *no credentials for this profile*; *no such profile*; *the usage endpoint could not be read*); a refusal with no reading ever held draws *`<tool>` · `<account>`: no reading yet* the same way. A stale chip at a cap is still red; a mark, not a state, nothing pressable. The page keys on the `reason` word, never on text. A **metered** account (§4.2a, TD-128; not built — TD-151) reads *`<tool>` · `<account>` · day $3.20 / $5* — the window's spend over its amount, or *day 1.2M tok* with no amount — its worst window the one nearest its amount, and the hover lists each window's spend, the reserve and the turns' rate; *spend unknown* when the adapter cannot report it |
+| Org top bar | **usage** chip | display only: **one chip per account** a live session's profile names (§4.2a, TD-122), printing the tool's display name (the adapter's `label`, §4.3), the account and that account's worst window — `<tool> · <account> · <label> n%`, *Claude · paul · week 24%* — and, where a profile sharing the account has a reserve for that window (§6, TD-100), its line after the number, *Claude · paul · week 61% / 70%*, the lowest line among those profiles when they differ, with each profile's reserve and line, the days left and when the line next moves on hover; the hover also lists the profiles sharing the account and the live sessions on each. Never a profile's name in the chip: the person knows the account as *Claude, paul*, and *grind · week 21%* said nothing (TD-071 item 8). *Worst* is the window with the smallest gap to its line, a window without a line counting the tool's 100% as its line (an unreserved window at 97% outranks a reserved one at 40% of a 70% line). Label and number are the adapter's (§4.3; Claude Code's are `5h` and `week`, and a per-model weekly window is `week · <model>`, TD-001, TD-073, TD-122), every window and its reset time on hover, red at a cap. An account whose adapter reports no quota has no chip, nor has one no live session uses. Chips sit side by side while they fit; the rest collapse to **+n**, listed on hover, and an account at or near a cap is never the one collapsed — *near* meaning within ten points of its line where it has one, and 80% where it has none. No rotation: a display that rotates hides the number at the moment it is looked at. A held reading goes stale, not out (TD-087): when the last poll was refused (§4.2 — the adapter's `reason` is not `ok`), the chip keeps the last good reading, dimmed, with *· stale* after the number, and its hover says when it was taken and why the poll since failed (*rate-limited by the usage endpoint*, and how long it asked to be left; *no credentials for this profile*; *no such profile*; *the usage endpoint could not be read*); a refusal with no reading ever held draws *`<tool>` · `<account>`: no reading yet* the same way. A stale chip at a cap is still red; a mark, not a state, nothing pressable. The page keys on the `reason` word, never on text. A **metered** account (§4.2a, TD-128; reconciled 2026-09-25; not built — TD-151) reads *`<tool>` · `<account>` · day $3.20 / $5* — the account's spend over the window's amount, the smallest among the profiles sharing the account when they differ, as the line is the lowest — or *day 1.2M tok* with no amount; its worst window the one nearest its amount, red at it, amber from eight tenths; the hover lists each window's spend and tokens by kind, each profile's amount and the turns' rate; *spend unknown* when the adapter cannot report it. Never *stale*: the reading is a sum (§4.4), and a node's turns held back by a link down are added when it dials |
 | New session | **Controllers** picker | which sessions may act on this one once it starts (§4.8): a tick per live session holding `control` — nothing else could act on it anyway — none ticked, since an empty list is the explicit default and the note says so rather than warning. With no grant-holder on the host the field says that instead. Prefilled from the preset's `controllers:` when it has one, else the repo's (§5), by name or id, as the directory and role change; an untick after that stands (TD-036, TD-040) |
 | New session | **Where**: this directory / new worktree | for a git repo, the host agent creates `<repo>/.claude/worktrees/<name>` on branch `<name>` from origin's default branch (reused if it exists; the repo's `hydrate_worktree.sh` runs when present) and the session runs there |
 | New session | name field → holder | as you type, the form asks the host agent who holds that name in the chosen repo or directory (§4.1, `/api/name_check` → the `name_check` RPC): a live holder disables Start and shows **Switch to**; an exited or closed holder shows "replaces the closed `aotest` — run log kept" and Start proceeds; free names show nothing. The host agent composes the texts, so `ao new` prints the same ones — the rule is decided in one place (`_name_verdict`) whether it is being asked about or applied |
@@ -4504,6 +4541,7 @@ session is never woken by mail at all.
 ```yaml
 usage_gate:                                   # §6 *Usage gate* — per profile, per window label as the adapter names it
   grind: {"5h": 30, week: {per_day: 10}}      # line 70% on the session window; 100 − 10 × days left on the weekly
+  grind-api: {day: "$5", week: "$20"}        # a metered profile's reserve is an amount (§4.2a): the window's 100; "2M tok" without prices
 teams:                                        # per team, by the name org.yml or a repo's teams: defines
   ao-grind:
     schedule: {start: reset, profile: grind, window: week}   # §6 *Schedule* (TD-133)
@@ -4516,7 +4554,7 @@ person:                                       # the person's own — nothing her
   terminal: {size: 13, face: "JetBrains Mono"}   # goal 12: ligatures off regardless, monospace always the fallback
 ```
 
-  A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
+  A metered profile's reserve under `usage_gate:` is an amount per window (§6 *Usage gate*; TD-128) — `grind-api: {day: "$5", week: "$20"}` or `{day: "2M tok"}` — read against the account's spend (§4.2a), where a subscription profile's is a percent; the unit says which, and one that does not fit the profile's billing is refused, naming it. A profile absent under `usage_gate:` has no line on any window; a team absent under `teams:` has
   no schedule, no stop time and no priority; a repo absent under `repos:` promotes by hand.
   **Nodes** (§4.4a *Settings, replicated*): the home sends the whole file to every node whose link
   is up after each write, and to a node on its `hello`; the node writes its replica and its gate
@@ -4935,16 +4973,21 @@ teams:
   host's `settings.yml` (§5), read on every tick and changed by `ao gate` (§4.7) or, once §4.5 lists
   one, a settings page; the top bar's chip shows the line beside the number (§4.5a). A one-day
   change to a reserve is by hand — the reserve down, and back after the reset. Rejected for now:
-  TD-101, an override that expires on its own. **A metered profile** (§4.2a; TD-128, designed 2026-09-25,
+  TD-101, an override that expires on its own. **A metered profile** (§4.2a; TD-128, designed 2026-09-25 and reconciled the same day with Paul,
   not built — TD-151) has no quota to keep back, so its reserve is an **amount per window**, in
   money where the profile has prices (`{day: "$5", week: "$20"}`) or in tokens where it has none
-  (`{day: "2M tok"}`), and the line is the amount itself: the pause is the same pause, sent when
-  a window's spend reaches its amount, and lifted when the window rolls (`next` is the boundary;
+  (`{day: "2M tok"}`), read against the **account's** spend (§4.2a): the amount is the window's
+  **100**, `pct` is spend over amount, and the line is `100 − <team priority>` — the amount itself
+  for the profile's plain sessions, nine tenths of it for a team carrying a reserve priority of 10,
+  so a team's priority means one thing on both billings. The pause is the same pause, sent when the
+  account's spend reaches the line, and lifted when the window rolls (`next` is the boundary;
   nothing else moves a spent window back). At eight tenths of an amount the home files one
   `system` note to the person inbox — *grind-api · day $4.10 of $5* — an FYI, uncounted, once per
-  window. A metered profile with no reserve has no line and pauses nothing, as a subscription
-  window without one does; the chip still shows its spend, because a bill with no bound is the
-  thing to see. **Credential lapse** (Not built — phase 3): adapter
+  window; the fraction is fixed, not a setting. A metered profile with no reserve has no line and
+  pauses nothing, as a subscription window without one does; the chip still shows its spend,
+  because a bill with no bound is the thing to see. Two profiles on one key with different amounts
+  pause at different spends of the same bill, as two profiles on one login keep different lines
+  against one number. **Credential lapse** (Not built — phase 3): adapter
   `credentials_ok()` false → don't start; running workers get a send when fresh credentials land
   (tdgrind's `.nudged` marker). **Stall** (Not built — phase 3): `working` with no output past
   `stall_after` → flag `stalled?`, send one prompt, then wrap up. **Exit reap** (Not built — phase

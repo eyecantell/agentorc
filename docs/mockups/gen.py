@@ -1275,10 +1275,14 @@ def settings_page():
     usage = card("grind", "account paul · Claude", 
         '<div class="txt">' + field("5h reserve", "30", "→ line 70%") + field("week reserve", "10/day", "→ line 60% · 4 days left · moves Thu 07:00") + '</div>'
         '<div class="meta">applies on the next tick · the chip shows the line</div>',
-        b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">budget — <i>not designed, TD-128</i></span>')
+        b("Save", "primary"))
     usage2 = card("paul", "account paul · Claude",
         '<div class="txt">' + field("5h reserve", "", "no line") + field("week reserve", "", "no line") + '</div>',
         b("Save", "primary"))
+    usage3 = card("grind-api", "account api-key · Claude · metered · $3 in / $15 out per M",
+        '<div class="txt">' + field("day amount", "$5", "spent $3.20 · 64% · resets 00:00", 80) + field("week amount", "$20", "spent $11.80 · 59% · resets Mon 00:00", 80) + field("month amount", "", "no line · spent $31.40", 80) + '</div>'
+        '<div class="meta">applies on the next tick · the chip reads day $3.20 / $5 · the spend is the account’s, the amounts this profile’s</div>',
+        b("Save", "primary") + gap + '<span class="muted" style="font-size: 12px;">prices in profiles.yml · by hand — <a href="#" style="color: #1f5fa8;">Open file</a></span>')
     teams = card("ao-grind", "team",
         '<div class="txt">' + field("stop time", "06:00", "Fri 06:00 · every member and seat") + field("reserve priority", "10", "+10 on grind’s reserve → line 60% for this team", 60) + '</div>'
         '<div class="txt muted" style="opacity: .6;">' + field("schedule", "at the reset of grind’s week", "not built — TD-133", 220) + '</div>',
@@ -1308,8 +1312,8 @@ def settings_page():
 <div style="padding: 16px 20px 28px;">
 <div class="inboxcol">
   {page_head("Settings", "")}
-  {sec("Usage", 2, True, "The reserves the usage gate pauses a profile’s unattended sessions at: what you keep back of each window for your own work, per profile, per window as the tool names them. Grouped by account, since the reading is the account’s. A change applies on the next tick; the line beside each field is what the chip will show. Set from here, from ao gate, never by hand.")}
-  {usage}{usage2}
+  {sec("Usage", 3, True, "The reserves the usage gate pauses a profile’s unattended sessions at: what you keep back of each window for your own work, per profile, per window as the tool names them. Grouped by account, since the reading is the account’s. A metered profile takes an amount per window instead — money with prices, tokens without — against the account’s spend. A change applies on the next tick; the line beside each field is what the chip will show. Set from here, from ao gate, never by hand.")}
+  {usage}{usage2}{usage3}
   {sec("Teams", 1)}
   {teams}
   {sec("Repos", 1)}
@@ -1322,7 +1326,7 @@ def settings_page():
   {profiles}
   {sec("Org", 1)}
   {org}
-  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Screen 8, Settings</b> (TD-100 (4), 2026-09-25): the one page that writes a setting — a value a person turns without redefining anything — and shows every other configured value with where it lives. The line: a <i>definition</i> (what a team, a repo, a host or a profile is) stays in its file and is read-only here, each with an <i>i</i> mark naming the file, when it is re-read and whether a change needs the host agent restarted, and an <b>Open file</b> button through the editor setting; a <i>setting</i> lives in the home’s <span class="mono">settings.yml</span> and is written only through <span class="mono">set_settings</span>. Usage first, because the reserves are what Paul moves weekly; Teams hold the three per-team settings (schedule — disabled until TD-133 — stop time, reserve priority); Repos hold the promote’s <i>auto</i>, moved out of the checked-in file; You in two halves by write path. On a node every editable value reads <i>set at kmaster</i> and writes forward to the home. Nothing here draws a constant, the terminal’s colours, or a density switch.</div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>Screen 8, Settings</b> (TD-100 (4), 2026-09-25): the one page that writes a setting — a value a person turns without redefining anything — and shows every other configured value with where it lives. The line: a <i>definition</i> (what a team, a repo, a host or a profile is) stays in its file and is read-only here, each with an <i>i</i> mark naming the file, when it is re-read and whether a change needs the host agent restarted, and an <b>Open file</b> button through the editor setting; a <i>setting</i> lives in the home’s <span class="mono">settings.yml</span> and is written only through <span class="mono">set_settings</span>. Usage first, because the reserves are what Paul moves weekly, and a metered profile’s card (TD-128, reconciled 2026-09-25) takes amounts — the window’s 100 — against the account’s spend; Teams hold the three per-team settings (schedule — disabled until TD-133 — stop time, reserve priority); Repos hold the promote’s <i>auto</i>, moved out of the checked-in file; You in two halves by write path. On a node every editable value reads <i>set at kmaster</i> and writes forward to the home. Nothing here draws a constant, the terminal’s colours, or a density switch.</div>
 </div>
 </div>
 </div>
