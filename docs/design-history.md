@@ -92,7 +92,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-23 (TD-122, the build): `account_for(profile)` added to the contract as an optional method — the core cannot read a profile, so the adapter says which account the poll keys on; without it the poll keys on the profile, as before.
 - 2026-09-24 (TD-035, the designer): the 2026-09-12 decision with Paul — tool-specific wiring of a repo's start hooks belongs in the adapter, not in the repo — written into the contract as *A repo's start hooks are every adapter's to run*: through the tool's start hook, else the runner at launch with its stdout prepended to the first prompt; the anchor check's source for another tool decided with that adapter (TD-112). Nothing to build until a second adapter exists.
 - 2026-09-25 (TD-128, the designer): `spend(profile)` — per-turn tokens and cost from the tool's own records for a metered profile; the prices are the profile's, never the core's.
-- 2026-09-25 (TD-128 reconciled, with Paul): `spend(profile, since)` with four token kinds — cache reads folded into input would report a bill several times the real one — read from a byte cursor per transcript across the profile's config directory, sessions agentorc did not start included.
+- 2026-09-25 (TD-128 reconciled, with Paul): `spend(profile, cursors)` with four token kinds — cache reads folded into input would report a bill several times the real one — read from a byte cursor per transcript across the profile's config directory, sessions agentorc did not start included.
 
 ## 4.4 Host agent
 

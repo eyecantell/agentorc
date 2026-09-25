@@ -546,12 +546,13 @@ launched the session, and the tool's equivalent where one exists — decided whe
 lands (TD-112). `shell` runs no hooks: it is not an agent.
 
 **Spend per turn** (TD-128; designed 2026-09-25, reconciled the same day; not built — TD-151). For
-a `metered` profile (§4.2a) an adapter reports `spend(profile, since) -> [Turn(at, model, input,
-output, cache_read, cache_write, cost)]`, the turns after `since`, from the tool's own records —
-Claude Code: the `usage` on each `assistant` entry of every transcript under the profile's config
-directory changed since `since`, sessions agentorc did not start included (a plain `claude` in a
-shell on the same key spends the same money) and subagent turns included (they are billed), read
-from a byte cursor per transcript, never the whole file each tick and never a grep; an
+a `metered` profile (§4.2a) an adapter reports `spend(profile, cursors) -> (turns, cursors)` — `cursors` a byte offset
+per transcript path, `turns` a list of `Turn(at, source, offset, model, input, output,
+cache_read, cache_write, cost)`, `source` and `offset` naming the transcript and the entry's
+position in it — from the tool's own records: Claude Code: the `usage` on each `assistant` entry of
+every transcript under the profile's config directory past its cursor, sessions agentorc did not
+start included (a plain `claude` in a shell on the same key spends the same money) and subagent
+turns included (they are billed), never the whole file each tick and never a grep; an
 OpenAI-compatible endpoint: the response's `usage`. Four token kinds, because a coding agent's
 input is mostly cache reads priced at a tenth of input: an adapter that folded them into `input`
 would report a bill several times the real one. `cost` is filled by the adapter where the tool
@@ -603,24 +604,27 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   (`usage.json`) and so is the allowance: the first poll after a restart waits until the held
   reading's `fetched` plus the cadence, never sooner. The reason is not held.
   **A metered account's reading is a sum, not a poll** (§4.2a; TD-128, reconciled 2026-09-25;
-  not built — TD-151). On every tick each host asks the adapter `spend(profile, since)` (§4.3) for
+  not built — TD-151). On every tick each host asks the adapter `spend(profile, cursors)` (§4.3) for
   the metered profiles its live sessions run under and adds the turns to a **daily ledger per
   account**, `spend.json` beside `usage.json`: one row per account per day holding tokens by kind
-  and cost, `since` the last turn's `at`, kept thirteen months. The three windows are summed from
-  it on the tick, the ledger is what survives a restart as the held reading does, and a turn is
-  counted once, because the cursor moves only after the row is written. `since` starts at the
-  first tick that finds the profile metered, so a key that ran unmetered for months does not bill
-  its history to the first day; a row's `cost` is written once, at that tick's prices, and a later
+  and cost, and the **cursors** — a byte offset per transcript, per host — kept thirteen months.
+  The three windows are summed from it on the tick, the ledger is what survives a restart as the
+  held reading does, and a turn is counted once, because a cursor moves only after the row is
+  written and a turn at or before its transcript's cursor is dropped: the test is per transcript,
+  never a time, since two profiles on one account read from two directories whose turns do not
+  interleave by `at`. On the first tick that finds a profile metered the cursors start at each
+  transcript's end, so a key that ran unmetered for months does not bill its history to the first
+  day; a row's `cost` is written once, at that tick's prices, and a later
   change to `prices:` applies from then on and rewrites nothing — the ledger is a record of what
   was charged, as the bill is. The reading is served, streamed and held as a polled one is, and it
   is never `stale`: a sum has no failed poll; and the cap rule below is skipped for it by the
   profile's `billing`, read before the windows are, so `limited` is never marked from an amount. A
   **node's turns** (§4.4a): the node reads its own transcripts and sends them home as `spend
-  {account, turns}`, a link method with a reply. The ledger's cursor is **per account per host**:
-  the home drops a turn at or before the cursor it holds for that host, writes the rest, and
-  answers with the cursor; the node advances its own on the reply. A lost request is resent, a
-  lost reply is resent and dropped whole, so a link down loses nothing and a turn is never counted
-  twice. The home learns a node's accounts from the node's own `spend` calls, and sends the
+  {account, turns}`, a link method with a reply. The ledger's cursors for that host's transcripts live at
+  the home: it drops each turn at or before the cursor it holds for the turn's `source`, writes the
+  rest, and answers with the cursors; the node advances its own on the reply. A lost request is
+  resent, a lost reply is resent and dropped turn by turn, so a link down loses nothing and a turn
+  is never counted twice. The home learns a node's accounts from the node's own `spend` calls, and sends the
   account's reading to every node that has named it — `usage {account, reading}`, a notification
   on the road the settings take (§4.4a *Settings, replicated*) — on the node's `hello`, after its
   first `spend` for an account, and whenever a window's `pct` moves a whole point or a window
@@ -1282,7 +1286,7 @@ call by call.
   answer from the replica, and the page says *set at <home>* beside each value. A write may
   originate at the home with no node involved, so the send is a broadcast, never a reply to a
   caller. Refused, not queued, as the intent push is. The same road carries a metered account's
-  reading, `usage {account, reading}`, home → node — on `hello` as the settings go, and on a move —
+  reading, `usage {account, reading}`, home → node — on `hello` as the settings go, after the node's first `spend` for an account, and on a move —
   and the node's turns travel the other way as `spend {account, turns}`, a method with a reply that
   carries the cursor (§4.4 *Usage*; TD-151). **Derived reports from a node.** The tick's
   derived `progress` and `findings` are home-owned, so a node's tick sends what it derives to the
