@@ -1756,7 +1756,7 @@ Screens:
    row's entry open beside it — is not designed; at any width the entry opens as its page, and the
    pane, if it is ever wanted, is this page drawn beside the list.
 
-   **Narrow (TD-129; mockup `InboxPhone.dc.html`).** Below 720 px, where Focus already turns narrow
+   **Narrow (TD-129, built by TD-137; mockup `InboxPhone.dc.html`).** Below 720 px, where Focus already turns narrow
    (*Phone layout*, below): the rail is not drawn. Under the title a chip row: first **Filters ▾**,
    pinned, carrying the number of picks; after it, scrolling sideways, the teams from the rail's own
    *Teams* list — every team a row carries and *no team*, each with its *Needs you* count, the
@@ -1767,6 +1767,9 @@ Screens:
    have to carry them twice. The chips and the sheet are the rail's toggles drawn twice from one
    list, never two lists, and the URL is the desktop's for the same picks. The list keeps one
    column, its rows' controls 44 px high as the phone's Org cards are. The message page is the page.
+   The sheet holds the rail itself — the one set of toggles, moved into the `<dialog>` while it is
+   open and back beside the column when it closes — and the team chips are drawn from the rail's
+   counts on every press and poll.
 7. ~~**Attention**~~ — struck (TD-123): a board item that needs the person is a row on the
    Inbox (screen 6), with Snooze and Done on §4.4's write-back, and the whole board, undated
    items and the stale-sweep warning included, is dev-cadence's own `/attention` report. There

@@ -971,7 +971,7 @@
       save(true); inboxFilter();
     };
     document.addEventListener("click", (e) => {
-      const line = e.target.closest(".rail .railline");
+      const line = e.target.closest(".rail .railline, .railchips .railline");
       if (line) { e.preventDefault(); return toggle(line.dataset.group, line.dataset.value); }
       // the row's team badge is the same press as the rail's line for its team
       const b = e.target.closest(".mailrow .badge.team");
@@ -980,6 +980,17 @@
     $("#railclear").addEventListener("click", () => {
       rail = AO.railPicks(""); f.value = ""; save(true); inboxFilter();
     });
+    // §4.5 screen 6 *Narrow* (TD-137): **Filters ▾** opens the sheet, and the sheet holds the rail
+    // itself — moved in while it is open and back when it closes, so there is one set of toggles.
+    const sheet = $("#railsheet"), railEl = $("#rail"), home = railEl && railEl.parentElement;
+    if (sheet && railEl && home) {
+      $("#railsheetbtn").addEventListener("click", () => { $("#railsheetbody").appendChild(railEl); sheet.showModal(); });
+      $("#railsheetdone").addEventListener("click", () => sheet.close());
+      sheet.addEventListener("close", () => { home.insertBefore(railEl, home.firstChild); });
+      // widened past the breakpoint with the sheet open: the rail belongs beside the column again
+      const wide = window.matchMedia ? window.matchMedia("(min-width: 721px)") : null;
+      if (wide && wide.addEventListener) wide.addEventListener("change", (m) => { if (m.matches && sheet.open) sheet.close(); });
+    }
     // §4.10: **Dismiss all** — the entries this browser has **on screen**, by id, never
     // *everything FYI holds now*: mail that arrived after the page was drawn is what must not go
     // unseen. The confirm says the number it is about, and the ids come off the DOM for that
@@ -1249,6 +1260,23 @@
       b.classList.toggle("dim", c.filtered && !cnt.shown);
     });
     $("#railclear").classList.toggle("hidden", !c.filtered);
+    // the narrow chip row (TD-137): the number of picks on **Filters ▾**, then the team chips from
+    // the same counts, picked first so a pick never scrolls out of sight
+    const pn = rail.team.length + rail.sec.length + rail.kind.length + (words.length ? 1 : 0);
+    const pe = $("#picksn"); if (pe) pe.textContent = pn ? `${pn}` : "";
+    const ct = $("#chipteams");
+    if (ct) {
+      const order = [...c.team_order.filter((t) => rail.team.includes(t)), ...c.team_order.filter((t) => !rail.team.includes(t))];
+      const html = order.map((t) => {
+        const cnt = c.teams[t] || { shown: 0, all: 0 }, on = rail.team.includes(t);
+        return `<button type="button" class="btn sm chip railline${c.filtered && !cnt.shown ? " dim" : ""}" data-group="team" data-value="${esc(t)}" aria-pressed="${on}"><span class="raillabel">${esc(t === "none" ? "no team" : t)}</span> <span class="railn">${num(cnt, c.filtered)}</span></button>`;
+      }).join("");
+      if (ct.innerHTML !== html) {
+        const had = document.activeElement && ct.contains(document.activeElement) ? document.activeElement.dataset.value : null;
+        ct.innerHTML = html;
+        if (had !== null) { const back = $$(".railline", ct).find((b) => b.dataset.value === had); if (back) back.focus({ preventScroll: true }); }
+      }
+    }
     // a section not picked is not drawn; one picked and emptied draws its heading and its empty line
     RAIL_SECS.forEach((k) => {
       const sec = $("#sec-" + k); if (!sec) return;

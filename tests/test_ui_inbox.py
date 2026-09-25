@@ -2615,3 +2615,27 @@ def test_the_script_counts_the_rail_as_the_server_does():
         assert js == rail_counts(rows, picks), q
         assert rail_picks(dict(parse_qsl(query.lstrip("?")))) == picks, (q, query)  # round trip
     assert got["words"] == find_words("  Merge, #517 (jeff) ") == ["merge", "#517", "jeff"]
+
+
+@pytest.mark.unit
+def test_below_720_the_rail_is_a_chip_row_and_a_sheet_holding_the_same_toggles(monkeypatch, tmp_path):
+    """§4.5 screen 6 *Narrow* (TD-137): the page carries a chip row — **Filters ▾** first, the team
+    chips after it — and a native `<dialog>` the rail itself moves into, so the chips and the sheet
+    are the rail's toggles and never a second list; below 720 px the rail beside the column is not
+    drawn, and a row's controls are 44 px high."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates
+
+    html = templates.get_template("inbox.html").render(
+        sections=_rail_fixture(), host="kmaster", active="Inbox", agent_down=False, volatile=False, usage={}
+    )
+    chips, sheet = html.index('id="railchips"'), html.index('<dialog class="railsheet" id="railsheet"')
+    assert chips < sheet < html.index('id="rail"')  # the sheet is empty until the rail moves in
+    assert 'id="railsheetbtn" aria-haspopup="dialog"' in html and 'id="railsheetdone"' in html
+    assert html.count('data-group="team"') == 3  # the rail's own team lines, once: the chips are the script's
+    js = (UI / "static" / "app.js").read_text()
+    assert '$("#railsheetbody").appendChild(railEl)' in js and "home.insertBefore(railEl" in js
+    css = (UI / "static" / "app.css").read_text()
+    narrow = css[css.index("@media (max-width: 720px)") :]
+    assert ".inboxwrap > .rail { display: none; }" in narrow and ".railchips { display: flex;" in narrow
+    assert ".inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }" in narrow
