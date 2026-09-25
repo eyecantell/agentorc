@@ -9,18 +9,18 @@
 <helmet>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-  body { margin: 0; background: #f4f5f7; color: #1c2128; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 13px; line-height: 1.4; }
+  body { margin: 0; background: #f4f5f7; color: #1c2128; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
   a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-decoration: underline; }
   .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
-  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
   .pill .dot { display: none; }
   /* design §4.5a **state icon**, as app.css draws it: a page of cards is read by shape before it is
      read by word, and a glyph never looks like something to press */
-  .pill::before { font-size: 9px; line-height: 1; }
-  .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
-  .pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
-  .pill.s-closed::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; } .pill.s-oncall::before { content: "◇"; font-size: 11px; }
-  .pill.s-idle.unseen::before { content: "●"; font-size: 9px; letter-spacing: 0; }
+  .pill::before { font-size: 11px; line-height: 1; }
+  .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 12px; } .pill.s-stalled::before { content: "?"; font-size: 12px; }
+  .pill.s-working::before { content: "∿"; font-size: 14px; } .pill.s-idle::before { content: "›_"; font-size: 12px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 12px; }
+  .pill.s-closed::before { content: "✓"; font-size: 12px; } .pill.s-unreachable::before { content: "⌀"; font-size: 12px; } .pill.s-oncall::before { content: "◇"; font-size: 12px; }
+  .pill.s-idle.unseen::before { content: "●"; font-size: 11px; letter-spacing: 0; }
   .pill.plain::before { content: none; }  /* a due date or a report's status is not a session state */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
@@ -39,18 +39,18 @@
   .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
   .due + .due { border-top: 1px solid #eceef1; }
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
-  .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
+  .badge { display: inline-block; padding: 1px 5px; border: 1px solid #cbd0d6; border-radius: 3px; font-size: 12px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
   .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
   .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; vertical-align: 0; }
   .badge.toggle.on { color: #fff; background: #1c2128; border-color: #1c2128; }
   .badge.toggle.on::before { background: #fff; border-color: #fff; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; color: #1c2128; font-size: 14px; font-weight: 500; white-space: nowrap; }
   .btn.primary { background: #1c2128; color: #fff; border-color: #1c2128; }
   .btn.danger { color: #991b1b; border-color: #e5b4b4; }
   .btn.ghost { border-color: transparent; background: transparent; color: #4b5563; }
   .btn.ghost:hover { background: #eef0f3; }
-  .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 14px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #374151; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
   .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #374151; }
@@ -59,7 +59,7 @@
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
   svg { width: 14px; height: 14px; }
-  .flag { display: inline-flex; align-items: center; gap: 4px; color: #991b1b; font-size: 11px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+  .flag { display: inline-flex; align-items: center; gap: 4px; color: #991b1b; font-size: 12px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
   .card { background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
   .sc { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; position: relative; }
   .sc-body { display: flex; flex-direction: column; gap: 8px; }
@@ -74,14 +74,14 @@
   .ac .r > * { flex-shrink: 0; } .ac .r > .fill { flex: 0 1 auto; min-width: 0; } .ac .r .grow { flex: 1; }
   .ac .name { font-family: "JetBrains Mono", monospace; font-size: 15px; font-weight: 600; color: #111418; }
   .ac .meta b { color: #374151; font-weight: 500; }
-  .mode { font-size: 11.5px; color: #6b7280; white-space: nowrap; }
+  .mode { font-size: 12.5px; color: #6b7280; white-space: nowrap; }
   .mode.mine { color: #1c2128; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
-  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10.5px; border: 1px solid #d9a441; color: #7c3d00; }
+  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; border: 1px solid #d9a441; color: #7c3d00; }
   .aslot { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 2px 0 2px 10px; border-left: 2px solid #cbd0d6; font-size: 12px; color: #1c2128; overflow: hidden; }
   .aslot .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
-  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 11px; color: #6b7280; white-space: nowrap; }
+  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 12px; color: #6b7280; white-space: nowrap; }
   .aslot.need { border-color: #f59e0b; } .aslot.need .t { color: #7c3d00; } .aslot.bad { border-color: #dc2626; } .aslot.lim { border-color: #7c3aed; }
-  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #4b5563; }
+  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 12.5px; color: #4b5563; }
   /* the quiet foot (second pass, 2026-09-21): the next act outlined at the text's strength, the rest
      plain links at normal strength; dimmed means disabled and nothing else; the only filled button a
      card carries is Allow */
@@ -94,18 +94,18 @@
   /* the keyboard's ring (TD-124): the browser's focus ring on the card, blue and offset, apart from the amber needs-you one */
   .ac.kring { outline: 2px solid #1f5fa8; outline-offset: 2px; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #111418; }
-  .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { font-family: "JetBrains Mono", monospace; font-size: 14px; color: #6b7280; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
-  .btn.sm { height: 24px; font-size: 11px; padding: 0 8px; }
+  .btn.sm { height: 26px; font-size: 12px; padding: 0 8px; }
   .btn.sm svg { width: 12px; height: 12px; }
-  .term.tail { height: 100%; box-sizing: border-box; font-size: 11px; line-height: 1.55; padding: 6px 9px; color: #aab3bf; border-radius: 4px; }
+  .term.tail { height: 100%; box-sizing: border-box; font-size: 12px; line-height: 1.55; padding: 6px 9px; color: #aab3bf; border-radius: 4px; }
   .topbar { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 20px; background: #1c2128; color: #e6e9ee; }
   .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 15px; letter-spacing: -.01em; }
   .wordmark b { color: #9ec5ff; font-weight: 500; }
   .tab { padding: 6px 10px; border-radius: 4px; color: #aab3bf; font-weight: 500; }
   .tab.on { background: #2b323b; color: #fff; }
   table { border-collapse: collapse; width: 100%; }
-  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #dfe3e8; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #dfe3e8; }
   td { padding: 9px 10px; border-bottom: 1px solid #eceef1; vertical-align: middle; }
   tr.needs td { background: #fffbeb; }
   .grp { display: flex; align-items: center; gap: 10px; padding: 10px 10px 6px; font-weight: 600; font-size: 12px; color: #374151; }
@@ -116,8 +116,8 @@
   .term { background: #0f1419; color: #d5dbe3; font-family: "JetBrains Mono", monospace; font-size: 12px; line-height: 1.5; padding: 14px 16px; border-radius: 6px; white-space: pre; overflow: hidden; }
   .term .p { color: #9ec5ff; } .term .q { color: #fde68a; } .term .g { color: #86efac; } .term .d { color: #7d8794; }
   .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 11px; font-weight: 600; color: #4b5563; text-transform: uppercase; letter-spacing: .04em; }
-  .input { height: 32px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .field label { font-size: 12px; font-weight: 600; color: #4b5563; text-transform: uppercase; letter-spacing: .04em; }
+  .input { height: 32px; padding: 0 10px; border: 1px solid #cbd0d6; border-radius: 4px; background: #fff; display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
   .radio { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #dfe3e8; border-radius: 4px; background: #fff; }
   .radio.on { border-color: #1c2128; box-shadow: inset 0 0 0 1px #1c2128; }
   .rb { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #6b7280; box-sizing: border-box; }
@@ -125,15 +125,15 @@
   .note { font-size: 12px; color: #6b7280; }
   .rs { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #374151; }
   .rs > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rs-k { display: inline-block; width: 52px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; }
+  .rs-k { display: inline-block; width: 52px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #6b7280; font-weight: 600; }
   .switch { display: inline-flex; align-items: center; width: 34px; height: 20px; border-radius: 10px; background: #cbd0d6; padding: 2px; box-sizing: border-box; flex-shrink: 0; }
   .switch .knob { width: 16px; height: 16px; border-radius: 50%; background: #fff; }
   .switch.on { background: #1c2128; justify-content: flex-end; }
   /* Inbox (design round 2, 2026-09-20, TD-082): a centred column, sections as plain headings, a row as a card */
   .inboxcol { width: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-  .isec-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 2px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; position: relative; }
+  .isec-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 2px 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; position: relative; }
   .isec-h .n { font-family: "JetBrains Mono", monospace; letter-spacing: 0; color: #374151; }
-  .info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #cbd0d6; background: #fff; color: #4b5563; font-size: 10px; font-weight: 600; text-transform: none; font-style: italic; font-family: Georgia, serif; }
+  .info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #cbd0d6; background: #fff; color: #4b5563; font-size: 11px; font-weight: 600; text-transform: none; font-style: italic; font-family: Georgia, serif; }
   .info.on { background: #1c2128; color: #fff; border-color: #1c2128; }
   .pop { flex: 0 0 100%; box-sizing: border-box; padding: 8px 12px; border-left: 2px solid #1c2128; background: #fff; color: #374151; border-radius: 0 4px 4px 0; font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.5; }
   .mcard { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 12px 17px; background: #fff; border: 1px solid #dfe3e8; border-radius: 6px; }
@@ -141,21 +141,21 @@
   .mcard.focus { outline: 2px solid #1f5fa8; outline-offset: 1px; }
   .mcard .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .mcard .who .nm { font-family: "JetBrains Mono", monospace; font-weight: 600; color: #111418; }
-  .mcard .txt { font-size: 13px; line-height: 1.5; color: #1c2128; }
+  .mcard .txt { font-size: 14px; line-height: 1.5; color: #1c2128; }
   .mcard .ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .kind { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6b7280; }
+  .kind { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #6b7280; }
   .sugg { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; border: 1px dashed #cbd0d6; border-radius: 4px; }
-  .sugg .lbl { font-size: 11px; color: #6b7280; }
-  .quoted { padding: 6px 10px; border-left: 2px solid #cbd0d6; color: #4b5563; font-size: 12.5px; }
+  .sugg .lbl { font-size: 12px; color: #6b7280; }
+  .quoted { padding: 6px 10px; border-left: 2px solid #cbd0d6; color: #4b5563; font-size: 14px; }
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
 <div style="width: 1440px; min-height: 1000px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
-  <div style="display: flex; gap: 2px;"><span class="tab">Org</span><span class="tab">Inbox 4 · 2</span><span class="tab on">Inbox 6 · 2</span></div>
+  <div style="display: flex; gap: 2px;"><span class="tab">Org</span><span class="tab on">Inbox 6 · 2</span></div>
   <div style="flex-grow: 1;"></div>
-  <span class="mono" style="font-size: 11px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>
+  <span class="mono" style="font-size: 12px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 12px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>
   <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #4b5563;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Shell</span><span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
 </div>
 <div style="padding: 16px 20px 28px;">
@@ -165,24 +165,24 @@
     <span style="flex-grow: 1;"></span>
   </div></div>
 <div style="display: flex; gap: 24px; align-items: flex-start; max-width: 1324px; margin: 0 auto;">
-<div style="flex: 0 0 200px; position: sticky; top: 16px; display: flex; flex-direction: column; font-size: 13px;">
+<div style="flex: 0 0 200px; position: sticky; top: 16px; display: flex; flex-direction: column; font-size: 14px;">
   <span class="btn sm" style="width: 100%; justify-content: center; margin-bottom: 6px;">Clear filters</span>
-  <div class="input" style="height: 28px; color: #9ca3af; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 0 8px; white-space: nowrap;" title="every word typed must match, in any order — a fourth pick, AND’d with the rail’s">find…<span style="flex-grow: 1;"></span><span class="mono" style="font-size: 11px; color: #9ca3af;">/</span></div>
-  <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="the page's sections, in its order — needs you, on a clock, waiting on them, none">Urgency</div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; background: #e6e9ee; font-weight: 600; box-shadow: inset 3px 0 0 #1f5fa8; color: #1c2128;"><span style="flex-grow: 1;">Needs you</span><span class="mono" style="font-size: 11px; color: #111418;">2 of 6</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">Steering</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">Waiting on them</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">Answered for you</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">FYI</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 14</span></div>
-  <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="every team a row carries — the count is what that team needs from you">Teams</div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; background: #e6e9ee; font-weight: 600; box-shadow: inset 3px 0 0 #1f5fa8; color: #1c2128;"><span style="flex-grow: 1;">ao-grind</span><span class="mono" style="font-size: 11px; color: #111418;">2 of 3</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">cm-grind</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">guardians</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 0</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">no team</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 2</span></div>
-  <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="the coarse kind of a row">Kinds</div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #1c2128;"><span style="flex-grow: 1;">questions</span><span class="mono" style="font-size: 11px; color: #6b7280;">1 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">steering</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #1c2128;"><span style="flex-grow: 1;">session states</span><span class="mono" style="font-size: 11px; color: #6b7280;">1 of 3</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">board items</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 0</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">notes</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 3</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 13px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">trail</span><span class="mono" style="font-size: 11px; color: #9ca3af;">0 of 6</span></div>
+  <div class="input" style="height: 28px; color: #9ca3af; font-size: 12px; display: flex; align-items: center; gap: 6px; padding: 0 8px; white-space: nowrap;" title="every word typed must match, in any order — a fourth pick, AND’d with the rail’s">find…<span style="flex-grow: 1;"></span><span class="mono" style="font-size: 12px; color: #9ca3af;">/</span></div>
+  <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="the page's sections, in its order — needs you, on a clock, waiting on them, none">Urgency</div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; background: #e6e9ee; font-weight: 600; box-shadow: inset 3px 0 0 #1f5fa8; color: #1c2128;"><span style="flex-grow: 1;">Needs you</span><span class="mono" style="font-size: 12px; color: #111418;">2 of 6</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">Steering</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">Waiting on them</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">Answered for you</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">FYI</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 14</span></div>
+  <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="every team a row carries — the count is what that team needs from you">Teams</div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; background: #e6e9ee; font-weight: 600; box-shadow: inset 3px 0 0 #1f5fa8; color: #1c2128;"><span style="flex-grow: 1;">ao-grind</span><span class="mono" style="font-size: 12px; color: #111418;">2 of 3</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">cm-grind</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">guardians</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 0</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">no team</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 2</span></div>
+  <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #6b7280; padding: 12px 8px 4px;" title="the coarse kind of a row">Kinds</div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #1c2128;"><span style="flex-grow: 1;">questions</span><span class="mono" style="font-size: 12px; color: #6b7280;">1 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">steering</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 1</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #1c2128;"><span style="flex-grow: 1;">session states</span><span class="mono" style="font-size: 12px; color: #6b7280;">1 of 3</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">board items</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 0</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">notes</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 3</span></div><div style="display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 5px; font-size: 14px; cursor: default; color: #9ca3af;"><span style="flex-grow: 1;">trail</span><span class="mono" style="font-size: 12px; color: #9ca3af;">0 of 6</span></div>
 </div>
 <div class="inboxcol" style="margin: 0; flex: 1 1 auto; min-width: 0;">
-  <div class="isec-h"><span>Needs you</span><span class="n">2 of 5</span><span class="info">i</span><span style="flex-grow: 1;"></span></div><div class="mcard hover"><span class="sbar" style="background: #f59e0b;"></span>
+  <div class="isec-h"><span>Needs you</span><span class="n">2 of 6</span><span class="info">i</span><span style="flex-grow: 1;"></span></div><div class="mcard hover"><span class="sbar" style="background: #f59e0b;"></span>
   <div class="who"><span class="pill s-needs"><span class="dot"></span>permission</span><span class="nm">tdgrind-ao-2</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">asked 40s ago · 4m 20s left</span></div>
   <div class="txt">Permission · <span class="mono">Bash</span> · <span class="mono">git push origin td073-usage-chips</span></div><div class="meta">doing 3m ago: TD-073: usage chips side by side — pushing for review</div>
   <div class="ctl"><span class="btn sm primary">Allow</span><span class="btn sm ">Deny</span><span style="flex-grow: 1;"></span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
 </div><div class="mcard focus"><span class="sbar" style="background: #f59e0b;"></span>
   <div class="who"><span class="kind">ask</span><span class="nm">tdgrind-ao-1</span><span class="badge">ao-grind</span><span style="flex-grow: 1;"></span><span class="meta">18m ago · about TD-079</span></div>
-  <div class="txt">TD-079: a permission answered from Focus and again from the Inbox within five seconds — <b>two trail rows, or one?</b> I will go with two unless you say otherwise; the fixture changes either way.</div><div style="margin-top: 2px;"><span class="muted" style="font-size: 12px; cursor: default;"><span style="font-size: 9px;">▸</span> details</span></div><div class="sugg"><span class="lbl">suggested by tdgrind-ao-1</span><span class="btn sm ">“Two rows — the how is the point”</span><span class="btn sm ">“One row, the later how wins”</span></div>
+  <div class="txt">TD-079: a permission answered from Focus and again from the Inbox within five seconds — <b>two trail rows, or one?</b> I will go with two unless you say otherwise; the fixture changes either way.</div><div style="margin-top: 2px;"><span class="muted" style="font-size: 12px; cursor: default;"><span style="font-size: 10px;">▸</span> details</span></div><div class="sugg"><span class="lbl">suggested by tdgrind-ao-1</span><span class="btn sm ">“Two rows — the how is the point”</span><span class="btn sm ">“One row, the later how wins”</span></div>
   <div class="ctl"><span class="btn sm primary">Reply</span><span class="btn sm ">Snooze ▾</span><span style="flex-grow: 1;"></span><span class="btn sm ghost danger">Delete</span><span class="btn sm ghost"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10"></path><path d="M8.5 10.5H11"></path></svg>Open</span></div>
 </div><div class="muted" style="padding: 8px 2px 0; font-size: 12px;">Steering, Waiting on them, Answered for you and FYI are not picked — press them in the rail, or <b>Clear filters</b>.</div>
-  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 5</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class="mono">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class="mono">/inbox</span>. Not designed: a preview pane (TD-129 option b) — at any width a row's text opens its page (<i>Inbox — message</i>).</div>
+  <div class="note" style="padding-top: 10px; border-top: 1px solid #dfe3e8; margin-top: 8px;">Design notes, not page text. <b>The rail with picks</b> (TD-129): <i>ao-grind</i> and <i>Needs you</i> pressed — Paul's workflow, one team's <i>Needs you</i> worked through, then the next team's. <b>Every count is a count of rows on the page now</b>: a picked line reads its share, an unpicked line in a group with a pick reads <i>0 of all</i>, dimmed (it contributes nothing until pressed, and <i>all</i> says what it would bring), an unpicked line in a group without a pick reads its share under the other groups' picks. The title row is <i>Inbox</i> alone: the picks are on the left, so a <i>showing …</i> line and a needs-you pill beside it were noise. <i>Needs you</i> reads <i>2 of 6</i> because the top bar's number is never filtered. A section not picked is not drawn; one picked and emptied by the other groups would draw its heading and its empty line — a filter shows or hides rows and never re-orders the queue. Every count reads <i>n of all</i> while anything is picked or typed and a plain number otherwise. <b>Clear filters</b> appears at the rail's head while anything is picked or typed and clears the lot. The URL is <span class="mono">/inbox?team=ao-grind&amp;sec=needs</span>: a filtered Inbox is a link, remembered per browser for a bare <span class="mono">/inbox</span>. Not designed: a preview pane (TD-129 option b) — at any width a row's text opens its page (<i>Inbox — message</i>).</div>
 </div>
 </div>
 </div>

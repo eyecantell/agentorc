@@ -1685,6 +1685,32 @@ with a soft-key row (`↑ ↓ ← → Enter Esc Tab 1–9`) so menus and questio
 *through the terminal*, the composer under it, side panel collapsed. The git panel and the
 New-session form stay desktop-width.
 
+**Type scale (TD-130, 2026-09-25; mockups `Type.dc.html`, `TypeDark.dc.html`, and every artboard
+regenerated at the scale).** The pages set their sizes as **six tokens on `:root`**, theme-
+independent, and no rule outside the token block names a pixel size: **`--t-body` 14 px** —
+everything a person reads: body text, a mail body, a board line, a question, a note's text, an
+input, a dialog; line height **`--lh` 1.5**; **`--t-small` 12 px** — small print: an age, a due
+word, a section's count, a button's label (`.btn` 13 px sits between, as `--t-btn`), a field's
+caption, the keys table, a toast; nothing set in lower case is ever smaller; **`--t-cap` 11 px** —
+uppercase tracked marks only: the state pill, a badge, a kind label, a section heading, a field
+label — capitals at 11 px read as lower case does at 12.5; **`--t-title` 16 px** — a card's name, a
+page's title, a group head; **`--t-mono` 13 px** — the terminal and mono reading text, since
+JetBrains Mono at 13 px sits at Plex Sans's x-height at 14; **`--t-mono-s` 12.5 px** — the mono
+small print: `.meta` (the doing line, times), `.status`, a reference, the tail; line height **`--lh-
+mono` 1.55**. What it replaces: a 13 px body with the text a person actually reads set *below* it
+(mail bodies 12 and 12.5, notes 12, small print 11, pills and badges 10, the tail 11), some fifty
+literals in `app.css` and as many in `docs/mockups/gen.py`. Heights follow the scale rather than
+fixing it: the card's rows (§4.5 *The card's anatomy*: 20 and 24 px, the slot 66, the foot 24) and
+the controls (`.btn` 28, `.btn.sm` 24, `.input` 32) become `em` or tokens beside the type tokens
+(`--row`, `--row1`, `--slot`; a button 30, a small one 26, an input 34), so a card stays six rows of
+one height and grows with its text; the six-row anatomy, the one-order sort and the column widths of
+screen 6 are unchanged. Checked in both themes on the regenerated artboards at 1440 and 390 px. **No
+density setting**: a *compact / comfortable* switch was weighed and turned down — a second scale
+doubles what every mockup and every later rule must be checked against, and the browser's zoom,
+remembered per site, is already a density setting that every page here survives (a card's rows are
+em-based after this round). Paul reads the result on the live page; if the base is too large there,
+the one number to change is `--t-body`, and the rest follows.
+
 Browser mechanics:
 
 - **Live state** comes over one `/events` websocket per browser tab, pushing per-session

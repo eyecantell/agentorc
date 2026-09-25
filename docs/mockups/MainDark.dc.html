@@ -9,18 +9,18 @@
 <helmet>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
-  body { margin: 0; background: #0e1116; color: #d7dce3; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 13px; line-height: 1.4; }
+  body { margin: 0; background: #0e1116; color: #d7dce3; font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; font-size: 14px; line-height: 1.5; }
   a { color: #1f5fa8; text-decoration: none; } a:hover { color: #164a85; text-decoration: underline; }
   .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace; }
-  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
+  .pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 3px; font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; line-height: 1; }
   .pill .dot { display: none; }
   /* design §4.5a **state icon**, as app.css draws it: a page of cards is read by shape before it is
      read by word, and a glyph never looks like something to press */
-  .pill::before { font-size: 9px; line-height: 1; }
-  .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 11px; } .pill.s-stalled::before { content: "?"; font-size: 11px; }
-  .pill.s-working::before { content: "∿"; font-size: 12px; } .pill.s-idle::before { content: "›_"; font-size: 10px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 11px; }
-  .pill.s-closed::before { content: "✓"; font-size: 11px; } .pill.s-unreachable::before { content: "⌀"; font-size: 11px; } .pill.s-oncall::before { content: "◇"; font-size: 11px; }
-  .pill.s-idle.unseen::before { content: "●"; font-size: 9px; letter-spacing: 0; }
+  .pill::before { font-size: 11px; line-height: 1; }
+  .pill.s-needs::before { content: "▲"; } .pill.s-limited::before { content: "◔"; font-size: 12px; } .pill.s-stalled::before { content: "?"; font-size: 12px; }
+  .pill.s-working::before { content: "∿"; font-size: 14px; } .pill.s-idle::before { content: "›_"; font-size: 12px; letter-spacing: -1px; } .pill.s-exited::before { content: "◌"; font-size: 12px; }
+  .pill.s-closed::before { content: "✓"; font-size: 12px; } .pill.s-unreachable::before { content: "⌀"; font-size: 12px; } .pill.s-oncall::before { content: "◇"; font-size: 12px; }
+  .pill.s-idle.unseen::before { content: "●"; font-size: 11px; letter-spacing: 0; }
   .pill.plain::before { content: none; }  /* a due date or a report's status is not a session state */
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   /* the state tokens (design §4.5 *The card's anatomy*, TD-095): working green — alive; idle blue —
@@ -39,18 +39,18 @@
   .due { display: flex; align-items: center; gap: 10px; padding: 6px 10px; }
   .due + .due { border-top: 1px solid #242a33; }
   .pill.scraped { outline: 1px dashed #d9a441; outline-offset: 1px; }
-  .badge { display: inline-block; padding: 1px 5px; border: 1px solid #3a424d; border-radius: 3px; font-size: 10px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
+  .badge { display: inline-block; padding: 1px 5px; border: 1px solid #3a424d; border-radius: 3px; font-size: 12px; color: #5b6470; font-family: "JetBrains Mono", monospace; }
   .badge.scraped { border-style: dashed; color: #8a5a00; border-color: #d9a441; }
   .badge.toggle { cursor: pointer; padding-left: 4px; white-space: nowrap; }
   .badge.toggle::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; margin-right: 4px; vertical-align: 0; }
   .badge.toggle.on { color: #fff; background: #e6e9ee; border-color: #e6e9ee; }
   .badge.toggle.on::before { background: #171b22; border-color: #fff; }
-  .btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid #3a424d; border-radius: 4px; background: #171b22; color: #e6e9ee; font-size: 12px; font-weight: 500; white-space: nowrap; }
+  .btn { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border: 1px solid #3a424d; border-radius: 4px; background: #171b22; color: #e6e9ee; font-size: 14px; font-weight: 500; white-space: nowrap; }
   .btn.primary { background: #e6e9ee; color: #0e1116; border-color: #e6e9ee; }
   .btn.danger { color: #fca5a5; border-color: #e5b4b4; }
   .btn.ghost { border-color: transparent; background: transparent; color: #9aa3b0; }
   .btn.ghost:hover { background: #eef0f3; }
-  .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #3a424d; font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #9aa3b0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #3a424d; font-family: "JetBrains Mono", monospace; font-size: 14px; color: #9aa3b0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #c3c9d2; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
   .status.doing { white-space: normal; overflow-wrap: anywhere; } .meta.doing { color: #c3c9d2; }
@@ -59,7 +59,7 @@
   .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
   .flag svg { width: 13px; height: 13px; flex-shrink: 0; }
   svg { width: 14px; height: 14px; }
-  .flag { display: inline-flex; align-items: center; gap: 4px; color: #fca5a5; font-size: 11px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+  .flag { display: inline-flex; align-items: center; gap: 4px; color: #fca5a5; font-size: 12px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
   .card { background: #171b22; border: 1px solid #2a313b; border-radius: 6px; }
   .sc { display: flex; flex-direction: column; gap: 16px; padding: 16px; overflow: hidden; position: relative; }
   .sc-body { display: flex; flex-direction: column; gap: 8px; }
@@ -74,14 +74,14 @@
   .ac .r > * { flex-shrink: 0; } .ac .r > .fill { flex: 0 1 auto; min-width: 0; } .ac .r .grow { flex: 1; }
   .ac .name { font-family: "JetBrains Mono", monospace; font-size: 15px; font-weight: 600; color: #f1f3f6; }
   .ac .meta b { color: #c3c9d2; font-weight: 500; }
-  .mode { font-size: 11.5px; color: #7d8794; white-space: nowrap; }
+  .mode { font-size: 12.5px; color: #7d8794; white-space: nowrap; }
   .mode.mine { color: #e6e9ee; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
-  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 10.5px; border: 1px solid #d9a441; color: #fcd34d; }
+  .mark { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 11.5px; border: 1px solid #d9a441; color: #fcd34d; }
   .aslot { display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 2px 0 2px 10px; border-left: 2px solid #3a424d; font-size: 12px; color: #e6e9ee; overflow: hidden; }
   .aslot .t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
-  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 11px; color: #7d8794; white-space: nowrap; }
+  .aslot .cap { font-family: "JetBrains Mono", monospace; font-size: 12px; color: #7d8794; white-space: nowrap; }
   .aslot.need { border-color: #f59e0b; } .aslot.need .t { color: #fcd34d; } .aslot.bad { border-color: #dc2626; } .aslot.lim { border-color: #7c3aed; }
-  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #9aa3b0; }
+  .aslot.mono .t { font-family: "JetBrains Mono", monospace; font-size: 12.5px; color: #9aa3b0; }
   /* the quiet foot (second pass, 2026-09-21): the next act outlined at the text's strength, the rest
      plain links at normal strength; dimmed means disabled and nothing else; the only filled button a
      card carries is Allow */
@@ -94,18 +94,18 @@
   /* the keyboard's ring (TD-124): the browser's focus ring on the card, blue and offset, apart from the amber needs-you one */
   .ac.kring { outline: 2px solid #1f5fa8; outline-offset: 2px; }
   .sc .name { font-family: "JetBrains Mono", monospace; font-size: 16px; font-weight: 600; color: #f1f3f6; }
-  .meta { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: #7d8794; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .meta { font-family: "JetBrains Mono", monospace; font-size: 14px; color: #7d8794; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .sbar { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
-  .btn.sm { height: 24px; font-size: 11px; padding: 0 8px; }
+  .btn.sm { height: 26px; font-size: 12px; padding: 0 8px; }
   .btn.sm svg { width: 12px; height: 12px; }
-  .term.tail { height: 100%; box-sizing: border-box; font-size: 11px; line-height: 1.55; padding: 6px 9px; color: #aab3bf; border-radius: 4px; }
+  .term.tail { height: 100%; box-sizing: border-box; font-size: 12px; line-height: 1.55; padding: 6px 9px; color: #aab3bf; border-radius: 4px; }
   .topbar { display: flex; align-items: center; gap: 16px; height: 48px; padding: 0 20px; background: #05070a; color: #e6e9ee; }
   .wordmark { font-family: "JetBrains Mono", monospace; font-weight: 500; font-size: 15px; letter-spacing: -.01em; }
   .wordmark b { color: #9ec5ff; font-weight: 500; }
   .tab { padding: 6px 10px; border-radius: 4px; color: #aab3bf; font-weight: 500; }
   .tab.on { background: #2b323b; color: #fff; }
   table { border-collapse: collapse; width: 100%; }
-  th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #7d8794; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #2a313b; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #7d8794; font-weight: 600; padding: 8px 10px; border-bottom: 1px solid #2a313b; }
   td { padding: 9px 10px; border-bottom: 1px solid #242a33; vertical-align: middle; }
   tr.needs td { background: #2a2410; }
   .grp { display: flex; align-items: center; gap: 10px; padding: 10px 10px 6px; font-weight: 600; font-size: 12px; color: #c3c9d2; }
@@ -116,8 +116,8 @@
   .term { background: #05070a; color: #d5dbe3; font-family: "JetBrains Mono", monospace; font-size: 12px; line-height: 1.5; padding: 14px 16px; border-radius: 6px; white-space: pre; overflow: hidden; }
   .term .p { color: #9ec5ff; } .term .q { color: #6b4d00; } .term .g { color: #86efac; } .term .d { color: #7d8794; }
   .field { display: flex; flex-direction: column; gap: 5px; }
-  .field label { font-size: 11px; font-weight: 600; color: #9aa3b0; text-transform: uppercase; letter-spacing: .04em; }
-  .input { height: 32px; padding: 0 10px; border: 1px solid #3a424d; border-radius: 4px; background: #171b22; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+  .field label { font-size: 12px; font-weight: 600; color: #9aa3b0; text-transform: uppercase; letter-spacing: .04em; }
+  .input { height: 32px; padding: 0 10px; border: 1px solid #3a424d; border-radius: 4px; background: #171b22; display: flex; align-items: center; justify-content: space-between; font-size: 14px; }
   .radio { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #2a313b; border-radius: 4px; background: #171b22; }
   .radio.on { border-color: #e6e9ee; box-shadow: inset 0 0 0 1px #e6e9ee; }
   .rb { width: 14px; height: 14px; border-radius: 50%; border: 1.5px solid #7d8794; box-sizing: border-box; }
@@ -125,15 +125,15 @@
   .note { font-size: 12px; color: #7d8794; }
   .rs { display: flex; flex-direction: column; gap: 2px; font-size: 12px; color: #c3c9d2; }
   .rs > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .rs-k { display: inline-block; width: 52px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #7d8794; font-weight: 600; }
+  .rs-k { display: inline-block; width: 52px; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: #7d8794; font-weight: 600; }
   .switch { display: inline-flex; align-items: center; width: 34px; height: 20px; border-radius: 10px; background: #3a424d; padding: 2px; box-sizing: border-box; flex-shrink: 0; }
   .switch .knob { width: 16px; height: 16px; border-radius: 50%; background: #171b22; }
   .switch.on { background: #e6e9ee; justify-content: flex-end; }
   /* Inbox (design round 2, 2026-09-20, TD-082): a centred column, sections as plain headings, a row as a card */
   .inboxcol { width: 100%; max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 10px; }
-  .isec-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 2px 0; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #7d8794; position: relative; }
+  .isec-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 14px 2px 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #7d8794; position: relative; }
   .isec-h .n { font-family: "JetBrains Mono", monospace; letter-spacing: 0; color: #c3c9d2; }
-  .info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #3a424d; background: #171b22; color: #9aa3b0; font-size: 10px; font-weight: 600; text-transform: none; font-style: italic; font-family: Georgia, serif; }
+  .info { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid #3a424d; background: #171b22; color: #9aa3b0; font-size: 11px; font-weight: 600; text-transform: none; font-style: italic; font-family: Georgia, serif; }
   .info.on { background: #e6e9ee; color: #fff; border-color: #e6e9ee; }
   .pop { flex: 0 0 100%; box-sizing: border-box; padding: 8px 12px; border-left: 2px solid #e6e9ee; background: #171b22; color: #c3c9d2; border-radius: 0 4px 4px 0; font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; line-height: 1.5; }
   .mcard { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 8px; padding: 12px 14px 12px 17px; background: #171b22; border: 1px solid #2a313b; border-radius: 6px; }
@@ -141,12 +141,12 @@
   .mcard.focus { outline: 2px solid #1f5fa8; outline-offset: 1px; }
   .mcard .who { display: flex; align-items: center; gap: 8px; min-width: 0; }
   .mcard .who .nm { font-family: "JetBrains Mono", monospace; font-weight: 600; color: #f1f3f6; }
-  .mcard .txt { font-size: 13px; line-height: 1.5; color: #e6e9ee; }
+  .mcard .txt { font-size: 14px; line-height: 1.5; color: #e6e9ee; }
   .mcard .ctl { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-  .kind { font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #7d8794; }
+  .kind { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: #7d8794; }
   .sugg { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; border: 1px dashed #3a424d; border-radius: 4px; }
-  .sugg .lbl { font-size: 11px; color: #7d8794; }
-  .quoted { padding: 6px 10px; border-left: 2px solid #3a424d; color: #9aa3b0; font-size: 12.5px; }
+  .sugg .lbl { font-size: 12px; color: #7d8794; }
+  .quoted { padding: 6px 10px; border-left: 2px solid #3a424d; color: #9aa3b0; font-size: 14px; }
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
@@ -155,7 +155,7 @@
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Org</span><span class="tab">Inbox 4 · 2</span></div>
   <div style="flex-grow: 1;"></div>
-  <span class="mono" style="font-size: 11px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 11px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>
+  <span class="mono" style="font-size: 12px; color: #aab3bf;">grind · week 58% · paul · 5h 41%</span><span class="mono" style="font-size: 12px; color: #aab3bf;">hosts: kmaster ● vps ● host1 ● vpnmaster ● laptop ◐</span>
   <span class="btn" style="height: 26px; background: transparent; color: #e6e9ee; border-color: #9aa3b0;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Shell</span><span class="btn primary" style="height: 26px;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M8 3v10M3 8h10"></path></svg>New session</span>
 </div>
 <div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
@@ -168,7 +168,7 @@
   </div>
   <div class="card" style="display: flex; flex-direction: column;">
     <div class="due" style="padding: 8px 10px; border-bottom: 1px solid #2a313b;"><span style="font-weight: 600;">Due</span><span class="muted">4 overdue · 2 today · from the dev-cadence boards</span><span style="flex-grow: 1;"></span><a href="#" style="font-size: 12px;">full board →</a><span class="btn sm ghost" style="padding: 0 4px;">▾</span></div>
-    <div class="due"><span class="pill plain s-stalled" style="width: 78px; justify-content: center;">14d overdue</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Get the TD-259 keep-half snapshot off this array — it is the only copy.</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">tdgrind-1</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-stalled" style="width: 78px; justify-content: center;">7d overdue</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Decide TD-196 per tool: delete or port.</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">tdgrind-2</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-stalled" style="width: 78px; justify-content: center;">2d overdue</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Decide whether to turn the signup → CM board writer ON.</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">2fb13646</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-stalled" style="width: 78px; justify-content: center;">2d overdue</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Add --fetch to the SessionStart hook line in the consumer settings.json files.</span><span class="meta" style="flex-shrink: 0;">dev-cadence · session <a href="#">3168de4c</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-needs" style="width: 78px; justify-content: center;">due today</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Deploy TD-296, then un-flag and republish the two DARPA notices.</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">tdgrind-2</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-needs" style="width: 78px; justify-content: center;">due today</span><span style="font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Deploy TD-036 step 2 (merged after the 05:00 UTC rollout, so not live).</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">tdgrind-1</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
+    <div class="due"><span class="pill plain s-stalled" style="width: 78px; justify-content: center;">14d overdue</span><span style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Get the TD-259 keep-half snapshot off this array — it is the only copy.</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">tdgrind-1</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-stalled" style="width: 78px; justify-content: center;">7d overdue</span><span style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Decide TD-196 per tool: delete or port.</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">tdgrind-2</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-stalled" style="width: 78px; justify-content: center;">2d overdue</span><span style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Decide whether to turn the signup → CM board writer ON.</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">2fb13646</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-stalled" style="width: 78px; justify-content: center;">2d overdue</span><span style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Add --fetch to the SessionStart hook line in the consumer settings.json files.</span><span class="meta" style="flex-shrink: 0;">dev-cadence · session <a href="#">3168de4c</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-needs" style="width: 78px; justify-content: center;">due today</span><span style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Deploy TD-296, then un-flag and republish the two DARPA notices.</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">tdgrind-2</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div><div class="due"><span class="pill plain s-needs" style="width: 78px; justify-content: center;">due today</span><span style="font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Deploy TD-036 step 2 (merged after the 05:00 UTC rollout, so not live).</span><span class="meta" style="flex-shrink: 0;">samscrape · session <a href="#">tdgrind-1</a></span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Snooze ▾</span><span class="btn sm ghost">Done</span></div>
   </div>
   <div class="warn" style="background: #1f242c; border-color: #3a424d; color: #c3c9d2; align-items: center;"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2.5l6 11H2z"></path><path d="M8 7v3M8 12v.5"></path></svg><span><b>laptop</b> unreachable since 14:02 (volatile host, probably asleep) · 1 session · last states kept</span><span style="flex-grow: 1;"></span><span class="btn sm ghost">Retry</span></div>
   <div style="display: flex; flex-direction: column; gap: 22px;"><div style="display: flex; flex-direction: column; gap: 12px; border: 1px solid #3a424d; border-radius: 8px; padding: 12px 14px 14px; background: #242a33;"><div style="display: flex; align-items: center; gap: 10px;"><span style="font-weight: 600; font-size: 15px;">samscrape-grind</span><span class="meta">kmaster / samscrape · 1 limited · 1 stalled? · 1 working · 2 idle · 1 on call</span><span style="flex-grow: 1;"></span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span></div><div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"><div class="card ac">

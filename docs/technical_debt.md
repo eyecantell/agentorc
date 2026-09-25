@@ -76,7 +76,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-127 | Inbox entries to the person are written for another agent: dense, dry, the decision buried under the reading; the row draws the whole text as one block | Medium | Designed 2026-09-24 (a cloud session with Paul) — the build is TD-138, TD-139 |
 | TD-128 | A profile billed per token (an API key, a hosted open model) has no usage window, so the usage gate and the chip have nothing to read and nothing bounds its spend | Low | Open — design first |
 | TD-129 | The Inbox has no page for one message, and its filters are one typed box: a row is read where it is listed, and team and kind are not visible controls | Medium | Designed 2026-09-24 (a cloud session with Paul) — the build is TD-135, TD-136, TD-137 |
-| TD-130 | The pages set 13 px body text, 12 px mail bodies and 11 px small print: small for comfortable reading | Medium | Design first (the designer) — asked by Paul 2026-09-24 |
+| TD-130 | The pages set 13 px body text, 12 px mail bodies and 11 px small print: small for comfortable reading | Medium | Designed 2026-09-25 (a cloud session with Paul) — the build is TD-144; the Done when is Paul's read of the live page |
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
 | TD-132 | Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row | Medium | Open — designed, pickable |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
@@ -90,6 +90,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-141 | Build mail before wind-down — the refusal on unread, the *mail read* row, an unread note ages out with its run | Medium | Open — designed, pickable; a parked build exists |
 | TD-142 | Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder | Medium | Open — designed; slice 1 pickable, slice 2 waits on dev-cadence's reader fields |
 | TD-143 | The Focus Reports panel reads as a to-do list: a `claimed` row with its PR open looks like an unstarted claim, and Drop beside it lets a person let go of work in review | Medium | Design first (the designer) — asked by Paul 2026-09-25 |
+| TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Open — designed, pickable |
 
 
 ---
@@ -1382,9 +1383,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-24 (Paul: *make a note to check our font size — is it small for comfortable reading?*; the anchor session)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** no — design first (§4.5's type scale), then a grinder changes the tokens
+**Pickable:** no — designed; the build is TD-144
 
-**Status:** Open — **held 2026-09-25 by a cloud session at Paul's ask (board line; branch `claude/kind-cerf-dg50d4`), so the designer leaves it. Asked 2026-09-24.** `app.css` sets `body { font: 13px/1.4 "IBM Plex Sans", … }`, `.inbox .mail .body { font-size: 12px }`, `.small`, `.note`, `.btn.sm`, the chips and field labels at 11–12 px, and card names at 16 px; the sizes are literals, not tokens, in some fifty rules (`grep -c font-size: app.css` → 48). 13 px body with 11 px small print is a dense desk, and the text a person actually reads — a mail body, a board line, a question — is set smaller than the body. The round decides a type scale as tokens (a base of 14–15 px, small print no smaller than 12 px, line height 1.45–1.5, the mail body at the base size) checked in both themes at the widths the pages are used at, and whether a density setting (compact / comfortable, remembered per browser) is wanted rather than one size; the grinder then replaces the literals with the tokens. Paul reads the result on the live page: the *Done when* is his.
+**Status:** **Designed 2026-09-25** in a cloud session with Paul (branch `claude/kind-cerf-dg50d4`; the board line that held it comes off in this PR). Design: §4.5 *Type scale* — six tokens on `:root` (`--t-body` 14, `--t-small` 12, `--t-cap` 11 for uppercase marks only, `--t-title` 16, `--t-mono` 13, `--t-mono-s` 12.5; `--lh` 1.5, `--lh-mono` 1.55), the reading text at the base size, no lower-case text under 12 px, heights in `em` so the card's six rows grow with the text; no density setting (the browser's zoom is one). Mockups regenerated at the scale, with a ladder artboard `Type.dc.html` / `TypeDark.dc.html`. A defensible default rather than a decision: Paul reads it on the live page after TD-144 lands, and the one number to move is `--t-body`. Was: **asked 2026-09-24.** `app.css` sets `body { font: 13px/1.4 "IBM Plex Sans", … }`, `.inbox .mail .body { font-size: 12px }`, `.small`, `.note`, `.btn.sm`, the chips and field labels at 11–12 px, and card names at 16 px; the sizes are literals, not tokens, in some fifty rules (`grep -c font-size: app.css` → 48). 13 px body with 11 px small print is a dense desk, and the text a person actually reads — a mail body, a board line, a question — is set smaller than the body. The round decides a type scale as tokens (a base of 14–15 px, small print no smaller than 12 px, line height 1.45–1.5, the mail body at the base size) checked in both themes at the widths the pages are used at, and whether a density setting (compact / comfortable, remembered per browser) is wanted rather than one size; the grinder then replaces the literals with the tokens. Paul reads the result on the live page: the *Done when* is his.
 
 **Location:** `src/agentorc/ui/static/app.css` (`body`, `.small`, `.note`, `.inbox .mail .body`, `.btn.sm`, the chips), design §4.5 (the card's anatomy, TD-095 — it names no sizes; the 16 px name on a 13 px body is `app.css`'s), `docs/mockups/gen.py` (the mockups' sizes follow)
 
@@ -1647,3 +1648,26 @@ Two things are missing, and the design round chooses between them or takes both:
 **Why:** one confused minute let go of two design PRs' claims; the Reports panel is the one place a person sees a session's work, and it must say what state each piece is in and what a press does to it before the press.
 
 **Related:** TD-056 (a claim is a lease), TD-028 (declared and derived), TD-045 (a derived claim's PR), TD-126 and TD-127 (the two claims dropped), TD-124 (keys: none on this panel yet).
+
+## TD-144: Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (TD-130's design, a cloud session with Paul)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — designed, nothing built. Design: §4.5 *Type scale*; mockups `Type.dc.html`, `TypeDark.dc.html` and the regenerated artboards (`docs/mockups/gen.py` already carries the scale).
+
+**Location:** `src/agentorc/ui/static/app.css` (the token block on `:root`, every `font-size:` and `font:` literal, the card's row heights, the control heights), `src/agentorc/ui/templates/*.html` (any inline `font-size`), `tests/test_screen.py` or a new `tests/test_css.py` (no pixel size outside the token block).
+
+**Why:** every page is read for minutes at a time, and today the text a person actually reads is set smaller than the body; a size chosen for density is paid in every reading (TD-130).
+
+**Fix:** one slice, all in `src/agentorc/ui/**` (no techlead hold).
+1. Tokens on `:root`, beside the colours: `--t-body: 14px; --t-small: 12px; --t-cap: 11px; --t-title: 16px; --t-mono: 13px; --t-mono-s: 12.5px; --t-btn: 13px; --lh: 1.5; --lh-mono: 1.55;` and the heights `--row: 22px; --row1: 26px; --slot: 72px; --foot: 26px` (or the same in `em` of `--t-body`).
+2. The map, literal → token, for `app.css` as it stands (48 `font-size:` rules and the `body` `font:`): `body` 13/1.4 → `--t-body`/`--lh`; `.inbox .mail .body` 12, `.inboxpage .mailrow .body` 12.5, `.note` 12, `.toast` 12, `.kv` 12, `.checks` 12, `.inline-banner` 12, `.alarms` 12, `.keys` 12.5, `.input` 13, `.composer textarea`, `.maildlg` text → `--t-body`; `.small` 11, `#hostchip` 11, `#usagechip` 11, `.flag` 11, `.mode` 11, `input.denywhy` 11, `kbd` 11, `.btn.sm` 11, `.term.tail` 11 → `--t-small`; `.btn` 12 → `--t-btn`; `.pill` 10, `.badge` 10, `.field label` 11, `.isec` summary marks, the *new* mark 9, the kind labels → `--t-cap` (the pill glyphs' `::before` tunings become `em` of the pill's size, keeping their relative look); `.h1` 16, `.ghead .h2` 16, `.sc .name` 16 → `--t-title`; `.wordmark` 15, `.focus .title` 15 → `--t-title` at weight 500 (one size fewer); `.term` 12/1.5 → `--t-mono`/`--lh-mono`; `.meta` 11.5, `.status` 11.5, `.reports .rep .ref` 11.5, `.inbox .mail .ref` 11.5, `.inboxpage .mailrow .ref` 11.5, `.ghead .name` 13, the `.st` rules 10.5, `.reports .rep .st` 10.5 → `--t-mono-s`. Anything not in the map is `--t-small` if lower case and `--t-cap` if uppercase-tracked.
+3. Heights: `.sc-body > .row` 20 → `--row`, `.r1` 24 → `--row1`, `.sc-slot` 66 → `--slot`, `.sc-foot` 24 → `--foot`, `.sc-slot > .caption` 16 → `1.15em`; `.btn` 28 → 30, `.btn.sm` 24 → 26, `.input` 32 → 34, `input.denywhy` 24 → 26; the top bar stays 48. The `.sc-slot > .status` two-line clamp is already `em`.
+4. A test that reads `app.css` and fails on any `font-size:` or `font:` value in `px` outside the `:root` block, so the literals do not creep back.
+
+**Done when** the pages read at the new scale in both themes with no rule outside `:root` naming a pixel size; every Org card is still one height and six rows at 1440 and at 390 px; the Inbox column, the rail and the Focus page fit as before; `pdm run test` and `pdm run lint` pass; and **Paul has read the live page after the promote and said the size is right** — if not, `--t-body` moves and nothing else does. TD-130 archives with his word.
+
+**Related:** TD-130 (the design), TD-095 (the card's anatomy: six rows of one height), TD-082 (the Inbox column), TD-137 (the narrow layout, which uses the same tokens), TD-127 (the fold, whose lead is `--t-body`).
