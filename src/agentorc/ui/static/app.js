@@ -450,7 +450,8 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      AO.toast(`${action === "identity_log" ? "Log TD" : action} failed: ${e.message}`);  // a control is not its wire name
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board" };
+      AO.toast(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       if (staterow && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
     }
   });

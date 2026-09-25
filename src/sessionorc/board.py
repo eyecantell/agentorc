@@ -66,6 +66,10 @@ def edit_line(
     if action == "done":
         return f"{m.group('lead')}[x]{m.group('gap')}{m.group('text')}{end}"
     if action == "reply":
+        if not DUE_RE.search(body) and DUE_RE.search(str(reply or "")):
+            # the reader and a later Snooze take a line's first `Due:`: on an undated item the
+            # reply's would become the item's date (review of PR #581)
+            raise Refused("this item has no Due: date, so a reply may not carry one: Snooze sets its date")
         return f"{body.rstrip()}{reply_tail(reply, by, today or date.today().isoformat())}{end}"
     if action != "snooze":
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")

@@ -295,6 +295,9 @@ def test_a_reply_is_refused_touching_nothing_where_an_edit_is(repo):
     with pytest.raises(board.Refused, match="not main"):
         board.write_back(repo, 7, ITEM, "reply", reply="x")
     assert (repo / board.BOARD).read_text() == BOARD_TEXT
+    with pytest.raises(board.Refused, match="no Due: date"):  # the reply's date would become the item's
+        board.edit_line("- [ ] x\n", "x", "reply", reply="push Due: 2026-10-01", by="p", today="2026-09-25")
+    assert "Due: 2026-10-01" in board.edit_line(f"- [ ] {ITEM}\n", ITEM, "reply", reply="Due: 2026-10-01", by="p")
     assert board.edit_line("- [ ] x\n", "x", "reply", reply="y", by="the person", today="2026-09-25") == (
         "- [ ] x — the person, 2026-09-25: y\n"
     )
@@ -318,6 +321,8 @@ async def test_board_reply_is_the_persons_and_says_nothing_was_sent_yet(agent, r
             await me.call("board_edit", board=path, line=7, text=ITEM, action="reply")
         with pytest.raises(AgentError, match="no longer holds this item"):
             await me.call("board_reply", board=path, line=8, text=ITEM, reply="x")
+        with pytest.raises(AgentError, match="names the item's line"):
+            await me.call("board_reply", board=path, text=ITEM, reply="x")
         got = await me.call("board_reply", board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122"])
     assert got["action"] == "reply" and got["sent"] == [] and "no session standing is known" in got["note"]
     assert git(repo, "log", "-1", "--format=%s") == got["message"] and got["message"].startswith("agentorc: reply on")

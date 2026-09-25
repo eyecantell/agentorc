@@ -4042,9 +4042,9 @@ class HostAgent:
     async def rpc_board_reply(
         self,
         board: str,
-        line: int,
-        text: str,
-        reply: str,
+        line: int | None = None,
+        text: str = "",
+        reply: str = "",
         refs: list[str] | None = None,
         caller: Any = None,
     ) -> dict[str, Any]:
