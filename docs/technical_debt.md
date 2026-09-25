@@ -81,12 +81,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-146 | Build the one settings file — `settings.yml` home-owned with `teams`, `repos` and `person`, `ui.yml` retired, the `settings` read, the team stop time and reserve priority in the tick, `ao team until` | Medium | Open — designed, pickable |
 | TD-147 | Build the settings replica — the `settings` link frame, the node's copy, `set_settings` forwarded and refused offline | Medium | Open — designed, pickable after TD-146 |
 | TD-148 | Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab | Medium | Open — designed, pickable after TD-146 |
-<<<<<<< HEAD
-| TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Open — pickable |
-=======
 | TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Partly done — (2), (4), (6) done; five remain |
-| TD-150 | Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session | Medium | Partly done — slice 1 (the panel) built; the route and the note remain |
->>>>>>> 494a0779 (TD-149 (2), (4), (6): promote: accepted and checked; the org roles overlay checked as a repo's; AGENTORC_TICK named as a test knob)
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed and reconciled 2026-09-25; pickable |
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Open — designed, pickable |
 | TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Open — design-first |
