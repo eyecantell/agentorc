@@ -1617,6 +1617,15 @@ def test_a_resume_of_a_worktree_record_checks_the_name_in_the_records_scope(tmp_
     assert "repo" not in q  # the form has no repo field; it derives it from Where
     plain = resume_form_url({**rec, "repo": None, "dir": str(tmp_path)})
     assert "where=" not in plain and "worktree=" not in plain
+    # `ao new --repo` scopes a directory by a repo without agentorc's worktree flow (`worktree` unset):
+    # the form keeps that directory — keying on `dir != repo` would have moved it (review of #543)
+    outside = {**rec, "worktree": None, "dir": str(tmp_path / "elsewhere")}
+    q = {
+        k: unquote_plus(v)
+        for k, v in (x.split("=", 1) for x in resume_form_url(outside).removeprefix("/new?").split("&"))
+    }
+    assert q["dir"] == str(tmp_path / "elsewhere") and "where" not in q and "worktree" not in q
+    assert resume_create(outside)["repo"] == str(repo)  # the one-press path still scopes by the repo
 
 
 @pytest.mark.unit

@@ -101,8 +101,7 @@ def _usage_hover(w: dict[str, Any], row: dict[str, Any] | None) -> str:
     if row is None:
         return f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})"
     return (
-        f"{w.get('label')} {w['pct']}% / line {row['line']:g}% ({_reserve_why(row)}; "
-        f"resets {w.get('resets') or '?'})"
+        f"{w.get('label')} {w['pct']}% / line {row['line']:g}% ({_reserve_why(row)}; resets {w.get('resets') or '?'})"
     )
 
 
@@ -1944,10 +1943,13 @@ def resume_form_url(rec: dict[str, Any], why: str = "") -> str:
     # A worktree record lands on the form as the form says it: **Where** = new worktree, the
     # worktree's name, and the directory field holding the *repo* — which is what the form's own
     # Start sends (`repo=dir` with `worktree`), so the create checks the name in the record's scope
-    # and takes its id back, exactly as the one-press Resume does (TD-145).
+    # and takes its id back, exactly as the one-press Resume does (TD-145). Keyed on the record's
+    # own `worktree` — the field the create sets when it made or reused `<repo>/.claude/worktrees/
+    # <name>` — never on `dir != repo`: `ao new --repo` scopes a directory that is a worktree of the
+    # repo's without going through that flow, and such a record resumes where it is (review of #543).
     repo = q.pop("repo", "")
-    if repo and q.get("dir") and q["dir"] != repo:
-        q["worktree"] = Path(q["dir"]).name
+    if repo and rec.get("worktree"):
+        q["worktree"] = str(rec["worktree"])
         q["where"] = "worktree"
         q["dir"] = repo
     q["lane"] = ", ".join(got["lane"])
