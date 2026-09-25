@@ -104,7 +104,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
 | TD-168 | Build *when it is read*: `mail.read_when`, the pair on the record's view, the composer's sentence that changes with the kind, `read_when` on every `ao msg` reply | Medium | Open |
-| TD-169 | A hook event queued while the host agent was slow is applied at the next tick after the events that followed it, so a stale state can overwrite a fresh one | Low | Open |
 
 
 ---
@@ -1954,19 +1953,3 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** TD-158's *Done when*: a person opening Message on an on-call seat reads, before typing, that a note will not fill it and an ask will, and switching the kind changes the line; and `ao msg` to an exited member ends with *read when it is resumed, or started again under this name*.
 
 **Related:** TD-158 (the design), TD-153 (what a session is told about being woken), TD-157 / TD-167 (the *i* marks: the same idea at the button), TD-152 (the `scheduled` sentence), §4.9b (the seat's trigger), §4.10 (the doorbell's order, the budget's refill).
-## TD-169: A hook event queued while the host agent was slow is applied at the next tick after the events that followed it, so a stale state can overwrite a fresh one
-
-**Priority:** Low
-**Added:** 2026-09-25 (the Sonnet review of PR #556, TD-155; `grinder-ao-1`)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built.
-
-**Location:** `src/agentorc/adapters/claude_code/hook.py` (`main`: any exception but `Refused` appends the event to `events/<session>.jsonl`), `src/sessionorc/agent.py` (`_reconcile` drains the queue and `_apply_event` sets the state unconditionally).
-
-**Why:** each hook is its own process with a 3 s call. If one call times out (the host agent busy, not down) and the next one succeeds, the second is applied at once and the first is applied at the next tick, **after** it — so the record ends on the older state. A queued `Stop` (`idle`) behind a live `UserPromptSubmit` (`working`) is the old case; TD-155 (PR #556) added one more, a queued `SessionStart` from a resume (`idle`) behind the argv prompt's `UserPromptSubmit`. Either way a working session reads `idle` until its next hook (usually seconds), and in that window the doorbell may ring it. Rare and self-healing, which is why it is Low; but a queued event is a record of the past and is applied as if it were the present.
-
-**Fix:** stamp a queued event with the time it happened (`at`, written by `hook.py` when it queues), and have `_apply_event` skip a queued event's **state** when the record's state changed after that stamp (`s.since` later than `at`) — the adapter id, the model and the subagent delta still apply. A test: queue an `idle` stamped before a live `working`, drain, the record stays `working`.
-
-**Related:** TD-115 (the queue is for an agent that is down, never for a refusal), TD-155 (the resume case), §4.2.

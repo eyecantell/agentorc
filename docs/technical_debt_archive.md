@@ -1330,3 +1330,20 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Resolved:** 2026-09-25 (PR #569, with TD-134) — the design is §4.10 *A conflict, worked* and *A bounded exchange, counted by thread*; the end-to-end tests its *done when* asked for are TD-134's.
 
 **Related:** design §4.8, §9 invariant 11, §10 (2026-09-12 and 2026-09-13 entries); TD-036 (the gate this extends), TD-028 (the report channels this adds a kind to), TD-032 (a stalled worker nobody noticed — the failure this must not reproduce).
+
+## TD-169: A hook event queued while the host agent was slow is applied at the next tick after the events that followed it, so a stale state can overwrite a fresh one
+
+**Priority:** Low
+**Added:** 2026-09-25 (the Sonnet review of PR #556, TD-155; `grinder-ao-1`)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25
+
+**Location:** `src/agentorc/adapters/claude_code/hook.py` (`main`: any exception but `Refused` appends the event to `events/<session>.jsonl`), `src/sessionorc/agent.py` (`_reconcile` drains the queue and `_apply_event` sets the state unconditionally).
+
+**Why:** each hook is its own process with a 3 s call. If one call times out (the host agent busy, not down) and the next one succeeds, the second is applied at once and the first is applied at the next tick, **after** it — so the record ends on the older state. A queued `Stop` (`idle`) behind a live `UserPromptSubmit` (`working`) is the old case; TD-155 (PR #556) added one more, a queued `SessionStart` from a resume (`idle`) behind the argv prompt's `UserPromptSubmit`. Either way a working session reads `idle` until its next hook (usually seconds), and in that window the doorbell may ring it. Rare and self-healing, which is why it is Low; but a queued event is a record of the past and is applied as if it were the present.
+
+**Resolved:** 2026-09-25 (PR #573, `grinder-ao-1`) — `hook.py` stamps a queued event `at`; `_apply_event(queued=True)` skips a queued state stamped before the last live hook (`_live_hook_at`), applying its adapter id, model and subagent delta. Held by `test_a_queued_event_older_than_a_live_one_does_not_overwrite_its_state`; design §4.2 carries the rule.
+
+**Related:** TD-115 (the queue is for an agent that is down, never for a refusal), TD-155 (the resume case), §4.2.
