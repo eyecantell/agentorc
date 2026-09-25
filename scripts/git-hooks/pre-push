@@ -5,14 +5,12 @@
 #
 # Server-side branch protection is paywalled for private repos on GitHub's free
 # plan, so this client-side hook is the seatbelt on the machine all pushes
-# originate from. Enabled per-clone via:
-#     git config core.hooksPath scripts/git-hooks
-# The SETTING is shared across git worktrees, but a relative path resolves
-# against each worktree's own working tree, so each worktree runs the copy of
-# this hook on ITS branch: a worktree on a branch without scripts/git-hooks/
-# (pre-adoption, or a --detach of an old commit) pushes with no guard at all,
-# and a branch that edits this file runs its edit (TD-055). PR merges happen
-# server-side via `gh pr merge` and are unaffected.
+# originate from. Enabled per-clone by scripts/install_git_hooks.sh (sync.sh runs
+# it): a shim in the clone's shared .git/hooks execs the MAIN checkout's copy of
+# this file, so every worktree runs the same hook whatever its branch — one on a
+# branch without scripts/git-hooks/ and one whose branch edits this file alike
+# (TD-055; the older relative core.hooksPath ran each worktree's own branch's copy,
+# or none). PR merges happen server-side via `gh pr merge` and are unaffected.
 #
 # Guarded: the repo's default branch (the §9 rule below, TD-042) AND `main` always —
 # a gate errs toward blocking, and a clone whose origin/HEAD is unset must not lose

@@ -1,14 +1,14 @@
 # Written by eyecantell/dev-cadence sync.sh — do not edit by hand.
 source: https://github.com/eyecantell/dev-cadence
-commit: 4316bd4
-files_commit: 4316bd4527e9864f37c61aa84f2ba8dd2307822e
-synced: 2026-09-25T21:20:31Z
-file: docs/cadence.md b36602a166dabfd4da10a3109ccab661e4bb8b45d9257b9cb5ef1e892fe6a251 644
-file: docs/cadence-changes.md f188ffaf8da00ad7d90d87850910584d9b871195841c2c7bf66bd559a636cba8 644
+commit: f3e76a2
+files_commit: f3e76a202c381fcb9ddc86ff296e4689292b6419
+synced: 2026-09-25T21:40:01Z
+file: docs/cadence.md 4c55ba81f7881fe0d6f5c769a7d8f33d2377c814e64ca2dbbe3c5770697e33c2 644
+file: docs/cadence-changes.md f84189c0d8ff6f528f26c196841ecb28dee2c080e0bbc1a2b14fbaf0cc3e76d4 644
 file: .claude/skills/stranded-work/SKILL.md 2be7d54623b4a229880a5e8407e20f9889f4d9d99fbf77a8e0aa1f856bb8c2a5 644
 file: .claude/skills/attention/SKILL.md 284d4edbcfbbf98cfaa243215eb057267e4ac8caf64a12a02a7c4aa526d3bb6b 644
 file: .claude/skills/cadence/SKILL.md ec2ed424f3099bca131bf6349bed8d096df4ac021d22819ea7264154fa489001 644
-file: scripts/check_claude_memory.sh 1094b533dee627b998e1f2a7fa1510c7ce79a6db5047fdbebad58dfbdd61c8e2 755
+file: scripts/check_claude_memory.sh b9afb71b06d6e5f4c38ea51563a3ea94876e1447b2c58643604142555f26f7e0 755
 file: scripts/check_anchor.py 0038197e66591d9b744ebd71e316290ae5bd4e1e347e871804ad35b14443664d 755
 file: scripts/nudge_user_attention.py 351cca1766dbb6e607f1f8b4bc2ffffe34b5cc704a8a635a215d7ba13418e5f3 755
 file: scripts/board_edit.py e751e36ef7a66cc2b5dbc4cf56e1cff5049dec1994e081db654e8d06c7d4e03f 755
@@ -22,5 +22,6 @@ file: scripts/adopt_repo_settings.sh 2e7b4319c80bbb7fa515c27a3ce5376e193a49c8442
 file: scripts/check_cadence.py 3b659b454d65a80e3d002ba3d8266b5d589676600a2d2f3f6ce44146929cdd50 755
 file: scripts/cadence_changes.py 9fc029d67696138c4c0434da93b36b01d413e76898d6f30e22bb0f5e0efc25ba 755
 file: scripts/cadence_hooks.sh 4086c468fa6257fd965f0f3a3e68e5d13ad4f2a5bfeebaac50641f970b8740ad 755
-file: scripts/git-hooks/pre-push 92f9f81d8de95c4c4f2e3786320e9ae2d290d74ddf24c75025cc4dc6cf376107 755
+file: scripts/install_git_hooks.sh 8701499089e5ecd93ec2a89b9deebd41c178dcfd4a3b5e587d8f01555d2f4b82 755
+file: scripts/git-hooks/pre-push b9be3bdaa64aa9c7a1e6920230a4586ececa6e5844afbed6ec0490fc04d62bdc 755
 file: scripts/git-hooks/post-merge ca1c66653ae87d068a7d9f66cd4da90dc9879250561b00231a0080ca7157f736 755
