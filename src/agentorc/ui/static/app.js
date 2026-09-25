@@ -190,7 +190,7 @@
     $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
     $("#mailkindrow").hidden = !!o.reply;
     $("#mailquote").textContent = o.quote ? `re: “${o.quote.length > 160 ? o.quote.slice(0, 160) + "…" : o.quote}”` : "";
-    $("#mailkind").value = "note"; $("#mailabout").value = ""; $("#mailtext").value = "";
+    $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = "";  // an ask by default (§4.5a **Message**, 2026-09-25)
     return new Promise((resolve) => {
       dlg.addEventListener("close", () => {
         const text = $("#mailtext").value;
