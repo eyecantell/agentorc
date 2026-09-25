@@ -196,7 +196,8 @@ def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[
             indeg[b] -= 1
             if indeg[b] == 0:
                 heapq.heappush(ready, (found[b].at, b))
-    left = sorted((e for e in found.values() if e not in out), key=lambda e: (e.at, e.id))
+    placed = {e.id for e in out}
+    left = sorted((e for e in found.values() if e.id not in placed), key=lambda e: (e.at, e.id))
     return out + left  # boxes that disagree (never expected) still lose nothing
 # What the home pushes a node about each of its records (§4.4a "The home pushes each node its
 # records' policy fields as they change", step 4b.2): the home-owned fields, less the mailbox — the
