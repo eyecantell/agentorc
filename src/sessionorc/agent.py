@@ -3441,6 +3441,31 @@ class HostAgent:
             self._save(r)
         await self._push_changes()
         now = datetime.now(UTC)
+        away = {
+            sid
+            for sid in (*named, *landed)
+            if sid != PERSON
+            and records[sid].host != self.host
+            and not (self.links.get(records[sid].host) or {}).get("up")
+        }
+        # §4.10 *When it is read* (TD-168): one sentence per addressee, after delivery — the kind a
+        # reply reads as a note does, an ask's own bound, a session's sender told of a spent budget
+        span = None
+        with contextlib.suppress(TypeError, ValueError):
+            span = _parse(entry.bound) - _parse(entry.at) if entry.bound else None
+        read_when = {
+            sid: mail.read_when(
+                records[sid],
+                entry.kind,
+                now,
+                person=sender == PERSON,
+                bound=span,
+                unreachable=sid in away,
+                rings=getattr(adapters.get(records[sid].adapter), "composer", None) is not None,
+            )
+            for sid in named
+            if sid != PERSON and sid in records
+        }
         return {
             # exhaustion is visible to the sender (design §4.10): the mail landed, and it wakes nobody
             "wake_budget_spent": [
@@ -3448,13 +3473,8 @@ class HostAgent:
             ],
             # landed at the home while its host's link is down (§4.4a "When the recipient's host is
             # unreachable"): nothing waits anywhere but the mailbox, and the sender is told
-            "unreachable": [
-                sid
-                for sid in (*named, *landed)
-                if sid != PERSON
-                and records[sid].host != self.host
-                and not (self.links.get(records[sid].host) or {}).get("up")
-            ],
+            "unreachable": [sid for sid in (*named, *landed) if sid in away],
+            "read_when": read_when,
             "entry": entry.to_dict(),
             "delivered": list(named),
             "copies": landed,
@@ -6100,6 +6120,12 @@ class HostAgent:
         # for this one* where it is, which it can only do if it knows before it draws; and the
         # RPC reads the same function, so drawn-or-not and refused-or-not cannot disagree.
         v["alarm_to"] = self._answers_for(s, graph)
+        # §4.10 *When it is read* (TD-168): the composer's sentence for each kind, as a person reads
+        # it — computed here so the dialog opens with it and asks nothing; a `reply` reads as a note
+        now = datetime.now(UTC)
+        down = s.host != self.host and not (self.links.get(s.host) or {}).get("up")
+        rings = getattr(adapters.get(s.adapter), "composer", None) is not None
+        v["read_when"] = {k: mail.read_when(s, k, now, unreachable=down, rings=rings) for k in ("ask", "note")}
         if s.host == self.host:
             if self.mode == "node":
                 v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)

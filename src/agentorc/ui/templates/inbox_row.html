@@ -48,7 +48,7 @@
 {%- endmacro %}
 
 {% macro reply_btn(e) -%}
-{%- if e['from'] not in ('person', 'system') %}<button class="btn sm ghost" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}">Reply</button>{% endif %}
+{%- if e['from'] not in ('person', 'system') %}<button class="btn sm ghost" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ e.from_name or e['from'] }}" data-quote="{{ e.text }}" data-when-note="{{ e.reply_when or '' }}">Reply</button>{% endif %}
 {%- endmacro %}
 
 {# design §4.5a **Inbox row: suggested answers** (§4.10 *Suggested answers*; TD-070). The sender's
@@ -298,7 +298,7 @@
 <div class="row gap wrap mfoot">
   <span class="st">answered from the record — nothing waits on you</span>
   <span class="grow"></span>
-  <button class="btn sm" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ asker }}" data-quote="{{ a.question or '' }}" title="your answer instead: it goes to {{ asker }} on the question's own thread, copied to {{ e.from_name or e['from'] }}, and {{ asker }} owes you what came of it">Overrule</button>
+  <button class="btn sm" data-act="reply" data-id="person" data-msg="{{ e.id }}" data-name="{{ asker }}" data-quote="{{ a.question or '' }}" data-when-note="{{ e.asker_when or '' }}" title="your answer instead: it goes to {{ asker }} on the question's own thread, copied to {{ e.from_name or e['from'] }}, and {{ asker }} owes you what came of it">Overrule</button>
   <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}">Dismiss</button>
 </div>
 {%- endmacro %}

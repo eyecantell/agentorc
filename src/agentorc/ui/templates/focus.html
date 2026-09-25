@@ -71,7 +71,7 @@
       <button class="btn sm {{ 'link' if s.own and s.ready_ok and s.state in ('idle', 'exited') else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
-      <button class="btn sm link" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail a note or an ask into this session's inbox — it lands and types nothing (Send, below, types)">✉ Message</button>
+      <button class="btn sm link" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="mail a note or an ask into this session's inbox — it lands and types nothing (Send, below, types)">✉ Message</button>
       {# design §4.5a Focus **Wrap up** (TD-156, *What Wrap up promises*): a person's Wrap up is only
          the prompt; the hover and the press's toast say that the close is theirs #}
       <button class="btn sm link" data-act="wrapup" data-id="{{ s.id }}"

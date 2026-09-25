@@ -1501,3 +1501,29 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Related:** TD-069 (the design; steps 0–3 built), TD-123 (the board's whole view stays dev-cadence's report), cadence §4 (a session's own board lines go by PR, as before).
 
 **Resolved:** 2026-09-25 (TD-140 slice 2, PR #580; slice 1 PR #578) — the Inbox's *Put on the board*: the button on FYI and trail rows, the form (`board_add.html`), `/api/person/board` with `action: add`; slice 1 the write-back's add. Design §4.5a *Inbox row: FYI*, §4.4.
+
+## TD-168: Build *when it is read*: `mail.read_when`, the pair on the record's view, the composer's sentence that changes with the kind, `read_when` on every `ao msg` reply
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-158's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25 — see *Resolved* below. Was: Open — nothing built. Design §4.10 *When it is read: the sentence the sender sees*, §4.5a **Message** (the last sentences), §4.7 *Mail* (the reply's last line); mockup `Message.dc.html`.
+
+**Location:** `src/sessionorc/mail.py` (`wake_budget_spent` is beside where `read_when` goes; the seat's `asks_waiting`), `src/sessionorc/agent.py` (`rpc_msg`'s reply dict — `wake_budget_spent`, `unreachable` already there; `_view` / the pushed record), `src/agentorc/ui/app.py` (`view`: `seat`, `seat_when`, `scraped`, the wrap-up and gate notes — the same facts the sentence reads), `src/agentorc/ui/templates/base.html` (the `#mailbox` dialog: a line under `#mailkindrow`), `src/agentorc/ui/static/app.js` (`AO.compose`: takes the record's `read_when` pair and swaps the line on the kind's `change`), `src/agentorc/cli.py` (`cmd_msg`: print `read_when` after `advice`), `src/agentorc/skill.md` (one clause: the reply says when it is read).
+
+**Why:** TD-158's *Why*: nothing on the screen said the seat comes on a question.
+
+**Fix:**
+1. **`read_when(record, kind, now) -> str`** in `sessionorc.mail`: the table's cases in its order, the page's words for states, the seat's two sentences by kind (`reply` as `note`), the bound clause on an `ask`, the budget clause only when the sender is a session (a parameter, `person: bool`). `src/sessionorc/**` is a held path: the techlead reads this PR.
+2. **On the record's view**: `read_when: {ask, note}` computed at `_view` time for every record the UI receives — two short strings, no request at open; a seat with nobody in it (the placeholder card) gets its pair from the seat's definition.
+3. **The composer**: the sentence under the kind selector, from the pair; swapped on the kind's `change`; the Reply dialog shows the `note` one. Text only.
+4. **`rpc_msg`** returns `read_when: {id: sentence}` per addressee, computed after delivery with `person=(sender == PERSON)`; **`ao msg`** prints each after the `advice` line, `read_when` under `--json`.
+5. **Tests:** `read_when` on a record per case (twelve cases, both kinds where they differ, the session's budget clause); the composer's swap under node as `test_ui_keys.py` runs `app.js`; the CLI's printed line on a fixture reply.
+
+**Done when** TD-158's *Done when*: a person opening Message on an on-call seat reads, before typing, that a note will not fill it and an ask will, and switching the kind changes the line; and `ao msg` to an exited member ends with *read when it is resumed, or started again under this name*.
+
+**Related:** TD-158 (the design), TD-153 (what a session is told about being woken), TD-157 / TD-167 (the *i* marks: the same idea at the button), TD-152 (the `scheduled` sentence), §4.9b (the seat's trigger), §4.10 (the doorbell's order, the budget's refill).
+
+**Resolved:** 2026-09-25 (PR #583, grinder-ao-1) — `mail.read_when`, `read_when` on `msg`'s reply and the `{ask, note}` pair on the record's view, the composer's line (`#mailwhen`, `AO.whenLine`), `ao msg`'s last lines; `tests/test_read_when.py`. The `scheduled` row waits for TD-152's state.

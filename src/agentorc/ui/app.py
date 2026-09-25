@@ -716,6 +716,13 @@ def view(
         d["seat_when"] += f" · {counted} of {trig.get('after')}"
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
+    # §4.10 *When it is read* (TD-168): the composer's sentence for each kind, the host agent's; a
+    # seat the definition names reads as one whatever the record's own `seat` says, so the pair is
+    # the seat's from here (`mail.read_when` is the one function either way)
+    rw = s.get("read_when") if isinstance(s.get("read_when"), dict) else {}
+    if d["seat"]:
+        rw = {k: mail.read_when(None, k, now, seat=True) for k in ("ask", "note")}
+    d["read_when"] = {k: str(rw.get(k) or "") for k in ("ask", "note")}
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
     # Another host's record, as the home shows it (design §4.4a): its own host on the card, and a
@@ -2362,6 +2369,8 @@ def create_app() -> FastAPI:
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
+            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does
+            e["reply_when"] = str(((records.get(e["from"]) or {}).get("read_when") or {}).get("note") or "")
             e["board_default"] = board_of(e["from"])
             if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
                 sender = records.get(e["from"]) or {}
@@ -2383,6 +2392,8 @@ def create_app() -> FastAPI:
             asker = str(_answered_of(e).get("asker") or "")
             if asker:
                 e["asker_name"] = names.get(asker, asker)
+                # Overrule writes to the asker, so its dialog's line is the asker's (TD-168)
+                e["asker_when"] = str(((records.get(asker) or {}).get("read_when") or {}).get("note") or "")
                 e["asker_open"] = asker if asker in names else ""
         return got
 
@@ -2878,9 +2889,12 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         got = await call("inbox", id=sid)
         fleet = await call("list")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        records = {o.get("id"): o for o in fleet}
         origin = page_origin(request)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does
+            e["reply_when"] = str(((records.get(e["from"]) or {}).get("read_when") or {}).get("note") or "")
             s = shaped(e.get("text"), origin)
             e["lead_html"], e["rest_html"] = str(s["lead"]), str(s["rest"])
         return got

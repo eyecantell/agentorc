@@ -89,7 +89,7 @@
       <button class="btn sm next" data-act="remove" data-id="{{ s.id }}">Forget</button>
     {% elif s.next_act == 'message' %}
       {# a seat on call (TD-097): asking it is how it comes — the same control as *more*'s #}
-      <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail a question into its inbox — that is what fills the seat (design §4.9b)">Message…</button>
+      <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="mail a question into its inbox — that is what fills the seat (design §4.9b)">Message…</button>
     {% elif s.next_act == 'close' %}
       <button class="btn sm next" data-act="close" data-id="{{ s.id }}">Close session</button>
     {% endif %}
@@ -102,7 +102,7 @@
     <details class="more">
       <summary class="btn sm link" title="more">⋯</summary>
       <div class="menu">
-        <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail into its inbox — lands, types nothing">Message…</button>
+        <button data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="mail into its inbox — lands, types nothing">Message…</button>
         {# design §4.5a **more ▾** (TD-095): the mode's toggle, moved here from the card's badge #}
         <button data-act="mode" data-id="{{ s.id }}"{% if s.unattended %} class="on"{% endif %}>Switch to {{ 'interactive' if s.unattended else 'unattended' }}</button>
         <button data-act="wrapup" data-id="{{ s.id }}">Wrap up</button>
