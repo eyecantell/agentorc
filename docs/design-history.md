@@ -76,6 +76,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-22 (TD-115, grinder-ao-1): the hook stopped queueing an error reply. Until this date `agentorc-hook` treated any error from the host agent as an agent that was down and appended the event to `events/<session>.jsonl`, which the tick applies unjudged — so a hook refused by §4.8a was applied two seconds later anyway (the techlead seat's `exited (hook)` at 03:55Z on 2026-09-23, after the refusal).
 - 2026-09-24 (TD-072, the designer): Ready to close gains **mail read**; the **outcomes reported** row TD-079 built on 2026-09-20 is written into the list, where it had been missing.
 - 2026-09-25 (TD-026, the designer; Paul's answer the same day): the `scheduled` state — a record with a launch record and no pane, created at `ao new --at` or the form's **At** field.
+- 2026-09-25 (TD-155, grinder-ao-1): `SessionStart` with `source: resume` reports `idle`. Until this date every `SessionStart` read `working`, and a one-press Resume with no prompt — the designer's record, 2026-09-25 14:06Z — sat `working (hook)` at an empty composer, headed for `stalled?` at `STALL_AFTER` and never rung by the doorbell, which rings a hook-confirmed idle only.
 
 ## 4.2a Profiles: tool · account · model
 

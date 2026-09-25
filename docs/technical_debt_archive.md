@@ -1219,3 +1219,22 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Done when** (1) techlead-ao-1's #517-style reply (a verdict line, a blank line, a list) reads as its verdict with *details* closed, and open shows the list rendered; (2) the six refusals above and the one allowed link behave as listed, in tests and in a browser; (3) an old one-paragraph entry from before the rule folds at a sentence and answers folded; (4) the page's find (TD-135, if landed) still matches words inside a closed *details*; (5) `pdm run test` and `pdm run lint` pass; (6) TD-127 is marked built for the page half; (7) the Focus Inbox panel's entries fold the same way.
 
 **Related:** TD-127 (the design), TD-139 (the senders' half), TD-136 (the message page renders the same row open), TD-135 (the find over the whole text), TD-071 item 8 (nothing pressable from text — the link rule is its one exception).
+
+## TD-155: A resumed session that starts no turn reads `working` until it stalls: `SessionStart` with source `resume` lands at the composer and fires no `Stop`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (seen on the designer's record after Paul's one-press Resume)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25
+
+**Location:** `src/agentorc/adapters/claude_code/hook.py` (`STATE_EVENTS` maps every `SessionStart` to `working`; `SESSION_START_NOT_A_START` exempts `compact` only, TD-090), `src/sessionorc/agent.py` (`STALL_AFTER`, `_bell_blocked` — *not hook-confirmed idle*), design §4.2.
+
+**Why:** `claude --resume <id>` prints the old conversation and waits at the composer. Its `SessionStart` (source `resume`) is reported as `working` with confidence `hook`, and no turn follows, so no `Stop` ever reports `idle`. Seen 2026-09-25 14:06Z: the designer resumed by Paul reads `working (hook)` with an empty composer (`ao explain`: *no screen rule matched*), and at `STALL_AFTER` (20 minutes) it will read `stalled?` — an alert on a session that is simply idle. Two things follow from the wrong state: the doorbell never rings it (it rings hook-confirmed idle only), so mail for a resumed session waits until someone types; and a manager's `wait` sees a member `working` that is doing nothing. A fresh `SessionStart` (source `startup`) is a different case — `ao new` types the prompt at once, so `working` is right there — and `clear` is already handled as a continuation.
+
+**Resolved:** 2026-09-25 (PR #556, `grinder-ao-1`) — `SESSION_START_AT_THE_COMPOSER = {"resume"}` in `hook.py` reports `idle` at confidence hook; a prompt given with the resume reports `working` through its own `UserPromptSubmit`. Held by `test_a_resume_lands_at_the_composer`; design §4.2's state table carries the row. The live check (a one-press Resume reads `idle (hook)` within a tick) is on `docs/user_attention.md`.
+
+**Done when** a one-press Resume with no prompt shows `idle` within a tick, never `stalled?`, and the doorbell rings it for mail that lands after the resume.
+
+**Related:** TD-090 (the `compact` exemption, the same shape), TD-081 / TD-145 (Resume), TD-153 (the doorbell needs a hook-confirmed idle), §4.2.
