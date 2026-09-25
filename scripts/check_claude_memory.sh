@@ -236,10 +236,19 @@ fi
 # core.hooksPath is clone-wide, so from a worktree it may legitimately hold the main
 # checkout's absolute path — accept any configured path that actually contains the
 # pre-push hook instead of string-matching against $REPO_ROOT.
-if [ -f "$REPO_ROOT/scripts/git-hooks/pre-push" ]; then
+# Where the shipped hook lives: scripts/git-hooks in a consumer; beside this script
+# when it runs from inside the repo, which is files/scripts/git-hooks in dev-cadence
+# itself (TD-038). A copy run from outside the repo keeps the consumer path.
+HOOKS_REL="scripts/git-hooks"
+here_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+root_dir="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P)"
+case "$here_dir/" in
+  "$root_dir"/*) [ -f "$here_dir/git-hooks/pre-push" ] && HOOKS_REL="${here_dir#"$root_dir"/}/git-hooks" ;;
+esac
+if [ -f "$REPO_ROOT/$HOOKS_REL/pre-push" ]; then
   hookspath=$(git -C "$REPO_ROOT" config core.hooksPath 2>/dev/null || true)
   if [ -z "$hookspath" ]; then
-    warns+=("core.hooksPath is not set in this clone — the pre-push main guard is OFF on this machine. Fix: git config core.hooksPath scripts/git-hooks")
+    warns+=("core.hooksPath is not set in this clone — the pre-push main guard is OFF on this machine. Fix: git config core.hooksPath $HOOKS_REL")
   else
     case "$hookspath" in
       /*) resolved="$hookspath" ;;
@@ -250,7 +259,7 @@ if [ -f "$REPO_ROOT/scripts/git-hooks/pre-push" ]; then
       # there. Never tell the user to repoint it — git honors one hooks directory,
       # so that trades the main guard for whatever lint/stamp hooks they already
       # run, and the loss is silent. Copying the hook in keeps both.
-      warns+=("core.hooksPath ($hookspath) has no pre-push hook — the pre-push main guard is OFF on this machine. git honors only ONE hooks directory, so do NOT repoint core.hooksPath — any hooks already in $hookspath would be silently disabled. Fix: mkdir -p \"$resolved\" && cp \"$REPO_ROOT/scripts/git-hooks/pre-push\" \"$resolved/\"")
+      warns+=("core.hooksPath ($hookspath) has no pre-push hook — the pre-push main guard is OFF on this machine. git honors only ONE hooks directory, so do NOT repoint core.hooksPath — any hooks already in $hookspath would be silently disabled. Fix: mkdir -p \"$resolved\" && cp \"$REPO_ROOT/$HOOKS_REL/pre-push\" \"$resolved/\"")
     fi
   fi
 fi
@@ -266,7 +275,8 @@ fi
 BOARD="$REPO_ROOT/docs/user_attention.md"
 
 # 6) Machine roster coverage (plan 2026-08-10 P1): does this machine's registry
-#    (~/.config/dev-cadence/repos.txt) know about this repo's board? Soft warn.
+#    ($DEV_CADENCE_REG_DIR, else ${XDG_CONFIG_HOME:-~/.config}/dev-cadence, /repos.txt)
+#    know about this repo's board? Soft warn.
 #    ORDER IS A PERFORMANCE INVARIANT — the conditions short-circuit as written:
 #    registry existence, then open board items, then coverage — so a clean board
 #    or an unregistered machine (fresh laptop, CI, ephemeral container) never
@@ -276,7 +286,7 @@ BOARD="$REPO_ROOT/docs/user_attention.md"
 #    is covered *somewhere*, which is all this check exists to establish).
 #    Degradation is silence, never a false warning. Path-resolution spec:
 #    cadence.md §Machine scope (parity: sync.sh, sync-all.sh, --report).
-REGISTRY="${XDG_CONFIG_HOME:-$HOME/.config}/dev-cadence/repos.txt"
+REGISTRY="${DEV_CADENCE_REG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/dev-cadence}/repos.txt"   # TD-029
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
 if [ -f "$REGISTRY" ] \
    && [ -f "$BOARD" ] && grep -Eq '^[[:space:]]*-[[:space:]]*\[ \]' "$BOARD" \

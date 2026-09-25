@@ -229,6 +229,42 @@ fi
 # Atomic: a reader (VS Code watches this file) never sees a half-written one.
 mv "$OUT.tmp" "$OUT"
 
+# TD-031: the overview run also prunes per-topic files whose worktree is gone. They live
+# at the clone root, outside the tree, so a hand `git worktree remove` leaves them (the
+# reaper deletes its own), gitignored and pointing at dead paths. A file is only ours to
+# delete when its FIRST root is exactly <clone>/.claude/worktrees/<topic>, <topic> being
+# its own name (minus a `+topic` suffix) -- the shape --topic writes -- and that path no
+# longer exists. Any other .code-workspace at the root is a person's, and never touched.
+if [[ "$MODE" != topic ]]; then
+    git worktree list --porcelain | python3 -c '
+import glob, json, os, sys
+clone_root, overview = sys.argv[1], sys.argv[2]
+# a REGISTERED worktree whose directory is merely unreachable (an unmounted volume) is
+# not gone: its file stays until git itself forgets the worktree
+registered = {os.path.realpath(line.split(" ", 1)[1].strip())
+              for line in sys.stdin if line.startswith("worktree ")}
+for f in sorted(glob.glob(os.path.join(clone_root, "*.code-workspace"))):
+    if os.path.realpath(f) == os.path.realpath(overview):
+        continue
+    topic = os.path.basename(f)[: -len(".code-workspace")]
+    topic = topic[: -len("+topic")] if topic.endswith("+topic") else topic
+    expect = os.path.realpath(os.path.join(clone_root, ".claude", "worktrees", topic))
+    try:
+        first = json.load(open(f, encoding="utf-8"))["folders"][0]["path"]
+    except Exception:
+        continue            # not ours to judge: unreadable, or not a workspace we wrote
+    # a relative root resolves against the workspace file, as the editor resolves it
+    first = os.path.realpath(os.path.join(os.path.dirname(f), first))
+    if first != expect or os.path.exists(expect) or expect in registered:
+        continue
+    try:
+        os.remove(f)
+        print("pruned %s (its worktree is gone)" % f)
+    except OSError as e:     # never fail the overview run over a stale file
+        print("could not prune %s: %s" % (f, e))
+' "$CLONE_ROOT" "$OUT"
+fi
+
 # --topic is machine-readable: the path on stdout, the summary on stderr.
 if [[ "$MODE" == topic ]]; then
     echo "$OUT"

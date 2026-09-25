@@ -79,7 +79,22 @@ fi
 CLONE_ROOT="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)"
 WT="$CLONE_ROOT/.claude/worktrees/$TOPIC"
 
-# --- create the worktree, branching off *updated* origin/main (cadence §1) ---
+# Default branch — cadence.md §9 "Default-branch rule". Parity: this function is copied
+# verbatim into pre-push, reap_worktrees.sh, open_worktree.sh and hydrate_worktree.sh,
+# and default_branch() in the Python scripts follows the same rule; tests/test_default_branch.sh
+# runs every copy against the same fixtures. Prints a branch NAME, never empty.
+default_branch() {
+    local repo="$1" b
+    b="$(git -C "$repo" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)"
+    for b in "${b#origin/}" "$(git -C "$repo" config init.defaultBranch 2>/dev/null)" main master; do
+        if [[ -n "$b" ]] && git -C "$repo" rev-parse --verify -q "refs/remotes/origin/$b" >/dev/null; then
+            echo "$b"; return 0
+        fi
+    done
+    echo main
+}
+
+# --- create the worktree, branching off *updated* origin/<default> (cadence §1) ---
 if [[ -d "$WT" ]]; then
     echo "worktree exists: $WT"
 else
@@ -88,8 +103,9 @@ else
         echo "branch $TOPIC exists — checking it out in a new worktree"
         git -C "$CLONE_ROOT" worktree add -q "$WT" "$TOPIC"
     else
-        git -C "$CLONE_ROOT" worktree add -q -b "$TOPIC" "$WT" origin/main
-        echo "created worktree $WT on new branch $TOPIC (from origin/main)"
+        BASE="origin/$(default_branch "$CLONE_ROOT")"
+        git -C "$CLONE_ROOT" worktree add -q -b "$TOPIC" "$WT" "$BASE"
+        echo "created worktree $WT on new branch $TOPIC (from $BASE)"
     fi
 fi
 

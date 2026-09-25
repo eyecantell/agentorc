@@ -15,9 +15,24 @@
 #
 # Never break or slow a pull: bounded, and exits 0 on every path.
 
+# The reaper is looked for beside this hook's directory (git-hooks/..) first, then
+# under the worktree's scripts/ — the same thing in a consumer, but dev-cadence
+# keeps the payload under files/scripts/, where scripts/ made this exit 0 on every
+# pull (TD-038).
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
-[[ -x "$ROOT/scripts/reap_worktrees.sh" ]] || exit 0
+REAP="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)/reap_worktrees.sh"
+[[ -x "$REAP" ]] || REAP="$ROOT/scripts/reap_worktrees.sh"
+[[ -x "$REAP" ]] || exit 0
 
-timeout 20 "$ROOT/scripts/reap_worktrees.sh" --quiet 2>/dev/null
+# Bounded where coreutils `timeout` exists; without it, unbounded rather than silently
+# never run (it once did nothing on every pull there). A stop at the bound says so: a
+# reaper killed mid-run is not a clean report. NOTE: git fires post-merge on merge
+# pulls only — with pull.rebase=true it never fires; run the reaper by hand (cadence §1).
+if command -v timeout >/dev/null 2>&1; then
+    timeout 20 "$REAP" --quiet 2>/dev/null
+    [ $? -eq 124 ] && echo "post-merge: the worktree reaper was stopped after 20 s — run $REAP by hand" >&2
+else
+    "$REAP" --quiet 2>/dev/null
+fi
 
 exit 0

@@ -122,6 +122,11 @@ def _pid_is_dead(entry: dict) -> bool:
     pid = _entry_pid(entry)
     if pid is None:
         return False  # no pid recorded — nothing to disprove
+    if not procfs_available():
+        # No procfs at all (macOS, some sandboxes): a missing /proc/<pid> proves
+        # nothing, and reading it as "dead" silenced the guard and made every
+        # worktree look idle to the reaper (TD-043). Undeterminable — keep it.
+        return False
     if not Path(f"/proc/{pid}").exists():
         return True  # stale registry entry (same-namespace case)
 
@@ -159,6 +164,11 @@ def _pid_is_dead(entry: dict) -> bool:
     return bool(comm) and comm not in SESSION_COMMS
 
 
+def procfs_available() -> bool:
+    """Whether this host has a procfs to judge liveness by (TD-043)."""
+    return Path("/proc/self").exists()
+
+
 def live_sessions() -> list[dict]:
     reg = Path.home() / ".claude" / "sessions"
     if not reg.is_dir():
@@ -175,6 +185,38 @@ def live_sessions() -> list[dict]:
             continue
         out.append(obj)
     return out
+
+
+REGISTRY_SETTLE_S = 5  # a registry file younger than this may still be being written
+
+
+def registry_format_note() -> str | None:
+    """TD-050 canary: the session registry is an undocumented Claude Code internal
+    (verified against Claude Code 2.1.280). When the NEWEST settled entry does not parse as
+    a session, the format moved — and the anchor guard, the reaper's idle gate and
+    list_sessions all degrade to "nobody is here" without a word. Judged on the newest
+    file older than REGISTRY_SETTLE_S, never on this session's own entry (written as the
+    session starts, racing the hooks) and never on "any file parses" (one stale entry in the
+    old format would mask a change forever); a file younger than that may be mid-write."""
+    reg = Path.home() / ".claude" / "sessions"
+    now = time.time()
+    try:
+        settled = sorted(((f.stat().st_mtime, f) for f in reg.glob("*.json")
+                          if now - f.stat().st_mtime >= REGISTRY_SETTLE_S), reverse=True)
+    except OSError:
+        return None
+    if not settled:
+        return None
+    newest = settled[0][1]
+    try:
+        obj = json.loads(newest.read_text(encoding="utf-8", errors="replace"))
+        if isinstance(obj, dict) and "sessionId" in obj and "pid" in obj:
+            return None
+    except (json.JSONDecodeError, OSError):
+        pass
+    return (f"⚠ the newest entry in Claude Code's session registry ({newest}) does not read as a "
+            "session — its format may have changed (verified against 2.1.280). Until the scripts "
+            "are updated, the anchor guard, the reaper's idle gate and list_sessions see no sessions.")
 
 
 def _ancestor_pids() -> set[int]:
@@ -242,6 +284,35 @@ def repo_root(cwd: Path, timeout: int = 10) -> Path | None:
         return None
 
 
+# git's "there is no checkout here" answers — nothing to guard, so silence. Matched
+# on git's own text, so the call runs in the C locale (gettext translates it). A bare
+# repo, or GIT_DIR without a work tree, answers the second (PR #107 review).
+NOT_A_CHECKOUT = ("not a git repository", "must be run in a work tree")
+GIT_C_LOCALE = {**os.environ, "LC_ALL": "C", "LANGUAGE": ""}
+
+
+def repo_root_or_error(cwd: Path, timeout: int = 10) -> "tuple[Path | None, str | None]":
+    """(root, None) in a repo; (None, None) when cwd is simply not a git repo; and
+    (None, "<why>") on any OTHER failure — dubious ownership, a timeout, git missing.
+    The last used to read as "not a repo" and the guard said nothing (TD-043)."""
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(cwd), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=timeout, check=False,
+            env=GIT_C_LOCALE,
+        )
+    except subprocess.TimeoutExpired:
+        return None, f"git rev-parse timed out after {timeout}s"
+    except OSError as e:
+        return None, f"git could not run ({e.strerror or e})"
+    if r.returncode == 0:
+        return Path(r.stdout.strip()).resolve(), None
+    err = (r.stderr or "").strip()
+    if any(m in err for m in NOT_A_CHECKOUT):
+        return None, None
+    return None, (err.splitlines() or [f"git rev-parse exited {r.returncode}"])[0]
+
+
 def _occupancy_repo_root(p: Path) -> "Path | None":
     """repo_root() for occupancy checks: memoized, time-bounded, fail-safe.
 
@@ -307,7 +378,15 @@ def main() -> int:
     self_id = data.get("session_id", "")
     cwd = Path(data.get("cwd") or os.getcwd()).resolve()
 
-    root = repo_root(cwd)
+    note = registry_format_note()
+    if note:
+        print(note)
+
+    root, err = repo_root_or_error(cwd)
+    if err:
+        # One line, never silence: a guard that cannot run must say so (TD-043).
+        print(f"⚠ anchor check did not run: {err}")
+        return 0
     if root is None:
         return 0  # not a git repo — nothing to guard
     if root != cwd and not occupies(str(cwd), root):

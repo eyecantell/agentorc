@@ -25,7 +25,8 @@
 #
 # WHAT COUNTS AS REAPABLE — all five, or it is left alone
 #   landed   the branch's own files are identical to origin/main
-#   clean    no modified AND no untracked files (scratch must never be reaped)
+#   clean    no modified, no untracked AND no ignored files (scratch must never
+#            be reaped), bar a short allowlist of derived paths — see IGNORED
 #   idle     no live Claude session has its cwd inside the worktree
 #   unlocked Claude Code locks worktrees it created; a lock means someone owns it
 #   nested   nothing inside it belonging to ANOTHER repo holds unsaved work
@@ -65,6 +66,36 @@
 # The reason names the session and pid that took it; if that pid is gone (see
 # cadence.md §1 on live-but-unattended sessions), the lock is a corpse.
 #
+# IGNORED FILES ARE SCRATCH TOO (TD-054)
+# --------------------------------------
+# `git status --untracked-files=all` never lists IGNORED paths, and `git
+# worktree remove` deletes them without --force. Reproduced on git 2.48.1: a
+# worktree whose only unsaved file is scratch/notes.txt under an ignored
+# scratch/ printed no status lines, was removed, and the file was gone. The
+# scratch a session is most likely to leave — notes in an ignored dir, build
+# output, a downloaded fixture — is ignored by construction, and so are two
+# worse things: a nested FULL clone (a .git directory, which hydrate's scan
+# prunes, so `nested` passes it) with its unpushed commits, and a worktree's
+# real .claude/settings.local.json, which hydrate refuses to touch because the
+# divergent copy may be the newer one.
+#
+# So `clean` also reads `git status --ignored --untracked-files=all` (the
+# traditional mode lists ignored files one by one, and a nested repo as one
+# `dir/` entry) and every ignored entry blocks, except:
+#   - anything under a __pycache__/ directory (derived, regenerated on import);
+#   - a symlink (removing it never touches its target — hydrate's links);
+#   - a nested WORKTREE (`dir/.git` is a file) when hydrate_worktree.sh is
+#     present, at most nested_depth() deep (3, or the deepest configured path) and not
+#     under node_modules: exactly what hydrate's
+#     --check/--dehydrate see, so the `nested` column already judges it (a
+#     parity pair with find_nested_worktrees's -maxdepth 4; test case 20 pins
+#     both sides of the boundary).
+# A nested .git DIRECTORY always blocks. The report prints the blocking paths
+# under the row, so a person can delete them deliberately. The ignored scan
+# walks ignored trees (.venv, node_modules), so it runs only for a worktree
+# that has already passed landed and the tracked/untracked check — any other
+# row is kept regardless, and its clean column says tracked+untracked only.
+#
 # THE LANDED TEST IS SCOPED, AND HAS TO BE
 # ----------------------------------------
 # Squash merges (§4) sever ancestry, so `git log origin/main..<branch>` reports
@@ -81,9 +112,12 @@
 # If main later edits those same files differently the test says "not landed"
 # and the worktree survives. That is the correct direction to be wrong in.
 #
+# BRANCHES WITHOUT A WORKTREE (TD-032) get their own report section and gates —
+# see ORPHAN BRANCHES below the worktree loop.
+#
 # USAGE
 #   scripts/reap_worktrees.sh            # report only
-#   scripts/reap_worktrees.sh --reap     # remove the ones that pass every check
+#   scripts/reap_worktrees.sh --reap     # remove the ones that pass every check (worktrees and orphan branches)
 #   scripts/reap_worktrees.sh --quiet    # print nothing when there is nothing to say
 
 set -uo pipefail
@@ -104,10 +138,46 @@ for a in "$@"; do
     esac
 done
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+TOP="$(git rev-parse --show-toplevel 2>/dev/null)" && TOP="$(cd "$TOP" && pwd -P)"
 CLONE_ROOT="$(cd "$(dirname "$(git rev-parse --git-common-dir)")" && pwd)" || exit 0
 cd "$CLONE_ROOT" || exit 0
 
-HYDRATE="$CLONE_ROOT/scripts/hydrate_worktree.sh"
+# Sibling scripts come from the MAIN checkout, never from the worktree this copy
+# happens to run in: hydrate's --check/--dehydrate gates the destructive path,
+# and a worktree mid-edit on it (or on an old branch) must not swap in its own
+# logic. So: $CLONE_ROOT/scripts/<name> first — exactly what a consumer always
+# used — then the main checkout's copy at THIS script's repo-relative directory
+# (files/scripts/ in dev-cadence itself, where scripts/ does not exist and a
+# hardcoded path left the reaper blind to hydrate and the registry, TD-038),
+# and only then the copy beside this one.
+REL=""
+case "$HERE/" in "${TOP:-/nonexistent}"/*) REL="${HERE#"$TOP"}"; REL="${REL#/}" ;; esac
+sibling() {
+    local c
+    for c in "$CLONE_ROOT/scripts/$1" ${REL:+"$CLONE_ROOT/$REL/$1"} "$HERE/$1"; do
+        [[ -e "$c" ]] && { printf '%s\n' "$c"; return; }
+    done
+    printf '%s\n' "$CLONE_ROOT/scripts/$1"
+}
+HYDRATE="$(sibling hydrate_worktree.sh)"
+ANCHOR_DIR="$(dirname "$(sibling check_anchor.py)")"
+
+# Default branch — cadence.md §9 "Default-branch rule". Parity: this function is copied
+# verbatim into pre-push, reap_worktrees.sh, open_worktree.sh and hydrate_worktree.sh,
+# and default_branch() in the Python scripts follows the same rule; tests/test_default_branch.sh
+# runs every copy against the same fixtures. Prints a branch NAME, never empty.
+default_branch() {
+    local repo="$1" b
+    b="$(git -C "$repo" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)"
+    for b in "${b#origin/}" "$(git -C "$repo" config init.defaultBranch 2>/dev/null)" main master; do
+        if [[ -n "$b" ]] && git -C "$repo" rev-parse --verify -q "refs/remotes/origin/$b" >/dev/null; then
+            echo "$b"; return 0
+        fi
+    done
+    echo main
+}
+BASE="origin/$(default_branch .)"
 
 # Only fetch when a human is driving. In hook mode we have just pulled, so
 # origin/main is already current and a network call would slow every pull.
@@ -136,9 +206,9 @@ LOCKED="$(git worktree list --porcelain | awk '
 # genuinely redundant — mutation testing showed the `||` already covers the
 # missing-interpreter case, and an unreachable branch no test can pin is a
 # liability rather than defence in depth.
-LIVE_CWDS="$(python3 - <<'PY' 2>/dev/null
+LIVE_CWDS="$(ANCHOR_DIR="$ANCHOR_DIR" python3 - <<'PY' 2>/dev/null
 import os, sys, pathlib
-sys.path.insert(0, str(pathlib.Path("scripts").resolve()))
+sys.path.insert(0, os.environ["ANCHOR_DIR"])
 try:
     # An UNREADABLE or MISSING registry is not the same fact as an EMPTY one,
     # and live_sessions() returns [] for all three. Empty means "nobody is
@@ -154,7 +224,10 @@ try:
     # raises on both missing and unreadable, and the handler below turns any
     # OSError into the sentinel.
     os.listdir(pathlib.Path.home() / ".claude" / "sessions")
-    from check_anchor import live_sessions
+    from check_anchor import live_sessions, procfs_available
+    # No procfs: liveness is undeterminable, so idleness is too (TD-043).
+    if not procfs_available():
+        raise RuntimeError("no procfs")
     for s in live_sessions():
         cwd = s.get("cwd")
         if cwd:
@@ -168,6 +241,70 @@ if [[ "$LIVE_CWDS" == *__UNKNOWN__* ]]; then
     echo "warn: could not read the live-session registry — not reaping anything" >&2
     REAP=0
 fi
+
+# Print the ignored paths in worktree $1 that removing it would destroy (see
+# IGNORED FILES above), one per line; nothing means none. Exit non-zero when
+# git itself fails, which the caller treats as not clean.
+# Nested-worktree scan depth (TD-058) — a §7 parity pair: hydrate_worktree.sh's
+# find_nested_worktrees and reap_worktrees.sh's ignored_blockers() must agree on how deep
+# a nested worktree can sit, or one sibling is invisible to hydrate yet exempt in the
+# reaper. The deepest path configured in docs/nested-repos.txt, never less than 3. This
+# function is copied verbatim into both scripts; tests/test_reap_worktrees.sh pins that.
+nested_depth() {
+    local d
+    # the path is every word but the last (the mode), as hydrate's read_config() reads it,
+    # so a directory name with a space counts at its real depth
+    d="$(awk '{sub(/#.*/, "")} NF >= 2 {p = $0; sub(/[ \t]+[^ \t]+[ \t]*$/, "", p)
+              sub(/^[ \t]+/, "", p); sub(/^\.\//, "", p); sub(/\/+$/, "", p)
+              n = split(p, a, "/"); if (n > m) m = n}
+              END {print (m > 3 ? m : 3)}' "$1" 2>/dev/null)"
+    echo "${d:-3}"
+}
+NESTED_DEPTH="$(nested_depth "$CLONE_ROOT/docs/nested-repos.txt")"
+
+ignored_blockers() {
+    local wt="$1" entry p rel depth out
+    # A file, not $(...): command substitution drops the NULs -z separates on.
+    out="$(mktemp)" || return 1
+    if ! git -C "$wt" status --porcelain -z --ignored --untracked-files=all >"$out" 2>/dev/null; then
+        rm -f "$out"; return 1
+    fi
+    while IFS= read -r -d '' entry; do
+        [[ "$entry" == '!! '* ]] || continue
+        p="${entry#!! }"
+        rel="${p%/}"
+        case "/$rel/" in */__pycache__/*) continue ;; esac
+        [[ -L "$wt/$rel" ]] && continue
+        if [[ "$p" == */ && -f "$wt/$rel/.git" && -x "$HYDRATE" ]]; then
+            depth="${rel//[!\/]/}"
+            case "/$rel/" in */node_modules/*) ;; *)
+                [[ ${#depth} -le $(( NESTED_DEPTH - 1 )) ]] && continue ;;
+            esac
+        fi
+        # One line per path in the report, even for a name holding a newline.
+        printf '%s\n' "${p//$'\n'/\\n}"
+    done < "$out"
+    rm -f "$out"
+    return 0
+}
+
+# landed_of <branch>: yes | empty | no — the scoped landed test (header: THE LANDED
+# TEST IS SCOPED), shared by the worktree loop and the orphan-branch pass so there is
+# ONE implementation of it and its traps (comments in the worktree loop below).
+landed_of() {
+    local branch="$1" base files
+    base="$(git merge-base "$BASE" "$branch" 2>/dev/null)"
+    [[ -z "$base" ]] && { echo no; return; }
+    files=()
+    mapfile -d '' -t files < <(git diff --name-only -z "$base" "$branch" 2>/dev/null)
+    if [[ ${#files[@]} -eq 0 ]]; then
+        echo empty
+    elif git diff --quiet "$BASE" "$branch" -- "${files[@]}" 2>/dev/null; then
+        echo yes
+    else
+        echo no
+    fi
+}
 
 reapable=()
 reapable_branch=()
@@ -201,16 +338,7 @@ while read -r path; do
     # spaces anywhere in a tracked path has it.
     landed="no"
     if [[ "$branch" != "HEAD" && "$branch" != "?" ]]; then
-        base="$(git merge-base origin/main "$branch" 2>/dev/null)"
-        if [[ -n "$base" ]]; then
-            files=()
-            mapfile -d '' -t files < <(git diff --name-only -z "$base" "$branch" 2>/dev/null)
-            if [[ ${#files[@]} -eq 0 ]]; then
-                landed="empty"
-            elif git diff --quiet origin/main "$branch" -- "${files[@]}" 2>/dev/null; then
-                landed="yes"
-            fi
-        fi
+        landed="$(landed_of "$branch")"
     fi
 
     # clean: untracked scratch counts, because reaping it destroys it.
@@ -219,11 +347,21 @@ while read -r path; do
     # clean. Distinguish on exit status and report it as its own state — inert
     # today because `landed` gates first, but a check that cannot fail loudly
     # is one refactor away from being trusted.
+    blockers=""
     if git -C "$path" rev-parse --git-dir >/dev/null 2>&1; then
         if [[ -z "$(git -C "$path" status --porcelain --untracked-files=all 2>/dev/null)" ]]; then
             clean="yes"
         else
             clean="no"
+        fi
+        # Ignored scratch (header: IGNORED FILES), only where it can decide the
+        # verdict. A failing scan reads as not clean, never as nothing found.
+        if [[ "$clean" == "yes" && "$landed" == "yes" ]]; then
+            if ! blockers="$(ignored_blockers "$path")"; then
+                clean="no"; blockers="(git status --ignored failed)"
+            elif [[ -n "$blockers" ]]; then
+                clean="no"
+            fi
         fi
     else
         clean="gone"
@@ -278,29 +416,100 @@ while read -r path; do
     report+=$(printf '  %-34s %-22s landed=%-3s clean=%-3s idle=%-3s unlocked=%-3s nested=%-3s  %s\n' \
         "$(basename "$path")" "$branch" "$landed" "$clean" "$idle" "$unlocked" "$nested" "$verdict")
     report+=$'\n'
+    if [[ -n "$blockers" ]]; then
+        n=0
+        while IFS= read -r b; do
+            n=$((n+1))
+            [[ $n -le 5 ]] && report+="      ignored, would be destroyed: $b"$'\n'
+        done <<< "$blockers"
+        [[ $n -gt 5 ]] && report+="      … and $((n-5)) more (git -C $path status --ignored)"$'\n'
+    fi
 done < <(git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}')
 
-if [[ -z "$report" ]]; then
-    [[ $QUIET -eq 0 ]] && echo "no worktrees besides the main checkout"
+# --- ORPHAN BRANCHES (TD-032) -------------------------------------------------
+# A branch left behind when its worktree moved on (a worker's `checkout -b` per PR,
+# then `checkout --detach` at its next run) has no worktree, so the loop above never
+# sees it. Branch refs are ONE namespace across every worktree and workers reuse
+# names, so the gate is never "its remote head is gone": a reused name can carry new
+# unpushed commits by now. A branch is deletable only when ALL hold:
+#   - not the default branch, and not `main` (with the anchor parked elsewhere, the
+#     default has no worktree and reads as contained — it must never be a candidate);
+#   - not checked out in ANY worktree, and not the branch a rebase or a bisect in any
+#     worktree started from (both detach HEAD, so `worktree list` stops naming it; the
+#     name is in rebase-merge/ or rebase-apply/head-name, or BISECT_START);
+#   - contained: every commit already on origin/<default> (`rev-list BASE..b` is 0) —
+#     stricter than the worktree loop's `empty` (no net file change), because commits
+#     that net to nothing are still history someone made — OR landed=yes by the same
+#     scoped predicate the worktree loop uses (landed_of).
+# `--reap` deletes with `git update-ref -d <ref> <sha seen here>`: a compare-and-delete,
+# so a branch that gained a commit between this report and the delete survives.
+DEFAULT_BRANCH="${BASE#origin/}"
+held="$(git worktree list --porcelain | awk '/^branch refs\/heads\//{print substr($0,19)}')"
+while read -r wt; do
+    [[ -z "$wt" ]] && continue
+    gd="$(git -C "$wt" rev-parse --absolute-git-dir 2>/dev/null)" || continue
+    for f in "$gd/rebase-merge/head-name" "$gd/rebase-apply/head-name" "$gd/BISECT_START"; do
+        [[ -r "$f" ]] && held+=$'\n'"$(sed 's#^refs/heads/##' "$f")"
+    done
+done < <(git worktree list --porcelain | awk '/^worktree /{print substr($0,10)}')
+
+orphans=()
+orphan_sha=()
+orphan_report=""
+while IFS=' ' read -r ob osha; do
+    [[ -z "$ob" ]] && continue
+    [[ "$ob" == "$DEFAULT_BRANCH" || "$ob" == "main" ]] && continue
+    grep -qxF -- "$ob" <<< "$held" && continue
+    if [[ "$(git rev-list --count "$BASE..$osha" 2>/dev/null)" == "0" ]]; then
+        state="contained"
+    else
+        state="$(landed_of "$osha")"
+        [[ "$state" == "empty" ]] && state="net-empty"   # commits, no net change: kept
+    fi
+    if [[ "$state" == "contained" || "$state" == "yes" ]]; then
+        verdict="DELETABLE"; orphans+=("$ob"); orphan_sha+=("$osha")
+    else
+        verdict="keep"
+    fi
+    orphan_report+=$(printf '  %-58s landed=%-9s %s' "$ob" "$state" "$verdict")
+    orphan_report+=$'\n'
+done < <(git for-each-ref --format='%(refname:short) %(objectname)' refs/heads/)
+
+if [[ -z "$report" && -z "$orphan_report" ]]; then
+    [[ $QUIET -eq 0 ]] && echo "no worktrees besides the main checkout, and no branches without one"
     exit 0
 fi
 
-if [[ ${#reapable[@]} -eq 0 && $QUIET -eq 1 ]]; then
+if [[ ${#reapable[@]} -eq 0 && ${#orphans[@]} -eq 0 && $QUIET -eq 1 ]]; then
     exit 0   # hook mode: silent unless there is something to do
 fi
 
-echo "worktrees:"
-printf '%s' "$report"
+[[ -n "$report" ]] && { echo "worktrees:"; printf '%s' "$report"; }
+[[ -n "$orphan_report" ]] && { echo "branches without a worktree:"; printf '%s' "$orphan_report"; }
 
-if [[ ${#reapable[@]} -eq 0 ]]; then
+if [[ ${#reapable[@]} -eq 0 && ${#orphans[@]} -eq 0 ]]; then
     exit 0
 fi
 
 if [[ $REAP -eq 0 ]]; then
     echo
-    echo "${#reapable[@]} reapable — run scripts/reap_worktrees.sh --reap to remove"
+    echo "${#reapable[@]} reapable worktree(s), ${#orphans[@]} deletable branch(es) — run scripts/reap_worktrees.sh --reap to remove"
     exit 0
 fi
+
+for i in "${!orphans[@]}"; do
+    ob="${orphans[$i]}"
+    # Re-check at the destructive step: a worktree may have checked it out since.
+    if git worktree list --porcelain | grep -qxF "branch refs/heads/$ob"; then
+        echo "branch $ob is checked out now — left alone" >&2
+        continue
+    fi
+    if git update-ref -d "refs/heads/$ob" "${orphan_sha[$i]}" 2>/dev/null; then
+        echo "deleted branch $ob (was ${orphan_sha[$i]:0:7})"
+    else
+        echo "branch $ob moved since the report — left alone" >&2
+    fi
+done
 
 for i in "${!reapable[@]}"; do
     path="${reapable[$i]}"
@@ -339,5 +548,6 @@ for i in "${!reapable[@]}"; do
     fi
 done
 
-[[ -x "$CLONE_ROOT/scripts/generate_workspace.sh" ]] && "$CLONE_ROOT/scripts/generate_workspace.sh" >/dev/null
+GENWS="$(sibling generate_workspace.sh)"
+[[ -x "$GENWS" ]] && "$GENWS" >/dev/null
 exit 0
