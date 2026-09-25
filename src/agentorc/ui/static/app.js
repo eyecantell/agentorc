@@ -1778,6 +1778,7 @@
       // outlined Close session on the acts line; the side card's small Close is the same act.
       const ready = !!(checks.length && checks.every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
       $("#closebtn").disabled = !ready;
+      $("#closebtn").classList.toggle("hidden", !v.own);  // a member's checklist has no button: its Close is more ▾'s
       const cm = $("#fclosemenu"); if (cm) cm.disabled = !ready;
       // …and the next act only on the person's own session (`own`): a team member runs itself
       $("#fready").classList.toggle("hidden", !(ready && v.own));

@@ -158,7 +158,7 @@
     {# open on the person's own session, folded on a team member (TD-156, Paul: *a user will presume
        the team members behave correctly and close when they are supposed to*) #}
     <details class="card pad side" data-side="ready"{% if s.own %} open{% endif %}>
-      <summary class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped." disabled>Close</button></summary>
+      <summary class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm{% if not s.own %} hidden{% endif %}" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped." disabled>Close</button></summary>
       <div class="checks" id="checks"></div>
       <div class="note">{% if s.own %}Closing is your act; the checklist only says when it is ready.{% else %}A team member is closed by its team's Wind down or Start once these pass; Close this one alone is under more ▾.{% endif %}</div>
     </details>
