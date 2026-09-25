@@ -37,7 +37,7 @@ from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
-from sessionorc.models import GRANTS, STATE_RANK, has_control, report_head, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, has_control, normalize_ref, report_head, report_line, stop_note
 
 from . import render as rendermod
 from . import uiconf
@@ -1600,6 +1600,30 @@ def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
     return argv, ""
 
 
+def _same_ref(a: Any, b: Any) -> bool:
+    """One reference, as the host agent stores it (`normalize_ref`: `td-27` is `TD-027`)."""
+    try:
+        return normalize_ref(str(a or "")) == normalize_ref(str(b or ""))
+    except ValueError:  # an empty reference names nothing
+        return False
+
+
+def review_pr(progress: Collection[dict[str, Any]], ref: str) -> int | None:
+    """The PR a claim on `ref` is in review as (design §4.5a *Focus side panel → Reports*, TD-150),
+    or None: a declared `claimed` entry's own `pr`, else the `review_pr` its record carries for its
+    branch — the rule `AO.reportGroups` draws the panel by, so the panel and the refusal agree. No
+    derived entry shares a declared one's reference (§9 invariant 10), so there is no third."""
+    for p in progress:
+        if not isinstance(p, dict) or not _same_ref(p.get("ref"), ref) or p.get("status") != "claimed":
+            continue
+        if (p.get("source") or "declared") != "declared":
+            continue
+        got = p.get("review_pr") or p.get("pr")
+        if isinstance(got, int) or str(got or "").isdigit():
+            return int(got)
+    return None
+
+
 def board_choices(roots: Collection[str | Path] | None = None) -> list[dict[str, str]]:
     """The boards *Put on the board* may write to (design §4.5a *Inbox row: FYI*, TD-140): each
     checkout this host's repos registry names that carries a board, as `{label, root, board}` with
@@ -2806,6 +2830,18 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ref = str(body.get("ref") or "").strip()
             if not ref:
                 raise HTTPException(400, "drop needs the reference to drop")
+            # TD-150 slice 2 (§4.5a *Reports*): not while a PR from that claim is open — the claim
+            # in review is the one a person reading the panel must not let go (TD-143)
+            s = await call("get", id=sid)
+            pr = review_pr(s.get("progress") or [], ref)
+            if pr:
+                # the record cannot yet say whether that PR is still open (slice 3 brings its state),
+                # so the refusal says what ends it either way
+                raise HTTPException(
+                    409,
+                    f"{ref} is in review as PR #{pr}: a claim with a PR is not dropped — it ends when the "
+                    "session reports it done or dropped, once the PR is merged or closed",
+                )
             await call("progress", id=sid, ref=ref, status="dropped", why=body.get("why") or "dropped from Focus")
         elif action == "stop":
             # design §4.5a Focus header **stops** badge → click to edit (§6, TD-026). The stop time
