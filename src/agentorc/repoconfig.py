@@ -457,7 +457,8 @@ def resolve_role(cfg: RepoConfig, name: str, roles_overlay: dict[str, dict[str, 
         if "label" in block:
             role.label = block["label"]
         if "review" in block:
-            # every layer through the one check: `org.yml`'s `roles:` reaches here unchecked
+            # every layer through the one check — the org's `roles:` is checked when read too (TD-149), and
+            # `normalize_review` is idempotent, so a second pass over its output changes nothing
             try:
                 role.review = normalize_review(block["review"])
             except ValueError as e:
