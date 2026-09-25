@@ -105,6 +105,10 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Open — design-first |
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Open — design-first |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
+| TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Open — design-first |
+| TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Open — design-first |
+| TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Open — design-first |
+| TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
 
 
 ---
@@ -1920,7 +1924,7 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Why:** the buttons are named for what they do to a record — Forget, Start, Wind down, Stop now, Kill, Close, Resume, New session here — and a person meets them at the moment they matter, on a card whose state they are trying to change, with no way to learn the difference between two of them but the design document. The two Paul asked about are the two whose consequence is least visible: **Forget** removes the record — the card and its history under Resumable — and keeps the worktree and the pane's run log readable until then, which is why a card carrying the dirty / unpushed flag is named apart in *Forget all* (§4.5a); a person wants it when a finished session's card is clutter and its work is merged or gone, and never as a way to stop anything (it refuses a live record). **Start** on a concluded team is not a message: it is `ao team start` — every check first, then the concluded sessions closed under the wrap-up's safety check, then the manager and members created from the definition with their briefs (§4.9a); a person wants it to run the team again, and mails a session (**Message**) when they want a running one to do something. That distinction is exactly what a button label cannot carry and what an *i* mark or a confirm's first line can.
 
-**What the design round has to settle:** (a) **the surface** — an *i* mark per control group (the card's foot, the team card's header, the Focus header) opening the same paragraph shape the Inbox's marks use: *what it does · when you would press it · what it does not do*; or a **Help** page reachable from the top bar that lists every control by screen; or the confirm's first line carrying the *what* (Start's already does: *It first closes designer-ao-1 …*); likely the marks with the page behind them; (b) **the source** — the text is written once, in §4.5a's third column or a fourth *help* column, and the page and the marks are generated or checked against it by a test, so the table stays the one place a control is defined; (c) **the first set** — Forget, Forget all, Start, Wind down, Stop now, Kill, Close, Resume, Wrap up, Message, the fold, Switch profile; (d) the keyboard: an *i* mark is a tab stop and its text is its `aria-describedby`; (e) the mockups.
+**What the design round has to settle:** (a) **the surface** — an *i* mark per control group (the card's foot, the team card's header, the Focus header) opening the same paragraph shape the Inbox's marks use: *what it does · when you would press it · what it does not do*; or a **Help** page reachable from the top bar that lists every control by screen; or the confirm's first line carrying the *what* (Start's already does: *It first closes designer-ao-1 …*); likely the marks with the page behind them; (b) **the source** — the text is written once, in §4.5a's third column or a fourth *help* column, and the page and the marks are generated or checked against it by a test, so the table stays the one place a control is defined; (c) **the first set** — Forget, Forget all, Start, Wind down, Stop now, Kill, Close, Resume, Wrap up, Message, the fold, Switch profile; (d) the keyboard: an *i* mark is a tab stop and its text is its `aria-describedby`; (e) the mockups; (f) **whether a member the definition names should offer Forget at all** (Paul, 2026-09-25, at the wound-down ao-grind: *if a team is defined to have those roles, should they be forget-able?*) — today an on-call seat offers no Forget while the definition names it (§4.5a *team card: Forget all*) and a member does; Forget drops the record and its mail and nothing spins back up, since Start recreates from the definition, so the round says whether a named member's Forget stays, goes, or is folded into Start and Forget all.
 
 **Done when** a person at a concluded team's card can learn, without leaving the page, that Forget drops the record and keeps the worktree, and that Start closes the concluded sessions and runs the team again from its definition, and the sentence they read is §4.5a's.
 
@@ -1966,3 +1970,82 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** design §4.2, §4.8, §8; `docs/decisions/2026-09-06-adopt-dev-cadence.md` (why it was adopted, what it changed); TD-035, TD-055, TD-070, TD-118, TD-125, TD-126, TD-142 (the clauses); dev-cadence cadence.md §3 (who makes a change to a synced file).
 
+## TD-160: A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *I should probably start having interactive sessions on the team itself to prove the project and get the benefits — tmux so stays alive, and PRs get routed automatically through the techlead*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+
+**Status:** Open — nothing designed. The mechanism exists in the design; what is missing is the role and the form.
+
+**Location:** design §4.9b (the `plain: {review: {reader: techlead}}` example, *a person's own interactive session inside a team*), §4.5a *New session* rows (Role, Controllers, Where, Project, Until, At — no Team), §4.7 `ao new --team`; `src/agentorc/cli.py` (`--team`, whose help reads *a badge, nothing keys on it*); `~/.agentorc/org.yml` `roles:` (only `grinder` and `designer` carry `review:`); the New session form's template.
+
+**Why:** the design's safety net for a person working inside a team is the reader: a `--team` session whose role carries `review:` has its held PRs read by the techlead, as a grinder's are. Today no role a person would start under carries it, so a person's team session merges its own PRs by ordinary cadence, and the one benefit Paul named does not arrive. The badge lands from the CLI only; the browser's New session form cannot put a session in a team, so the org's page cannot start the session that would prove the org. Paul's agentorc questions run in cloud sessions, which can never join the org (ADR 2026-09-24); a team session in tmux is the way to move them in, and it should be one press.
+
+**What the design round has to settle:** (a) **the role** — a `plain` (or `person`) role in the org's `roles:` with `review: {reader: techlead, held: [...]}` and the held paths for agentorc, or `review:` defaulted for any `--team` session whose team has a techlead; (b) **the Team field** on New session — a picker over the org's team definitions, filtering the role list to that team's roles plus `plain`, prefilling `controllers` from the team's manager as `ao new --team` would; (c) **what `team` keys on** once it is more than a badge — the card lands in the team's group, the team's counts include it, Wind down and Stop now leave a person's attended session alone or ask; (d) the CLI help line, once (c) is true.
+
+**Done when** Paul starts a session on ao-grind from the New session form, its card sits in the team's group, and a PR it opens on a held path waits on the techlead seat (`ao pr held <n>` says so).
+
+**Related:** §4.9b (the reader, TD-075), §4.5a *New session*, §4.9 (team definitions), ADR 2026-09-24 (cloud sessions cannot join), TD-162 (who a person in the team messages), TD-161 (the prompts they press).
+
+## TD-161: Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *lets talk about adding on-demand buttons for interactive sessions and what that might look like*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+
+**Status:** Open — nothing designed.
+
+**Location:** design §4.5a *Focus composer* (**Send**, **Attach**), §4.5a *Inbox row: state* (*Reopen and push* — the precedent: a first prompt the page wrote, fixed text in the source, never anything a session said), §4.8 role presets, §5 (`roles:` in `.agentorc.yml` and `org.yml`), §4.5 screen 5 (Commands — the button that runs a script, phase 4, TD-123); `src/agentorc/ui/templates/focus.html` (the composer), `src/agentorc/ui/static/app.js`.
+
+**Why:** the design has two on-demand buttons: a Commands button runs a script as a `kind: command` session, and a role preset starts a session shaped for a job. Neither presses a prompt into a running interactive session. What a person types by hand into their own session, again and again — *review PR n*, *sweep stranded work*, `/cadence`, *what is waiting on me* — is a saved prompt, and the rule for one already exists in *Reopen and push*: fixed text from the source, typed by the page, never something a session said. Claude Code's own slash commands cover the case at the keyboard; the button's worth is the browser and the phone, where a person steers a session without a keyboard to type into.
+
+**What the design round has to settle:** (a) **where the text lives** — a `prompts:` list on the role preset (org and repo `roles:`, layered as presets are), each `{label, text}`, so a grinder's chips differ from a plain session's; (b) **the surface** — chips beside Send on the Focus composer, drawn only on an interactive session (an unattended session's composer is closed, TD-096), each press filling the composer or sending outright, and whether the chip reads **Steer** while a turn is in flight as Send does; (c) **on New session** — the same list offered as the first prompt, beside the brief the preset fills; (d) **bounds** — a chip is a Send and nothing more: no grant, no schedule, no state on the record; (e) the §4.5a rows and the mockup.
+
+**Done when** Paul, on his own team session's Focus from a phone, presses one chip and the session starts the turn with that text, and the chip's text is readable in `org.yml` or `.agentorc.yml` and nowhere else.
+
+**Related:** §4.5a *Focus composer*, *Inbox row: state* (Reopen and push), §4.8, TD-123 (Commands, the other button), TD-160 (the session the chips are for), TD-157 (an *i* mark per chip is the same mechanism).
+
+## TD-162: When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *add info icons to each team member's message button to say when you would want to message them*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+
+**Status:** Open — nothing designed. Paul suggested the profiles as the home for the line; a profile is tool · account · model (§4.2a) and says nothing about a job, so the role preset (§4.8) is the candidate — the round confirms.
+
+**Location:** design §4.5a **Message** (the composer), §4.8 *Role names* and the presets, §4.9 (manager, techlead, members: who does what), §4.9b (an `ask` fills the seat); TD-157 (the *i* mark per control), TD-158 (what the composer says about when the message is read); `src/agentorc/ui/templates/base.html` (`#mailbox`), `src/agentorc/ui/static/app.js` (`AO.compose`).
+
+**Why:** every card's Message opens the same composer, and the design's answer to *who do I message* is spread over §4.9: the manager for what the team works on, the techlead for a PR or the architecture, a grinder only about its own card. A person at the Org sees six Message buttons and no reason to pick one over another; the wrong pick costs a wake budget and a round of passing up. The role knows its own job — the brief says it — so one sentence per role, *message me when …*, drawn where the choice is made, lets the person choose before typing. TD-158 says *when* the message will be read; this says *whether this is the one to send it to*.
+
+**What the design round has to settle:** (a) **the field** — `message:` on the role preset (built-in presets carry a default: manager, techlead, grinder, hunter, auditor, designer), overridable in org and repo `roles:`, one sentence; (b) **the surfaces** — the *i* mark on the card's Message and in `more ▾` (TD-157's mechanism), and the line at the top of the composer under the addressee's name, beside TD-158's when-read line; (c) **a team-level pointer** — on the team header, *questions to the manager; PRs to the techlead*, generated from the same fields; (d) whether a session may rewrite its own line (the entry's view: no, it is the definition's, in the spirit of §9 invariant 9 — a preset sets defaults at start and is a badge afterwards; the round decides); (e) the mockup.
+
+**Done when** a person hovering the Message *i* on the techlead's card reads what it is for, and the composer repeats the line above the text box.
+
+**Related:** §4.5a **Message**, §4.8, §4.9, §4.9b, TD-157, TD-158, TD-160 (the person in the team who needs this most).
+
+## TD-163: Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *a button on the team card to add/remove a member, e.g. a grinder, that would change the team definition*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+
+**Status:** Open — nothing designed. It crosses a line drawn today: the settings audit (ADR 2026-09-25 §5) says *a definition says what a team is and belongs in its file, by hand or by PR; a setting is a number a person turns* — and its §2 calls the org file *a team editor in waiting*. This is the first control that edits a definition from the page, and the round has to say so in the ADR's terms.
+
+**Location:** ADR `docs/decisions/2026-09-25-settings-audit.md` §5 and its open decisions, design §4.5 screen 8 (Settings: **Teams** — schedule, until, reserve; no members), §4.5a *Org: team card* (Start / Wind down / Stop now, Forget all), §4.9 (a team definition: manager, techlead, members with role, name, lane, brief), §5 (`org.yml` `teams:`; a repo's `.agentorc.yml` `teams:`), §4.4a (the org file is read per call, clients only, never the agent); `~/.agentorc/org.yml`; TD-146–148 (the settings file, replica and page).
+
+**Why:** growing or shrinking a running team is the one change a person makes by watching it — a third grinder contends on the ledger, a second designer is needed for a review week — and today it is a hand edit of `org.yml`, then `ao team start` to pick it up, with nothing on the page that says the definition and the run now differ. A member is a definition, not a setting, so the Settings page as designed does not hold it; but the act is a person's, one press, on the team's own card, which is where every other team control lives.
+
+**What the design round has to settle:** (a) **what is edited** — `org.yml`'s `teams.<team>.members` (add: role, name, lane, brief from the role's defaults; remove: by name), written by the client that serves the page as `ao` would, with the file's comments preserved or the edit refused when they cannot be; a repo-defined team (`.agentorc.yml`) is a PR's and the control says so; (b) **when it takes effect** — on a running team, add creates the member at once under the manager (the same create `ao team start` does for one member) and remove is a Wind down of that one member; on a stopped team, the definition only; (c) **the surface** — **Members…** on the team card's header beside Start, a dialog listing the definition's members with add and remove, the same shape as the Focus **Members** view; or the Settings **Teams** section gaining a members table — the ADR's line argues for the card; (d) **what a removed member's record does** — it stays a card until Forget, as any exited member's does; (e) the mockup and the §4.5a rows.
+
+**Done when** Paul adds a grinder to ao-grind from its card while it runs, the member appears under the manager without a restart, and `org.yml` shows the member with the comment block above it intact.
+
+**Related:** ADR 2026-09-25 §5 (definition versus setting), TD-146–148 (the Settings page), §4.5a *Org: team card*, §4.9, TD-157 (Forget on a defined member — the same question from the other side), TD-160 (a person as a member).
