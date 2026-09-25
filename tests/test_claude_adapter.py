@@ -375,7 +375,9 @@ def test_hook_script_queues_when_agent_down(tmp_path, monkeypatch):
     cp = run_hook("ao-x-y", {"hook_event_name": "Stop", "session_id": "u"})
     assert cp.returncode == 0
     q = (tmp_path / "home" / "events" / "ao-x-y.jsonl").read_text().strip()
-    assert json.loads(q) == {"adapter_id": "u", "state": "idle", "pending": None}
+    got = json.loads(q)
+    assert isinstance(got.pop("at"), float)  # when it happened, for the drain's order (TD-169)
+    assert got == {"adapter_id": "u", "state": "idle", "pending": None}
 
 
 async def test_a_refused_hook_is_never_queued(agent, tmp_path):
