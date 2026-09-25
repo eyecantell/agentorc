@@ -101,6 +101,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-153 | Sessions poll for mail in foreground loops instead of going idle to be rung: the doorbell is built, and nothing tells a session it will be woken | High | Open |
 | TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Open — design-first |
 | TD-155 | A resumed session that starts no turn reads `working` until it stalls: `SessionStart` with source `resume` lands at the composer and fires no `Stop` | Medium | Open |
+| TD-156 | UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel, and a concluded team folds the card that is ready to close | Medium | Open — design-first, Paul's interactive review |
 
 
 ---
@@ -1878,3 +1879,23 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a one-press Resume with no prompt shows `idle` within a tick, never `stalled?`, and the doorbell rings it for mail that lands after the resume.
 
 **Related:** TD-090 (the `compact` exemption, the same shape), TD-081 / TD-145 (Resume), TD-153 (the doorbell needs a hook-confirmed idle), §4.2.
+
+## TD-156: UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel, and a concluded team folds the card that is ready to close
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: he wrapped up the resumed designer and could not find a Close)
+**Owner:** paul
+**Kind:** design-first
+**Pickable:** no — Paul's interactive UI review, likely a cloud session (board line, due 2026-09-30); the design changes it yields go to the designer or a grinder afterwards
+
+**Status:** Open — nothing designed. What happened, as the seed for the review, 2026-09-25 15:15Z on the designer resumed by Paul (TD-155's record):
+
+1. Paul pressed **Wrap up** on Focus. The session declared *out of work* (`ao progress none`, the wrap-up's words), the record reads `idle` with every Ready-to-close check passing (*tree clean*, *branch pushed*, *no subagents running*, *outcomes reported*). Nothing closes it: a person's Wrap up is only the prompt (§4.5a *Focus: Wrap up*); the policy's `run_until` path is what kills after a wrap-up, and it applies to a stop time, never a press (`_enforce_run_until`). *Closing is your act; the checklist only says when it is ready* (the side panel's own note). That is the design (§2, goal *only the person closes it*) and this entry does not question it.
+2. On **Focus** the header reads *Pop out · Open shell here · VS Code · Copy · Paste · Message · Wrap up · ✕ Kill* — Kill in red as the only stop in sight. **Close** is a small button in the side panel's *Ready to close* card (`focus.html`, `#closebtn`, enabled by `app.js` when every check passes and the state is `idle` or `exited`), below the Reports and Inbox panels, where Paul did not find it. §4.5a says exactly this — *Focus side panel: diff / log / PRs, run-log link, Close* — so the build is faithful and the design is what the review has to change: the card's rule (§4.5 *The card's anatomy*: the next act is the one outlined button in the foot, **Close session** on *ready to close ✓*) has no counterpart on Focus, whose header shows the same controls whatever the session's state.
+3. On **Org** the card was there but hidden: the `ao-grind` team had concluded (its manager exited), and a team with nothing live folds its cards behind *n sessions — show* (§4.5a *team groups*). The designer, `idle` and ready to close, counts as nothing live for the fold (`live: 0 if g["stopped"]`, `app.py`), so the header read *concluded 6m ago · out of work · 1 idle · 1 on call · 3 exited · 5 sessions* with a **Start** button, and Paul read it as *already closed*. The folded card carries the caption *ready to close ✓* and the **Close session** button, but the fold hides both, and the header's counts do not say that one of the five is a live session waiting for a press.
+
+**What the review has to settle:** (a) **Focus after a wrap-up** — when Ready to close passes, does the header carry **Close session** as the outlined next act (the card's rule applied to Focus), with Kill behind *more* or kept as the danger it is; and does the *out of work* badge in the header say *ready to close ✓ · Close* the way the card's slot and caption do; (b) **a concluded team's fold** — a session still there (`idle`, `exited` with a pane) is *live* for the fold, or the fold header carries *1 ready to close* with the Close a press away, or the folded group unfolds itself while it holds anything a person must still close; (c) **what Wrap up promises** — the button's label or its confirm says what happens next (*asks it to finish and push; you close it when the checklist passes*), so a person is not left waiting for a close that is theirs to press; (d) **Kill's place** — whether a `ready to close ✓` session should offer Kill at all, since Close does the same kill after the checks; (e) the mockups (`docs/mockups/gen.py`) for Focus at *ready to close* and for a concluded team holding one.
+
+**Done when** Paul, having pressed Wrap up on a session, sees on the same screen the one press that closes it once it is ready, and a team card with a session waiting to be closed says so without unfolding.
+
+**Related:** §4.5 *The card's anatomy* (the outlined next act), §4.5a *Focus: Wrap up*, *Focus: Kill*, *Focus side panel: Close*, *card: Close session*, *Org: team groups* (the fold), §4.9a (a declaration is not a state), TD-081 / TD-145 / TD-155 (the resumed session this was seen on), TD-154 (reading a transcript, the other reason the session was resumed at all), TD-095 (the card's foot and slot).
