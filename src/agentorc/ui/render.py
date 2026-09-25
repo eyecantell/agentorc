@@ -146,12 +146,10 @@ def render(text: str, origin: str | None = None) -> str:
     return "".join(out)
 
 
-def fold(text: str) -> tuple[str, str]:
-    """design §4.5a *Inbox row: details*: `(lead, rest)` — the first paragraph, up to the first
-    blank line (one inside a code block does not count), and the rest; for text with no blank line
-    and longer than `FOLD_CHARS`, the lead ends at the last sentence end before that, else at
-    `FOLD_CHARS`. `rest` is empty when there is nothing to fold, and the row then draws no
-    disclosure."""
+def paragraph_break(text: str) -> tuple[str, str] | None:
+    """`(first paragraph, the rest)` split at the first blank line — one inside a code block does
+    not count, and `\r\n` is a line break — or None when the text has no such line. The one
+    definition of *a blank line* that `fold` and `ao msg`'s shape warning share (design §4.10)."""
     t = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     lines = t.split("\n")
     fenced = False
@@ -160,6 +158,18 @@ def fold(text: str) -> tuple[str, str]:
             fenced = not fenced
         elif not fenced and not line.strip():
             return "\n".join(lines[:i]).rstrip(), "\n".join(lines[i + 1 :]).strip()
+    return None
+
+
+def fold(text: str) -> tuple[str, str]:
+    """design §4.5a *Inbox row: details*: `(lead, rest)` — the first paragraph, up to the first
+    blank line (`paragraph_break`), and the rest; for text with no blank line and longer than
+    `FOLD_CHARS`, the lead ends at the last sentence end before that, else at `FOLD_CHARS`. `rest`
+    is empty when there is nothing to fold, and the row then draws no disclosure."""
+    split = paragraph_break(text)
+    if split is not None:
+        return split
+    t = (text or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     if len(t) <= FOLD_CHARS:
         return t, ""
     ends = [m.end() for m in _SENTENCE_END.finditer(t, 0, FOLD_CHARS)]

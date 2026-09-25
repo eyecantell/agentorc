@@ -936,6 +936,10 @@ def test_the_shape_warning_counts_the_first_paragraph():
     unbroken = ("a sentence of eight words said at length. " * 10).strip()  # 80 words, over 300 characters
     assert "80 words" in (cli.shape_warning(unbroken) or "")
     assert cli.shape_warning("x" * 250) is None  # one long word under the backstop: nothing to fold
+    # the blank line is the Inbox row's own: `\r\n` counts, and one inside a code block does not
+    assert cli.shape_warning("merged #9\r\n\r\n" + ninety) is None
+    fenced = "```\na\n\nb\n```\n" + unbroken
+    assert "words" in (cli.shape_warning(fenced) or "")
 
 
 def test_msg_to_the_person_warns_on_an_unshaped_message_and_sends_it(subprocess_agent, tmp_path, capsys, monkeypatch):

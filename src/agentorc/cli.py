@@ -1147,17 +1147,18 @@ def shape_warning(text: str) -> str | None:
     """The one line `ao msg` prints when a message the person will read is not shaped for them
     (design §4.10): its first paragraph runs past `FIRST_PARA_WORDS`, or it has no blank line and
     runs past the Inbox's `FOLD_CHARS`, where the row cuts it at a sentence for them. It warns and
-    never refuses: mail is never lost to a style rule. The split is the Inbox row's own (`fold`),
-    so what is counted here is what the row draws."""
-    from agentorc.ui.render import FOLD_CHARS, fold
+    never refuses: mail is never lost to a style rule. The blank line is the Inbox row's own
+    (`paragraph_break`, which `fold` uses), so what is counted here is what the row draws."""
+    from agentorc.ui.render import FOLD_CHARS, paragraph_break
 
-    t = text.strip()
-    if not re.search(r"\n[ \t]*\n", t):  # no blank line: the whole text is its first paragraph
+    split = paragraph_break(text)
+    if split is None:  # no blank line: the whole text is its first paragraph
+        t = text.strip()
         words = len(t.split())
         if words <= FIRST_PARA_WORDS and len(t) <= FOLD_CHARS:
             return None
     else:
-        words = len(fold(t)[0].split())
+        words = len(split[0].split())
         if words <= FIRST_PARA_WORDS:
             return None
     return (
