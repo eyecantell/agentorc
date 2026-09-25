@@ -96,7 +96,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-148 | Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab | Medium | Open — designed, pickable after TD-146 |
 | TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Open — pickable |
 | TD-150 | Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session | Medium | Open — designed, pickable |
-| TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed, pickable |
+| TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed; held, not pickable, while the design is reconciled (2026-09-25, a cloud session with Paul) |
 
 
 ---
@@ -1780,7 +1780,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (the designer; TD-128's design round, PR #547)
 **Owner:** grinder
 **Kind:** build
-**Pickable:** yes
+**Pickable:** no — **held 2026-09-25 (Paul):** the design is being reconciled against a cloud session's proposal (per-account spend, cache token prices, where spend lives between ticks, the Settings row, `limited`); the reconciliation PR sets this back to yes and rewrites the slices below
 **Status:** Open — designed, nothing built; no metered profile runs today, so the build is proven on the test adapter and on a Claude Code profile with an API key when Paul declares one. Design: §4.2a *How a profile is billed*, §4.3 *Spend per turn*, §6 *Usage gate* (the amount reserve), §4.5a *usage chip*, §5 `usage_gate:`.
 
 **Location:** `src/agentorc/profiles.py` and `~/.agentorc/profiles.yml` (`billing`, the prices, validation), `src/agentorc/adapters/claude_code/` (`spend()` from the transcript's top-level `assistant` entries' `usage`, read on the tick beside the model in use), `src/agentorc/adapters/__init__.py` (the contract: `spend`, `Turn`), `src/sessionorc/agent.py` (the sum per profile per window into `Usage(windows=[…])`, the `pct` from the reserve's amount, the pause at the amount, the note at eight tenths, `next` at the boundary), `src/sessionorc/settings.py` (an amount reserve: `$n`, `n tok`, `nM tok`; refused against a subscription profile and a percent against a metered one), `src/agentorc/cli.py` (`ao gate` takes the same values; `ao status -v` prints spend), `src/agentorc/ui/app.py` and the top bar (the chip's metered form, *spend unknown*), the Settings page's budget row (TD-148), `tests/`.
