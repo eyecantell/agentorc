@@ -168,6 +168,7 @@
 <div class="row gap wrap mfoot">
   <span class="st">it was a <b>{{ e.kind }}</b> row{% if e.for_words %}, up for {{ e.for_words }}{% endif %} — it left the Inbox without you answering it, so it is here</span>
   <span class="grow"></span>
+  {{ put_btn(e) }}
   <button class="btn sm ghost" data-act="dismiss" data-id="person" data-msg="{{ e.id }}">Dismiss</button>
 </div>
 {%- endmacro %}
@@ -240,6 +241,14 @@
 </div>
 {%- endmacro %}
 
+{# §4.5a **Inbox row: FYI** → **Put on the board** (TD-140): the one door from mail to a board, on
+   FYI rows only — a `note`, a closed question, a trail row — drawn by the two macros FYI reaches and
+   by no other, so an open `ask` or `steer`, whose *later* is Snooze, never shows it. It opens the
+   page's form (`#boardadd`) with the sender's repo's board, when there is one, and the text. #}
+{% macro put_btn(e) -%}
+<button class="btn sm ghost" data-act="board_add" data-id="person" data-msg="{{ e.id }}" data-board="{{ e.board_default or '' }}" data-text="{{ e.text or '' }}" title="one line on a board, with a Due date — committed there, never pushed — and this entry dismissed">Put on the board</button>
+{%- endmacro %}
+
 {# §4.5a **Inbox row: `note` and the rest of FYI** — the text; **Dismiss** deletes. No Reply here,
    on a `system` note least of all: it reports what happened to your own message, and there is
    nobody to reply to (§4.10). #}
@@ -254,6 +263,7 @@
   {%- set st = state_line(e) | trim %}
   {%- if st %}<span class="st">{{ st }}</span>{% endif %}
   <span class="grow"></span>
+  {{ put_btn(e) }}
   <button class="btn sm ghost" data-act="unmail" data-id="person" data-msg="{{ e.id }}" data-confirm="Dismiss this entry? It leaves your inbox; the sender keeps its copy.">Dismiss</button>
 </div>
 {%- endmacro %}

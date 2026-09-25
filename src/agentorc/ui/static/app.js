@@ -200,6 +200,43 @@
     });
   };
 
+  // design §4.5a **Inbox row: FYI** → **Put on the board** (TD-140): the page's form (`#boardadd`),
+  // opened with the row's board and text. Resolves to the agent's answer once the line is on the
+  // board, or null on Cancel. A refusal is drawn in the form and leaves it open, so the person can
+  // pick another board or fix the date rather than start again from the row.
+  AO.boardAdd = function (b) {
+    const dlg = $("#boardadd");
+    if (!dlg) { AO.toast("Put on the board: this page has no form for it"); return Promise.resolve(null); }
+    const sel = $("#baboard"), text = $("#batext"), due = $("#badue"), err = $("#baerr"), go = $("#bago");
+    err.hidden = true; err.textContent = "";
+    if (sel) {
+      const want = b.dataset.board || "";
+      const opts = [...sel.options].map((o) => o.value).filter(Boolean);
+      sel.value = opts.includes(want) ? want : opts.length === 1 ? opts[0] : "";
+    }
+    // the entry's first paragraph, on one line: a board item is one line (§4.4)
+    if (text) text.value = String(b.dataset.text || "").split(/\n\s*\n/)[0].split(/\s+/).filter(Boolean).join(" ");
+    if (due) due.value = "";
+    dlg.querySelectorAll("[data-bawhen]").forEach((w) => { w.onclick = () => { due.value = boardDue(w.dataset.bawhen); }; });
+    return new Promise((resolve) => {
+      let done = null;
+      if (go) go.onclick = async () => {
+        const body = { action: "add", msg: b.dataset.msg, board: sel.value, text: text.value.trim(), due: due.value };
+        const miss = !body.board ? "pick a board" : !body.text ? "say what is needed" : !body.due ? "give it a Due date" : "";
+        if (miss) { err.textContent = miss; err.hidden = false; return; }
+        go.disabled = true;
+        try {
+          done = await act("person", "board", body);
+          dlg.close("done");
+        } catch (e) {
+          err.textContent = `not put on the board: ${e.message}`; err.hidden = false;
+        } finally { go.disabled = false; }
+      };
+      dlg.addEventListener("close", () => resolve(done), { once: true });
+      dlg.returnValue = ""; dlg.showModal(); (text || dlg).focus();
+    });
+  };
+
   document.addEventListener("click", async (ev) => {
     const b = ev.target.closest("[data-act], [data-copy]");
     if (!b) return;
@@ -323,6 +360,15 @@
       // session's id or the filled-in form to finish by hand — *it is not a guess*. **Resume with
       // changes…** and **Reopen and push** are the same route: the first asks for the form
       // outright, the second adds the page's own first prompt.
+      if (action === "board_add") {
+        const res = await AO.boardAdd(b);
+        if (!res) return;
+        AO.toast(res.dismiss_refused
+          ? `on the board, committed — but the entry stayed: ${res.dismiss_refused}`
+          : "on the board — committed there, not pushed; the entry is dismissed", true);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       if (action === "resume-form") {
         const r = await act(id, "resume", { form: true });
         location.href = r.form || `/new`;

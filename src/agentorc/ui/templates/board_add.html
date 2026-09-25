@@ -1,0 +1,32 @@
+{# design §4.5a **Inbox row: FYI** → **Put on the board** (TD-140): the form the row's button opens.
+   The board is the sender's repo's when the row knows it, else a pick from this host's registered
+   repos that carry one; the text is the entry's, editable, one line (a board line is *what's
+   needed* in the person's words); **Due** is +1 day · +1 week · a date, as Snooze offers. Confirm
+   is the board write-back's one add (§4.4); a refusal is drawn here, in the form, not as a toast. #}
+<dialog id="boardadd" class="card pad maildlg" aria-labelledby="boardaddtitle">
+  <form method="dialog" class="col gap">
+    <div class="h2" id="boardaddtitle">Put on the board</div>
+    {%- if board_choices %}
+    <label class="field">board <select class="input" id="baboard">
+      <option value="">pick a board…</option>
+      {%- for c in board_choices %}<option value="{{ c.board }}" title="{{ c.board }}">{{ c.label }}</option>{% endfor %}
+    </select></label>
+    <label class="field">what's needed <input class="input" id="batext" placeholder="what is needed, in your words — one line"></label>
+    <div class="row gap wrap">
+      <span class="field">Due</span>
+      <button class="btn sm ghost" type="button" data-bawhen="1d">+1 day</button>
+      <button class="btn sm ghost" type="button" data-bawhen="1w">+1 week</button>
+      <input class="input" type="date" id="badue" aria-label="Due date">
+    </div>
+    {%- else %}
+    <p class="note" id="banone">No repo this host knows carries a board (<code>docs/user_attention.md</code>), so there is nowhere to put it.</p>
+    {%- endif %}
+    <p class="note warn" id="baerr" hidden></p>
+    <div class="row gap">
+      <span class="note">One line at the top of the board's <i>Needs the user</i>, committed in that checkout and never pushed; then this entry is dismissed.</span>
+      <span class="grow"></span>
+      <button class="btn ghost" value="cancel">Cancel</button>
+      {%- if board_choices %}<button class="btn primary" type="button" id="bago">Put it on</button>{% endif %}
+    </div>
+  </form>
+</dialog>
