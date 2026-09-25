@@ -75,6 +75,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-22 (TD-064, PR #431, grinder-ao-1): the unattended launch's settings layer gained `crossSessionInbound: refuse`, written to its own `<profile>[+cadence]+unattended.json`; the held-peer-message screen rule and the briefs' sentence landed with it. Paul's word: *refuse them*.
 - 2026-09-22 (TD-115, grinder-ao-1): the hook stopped queueing an error reply. Until this date `agentorc-hook` treated any error from the host agent as an agent that was down and appended the event to `events/<session>.jsonl`, which the tick applies unjudged — so a hook refused by §4.8a was applied two seconds later anyway (the techlead seat's `exited (hook)` at 03:55Z on 2026-09-23, after the refusal).
 - 2026-09-24 (TD-072, the designer): Ready to close gains **mail read**; the **outcomes reported** row TD-079 built on 2026-09-20 is written into the list, where it had been missing.
+- 2026-09-25 (TD-026, the designer; Paul's answer the same day): the `scheduled` state — a record with a launch record and no pane, created at `ao new --at` or the form's **At** field.
 
 ## 4.2a Profiles: tool · account · model
 
@@ -248,6 +249,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-100 (4)): the **Settings page** rows — Usage, Teams, Repos, You, Open file, the read-only *i* marks — and the top bar's **Settings** tab designed; the editor button's row points at `person.open_in`.
 - 2026-09-25 (TD-143, the designer; the cloud session's recommendation confirmed): the Focus **Reports** panel grouped by state with the PR beside a claim in review, Drop behind *more ▾* on an in-progress row only with a confirm naming the consequence, the explanation as the heading's *i* mark, the session told by a `system` note. Cause: on 2026-09-24 Paul read claimed rows with open PRs as a to-do list and dropped two. An Undo on the trail row was asked of Paul, not designed. The build is TD-150.
 - 2026-09-25 (TD-128, the designer): the **usage** chip's metered form — spend over the amount, or tokens with no amount, *spend unknown* rather than nothing.
+- 2026-09-25 (TD-026, the designer): the **starts** note, the **At** field, the ◷ glyph, Start now and Cancel on a scheduled record's Focus banner and card. Also recorded: TD-143's Undo — Paul chose none (2026-09-25); the row stands as merged in #546.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
@@ -293,6 +295,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-24 (TD-120 step 2, the designer): `ao promote [<repo>] [--sha]` and `ao promote status` designed — the press from a terminal through a person-only `promote` RPC; it returns once the run is started, since for this repo the command's own host agent goes away under it.
 - 2026-09-24 (TD-026, the designer): `ao schedule` designed — `<team> reset --profile --window` / `off`, through `set_settings`; the client checks the team and the label, since the host agent reads neither `org.yml` nor an adapter's labels by name.
 - 2026-09-25 (TD-100 (4)): `ao team until`, `ao team reserve` and `ao settings` designed; `ao schedule` writes `teams.<team>.schedule`.
+- 2026-09-25 (TD-026, the designer): `ao new --at`, `ao at <session> <when> | now`, cancel by `ao close`; parsed as `--until` is, gated as `set_stop` is.
 
 ## 4.8 Capabilities, report channels, and role presets
 
@@ -490,6 +493,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-24 (TD-026, the designer): **Schedule** designed — the team start at the reset Paul decided on 2026-09-22 (*not vital, not scheduled*) as a **replay of the team's last person-pressed start** from the launch records (`why: schedule`, under the restart ceiling, seats included), never a definition re-read, so the host agent still reads no `org.yml` and a brief change stays a person's `ao team start`; the instant from the account's `resets` for a profile and a window label. Considered and not taken: the home running `ao team start` as a subprocess (it would re-read briefs from whatever branch the checkout holds, and put an `org.yml` reader inside the agent by the back door). The other shapes TD-026 lists — `start_at` / `scheduled`, overrides with an expiry (already *not wanted* as TD-101), calendar windows, one-off runs — were put to Paul as a scope question the same day; TD-133 holds the build, unscheduled until he says.
 - 2026-09-25 (TD-100 (4)): a **team's reserve priority** on the usage gate and a **team stop time** designed as the two per-team settings beside the schedule; the schedule's key moved under `teams.<team>`.
 - 2026-09-25 (TD-128, the designer): a metered profile's reserve is an amount per window (money with prices, tokens without), the line the amount, the same pause at it and one FYI note at eight tenths; a spent window comes back only when it rolls.
+- 2026-09-25 (TD-026, the designer; Paul 2026-09-25: *keep start_at and a scheduled state for one session as well; design those next*): **Start time** designed as the stop time's twin — the record created at once with its launch record and the directory's slot held, the session created at the instant by the tick from that record under the restart ceiling; `--at` needs `--unattended`; Cancel forgets a record that ran nothing. The other shapes TD-026 listed — overrides with an expiry, calendar windows, one-off runs — dropped on the same answer. Steered to Paul on two defaults: the slot held from creation, and Cancel forgetting. The build is TD-152.
 
 ## 7. Phases
 
