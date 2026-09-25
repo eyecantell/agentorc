@@ -88,6 +88,7 @@ decisions; this file points at them rather than repeating them.
 - The adapter status table was written "at design time", each row to be verified before its adapter is built; Claude Code and `shell` were phase 1.
 - 2026-09-23 (TD-122): `label` added to the contract (the tool's display name, for the chip), and `usage()` said to be called once per account and to carry every window the endpoint reports, a per-model weekly one labelled with the model.
 - 2026-09-23 (TD-122, the build): `account_for(profile)` added to the contract as an optional method — the core cannot read a profile, so the adapter says which account the poll keys on; without it the poll keys on the profile, as before.
+- 2026-09-24 (TD-035, the designer): the 2026-09-12 decision with Paul — tool-specific wiring of a repo's start hooks belongs in the adapter, not in the repo — written into the contract as *A repo's start hooks are every adapter's to run*: through the tool's start hook, else the runner at launch with its stdout prepended to the first prompt; the anchor check's source for another tool decided with that adapter (TD-112). Nothing to build until a second adapter exists.
 
 ## 4.4 Host agent
 
