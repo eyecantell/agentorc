@@ -140,7 +140,8 @@ def pretrust(cwd: Path, profile: Profile) -> bool:
 # it for hand-started sessions, this layer carries it for the sessions agentorc starts. Since
 # 2026-09-25 (dev-cadence TD-055 (b)) the line runs the MAIN checkout's runner — the first entry of
 # `git worktree list --porcelain`, computed live, so it is right in a container as on the host — and
-# the runner finds its children beside itself, so a worktree on an older branch runs the current
+# dev-cadence's runner finds its children beside itself (its PR #101, 2026-09-22; a consumer's copy
+# under scripts/ is what its last sync carried), so a worktree on an older branch runs the current
 # hook set against itself; `$CLAUDE_PROJECT_DIR` alone resolved to that branch's own copy. In the
 # main checkout the two are the same directory; outside a git repo `r` is empty and the old path
 # plus the `[ -x ]` guard keep it a no-op, as in a directory that is not a dev-cadence consumer.

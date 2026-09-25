@@ -234,8 +234,8 @@ sessions run in plain directories too, hand-started sessions stay untouched, and
 (dev-cadence's SessionStart guards) keep running alongside. **The layer also carries dev-cadence's
 one SessionStart line** — every adapter's launch does, §4.3 *A repo's start hooks are every adapter's to run* — (`scripts/cadence_hooks.sh --session-start`, guarded by `[ -x ]`; cadence
 §3), byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`). The line runs the **main checkout's** runner — the
-first entry of `git worktree list --porcelain`, computed live, so it holds in a container as on the host; the runner
-finds its children beside itself — and falls back to the directory's own copy outside a git repo (dev-cadence
+first entry of `git worktree list --porcelain`, computed live, so it holds in a container as on the host; dev-cadence's
+runner finds its children beside itself, and a consumer's copy is what its last sync carried — and falls back to the directory's own copy outside a git repo (dev-cadence
 TD-055 (b), 2026-09-25): a worktree on an older branch runs the current hook set against itself, where
 `$CLAUDE_PROJECT_DIR` alone ran that branch's copy. An unattended launch's layer also refuses the tool's own peer
 messages (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064). It uses the cadence line when
