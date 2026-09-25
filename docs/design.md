@@ -247,8 +247,11 @@ The hook script (`agentorc-hook`) knows its session from `AGENTORC_SESSION` and 
 `AGENTORC_HOME`; the host agent sets both on the tmux session at creation, explicitly, because the
 tmux server may predate the host agent and carry another environment
 ([ADR](decisions/2026-09-06-adopt-dev-cadence.md)). An event it cannot deliver because nothing
-answers on the socket is appended to `events/<session>.jsonl`, and the tick applies the file on its
-next pass; **an error in the reply is the host agent answering** — a refusal (§4.8a) or a bug —
+answers on the socket is appended to `events/<session>.jsonl`, stamped with when it happened, and
+the tick applies the file on its next pass — **except a queued state older than one that reached
+the record live meanwhile**, which is skipped (its session id, model and subagent count still
+apply), because a call that timed out while the next one got through would otherwise overwrite a
+fresh state with a stale one (TD-169); **an error in the reply is the host agent answering** — a refusal (§4.8a) or a bug —
 never an outage, so it goes to the hook's stderr and is never queued (TD-115). agentorc chooses Claude Code's session uuid
 at launch (`--session-id`), so `adapter_id` is known from birth; a resume passes `--resume <id>`.
 **First-run quirk**: no hook reports the "trust this folder?" dialog, so the adapter marks the

@@ -429,6 +429,9 @@ class HostAgent:
         self._last_hook: dict[str, datetime] = {
             sid: datetime.now(UTC) for sid, s in self.sessions.items() if s.confidence == "hook"
         }
+        # When a hook event last reached a record **live**, in epoch seconds (TD-169): a queued
+        # event stamped before it is older than the state it would set, so its state is skipped.
+        self._live_hook_at: dict[str, float] = {}
         # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
         # The last good reading per profile, kept across a restart (TD-087) — with, beside the
         # windows, why the *last poll* failed, which the page draws as a stale chip rather than
@@ -1412,7 +1415,7 @@ class HostAgent:
 
     def _reconcile(self, panes: dict[str, PaneInfo], tails: dict[str, list[str]], snapshot_at: datetime) -> None:
         for sid, event in self.events.drain():
-            self._apply_event(sid, event)
+            self._apply_event(sid, event, queued=True)
         now = datetime.now(UTC)
         mono = time.monotonic()
         self._removed = {k: v for k, v in self._removed.items() if mono - v[1] < REMOVED_GUARD_SECONDS}
@@ -1510,11 +1513,20 @@ class HostAgent:
             return None
         return explain(s.tail)
 
-    def _apply_event(self, sid: str, event: dict[str, Any]) -> None:
-        """A hook-fed state transition (design §4.2 table). Adapters map hook names to these."""
+    def _apply_event(self, sid: str, event: dict[str, Any], queued: bool = False) -> None:
+        """A hook-fed state transition (design §4.2 table). Adapters map hook names to these.
+
+        A **queued** event (the hook's call failed and it wrote `events/<session>.jsonl`, drained
+        at the tick) carries `at`, when it happened. One stamped before an event that reached the
+        record live is older than the state that event set, so its state is skipped; its adapter
+        id, model and subagent count still apply (TD-169)."""
         s = self.sessions.get(sid)
         if s is None:
             return
+        at = event.get("at") if queued else None  # a queue written before the stamp is applied as it was
+        stale = isinstance(at, int | float) and at < self._live_hook_at.get(sid, 0.0)
+        if not queued:
+            self._live_hook_at[sid] = time.time()
         self._last_hook[sid] = datetime.now(UTC)  # apply time, also for events drained from the offline queue
         if aid := event.get("adapter_id"):
             s.adapter_id = aid
@@ -1522,7 +1534,7 @@ class HostAgent:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
         if delta := event.get("subagent_delta"):
             s.subagents = max(0, s.subagents + int(delta))
-        state = event.get("state")
+        state = None if stale else event.get("state")
         if state:
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else None
             if state == "needs-you" and self._permission_waiting(sid):
@@ -1546,6 +1558,7 @@ class HostAgent:
             self._model_checked,
             self._pre_limited,
             self._last_hook,
+            self._live_hook_at,
             self._killed_at,
             self._mail_hints,
             self._asks_hints,
@@ -4289,6 +4302,7 @@ class HostAgent:
         if s is None:
             return None
         self._last_hook[session] = datetime.now(UTC)
+        self._live_hook_at[session] = time.time()
         wait = float(event.get("wait_seconds") or 600)
         deadline = (datetime.now(UTC) + timedelta(seconds=wait)).replace(microsecond=0)
         tool_use_id = event.get("tool_use_id") or f"{session}:{now_iso()}"

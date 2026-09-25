@@ -77,6 +77,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-24 (TD-072, the designer): Ready to close gains **mail read**; the **outcomes reported** row TD-079 built on 2026-09-20 is written into the list, where it had been missing.
 - 2026-09-25 (TD-026, the designer; Paul's answer the same day): the `scheduled` state — a record with a launch record and no pane, created at `ao new --at` or the form's **At** field.
 - 2026-09-25 (TD-155, grinder-ao-1): `SessionStart` with `source: resume` reports `idle`. Until this date every `SessionStart` read `working`, and a one-press Resume with no prompt — the designer's record, 2026-09-25 14:06Z — sat `working (hook)` at an empty composer, headed for `stalled?` at `STALL_AFTER` and never rung by the doorbell, which rings a hook-confirmed idle only.
+- 2026-09-25 (TD-169, grinder-ao-1): a queued hook event carries `at`, and a queued state older than a live one is skipped at the drain. Until this date the queue was applied unjudged after anything that had got through live, so a call that timed out (the host agent slow, not down) could land its state after a newer one — found by the review of PR #556 (TD-155), whose resume `idle` made one such pair diverge.
 
 ## 4.2a Profiles: tool · account · model
 

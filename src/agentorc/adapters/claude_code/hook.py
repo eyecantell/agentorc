@@ -17,6 +17,7 @@ import json
 import os
 import socket
 import sys
+import time
 from typing import Any
 
 from sessionorc import paths
@@ -164,7 +165,9 @@ def main() -> int:
         print(f"agentorc-hook: {session}: the host agent refused the event: {e}", file=sys.stderr)
     except Exception:  # noqa: BLE001
         with contextlib.suppress(OSError):
-            EventQueue().append(session, {k: v for k, v in params.items() if k != "session"})
+            # `at`: when it happened, so the drain can tell it from a newer event that got through
+            # live while this one waited (TD-169)
+            EventQueue().append(session, {**{k: v for k, v in params.items() if k != "session"}, "at": time.time()})
     return 0
 
 
