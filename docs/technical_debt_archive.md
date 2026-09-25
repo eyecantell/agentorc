@@ -1526,4 +1526,4 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Related:** TD-158 (the design), TD-153 (what a session is told about being woken), TD-157 / TD-167 (the *i* marks: the same idea at the button), TD-152 (the `scheduled` sentence), §4.9b (the seat's trigger), §4.10 (the doorbell's order, the budget's refill).
 
-**Resolved:** 2026-09-25 (PR #PRNUM, grinder-ao-1) — `mail.read_when`, `read_when` on `msg`'s reply and the `{ask, note}` pair on the record's view, the composer's line (`#mailwhen`, `AO.whenLine`), `ao msg`'s last lines; `tests/test_read_when.py`. The `scheduled` row waits for TD-152's state.
+**Resolved:** 2026-09-25 (PR #583, grinder-ao-1) — `mail.read_when`, `read_when` on `msg`'s reply and the `{ask, note}` pair on the record's view, the composer's line (`#mailwhen`, `AO.whenLine`), `ao msg`'s last lines; `tests/test_read_when.py`. The `scheduled` row waits for TD-152's state.
