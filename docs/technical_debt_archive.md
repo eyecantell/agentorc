@@ -1546,7 +1546,7 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Related:** TD-056 (a claim is a lease), TD-028 (declared and derived), TD-045 (a derived claim's PR), TD-126 and TD-127 (the two claims dropped), TD-124 (keys: none on this panel yet).
 
-**Resolved:** 2026-09-25 — designed by PR #546; built by TD-150 (PRs #586, #590 and PR #PRNUM).
+**Resolved:** 2026-09-25 — designed by PR #546; built by TD-150 (PRs #586, #590 and PR #591).
 
 ## TD-150: Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session
 
@@ -1567,4 +1567,4 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 
 **Related:** TD-143 (the design), TD-056 (a claim is a lease), TD-028 (declared and derived), TD-045 (a derived claim's PR), TD-124 (keys: none on this panel yet).
 
-**Resolved:** 2026-09-25 — PR #586 (the panel), PR #590 (the refusal), PR #PRNUM (the `system` note and the branch's PR as `review_pr`), grinder-ao-1. Found on the way: a declared claim's PR has two sources, not three (§9 invariant 10); a declared claim's own `pr` is refused merged or open alike, since only `review_pr` can tell.
+**Resolved:** 2026-09-25 — PR #586 (the panel), PR #590 (the refusal), PR #591 (the `system` note and the branch's PR as `review_pr`), grinder-ao-1. Found on the way: a declared claim's PR has two sources, not three (§9 invariant 10); a declared claim's own `pr` is refused merged or open alike, since only `review_pr` can tell.
