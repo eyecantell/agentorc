@@ -619,8 +619,8 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   transcript read from 0 again after a rewrite (§4.3) has every entry before that `at` dropped,
   and at that `at` the entries in file order up to and including the one with that `id` — every
   entry at that `at` when none carries it, since a survivor at the old boundary is old and a new
-  turn at that millisecond is a coincidence worth cents, where a re-bill is the whole turn — and a
-  rewrite neither re-bills nor loses a turn. On the
+  turn at that millisecond is a coincidence worth cents, where a re-bill is the whole turn — so a
+  rewrite never re-bills, and loses at most that one coincidence. On the
   first tick that finds a profile metered the cursors start at each transcript's end, so a key that
   ran unmetered for months does not bill its history to the first day; a transcript that first
   appears on a later tick starts at offset 0; a row's `cost` is written once, at that tick's prices, and a later
