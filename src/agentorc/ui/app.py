@@ -3223,6 +3223,22 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # it in the repo's main checkout. The row hands back what the reader gave it — the board,
             # the line and its text — and the agent refuses the edit when that line has moved on.
             what = str(body.get("action") or "")
+            if what == "reply":
+                # §4.5a *Due strip / Inbox board row* → **Reply** (§4.4, TD-142): the person's words
+                # appended to the item's own line by `board_reply`, which re-checks the line as an
+                # edit does; `refs` are the reader's when it carries them (TD-142 slice 2)
+                board, text = str(body.get("board") or ""), str(body.get("text") or "")
+                reply = str(body.get("reply") or "").strip()
+                try:
+                    line = int(body.get("line"))
+                except (TypeError, ValueError):
+                    raise HTTPException(400, "a board reply names the item's line") from None
+                if not board or not text or not reply:
+                    raise HTTPException(400, "a board reply names the board, the item's text and the reply")
+                refs = [str(r) for r in body.get("refs") or () if str(r).strip()]
+                got = await call("board_reply", board=board, line=line, text=text, reply=reply, refs=refs)
+                await board_items(fresh=True)
+                return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if what == "add":
                 # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board, text and
                 # Due, and the entry it comes from; the agent writes the one line, commits it, and

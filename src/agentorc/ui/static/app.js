@@ -366,6 +366,20 @@
       // session's id or the filled-in form to finish by hand — *it is not a guess*. **Resume with
       // changes…** and **Reopen and push** are the same route: the first asks for the form
       // outright, the second adds the page's own first prompt.
+      // design §4.5a **Due strip / Inbox board row** → **Reply** (§4.4, TD-142): the mail composer, the
+      // line quoted; what it sends is written on the line by `board_reply`. The row stays — a reply
+      // is not Done — and the refresh brings it back with the reply on it.
+      if (action === "board_reply") {
+        const m = await AO.compose({ to: b.dataset.name || "the board", reply: true, quote: b.dataset.text });
+        if (!m) return;
+        const res = await act("person", "board", {
+          action: "reply", board: b.dataset.board, line: Number(b.dataset.line), text: b.dataset.text, reply: m.text,
+        });
+        const to = (res.sent || []).map((x) => `${x.session} (holds ${x.ref})`).join(", ");
+        AO.toast(to ? `written on the board · sent to ${to}` : res.note || "written on the board", true);
+        if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
+        return;
+      }
       if (action === "board_add") {
         const res = await AO.boardAdd(b);
         if (!res) return;
@@ -437,7 +451,8 @@
         if (typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();
         return;
       }
-      AO.toast(`${action === "identity_log" ? "Log TD" : action} failed: ${e.message}`);  // a control is not its wire name
+      const named = { identity_log: "Log TD", board_reply: "Reply", board_add: "Put on the board" };
+      AO.toast(`${named[action] || action} failed: ${e.message}`);  // a control is not its wire name
       if (staterow && typeof AO.refreshInboxPage === "function") AO.refreshInboxPage();  // put the row back
     }
   });

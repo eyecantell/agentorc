@@ -1049,7 +1049,7 @@ def test_log_td_is_drawn_exactly_where_the_home_says_a_session_answers_for_the_r
     assert "res.to.name || res.to.id" in js  # the RPC answers `to` as {id, name}, never a bare string
     # an answer, so the row goes (only Suspend leaves it standing), and a refusal names the control
     assert 'if (staterow && action !== "suspend") { AO.handRing(staterow); staterow.remove(); }' in js
-    assert '${action === "identity_log" ? "Log TD" : action} failed' in js
+    assert 'identity_log: "Log TD"' in js and "${named[action] || action} failed" in js
 
 
 # -- what the review of PR #251 found -------------------------------------------------------------

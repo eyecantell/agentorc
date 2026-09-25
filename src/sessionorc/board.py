@@ -1,6 +1,6 @@
-"""Board write-back (design §4.4, TD-069 step 3): **Snooze** and **Done** on one item of a repo's
-`docs/user_attention.md`, made by the host agent and committed in that repo's main checkout — and
-its one **add**, *Put on the board* (TD-140), the only line this system ever adds to a board.
+"""Board write-back (design §4.4, TD-069 step 3): **Snooze**, **Done** and **Reply** (TD-142) on
+one item of a repo's `docs/user_attention.md`, made by the host agent and committed in that repo's
+main checkout — and its one **add**, *Put on the board* (TD-140), the only line this system ever adds to a board.
 
 A board is dev-cadence's file and its items are read by dev-cadence's reader
 (`nudge_user_attention.py --report --json`), which gives each item's line number and text; this
@@ -21,7 +21,7 @@ from datetime import date
 from pathlib import Path
 
 BOARD = Path("docs") / "user_attention.md"
-ACTIONS = ("snooze", "done")
+ACTIONS = ("snooze", "done", "reply")
 # Any item, open or done: the add goes above the first of them, the top of the open items (§4.4).
 ANY_ITEM_RE = re.compile(r"^\s*-\s*\[[ xX]\]\s")
 NEEDS_RE = re.compile(r"^##\s+Needs the user\b")
@@ -41,9 +41,23 @@ class Refused(Exception):
     """The edit was not made, and why, in words a person reads on the Inbox."""
 
 
-def edit_line(line: str, text: str, action: str, due: str | None = None) -> str:
-    """`line` with the item done or snoozed to `due`. Refused unless `line` is an open item whose
-    text is exactly `text` — the item the person was shown, not whatever moved onto that line."""
+def reply_tail(reply: str, by: str, today: str) -> str:
+    """The words **Reply** appends to an item's own line (design §4.4, TD-142): ` — <by>, <date>:
+    <reply>`. On the line, not under it: an item is one line, and the reader and the SessionStart
+    hook read lines, so a reply typed over several lines is joined onto it with spaces. Refused for
+    a reply that is empty."""
+    words = " ".join(str(reply or "").split())
+    if not words:
+        raise Refused("a reply needs its text: what the next session should do")
+    return f" — {by}, {today}: {words}"
+
+
+def edit_line(
+    line: str, text: str, action: str, due: str | None = None, *, reply: str = "", by: str = "", today: str = ""
+) -> str:
+    """`line` with the item done, snoozed to `due`, or replied to (`reply`, by `by` on `today`).
+    Refused unless `line` is an open item whose text is exactly `text` — the item the person was
+    shown, not whatever moved onto that line."""
     m = ITEM_RE.match(line.rstrip("\n"))
     if m is None or m.group("text").strip() != text.strip():
         raise Refused("that line of the board no longer holds this item: reload the Inbox and try again")
@@ -51,6 +65,12 @@ def edit_line(line: str, text: str, action: str, due: str | None = None) -> str:
     body = line.rstrip("\n")
     if action == "done":
         return f"{m.group('lead')}[x]{m.group('gap')}{m.group('text')}{end}"
+    if action == "reply":
+        if not DUE_RE.search(body) and DUE_RE.search(str(reply or "")):
+            # the reader and a later Snooze take a line's first `Due:`: on an undated item the
+            # reply's would become the item's date (review of PR #581)
+            raise Refused("this item has no Due: date, so a reply may not carry one: Snooze sets its date")
+        return f"{body.rstrip()}{reply_tail(reply, by, today or date.today().isoformat())}{end}"
     if action != "snooze":
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
     try:
@@ -71,7 +91,7 @@ def message(text: str, action: str, due: str | None = None) -> str:
         head = head[: HEAD_MAX - 1].rstrip() + "…"
     s = SESSION_RE.search(text)
     who = s.group("name") if s else "n/a"
-    what = f"snooze {head} to {due}" if action == "snooze" else f"done {head}"
+    what = {"snooze": f"snooze {head} to {due}", "reply": f"reply on {head}"}.get(action, f"done {head}")
     return f"agentorc: {what} (session {who})"
 
 
@@ -119,17 +139,29 @@ def ready(root: Path) -> None:
         raise Refused(f"{root}'s board has uncommitted changes: commit or discard them first, then try again")
 
 
-def write_back(root: str | Path, line: int, text: str, action: str, due: str | None = None) -> dict[str, str]:
-    """Make one Snooze or Done on the board of the checkout `root` and commit it there (§4.4).
-    Returns `{commit, message}`; raises `Refused` with nothing changed."""
+def author(root: Path) -> str:
+    """Who a reply is signed by: the checkout's git `user.name` — the name the commit is authored
+    under — else *the person*."""
+    try:
+        name = _git(root, "config", "user.name").stdout.strip()
+    except Refused:
+        name = ""
+    return name or "the person"
+
+
+def write_back(
+    root: str | Path, line: int, text: str, action: str, due: str | None = None, *, reply: str = ""
+) -> dict[str, str]:
+    """Make one Snooze, Done or Reply on the board of the checkout `root` and commit it there
+    (§4.4). Returns `{commit, message}`; raises `Refused` with nothing changed."""
     root = Path(root)
     if action not in ACTIONS:
         raise Refused(f"unknown board action {action!r}: {' or '.join(ACTIONS)}")
     with _EDIT:
-        return _write_back(root, line, text, action, due)
+        return _write_back(root, line, text, action, due, reply)
 
 
-def _write_back(root: Path, line: int, text: str, action: str, due: str | None) -> dict[str, str]:
+def _write_back(root: Path, line: int, text: str, action: str, due: str | None, reply: str = "") -> dict[str, str]:
     ready(root)
     path = root / BOARD
     try:
@@ -139,7 +171,8 @@ def _write_back(root: Path, line: int, text: str, action: str, due: str | None) 
     if not isinstance(line, int) or not 1 <= line <= len(lines):
         raise Refused("that line of the board no longer holds this item: reload the Inbox and try again")
     was = "".join(lines)
-    lines[line - 1] = edit_line(lines[line - 1], text, action, due)
+    by = author(root) if action == "reply" else ""
+    lines[line - 1] = edit_line(lines[line - 1], text, action, due, reply=reply, by=by)
     msg = message(text, action, due)
     path.write_text("".join(lines), encoding="utf-8")
     try:

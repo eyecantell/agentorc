@@ -267,3 +267,63 @@ async def test_put_on_the_board_twice_at_once_writes_one_line_and_a_refused_dism
         got = await me.call("board_edit", **args, entry=two["id"])
         assert got["dismissed"] == [] and got["dismiss_refused"] == "refused for the test" and got["commit"]
         await me.call("kill", id=w)
+
+
+def test_a_reply_is_appended_to_the_items_own_line_signed_and_committed(repo):
+    """TD-142 slice 1 (design §4.4): Reply appends ` — <name>, <date>: <reply>` to the item's line,
+    the name the checkout's git `user.name`, one commit with the fixed message, the line still open."""
+    git(repo, "config", "user.name", "Paul")
+    got = board.write_back(repo, 7, ITEM, "reply", reply="  rebase it,\nthen merge  ")
+    today = __import__("datetime").date.today().isoformat()
+    line = (repo / board.BOARD).read_text().splitlines()[6]
+    assert line == f"- [ ] {ITEM} — Paul, {today}: rebase it, then merge"
+    assert got["message"] == "agentorc: reply on Merged, live check pending: the doorbell. (session grinder-ao-1)"
+    assert git(repo, "log", "-1", "--format=%s") == got["message"] and git(repo, "status", "--porcelain") == ""
+    # the line still holds an open item, so a second reply or a Done finds it by its new text
+    board.write_back(repo, 7, line[len("- [ ] ") :], "done")
+    assert (repo / board.BOARD).read_text().splitlines()[6].startswith("- [x] ")
+
+
+def test_a_reply_is_refused_touching_nothing_where_an_edit_is(repo):
+    for args, why in (
+        ((7, ITEM, "reply"), "needs its text"),
+        ((8, ITEM, "reply"), "no longer holds this item"),
+    ):
+        with pytest.raises(board.Refused, match=why):
+            board.write_back(repo, *args, reply="" if why == "needs its text" else "x")
+    git(repo, "checkout", "-q", "-b", "feature")
+    with pytest.raises(board.Refused, match="not main"):
+        board.write_back(repo, 7, ITEM, "reply", reply="x")
+    assert (repo / board.BOARD).read_text() == BOARD_TEXT
+    with pytest.raises(board.Refused, match="no Due: date"):  # the reply's date would become the item's
+        board.edit_line("- [ ] x\n", "x", "reply", reply="push Due: 2026-10-01", by="p", today="2026-09-25")
+    assert "Due: 2026-10-01" in board.edit_line(f"- [ ] {ITEM}\n", ITEM, "reply", reply="Due: 2026-10-01", by="p")
+    assert board.edit_line("- [ ] x\n", "x", "reply", reply="y", by="the person", today="2026-09-25") == (
+        "- [ ] x — the person, 2026-09-25: y\n"
+    )
+
+
+async def test_board_reply_is_the_persons_and_says_nothing_was_sent_yet(agent, repo, tmp_path):
+    """The RPC (§4.4): person-only, a known board only, the file half written and `sent` empty with
+    the note saying why — and `board_edit` will not take a reply, which is `board_reply`'s."""
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    path = str(repo / board.BOARD)
+    async with LocalClient(caller="ao-some-worker") as worker:
+        with pytest.raises(AgentError, match="the person's own"):
+            await worker.call("board_reply", board=path, line=7, text=ITEM, reply="x")
+    async with LocalClient() as me:
+        with pytest.raises(AgentError, match="not the board of a repo this host knows"):
+            await me.call("board_reply", board=str(tmp_path / "elsewhere.md"), line=7, text=ITEM, reply="x")
+        with pytest.raises(AgentError, match="is board_reply"):
+            await me.call("board_edit", board=path, line=7, text=ITEM, action="reply")
+        with pytest.raises(AgentError, match="no longer holds this item"):
+            await me.call("board_reply", board=path, line=8, text=ITEM, reply="x")
+        with pytest.raises(AgentError, match="names the item's line"):
+            await me.call("board_reply", board=path, text=ITEM, reply="x")
+        got = await me.call("board_reply", board=path, line=7, text=ITEM, reply="rebase it", refs=["TD-122"])
+    assert got["action"] == "reply" and got["sent"] == [] and "no session standing is known" in got["note"]
+    assert git(repo, "log", "-1", "--format=%s") == got["message"] and got["message"].startswith("agentorc: reply on")
+    assert (repo / board.BOARD).read_text().splitlines()[6].endswith(": rebase it")
