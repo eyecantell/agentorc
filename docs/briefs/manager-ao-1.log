@@ -423,3 +423,4 @@ Note worth carrying forward: TD-125 landed *during* this run (merged by grinder-
 10:27–11:26  quiet: designer-ao-1 still working (since 06:30:04Z, ~5h, last_hook 11:25, not stalled). techlead seat idle/exited. grinder-1/2 still finished. No unread inbox.
 11:26–12:25  quiet: designer-ao-1 still working/self-polling (since 06:30:04Z, ~6h, last_hook 12:20, PR #547 pending, not stalled). techlead seat idle/exited. grinder-1/2 still finished. No unread inbox.
 12:25–13:25  quiet: designer-ao-1 still working/self-polling (since 06:30:04Z, ~7h, last_hook 13:24, not stalled). techlead seat idle/exited. grinder-1/2 still finished. No unread inbox.
+13:42  designer-ao-1: note "done: TD-128 — PR #547 merged" → cadence check PR #547: pass (review SHIP, ci green, ledger named). Still working, new design-first item.
