@@ -78,10 +78,10 @@ page writes, one person-only RPC that writes it (`set_settings` grows the key), 
 `BACKUP_MEMBERS`; the merged file goes in, which the round's build entry names), and the agent ignores `person:`, which keeps §5's rule that nothing of the
 person's reaches a host agent. Why that is safe rather than merely asserted: the gate reads
 `usage_gate:` by key and `schedules:` by key (`sessionorc.settings.reserves`), a stanza it does not
-name is inert to it, and the UI already reads a host-agent-owned file per request (`hosts.yml`)
-without the agent knowing; the coupling is one file on one disk, not one reader. §5's reason for two files — a second person, or a UI off the home —
-is the trigger §5 already names for moving the scope when it comes. The UI runs on the home and
-reads the file as it reads `hosts.yml`. The theme stays per browser: a phone and a desk differ.
+name is inert to it, and the page reaches the key only through the agent's own RPCs; the coupling is one file on
+one disk, not one reader. §5's reason for two files — a second person, or a UI off the home —
+is the trigger §5 already names for moving the scope when it comes. The page reads and writes through the agent's RPCs, never the file (§4 *Nodes and ownership*).
+The theme stays per browser: a phone and a desk differ.
 
 **YAML stays.** Python reads TOML from the standard library (3.11+) but has no writer in it; a
 write needs a third-party package, so a move buys nothing on dependencies (PyYAML is one already)
@@ -103,27 +103,56 @@ Screen 7, **Settings**, `/settings`, a top-bar tab once built (TD-123's rule). O
 as the Inbox (TD-082), sections in this order, each with its *i* mark: **Usage** (the reserves
 matrix by account → profile → window, each cell a reserve, flat or per day, with the line it
 produces; budgets per metered profile when TD-128 lands), **Schedules** (per team; drawn disabled with *not built — TD-133* until that lands, as the budget rows wait on TD-128),
-**You** (`open_in`, terminal font and size, and this browser's theme, *mine* and folds with a
-*reset this browser*), **Hosts**, **Profiles**, **Org**, **Repos** (read-only, the file, the
-re-read rule, the editor button). Writes go through `set_settings`; nothing else on the page
-writes a file. **Nodes.** Today §5 says the page edits the home's file and *a node's is edited at
-the node until the replica carries settings*, and the gate runs on each session host reading its
-own file — so a reserve set on the home would not reach a profile's sessions on a container node,
-which is where the page's first user would be misled. The design round therefore **designs the
-replica**: `settings.yml` becomes home-owned, the home writes a node's copy over the link on every
-change and at every dial (as it writes the node's `profiles.yml` at provision, §4.4a), a hand edit
-at the node is overwritten, and the page's one file is the one file. Until that slice lands the
-page marks a profile that runs on a node with the node's name and the words *set at <node>*, and
-never pretends the home's reserve reaches it. Edits
+**You**, in two halves the §4.5a rows keep apart by write path: *yours everywhere* — `open_in`,
+the terminal's size and face (a typed or picked `font-family` name with the ordinary CSS fallback;
+no font enumeration), written through `set_settings` — and *this browser* — theme, *mine*, the
+folds, remembered in `localStorage`, with **Reset this browser**, a new control, **Hosts**, **Profiles**, **Org**, **Repos** (read-only, display only: the file's values, the
+re-read rule and whether a change needs a restart on the *i* mark; **Repos** one card per
+registered checkout, its `.agentorc.yml` when it has one; an **Open file** button per file, a new
+use of `open_in`'s template with a file path rather than a session directory, which the round adds
+to the editor button's §4.5a row). The disabled Schedules rows and the *set at <node>* words are
+display only. Writes to the home's file go through `set_settings`, the browser half of **You** through
+`localStorage`, and nothing on the page writes any other file. **Nodes and ownership (decided for the round; Paul confirms).** Today §5 says the page edits the
+home's file and *a node's is edited at the node until the replica carries settings*, the gate runs
+on each session host reading its own file, and §4.4a's offline table serves `set_settings` at a
+node *link or no link* because the file is that host's own — so a reserve set on the home would not
+reach a profile's sessions on a container node, which is where the page's first user would be
+misled. The round makes **`settings.yml` home-owned**, one file for the org, and the four things
+that follow are decided here, not left to the build: (1) **the replica is new work**, not
+continuous with anything today — `write_node_config` copies `profiles.yml` into a container's
+bind-mounted home only at `ao host up` and a promote, a local write that never crosses the link,
+and the link (§4.4a *Frames*) carries records, not files; the round adds a **`settings` frame**
+the home sends a node on `hello` (every dial) and after every `set_settings` write, from which the
+node rewrites its own `settings.yml`; (2) **`set_settings` becomes a home-owned edit**: served at
+the home, forwarded from a node while the link is up, refused at an offline node in the words
+`set_controllers` uses — the offline table's row changes from *served* to *forwarded / refused* —
+while **the node's gate keeps reading its replica offline**, so the last reserves it was sent stay
+in force and a node still acts only on its own files (§9); a reserve moved while a node is offline
+reaches it on the next dial, and the page says *nodes offline: <n> — takes effect when it dials*;
+(3) **the page never reads the file from disk**: it reads through the agent (`gate` today; the
+round adds a `settings` read RPC beside `set_settings`) and writes through `set_settings`, so a UI
+started on a node — §4.4a allows one — shows the home's settings through the link and says *set at
+<home>* when the link is down, exactly as `ao team` does on a node; the §3 sentence that the UI
+reads the file *as it reads `hosts.yml`* is withdrawn; (4) **the person's own follows the home**:
+folding `open_in` and the terminal font into the home-owned file retires §5's *read on the machine
+the UI runs on* — one person, one org, one place, and a UI on a node shows them through the link.
+This is a scope change named as such, and it is the reason Open decision 1 is a decision.
+**Until the replica lands**, a profile with a live session on a node (a record lookup by host and
+profile — every profile is copied to every node at provision, so nothing static says where a
+profile runs) carries the node's name and *set at <node>* on its row, display only. Edits
 apply on the next tick and the page says so; a reserve's new line is shown as the chip will show
 it before the press lands.
 
 ## Open decisions
 
-1. The `ui.yml` fold into `settings.yml` (§3) — recommended yes.
-2. The page edits the home's settings only — recommended yes, as §5 says.
+1. The `ui.yml` fold into `settings.yml`, and with it **the person's own following the home** rather
+   than the machine the UI runs on (§4) — recommended yes.
+2. `settings.yml` home-owned, replicated to nodes by a `settings` frame; `set_settings` forwarded from
+   a node and refused offline, the node's gate reading its replica (§4) — recommended yes.
 3. A top-bar tab — recommended, once built.
 
 ## Review rounds
 
 **Round 1 (Sonnet, 2026-09-25): NOT READY — 1 BLOCK, 3 FIX, 4 NOTE, all adopted.** BLOCK: the outline said a node's settings are the home's; §5 says the opposite, and the gate reads each host's own file, so a reserve set on the home would not reach a node's sessions — the round now designs the replica and the page marks node-run profiles until it lands. FIX: the default profile was listed as editable with no writer (dropped); `local.person` is parsed, not absent from the code; `ui.yml` is also outside `BACKUP_MEMBERS`. NOTE: the fold's safety argued rather than asserted; Schedules drawn disabled until TD-133; the terminal face from monospace faces with ligatures off (goal 12); `AGENTORC_TICK`'s framing. Verified correct by the round: the six-scope table, `set_settings`'s person-only rule and next-tick effect, `promote:` refused today (executed), the org `roles:` overlay unvalidated, no `/settings` route, the localStorage keys, the TOML facts, the TD quotes, screen 7 free since TD-123.
+
+**Round 2 (Sonnet, 2026-09-25): NOT READY — 3 BLOCK, 2 FIX, 2 NOTE, all adopted; the blocks forced decisions.** BLOCK: the replica was described as continuous with `profiles.yml`'s provision-time copy, which is a local bind-mount write at `ao host up`, never over the link — the replica is now named as new work, a `settings` frame on `hello` and after each write; once the file is home-owned, `set_settings` at a node can no longer be *served link or no link* — decided: forwarded while linked, refused offline, the node's gate reading its replica; the UI is not guaranteed to run on the home (§5 allows a laptop, §4.4a a node) and the chip already reads through the `gate` RPC, so the page reads and writes through RPCs, never the file. FIX: folding `person:` into a replicated file retires *read on the machine the UI runs on* — named as a scope change and made Open decision 1; the You section split by write path with **Reset this browser** a new control. NOTE: the font is a typed or picked family name with CSS fallback, no enumeration (`AO.termFont` already refits without a reload); display-only marks named; *runs on a node* is a record lookup by host and profile; Repos one card per checkout; **Open file** a new use of `open_in`. Verified correct: `set_settings`'s guard covers the whole RPC so no session can write `person:`; a `person:` stanza is inert to the gate; `save()` loses nothing on a machine-owned file; goal 12 permits a chosen face; TD-082's layout fits the outline.
