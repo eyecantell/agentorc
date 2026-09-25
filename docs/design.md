@@ -781,7 +781,7 @@ the home instead (*Mail across hosts*).
 | reads — `list`, `get`, `tail`, `explain`, `occupancy`, `name_check`, `recent_dirs`, `usage`, `adapters`, `ping`, `wait` | served: this host's sessions only | served; a `wait` sees only this host's records and no mail |
 | node-owned acts on this host's sessions — `send`, `keys`, `kill`, `close`, `remove`, `create`, `seen`, `decide`, `hook` | served (a create keeps the `controllers` the person gave) | on **itself**: served, except `decide` (a session does not answer its own permission prompt, TD-119). On another session, and any `create`: **refused** — except `seen` and `hook`, which the gate does not cover (§4.8) and which are the node's own socket |
 | home-owned edits — `set_controllers`, `set_grants`, `set_stop`, `set_mode` | **refused**: they wait for the link | refused |
-| `set_settings` (§5 `settings.yml`, TD-100; home-owned since 2026-09-25) | **forwarded** while the link is up; **refused** offline in the home-owned edits' words — the file is the home's, and the node's gate reads the replica it was last sent (*Settings, replicated*, below) | refused — a person's own, link or no link |
+| `set_settings` (§5 `settings.yml`, TD-100; home-owned since 2026-09-25) | **forwarded** while the link is up; **refused** offline in the home-owned edits' words — the file is the home's, and the node's gate reads the replica it was last sent (*Settings, replicated*, below; not built — TD-147: today the row reads *served, link or no link*) | refused — a person's own, link or no link |
 | the mailbox — `msg`, `inbox`, `inbox_delete`, and the person's own `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (§4.10, TD-069) | **refused**: the mailbox is at the home | refused |
 | reports — `progress`, `finding`, `doing` | — | **refused** |
 
@@ -1194,42 +1194,40 @@ call by call.
   **hint**, not an inbox: a read the node serves alone carries the mail line from it.
   Refused, not queued: nothing is pushed to a link that is down, and the next snapshot pushes
   everything.
-- - **Settings, replicated** (TD-100 (4), 2026-09-25; not built — TD-147). `settings.yml` is home-
-- owned (§5), and the policies that read it — the usage gate, a team's stop time, a schedule — run
-- on the node that holds the session, so the file travels: the `settings` link method, home → node,
-- a notification carrying the whole file as the home holds it, sent to **every node whose link is up
-- after each `set_settings` write**, and to a node once **on its `hello`** at every dial. The node
-- writes its own `settings.yml` from it and reads that on every tick as the home reads its own,
-- offline included — *policies that stop run on the node, from its replica*, the rule the stop time
-- already has — so the last settings a node was sent stay in force until its next dial, and a hand
-- edit at a node is overwritten by the next frame. `set_settings` at a node is forwarded while the
-- link is up and refused offline (the table above); the reads a node serves — `gate`, `settings` —
-- answer from the replica, and the page says *set at <home>* beside each value. A write may
-- originate at the home with no node involved, so the send is a broadcast, never a reply to a
-- caller. Refused, not queued, as the intent push is.
-- **Derived reports from a node.** The tick's derived `progress` and `findings` are home-owned, so
-  a node's tick sends what it derives to the home as `derived {id, progress, findings, retire}` —
-  applied there exactly as the home's own tick applies its own (upserts under invariant 10, a
-  moved-off branch claim retired), for a record of that link's host only, and refused whole if an
-  entry says `declared`. Its own link method rather than a forwarded `progress`, because a derived
-  entry carries the branch it came from and a retire, which the RPC does not. While the link is
-  down the node derives nothing: a claim written to the replica is overwritten on reconnect and
-  was never checked against the siblings' leases.
-- **Reads of a pane.** `tail` and `explain` on `id@host` read a screen only that node's tmux
-  holds, so the home asks the node for them — `read {rpc, params}`, a link method of its own whose
-  allowlist is exactly those two (`NODE_READS`), so a read can never reach an acting method through
-  it and `act`'s list never grows by a read. **Ungated**, as on one host (§9 invariant 11): no
-  caller crosses with it, and a session with no grant reads a node's pane as it reads a local one.
-  Refused as unreachable — never queued — while the link is down; the reply is the node's,
-  untouched but for its addresses. A node serves reads of its own host's panes only: a call at a
-  node naming another host's session is *no session* there, not forwarded (the UI does not call
-  either — a card's preview is the record's own `tail`, reported).
-- **`create` with a `host`.** `create` takes `host` (default: this one); for another host it is an
-  act to that node, whose `create` runs the anchor rule and occupancy over *its* records and its
-  checkout, adds the caller — as the node addresses it — to `controllers`, and the reply is
-  addressed `id@host`. The home's own occupancy check does not reach across hosts, except for a
-  container node on the home's machine, whose checkout is one directory (above). `ao new --host
-  <name>` is the terminal's form.
+- **Settings, replicated** (TD-100 (4), 2026-09-25; not built — TD-147). `settings.yml` is home-
+  owned (§5), and the policies that read it — the usage gate, a team's stop time, a schedule — run
+  on the node that holds the session, so the file travels: the `settings` link method, home → node,
+  a notification carrying the whole file as the home holds it, sent to **every node whose link is up
+  after each `set_settings` write**, and to a node once **on its `hello`** at every dial. The node
+  writes its own `settings.yml` from it and reads that on every tick as the home reads its own,
+  offline included — *policies that stop run on the node, from its replica*, the rule the stop time
+  already has — so the last settings a node was sent stay in force until its next dial, and a hand
+  edit at a node is overwritten by the next frame. `set_settings` at a node is forwarded while the
+  link is up and refused offline (the table above); the reads a node serves — `gate`, `settings` —
+  answer from the replica, and the page says *set at <home>* beside each value. A write may
+  originate at the home with no node involved, so the send is a broadcast, never a reply to a
+  caller. Refused, not queued, as the intent push is. **Derived reports from a node.** The tick's
+  derived `progress` and `findings` are home-owned, so a node's tick sends what it derives to the
+  home as `derived {id, progress, findings, retire}` — applied there exactly as the home's own tick
+  applies its own (upserts under invariant 10, a moved-off branch claim retired), for a record of
+  that link's host only, and refused whole if an entry says `declared`. Its own link method rather
+  than a forwarded `progress`, because a derived entry carries the branch it came from and a retire,
+  which the RPC does not. While the link is down the node derives nothing: a claim written to the
+  replica is overwritten on reconnect and was never checked against the siblings' leases. **Reads of
+  a pane.** `tail` and `explain` on `id@host` read a screen only that node's tmux holds, so the home
+  asks the node for them — `read {rpc, params}`, a link method of its own whose allowlist is exactly
+  those two (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
+  never grows by a read. **Ungated**, as on one host (§9 invariant 11): no caller crosses with it,
+  and a session with no grant reads a node's pane as it reads a local one. Refused as unreachable —
+  never queued — while the link is down; the reply is the node's, untouched but for its addresses. A
+  node serves reads of its own host's panes only: a call at a node naming another host's session is
+  *no session* there, not forwarded (the UI does not call either — a card's preview is the record's
+  own `tail`, reported). **`create` with a `host`.** `create` takes `host` (default: this one); for
+  another host it is an act to that node, whose `create` runs the anchor rule and occupancy over
+  *its* records and its checkout, adds the caller — as the node addresses it — to `controllers`, and
+  the reply is addressed `id@host`. The home's own occupancy check does not reach across hosts,
+  except for a container node on the home's machine, whose checkout is one directory (above). `ao
+  new --host <name>` is the terminal's form.
 
 **Considered and rejected.**
 - *The UI host as a store-and-forward router*: makes the UI, a client tier that may be a sleeping laptop, a second writer holding state, and leaves unanswered which host gates an act across hosts.
@@ -1680,7 +1678,7 @@ Screens:
    Inbox (screen 6), with Snooze and Done on §4.4's write-back, and the whole board, undated
    items and the stale-sweep warning included, is dev-cadence's own `/attention` report. There
    is no Attention page and no tab for one.
-8. 8. **Settings** (`/settings`; TD-100 (4), designed 2026-09-25 with Paul — TD-146, TD-147 and
+8. **Settings** (`/settings`; TD-100 (4), designed 2026-09-25 with Paul — TD-146, TD-147 and
    TD-148 build it; the reasoning is the ADR [2026-09-25 settings
    audit](decisions/2026-09-25-settings-audit.md); mockups `Settings.dc.html`,
    `SettingsDark.dc.html`): the one page that **writes a setting** — a value a person moves without
@@ -1840,7 +1838,7 @@ noted). If a control is not in this table it does not exist.
 | Focus | **Open shell here** | a `shell` session in this session's directory |
 | Focus | **Wrap up** | sends the wrap-up prompt (same one the policy uses) |
 | Focus | **Kill** | confirms, then kills the tmux session; worktree kept; state `exited` with `pane: false` — unlike a natural exit, whose dead pane is kept, a kill destroys it, so the card offers Details and Focus / `ao focus` refuse without calling tmux (TD-023) |
-| Focus (exited / closed) | **Resume** / **Resume with changes…** / **New session here** / **Forget** | the exited banner. **Resume** is one press and no form (TD-081), on an `exited` or `closed` record holding a tool session id: a `create` on the record's host with its own `name`, `dir`, `adapter`, `profile`, `role`, `team`, `project`, `lane` and `controllers`, **its `repo` when it has one** — the scope the name is checked in (§4.1): a session in a worktree is scoped by its repo, and a resume that sent the worktree directory alone computed a different id, so a second record appeared beside the one being resumed (TD-146) — and `resume` = the tool's session id — the name check answers `supersede`, the new session takes the bare name and the record's id, the old record is replaced in place and its mail stays with it (§4.10 *Resume carries mail forward*); a live team finds its member by the same name. **Never carried: `unattended`** — the session a press starts is attended, whatever the record was: an unattended session answers its own permission prompts, and a press with no form is no place to grant that; its prompts come to the Inbox. To make it unattended again use **Resume with changes…**, where *Unattended* and its stop time are on the form together. Also not carried: `run_until` and `wrapup_prompt` (a passed deadline is not one; an attended session has none, §6), `prompt`, and `capabilities` — the page takes the grants of the record's `role` from the role presets, as the form does. `controllers` are carried as they were: a controller that is gone is a wake that goes nowhere; `supervised` (§6) is carried the same way and is inert while the session is attended. A person's act — no `caller`, no attenuation (§4.8 create rule); no CLI form beyond `ao new --resume`. **When it cannot be silent it is not a guess:** no tool session id (a `shell`, a command), a name a *live* record holds, a directory that is gone, a profile or role that no longer exists, or a host not connected — the press lands on the form, filled in, with the reason on it. **Resume with changes…** is that same filled-in form, asked for, *Unattended* as the record had it; a worktree record lands with **Where** = new worktree, the worktree's name and the repo in the directory field — the fields the form's own Start sends back, so the create checks the name in the record's scope. **New session here** prefills the directory only; **Forget** removes the record (pane and run log readable until then); CLI: `ao forget <id>` (the `remove` RPC; refuses a live record) |
+| Focus (exited / closed) | **Resume** / **Resume with changes…** / **New session here** / **Forget** | the exited banner. **Resume** is one press and no form (TD-081), on an `exited` or `closed` record holding a tool session id: a `create` on the record's host with its own `name`, `dir`, `adapter`, `profile`, `role`, `team`, `project`, `lane` and `controllers`, **its `repo` when it has one** — the scope the name is checked in (§4.1): a session in a worktree is scoped by its repo, and a resume that sent the worktree directory alone computed a different id, so a second record appeared beside the one being resumed (TD-145) — and `resume` = the tool's session id — the name check answers `supersede`, the new session takes the bare name and the record's id, the old record is replaced in place and its mail stays with it (§4.10 *Resume carries mail forward*); a live team finds its member by the same name. **Never carried: `unattended`** — the session a press starts is attended, whatever the record was: an unattended session answers its own permission prompts, and a press with no form is no place to grant that; its prompts come to the Inbox. To make it unattended again use **Resume with changes…**, where *Unattended* and its stop time are on the form together. Also not carried: `run_until` and `wrapup_prompt` (a passed deadline is not one; an attended session has none, §6), `prompt`, and `capabilities` — the page takes the grants of the record's `role` from the role presets, as the form does. `controllers` are carried as they were: a controller that is gone is a wake that goes nowhere; `supervised` (§6) is carried the same way and is inert while the session is attended. A person's act — no `caller`, no attenuation (§4.8 create rule); no CLI form beyond `ao new --resume`. **When it cannot be silent it is not a guess:** no tool session id (a `shell`, a command), a name a *live* record holds, a directory that is gone, a profile or role that no longer exists, or a host not connected — the press lands on the form, filled in, with the reason on it. **Resume with changes…** is that same filled-in form, asked for, *Unattended* as the record had it; a worktree record lands with **Where** = new worktree, the worktree's name and the repo in the directory field — the fields the form's own Start sends back, so the create checks the name in the record's scope. **New session here** prefills the directory only; **Forget** removes the record (pane and run log readable until then); CLI: `ao forget <id>` (the `remove` RPC; refuses a live record) |
 | Focus | **Copy / Paste** | Paste is inert on an `unattended` session's read-only Focus (TD-096, *Focus watches*: it goes through the terminal as keys do; Copy only reads, and works). Terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027). Reads **Steer** ("steers the turn in flight") while the session is `working` and **Send** ("starts a new turn") when idle (§4.3) — one control, labelled for the job it is doing. `stalled?` steers too — a `working` session that stopped producing output (§4.2) is a turn in flight; `limited` says the cap holds what you send, since nothing the person does clears a cap (§4.2; its controls are **Switch profile** and **Wait**). Closed, composer and all, on an `unattended` session (TD-096, *Focus watches*: typing is the disruption; Take over opens it). Disabled with a reason on `exited`, `closed` and `unreachable`, where there is no turn (TD-047), and the host agent refuses `send` and `keys` to an `exited` or `closed` record the same, in words with the exit code, whoever sends (TD-078) — the record's own state, not a screen rule |
@@ -4463,17 +4461,17 @@ session is never woken by mail at all.
   are the node→home link of §4.4a (built for a container node; a machine node is not yet in use, TD-057). **`home:`** names the host whose agent holds the org's graph
   and mail; an agent whose file names no `home:`, or names itself, is the home. On Paul's machines
   it is `home: kmaster`.
-- - **The settings a person moves** (TD-100; one file since 2026-09-25 — the ADR [settings
-- audit](decisions/2026-09-25-settings-audit.md); TD-146 builds the file, TD-147 the replica, TD-148
-- the page): **`settings.yml`**, beside `hosts.yml` in the agentorc home **of the home** — home-
-- owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
-- written **only by its `set_settings` RPC**, a person's own, refused to a session as `inbox_pause`
-- is; `ao gate`, `ao schedule`, `ao team until` (§4.7) and the Settings page (§4.5 screen 8) all
-- write through it. Nobody edits it by hand while the agent runs, though a hand edit is read on the
-- next tick; it carries no comments, and a write rewrites it whole. **The line it draws**: a
-- *definition* — what a team, a repo, a host or a profile *is* — stays in its own file above and
-- below this bullet; a *setting* is a value the person turns without redefining anything, and every
-- such value lives here, under four keys:
+- **The settings a person moves** (TD-100; one file since 2026-09-25 — the ADR [settings
+  audit](decisions/2026-09-25-settings-audit.md); TD-146 builds the file, TD-147 the replica, TD-148
+  the page): **`settings.yml`**, beside `hosts.yml` in the agentorc home **of the home** — home-
+  owned, one file for the org — read by the home's agent on every tick (`sessionorc.settings`),
+  written **only by its `set_settings` RPC**, a person's own, refused to a session as `inbox_pause`
+  is; `ao gate`, `ao schedule`, `ao team until` (§4.7) and the Settings page (§4.5 screen 8) all
+  write through it. Nobody edits it by hand while the agent runs, though a hand edit is read on the
+  next tick; it carries no comments, and a write rewrites it whole. **The line it draws**: a
+  *definition* — what a team, a repo, a host or a profile *is* — stays in its own file above and
+  below this bullet; a *setting* is a value the person turns without redefining anything, and every
+  such value lives here, under four keys:
 
 ```yaml
 usage_gate:                                   # §6 *Usage gate* — per profile, per window label as the adapter names it
@@ -4840,35 +4838,33 @@ teams:
   time for one session (`start_at`, a `scheduled` state), window overrides with an expiry
   (TD-101: not wanted yet), calendar-shaped windows and one-off runs — TD-026 holds them for the
   person's word on scope.
-- - **Team stop time** (§5 `teams.<team>.until`; the Settings page and `ao team until`, §4.7;
-- 2026-09-25, not built — TD-146): the team-wide form of a session's `run_until`. On every tick,
-- each live session carrying the team's badge — members and seats — whose `run_until` is unset or
-- later than the team's takes the team's instant, exactly as `set_stop` would give it
-- (`wrapup_sent_at` reset, the wrap-up then the kill as the stop time's own rule says), and a start
-- the team makes after the instant is set stamps it on what it creates. **Clear** removes the key; a
-- session's own later `ao until` is kept as the earlier of the two. A stop time in the past is
-- refused when set, as `ao until`'s is.
-- **Run window** (Not built — phase 3, the tdgrind port): start missing workers inside the
-  window; wrap-up-then-kill outside, by setting a stop time.
-- **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on
-  a profile when **any** of its reported windows reaches that window's **line**, and resume them
-  when every window is back under its line — the windows being the **account's** reading, the
-  one poll every profile on that account shares (§4.2a, TD-122), read against this profile's own
-  lines; a fetch failure never pauses — the last good reading
-  stands, as the chip's does (§4.5a, TD-087). The windows and their labels are the adapter's
-  (§4.3, TD-073); the gate knows none of them by name. **The line is computed from a reserve,
-  never typed as a percentage.** What a person keeps back is some of each session, and some of
-  each remaining day of the week, for their own interactive work, so the setting is a **reserve**
-  per window label, of two shapes: a flat percent — `30` — whose line is `100 − reserve`; or a
-  percent **per day** — `{per_day: 10}` — whose line is `100 − per_day × days_left`, where
-  `days_left` is the whole days until the window's `resets`, today counted whole (`ceil`, never
-  below 1), and the line is clamped to 0–100. A per-day reserve on a window whose reading carries
-  no `resets` (§4.3 allows one) makes no line, as no reserve does. With 10 a day the weekly line
-  is 30% on the reset day, 60% with four days left, 90% on the last day: **the line rises as the
-  week goes**, so a team paused on a Wednesday at 60% resumes on the Thursday when the line moves
-  to 70%, and one paused on the last day resumes at the reset, when the window empties. A window
-  with no reserve has no line and pauses nothing; the tool's own 100% shows `limited`. **A team's
-  reserve priority** (§5 `teams.<team>.reserve`, the Settings page; 2026-09-25, not built —
+- **Team stop time** (§5 `teams.<team>.until`; the Settings page and `ao team until`, §4.7;
+  2026-09-25, not built — TD-146): the team-wide form of a session's `run_until`. On every tick,
+  each live session carrying the team's badge — members and seats — whose `run_until` is unset or
+  later than the team's takes the team's instant, exactly as `set_stop` would give it
+  (`wrapup_sent_at` reset, the wrap-up then the kill as the stop time's own rule says), and a start
+  the team makes after the instant is set stamps it on what it creates. **Clear** removes the key; a
+  session's own later `ao until` is kept as the earlier of the two. A stop time in the past is
+  refused when set, as `ao until`'s is. **Run window** (Not built — phase 3, the tdgrind port):
+  start missing workers inside the window; wrap-up-then-kill outside, by setting a stop time.
+  **Usage gate** (per profile; designed, being built — TD-100): pause every unattended session on a
+  profile when **any** of its reported windows reaches that window's **line**, and resume them when
+  every window is back under its line — the windows being the **account's** reading, the one poll
+  every profile on that account shares (§4.2a, TD-122), read against this profile's own lines; a
+  fetch failure never pauses — the last good reading stands, as the chip's does (§4.5a, TD-087). The
+  windows and their labels are the adapter's (§4.3, TD-073); the gate knows none of them by name.
+  **The line is computed from a reserve, never typed as a percentage.** What a person keeps back is
+  some of each session, and some of each remaining day of the week, for their own interactive work,
+  so the setting is a **reserve** per window label, of two shapes: a flat percent — `30` — whose
+  line is `100 − reserve`; or a percent **per day** — `{per_day: 10}` — whose line is `100 − per_day
+  × days_left`, where `days_left` is the whole days until the window's `resets`, today counted whole
+  (`ceil`, never below 1), and the line is clamped to 0–100. A per-day reserve on a window whose
+  reading carries no `resets` (§4.3 allows one) makes no line, as no reserve does. With 10 a day the
+  weekly line is 30% on the reset day, 60% with four days left, 90% on the last day: **the line
+  rises as the week goes**, so a team paused on a Wednesday at 60% resumes on the Thursday when the
+  line moves to 70%, and one paused on the last day resumes at the reset, when the window empties. A
+  window with no reserve has no line and pauses nothing; the tool's own 100% shows `limited`. **A
+  team's reserve priority** (§5 `teams.<team>.reserve`, the Settings page; 2026-09-25, not built —
   TD-146) is a flat percent added to the profile's reserve for the sessions carrying that team's
   badge on every window: with grind at 30 on the session window and ao-grind at 10, ao-grind's
   sessions pause at 60% and the profile's others at 70%, so two teams on one profile pause at
@@ -4877,53 +4873,49 @@ teams:
   **A pause is a send, not a kill** (the PAUSE flag of this section's last bullet): the host agent
   submits the record's `pause_prompt` once — *pause: finish the step in hand, commit and push what
   you have, then stop and wait for a resume* — which a working session takes as its next prompt
-  (§4.3: a busy session queues the text), and marks the record
-  `gated: {profile, label, pct, line, since, next, resets, sent_at}` — `next` being when the line
-  next moves or the window resets, whichever is sooner, `resets` the window's reset, and `sent_at` when the pause prompt **landed**,
+  (§4.3: a busy session queues the text), and marks the record `gated: {profile, label, pct, line,
+  since, next, resets, sent_at}` — `next` being when the line next moves or the window resets,
+  whichever is sooner, `resets` the window's reset, and `sent_at` when the pause prompt **landed**,
   as `wrapup_sent_at` is to `wrapup_at` (§4.4a): the mark is written the tick the line is crossed,
   the send is retried on every tick until it lands, and a card reads the two apart — *paused ·
-  usage* once the mark exists, *· pause sent* once it landed. A session sitting on a permission or
-  a question is **not typed at** — the same rule as `send`'s (§4.2) — and, unlike the stop time,
-  the gate does not kill it: a session waiting on a dialog is consuming nothing, so the mark
-  stands and the send lands on the tick after the dialog clears. The wording travels on the record
-  as `wrapup_prompt` does, and for the same reason. While gated: the doorbell does not ring the
-  session; a controller's `send` is refused at the home with the gate as the reason — read from
-  the replica's `gated`, a node-owned field like `state` (§4.4a); a person's own send is not —
-  `ao send` directly (a person is not a session, §9 invariant 11), or from Focus after **Take
-  over** (TD-096: the composer of an unattended session is closed), which makes the session
-  interactive and out of the gate's reach altogether (§9 invariant 5). The card's slot reads
-  ***paused · usage** — grind week 71% ≥ 70%, line moves Thu 07:00* as *what explains a stop*
-  (§4.5 *The card's anatomy*, row 5 (a)), and row 5's rule stands, **one text, the first that
-  applies**: a pending permission or question, a `limited` reset or a `stalled?` note wins the
-  slot, since each needs a person and the pause does not, and the mark is drawn once that clears;
-  the Focus header shows the mark whatever the slot shows. A mark, not a state — the session
-  still reads `idle`. **Resume** is the record's `resume_prompt` — *resume: carry on from where
-  you paused* — sent once when every window of the profile is under its line and no sooner than
-  `RESUME_MIN` (ten minutes) after the pause; the mark goes with it. A manager on the profile is
-  paused like any worker (this section's opening paragraph), so a team pauses whole: the mark
-  says why it is quiet, which answers the page's half of TD-099's *stopped for the usage window*
-  — a paused team is a live team, so its card keeps **Wind down** and **Stop now** (§4.5a), and a
-  wind-down sent to a paused member is a person's act, lands as one and ends it; whether a paused
-  manager should also *declare* is TD-099's other half. The run window's wrap-up-then-kill is
-  deliberately **not** used here: a pause that killed would need a start, and a start is a
-  person's act or a schedule's (TD-026, off by default), so a team paused for the night would be
-  a team ended for the week. Interactive sessions are never paused and carry no line: at 100%
-  they show `limited`. The reserves are the person's, per profile, in the host's `settings.yml`
-  (§5), read on every tick and changed by `ao gate` (§4.7) or, once §4.5 lists one, a settings
-  page; the top bar's chip shows the line beside the number (§4.5a). A one-day change to a
-  reserve is by hand — the reserve down, and back after the reset. Rejected for now: TD-101, an
-  override that expires on its own.
-- **Credential lapse** (Not built — phase 3): adapter `credentials_ok()` false → don't start;
-  running workers get a send when fresh credentials land (tdgrind's `.nudged` marker).
-- **Stall** (Not built — phase 3): `working` with no output past `stall_after` → flag `stalled?`,
-  send one prompt, then wrap up.
-- **Exit reap** (Not built — phase 3): a worker whose tool exited sits on a sleep; reap it and
-  keep the run log.
-- **Worktree reap** (Not built — phase 3): run `reap_worktrees.sh` (or its generalized form)
-  between lifecycles.
-- **Stranded-work flag** (Not built — phase 3): any session going `idle`/`exited` with a dirty
-  tree or unpushed commits is flagged in the team — the stranded-work audit, continuous.
-- **PAUSE** flag and `on`/`off`/`off --now` semantics (Not built — phase 3): kept as agent RPCs.
+  usage* once the mark exists, *· pause sent* once it landed. A session sitting on a permission or a
+  question is **not typed at** — the same rule as `send`'s (§4.2) — and, unlike the stop time, the
+  gate does not kill it: a session waiting on a dialog is consuming nothing, so the mark stands and
+  the send lands on the tick after the dialog clears. The wording travels on the record as
+  `wrapup_prompt` does, and for the same reason. While gated: the doorbell does not ring the
+  session; a controller's `send` is refused at the home with the gate as the reason — read from the
+  replica's `gated`, a node-owned field like `state` (§4.4a); a person's own send is not — `ao send`
+  directly (a person is not a session, §9 invariant 11), or from Focus after **Take over** (TD-096:
+  the composer of an unattended session is closed), which makes the session interactive and out of
+  the gate's reach altogether (§9 invariant 5). The card's slot reads ***paused · usage** — grind
+  week 71% ≥ 70%, line moves Thu 07:00* as *what explains a stop* (§4.5 *The card's anatomy*, row 5
+  (a)), and row 5's rule stands, **one text, the first that applies**: a pending permission or
+  question, a `limited` reset or a `stalled?` note wins the slot, since each needs a person and the
+  pause does not, and the mark is drawn once that clears; the Focus header shows the mark whatever
+  the slot shows. A mark, not a state — the session still reads `idle`. **Resume** is the record's
+  `resume_prompt` — *resume: carry on from where you paused* — sent once when every window of the
+  profile is under its line and no sooner than `RESUME_MIN` (ten minutes) after the pause; the mark
+  goes with it. A manager on the profile is paused like any worker (this section's opening
+  paragraph), so a team pauses whole: the mark says why it is quiet, which answers the page's half
+  of TD-099's *stopped for the usage window* — a paused team is a live team, so its card keeps
+  **Wind down** and **Stop now** (§4.5a), and a wind-down sent to a paused member is a person's act,
+  lands as one and ends it; whether a paused manager should also *declare* is TD-099's other half.
+  The run window's wrap-up-then-kill is deliberately **not** used here: a pause that killed would
+  need a start, and a start is a person's act or a schedule's (TD-026, off by default), so a team
+  paused for the night would be a team ended for the week. Interactive sessions are never paused and
+  carry no line: at 100% they show `limited`. The reserves are the person's, per profile, in the
+  host's `settings.yml` (§5), read on every tick and changed by `ao gate` (§4.7) or, once §4.5 lists
+  one, a settings page; the top bar's chip shows the line beside the number (§4.5a). A one-day
+  change to a reserve is by hand — the reserve down, and back after the reset. Rejected for now:
+  TD-101, an override that expires on its own. **Credential lapse** (Not built — phase 3): adapter
+  `credentials_ok()` false → don't start; running workers get a send when fresh credentials land
+  (tdgrind's `.nudged` marker). **Stall** (Not built — phase 3): `working` with no output past
+  `stall_after` → flag `stalled?`, send one prompt, then wrap up. **Exit reap** (Not built — phase
+  3): a worker whose tool exited sits on a sleep; reap it and keep the run log. **Worktree reap**
+  (Not built — phase 3): run `reap_worktrees.sh` (or its generalized form) between lifecycles.
+  **Stranded-work flag** (Not built — phase 3): any session going `idle`/`exited` with a dirty tree
+  or unpushed commits is flagged in the team — the stranded-work audit, continuous. **PAUSE** flag
+  and `on`/`off`/`off --now` semantics (Not built — phase 3): kept as agent RPCs.
 
 ## 7. Phases
 
