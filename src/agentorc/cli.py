@@ -1273,6 +1273,9 @@ def cmd_msg(args: argparse.Namespace) -> int:
             print(f"landed — host unreachable: {', '.join(got['unreachable'])}")
         for asked, now in (got.get("forwarded") or {}).items():
             print(f"forwarded: {asked} was resumed as {now}")
+        # design §4.10 *When it is read* (TD-168): the reply ends with when each addressee reads it
+        for sid, when in (got.get("read_when") or {}).items():
+            print(f"{sid}: {when}")
 
     return emit(args, got, prose)
 

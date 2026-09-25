@@ -282,3 +282,73 @@ def unread_line(n: int) -> str:
     no `from`, no `kind`, no `about`, no body — which is what keeps a ring a message and not a
     laundered `send`: whatever is pasted and followed by Enter is the recipient's next prompt."""
     return f"[agentorc] you have {int(n)} unread messages — run ao inbox"
+
+
+def _hours(d: timedelta) -> str:
+    h = d.total_seconds() / 3600
+    return f"{h:g} h" if h >= 1 else f"{int(d.total_seconds() // 60)} min"
+
+
+def read_when(
+    s: Session | None,
+    kind: str,
+    now: datetime,
+    *,
+    person: bool = True,
+    seat: bool = False,
+    bound: timedelta | None = None,
+    unreachable: bool = False,
+) -> str:
+    """**When it is read** (design §4.10 *When it is read: the sentence the sender sees*, TD-158,
+    built by TD-168): one sentence saying when a message of `kind` to `s` will be read — the first
+    case of the design's table that applies, in the doorbell's own order (`_bell_blocked`, then the
+    budget), so it never promises a ring the doorbell would not give. A pure function of the record
+    and the kind, never stored. `s` None with `seat` is a seat nobody fills (the placeholder card);
+    `person` is whether the sender is a person, whose message refills the budget (*Time and a
+    person restore it*), so only a session's reads *budget spent*; `unreachable` is the home's word
+    that the record's host link is down (§4.4a), which the record's own state may not say yet.
+    Advice, never a refusal."""
+    ask = kind == "ask"
+    tail = f" — an ask takes the default bound of {_hours(bound or ASK_BOUND)}" if ask else ""
+    if s is not None and not mail_wakes(s):
+        return (
+            "lands in its inbox and wakes nothing: a person's session is never rung (invariant 5)"
+            " — the card's unread chip shows it" + tail
+        )
+    state = s.state if s is not None else "exited"
+    on_call = (seat or (s is not None and bool(s.seat))) and state in ("exited", "closed")
+    if on_call:
+        if ask:
+            return "fills this seat: a session starts on the next tick and reads it first" + tail
+        return (
+            "waits in the seat's mailbox: a note fills no seat, and is read at the next fill, which a question causes"
+        )
+    if s is None or state in ("exited", "closed"):
+        return "read when this session is resumed, or started again under this name" + tail
+    if state == "unreachable" or unreachable:
+        return "lands at the home; its host cannot be reached, so it is delivered when the link is back" + tail
+    stop = s.wrapup_sent_at or s.wrapup_at
+    if not stop and s.run_until:
+        try:
+            stop = datetime.fromisoformat(s.run_until.replace("Z", "+00:00")) <= now
+        except ValueError:
+            stop = False
+    if stop or s.gated:
+        why = "it is wrapping up" if stop else "it is paused for usage"
+        return f"lands and waits: {why}, and mail never pushes a session past a stop" + tail
+    if state == "limited":
+        cap = s.pending.text if s.pending and s.pending.text else "a usage cap"
+        return f"lands and waits: its account is capped ({cap}), and it is rung after" + tail
+    if not person and wake_budget_spent(s, now):
+        return "lands without waking it: its wake budget is spent, read on its next look" + tail
+    if state == "needs-you":
+        what = "question" if s.pending and s.pending.kind == "question" else "permission"
+        return f"read once its {what} is answered and its turn ends" + tail
+    if state in ("working", "stalled?"):
+        return "read when its turn ends: it is rung on the tick after its Stop" + tail
+    if s.confidence == "hook":
+        return 'rung within a tick: the doorbell types "you have n unread" into its pane' + tail
+    return (
+        "lands; its idle is a guess from the screen, so nothing is typed into it"
+        " — read on its next look or its next `ao` reply" + tail
+    )

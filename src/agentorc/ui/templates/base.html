@@ -48,6 +48,8 @@
       <label class="field">kind <select class="input" id="mailkind"><option value="ask" selected>ask — needs an answer</option><option value="note">note — no reply expected</option></select></label>
       <label class="field">about <input class="input" id="mailabout" placeholder="TD-052, a PR, a session (optional)"></label>
     </div>
+    {#- §4.10 *When it is read* (TD-168): one sentence, from the addressee's record, swapped with the kind #}
+    <div class="note" id="mailwhen" hidden></div>
     <div class="note" id="mailquote"></div>
     <textarea class="input tall" id="mailtext" placeholder="First what you want, then why."></textarea>
     <div class="row gap">

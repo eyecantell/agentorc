@@ -204,12 +204,29 @@
     return g;
   };
 
+  // §4.10 *When it is read* (TD-168): the composer's line for a kind, from the addressee's pair
+  // (`read_when` on its record's view). Pure, so a test can call it: a reply reads as a note does,
+  // and a pair the record did not carry (an older host agent) draws no line at all.
+  AO.whenLine = function (pair, kind, reply) {
+    const t = (pair || {})[reply || kind === "note" ? "note" : "ask"] || "";
+    return t ? `When it is read: ${t}.` : "";
+  };
+
   AO.compose = function (o) {
     const dlg = $("#mailbox");
     $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
     $("#mailkindrow").hidden = !!o.reply;
     $("#mailquote").textContent = o.quote ? `re: “${o.quote.length > 160 ? o.quote.slice(0, 160) + "…" : o.quote}”` : "";
     $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = "";  // an ask by default (§4.5a **Message**, 2026-09-25)
+    // §4.10 *When it is read* (TD-168): the addressee's pair, from its record's view, never a
+    // request; a reply reads as a note does, and switching the kind swaps the sentence
+    const when = $("#mailwhen");
+    if (when) {
+      const show = () => {
+        when.textContent = AO.whenLine(o.when, $("#mailkind").value, o.reply); when.hidden = !when.textContent;
+      };
+      $("#mailkind").onchange = show; show();
+    }
     return new Promise((resolve) => {
       dlg.addEventListener("close", () => {
         const text = $("#mailtext").value;
@@ -313,7 +330,10 @@
       }
       // design §4.5a **Message**, Focus Inbox **Reply** and delete (§4.10): mail, never a send
       if (action === "message" || action === "reply") {
-        const m = await AO.compose({ to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote });
+        const m = await AO.compose({
+          to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote,
+          when: { ask: b.dataset.whenAsk || "", note: b.dataset.whenNote || "" },
+        });
         if (!m) return;
         body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
       }

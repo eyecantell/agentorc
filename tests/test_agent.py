@@ -1619,7 +1619,8 @@ async def test_a_view_past_the_line_limit_is_dropped_from_the_stream_not_the_str
         big = await c.call("create", name="wide", dir=str(tmp_path), adapter="shell")
         await c.call("progress", id=big["id"], ref="TD-1", status="claimed", why="x" * 4_000)
         small = await c.call("create", name="thin", dir=str(tmp_path), adapter="shell")
-        monkeypatch.setattr(link, "FRAME_LIMIT", 2_048)
+        # between the two: the thin card is ~2.1 KB since the view carries `read_when` (TD-168), the wide ~6 KB
+        monkeypatch.setattr(link, "FRAME_LIMIT", 3_072)
         await sub.call("subscribe")
         seen = set()
         while small["id"] not in seen:

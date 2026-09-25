@@ -96,7 +96,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Open — design-first |
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
-| TD-168 | Build *when it is read*: `mail.read_when`, the pair on the record's view, the composer's sentence that changes with the kind, `read_when` on every `ao msg` reply | Medium | Open |
 
 
 ---
@@ -1780,26 +1779,3 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** §4.5a *Focus: Copy / Paste*, §4.6 *Scrollback is tmux's* (TD-022), TD-096 (the read-only attach), TD-157 (an *i* mark for the control), ADR 2026-09-25 (where a person's preference lives).
 
-## TD-168: Build *when it is read*: `mail.read_when`, the pair on the record's view, the composer's sentence that changes with the kind, `read_when` on every `ao msg` reply
-
-**Priority:** Medium
-**Added:** 2026-09-25 (the designer, from TD-158's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built. Design §4.10 *When it is read: the sentence the sender sees*, §4.5a **Message** (the last sentences), §4.7 *Mail* (the reply's last line); mockup `Message.dc.html`.
-
-**Location:** `src/sessionorc/mail.py` (`wake_budget_spent` is beside where `read_when` goes; the seat's `asks_waiting`), `src/sessionorc/agent.py` (`rpc_msg`'s reply dict — `wake_budget_spent`, `unreachable` already there; `_view` / the pushed record), `src/agentorc/ui/app.py` (`view`: `seat`, `seat_when`, `scraped`, the wrap-up and gate notes — the same facts the sentence reads), `src/agentorc/ui/templates/base.html` (the `#mailbox` dialog: a line under `#mailkindrow`), `src/agentorc/ui/static/app.js` (`AO.compose`: takes the record's `read_when` pair and swaps the line on the kind's `change`), `src/agentorc/cli.py` (`cmd_msg`: print `read_when` after `advice`), `src/agentorc/skill.md` (one clause: the reply says when it is read).
-
-**Why:** TD-158's *Why*: nothing on the screen said the seat comes on a question.
-
-**Fix:**
-1. **`read_when(record, kind, now) -> str`** in `sessionorc.mail`: the table's cases in its order, the page's words for states, the seat's two sentences by kind (`reply` as `note`), the bound clause on an `ask`, the budget clause only when the sender is a session (a parameter, `person: bool`). `src/sessionorc/**` is a held path: the techlead reads this PR.
-2. **On the record's view**: `read_when: {ask, note}` computed at `_view` time for every record the UI receives — two short strings, no request at open; a seat with nobody in it (the placeholder card) gets its pair from the seat's definition.
-3. **The composer**: the sentence under the kind selector, from the pair; swapped on the kind's `change`; the Reply dialog shows the `note` one. Text only.
-4. **`rpc_msg`** returns `read_when: {id: sentence}` per addressee, computed after delivery with `person=(sender == PERSON)`; **`ao msg`** prints each after the `advice` line, `read_when` under `--json`.
-5. **Tests:** `read_when` on a record per case (twelve cases, both kinds where they differ, the session's budget clause); the composer's swap under node as `test_ui_keys.py` runs `app.js`; the CLI's printed line on a fixture reply.
-
-**Done when** TD-158's *Done when*: a person opening Message on an on-call seat reads, before typing, that a note will not fill it and an ask will, and switching the kind changes the line; and `ao msg` to an exited member ends with *read when it is resumed, or started again under this name*.
-
-**Related:** TD-158 (the design), TD-153 (what a session is told about being woken), TD-157 / TD-167 (the *i* marks: the same idea at the button), TD-152 (the `scheduled` sentence), §4.9b (the seat's trigger), §4.10 (the doorbell's order, the budget's refill).
