@@ -514,7 +514,7 @@ def team_desktop():
                 f'{n("pickable", pickable)}<span>·</span>{n("design-first", design_first)}<span>·</span>{fy}<span>·</span>'
                 f'<a href="#" style="font-weight: 600;">on now</a> <span class="mono" style="font-size: 12px;">{now}</span></div>')
 
-    STRIPS = {"samscrape-grind": strip("samscrape", 4, "2d", 7, 3, 2, 1,
+    STRIPS = {"samscrape-grind": strip("samscrape", 4, "3d", 7, 3, 2, 1,
                                        ["TD-301 (tdgrind-1, #811)", "TD-296 (tdgrind-2, #437)", "TD-290 (tdgrind-3, #812)"])}
 
     grid = ""
