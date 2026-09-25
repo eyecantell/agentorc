@@ -1240,6 +1240,13 @@ class HostAgent:
                 continue
             branch = (s.git or {}).get("branch") if s.id in holders else None
             pending = [e for e in s.progress if e.source != "declared" and e.status == "claimed" and e.pr]
+            # …and a declared claim's `review_pr` (TD-150), re-checked by number as those are, so its
+            # merge clears it after the session has moved to its next branch
+            pending += [
+                ProgressEntry(ref=e.ref, pr=e.review_pr)
+                for e in s.progress
+                if e.source == "declared" and e.status == "claimed" and e.review_pr and not e.pr
+            ]
             # Branch-only claims from a branch this record is no longer on (TD-045). Only for a
             # record that still holds its directory: what is checked out elsewhere says nothing
             # about this one, and an exited worker's claims are its history, not a live question.
@@ -2747,6 +2754,15 @@ class HostAgent:
             # a session that claims something went on after all — both endings are taken back
             # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
             s.out_of_work = s.restart_wanted = None
+        if applied and status == "dropped" and entry.source == "declared" and mail.is_person(caller):
+            # §4.5a *Reports* → Drop, §4.10 (TD-150 slice 3): the session is told its lease went, by a
+            # `system` note that wakes it as a person's act does — else it works on, holding nothing
+            self._system_note(
+                self._address(s),
+                f"your claim on {entry.ref} was dropped by the person — the lease is gone; claim again if you "
+                "still hold the work",
+                wake="person",
+            )
         out = await self._report(s, applied, entry)
         if holder is not None and applied:
             out["lease_overridden"] = holder
