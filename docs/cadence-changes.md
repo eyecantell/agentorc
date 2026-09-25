@@ -12,6 +12,10 @@ Read by `scripts/cadence_changes.py --hook` (SessionStart) and by orchestrators 
 sessions already running (agentorc design §4.8). Written by the dev-cadence PR that changes
 the convention (cadence.md §7).
 
+## 2026-09-25 — git hooks run from the main checkout in every worktree: shims in `.git/hooks`, not `core.hooksPath`
+Do: run `scripts/install_git_hooks.sh` once per clone (sync.sh does it) when the SessionStart guard says the hooks are not installed or `core.hooksPath` is relative; it never clobbers a hook of the clone's own — heed its WARN lines.
+See: cadence.md §4 (Give the rule teeth); `scripts/install_git_hooks.sh`; TD-055.
+
 ## 2026-09-25 — the SessionStart line runs the main checkout's runner: update your repo's settings.json line
 Do: replace the `cadence_hooks.sh` line in `.claude/settings.json` with the one in dev-cadence's `files/.claude/settings.json` (it resolves the main checkout via `git worktree list --porcelain`), in your own PR — SEED files are not re-synced; until then a worktree runs its own branch's hook set. `sync.sh` WARNs while the old line remains.
 See: cadence.md §3 (one settings line); `cadence_hooks.sh` header; TD-055 (b); agentorc's `CADENCE_HOOK_LINE` (the parity pair, changed the same day).
