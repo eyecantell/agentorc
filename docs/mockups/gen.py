@@ -515,7 +515,7 @@ def team_desktop():
                 f'<a href="#" style="font-weight: 600;">on now</a> <span class="mono" style="font-size: 12px;">{now}</span></div>')
 
     STRIPS = {"samscrape-grind": strip("samscrape", 4, "2d", 7, 3, 2, 1,
-                                       ["TD-301 (tdgrind-1, #811)", "TD-296 (tdgrind-2, #437)", "TD-290 (tdgrind-3)"])}
+                                       ["TD-301 (tdgrind-1, #811)", "TD-296 (tdgrind-2, #437)", "TD-290 (tdgrind-3, #812)"])}
 
     grid = ""
     for team, source, lead, live, repo in TEAMS:
@@ -837,10 +837,11 @@ def repo_page():
     as the Inbox, a section per number in the strip's order, a row a card; the board rows are the
     Inbox's own with their controls. No chart, no history: the numbers are today's and the lists
     are the things themselves."""
-    def sec(title, count, rows, blurb):
+    def sec(title, count, rows, blurb, act=""):
         return (f'<div style="display: flex; flex-direction: column; gap: 8px;">'
                 f'<div style="display: flex; align-items: baseline; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">{title}</span>'
-                f'<span class="meta">{count}</span><span class="btn sm ghost" style="height: 22px; padding: 0 6px;" title="{blurb}">i</span></div>{rows}</div>')
+                f'<span class="meta">{count}</span><span class="btn sm ghost" style="height: 22px; padding: 0 6px;" title="{blurb}">i</span>'
+                f'<span style="flex-grow: 1;"></span>{act}</div>{rows}</div>')
     def row(inner, hover=False):
         bg = "#f7f8fa" if hover else "#fff"
         return f'<div class="card" style="padding: 10px 12px; display: flex; align-items: center; gap: 10px; background: {bg};">{inner}</div>'
@@ -869,7 +870,7 @@ def repo_page():
     now = "".join([
         row(f'<a href="#" class="mono">tdgrind-1</a>{pill("working")}<span class="mono">TD-301 → #811</span><span style="flex-grow: 1;"></span>{m("pushing the branch for review · says 14s ago")}'),
         row(f'<a href="#" class="mono">tdgrind-2</a>{pill("stalled")}<span class="mono">TD-296 → #437</span><span style="flex-grow: 1;"></span>{m("waiting on the reader · says 47m ago")}'),
-        row(f'<a href="#" class="mono">tdgrind-3</a>{pill("limited")}<span class="mono">TD-290</span><span style="flex-grow: 1;"></span>{m("says nothing")}'),
+        row(f'<a href="#" class="mono">tdgrind-3</a>{pill("limited")}<span class="mono">TD-290 → #812</span><span style="flex-grow: 1;"></span>{m("says nothing")}'),
     ])
     return head("Repo") + f'''<div style="width: 1440px; min-height: 1320px; background: #f4f5f7; display: flex; flex-direction: column;">
 {topbar("Org")}
@@ -879,7 +880,8 @@ def repo_page():
     <div class="meta">serviced by <a href="#">samscrape-grind</a> · PRs read 2m ago · ledger read at its last commit, 14m ago · board read 30s ago</div>
   </div>
   {sec("Open PRs", "4 · oldest 3d", prs, "open PRs on the repo's remote, read every five minutes; the badge says whether the team's reader has been asked and has answered")}
-  {sec("Technical debt", "7 pickable · 3 design-first", tds, "the ledger's entries whose header reads Pickable: yes, and the ones whose Kind is design-first; held by — a member's progress claims the reference")}
+  {sec("Technical debt", "7 pickable · 3 design-first", tds, "the ledger's entries whose header reads Pickable: yes, and the ones whose Kind is design-first; held by — a member's progress claims the reference",
+       act=f'<span class="btn sm" title="opens docs/technical_debt.md through your open_in (design §5) — an entry is edited in its file, never here">{ICON["code"]}Open ledger</span>')}
   {sec("Waiting on you", "2 due · 1 overdue", board, "the repo's board items that are due — the Inbox's own rows; Snooze, Done and Reply write the board as they do there")}
   {sec("On now", "3 members", now, "every member of the servicing team that holds a claim or says what it is doing, from the records")}
   <div class="note">Design §4.5 screen 9 (TD-170): <b>not a dashboard</b> — no chart, no history; the numbers are today's and the lists are the things themselves. The heading counts are the strip's numbers; <b>Open ledger</b> on the Technical debt heading opens the file through <span class="mono">open_in</span> and is drawn only when one is set. Reached from the strip on the team card, no tab (TD-123). Narrow: the same column, as the Inbox.</div>
