@@ -1,11 +1,13 @@
-# An interactive UI/UX review ships screenshots
+# An interactive UI/UX review makes the change visible
 
 **Written 2026-09-25** at Paul's ask, after TD-156 (the Focus screen) and TD-170 (the repo strip
 and the Repo page) were reviewed with him in one cloud session.
 
-**The rule.** When an interactive UI/UX review with Paul produces significant changes — a screen
-redesigned, a control moved, a new page — always produce rendered screenshots for him to look at,
-in the same turn as the proposal or the build, never only the artboard source or a description:
+**The rule (Paul's words, corrected the same day).** When an interactive UI/UX review with Paul
+produces significant changes — a screen redesigned, a control moved, a new page — **make the change
+visible to him**: a screenshot, a rendering, a published design page, whichever shows it best, in
+the same turn as the proposal or the build, never only the artboard source or a description. The
+ways that have worked:
 
 - **the mockups**: regenerate `docs/mockups/gen.py`, then `docs/mockups/shot.sh <out> <Name>…`
   (headless Chromium; on a cloud box symlink `/opt/pw-browsers/chromium-*/chrome-linux/chrome` to

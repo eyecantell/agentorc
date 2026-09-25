@@ -28,4 +28,4 @@
 - [Retarget a stacked PR with the API](retarget-a-stacked-pr-with-the-api.md) — `gh pr edit --base` fails on projectCards; PATCH pulls/N, rebase --onto, delete the base last
 - [Summary-table conflicts resolve row-wise](summary-table-conflicts-resolve-row-wise.md) — one row per id after a rebase, never both sides; `ao --json` goes before the subcommand
 - [Designer run lessons 2026-09-25](designer-run-lessons-2026-09-25.md) — a steer is refused when the person inbox is full (board line instead); reviewer agents need explicit refs in a shared worktree; re-read main for the next TD number before a design PR
-- [An interactive UI/UX review ships screenshots](ui-review-screenshots.md) — significant UI changes reviewed with Paul always come with rendered PNGs (mockup, built page, or one per compared shape), under docs/mockups/reviews/, sent into the chat
+- [An interactive UI/UX review makes the change visible](ui-review-screenshots.md) — significant UI changes reviewed with Paul always come with something to look at: screenshots, renderings or a design page (one per compared shape), kept under docs/mockups/reviews/ and sent into the chat
