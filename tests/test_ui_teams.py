@@ -274,8 +274,9 @@ def test_a_stopped_teams_card_reads_wound_down_where_it_would_have_read_stopped(
 def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, client):
     """TD-099, design §4.5a **team groups** and **Start / Wind down / Stop now**: a live team whose
     every live session is idle and declared stops offering a wind-down that would only wake its
-    manager. It reads *concluded <t> ago · restart wanted*, folds and sorts with the stopped teams,
-    and carries Start alone, whose confirm names the sessions it closes first."""
+    manager. It reads *concluded <t> ago · restart wanted*, sorts with the stopped teams, and carries
+    Start alone, whose confirm names the sessions it closes first. It **never folds** (TD-156 (b)):
+    its idle cards wait for a person's Close, and folded they read as already closed."""
     _tmp, fleet = world
     rw = {"at": "2026-09-22T21:00:00Z", "why": "usage window, resets 06:00", "early": True}
     out = {"at": "2026-09-22T20:00:00Z", "why": "nothing open"}
@@ -286,10 +287,10 @@ def test_a_concluded_team_is_drawn_like_a_stopped_one_with_start_alone(world, cl
     ]
     html = client.get("/").text
     sec = html[html.index('<section class="tgroup" data-team="ao-grind"') :]
-    assert 'data-live="0"' in sec[:200]  # what the fold keys on
+    assert 'data-live="2"' in sec[:200]  # what the fold keys on: still live, so no fold
     head = sec[: sec.index('<div class="grid">')]
     assert "concluded" in head and "ago · restart wanted" in head and ">stopped<" not in head
-    assert 'data-fold="ao-grind" data-n="2"' in head
+    assert "data-fold" not in head and "foldmail" not in head
     assert 'data-team-act="start"' in head and 'data-team-act="stop' not in head
     assert "It first closes grind-1, orc-ao" in head  # the confirm names what the Start closes
     assert html.index('data-team="adhoc"') < html.index('data-team="ao-grind"')  # sorted with the stopped

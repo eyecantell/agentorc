@@ -48,6 +48,10 @@ CSS = """
   .btn.danger { color: #991b1b; border-color: #e5b4b4; }
   .btn.ghost { border-color: transparent; background: transparent; color: #4b5563; }
   .btn.ghost:hover { background: #eef0f3; }
+  .btn.next { background: transparent; border-color: #6b7280; }  /* the next act: outlined at normal strength (§4.5, TD-095 / TD-156) */
+  .btn.link { background: transparent; border-color: transparent; padding: 0 6px; }
+  .badge.ready { color: #065f46; background: #d1fae5; border-color: #059669; font-family: inherit; }
+  .side-h { display: flex; align-items: center; gap: 8px; font-weight: 600; } .side-h .chev { color: #6b7280; font-weight: 400; }
   .status { display: block; padding: 3px 0 3px 10px; border-left: 2px solid #cbd0d6; font-family: "JetBrains Mono", monospace; font-size: 14px; color: #4b5563; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .status.ok { border-color: #059669; } .status.end { border-color: #9ca3af; color: #374151; } .status.bad { border-color: #dc2626; } .status.lim { border-color: #7c3aed; }
   /* the doing line wraps rather than truncating — it is a sentence, not a log line (§4.5a, TD-074) */
@@ -523,13 +527,13 @@ def team_desktop():
             continue
         st = STOPPED.get(team, {})
         sub = st.get("place") or st.get("def", "")
-        fold = (f'<span class="btn sm ghost" title="a stopped team\'s cards are folded away">{st["folded"]} sessions — show</span>'
+        fold = (f'<span class="btn sm ghost" title="a stopped team\'s cards are folded away — click to show or hide them">▸ {st["folded"]} sessions</span>'
                 if st.get("folded") else "")
         when = f'wound down {st["wound"]} ago' if st.get("wound") else "stopped"
         grid += (f'<div style="display: flex; align-items: center; gap: 10px; border: 1px solid #cbd0d6; border-radius: 8px; '
                  f'padding: 10px 14px; background: #eceef1;" title="defined in {source}">'
-                 f'<span style="font-weight: 600; font-size: 15px;">{team}</span><span class="meta">{sub}</span>{fold}'
-                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span></div>')
+                 f'<span style="font-weight: 600; font-size: 15px;">{team}</span><span class="meta">{sub}</span>'
+                 f'<span style="flex-grow: 1;"></span><span class="meta">{when}</span><span class="btn sm primary">Start</span>{fold}</div>')
     cards = grid
     # TD-071 (6): the note's sort order is the glyphs a person scans for, not words about them
     ORDER_PILLS = " → ".join([pill("needs"), pill("limited"), pill("stalled"), pill("unreachable", "unreachable (non-volatile)"),
@@ -594,6 +598,51 @@ def team_phone():
 </div>
 ''' + TAIL
 
+def focus_head(name, state, identity, next_act="", editor=True, member=False):
+    """The two-line Focus header (§4.5 *The Focus screen's anatomy*, TD-156): the identity line —
+    the name alone, state, marks, nothing pressable but a permission's answer (the doing line is
+    the Working card, host and repo the Session card's: Paul, *the top line is very crowded*) — then the acts
+    line: the next act outlined first (Close session, Take over, or none), the plain ones, more ▾
+    at the right with Kill last. Until 2026-09-25 this was one wrapping row, the buttons at its
+    tail, which broke over three lines on Paul's screen with the buttons split between two."""
+    vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span>' if editor else ""
+    return f'''<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <a href="#" class="muted">← Org</a>
+      <span class="mono" style="font-size: 15px; font-weight: 500;">{name}</span>
+      {state}{identity}
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+      {next_act}<span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link">{ICON["term"]}Open shell here</span>{vs}
+      <span style="flex-grow: 1;"></span>
+      <span class="btn sm link">more ▾</span>
+      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · {"Close · " if member else ""}<span style="color: #991b1b;">Kill</span></span>
+    </div>'''
+
+def side_card(title, meta="", body="", open_=True):
+    """A side card is a fold (TD-156): the heading is the disclosure, remembered per browser;
+    Session starts folded, the rest open."""
+    chev = "▾" if open_ else "▸"
+    head = f'<div class="side-h"><span class="chev">{chev}</span><span>{title}</span><span style="flex-grow: 1;"></span>{meta}</div>'
+    return f'<div class="card" style="padding: 12px;">{head}{body if open_ else ""}</div>'
+
+def focus_session_card(profile, adapter_id, tmux, started, last, mode, stops, log, grants, controllers, open_=False):
+    """The Session card: profile, ids, times, mode, the stops control when no time is set, run log,
+    and the grants and controllers chips the header carried until TD-156 — read at a session's
+    start and rarely pressed after, so it is last and folded, its summary the profile."""
+    body = f'''<dl class="kv" style="margin: 10px 0 0;">
+        <dt>profile</dt><dd class="mono" style="font-size: 12px;">{profile}</dd>
+        <dt>adapter id</dt><dd class="mono" style="font-size: 12px;">{adapter_id}</dd>
+        <dt>tmux</dt><dd class="mono">{tmux}</dd>
+        <dt>started</dt><dd>{started}</dd>
+        <dt>last output</dt><dd>{last}</dd>
+        <dt>mode</dt><dd>{mode}</dd>
+        <dt>stops</dt><dd><span class="badge" title="click to set or change it, empty to clear">{stops}</span></dd>
+        <dt>run log</dt><dd><a href="#">{log}</a></dd>
+        <dt>grants</dt><dd><span class="badge" title="capabilities: click to grant or revoke (design §4.8)">{grants}</span></dd>
+        <dt>controllers</dt><dd><span class="badge" title="the sessions that may act on this one; + adds one">{controllers}</span> <span class="btn sm ghost">+</span></dd>
+      </dl>'''
+    return side_card("Session", f'<span class="meta" style="font-size: 12px;">{profile}</span>', body, open_=open_)
+
 def focus():
     term = '''<span class="d">● tdgrind-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/tdgrind-1</span>
 
@@ -611,19 +660,11 @@ def focus():
 {topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-      <a href="#" class="muted">← Org</a>
-      <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
-      {pill("needs")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
-      <span class="meta" title="the session\'s name as its tool holds it — set in the tool, not in agentorc">DIU fetcher</span>
-      <span class="badge">samscrape-grind</span><span class="badge">{role_icon("grinder")}grinder</span>
-      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: none</span>
-      <span class="badge" title="the sessions that may act on this one; + adds one">under orc-1 ×  +</span>
-      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review · says · 14s ago</span>
-      <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="meta">Bash · git push -u origin td301-fix</span>
-      <span style="flex-grow: 1;"></span>
-      <span class="btn">{ICON["term"]}Open shell here</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{ICON["kill"]}Kill</span>
-    </div>
+    {focus_head("tdgrind-1", pill("needs"),
+                f'''<span class="meta" title="the session\'s name as its tool holds it — set in the tool, not in agentorc">DIU fetcher</span>
+      <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="input" style="height: 26px; width: 150px; font-size: 12px; color: #9ca3af;">why? (optional)</span><span class="meta">Bash · git push -u origin td301-fix · 9m 12s</span>
+      <span class="badge">stops 06:00</span>''',
+                next_act='<span class="btn sm next">Take over</span>', member=True)}
     <div class="term" style="height: 560px;">{term}</div>
     <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
       <div class="input" style="height: 64px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt… multi-line, paste-friendly. Drop files or paste a screenshot here; the terminal above takes keys directly for menus and questions.</div>
@@ -636,30 +677,17 @@ def focus():
     </div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
-    <div class="card" style="padding: 12px;">
-      <div style="font-weight: 600; margin-bottom: 8px;">Session</div>
-      <dl class="kv" style="margin: 0;">
-        <dt>profile</dt><dd class="mono" style="font-size: 12px;">claude-code · grind (pro) · sonnet</dd>
-        <dt>adapter id</dt><dd class="mono" style="font-size: 12px;">1c8e0b2f…f42a</dd>
-        <dt>tmux</dt><dd class="mono">ao-samscrape-tdgrind-1</dd>
-        <dt>started</dt><dd>2026-09-04 20:02 MDT · 3h 14m</dd>
-        <dt>last output</dt><dd>14 s ago</dd>
-        <dt>policy</dt><dd>window 20:00–06:00 · gate 70/70</dd>
-        <dt>run log</dt><dd><a href="#">tdgrind-1-20260904.log</a> · 1.2 MB</dd>
-      </dl>
-    </div>
-    <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;"><span style="font-weight: 600;">Git</span><span class="mono muted" style="font-size: 12px;">td301-fix · 2 ahead of origin/main</span></div>
-      <div class="mono" style="font-size: 12px; line-height: 1.7;">
+    {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 14s ago</span>', '<div style="font-size: 12px; margin-top: 8px;" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review</div>')}
+    {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td301-fix · 2 ahead of origin/main</span>', '''
+      <div class="mono" style="font-size: 12px; line-height: 1.7; margin-top: 8px;">
         <div><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>
         <div><span style="color: #065f46;">M</span> tests/test_scripts/test_recover_stuck_notices.py</div>
         <div><span style="color: #1f5fa8;">A</span> docs/claude-memory/project_td301.md</div>
       </div>
-      <div style="display: flex; gap: 6px; margin-top: 10px;"><span class="btn" style="height: 24px; font-size: 12px;">diff</span><span class="btn" style="height: 24px; font-size: 12px;">log</span><span class="btn" style="height: 24px; font-size: 12px;">PRs</span></div>
-    </div>
+      <div style="display: flex; gap: 6px; margin-top: 10px;"><span class="btn" style="height: 24px; font-size: 12px;">diff</span><span class="btn" style="height: 24px; font-size: 12px;">log</span><span class="btn" style="height: 24px; font-size: 12px;">PRs</span></div>''')}
     <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">1/3 done · 2 filed</span></div>
-      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
+      <div class="side-h"><span class="chev">▾</span><span>Reports</span><span style="flex-grow: 1;"></span><span class="meta">1/3 done · 2 filed</span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; margin-top: 8px;">
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-301</span><span class="pill plain s-working">claimed</span><a href="#">#811</a><span class="meta">20:04</span><span style="flex-grow: 1;"></span><span class="badge">declared</span><span class="btn sm ghost">Drop</span></div>
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-299</span><span class="pill plain s-done">done</span><a href="#">#809</a><span class="meta">18:40</span><span style="flex-grow: 1;"></span><span class="badge scraped">derived</span></div>
         <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-288</span><span class="pill plain s-ended">dropped</span><span class="meta">held by tdgrind-3</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
@@ -668,16 +696,69 @@ def focus():
       </div>
       <div class="note" style="margin-top: 8px;">Both channels, as the session declared them or the agent derived them from the branch and its PRs (dashed). <b>Drop</b> records the person's decision as a declaration, so the next tick cannot put the claim back.</div>
     </div>
+    {side_card("Ready to close", '<span class="btn sm" style="opacity: .5;">Close</span>', "", open_=False)}
+    {focus_session_card("claude-code · grind (pro) · sonnet", "1c8e0b2f…f42a", "ao-samscrape-tdgrind-1", "2026-09-04 20:02 MDT · 3h 14m", "14 s ago", "unattended", "stops 06:00", "tdgrind-1-20260904.log · 1.2 MB", "none", "under orc-1 ×")}
+  </div>
+</div>
+</div>
+''' + TAIL
+
+def focus_ready():
+    """Focus after a person's Wrap up, once Ready to close passes (TD-156, the case Paul could not
+    find a Close for), on a session that is the person's own — here a member taken over, so
+    `interactive`: *ready to close ✓* on the identity line in the card's words, **Close session**
+    the outlined next act on the acts line, Kill one menu away; the side panel in reading order,
+    Ready to close open because the close is the person's, Session folded to one line. An
+    unattended team member shows none of this: its team closes it, and its checklist is folded."""
+    term = '''<span class="d">● designer-ao-1 · claude-code · /home/kmaster/agentorc/.claude/worktrees/designer-ao-1</span>
+
+<span class="p">&gt;</span> Wrap up: finish what you hold, push, report, and say what is left.
+
+<span class="d">⏺</span> Bash(git push -u origin td154-transcript)
+  <span class="g">branch pushed · PR #556 opened</span>
+<span class="d">⏺</span> Bash(ao progress done TD-154 --pr 556)
+<span class="d">⏺</span> Bash(ao progress none --why "TD-154 designed and handed to the anchor; nothing else on my list")
+  <span class="g">recorded · out of work</span>
+
+Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
+
+<span class="p">&gt;</span> <span class="d">▌</span>'''
+    return head("Focus — ready to close") + f'''<div style="width: 1440px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
+  <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
+    {focus_head("designer-ao-1", pill("idle"),
+                '''<span class="meta" title="the session\'s name as its tool holds it">TD-154 transcript</span>
+      <span class="badge ready" title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>
+      <span class="badge" title="declared by the session: TD-154 designed and handed to the anchor">out of work · 6m</span>''',
+                next_act='<span class="btn sm next">Close session</span>')}
+    <div class="term" style="height: 420px;">{term}</div>
+    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+      <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
+      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">{ICON["clip"]}Attach</span><span style="flex-grow: 1;"></span><span class="btn primary">{ICON["send"]}Send</span></div>
+    </div>
+    <div class="note">Paul took this member over, so it is <b>interactive</b> — his to close. After a <b>Wrap up</b> the toast reads <i>wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes</i>, and when the checklist passes <b>Close session</b> appears here, outlined, where Kill used to be the only stop in sight; Kill is under more ▾. An unattended team member shows none of this: its team's Wind down or Start closes it, its Ready to close is folded, and its Close is the more ▾ entry.</div>
+  </div>
+  <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 6m ago</span>', '<div style="font-size: 12px; margin-top: 8px;">wrapped up: TD-154 designed and handed to the anchor</div>')}
+    {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td154-transcript · pushed</span>', '<div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div>')}
     <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm" style="opacity: .5;">Close</span></div>
-      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
-        <div><span style="color: #065f46;">✓</span> tree clean</div>
-        <div><span style="color: #991b1b;">✗</span> branch pushed</div>
-        <div><span style="color: #991b1b;">✗</span> PR merged</div>
-        <div><span style="color: #065f46;">✓</span> no subagents running</div>
-        <div><span style="color: #991b1b;">✗</span> ledger / attention board updated</div>
+      <div class="side-h"><span class="chev">▾</span><span>Reports</span><span style="flex-grow: 1;"></span><span class="meta">1 progress</span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; margin-top: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-154</span><span class="pill plain s-done">done</span><a href="#">#556</a><span class="meta">18:41</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
       </div>
     </div>
+    <div class="card" style="padding: 12px;">
+      <div class="side-h"><span class="chev">▾</span><span>Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm">Close</span></div>
+      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; margin-top: 8px;">
+        <div><span style="color: #065f46;">✓</span> tree clean</div>
+        <div><span style="color: #065f46;">✓</span> branch pushed</div>
+        <div><span style="color: #065f46;">✓</span> no subagents running</div>
+        <div><span style="color: #065f46;">✓</span> outcomes reported</div>
+      </div>
+      <div class="note" style="margin-top: 8px;">Closing is your act; the checklist only says when it is ready.</div>
+    </div>
+    {focus_session_card("claude-code · paul · fable-5-1", "111132eb…c01c3", "ao-agentorc-designer-ao-1", "2026-09-25 18:27 MDT · 3h 02m", "6 m ago", "interactive", "—", "ao-agentorc-designer-ao-1-20260925.log", "none", "under manager-ao-1 ×")}
   </div>
 </div>
 </div>
@@ -702,17 +783,8 @@ def focus_orchestrator():
 {topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-      <a href="#" class="muted">← Org</a>
-      <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / orc-1</span>
-      {pill("idle")}<span class="badge toggle on" title="click: switch to interactive">unattended</span>
-      <span class="badge">samscrape-grind</span><span class="badge">{role_icon("lead")}lead</span>
-      <span class="badge" title="capabilities: click to grant or revoke (design §4.8)">grants: control ×</span>
-      <span class="badge" title="the sessions that may act on this one; + adds one">no controller  +</span>
-      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">round 41: reading four members, two claims to re-check · says · 2m ago</span>
-      <span style="flex-grow: 1;"></span>
-      <span class="btn">{ICON["term"]}Open shell here</span><span class="btn">{ICON["code"]}VS Code</span><span class="btn">Wrap up</span><span class="btn danger">{ICON["kill"]}Kill</span>
-    </div>
+    {focus_head("orc-1", pill("idle"), '''<span class="badge">stops 06:00</span>''',
+                next_act='<span class="btn sm next">Take over</span>', member=True)}
     <div class="term" style="height: 520px;">{term}</div>
     <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
       <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
@@ -1389,6 +1461,7 @@ files = {
     "Phone.dc.html": team_phone(),
     "Focus.dc.html": focus(),
     "FocusOrc.dc.html": focus_orchestrator(),
+    "FocusReady.dc.html": focus_ready(),
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
@@ -1418,6 +1491,7 @@ LAYOUT = [
     ("InboxMessage.dc.html", "Inbox — message", 0),
     ("Focus.dc.html", "Focus — member", 0),
     ("FocusOrc.dc.html", "Focus — orchestrator", 0),
+    ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
     ("Message.dc.html", "Message — when it is read", 0),

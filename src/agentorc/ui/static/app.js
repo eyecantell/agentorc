@@ -392,6 +392,7 @@
       if (action === "remove") { const c = $(`#card-${CSS.escape(id)}`); if (c) { AO.handRing(c); c.remove(); } if (location.pathname.startsWith("/focus/") && !AO.poppedId) location.href = "/"; }
       if (action === "allow" || action === "deny") AO.toast(`${action}${body.reason ? " with your reason" : ""}: sent through the hook`, true);
       if (action === "drop") AO.toast(`${b.dataset.ref}: dropped`, true);
+      if (action === "wrapup") AO.toast("wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes", true);
       if (action === "message" || action === "reply") AO.toast(`mailed to ${(res.delivered || []).join(", ")} — lands in the inbox, nothing typed`, true);
       if (action === "answer") AO.toast(`answered ${(res.delivered || []).join(", ")} — the reply is the answer you pressed`, true);
       if (action === "unmail") AO.toast(res.declined ? "declined — the sender is told (design §4.10)" : "deleted from this inbox", true);
@@ -841,7 +842,7 @@
       const team = sec.dataset.team, b = $(".ghead .fold", sec);
       const folded = !!team && !+sec.dataset.live && !!b && store.get(foldKey(team), true);
       sec.classList.toggle("folded", folded);
-      if (b) b.textContent = `${b.dataset.n} session${b.dataset.n === "1" ? "" : "s"} — ${folded ? "show" : "hide"}`;
+      if (b) b.textContent = `${folded ? "▸" : "▾"} ${b.dataset.n} session${b.dataset.n === "1" ? "" : "s"}`;
     });
     // a header re-rendered for a delta must not re-arm a request in flight
     $$("#groups .ghead [data-team-act]").forEach((b) => (b.disabled = pendingTeams.has(b.dataset.team)));
@@ -1458,6 +1459,10 @@
           const grid = $(".tgroup .grid");  // syncGroups below moves it into its own group
           grid.appendChild(fresh);
         }
+        // TD-156 (g): Paul saw two cards named designer-ao-1 after a resume superseded the exited
+        // record of that name. The swap above is by id, so a second element needs a second insert
+        // of one id, and the cause is not reproduced yet; until it is, a delta leaves one card per id.
+        $$(`[id="card-${CSS.escape(ev.id)}"]`).slice(1).forEach((dup) => dup.remove());
         if (ev.groups !== undefined) syncGroups(ev.groups);
         AO.markPopped(fresh);
         layout();
@@ -1724,6 +1729,7 @@
     function banner(text) { const b = $("#fbanner"); b.textContent = text; b.classList.remove("hidden"); setTimeout(() => b.classList.add("hidden"), 7000); }
     function render(v) {
       document.title = AO.focusTitle(v);
+      const readyNow = !!((v.ready || []).length && (v.ready || []).every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
       const cls = v.state_class, scraped = v.scraped ? " scraped" : "";
       let head = `<span class="pill s-${cls}${scraped}"><span class="dot"></span>${v.state_label}</span>`;
       const p = v.pending;
@@ -1777,12 +1783,29 @@
       AO.restoreDenyWhys($("#fstate"), kept);
       // The mode toggle, named for what it does, and what it governs (design §4.5a, TD-096): the
       // composer is closed on an unattended session — it types, and typing is the disruption.
-      const ma = $("#fmodeact");
-      if (ma && v.mode_act) {
-        ma.textContent = v.mode_act; ma.title = v.mode_title || "";
-        ma.dataset.unattended = v.unattended ? "1" : "0";
-        ma.classList.toggle("primary", !!v.unattended);
+      // …**Take over** on the acts line as the next act, **Hand back** / *Switch to unattended* in
+      // more ▾ (§4.5 *The Focus screen's anatomy*, TD-156). Both read `mode_act`, and the one that
+      // applies is the one shown. Until 2026-09-25 a card-era line below rewrote every mode
+      // button's text to the bare mode word, so the header read *unattended* where the design
+      // said *Take over* (seen on Paul's screenshot for TD-156).
+      for (const el of [$("#fmodeact"), $("#fmodemenu")]) {
+        if (!el || !v.mode_act) continue;
+        el.textContent = v.mode_act; el.title = v.mode_title || "";
+        el.dataset.unattended = v.unattended ? "1" : "0";
       }
+      const ma = $("#fmodeact"); if (ma) ma.classList.toggle("hidden", !v.unattended);
+      // one outlined act (§4.5 *The card's anatomy*, row 6): Close session outranks Take over,
+      // which is drawn plain beside it while the checklist passes
+      if (ma) { ma.classList.toggle("next", !(readyNow && v.own)); ma.classList.toggle("link", !!(readyNow && v.own)); }
+      // the **Working** card (TD-156): the session's own words, and their age, from the delta
+      const wc = $("#workingcard");
+      if (wc) {
+        const dg = v.doing;
+        wc.classList.toggle("hidden", !dg);
+        $("#workingtext").textContent = (dg && dg.text) || "";
+        $("#workingage").textContent = dg && dg.age ? `says · ${dg.age} ago` : "";
+      }
+      const mm = $("#fmodemenu"); if (mm) mm.hidden = !!v.unattended;
       const fm = $("#fmode"); if (fm) fm.textContent = v.unattended ? "unattended" : "interactive";
       const cp = $("#composer"); if (cp) cp.classList.toggle("hidden", !!v.unattended);
       const tp = $("#tpaste");
@@ -1862,14 +1885,23 @@
       renderMembership(v);
       const checks = v.ready || [];
       $("#checks").innerHTML = checks.map(([n, ok]) => `<div class="${ok ? "ok" : "bad"}">${ok ? "✓" : "✗"} ${esc(n)}</div>`).join("");
-      $("#closebtn").disabled = !(checks.length && checks.every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
-      $$("[data-act=mode]").forEach((b) => { b.classList.toggle("on", !!v.unattended); b.textContent = v.unattended ? "unattended" : "interactive"; });
+      // design §4.5a Focus header **Close session** (TD-156): the checklist passing on an idle or
+      // exited session puts *ready to close ✓* on the identity line, in the card's words, and the
+      // outlined Close session on the acts line; the side card's small Close is the same act.
+      const ready = !!(checks.length && checks.every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
+      $("#closebtn").disabled = !ready;
+      $("#closebtn").classList.toggle("hidden", !v.own);  // a member's checklist has no button: its Close is more ▾'s
+      const cm = $("#fclosemenu"); if (cm) cm.disabled = !ready;
+      // …and the next act only on the person's own session (`own`): a team member runs itself
+      $("#fready").classList.toggle("hidden", !(ready && v.own));
+      $("#fclose").classList.toggle("hidden", !(ready && v.own));
     }
     // design §4.5a **Reports** / **grants** chip (§4.8, TD-028 step 4). The lists come from the
     // pushed record, so a `progress` or `finding` call from anywhere shows up here without a reload.
     function renderReports(v) {
       const progress = v.progress || [], findings = v.findings || [];
       $("#reportscard").classList.toggle("hidden", !(progress.length || findings.length));
+      $("#reportscount").textContent = [progress.length ? `${progress.length} progress` : "", findings.length ? `${findings.length} filed` : ""].filter(Boolean).join(" · ");
       $("#progresslist").innerHTML = progress.map((p) => {
         const derived = (p.source || "declared") !== "declared";
         // a reference is shown once (§4.5a **report line**, TD-095): an entry whose reference is
@@ -1927,18 +1959,18 @@
         const cs = v.under || [];
         el.innerHTML = (cs.length
           ? "under " + cs.map((c) => `<button class="badge controller${c.gone ? " scraped" : ""}" data-act="uncontrol" data-id="${esc(id)}" data-who="${esc(c.id)}" title="${esc(c.id)} — click to remove it as a controller${c.gone ? " (its session is gone)" : ""}">${esc(c.name)} ×</button>`).join("")
-          : `<span class="note">no controller — nobody may act on this session</span>`)
+          : `<span class="note">none — nobody may act on this session</span>`)
           + ` <button class="btn sm ghost" data-act="control-add" data-id="${esc(id)}" title="add a controller">+</button>`;
       }
       const box = $("#members"); if (!box) return;
       const ms = v.members || [];
-      box.innerHTML = `<div class="h2">Members</div>`
-        + (ms.length
+      const mc = $("#memberscount"); if (mc) mc.textContent = String(ms.length);
+      box.innerHTML = (ms.length
           ? ms.map((m) => `<div class="row gap"><a class="name" href="/focus/${encodeURIComponent(m.id)}">${esc(m.name)}</a>`
               + `<span class="meta">${esc(m.state || "")}</span>`
               + (m.lane ? `<span class="meta">${esc(m.lane)}</span>` : "") + `<span class="grow"></span>`
               + (m.report ? `<span class="meta">${esc(m.report)}</span>` : "") + `</div>`).join("")
-          : `<div class="note">no members yet — <code>ao control ${esc(v.name || "")} add &lt;session&gt;</code>, or the controllers chip on a session's Focus</div>`)
+          : `<div class="note">no members yet — <code>ao control ${esc(v.name || "")} add &lt;session&gt;</code>, or the controllers chip in a session's Session card</div>`)
         + `<div class="note">The sessions this one may act on. It needs both the grant and a place in each session's controllers (design §4.8).</div>`;
     }
     let membershipSoon = null;
@@ -1956,12 +1988,21 @@
     // design §4.5a Focus header **stops** badge (§6, TD-026): the one place a stop time can be
     // changed after the session started. The agent parses the time and refuses an interactive
     // session, so this only asks — the same division as the grants and controllers chips.
+    // Two places, one control (TD-156): the Session card's row, always — *none — set* until one
+    // is — and the identity line's note, drawn only while a stop time is set, as the reminder.
     function renderStop(v) {
-      const el = $("#fstop"); if (!el) return;
-      el.hidden = !v.unattended;  // a flip to interactive takes the control away, not just the time
-      el.textContent = v.stop_note || "no stop time";
-      el.classList.toggle("off", !v.stop_note);
-      el.dataset.until = v.run_until || "";  // the record's own value: what the edit box is filled from
+      const el = $("#fstop"), row = $("#fstopset");
+      if (el) {
+        el.classList.toggle("hidden", !v.unattended || !v.stop_note);  // a flip to interactive takes the control away, not just the time
+        el.textContent = v.stop_note || "no stop time";
+        el.dataset.until = v.run_until || "";  // the record's own value: what the edit box is filled from
+      }
+      if (row) {
+        row.hidden = !v.unattended;
+        row.textContent = v.stop_note || "none — set";
+        row.classList.toggle("off", !v.stop_note);
+        row.dataset.until = v.run_until || "";
+      }
     }
     function renderGrants(v) {
       const el = $("#fgrants"); if (!el) return;
@@ -1973,6 +2014,15 @@
           + `${on ? ` data-confirm="Revoke ${esc(g)} from this session?"` : ` data-confirm="Grant ${esc(g)}? It lets this session send to, kill and close other sessions."`}>${esc(g)}</button>`;
       }).join("");
     }
+    // The side panel's folds (design §4.5 *The Focus screen's anatomy*, TD-156): every card a
+    // `<details>`, the template's `open` its default, this browser's choice remembered per card as
+    // a team's fold is. A button in a card's summary (Ready to close's Close) must not also fold it.
+    $$("details.side").forEach((d) => {
+      const key = `focus.side.${d.dataset.side}`;
+      d.open = store.get(key, d.open);
+      d.addEventListener("toggle", () => store.set(key, d.open));
+    });
+    document.addEventListener("click", (e) => { if (e.target.closest("details.side > summary button")) e.preventDefault(); });
     render(s);
     connectEvents((ev) => {
       if (ev.event === "session" && ev.id === id) {

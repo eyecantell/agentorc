@@ -859,6 +859,11 @@ def view(
     # on a card only when it says something the name does not (TD-095): a team's members are
     # titled by their names, and the same word twice is noise. Focus shows it as before.
     d["title_shown"] = d["title"] if d["title"] != s.get("name") else ""
+    # design §4.5 *The Focus screen's anatomy* (TD-156, Paul): a session is the person's **own** —
+    # theirs to close — when it is interactive or carries no team badge; an unattended team member
+    # runs itself and its team's Wind down or Start closes it, so Focus offers Close session as
+    # the next act, and *ready to close ✓*, only on an own session, and folds its checklist away
+    d["own"] = not s.get("team") or not s.get("unattended")
     # The role's icon (design §4.8 *Role presets*): resolved here from the role's *name* — nothing in
     # the core keys on a role (§9 invariant 9) and no icon is stored on the record. Without a map
     # (a caller that did not resolve one) the badge draws its word alone, as it always has.
@@ -1103,7 +1108,9 @@ def next_act(d: dict[str, Any]) -> str:
     """The foot's first button, by state (design §4.5 *The card's anatomy*, row 6, TD-095): what a
     person would press next. `allow` (with Deny beside it) for a hook permission; `forget` for an
     exited session, ready to close or not — there is no process left to close; `close` for an idle
-    session the checklist passes; `details` when the pane is gone; else `focus`. A `limited`
+    session the checklist passes **when it is the person's own** (§4.5 *Whose session it is*,
+    TD-156: an unattended team member is closed by its team, and its Close stays in *more ▾*);
+    `details` when the pane is gone; else `focus`. A `limited`
     session's *Switch profile…* / *Wait* have no route yet, so it falls to Focus. A seat on call
     (TD-097) → `message`: asking it is how it comes, and it is never Forget or Close session."""
     state, pend = d["state"], d["pending"]
@@ -1113,7 +1120,7 @@ def next_act(d: dict[str, Any]) -> str:
         return "message"
     if state == "exited":
         return "forget"
-    if state == "idle" and d["ready_ok"]:
+    if state == "idle" and d["ready_ok"] and d.get("own", True):
         return "close"
     if state == "closed" or d.get("pane") is False:
         return "details"
@@ -1271,6 +1278,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
         # delta between the two reads) is not drawn concluded — Wind down is the safe offer then
         concluded = c if live and isinstance(c, dict) and len(c.get("names") or ()) == live else None
         dead = [m for m in members if not m.get("seat")] if team != NO_TEAM and not live else []
+        ready = sum(1 for m in members if (m.get("slot") or {}).get("ccls") == "ready" and m.get("state") == "idle")
         groups.append(
             {
                 "team": team,
@@ -1290,7 +1298,9 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 # team's sessions are, once, and how many are in each state — never its manager's
                 # name, state or line, which are on the manager's card, the first in the group
                 "place": group_place(members),
-                "counts": state_counts(members),
+                # …and, on any team, how many wait for a person's Close (TD-156 (b): a concluded
+                # team's idle cards were folded away and read as already closed)
+                "counts": state_counts(members) + ([f"{ready} ready to close"] if ready else []),
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),
@@ -2264,7 +2274,7 @@ def create_app() -> FastAPI:
             {
                 "team": g["team"],
                 "manager": (g["manager"] or {}).get("id", ""),
-                "live": 0 if g["stopped"] else g["live"],  # what the fold keys on: a concluded team folds
+                "live": g["live"],  # what the fold keys on: only a team with nothing live folds (TD-156)
                 "ids": g["ids"],
                 "html": head.render(g=g),
             }

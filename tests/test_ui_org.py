@@ -669,6 +669,11 @@ def test_ready_to_close_is_the_caption_and_the_next_act_is_the_foots_first_butto
     assert ready["ready_ok"] and ready["slot"]["caption"] == "ready to close ✓"
     assert ready["slot"]["text"] == "done with TD-1"  # its last word stays in the slot
     assert ready["next_act"] == "close"
+    # a team member that passes keeps the caption — a fact — but its foot leads with Focus: its
+    # team closes it, and Close stays in more ▾ (§4.5 *Whose session it is*, TD-156)
+    member = view(_card(git=clean, team="t", unattended=True))
+    assert member["slot"]["caption"] == "ready to close ✓" and member["next_act"] == "focus" and not member["own"]
+    assert view(_card(git=clean, team="t", unattended=False))["next_act"] == "close"  # taken over: the person's
     # exited reads ready to close too, and its first button is still Forget: nothing left to close
     ex = view(_card(state="exited", exit_code=0, git=clean))
     assert ex["slot"]["caption"] == "ready to close ✓" and ex["next_act"] == "forget"
