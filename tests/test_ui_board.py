@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from test_ui_inbox import needs_line
 
 READER = pathlib.Path(__file__).parents[1] / "scripts" / "nudge_user_attention.py"
 
@@ -308,7 +309,7 @@ def test_the_page_the_top_bar_and_the_poll_carry_the_board_rows_and_the_note(tmp
     monkeypatch.setattr(uiapp, "LocalClient", Fake)
     with TestClient(uiapp.create_app()) as c:
         page = c.get("/inbox").text
-        assert "decide the thing" in page and '<span id="needsn">1</span> needs you' in page
+        assert "decide the thing" in page and needs_line(page) == "1"
         assert "a note from the reader" in page and 'id="boardnote"' in page
         got = c.get("/api/person/inbox").json()
         assert got["needs"] == 1 and got["sections"]["needs"] == [rows[0]["id"]]
@@ -342,5 +343,5 @@ def test_with_the_host_agent_down_no_surface_counts_the_board(tmp_path, monkeypa
     monkeypatch.setattr(uiapp, "LocalClient", Down)
     with TestClient(uiapp.create_app()) as c:
         page = c.get("/inbox").text
-        assert "decide the thing" not in page and '<span id="needsn">0</span>' in page
+        assert "decide the thing" not in page and needs_line(page) == "0"
         assert c.get("/api/person/inbox").json()["needs"] is None

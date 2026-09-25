@@ -1,0 +1,51 @@
+{# design §4.5 screen 6 *The rail* and *Find*, §4.5a **Inbox page: the rail**, **Inbox page: find**
+   (TD-129, built by TD-135). Left of the column, sticky: **Clear filters**, the find box, then three
+   groups of toggles — *Urgency* (the page's sections), *Teams*, *Kinds*. Every line is a real
+   `<button>` with `aria-pressed`, so a pick is a press and a keyboard reaches it; within a group
+   the picks are OR'd, across groups AND'd, and a group with nothing picked means all of it.
+
+   The counts are `rail_counts`' — rows on the page now — and read *n of all* while anything is
+   picked or typed, a plain number otherwise; a line at 0 stays, dimmed, so a pick can be undone.
+   The page's script recounts on every press and every poll (`AO.railCounts`, the same rule); what
+   is drawn here is the first paint, from the picks in the URL. A team's name is the envelope's,
+   drawn as text. #}
+
+{% macro num(c, filtered) -%}
+{%- if filtered %}{{ c.shown }} of {{ c.all }}{% else %}{{ c.all }}{% endif -%}
+{%- endmacro %}
+
+{% macro line(group, value, label, c, picks, filtered, title='') -%}
+<button type="button" class="railline{% if filtered and not c.shown %} dim{% endif %}" data-group="{{ group }}" data-value="{{ value }}" aria-pressed="{{ 'true' if value in picks[group] else 'false' }}"{% if title %} title="{{ title }}"{% endif %}><span class="raillabel">{{ label }}</span><span class="railn">{{ num(c, filtered) }}</span></button>
+{%- endmacro %}
+
+{% macro teams_group(rail, picks) -%}
+{%- for t in rail.team_order %}
+{{ line('team', t, 'no team' if t == 'none' else t, rail.teams[t], picks, rail.filtered, 'its rows that need you, on the page now — press: show only this team; a second team adds its rows') }}
+{%- endfor %}
+{%- endmacro %}
+
+{% macro rail_html(rail, picks, needs_title) -%}
+<aside class="rail" id="rail" aria-label="Filters">
+  <button type="button" class="btn sm railclear{% if not rail.filtered %} hidden{% endif %}" id="railclear" title="clear every pick and the find">Clear filters</button>
+  <div class="railfind">
+    <input class="input" id="ifilter" type="search" placeholder="find…" value="{{ picks.find }}" aria-label="find: every word must match, in any order" title="every word typed must match, in any order — a fourth pick, AND’d with the rail’s">
+    <span class="meta" id="findn" aria-live="polite"></span>
+  </div>
+  <div class="railgroup" role="group" aria-labelledby="railh-sec">
+    <div class="railh" id="railh-sec">Urgency</div>
+    {%- for s in rail_sections %}
+    {{ line('sec', s, rail_section_names[s], rail.sections[s], picks, rail.filtered, needs_title if s == 'needs' else '') }}
+    {%- endfor %}
+  </div>
+  <div class="railgroup" role="group" aria-labelledby="railh-team">
+    <div class="railh" id="railh-team">Teams</div>
+    <div id="railteams">{{ teams_group(rail, picks) }}</div>
+  </div>
+  <div class="railgroup" role="group" aria-labelledby="railh-kind">
+    <div class="railh" id="railh-kind">Kinds</div>
+    {%- for k in rail_kinds %}
+    {{ line('kind', k, rail_kind_names[k], rail.kinds[k], picks, rail.filtered) }}
+    {%- endfor %}
+  </div>
+</aside>
+{%- endmacro %}

@@ -14,7 +14,7 @@
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e['from'] }}{% if e.from_role %} · {{ e.from_role }}{% endif %}">{{ e.from_name or e['from'] }}</span>
   {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
-  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-{{ e.kind }}">{{ e.kind }}</span>
   {#- §4.5a *PRs waiting* (§4.9b *The reader*, TD-093): the PR a held author put in front of you, a
       structured field drawn as a link — the text stays the author's text #}
@@ -154,7 +154,7 @@
 {% macro trail(e, section) -%}
 <div class="row gap wrap mhead">
   {%- if e.sid %}<span class="ref" title="{{ e.sid }}">{{ e.name or e.sid }}</span>{% endif %}
-  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-trail">trail</span>
   <span class="st">resolved: {{ e.how or 'resolved' }}</span>
   {%- if e.count and e.count > 1 %} <span class="st">&times;{{ e.count }}</span>{% endif %}
@@ -269,7 +269,7 @@
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e['from'] }} — who answered">{{ e.from_name or e['from'] }}</span>
   {%- if e.from_open %} <a class="btn sm ghost" href="/focus/{{ e.from_open }}" title="Focus on {{ e.from_name }}">Open</a>{% endif %}
-  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-answered">answered for you</span>
   {%- if e.about %} <span class="st">re {{ e.about }}</span>{% endif %}
   <span class="grow"></span>
@@ -331,7 +331,7 @@
       team to be filtered by: *No team* on that row said nothing (the anchor, from the live page,
       2026-09-20). Every other state row keeps the badge, which is also its team filter. -#}
   {%- if e.row != 'alarm_host' %}
-  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   {%- endif %}
   <span class="grow"></span>
   {#- §4.8a (TD-077 a2): the **suspended** mark rides with the record wherever it is drawn, and
@@ -482,7 +482,7 @@
 {% macro board(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.board }}">{{ e.repo }}</span>
-  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — click: show only this team">{{ e.team or 'No team' }}</button>
+  <button class="badge team" data-team="{{ e.team or '' }}" title="{% if e.team %}team {{ e.team }}{% else %}no team{% endif %} — press: pick this team in the rail, again to unpick it">{{ e.team or 'No team' }}</button>
   <span class="badge kindmark k-board">board</span>
   <span class="grow"></span>
   <span class="st" title="Due: {{ e.due }}">{{ e.due_tag }}</span>
@@ -505,20 +505,20 @@
 
 {% macro row(e, section) -%}
 {%- if e.row == 'board' %}
-<div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ e.find }}">
+<div class="mailrow boardrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="board" data-rkind="board" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {{ board(e, section) }}
 </div>
 {%- elif e.row == 'trail' %}
-<div class="mailrow trailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="trail" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.name or '') ~ ' ' ~ (e.kind or '') ~ ' ' ~ (e.how or '') ~ ' ' ~ (e.text or '')) | lower }}">
+<div class="mailrow trailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="trail" data-rkind="trail" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {{ trail(e, section) }}
 </div>
 {%- elif e.row %}
-<div class="mailrow staterow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ e.find }}">
+<div class="mailrow staterow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="state" data-rkind="states" data-row="{{ e.row }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {%- if section == 'snoozed' %}{{ state_snoozed(e, section) }}
 {%- elif e.row in ('alarm', 'alarm_host') %}{{ alarm(e, section) }}{% else %}{{ state(e, section) }}{% endif %}
 </div>
 {%- else %}
-<div class="mailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ ((e.from_name or e['from']) ~ ' ' ~ e.text ~ ' ' ~ (e.about or '') ~ (' ' ~ (e.asker_name or '') ~ ' ' ~ (e.answered.question or '') ~ ' ' ~ (e.answered.source or '') if section == 'answered' else '')) | lower }}">
+<div class="mailrow" tabindex="0" data-msg="{{ e.id }}" data-at="{{ e.at or '' }}" data-kind="{{ e.kind }}" data-rkind="{{ rail_kind(e) }}" data-section="{{ section }}" data-team="{{ e.team or '' }}" data-find="{{ row_find(e, section) }}">
 {#- the section decides the controls, not the kind alone: a closed `steer` is an FYI row and must
     not offer Pause or Go with it, which the agent would refuse anyway (§4.10). -#}
 {%- if section == 'snoozed' %}{{ snoozed(e, section) }}

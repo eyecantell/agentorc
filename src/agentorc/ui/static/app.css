@@ -134,7 +134,25 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
    `max-width: 110ch` that did that to `.body` is gone, the column is the measure now. **A section
    is a heading, not a box** (no `.card`, no border). **A row is a card.** Every colour is a token —
    a light theme is required later (TD-071 item 8). */
-.inboxpage { max-width: 1100px; width: 100%; margin: 0 auto; }
+.inboxpage { max-width: calc(1100px + 200px + 24px); width: 100%; margin: 0 auto; }
+/* design §4.5 screen 6 *The rail* (TD-129, built by TD-135): left of the column, sticky, 200 px,
+   starting under the title; the column keeps its 1100 px. Every line is a toggle — a real button
+   whose pressed state is the one thing that marks it, and a line at 0 stays, dimmed. */
+.inboxwrap { display: grid; grid-template-columns: 200px minmax(0, 1100px); gap: 24px; align-items: start; }
+.inboxcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.rail { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 12px; }
+.rail .railclear { width: 100%; justify-content: center; }
+.rail .railfind { display: flex; flex-direction: column; gap: 3px; }
+.rail .railfind .input { width: 100%; height: 30px; }
+.rail .railgroup { display: flex; flex-direction: column; gap: 1px; }
+.rail .railh { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); padding: 0 6px 3px; }
+.rail .railline { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 3px 6px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.rail .railline:hover { background: var(--hover); }
+.rail .railline[aria-pressed="true"] { background: var(--hover); border-color: var(--muted); font-weight: 600; }
+.rail .railline.dim { color: var(--muted); }
+.rail .raillabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inboxpage .railout { display: none !important; }  /* a section the rail does not pick is not drawn */
+.rail .railn { flex: none; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--muted); }
 .inboxpage .isec { display: flex; flex-direction: column; gap: 8px; }
 .inboxpage .sechead { align-items: baseline; }
 /* FYI's fold **is** its heading: the disclosure's own ▾ before the name, and no second control */
@@ -362,6 +380,8 @@ body.popped .page { padding: 10px 12px; } body.popped .termbox { height: calc(10
 .kv { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 4px 10px; font-size: var(--t-body); margin: 8px 0 0; } .kv dt { color: var(--muted); } .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; }
 .gitfiles { line-height: 1.7; margin-top: 6px; } .checks { display: flex; flex-direction: column; gap: 5px; font-size: var(--t-body); margin: 8px 0; } .checks .ok { color: var(--done-fg); } .checks .bad { color: var(--stalled-fg); }
 @media (max-width: 720px) {
+  /* until the narrow layout lands (TD-137: a chip row and a filter sheet), the rail stacks above */
+  .inboxwrap { grid-template-columns: minmax(0, 1fr); } .rail { position: static; }
   .page.focus { flex-direction: column; } .focus .side { width: 100%; } .termbox { height: 50vh; } .topbar { gap: 8px; padding: 0 10px; } #hostchip { display: none; }
   .grid { grid-template-columns: 1fr; }
 }
