@@ -1184,3 +1184,19 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Resolved:** 2026-09-23 (PR #506, `grinder-ao-1`) — `details.more .menu` is `position: fixed`, placed by `AO.placeMenu` from its summary's rect when it opens (right-aligned under it, flipped above when the space below is short, kept 8px inside the viewport) and re-placed on scroll and resize; `.sc` keeps its `overflow: hidden`. The one rule covers the cards, the Inbox rows' *Snooze* menus and the Focus header's menu; a delta that redraws a card reopens the menu that was open on it. Test: `tests/test_ui_menu.py`.
 
 **Related:** TD-095 (the card's one height), TD-046 (Pop out lives in this menu).
+
+## TD-145: A one-press Resume of a session in a worktree creates a second record beside the one being resumed
+
+**Priority:** High
+**Added:** 2026-09-24 (Paul, from the Org page: two techleads on the ao team; the anchor session)
+**Owner:** anchor
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-24
+**Location:** `src/agentorc/ui/app.py` (`resume_create`, `resume_form_url`, the `/new` form's prefill), `src/agentorc/ui/templates/new.html` (the Where radio), `sessionorc/naming.py` (`base_id`: unchanged — the rule it applies is §4.1's)
+
+**Why:** a name identifies one session per scope (§4.1, §9 invariant 12), and the scope of a session in a worktree is its repo: the record's id is `ao-<repo>-<name>`. The one-press Resume (TD-081) sent the record's `dir` and not its `repo`, so the agent scoped the name by the worktree's basename — and every team member's worktree is named after the member, so `ao-techlead-ao-1-techlead-ao-1` collapsed to `ao-techlead-ao-1`, an id nobody held. The name check answered *free*, a second record was created, and `_supersede` (matching on the tool's session id) then closed the first with `superseded_by` pointing at the second. Seen 2026-09-24 19:42 MDT on `ao-grind`: the exited `ao-agentorc-techlead-ao-1` was resumed from Focus, `ao-techlead-ao-1` appeared beside it, the team's status listed two techleads, and the seat's `asks` trigger went dead — `_seat_pass` skips a superseded record, and the second record carried no `seat` (Resume does not carry one, by design). The mode flips that followed acted on the second record and changed nothing here; popping the tab into its own window is the browser's and touched nothing.
+
+**Resolved:** 2026-09-24 (PR #543, the anchor session) — `resume_create` carries `repo` when the record has one, so the create checks the name in the record's scope and takes its id back; `resume_form_url` lands a worktree record on the form as Where = new worktree, the worktree's name and the repo in the directory field, which is what the form's own Start sends; the `/new` form prefills `where` and `worktree`. Design §4.5a *Focus (exited / closed)* says both. The live team was put right by hand: the seat filled from its launch record (`create` with `keep_mail` and `supervised`, the tick's own replay), the stray record forgotten.
+
+**Related:** TD-081 (the one-press Resume), §4.1 (the scope rule), §6 rule 3 (the seat fill that a superseded record blocks).

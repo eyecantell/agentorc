@@ -101,8 +101,7 @@ def _usage_hover(w: dict[str, Any], row: dict[str, Any] | None) -> str:
     if row is None:
         return f"{w.get('label')} {w['pct']}% (resets {w.get('resets') or '?'})"
     return (
-        f"{w.get('label')} {w['pct']}% / line {row['line']:g}% ({_reserve_why(row)}; "
-        f"resets {w.get('resets') or '?'})"
+        f"{w.get('label')} {w['pct']}% / line {row['line']:g}% ({_reserve_why(row)}; resets {w.get('resets') or '?'})"
     )
 
 
@@ -1839,7 +1838,7 @@ def inbox_sections(
 
 # design §4.5a **Focus (exited / closed)** → **Resume** (TD-081 step 2; the plumbing is step 1,
 # PR #282). What a one-press resume carries, and what it deliberately does not.
-RESUME_CARRIES = ("name", "dir", "adapter", "profile", "role", "team", "project", "lane", "controllers")
+RESUME_CARRIES = ("name", "dir", "adapter", "profile", "repo", "role", "team", "project", "lane", "controllers")
 # The first prompt **Reopen and push** writes (§4.5a *Inbox row: state*, TD-081). Fixed text, in
 # the source: it is the page's sentence, never anything a session said (§4.2), and what comes of it
 # returns as an outcome (§4.10 *Outcomes*).
@@ -1858,6 +1857,15 @@ def resume_create(rec: dict[str, Any], *, prompt: str = "") -> dict[str, Any]:
     replaced in place and its mail stays with it (§4.10 *a resume under the same name*, built by
     TD-081 step 1). And it carries `dir`, `adapter`, `profile`, `role`, `team`, `project`, `lane`
     and `controllers`, so a live team finds its member where it was.
+
+    **And `repo`, when the record has one** (TD-145). A name identifies one session per *scope*
+    (§4.1), and the scope of a session in a worktree is its repo, not the worktree directory: the
+    record's id is `ao-<repo>-<name>`. A resume that sent `dir` alone put the worktree's basename
+    in the scope — and a worktree named after its session (every team member's is) made
+    `ao-<name>-<name>`, collapsed to `ao-<name>`, an id nobody held — so the name check answered
+    *free*, a second record appeared beside the one being resumed, and the team showed two of the
+    seat (2026-09-24: `ao-techlead-ao-1` beside `ao-agentorc-techlead-ao-1`, and the seat's
+    trigger dead with it, since a superseded record is never filled).
 
     **Never `unattended`.** The session a press starts is *attended*, whatever the record was: an
     unattended session answers its own permission prompts, and a press with no form is no place to
@@ -1884,6 +1892,8 @@ def resume_create(rec: dict[str, Any], *, prompt: str = "") -> dict[str, Any]:
         "controllers": [str(c) for c in (rec.get("controllers") or [])],
         "resume": str(rec.get("adapter_id") or ""),
         "unattended": False,
+        # the scope the name is checked in (§4.1): sent only when the record has one (§4.4 skew rule)
+        **({"repo": str(rec["repo"])} if rec.get("repo") else {}),
         **({"host": host} if host and host != host_name() else {}),
     }
     if prompt:
@@ -1930,6 +1940,18 @@ def resume_form_url(rec: dict[str, Any], why: str = "") -> str:
     # has no host field, and phase 1 starts a session on the host the page is served from.
     q = {k: v for k, v in got.items() if k in RESUME_CARRIES and k not in ("lane", "controllers") and v}
     q["resume"] = got["resume"]
+    # A worktree record lands on the form as the form says it: **Where** = new worktree, the
+    # worktree's name, and the directory field holding the *repo* — which is what the form's own
+    # Start sends (`repo=dir` with `worktree`), so the create checks the name in the record's scope
+    # and takes its id back, exactly as the one-press Resume does (TD-145). Keyed on the record's
+    # own `worktree` — the field the create sets when it made or reused `<repo>/.claude/worktrees/
+    # <name>` — never on `dir != repo`: `ao new --repo` scopes a directory that is a worktree of the
+    # repo's without going through that flow, and such a record resumes where it is (review of #543).
+    repo = q.pop("repo", "")
+    if repo and rec.get("worktree"):
+        q["worktree"] = str(rec["worktree"])
+        q["where"] = "worktree"
+        q["dir"] = repo
     q["lane"] = ", ".join(got["lane"])
     q["controllers"] = ",".join(got["controllers"])
     # *Unattended* as the record had it — on the form, where it is next to its stop time
@@ -2271,6 +2293,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
         lane: str = "",
         controllers: str = "",
         unattended: str = "",
+        where: str = "here",  # a worktree record's Resume with changes… (TD-145)
+        worktree: str = "",
         prefilled: str = "",
         why: str = "",
     ):
@@ -2328,6 +2352,8 @@ def _new_routes(app: FastAPI, h: SimpleNamespace) -> None:
                     "lane": lane,
                     "controllers": [c for c in controllers.split(",") if c.strip()],
                     "unattended": unattended == "on",
+                    "where": "worktree" if where == "worktree" else "here",
+                    "worktree": worktree,
                     "prefilled": prefilled == "1",
                     "why": why,
                 },
