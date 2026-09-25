@@ -1876,8 +1876,8 @@
     // design §4.5a Focus header **stops** badge (§6, TD-026): the one place a stop time can be
     // changed after the session started. The agent parses the time and refuses an interactive
     // session, so this only asks — the same division as the grants and controllers chips.
-    // Two places, one control (TD-156): the identity line's note, drawn only while a stop time is
-    // set, and the Session card's row, which reads *none — set* until one is.
+    // Two places, one control (TD-156): the Session card's row, always — *none — set* until one
+    // is — and the identity line's note, drawn only while a stop time is set, as the reminder.
     function renderStop(v) {
       const el = $("#fstop"), row = $("#fstopset");
       if (el) {

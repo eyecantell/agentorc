@@ -34,7 +34,8 @@
          only for an unattended session, because a stop time is a policy and policies leave an
          interactive session alone (§4.2) — the agent refuses one either way, and offering a
          control that is always refused is worse than not offering it. On the identity line only
-         while a stop time is set (TD-156); the Session card's row is the control when none is. #}
+         while a stop time is set (TD-156) — a reminder, still pressable; the Session card's row is
+         the control whether one is set or not. #}
       {% if s.unattended %}<button class="badge{% if not s.stop_note %} hidden{% endif %}" id="fstop" data-act="stop" data-id="{{ s.id }}" data-until="{{ s.run_until or '' }}"
               title="when the agent asks this session to wrap up and then stops it — click to change it, empty to clear">{{ s.stop_note or "no stop time" }}</button>{% endif %}
       {# design §4.5a Focus header **out of work** chip (§4.9a, TD-053 step 6): the words, the
@@ -67,7 +68,7 @@
       {# design §4.5a Focus header **mode toggle** (TD-096, *Focus watches*): named for what it does —
          Take over an unattended session (read-only until then) is the next act here; Hand back and
          Switch to unattended, the same toggle the other way, sit in more ▾ (TD-156). #}
-      <button class="btn sm {{ 'link' if s.ready_ok and s.state in ('idle', 'exited') else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
+      <button class="btn sm {{ 'link' if s.own and s.ready_ok and s.state in ('idle', 'exited') else 'next' }}{% if not s.unattended %} hidden{% endif %}" id="fmodeact" data-act="mode" data-id="{{ s.id }}"
               data-unattended="{{ 1 if s.unattended else 0 }}"
               title="{{ s.mode_title }}">{{ s.mode_act }}</button>
       <button class="btn sm link" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" title="mail a note or an ask into this session's inbox — it lands and types nothing (Send, below, types)">✉ Message</button>
@@ -174,7 +175,7 @@
         <dt>started</dt><dd>{{ s.created[:16].replace('T', ' ') }}Z</dd>
         <dt>last output</dt><dd id="last_output">{{ s.last_output or '—' }}</dd>
         <dt>mode</dt><dd id="fmode" title="changed by Take over and Hand back">{{ 'unattended' if s.unattended else 'interactive' }}</dd>
-        {# the stops control when no stop time is set (TD-156); the identity line's note when one is #}
+        {# the stops control, set or not (TD-156); the identity line repeats it as a note while one is set #}
         {% if s.unattended %}<dt>stops</dt><dd><button class="badge{% if not s.stop_note %} off{% endif %}" id="fstopset" data-act="stop" data-id="{{ s.id }}" data-until="{{ s.run_until or '' }}"
               title="when the agent asks this session to wrap up and then stops it — click to set or change it, empty to clear">{{ s.stop_note or "none — set" }}</button></dd>{% endif %}
         {% if s.run_log %}<dt>run log</dt><dd class="mono small">{{ s.run_log.rsplit('/', 1)[-1] }}</dd>{% endif %}
