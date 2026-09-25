@@ -617,7 +617,9 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   interleave by `at`. Beside each cursor the ledger keeps the last ledgered entry's `at` and `id`
   for that transcript: `at` never decreases within one file but two entries may share it, so a
   transcript read from 0 again after a rewrite (§4.3) has every entry before that `at` dropped,
-  and at that `at` the entries in file order up to and including the one with that `id`, and a
+  and at that `at` the entries in file order up to and including the one with that `id` — every
+  entry at that `at` when none carries it, since a survivor at the old boundary is old and a new
+  turn at that millisecond is a coincidence worth cents, where a re-bill is the whole turn — and a
   rewrite neither re-bills nor loses a turn. On the
   first tick that finds a profile metered the cursors start at each transcript's end, so a key that
   ran unmetered for months does not bill its history to the first day; a transcript that first
