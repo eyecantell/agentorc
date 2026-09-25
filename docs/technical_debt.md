@@ -77,13 +77,11 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-132 | Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row | Medium | Open — designed, pickable |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
 | TD-142 | Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder | Medium | Partly done — slice 1 (the file half) built; the mail half waits on the reader |
-| TD-143 | The Focus Reports panel reads as a to-do list: a `claimed` row with its PR open looks like an unstarted claim, and Drop beside it lets a person let go of work in review | Medium | Open — designed; the build is TD-150, and this entry archives with it |
 | TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Built 2026-09-25 (PR #559) — Paul's live look pending |
 | TD-146 | Build the one settings file — `settings.yml` home-owned with `teams`, `repos` and `person`, `ui.yml` retired, the `settings` read, the team stop time and reserve priority in the tick, `ao team until` | Medium | Open — designed, pickable |
 | TD-147 | Build the settings replica — the `settings` link frame, the node's copy, `set_settings` forwarded and refused offline | Medium | Open — designed, pickable after TD-146 |
 | TD-148 | Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab | Medium | Open — designed, pickable after TD-146 |
 | TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Open — pickable |
-| TD-150 | Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session | Medium | Partly done — slice 1 (the panel) built; the route and the note remain |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed and reconciled 2026-09-25; pickable |
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Open — designed, pickable |
 | TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Open — design-first |
@@ -1389,24 +1387,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-126 (the design), TD-069 step 3 (`board_edit`, the pattern), TD-077 b (`handed`), TD-079 (outcomes), TD-056 (the lease).
 
-## TD-143: The Focus Reports panel reads as a to-do list: a `claimed` row with its PR open looks like an unstarted claim, and Drop beside it lets a person let go of work in review
-
-**Priority:** Medium
-**Added:** 2026-09-25 (Paul, on designer-ao-1's Focus page: *I was confused by it and hit "Drop" on 126 and 127 thinking they were todo, but apparently they were done (already had a PR) — lets add a TD to make this more clear*; a cloud session)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** no — designed; the build is TD-150, and this entry archives with it
-
-**Status:** Open — **designed 2026-09-25 (the designer, PR #546), the recommendation (a)–(f) confirmed as written:** §4.5a *Focus side panel → Reports* (grouped by state, the PR beside a claim in review from the entry, the derived entry or the branch's PR; Drop behind *more ▾* on an in-progress row only, its confirm naming the consequence; the *i* mark; the trail row names the PR) and §4.10 (the `system` note on a person's drop). **Undo** on the trail row: **none** (Paul, 2026-09-25 — the session claims again on its own, told by the note). Build: TD-150. Was: **asked 2026-09-25.** What happened: the designer's Reports panel listed `TD-069 claimed 5h 51m Drop`, `TD-072 claimed`, `TD-035 claimed`, `TD-126 claimed`, `TD-127 claimed`, each with a **Drop** button, above `TD-120 done → #525` and two more; TD-126 and TD-127 each had an open PR (#531, #532) waiting in a stack, which the panel did not say — a declared claim carries no `pr` until `done --pr`, and the derived channel's PR for the same reference is not drawn beside the declared entry. Paul read the claimed rows as a to-do list and pressed Drop on two; the confirm (*Drop TD-127? It is recorded as dropped by you.*) says what is recorded, not what it means: the lease ends, the record reads *dropped — dropped from Focus*, the designer's inbox is not told, and its PRs stay open with no claim pointing at them. The panel's one explanation (*What the session declared, plus what the agent derived from its branch and PRs (dashed). Drop records that a claim was let go.*) is a note under the list, read after the press. Three faults: **(1)** a claim in review is drawn like a claim not started; **(2)** Drop is a first-class button on every claimed row, though letting go of another session's work is rare and consequential — the rest of the pages put such acts behind a confirm that says the consequence, or behind `more ▾`; **(3)** nothing says who a drop affects (the lease another session may now take; the session, which is not told) or how it is undone (the session claims again; a person cannot).
-
-**The recommendation for the round:** (a) a claimed row shows its PR when one exists — the entry's own `pr`, else the derived entry on the same reference, else a PR from the record's `tdNNN-*` branch (`sessionorc.reports` already asks `gh` for it) — as *claimed · in review #532*, and the panel groups its rows *in progress*, *in review*, *done*, *dropped*, so the states read at a glance; (b) Drop leaves the row's face — behind the panel's `more ▾`, never a primary button — and is not offered while a PR from that claim is open; (c) its confirm names the consequence: *let go of TD-127's claim: the lease ends and another session may take it; the branch and PR #532 stay; only designer-ao-1 can claim it again*; (d) a person's drop is told to the session by a `system` note, as every act on its work is (§4.10), so a worker learns its lease is gone before it pushes into a reference somebody else has taken; (e) the explanation becomes the panel's *i* mark at its heading (§4.5 screen 6's pattern); (f) the trail row names the PR too. **Open for Paul:** an **Undo** on the trail row (the person re-declares the claim on the session's behalf — a declaration by the person, as Drop is; §9 invariant 14 says only the session writes its own word, so this is a new exception) or none, since the session can claim again and (d) tells it to.
-
-**Location:** design §4.5a *Focus side panel → Reports*, §4.8 (report channels; the lease), §4.10 (`system` notes), `src/agentorc/ui/static/app.js` (the Reports panel, `data-act="drop"`, its confirm), `src/agentorc/ui/templates/focus.html` (the note under the list), `src/agentorc/ui/app.py` (the drop route, *dropped from Focus*), `src/sessionorc/reports.py` (the derived PR beside a declared claim), `src/sessionorc/agent.py` (`rpc_progress`: the note to the session on a person's drop).
-
-**Why:** one confused minute let go of two design PRs' claims; the Reports panel is the one place a person sees a session's work, and it must say what state each piece is in and what a press does to it before the press.
-
-**Related:** TD-056 (a claim is a lease), TD-028 (declared and derived), TD-045 (a derived claim's PR), TD-126 and TD-127 (the two claims dropped), TD-124 (keys: none on this panel yet).
-
 ## TD-144: Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em`
 
 **Priority:** Medium
@@ -1506,25 +1486,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** each of the eight is done or struck with a reason, §5 names only keys the code reads, and `pdm run test` covers (2) and (4).
 
 **Related:** TD-100, TD-132, TD-004, TD-060.
-
-## TD-150: Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session
-
-**Priority:** Medium
-**Added:** 2026-09-25 (the designer; TD-143's design round, PR #546)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Partly done — **slice 1 built 2026-09-25 (grinder-ao-1, PR #586)**: the groups (`AO.reportGroups`), *claimed · in review #n* from the entry's own `pr`, the heading's *i* mark, Drop under the panel's `more ▾` on declared in-progress claims with the consequence confirm. **Found on review (PR #586):** a declared claim's PR has only two sources — its own `pr`, and its branch's — because §9 invariant 10's upsert never lets a derived entry share a declared one's reference; and a session that claimed and then opened its PR without `--pr` reads *in progress* until the branch source lands, which makes that source the one that matters. Remaining: the branch's PR on the record as `review_pr` (from `sessionorc.reports`, a held path; `AO.reportGroups` already reads it), slice 3 (the `system` note). **Slice 2 built 2026-09-25 (PR #590)**: the drop route refuses a declared claim with a PR (`review_pr`, the panel's rule), 409 in words — merged or open alike, since the record cannot tell them apart until the branch's PR state lands with the branch source; *the trail row names the PR* is moot, since no drop now has one. Design: §4.5a *Focus side panel → Reports*, §4.10 (the `system` note on a person's drop).
-
-**Location:** `src/agentorc/ui/static/app.js` (the Reports panel: the four groups, *claimed · in review #n* with the PR as a link from the entry's `pr`, the derived entry on the same reference, or the branch's PR; Drop moved under the panel's `more ▾`, drawn only on an in-progress row, `data-confirm` naming the consequence with the reference, the PR and the session's name), `src/agentorc/ui/templates/focus.html` (the note under the list becomes the heading's **i** mark), `src/agentorc/ui/app.py` (the drop route: refuse while a PR from that claim is open, saying which; the trail row names the PR), `src/sessionorc/reports.py` (the PR for a record's `tdNNN-*` branch exposed beside the declared entry — it already asks `gh`), `src/sessionorc/agent.py` (`rpc_progress`: a person's `dropped` sends the session the `system` note, waking it as a person's act does), `tests/test_ui.py`, `tests/test_agent.py`.
-
-**Why:** on 2026-09-24 Paul read the designer's claimed rows as a to-do list and pressed Drop on two claims whose PRs were open in a stack; the panel said neither that they were in review nor what Drop would do, and the session was not told (TD-143).
-
-**Fix:** three slices; the last touches `src/sessionorc/**`, so the techlead reads it (§4.9b). (1) The panel: groups, the PR beside a claim in review from the three sources in that order, the *i* mark, Drop under `more ▾` on in-progress rows only, the consequence confirm; a test that a claimed entry with a derived PR on the same reference is drawn *in review* with the number. (2) The route: refuse a drop while a PR from that claim is open (the same three sources), the trail row with the PR. (3) The note: `rpc_progress` with a person caller and `status: dropped` files the `system` note to the session (§4.10's words), one per drop; a test that the session's inbox holds it and its wake fires.
-
-**Done when** a session with a claimed reference and an open PR on its `tdNNN-*` branch shows *claimed · in review #n* under *in review* with no Drop on its face; Drop on an in-progress row sits under `more ▾`, its confirm names the lease, the branch and who can claim again, and the session's inbox holds the note after the press; the panel's heading carries the *i* mark and the note under the list is gone; TD-143 is archived.
-
-**Related:** TD-143 (the design), TD-056 (a claim is a lease), TD-028 (declared and derived), TD-045 (a derived claim's PR), TD-124 (keys: none on this panel yet).
 
 ## TD-151: Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip
 

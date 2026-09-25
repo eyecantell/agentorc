@@ -173,6 +173,12 @@ class ProgressEntry:
     # by name for the PR it may have grown, and retired when it never grew one (TD-045). Never set on
     # a declared entry: what the session says about itself stands on its own.
     branch: str | None = None
+    # Beside a *declared* claim, the one thing the agent adds (design §4.5a *Reports*, TD-150): the
+    # open PR of the branch named for its reference, as the tick derived it — so the panel reads
+    # *in review* for a claim whose session opened its PR without `--pr`. Derived, and never one
+    # of the session's own fields: its status, `pr` and `why` stay as it declared them (§9
+    # invariant 10). Cleared when that PR merges, since a merged PR holds no review.
+    review_pr: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -916,6 +922,13 @@ class Session:
         never overwritten by what the agent derived or scraped."""
         return _upsert(self.progress, entry)
 
+    def note_review(self, entry: ProgressEntry) -> bool:
+        """The tick's derived `entry`, where it is refused over a declared claim on its reference,
+        leaves its PR beside the claim as `review_pr` (§4.8, TD-150). True when that changed. Only
+        the tick calls it: an RPC's refused entry is refused, and says so (`refused`)."""
+        old = next((e for e in self.progress if e.ref == entry.ref), None)
+        return old is not None and _note_review(old, entry)
+
     def report_finding(self, entry: FindingEntry) -> bool:
         """Upsert a `findings` entry by reference; same invariant-10 rule as `report_progress`."""
         return _upsert(self.findings, entry)
@@ -952,9 +965,29 @@ def _upsert(entries: list[Any], entry: Any) -> bool:
             continue
         if old.source == "declared" and entry.source != "declared":
             return False
+        if isinstance(old, ProgressEntry) and old.source == "declared" and entry.status == "claimed" and not entry.pr:
+            entry.review_pr = old.review_pr  # a re-claim keeps what the tick last saw; done or dropped holds none
         entries[i] = entry
         return True
     entries.append(entry)
+    return True
+
+
+# A derived entry's `why` when its PR was closed without merging (`sessionorc.reports`): no review is
+# held by a closed PR, so `review_pr` clears on it as it does on a merge (TD-150).
+PR_CLOSED = "PR closed unmerged"
+
+
+def _note_review(old: ProgressEntry, derived: ProgressEntry) -> bool:
+    """A derived progress entry on a *declared* claim's reference is refused (§9 invariant 10) —
+    all but its PR, which is kept beside the claim as `review_pr` while it is open and cleared once
+    it merged (TD-150). True only when that changed, so the record is saved only then."""
+    if old.source != "declared" or old.status != "claimed" or derived.source == "declared":
+        return False
+    want = derived.pr if derived.status == "claimed" and derived.pr and derived.why != PR_CLOSED else None
+    if want == old.review_pr:
+        return False
+    old.review_pr = want
     return True
 
 

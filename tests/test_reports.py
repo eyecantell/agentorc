@@ -196,3 +196,28 @@ def test_an_unreachable_gh_retires_nothing(repo, monkeypatch):
     # and a genuine "no PR from that branch" still retires
     stub_prs(monkeypatch, [], head=[])
     assert reports.derive(repo, "main", left=[("TD-077", "td077-cap")]) == ([], [], ["TD-077"])
+
+
+def test_a_declared_claims_review_pr_is_rechecked_by_number_and_a_closed_pr_says_so(repo, monkeypatch):
+    """TD-150: `reviews` — a declared claim's `review_pr` after the session left its branch — is
+    looked up by number: merged is `done`, closed without a merge is a claim marked `PR_CLOSED`
+    (both clear the claim's `review_pr`), open is nothing; the checked-out branch's closed PR is
+    marked the same way."""
+    from sessionorc.models import PR_CLOSED
+
+    stub_prs(
+        monkeypatch,
+        [
+            {"number": 50, "state": "CLOSED", "mergedAt": None, "headRefName": "td050-a"},
+            {"number": 51, "state": "MERGED", "mergedAt": "now", "headRefName": "td051-b"},
+            {"number": 52, "state": "OPEN", "mergedAt": None, "headRefName": "td052-c"},
+        ],
+    )
+    progress, _, _ = reports.derive(repo, "main", reviews=[("TD-050", 50), ("TD-051", 51), ("TD-052", 52)])
+    assert [(p.ref, p.status, p.pr, p.why) for p in progress] == [
+        ("TD-050", "claimed", 50, PR_CLOSED),
+        ("TD-051", "done", 51, None),
+    ]
+    git(repo, "checkout", "-qb", "td050-a")
+    (e,) = reports.derive(repo, "td050-a")[0]
+    assert (e.status, e.pr, e.why) == ("claimed", 50, PR_CLOSED)

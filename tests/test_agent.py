@@ -859,6 +859,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
                     "at": s["progress"][0]["at"],
                     "source": "declared",
                     "branch": None,  # TD-045: only a derived claim records the branch it came from
+                    "review_pr": None,  # TD-150: only the tick sets it, beside a declared claim
                 }
             ]
             s = await worker.call("progress", id=sid, ref="TD-027", status="done", pr="#60")
@@ -892,6 +893,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
                 "at": later["progress"][1]["at"],
                 "source": "declared",
                 "branch": None,
+                "review_pr": None,  # TD-150: only the tick sets it, beside a declared claim
             }
         # a foreign session may write a record's channels: reports are not an acting RPC (§4.8)
         async with LocalClient(caller="ao-stranger") as stranger:
@@ -1222,7 +1224,7 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         monkeypatch.setattr(
             reports,
             "derive",
-            lambda directory, branch, pending=None, ledger=None, left=None: (
+            lambda directory, branch, pending=None, ledger=None, left=None, reviews=None: (
                 (ledgers.append(ledger) or [])
                 or (
                     [ProgressEntry(ref="TD-080", source="derived"), ProgressEntry(ref="TD-081", source="derived")],
