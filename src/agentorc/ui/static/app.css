@@ -151,7 +151,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .rail .railline[aria-pressed="true"] { background: var(--hover); border-color: var(--muted); font-weight: 600; }
 .rail .railline.dim { color: var(--muted); }
 .rail .raillabel { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.inboxpage .railout { display: none !important; }
+.inboxpage .railout { display: none !important; }  /* a section the rail does not pick is not drawn */
 /* §4.5 screen 6 *Narrow* (TD-137): the chip row and the sheet exist below 720 px only */
 .railchips, .railsheet:not([open]) { display: none; }
 .railchips .chip { border-radius: 999px; flex: none; gap: 6px; }
@@ -160,7 +160,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .railsheet { color: var(--fg); background: var(--bg); border: 0; }
 .railsheet::backdrop { background: rgba(0,0,0,.35); }
 .railsheet .sheethead { align-items: center; margin-bottom: 12px; }
-.railsheet .rail { position: static; }  /* a section the rail does not pick is not drawn */
+.railsheet .rail { position: static; }
 .rail .railn { flex: none; font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); color: var(--muted); }
 .inboxpage .isec { display: flex; flex-direction: column; gap: 8px; }
 .inboxpage .sechead { align-items: baseline; }
