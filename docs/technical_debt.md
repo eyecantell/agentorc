@@ -41,7 +41,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-069 | One place to work from: an Inbox page listing everything that needs a person — session states, mail, due board items — each with its controls, filtered by team; today they are in three places and the mail dialog is too narrow to read | Medium | Open — steps 0–3 built; step 4 designed, its build is TD-140 |
 | TD-070 | Neither an `ask` nor a board item can offer its expected answers, so the person types every reply from scratch: `--answer` on `ao msg`, and an answers field on the board entry (a dev-cadence format change), rendered as buttons | Medium | Open |
 | TD-071 | Org page review 2026-09-18: the ideas not built — Forget all on a stopped team, unread mail on a folded team, a state roll-up on a live team's header, slimmer dead cards, a quieter mode badge | Low | Items 1 and 2 built 2026-09-23 (PR #499); 8 is Paul's canvas |
-| TD-072 | Sessions exit with unread mail: nothing makes a worker read its inbox before it says it is out of work, and an unread `note` outlives the run it was sent to | Medium | Open — designed; the build is TD-141, and this entry archives with it |
 | TD-075 | Every question a worker has goes to the person: a go-between — the lead, or a session beside it, on a stronger model — could answer what is already written down and steering, and pass up the rest with a recommendation | Medium | Partly done |
 | TD-077 | A caller's identity on one host is a field the caller fills in: any local process can send as another session, or as the person by sending no caller at all | High | Open |
 | TD-078 | Two timing flakes in the suite: the restart test's migration assertion (fixed, PR #264) and a `send` to a pane that was gone in `test_send_wait_three_outcomes` (diagnosed and refused in words, PR #286; watching until 2026-09-27) | Low | Partly done |
@@ -79,7 +78,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-132 | Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row | Medium | Open — designed, pickable |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
 | TD-140 | Build *Put on the board* — the write-back's one add and the FYI row's form | Low | Open — designed, pickable |
-| TD-141 | Build mail before wind-down — the refusal on unread, the *mail read* row, an unread note ages out with its run | Medium | Open — designed, pickable; a parked build exists |
 | TD-142 | Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder | Medium | Open — designed; slice 1 pickable, slice 2 waits on dev-cadence's reader fields |
 | TD-143 | The Focus Reports panel reads as a to-do list: a `claimed` row with its PR open looks like an unstarted claim, and Drop beside it lets a person let go of work in review | Medium | Open — designed; the build is TD-150, and this entry archives with it |
 | TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Built 2026-09-25 (PR #559) — Paul's live look pending |
@@ -731,30 +729,6 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Done when** each idea is either built (its own PR, §4.5a first) or struck here.
 
 **Related:** design §4.5a (**team groups**, **state icon**), TD-069, TD-070, TD-065 (the undefined `chip` class — same page, same kind of finding).
-
-
-## TD-072: Sessions exit with unread mail — nothing makes a worker read its inbox before it winds down
-
-**Priority:** Medium
-**Added:** 2026-09-18 (the anchor session; Paul's review of the Org page — *"our agents should go through them and decide they don't care about them instead of just leaving them pending"*)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** no — designed 2026-09-24; the build is TD-141 (the parked branch, rebased), and this entry archives with it
-**Status:** Open — **designed 2026-09-24 (the designer, PR #529), beside TD-079 as built (the person's 2026-09-20 condition):** §4.9a *The declaration is refused while the session has unread mail* (`none` and `restart`, naming the count and the command, beside the *owed outcome* refusal TD-079 built), §4.2 Ready to close *mail read* (and the *outcomes reported* row written in), §4.10 lifecycle: an unread `note` or `reply` on an `exited` or `closed` record ages out on the retention window from the exit, open questions untouched. The parked branch is taken as written; the Stop-hook road (TD-059) rejected — a session that ignores a note would be un-endable, and wakes are bounded by design. Steered to Paul as a default. Build: TD-141. Was: three parts proposed to Paul 2026-09-18, not yet approved one by one. Design first: §4.10 (mail lifecycle) and §4.9a (wind-down) change before code does. **Do not build it alone: it overlaps TD-079** (the Inbox as a queue — `ao progress none` refused while something is owed, and a Ready to close row), and the two must be designed together (person, 2026-09-20). **A build of all three parts is parked, unmerged, on branch `td072-mail-before-winddown`** (worker `tdgrind-ao-1`, 2026-09-20, claim dropped the same day; suite and lint green there): `ao progress none` refused while unread, naming the count; a *mail read* row on Ready to close; an unread `note` on an exited record ageing out on the retention window running from the exit — *not* dropped at the exit, because resume carries mail forward inside that window, which is the one place the build reads this entry differently; the two briefs; and the design edits to §4.9a, §4.2 and §4.10. Take from it or discard it in the design round — the refusal and the Ready to close row are exactly where it collides with TD-079.
-**Location:** `docs/briefs/tdgrind-ao-1.md` and the samscrape team's briefs (when a worker reads mail), `src/sessionorc/agent.py` (`rpc_progress` → `_out_of_work`, and the mail sweep), the Ready to close checks (§4.2; the check names live in `src/agentorc/repoconfig.py`, `ready_when`, and the phase-1 subset that is evaluated is `ready_to_close()` in `src/agentorc/ui/app.py`), design §4.10 and §4.9a
-
-**Why:** on 2026-09-18 the Org page showed exited sessions still holding unread mail — `tdgrind-1` 19 entries, `tdgrind-3` 2 — almost all `note`s from siblings (*claimed: TD-289…*) and from the lead. Part of that night's count was a defect, since fixed: any reply longer than the client's 64 KiB line limit failed (TD-066, recorded there as the `list` reply; fixed by PR #209), and three sessions reported to the person inbox between 00:36Z and 01:47Z that bare `ao inbox` died the same way on one long message — *Separator is found, but chunk is longer than limit* — while `ao inbox --unread --json` still worked. A worker told *19 unread* on every `ao` reply had a default read command that crashed. But the mechanism allows it on any night. Reading is what marks mail read (`ao inbox`, design §4.10); every `ao` reply carries the unread count (`cli.py`, `unread_line`); and nothing else happens. The lead's brief says to read the inbox at the top of every round (`docs/briefs/orchestrator-ao-1.md`, step 1); the grinder's brief says to read it before claiming a reference (`docs/briefs/tdgrind-ao-1.md`, *Read your inbox before claiming*) and never again — not before it declares itself out of work, which is the moment the 19 were left behind. An unread entry never ages out (§4.10), so a claim note that was stale within the hour sits on a dead record until a person forgets the session — and it is noise on the page that TD-069 is about to make the place a person works from.
-
-**Fix, three parts, cheapest first:**
-1. **The briefs say when, twice.** A grinder already reads `ao inbox --unread` before it claims a reference; it also reads it before it declares itself out of work. Reading is the triage: a `note` needs no answer, an `ask` gets one or a refusal.
-2. **The wind-down checks it.** `ao progress none --why …` (§4.9a) is refused while the session has unread mail, naming the count and the command — briefs are skimmed, a refusal is not. Ready to close (§4.2) gains a row, *mail read*, so a session that exits some other way still shows it.
-3. **A `note` does not outlive the run it was sent to.** When a session's record goes to `exited`, its unread `note`s are dropped; an `ask` keeps the lifecycle it has (§4.10: it stays pending while the record is only exited — the asker's `ao` replies say *addressee exited* — and expires when the record is closed or forgotten, or at its own bound). **Not verified, and part of this item:** what a fresh `ao team start` under the same name does with the dead record's inbox — a resumed conversation takes the mail with it (`_supersede` → `_move_mail`), a new one of the same name was not traced.
-
-**Done when** a grinder that tries to wind down with unread mail is refused and told why, Ready to close shows the row, an exited session's card shows no unread `note`s, the briefs say when to read, and §4.10 / §4.9a / §4.2 say all of it.
-
-**A third road, from the neighbours survey (TD-059, 2026-09-20):** `multi-agent-shogun`'s Claude Code Stop hook refuses to end a turn while the agent has unread mail and feeds the mail back in — the refusal at the moment the turn ends rather than at `ao progress none`. It would live in the Claude Code adapter (§4.3), and it covers a session that never declares; weigh it in the design round beside part 2.
-
-**Related:** design §4.10 (lifecycle, *an unread entry never ages out*), §4.9a (`out_of_work`), §4.2 (Ready to close), TD-052 (mail), TD-053 (wind-down), TD-066 (the crash that hid that night's mail), TD-069 (the page this keeps clean), TD-071 item 2.
 
 
 ## TD-075: A go-between for what needs the person — answer what is written down, pass up the rest with a recommendation
@@ -1452,24 +1426,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-069 (the design; steps 0–3 built), TD-123 (the board's whole view stays dev-cadence's report), cadence §4 (a session's own board lines go by PR, as before).
 
-## TD-141: Build mail before wind-down — the refusal on unread, the *mail read* row, an unread note ages out with its run
-
-**Priority:** Medium
-**Added:** 2026-09-24 (the designer; TD-072's design round, PR #529)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — designed; **a build exists**: branch `td072-mail-before-winddown` (worker `tdgrind-ao-1`, 2026-09-20, suite and lint green there then; 116 lines over `src/sessionorc/agent.py`, `src/agentorc/ui/app.py`, `tests/test_mail.py`, `tests/test_ui_org.py`, two briefs and the design). Rebase it onto `main`, drop its design edits (the design now says it), and finish what is below. Design: §4.9a *The declaration is refused while the session has unread mail*, §4.2 Ready to close *mail read*, §4.10 lifecycle stages 1 and 3.
-
-**Location:** `src/sessionorc/agent.py` (`rpc_progress` → the `none` and `restart` paths; the mail sweep's `_keep` with `dead_since`), `src/agentorc/ui/app.py` (`ready_to_close`: the *mail read* row beside *outcomes reported*), `src/agentorc/briefs/grinder.md` and `manager.md` (read the inbox before a claim and before the declaration — the grinder preset says neither today; the manager's says *first*), `tests/test_mail.py`, `tests/test_cli.py` (the briefs' words), `docs/briefs/` only if a repo supplement restates it (it should not: cadence §7, cite by section).
-
-**Why:** on 2026-09-18 the Org showed exited sessions holding nineteen unread entries; nothing makes a worker read its inbox before it winds down, and an unread entry never ages out. The design (TD-072) says what changes; the parked branch built most of it before TD-079 landed the sibling refusal, and the two now sit side by side.
-
-**Fix:** three slices; the first touches `src/sessionorc/**`, so the techlead reads it (§4.9b). (1) The refusal: `ao progress none` and `ao progress restart` refused while `s.unread()` is non-zero — *has n unread messages: read them with `ao inbox` and answer what needs answering before declaring* — after the owed-outcome check, so a session with both is told the one it can clear first; the sweep prunes an unread `note` or `reply` on an `exited`/`closed` record on `MAIL_RETENTION` from the transition (`dead_since`), open `ask`/`steer`/`conflict` untouched; tests for both, and one that a resume inside the window still carries the note. (2) Ready to close: the *mail read* row from `unread`, drawn as *outcomes reported* is; a test in `tests/test_ui_org.py`. (3) The presets: one line in the grinder preset — *read `ao inbox --unread` before a claim and before `ao progress none`* — and `tests/test_cli.py` holds it (TD-125's pattern); the manager preset already reads first.
-
-**Done when** a worker that runs `ao progress none` with unread mail is refused and told the count, reads, and is then accepted; an `exited` card shows no unread `note`s twelve hours after its exit; a resume within the window carries the note; Ready to close shows *mail read*; the grinder preset's line has its test; the parked branch is deleted; TD-072 is archived.
-
-**Related:** TD-072 (the design), TD-079 (the sibling refusal and row), TD-066 (the crash that hid that night's mail), TD-069 (the page this keeps clean), TD-059 (the Stop-hook road, not taken).
 ## TD-142: Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder
 
 **Priority:** Medium
