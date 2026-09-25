@@ -875,6 +875,39 @@ RESUMABLE = [
     ]),
 ]
 
+def message_dialogs():
+    """The Message composer (§4.5a **Message**, TD-158): the sentence under the kind selector that
+    says when the message will be read, from the addressee's record, changing with the kind."""
+    def dlg(title, kind, line, note=False):
+        sel = ('<span class="input" style="width: 230px;">ask — needs an answer ▾</span>' if kind == "ask"
+               else '<span class="input" style="width: 230px;">note — no reply expected ▾</span>')
+        return f'''<div class="card" style="width: 560px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+  <div style="font-weight: 600;">{title}</div>
+  <div style="display: flex; gap: 10px; align-items: center;"><span class="meta">kind</span>{sel}<span class="meta">about</span><span class="input" style="flex-grow: 1; color: #9ca3af;">TD-052, a PR, a session (optional)</span></div>
+  <div style="font-size: 14px; padding: 8px 10px; background: #eef1f5; border-radius: 4px; display: flex; gap: 8px;"><span style="color: #6b7280;">⏱</span><span>{line}</span></div>
+  <div class="input" style="height: 84px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">First what you want, then why…</div>
+  <div style="display: flex; align-items: center; gap: 8px;"><span class="note">Mail lands in the inbox and is read when the session next looks. It types nothing into the pane — that is <b>Send</b>.</span><span style="flex-grow: 1;"></span><span class="btn ghost">Cancel</span><span class="btn primary">✉ Mail it</span></div>
+</div>'''
+    boards = [
+        dlg("Message techlead-ao-1", "ask", "<b>On call.</b> An ask fills this seat: a session starts on the next tick and reads it first. An ask takes the default bound of 12 h."),
+        dlg("Message techlead-ao-1", "note", "<b>On call.</b> A note waits in the seat's mailbox: it fills no seat, and is read at the next fill, which a question causes."),
+        dlg("Message grinder-ao-2", "ask", "<b>Working.</b> Read when its turn ends: it is rung on the tick after its Stop."),
+        dlg("Message designer-ao-1", "note", "<b>Exited.</b> Read when this session is resumed, or started again under this name — the mail moves with the name."),
+        dlg("Message main", "ask", "<b>Yours.</b> Lands in its inbox and wakes nothing: a person's session is never rung; the card's unread chip shows it."),
+        dlg("Message grinder-ao-1", "ask", "<b>Idle.</b> Rung within a tick: the doorbell types <span class=\"mono\">[agentorc] you have 1 unread message</span> into its pane."),
+    ]
+    grid = "".join(f'<div>{b}</div>' for b in boards)
+    return head("Message") + f'''<div style="width: 1440px; min-height: 1060px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 16px 20px; display: flex; flex-direction: column; gap: 12px;">
+  {page_head("Message — when it is read", "the composer on six addressees: the sentence under the kind selector, from the record, changing with the kind", "")}
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px 40px; justify-items: center;">{grid}</div>
+  <div class="note">Design notes, not page text. One sentence, computed once (<span class="mono">mail.read_when</span>, design §4.10 <i>When it is read</i>, TD-158) in the doorbell's own precedence, so it never promises a ring the doorbell would not give; the seat's is the only case the kind changes, and it swaps as the person switches ask ↔ note before typing. The same sentence ends every <span class="mono">ao msg</span> reply. A note to a seat is not refused: it lands and waits for the next fill.</div>
+</div>
+</div>
+''' + TAIL
+
+
 def resumable():
     def r(host, repo, path, s):
         sid, nm, where, span, started, ended, board, live = s
@@ -1359,6 +1392,7 @@ files = {
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
+    "Message.dc.html": message_dialogs(),
     "Commands.dc.html": commands(),
     "Inbox.dc.html": inbox(),
     "InboxRail.dc.html": inbox(picks=True),
@@ -1386,6 +1420,7 @@ LAYOUT = [
     ("FocusOrc.dc.html", "Focus — orchestrator", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
+    ("Message.dc.html", "Message — when it is read", 0),
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("NewSession.dc.html", "New session", 1),
@@ -1415,7 +1450,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }
