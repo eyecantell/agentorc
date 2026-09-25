@@ -13,6 +13,7 @@
 - [Scratchpad too long for unix sockets](scratchpad-too-long-for-unix-sockets.md) — a scratch AGENTORC_HOME needs a short path like ~/.cache/ao<topic>
 - [How a design round runs from a cloud session](cloud-design-round.md) — park on the board first, propose in chat, Sonnet rounds to READY, fact-check on the PR, one branch
 - [Check open PRs before a design round](check-open-prs-before-a-design-round.md) — the designer's stacked PRs may already hold the design; compare and reconcile, never design twice
+- [A park is a merged PR, not an open one](a-park-is-a-merged-pr.md) — the designer reads the board on `main`; wait for the park PR to merge, and re-search the id in every state before the round
 - [Check in-flight work before a TD step](check-in-flight-before-a-td-step.md) — another session may hold the next step; conformance-read instead; `ao msg` for leads, never a peer message
 - [Headless screenshots on kmaster](headless-screenshots-on-kmaster.md) — snap Firefox `--headless --screenshot`; profile and output under a plain home dir, not /tmp or hidden
 - [Open the PR before writing its number](open-the-pr-before-writing-its-number.md) — a guessed `PR #N` in the ledger points at someone else's PR

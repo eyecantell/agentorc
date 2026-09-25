@@ -12,7 +12,9 @@ compare and reconcile; never design twice ([[check-open-prs-before-a-design-roun
 kmaster), so the designer would pick the same entry. Push one commit that adds a board line —
 `- [ ] <date> (session <id> on claude.ai/code) — **Held: TD-NNN … is being designed in a cloud
 session at Paul's ask — not by the designer.** … Due: <+3 days>.` — and a clause at the front of
-the entry's Status, open the PR, and ask Paul to merge it before the design starts. The design PR
+the entry's Status, open the PR, and ask Paul to merge it before the design starts — **and check that it merged
+before proposing anything**: the designer reads the board on `main`, so an open park PR parks
+nothing ([[a-park-is-a-merged-pr]]; TD-128 was designed twice on 2026-09-25 this way). The design PR
 takes the line off. The designer's brief honours a board park; a mail from Paul to the designer
 covers the current run only.
 
