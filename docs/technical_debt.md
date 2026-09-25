@@ -99,7 +99,6 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Open — designed, pickable |
 | TD-153 | Sessions poll for mail in foreground loops instead of going idle to be rung: the doorbell is built, and nothing tells a session it will be woken | High | Open |
 | TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Open — design-first |
-| TD-155 | A resumed session that starts no turn reads `working` until it stalls: `SessionStart` with source `resume` lands at the composer and fires no `Stop` | Medium | Open |
 | TD-156 | UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel, and a concluded team folds the card that is ready to close | Medium | Open — design-first, Paul's interactive review |
 | TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Open — design-first |
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Designed 2026-09-25 (the designer) — the build is TD-168; archives with it |
@@ -1848,25 +1847,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** Paul can read the designer's last run from its exited card without a session starting, and `ao transcript designer-ao-1` prints it.
 
 **Related:** TD-081 (Resume, what this is not), TD-145 (a Resume's record), TD-155 (why a resume misleads today), TD-091 (context near its limit: the other reader of the transcript), §4.5a *Resumable*, §4.3 `transcript_path`.
-
-## TD-155: A resumed session that starts no turn reads `working` until it stalls: `SessionStart` with source `resume` lands at the composer and fires no `Stop`
-
-**Priority:** Medium
-**Added:** 2026-09-25 (seen on the designer's record after Paul's one-press Resume)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built.
-
-**Location:** `src/agentorc/adapters/claude_code/hook.py` (`STATE_EVENTS` maps every `SessionStart` to `working`; `SESSION_START_NOT_A_START` exempts `compact` only, TD-090), `src/sessionorc/agent.py` (`STALL_AFTER`, `_bell_blocked` — *not hook-confirmed idle*), design §4.2.
-
-**Why:** `claude --resume <id>` prints the old conversation and waits at the composer. Its `SessionStart` (source `resume`) is reported as `working` with confidence `hook`, and no turn follows, so no `Stop` ever reports `idle`. Seen 2026-09-25 14:06Z: the designer resumed by Paul reads `working (hook)` with an empty composer (`ao explain`: *no screen rule matched*), and at `STALL_AFTER` (20 minutes) it will read `stalled?` — an alert on a session that is simply idle. Two things follow from the wrong state: the doorbell never rings it (it rings hook-confirmed idle only), so mail for a resumed session waits until someone types; and a manager's `wait` sees a member `working` that is doing nothing. A fresh `SessionStart` (source `startup`) is a different case — `ao new` types the prompt at once, so `working` is right there — and `clear` is already handled as a continuation.
-
-**Fix:** one slice in the adapter (no techlead hold): `SessionStart` with source `resume` reports `idle` at confidence `hook` (Claude Code's resume brings the session to its composer and nothing else); a `--prompt` given with the resume is typed by the host agent afterwards and reports `working` through `UserPromptSubmit` as any send does. A test on the hook mapping per source: `startup` → working, `resume` → idle, `compact` → unchanged, `clear` → continuation. Check on the live designer record after the promote: `ao explain` reads `idle (hook)` within a tick of the resume.
-
-**Done when** a one-press Resume with no prompt shows `idle` within a tick, never `stalled?`, and the doorbell rings it for mail that lands after the resume.
-
-**Related:** TD-090 (the `compact` exemption, the same shape), TD-081 / TD-145 (Resume), TD-153 (the doorbell needs a hook-confirmed idle), §4.2.
 
 ## TD-156: UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel, and a concluded team folds the card that is ready to close
 
