@@ -381,7 +381,7 @@ body.popped .page { padding: 10px 12px; } body.popped .termbox { height: calc(10
 /* the one long thing the row may take back instead: the tool's title, shown and never acted on,
    the whole of it on hover (the doing line left the header for the Working card, TD-156) */
 .focus #fhead > .tool-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-details.side .doing { margin-top: 8px; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
+details.side .doing { margin-top: 8px; font-size: var(--t-small); line-height: 1.55; overflow-wrap: anywhere; }
 /* design §4.5 *The Focus screen's anatomy* (TD-156): the header is two lines — the identity line
    above, this acts line below it — with the card's foot rule: the next act outlined at normal
    strength, the rest plain, more ▾ at the right. The buttons had been spread over the tail of the
@@ -390,7 +390,7 @@ details.side .doing { margin-top: 8px; font-size: 12px; line-height: 1.55; overf
 .focus #facts .btn.next { background: transparent; color: var(--fg); border-color: var(--muted); }
 .focus #facts .btn.link { background: transparent; border-color: transparent; color: var(--fg); padding: 0 6px; }
 .focus #facts .btn.next:hover, .focus #facts .btn.link:hover { background: var(--hover); }
-.focus #facts details.more .menu { min-width: 210px; } .focus #facts .menu .key { float: right; margin-left: 12px; color: var(--muted); font-size: 11px; }
+.focus #facts details.more .menu { min-width: 210px; } .focus #facts .menu .key { float: right; margin-left: 12px; color: var(--muted); font-size: var(--t-cap); }
 .focus #facts .menu button.danger { color: var(--stalled-fg); }
 .badge.readymark { cursor: default; color: var(--done-fg); background: var(--done-bg); border-color: var(--done); }  /* the card's caption, in the card's words */
 /* the side panel's folds: the heading is the disclosure, a chevron before it, Session folded by default */
