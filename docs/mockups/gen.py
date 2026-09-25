@@ -165,6 +165,7 @@ ICON = {
     "resume": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8a5 5 0 019-3M13 8a5 5 0 01-9 3"></path><path d="M12 2v3H9M4 14v-3h3"></path></svg>',
     "play": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M5 3.5v9l7-4.5z"></path></svg>',
     "term": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>',
+    "doc": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 2h5l3 3v9H4z"></path><path d="M9 2v3h3M6 8h4M6 10.5h4"></path></svg>',
     "git": '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4" cy="4" r="1.6"></circle><circle cx="4" cy="12" r="1.6"></circle><circle cx="12" cy="6" r="1.6"></circle><path d="M4 5.6v4.8M12 7.6c0 2.4-8 1.2-8 3"></path></svg>',
 }
 
@@ -605,7 +606,7 @@ def focus_head(name, state, identity, next_act="", editor=True, member=False):
     line: the next act outlined first (Close session, Take over, or none), the plain ones, more ▾
     at the right with Kill last. Until 2026-09-25 this was one wrapping row, the buttons at its
     tail, which broke over three lines on Paul's screen with the buttons split between two."""
-    vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span>' if editor else ""
+    vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span><span class="btn" title="what this session said and did, without resuming it (design §4.5 screen 9)">{ICON["doc"]}Transcript</span>' if editor else ""
     return f'''<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
       <span class="mono" style="font-size: 15px; font-weight: 500;">{name}</span>
@@ -975,6 +976,70 @@ def message_dialogs():
   {page_head("Message — when it is read", "the composer on six addressees: the sentence under the kind selector, from the record, changing with the kind", "")}
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px 40px; justify-items: center;">{grid}</div>
   <div class="note">Design notes, not page text. One sentence, computed once (<span class="mono">mail.read_when</span>, design §4.10 <i>When it is read</i>, TD-158) in the doorbell's own precedence, so it never promises a ring the doorbell would not give; the seat's is the only case the kind changes, and it swaps as the person switches ask ↔ note before typing. The same sentence ends every <span class="mono">ao msg</span> reply. A note to a seat is not refused: it lands and waits for the next fill.</div>
+</div>
+</div>
+''' + TAIL
+
+
+def transcript():
+    """Screen 9 (TD-154): a session's transcript, folded as the pane draws it — read, never resumed.
+    Everything on it is text; the only controls are the folds, *earlier turns* and VS Code."""
+    def fold(label):
+        return f'<span class="meta" style="cursor: pointer; user-select: none;">▸ {label}</span>'
+    def prompt(text, at):
+        return f'<div style="display: flex; gap: 10px; padding: 10px 12px; background: #eef1f5; border-radius: 4px;"><span class="mono" style="color: #6b7280;">&gt;</span><div style="flex-grow: 1; white-space: pre-wrap;">{text}</div><span class="meta mono" style="flex-shrink: 0;">{at}</span></div>'
+    def said(text):
+        return f'<div style="padding: 4px 12px 4px 30px; white-space: pre-wrap;">{text}</div>'
+    def tool(name, arg, result=None, extra=""):
+        r = f'<div style="padding-left: 22px;">{fold(result)}</div>' if result else ""
+        return f'<div style="padding: 3px 12px; display: flex; flex-direction: column; gap: 2px;"><div class="mono" style="font-size: 12.5px;"><span style="color: #6b7280;">⏺</span> {name}(<span style="color: #4b5563;">{arg}</span>){extra}</div>{r}</div>'
+    def thought(n):
+        return f'<div style="padding: 3px 12px 3px 30px;">{fold(f"thought · {n} lines")}</div>'
+    turns = "".join([
+        '<div style="text-align: center; padding: 10px;"><span class="btn sm">earlier turns · 20 more above</span></div>',
+        '<div style="text-align: center;"><span class="meta">— compacted 14:02 —</span></div>',
+        prompt("[agentorc] you have 1 unread message — run ao inbox", "14:06:12"),
+        thought(4),
+        tool("Bash", "ao inbox --unread --json", "result · 21 lines"),
+        said("Paul answered the steer on TD-128 with <i>go with it</i>. Merging #547 once the cadence check passes."),
+        tool("Bash", "python3 scripts/check_cadence.py --pr 547; echo exit=$?", "result · 9 lines"),
+        tool("Bash", "gh pr merge 547 --squash --delete-branch", "result · 2 lines"),
+        tool("Bash", "ao progress done TD-128 --pr 547 --json", "result · 6 lines"),
+        said("TD-128 is designed and merged as #547. Taking TD-026 next: the start time."),
+        prompt("Design TD-026 as the brief says: start_at, the scheduled state, the tick's create at the instant.", "14:21:40"),
+        thought(31),
+        tool("Read", "docs/design.md · §6 Schedule", "result · 118 lines"),
+        tool("Agent", "Explore · where the tick creates a session", "result · 40 lines", ' <span class="badge">6 subagent turns</span>'),
+        tool("Edit", "docs/design.md", "result · 1 line"),
+        tool("Edit", "docs/technical_debt.md", "result · 1 line"),
+        tool("Bash", "pdm run test tests/test_ledger.py -q", "result · 3 lines"),
+        said("The design is written: §6 <i>Schedule</i> gains <span class=\"mono\">start_at</span> and the <span class=\"mono\">scheduled</span> state; §4.5a the card's <i>starts</i> note and <span class=\"mono\">ao at</span>. Opening the PR and a steer to Paul on the verb's name."),
+        tool("Bash", "gh pr create --title \"TD-026 round 2: the start time\" --body-file /tmp/pr.md", "result · 1 line"),
+        tool("Bash", "ao msg --kind steer --default \"ao at\" --bound 43200 --about TD-026 person \"…\"", "result · 4 lines"),
+        said("PR #548 is open. Steer sent; on to the next entry."),
+        tool("Bash", "ao progress done TD-026 --pr 548 --json", "result · 6 lines"),
+    ])
+    return head("Transcript") + f'''<div style="width: 1440px; min-height: 1180px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 12px 20px; display: flex; flex-direction: column; gap: 10px; max-width: 1100px; align-self: center; width: 100%;">
+  <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+    <a href="#" class="muted">&larr; Focus</a>
+    <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / agentorc / designer-ao-1</span>
+    {pill("ended", "exited 2h")}
+    <span class="badge">ao-grind</span><span class="badge">{role_icon("grinder")}designer</span>
+    <span class="meta">claude-code · paul (max) · fable-5-1</span>
+    <span style="flex-grow: 1;"></span>
+    <span class="btn">{ICON["code"]}VS Code</span>
+  </div>
+  <div class="card" style="padding: 10px 12px;">
+    <dl class="kv" style="margin: 0;">
+      <dt>file</dt><dd class="mono" style="font-size: 12px;">~/.claude/projects/-home-kmaster-agentorc--claude-worktrees-designer-ao-1/9f2c…41b0.jsonl · 812 KB · on kmaster</dd>
+      <dt>turns</dt><dd>63 · 2026-09-25 13:48 &rarr; 16:12 MDT · compacted once</dd>
+      <dt>showing</dt><dd>the last 20 turns · <span class="muted">a snapshot at 18:31; reload to read what came after</span></dd>
+    </dl>
+  </div>
+  <div class="card" style="padding: 6px 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; line-height: 1.5;">{turns}</div>
+  <div class="note">Design notes, not page text. The page is the pane's reading of the conversation, folded (design §4.5 screen 9, TD-154): the prompt as sent, the assistant's text in full, each tool call one line with its result folded under it, a thought one folded line, a subagent's turns folded under the Agent call that started them. Every line is text; the only controls are the folds, <b>earlier turns</b> and <b>VS Code</b>, which opens the raw file. Reached from the Focus header on any state and from each Resumable row; <span class="mono">ao transcript &lt;id&gt;</span> prints the same twenty turns.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1465,6 +1530,7 @@ files = {
     "NewSession.dc.html": new_session(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
+    "Transcript.dc.html": transcript(),
     "Message.dc.html": message_dialogs(),
     "Commands.dc.html": commands(),
     "Inbox.dc.html": inbox(),
@@ -1494,6 +1560,7 @@ LAYOUT = [
     ("FocusReady.dc.html", "Focus — ready to close", 0),
     ("Legend.dc.html", "States & badges", 0),
     ("Resumable.dc.html", "Resumable", 0),
+    ("Transcript.dc.html", "Transcript", 0),
     ("Message.dc.html", "Message — when it is read", 0),
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
@@ -1524,7 +1591,7 @@ def artboards():
 canvas = {
     "artboards": artboards(),
     "annotations": [
-        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
+        {"id": "brief", "x": 0, "y": -150, "w": 520, "text": "agentorc mockups (2026-09-04, static, utilitarian operator console).\nRound 2: card grid chosen; profile line (tool · account · model) replaces the source column; new LIMITED state; attention/pinned sort toggle.\nRound 3: 'Done when' → 'Ready to close' + user-driven Close → closed state; dark artboard added; laptop shown as a volatile host (◐).\nRound 4: Resumable, Commands and Attention tabs added; then the consistency pass — renamed agentorc, Urgent-first sort + Due strip, shells as cards (host1, vpnmaster), command runs off the Org, unreachable host banner, permissions via hook (no answer buttons under the terminal), Adopt for hand-started sessions.\nRound 6 (2026-09-21, TD-095): the Org card redrawn to §4.5 *The card's anatomy* — six rows at one height, the name once, one clock, the mode a word (interactive marked, unattended quiet), the slot one text with *ready to close ✓* as its caption, the quiet foot led by the next act; working green, idle blue, one grey for everything over; a team's header without its manager; the legend gains the state tokens.\nRound 12 (2026-09-25, TD-158): the Message composer's sentence — when the message will be read, by the addressee's state and the kind.\nRound 10 (2026-09-25, TD-154): screen 9, Transcript — a session's conversation folded as the pane draws it, read without resuming; the Focus header gains Transcript.\nRound 9 (2026-09-25, TD-100 (4)): screen 8, Settings, in both themes.\nRound 8 (2026-09-25, TD-130): the type scale — body 14, small 12, caps 11, mono 13 / 12.5 — applied to every artboard, with a ladder artboard in both themes.\nRound 7 (2026-09-24, TD-129): the Inbox gains the rail — sections, teams and kinds as toggles with counts, the find box — and three artboards beside it: the rail with picks, the message page, the phone layout.\nRound 5 (2026-09-13, TD-037): caught up with a week of shipped UI — the home screen is the Org, not the Team; team groups with a header per team (lead, project, needs-you) and the card's team / role badges, under chip and report line; the Teams strip with Start / Stop; Focus gains the grants and controllers chips and the Reports panel, and a second Focus artboard draws the lead's Members list, which only a session holding `orchestrate` ever sees; New session is redrawn field for field from the shipped form — the four-way Where radio group with its existing-worktree picker and the Fresh/Resume pair never existed."},
     ],
     "launch": {"view": "canvas"},
 }

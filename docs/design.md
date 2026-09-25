@@ -480,6 +480,13 @@ class Adapter(Protocol):
     def state_source(self) -> Literal["hook", "scraped"]
     def classify_pane(self, tail: str) -> State | None   # only for scraped adapters
     def transcript_path(self, session_id: str, cwd: Path) -> Path | None
+    def read_transcript(self, session_id: str, cwd: Path, profile: Profile | None, *,
+                        before: int | None = None, turns: int = 20) -> Transcript | None
+                                                          # the tool's transcript as neutral entries — a prompt, text, a thought, a
+                                                          # tool call with its result, a compaction, a sidechain group — the last
+                                                          # `turns` before byte `before` (None: the file's end), with the offset that
+                                                          # asks for earlier ones; None when there is no file. No field name of the
+                                                          # tool's leaves this method, as none of `usage` does (§4.5 screen 9, TD-154)
     def quirks(self) -> Quirks                      # first-run dialogs, settings pre-seed
     def usage(self, profile: Profile) -> Usage | None     # this account's quota windows: Usage(windows=[Window(label, pct,
                                                           # resets), ...], fetched). The labels are the adapter's; nothing
@@ -1315,10 +1322,11 @@ call by call.
   than a forwarded `progress`, because a derived entry carries the branch it came from and a retire,
   which the RPC does not. While the link is down the node derives nothing: a claim written to the
   replica is overwritten on reconnect and was never checked against the siblings' leases. **Reads of
-  a pane.** `tail` and `explain` on `id@host` read a screen only that node's tmux holds, so the home
+  a pane, and of a transcript.** `tail` and `explain` on `id@host` read a screen only that node's tmux
+  holds, and `transcript` a file only that node's disk holds (§4.5 screen 9), so the home
   asks the node for them — `read {rpc, params}`, a link method of its own whose allowlist is exactly
-  those two (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
-  never grows by a read. **Ungated**, as on one host (§9 invariant 11): no caller crosses with it,
+  those three (`NODE_READS`), so a read can never reach an acting method through it and `act`'s list
+  never grows by a read. A transcript is read where it lies and never copied to the home. **Ungated**, as on one host (§9 invariant 11): no caller crosses with it,
   and a session with no grant reads a node's pane as it reads a local one. Refused as unreachable —
   never queued — while the link is down; the reply is the node's, untouched but for its addresses. A
   node serves reads of its own host's panes only: a call at a node naming another host's session is
@@ -1876,6 +1884,50 @@ Screens:
    (TD-123: a tab exists only for a built page), last, after Inbox; the host chip's hover names the
    page until then.
 
+9. **Transcript** (`/transcript/<id>`; TD-154, designed 2026-09-25 — the build is TD-165 and
+   TD-166; mockup `Transcript.dc.html`): **a read of what a session said and did, without resuming
+   it.** Resuming was the only way to read a finished session, and it is the wrong tool three times
+   over: it creates a live session and a record, it is a lifecycle event a manager may act on, and
+   it has to be closed again. The transcript is a file on the session's host that its adapter
+   already locates (`transcript_path`, §4.3); reading it is a read, gated by nobody (§9 invariant
+   11). **The page is the pane's reading of the conversation, folded**: one block per turn — the
+   prompt as it was sent, drawn as the pane draws it (`>`), the assistant's text in full, each tool
+   call collapsed to its one line (`⏺ Bash(pdm run test …)`) with its result folded under it, opened
+   by a press, and a thought as one folded line (*thought · n lines*) where the file holds any. The
+   turns of a subagent (a sidechain — §4.2a's rule for the model in use already tells them apart)
+   are not the session's and are folded under the Agent call that started them, with their count.
+   A compaction is one line where it happened. Nothing else in the file is drawn: the tool's
+   bookkeeping lines (mode, title, snapshots, the hook attachments) are the tool's, and the raw
+   file is a press away. **The head** says whose it is — the record's name, host, directory,
+   profile and the model in use (§4.2a) — and what it is: the file's path on its host, its size,
+   the first and last timestamps, the count of turns. **Beside the head**: **VS Code**, the editor
+   button's link (§5 *The person's own*) pointed at the file rather than the directory — the raw
+   file's reader, since one JSON object per line is not a page. The page opens on the **last
+   twenty turns** and offers **earlier turns** above them, twenty at a press, read backwards from
+   the file by byte offset, so the transcript of a long run costs what is read and no more; a live
+   session's page is a snapshot at the moment it was opened, refreshed by the browser's reload and
+   by nothing else — the terminal is the live view, the transcript is the record. **Everything on
+   it is text** (TD-071): the only controls are the folds, *earlier turns* and VS Code; nothing a
+   session wrote becomes a button. Reached from the Focus header on **any state** (§4.5a *Focus
+   header* **Transcript**) — a live worker gone quiet is read here rather than resumed or sent to
+   (TD-091's moment) — and from each Resumable row (screen 4, phase 4). Absent where there is
+   nothing to read: a record without a tool session id (a `shell`, a command run, a session whose
+   hook never reported one) offers no Transcript, and `ao transcript` says which. **The adapter
+   renders, the core draws**: `read_transcript` (§4.3) turns the tool's file into a neutral list
+   of entries — a prompt, text, a thought, a tool call with its result, a compaction, a sidechain
+   group — and no field name of the tool's leaves the adapter, as no usage field does (TD-073);
+   the page, `ao transcript` and the `transcript` RPC read only that shape, so a second adapter's
+   transcript draws on the same page. **Where it is read**: the `transcript` RPC is served on the
+   record's host, since the file is there; for a node's record the home asks the node through
+   `read` as it asks for `tail` (§4.4a *Reads of a pane, and of a transcript*: `NODE_READS` is
+   `tail`, `explain`, `transcript`), refused as unreachable while the link is down, and the file
+   is never copied to the home. **Which record**: the transcript is located from the record's own
+   `adapter_id`, `dir`, `adapter` and `profile`, so an `exited` record reads the run it held and a
+   `closed` one left behind by a resume (`superseded_by`, TD-081) still reads its own; the
+   successor's page reads what the successor's tool session wrote, which for Claude Code carries
+   the conversation on. Forgetting a record takes its pointer with it; the file stays, for the
+   Resumable list's index. The CLI's form is `ao transcript` (§4.7).
+
 Security: the UI can type into a shell as you, so it is root-equivalent. **Never a bare public
 port.** The UI is reached over a private network or through an authenticated tunnel, and holds
 no credential beyond the host ssh keys. The concrete options, any of which satisfies the rule
@@ -2073,13 +2125,15 @@ noted). If a control is not in this table it does not exist.
 | card | **team** badge | the `team` the session was started under (§4.9), a badge like `role`; click filters the grid to that team. Not drawn inside that team's own group (TD-095); drawn in *No team*, and in a filtered or flat grid |
 | card (closed, or exited with `pane: false`) | **Details** | the Focus page without a terminal (the pane is gone); the banner offers Resume / New session here / Forget |
 | New session | **Start session / Cancel** | agent creates the session / discards the form |
-| Resumable | **Resume** | for a conversation an exited record of ours holds: the banner's one-press **Resume** (*Focus (exited / closed)*, above) with **Resume with changes…** beside it; for a transcript no record holds there is no name or role to take back, so it is the form — New session prefilled (host, repo, directory, worktree, Start = Resume) |
+| Resumable | **Resume** | for a conversation an exited record of ours holds: the banner's one-press **Resume** (*Focus (exited / closed)*, above) with **Resume with changes…** beside it; for a transcript no record holds there is no name or role to take back, so it is the form — New session prefilled (host, repo, directory, worktree, Start = Resume). **Transcript** beside it on every row (§4.5 screen 9, TD-154): the page for the conversation the row names — by its record where one holds it, and by the tool session id and directory the index found where none does, which the `transcript` RPC takes in a record's place |
 | Resumable | **Switch to** | the running card in the Org |
 | Resumable | **Adopt…** | attach to a hand-started tmux session and name it |
 | Commands | **Run / Stop** | start a `kind: command` session / kill it |
 | Commands | **log**, **Focus** | the run log; the run's terminal |
 | Commands | **edit yml** | opens `.agentorc.yml` in the person's editor — the same `open_in:` as the card's button, and not drawn under `none` (TD-095). Not built: as built it opens in VS Code regardless |
 | Focus header | **VS Code** — the **editor** button | the same button as the card's, from the person's `open_in:` (§5 *The person's own*, TD-095) — `none` removes it here too |
+| Focus header | **Transcript** | opens the Transcript page (§4.5 screen 9, TD-154) for this record in a new tab, on any state: a read of the file the tool wrote, through the `transcript` RPC on the record's host, gated by nobody (§9 invariant 11). Absent on a record with no tool session id (a `shell`, a command run, a hook that never reported one) — nothing to read, so no button. Designed 2026-09-25, not built — TD-166 |
+| Transcript | **earlier turns** · fold toggles · **VS Code** | the page's only controls (TD-071: nothing a session wrote becomes one). *earlier turns* asks the RPC for the twenty turns before the first shown, by byte offset, and prepends them; a fold opens a tool result, a thought or a sidechain group, and is remembered nowhere; **VS Code** is the editor button's template (§5 *The person's own*) with the transcript file's path in place of the directory, on the record's host — the raw file's reader, absent when `open_in:` is `none`. Not built — TD-166 |
 | Org top bar | **filter…** text box | matches name, repo, directory, branch; client-side |
 | Resumable | **search transcripts…**, Recent / Closed / With board items, date range | filters over the transcript index — *phase 4 polish; phases 1–3 ship the plain list* |
 | Commands | host / repo filters | client-side filters — *phase 4* |
@@ -2230,6 +2284,17 @@ points at them; there is no copy under `docs/`, which would drift.
 
 **Explain.** `ao explain <id>` prints a session's screen, the rule that fires on it and whether
 it applies; `ao explain --file` classifies a saved screen (TD-015).
+
+**Transcript.** `ao transcript <id> [-n N] [--before OFFSET] [--raw]` prints what a session said
+and did, without resuming it (§4.5 screen 9, TD-154): the last N turns (20) as the pane draws
+them — `>` the prompt, the assistant's text, `⏺ Tool(first line)` per call with its result folded
+to its first line, *thought · n lines*, *n subagent turns* — through the `transcript` RPC on the
+record's host, a read gated by nobody. `--json` prints the adapter's neutral entries and the
+offset `--before` takes for the turns before them; `--raw` prints the file's own lines instead,
+the last N of them, for a reader that wants the tool's shape. A record with no tool session id is
+refused with what it is (*a shell has no transcript*). A read-only verb, listed beside `tail` and
+`explain` in `ao --skill`: what a manager reads before deciding a quiet member has stalled
+(TD-091's moment), and what a person reads instead of Resume.
 
 **Reporting (§4.8, §4.9a).** Each is a small RPC on the calling session's own record — `--id`
 for another's, since the channels are ungated:
