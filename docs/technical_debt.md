@@ -1460,7 +1460,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Slice 1 built 2026-09-25 (PR #NNN, grinder-ao-1: the `thread` read, `ao inbox --thread`); slice 2, the page, remains (grinder-ao-2 is on it). Design: §4.5 screen 6 *The message page*, §4.5a *Inbox message page*, the **keys** row (`Enter`, `Esc`, `j` / `k` on the page), mockup `InboxMessage.dc.html`.
+**Status:** Slice 1 built 2026-09-25 (PR #576, grinder-ao-1: the `thread` read, `ao inbox --thread`); slice 2, the page, remains (grinder-ao-2 is on it). Design: §4.5 screen 6 *The message page*, §4.5a *Inbox message page*, the **keys** row (`Enter`, `Esc`, `j` / `k` on the page), mockup `InboxMessage.dc.html`.
 
 **Location:** `src/sessionorc/agent.py` (a new person-only read, `thread {id}`: every entry whose `root` is the named entry's root, gathered across the person inbox and every record's `inbox` and `outbox`, one per id, oldest first, marking nothing — `src/sessionorc/**`, so the techlead reads that slice, §4.9b), `src/agentorc/cli.py` (`ao inbox --thread <id>`, the same read printed), `src/agentorc/ui/app.py` (the `/inbox/<id>` route: the entry from the `inbox` read by id, the thread from `thread`, the *gone* and refusal cases), a new template `inbox_entry.html` reusing `inbox_row.html`'s macros for the head, the thread rows and the controls, `inbox_row.html` (a mail row's text becomes the link to its page; `data-page` for the key), `src/agentorc/ui/static/app.js` (`Enter` on a mail row; `Esc` on the page; `j` / `k` across the list's order; the return to the ringed row), `tests/`.
 
