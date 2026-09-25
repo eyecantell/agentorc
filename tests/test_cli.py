@@ -879,7 +879,12 @@ def test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction():
     """TD-134 (design §4.10 *A conflict, worked*): the kind and its citations are named, the worker
     never picks one, and the unanswered case goes to the person — never a stalled worker."""
     text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
-    assert "--kind conflict --cites <send> <send>" in text
+    line = next(ln for ln in text.splitlines() if "--kind conflict" in ln)
+    example = re.search(r"`(ao msg [^`]*)`", line).group(1)
+    # the example parses as written: a worker that types it raises the conflict, not a usage error
+    argv = example.split()[1:]
+    args = cli.build_parser().parse_args([a.replace("<", "").replace(">", "") for a in argv])
+    assert args.kind == "conflict" and len(cli._refs(args.cites)) == 2
     assert "never pick one" in text and "the first reply is the ruling" in text
     assert "ask the person yourself" in text
 
