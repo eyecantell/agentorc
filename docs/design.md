@@ -2183,7 +2183,7 @@ whose consequence is least visible:
 - **Forget all** (team card) — The Forget of every exited or closed card of this team, in one
   press. Press it when the team's run is over and everything it pushed has landed. It never forgets
   a card carrying work that exists only on this machine — those it names, and you forget them one
-  at a time with the flag in view — nor a seat on call, nor a suspended record.
+  at a time with the flag in view — nor a seat on call.
 - **Kill** (Focus header, *more ▾*) — Ends this session's process now and destroys its pane; the
   record stays, reading exited, and the worktree stays. Press it when a session is stuck or running
   away and a Wrap up would not be read. It is not Close, which also reaps the worktree, and not
