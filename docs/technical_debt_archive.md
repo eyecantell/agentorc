@@ -1366,3 +1366,22 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Done when** a session that has sent a `steer` or an `ask` and has nothing else to do ends its turn, the record reads `idle`, and the reply rings it; the designer's next run shows no `ao wait`/`ao inbox` loop in its transcript; and a grinder asked in review why it is idle can point at the skill sentence.
 
 **Related:** TD-052 (step 7, the doorbell; step 3, `wait` in the host agent), §4.10 (*How a Claude Code session is told it has mail*, the wake budget), TD-120 (the designer role and its brief), TD-072 / TD-141 (mail before wind-down: the other place a session is told what mail does to its turn).
+
+## TD-136: Build the Inbox message page — `/inbox/<id>`, the thread, the row's controls at the foot
+
+**Priority:** Medium
+**Added:** 2026-09-24 (TD-129's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25 — slice 1 (PR #576, grinder-ao-1: the `thread` read, `ao inbox --thread`), slice 2 (PR #579, grinder-ao-2: the page). Design: §4.5 screen 6 *The message page*, §4.5a *Inbox message page*, the **keys** row (`Enter`, `Esc`, `j` / `k` on the page), mockup `InboxMessage.dc.html`.
+
+**Location:** `src/sessionorc/agent.py` (a new person-only read, `thread {id}`: every entry whose `root` is the named entry's root, gathered across the person inbox and every record's `inbox` and `outbox`, one per id, oldest first, marking nothing — `src/sessionorc/**`, so the techlead reads that slice, §4.9b), `src/agentorc/cli.py` (`ao inbox --thread <id>`, the same read printed), `src/agentorc/ui/app.py` (the `/inbox/<id>` route: the entry from the `inbox` read by id, the thread from `thread`, the *gone* and refusal cases), a new template `inbox_entry.html` reusing `inbox_row.html`'s macros for the head, the thread rows and the controls, `inbox_row.html` (a mail row's text becomes the link to its page; `data-page` for the key), `src/agentorc/ui/static/app.js` (`Enter` on a mail row; `Esc` on the page; `j` / `k` across the list's order; the return to the ringed row), `tests/`.
+
+**Why:** a long entry — a techlead's reading, a passed-up question with its history — is read in a scrolled box a few lines high, and the thread it belongs to is shown nowhere.
+
+**Resolved:** 2026-09-25 (PR #576, `grinder-ao-1`; PR #579, `grinder-ao-2`) — `rpc_thread` and `ao inbox --thread`; the `/inbox/<id>` route and `inbox_entry.html`, the row's *whole entry ›* link and `data-page`, the keys (`Enter` the page, `o` Open, `Esc` / `j` / `k` / `r` / `s` / `x` on the page), the refresh after an answer. Left for later, each named in design-history §4.5a: a trail row's *re* as a link, and *pruned <t> ago* on a gone entry. Design §4.5 screen 6 *The message page* carries the lasting content.
+
+**Done when** (1) a 2,000-character `ask` with two replies (one the person's) and an outcome reads whole on its page, the answer controls directly under it, the thread under those, oldest first with the person's reply in it, and **Reply** sends the mail the row's Reply sends and returns to the list at that row, ringed; `ao inbox --thread` prints the same entries and a session calling `thread` is refused; (2) `Enter` on a ringed mail row opens its page, `Esc` returns to the list with the filters as they were, and `j` on the page opens the next entry of the filtered list; (3) the page of a pruned id and of another host's id read their words, never a blank or a 500; (4) a permission row and a board row are unchanged; (5) `pdm run test` covers the `thread` read (root across mailboxes, one per id, the person's reply included, `pruned`) and the two failure texts; (6) TD-129 (1) is marked built.
+
+**Related:** TD-129, TD-135 (the filtered list this returns to), TD-127 (the entry's shape, applied here when it lands), TD-124 (keys), TD-079 (outcomes, the thread), TD-125 (retention: the *gone* case).
