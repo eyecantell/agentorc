@@ -25,8 +25,8 @@
     <div class="row gap">
       <span class="note">One line at the top of the board's <i>Needs the user</i>, committed in that checkout and never pushed; then this entry is dismissed.</span>
       <span class="grow"></span>
-      <button class="btn ghost" value="cancel">Cancel</button>
-      {%- if board_choices %}<button class="btn primary" type="button" id="bago">Put it on</button>{% endif %}
+      <button class="btn ghost" type="button" id="bacancel">Cancel</button>
+      {%- if board_choices %}<button class="btn primary" type="submit" id="bago">Put it on</button>{% endif %}
     </div>
   </form>
 </dialog>

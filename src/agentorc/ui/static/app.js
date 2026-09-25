@@ -220,7 +220,13 @@
     dlg.querySelectorAll("[data-bawhen]").forEach((w) => { w.onclick = () => { due.value = boardDue(w.dataset.bawhen); }; });
     return new Promise((resolve) => {
       let done = null;
-      if (go) go.onclick = async () => {
+      // Put it on is the form's one submit, so Enter in the text or the date confirms; Cancel and
+      // Esc close with nothing sent
+      const cancel = $("#bacancel");
+      if (cancel) cancel.onclick = () => dlg.close("cancel");
+      dlg.querySelector("form").onsubmit = async (ev) => {
+        ev.preventDefault();
+        if (!go || go.disabled) return;
         const body = { action: "add", msg: b.dataset.msg, board: sel.value, text: text.value.trim(), due: due.value };
         const miss = !body.board ? "pick a board" : !body.text ? "say what is needed" : !body.due ? "give it a Due date" : "";
         if (miss) { err.textContent = miss; err.hidden = false; return; }
