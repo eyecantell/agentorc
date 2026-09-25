@@ -467,6 +467,8 @@ class HostAgent:
         # When a hook event last reached a record **live**, in epoch seconds (TD-169): a queued
         # event stamped before it is older than the state it would set, so its state is skipped.
         self._live_hook_at: dict[str, float] = {}
+        # entries whose *Put on the board* is under way (TD-140): one press per entry at a time
+        self._board_adding: set[str] = set()
         # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
         # The last good reading per profile, kept across a restart (TD-087) — with, beside the
         # windows, why the *last poll* failed, which the page draws as a stale chip rather than
@@ -3987,13 +3989,26 @@ class HostAgent:
         return {"id": PERSON, "row": key, "snoozed_until": self.attention_snoozed.get(key)}
 
     async def rpc_board_edit(
-        self, board: str, line: int, text: str, action: str, due: str | None = None, caller: Any = None
+        self,
+        board: str,
+        line: int | None = None,
+        text: str = "",
+        action: str = "",
+        due: str | None = None,
+        entry: str | None = None,
+        caller: Any = None,
     ) -> dict[str, Any]:
         """**Snooze** or **Done** on a board item (design §4.4 *Board write-back*, TD-069 step 3):
         the one line edited in the repo's main checkout and committed there with the fixed message,
         never pushed. `board` must be the board of a checkout this host's repos registry names;
         `line` and `text` are what dev-cadence's reader gave the Inbox, and the edit is refused
-        unless the line still holds that text. A person's only, as every act on the Inbox is."""
+        unless the line still holds that text. A person's only, as every act on the Inbox is.
+
+        `action: add` is **Put on the board** (§4.5a, TD-140): `entry` an FYI row of the person's
+        Inbox — a `note`, a closed question, a trail row, never an open `ask` or `steer` — and
+        `text` and `due` the form's; one new line at the top of the board's open items naming the
+        entry's sender and its `about`, committed, and only then the entry dismissed as Dismiss
+        does, so a refused or failed commit leaves the row where it was."""
         if not mail.is_person(caller):
             raise RpcError(f"{caller} cannot edit the board: Snooze and Done are the person's own (design §4.4)")
         want = Path(board).resolve()
@@ -4001,12 +4016,70 @@ class HostAgent:
         root = next((r for r in roots if (r / board_mod.BOARD).resolve() == want), None)
         if root is None:
             raise RpcError(f"{board} is not the board of a repo this host knows (its repos registry)")
+        if action == "add":
+            return await self._board_add(root, want, text, due, entry, caller)
+        if line is None:
+            raise RpcError(f"a board {action or 'edit'} names the item's line (design §4.4)")
         try:
             done = await asyncio.to_thread(board_mod.write_back, root, line, text, action, due)
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
         return {"board": str(want), "line": line, "action": action, "due": due, **done}
+
+    async def _board_add(
+        self, root: Path, board: Path, text: str, due: str | None, entry: str | None, caller: Any
+    ) -> dict[str, Any]:
+        """`board_edit` with `action: add` (above): the entry checked, the line written and
+        committed, then the entry dismissed. The sender named on the line is the entry's session
+        by name and host, `n/a` for the person or a `system` note."""
+        if not entry:
+            raise RpcError("Put on the board names the Inbox entry it comes from (design §4.5a)")
+        # One press per entry at a time: a retried request must not write the line twice. Taken
+        # before the first await, so the check and the mark are one step on the loop.
+        if entry in self._board_adding:
+            raise RpcError(f"{entry} is already being put on the board")
+        self._board_adding.add(entry)
+        try:
+            return await self._board_add_one(root, board, text, due, entry, caller)
+        finally:
+            self._board_adding.discard(entry)
+
+    async def _board_add_one(
+        self, root: Path, board: Path, text: str, due: str | None, entry: str, caller: Any
+    ) -> dict[str, Any]:
+        mail_entry = next((e for e in self.person_inbox if e.id == entry), None)
+        trail_row = next((t for t in self.trail if t.get("id") == entry), None)
+        if mail_entry is None and trail_row is None:
+            raise RpcError(f"the person inbox holds no entry {entry}")
+        if mail_entry is not None and mail_entry.open:
+            raise RpcError(
+                f"{entry} is an open {mail_entry.kind}: a question waiting on you is answered, declined or "
+                "snoozed — Put on the board is for FYI rows (design §4.5a)"
+            )
+        sid = mail_entry.from_ if mail_entry is not None else str(trail_row.get("sid") or "")
+        rec = self._graph().get(sid) if sid else None
+        name = rec.name if rec else (str(trail_row.get("name") or "") if trail_row else "") or None
+        if mail_entry is not None and mail_entry.from_ in (PERSON, mail.SYSTEM):
+            name = None
+        host = (rec.host if rec else "") or self.host
+        context = mail_entry.about if mail_entry is not None else None
+        try:
+            done = await asyncio.to_thread(
+                board_mod.add, root, text, str(due or ""), entry=entry, session=name, host=host, context=context
+            )
+        except board_mod.Refused as e:
+            raise RpcError(str(e)) from None
+        log.info("board %s: %s", root, done["message"])
+        out: dict[str, Any] = {"board": str(board), "action": "add", "due": due, **done}
+        try:
+            out["dismissed"] = (await self.rpc_inbox_dismiss(msg=[entry], caller=caller))["dismissed"]
+        except RpcError as e:
+            # The line is committed, so the press succeeded; the row staying is said, not raised, so
+            # a second press is not taken for a first (review of PR #578).
+            out["dismissed"], out["dismiss_refused"] = [], str(e)
+        await self._push_changes()
+        return out
 
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
         """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer
