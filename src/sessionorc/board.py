@@ -1,5 +1,6 @@
 """Board write-back (design §4.4, TD-069 step 3): **Snooze** and **Done** on one item of a repo's
-`docs/user_attention.md`, made by the host agent and committed in that repo's main checkout.
+`docs/user_attention.md`, made by the host agent and committed in that repo's main checkout — and
+its one **add**, *Put on the board* (TD-140), the only line this system ever adds to a board.
 
 A board is dev-cadence's file and its items are read by dev-cadence's reader
 (`nudge_user_attention.py --report --json`), which gives each item's line number and text; this
@@ -21,6 +22,9 @@ from pathlib import Path
 
 BOARD = Path("docs") / "user_attention.md"
 ACTIONS = ("snooze", "done")
+# Any item, open or done: the add goes above the first of them, the top of the open items (§4.4).
+ANY_ITEM_RE = re.compile(r"^\s*-\s*\[[ xX]\]\s")
+NEEDS_RE = re.compile(r"^##\s+Needs the user\b")
 # dev-cadence's own shapes (`nudge_user_attention.py`'s ITEM_RE and DUE_RE): an open item, and its date.
 ITEM_RE = re.compile(r"^(?P<lead>\s*-\s*)\[ \](?P<gap>\s+)(?P<text>.+)$")
 DUE_RE = re.compile(r"\b(?P<key>Due:\s*)(?P<due>\d{4}-\d{2}-\d{2})\b", re.IGNORECASE)
@@ -148,3 +152,73 @@ def _write_back(root: Path, line: int, text: str, action: str, due: str | None) 
         why = (cp.stderr or cp.stdout).strip().splitlines()
         raise Refused(f"the commit failed, and the board is as it was: {why[-1] if why else cp.returncode}")
     return {"commit": _git(root, "rev-parse", "--short", "HEAD").stdout.strip(), "message": msg}
+
+
+def item_line(text: str, due: str, today: str, session: str | None, host: str | None, context: str | None) -> str:
+    """The one line *Put on the board* writes (design §4.5a), in the board's own `Format:` —
+    `- [ ] <today> (session `<name>` on <host>, or n/a) — <text>. Context: <about>. Due: <date>.`
+    Refused for text that is empty or more than one line: an item is one line."""
+    words = " ".join(str(text or "").split()).rstrip(".")
+    if not words:
+        raise Refused("a board line needs its text: what is needed, in your words")
+    if "\n" in str(text).strip():
+        raise Refused("a board line is one line: put the rest in the text on one line")
+    try:
+        date.fromisoformat(str(due))
+    except ValueError:
+        raise Refused(f"a board line needs a Due date as YYYY-MM-DD, not {due!r}") from None
+    who = f"session `{session}` on {host}" if session else "n/a"
+    ctx = " ".join(str(context or "").split()) or "none"
+    return f"- [ ] {today} ({who}) — {words}. Context: {ctx}. Due: {due}.\n"
+
+
+def add(
+    root: str | Path,
+    text: str,
+    due: str,
+    *,
+    entry: str,
+    session: str | None = None,
+    host: str | None = None,
+    context: str | None = None,
+    today: str | None = None,
+) -> dict[str, str | int]:
+    """**Put on the board** (design §4.4, the write-back's one add; TD-140): one new line at the top
+    of the open items of the checkout `root`'s board, committed there as `agentorc: board <item
+    head> (from <entry id>)`, never pushed. Refused on the same conditions as an edit, touching
+    nothing. Returns `{commit, message, line}` — `line` the new item's line number."""
+    root = Path(root)
+    line = item_line(text, due, today or date.today().isoformat(), session, host, context)
+    with _EDIT:
+        ready(root)
+        path = root / BOARD
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+        except OSError as e:
+            raise Refused(f"cannot read {path}: {e}") from None
+        at = next((i for i, ln in enumerate(lines) if ANY_ITEM_RE.match(ln)), None)
+        if at is None:  # no item yet: under the *Needs the user* heading and its blank, else at the end
+            head = next((i for i, ln in enumerate(lines) if NEEDS_RE.match(ln)), None)
+            at = len(lines) if head is None else head + 1
+            if head is not None:
+                while at < len(lines) and not lines[at].strip():
+                    at += 1
+            if lines and not lines[-1].endswith("\n") and at == len(lines):
+                lines[-1] += "\n"
+        was = "".join(lines)
+        lines.insert(at, line)
+        head = " ".join(str(text).split()).rstrip(".")
+        if len(head) > HEAD_MAX:
+            head = head[: HEAD_MAX - 1].rstrip() + "…"
+        msg = f"agentorc: board {head} (from {entry})"
+        path.write_text("".join(lines), encoding="utf-8")
+        try:
+            cp = _git(root, "commit", "--quiet", "-m", msg, "--only", "--", str(BOARD))
+        except Refused as e:
+            path.write_text(was, encoding="utf-8")
+            raise Refused(f"the commit failed, and the board is as it was: {e}") from None
+        if cp.returncode != 0:
+            path.write_text(was, encoding="utf-8")
+            why = (cp.stderr or cp.stdout).strip().splitlines()
+            raise Refused(f"the commit failed, and the board is as it was: {why[-1] if why else cp.returncode}")
+        return {"commit": _git(root, "rev-parse", "--short", "HEAD").stdout.strip(), "message": msg, "line": at + 1}

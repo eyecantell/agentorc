@@ -137,3 +137,80 @@ async def test_board_edit_is_the_persons_and_only_on_a_known_board(agent, repo, 
         got = await me.call("board_edit", board=path, line=7, text=ITEM, action="snooze", due="2026-10-01")
     assert got["action"] == "snooze" and got["message"].startswith("agentorc: snooze Merged")
     assert git(repo, "log", "-1", "--format=%s") == got["message"]
+
+
+def test_put_on_the_board_writes_one_line_at_the_top_of_the_items_and_commits_it(repo):
+    """TD-140 (design §4.4, §4.5a): the one add — a line in the board's own format above the first
+    item, committed with the message naming the entry, nothing else in the file touched."""
+    got = board.add(
+        repo, "Check the fetcher Friday.", "2026-10-02", entry="m-abc", session="grinder-ao-2", host="kmaster",
+        context="TD-900", today="2026-09-25",
+    )  # fmt: skip
+    line = (
+        "- [ ] 2026-09-25 (session `grinder-ao-2` on kmaster) — Check the fetcher Friday. Context: TD-900. "
+        "Due: 2026-10-02.\n"
+    )
+    text = (repo / board.BOARD).read_text()
+    assert text == BOARD_TEXT.replace(f"- [ ] {ITEM}", line.rstrip("\n") + f"\n- [ ] {ITEM}")
+    assert got["line"] == 7 and got["message"] == "agentorc: board Check the fetcher Friday (from m-abc)"
+    assert git(repo, "log", "-1", "--format=%s") == got["message"] and git(repo, "status", "--porcelain") == ""
+    # no sender, no about: `n/a` and `none`
+    assert board.item_line("x", "2026-10-02", "2026-09-25", None, None, None) == (
+        "- [ ] 2026-09-25 (n/a) — x. Context: none. Due: 2026-10-02.\n"
+    )
+    for bad in (("", "2026-10-02"), ("two\nlines", "2026-10-02"), ("x", "Friday")):
+        with pytest.raises(board.Refused):
+            board.add(repo, *bad, entry="m-abc")
+    assert git(repo, "status", "--porcelain") == ""
+
+
+def test_the_add_on_a_board_with_no_items_goes_under_its_heading(repo):
+    (repo / board.BOARD).write_text("# User attention\n\n## Needs the user\n\n## Later\n")
+    git(repo, "commit", "-qam", "empty")
+    board.add(repo, "First", "2026-10-02", entry="m-1", today="2026-09-25")
+    assert (repo / board.BOARD).read_text().splitlines()[4] == (
+        "- [ ] 2026-09-25 (n/a) — First. Context: none. Due: 2026-10-02."
+    )
+
+
+def test_the_add_is_refused_touching_nothing_where_an_edit_is(repo):
+    git(repo, "checkout", "-q", "-b", "feature")
+    with pytest.raises(board.Refused, match="not main"):
+        board.add(repo, "x", "2026-10-02", entry="m-1")
+    assert (repo / board.BOARD).read_text() == BOARD_TEXT
+
+
+async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(agent, repo, tmp_path):
+    """TD-140: `board_edit` with `action: add` takes an FYI row — a `note` here — writes the line
+    naming its sender and `about`, commits, then dismisses the row; an open question is refused, as
+    is an entry the person inbox does not hold, a session, and a refused commit, which leaves the
+    row where it was."""
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    path = str(repo / board.BOARD)
+    async with LocalClient() as me:
+        w = (await me.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        async with LocalClient(caller=w) as worker:
+            note = (await worker.call("msg", to="person", text="check this Friday", about="TD-900"))["entry"]
+            asked = (await worker.call("msg", to="person", text="which?", kind="ask"))["entry"]
+            with pytest.raises(AgentError, match="the person's own"):
+                await worker.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry=note["id"])
+        with pytest.raises(AgentError, match="open ask"):
+            await me.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry=asked["id"])
+        with pytest.raises(AgentError, match="holds no entry m-nope"):
+            await me.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry="m-nope")
+        (repo / board.BOARD).write_text(BOARD_TEXT + "dirty\n")  # a refused commit: the row stays
+        with pytest.raises(AgentError, match="uncommitted changes"):
+            await me.call("board_edit", board=path, action="add", text="x", due="2026-10-02", entry=note["id"])
+        assert note["id"] in [e["id"] for e in (await me.call("inbox"))["entries"]]
+        (repo / board.BOARD).write_text(BOARD_TEXT)
+        got = await me.call(
+            "board_edit", board=path, action="add", text="Check the fetcher", due="2026-10-02", entry=note["id"]
+        )
+        assert got["dismissed"] == [note["id"]] and got["message"].endswith(f"(from {note['id']})")
+        line = (repo / board.BOARD).read_text().splitlines()[got["line"] - 1]
+        assert line.startswith("- [ ] ") and "(session `w` on " in line and "Context: TD-900. Due: 2026-10-02." in line
+        assert note["id"] not in [e["id"] for e in (await me.call("inbox"))["entries"]]
+        await me.call("kill", id=w)
