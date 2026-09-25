@@ -37,7 +37,7 @@ from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
-from sessionorc.models import GRANTS, STATE_RANK, has_control, report_head, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, has_control, normalize_ref, report_head, report_line, stop_note
 
 from . import render as rendermod
 from . import uiconf
@@ -1601,7 +1601,11 @@ def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
 
 
 def _same_ref(a: Any, b: Any) -> bool:
-    return str(a or "").strip().upper() == str(b or "").strip().upper()
+    """One reference, as the host agent stores it (`normalize_ref`: `td-27` is `TD-027`)."""
+    try:
+        return normalize_ref(str(a or "")) == normalize_ref(str(b or ""))
+    except ValueError:  # an empty reference names nothing
+        return False
 
 
 def review_pr(progress: Collection[dict[str, Any]], ref: str) -> int | None:

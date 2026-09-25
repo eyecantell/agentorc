@@ -14,6 +14,7 @@ def test_review_pr_is_the_panels_rule():
     claimed = {"ref": "TD-127", "status": "claimed", "source": "declared"}
     assert review_pr([claimed], "TD-127") is None
     assert review_pr([{**claimed, "pr": 532}], "td-127") == 532
+    assert review_pr([{**claimed, "ref": "TD-027", "pr": 9}], "td-27") == 9  # the agent's own normal form
     assert review_pr([{**claimed, "review_pr": 533}], "TD-127") == 533  # its branch's (slice 3)
     assert review_pr([{**claimed, "source": "derived", "pr": 534}], "TD-127") is None  # nothing declared
     assert review_pr([{**claimed, "status": "done", "pr": 532}], "TD-127") is None
