@@ -1295,3 +1295,38 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Done when** at 390 px wide the Inbox shows the chip row, a team chip filters as the rail's line does, the sheet opens and its toggles work, the URL is the desktop's for the same picks, and a mail row's text opens its page; back at 1100 px the rail is drawn with the picks kept.
 
 **Related:** TD-129, TD-135 (the toggles this re-renders), TD-136 (the page), §4.5 *Phone layout*.
+
+## TD-134: A test drives two controllers to contradict one worker, and the grinder preset says what a worker does with a contradiction
+
+**Priority:** Low
+**Added:** 2026-09-24 (the designer; TD-039's design round, PR #527)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25. Was: Open — designed, nothing built. Design: §4.10 *A conflict, worked* and *A bounded exchange, counted by thread* (the escalation is an `ask` to the person, not a board line).
+
+**Location:** `tests/test_mail.py` (beside `test_sends_are_recorded_with_who_typed_and_a_conflict_cites_them` and `test_a_conflicts_answers_reach_every_controllers_copy`), `src/agentorc/briefs/grinder.md` (one line under the mail rules), nothing in `src/agentorc/cli.py`: the escalation names the conflict's id in the text of a plain `ask` to the person, and the asker writes the ruling as a `reply` on the conflict's thread (`--thread` takes only the caller's own question to the person and is not the road).
+
+**Why:** TD-039's *done when* — a test that drives two controllers to contradict one worker and ends in a recorded resolution or a question to the person, never a stalled worker — has no test, and the grinder preset does not say what a worker does when two `send`s contradict each other. The mechanics exist (the `conflict` kind, `sends`, the first reply closing every copy, `bound_hit`); the path through them is untested end to end.
+
+**Resolved:** 2026-09-25 (PR #569, `grinder-ao-1`) — `tests/test_mail.py`'s `test_two_controllers_contradict_a_worker_and_the_first_reply_is_the_ruling` and `test_a_conflict_nobody_answers_goes_to_the_person_and_is_never_a_stalled_worker`; the grinder preset's *Two controllers telling you opposite things* rule, held by `test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction`. Step (2) as written — the worker writes the person's ruling *as a `reply` on the conflict's thread* — is not possible (a worker holds no copy of its own conflict); §4.10 *A conflict, worked* now says one `note` to both controllers, and *ends its turn in `ao wait`* became *ends its turn, to be rung by the reply* (TD-153).
+
+**Done when** the two tests pass on the suite, the grinder preset carries the line and its test, and TD-039 is archived with a pointer at §4.10 *A conflict, worked*.
+
+**Related:** TD-039 (the design), TD-052 (the mail this rides on), TD-032 (the stalled worker this must not reproduce), TD-125 (the brief-test pattern).
+
+## TD-039: Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation
+
+**Priority:** Medium
+**Added:** 2026-09-13
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25. Was: Open — **the conflict-specific half designed 2026-09-24 (the designer, PR #527):** §4.10 *A conflict, worked* — the worker stops on the contested step and waits in `ao wait`, never guessing; the first `reply` from either controller is the ruling and the worker is never the arbiter; a resolved conflict is a thread, not a `finding` (what it reveals is the manager's ledger entry); nobody writes a board line — the escalation on a `bound_hit` or an expired bound is an `ask` to the person carrying the thread, which also changes the bounded-exchange rule's *the refused sender writes the board line itself* (steered to Paul as a default, bound one night). The worker asks the person only when its bound expires with no reply at all. Left to build: the test and the grinder preset's one line — TD-134. Was: design task, raised by Paul 2026-09-13 with the TD-036 go. **Its general half was answered 2026-09-14 by design §4.10** (TD-052): the gap was not a conflict feature but a missing concept — sessions could act on each other and never message each other — so the conflict report is a `conflict` message to both controllers, the exchange is `reply` traffic in one thread, the escalation is §4.10's exchange bound, and "not double-nudging" stops being a matter for briefs, since a controller's message about a session is copied to that session's other controllers. What stays here: the conflict-specific judgement — what a worker does *while* it waits, whether a resolved conflict becomes a `finding`, and who writes the board line. Not to be coded before TD-052 step 6 sets the bounds
+**Location:** design §4.8 (membership, report channels), §10 (the 2026-09-13 question); later `src/sessionorc/agent.py` (`_gate`, a new report kind), `src/agentorc/cli.py`, the orchestrator brief
+
+**Why:** TD-036 deliberately allows several controllers per session with no privileged member, and says keeping them from double-nudging "is a matter for their briefs". That is fine for nudges and useless for contradictions: a ui orc says "ship the chip now", a backend orc says "wait for the RPC", and the worker has no move but to pick one or stall. Paul's rule is the one a team would use — the worker puts it to both leads, they settle it between themselves, and a person hears about it only if they cannot. Nothing in agentorc supports that today. Upward, a worker has `ao progress` and `ao finding`, which declare claims on references and are read by whoever looks at the card, not delivered to a controller. Sideways, an orchestrator may `ao send` to another only because the `orchestrate` grant is not yet narrowed by membership; once TD-036's gate lands, two peers over a shared worker control neither each other nor anything but their own members, so even that accidental path closes. There is no conflict object, no delivery, no bound, and no escalation.
+
+**Resolved:** 2026-09-25 (PR #569, with TD-134) — the design is §4.10 *A conflict, worked* and *A bounded exchange, counted by thread*; the end-to-end tests its *done when* asked for are TD-134's.
+
+**Related:** design §4.8, §9 invariant 11, §10 (2026-09-12 and 2026-09-13 entries); TD-036 (the gate this extends), TD-028 (the report channels this adds a kind to), TD-032 (a stalled worker nobody noticed — the failure this must not reproduce).

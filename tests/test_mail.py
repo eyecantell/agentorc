@@ -1610,6 +1610,99 @@ async def test_a_conflicts_answers_reach_every_controllers_copy(agent, tmp_path)
             await person.call("kill", id=sid)
 
 
+async def _contradicted(person, tmp_path):
+    """Two controllers that each `send` one worker a contradicting instruction (TD-134): the
+    worker, both leads, and the two `sends` ids the worker's `conflict` cites."""
+    mk = _mk(person, tmp_path)
+    lead, lead2, worker = [await mk(n, unattended=True) for n in ("lead", "lead2", "w")]
+    for sid in (lead, lead2):
+        await person.call("set_grants", id=sid, add=["control"])
+    await person.call("set_controllers", id=worker, add=[lead, lead2])
+    await wait_state(person, worker, "idle")
+    async with LocalClient(caller=lead) as ld, LocalClient(caller=lead2) as l2:
+        await ld.call("send", id=worker, text="echo merge TD-900 into main")
+        await l2.call("send", id=worker, text="echo keep TD-900 on its branch")
+    cites = [e["id"] for e in (await person.call("get", id=worker))["sends"]][-2:]
+    return lead, lead2, worker, cites
+
+
+async def test_two_controllers_contradict_a_worker_and_the_first_reply_is_the_ruling(agent, tmp_path):
+    """TD-134, design §4.10 *A conflict, worked*: the worker raises one `conflict` citing both
+    `sends`, never picking one; the first controller's `reply` closes every copy at that moment and
+    lands in the worker's inbox as unread mail — what rings it once it has ended its turn (TD-153);
+    the second controller's reply, arriving after the ruling, counts as a `note` on the same
+    thread, and the worker is never asked twice."""
+    async with LocalClient() as person:
+        lead, lead2, worker, cites = await _contradicted(person, tmp_path)
+        async with LocalClient(caller=worker) as w:
+            got = await w.call(
+                "msg", to=[lead, lead2], text="merge or keep the branch?", kind="conflict", cites=cites, about="TD-900"
+            )
+        cid = got["entry"]["id"]
+        assert got["delivered"] == [lead, lead2]
+        for sid in (lead, lead2):  # one entry, one id, open in both controllers' inboxes
+            assert (await person.call("get", id=sid))["mail"]["open_asks"] == [cid]
+        async with LocalClient(caller=lead2) as l2:
+            ruling = await l2.call("msg", text="keep it on its branch", kind="reply", reply_to=cid)
+        assert ruling["delivered"] == [worker] and ruling["closed"] == cid and ruling["copies"] == [lead]
+        for sid in (lead, lead2):  # closed on every copy, by the one reply
+            copy = [e for e in (await person.call("inbox", id=sid))["entries"] if e["id"] == cid][0]
+            assert copy["closed_by"] == ruling["entry"]["id"]
+        for sid in (lead, lead2):
+            assert (await person.call("get", id=sid))["mail"]["open_asks"] == []
+        assert (await person.call("get", id=worker))["unread"] == 1  # the ruling, waiting to ring it
+        # the other controller disagrees after the ruling: a note on the thread, closing nothing
+        async with LocalClient(caller=lead) as ld:
+            late = await ld.call("msg", text="I still say merge", kind="reply", reply_to=cid)
+        assert late["closed"] is None and late["entry"]["root"] == cid
+        assert (await person.call("get", id=worker))["threads"][cid]["count"] == 2
+        async with LocalClient(caller=worker) as w:
+            read = (await w.call("inbox", unread=True))["entries"]
+        assert [e["text"] for e in read] == ["keep it on its branch", "I still say merge"]
+        assert all(e["root"] == cid for e in read)
+        for sid in (lead, lead2, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_a_conflict_nobody_answers_goes_to_the_person_and_is_never_a_stalled_worker(agent, tmp_path):
+    """TD-134, design §4.10 *A conflict, worked*: with **no** reply by its bound the conflict
+    expires on every copy, and the worker asks the person itself — the conflict's id and the two
+    `sends` named in the text, an `ask` under *Needs you*, never a board line. Once the person
+    answers, the worker owes an outcome and cannot declare itself out of work until it settles
+    it; it tells both controllers the ruling in one `note` (it holds no copy of its own conflict
+    to reply on), and settles the question with the outcome."""
+    async with LocalClient() as person:
+        lead, lead2, worker, cites = await _contradicted(person, tmp_path)
+        async with LocalClient(caller=worker) as w:
+            got = await w.call("msg", to=[lead, lead2], text="merge or keep?", kind="conflict", cites=cites, bound=0.5)
+            cid = got["entry"]["id"]
+            await asyncio.sleep(0.7)
+            await agent._sweep_mail(datetime.now(UTC))
+            assert (await person.call("get", id=worker))["mail"]["expired"] == [cid]
+            for sid in (lead, lead2):
+                copy = [e for e in (await person.call("inbox", id=sid))["entries"] if e["id"] == cid][0]
+                assert copy["expired_at"]
+            text = f"conflict {cid} expired unanswered: {cites[0]} says merge TD-900, {cites[1]} says keep it"
+            asked = (await w.call("msg", to="person", text=text, kind="ask", about=worker))["entry"]
+            held = [e for e in (await person.call("inbox"))["entries"] if e["id"] == asked["id"]][0]
+            assert cid in held["text"] and all(c in held["text"] for c in cites)
+            await person.call("msg", to=worker, text="keep it on its branch", kind="reply", reply_to=asked["id"])
+            with pytest.raises(AgentError, match="owes 1 outcome"):
+                await w.call("progress", id=worker, status="none", why="nothing open")
+            told = await w.call(
+                "msg", to=[lead, lead2], text=f"ruling on {cid}, from the person: keep it on its branch", about="TD-900"
+            )
+            assert told["delivered"] == [lead, lead2]
+            await w.call("msg", to="person", text=f"done: told both leads ({cid})", outcome="done", for_=asked["id"])
+            assert (await person.call("get", id=worker))["mail"]["owed"] == []
+        for sid in (lead, lead2):
+            async with LocalClient(caller=sid) as c:
+                entries = (await c.call("inbox", unread=True))["entries"]
+                assert any("keep it on its branch" in e["text"] for e in entries)
+        for sid in (lead, lead2, worker):
+            await person.call("kill", id=sid)
+
+
 async def test_the_home_checks_that_a_picked_answer_is_one_of_them(agent, tmp_path):
     """Design §4.10: **the home checks it** — `answer` must index the `answers` of the entry
     `reply_to` names and `text` must equal that answer exactly, else the reply is refused (*that is
