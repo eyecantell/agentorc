@@ -18,10 +18,19 @@ The index is generated on demand from the transcripts — never maintained by
 hand — so it is always current and covers crashed/disconnected sessions too.
 
 Usage:
-    list_sessions.py [--repo PATH]... [--limit N] [--days N] [--chars N] [--format text|md]
+    list_sessions.py [--repo PATH]... [--roster] [--mentioning PATH]... [--limit N] [--days N]
+                     [--chars N] [--format text|md]
 
 --repo is repeatable: pass each repo that runs sessions on this machine to get
 one combined, recency-sorted index (e.g. --repo ~/samscrape --repo ~/contractmatch).
+--roster adds every repo on this machine's roster (cadence.md §9).
+
+--mentioning PATH (repeatable, TD-28) keeps only the sessions whose transcript
+names that repo's path (absolute, or ~/-relative) — work on repo A routinely
+happens from a session running in repo B, and its transcript lives under B.
+`--roster --mentioning <this repo>` lists the candidates from every repo on the
+machine. A path in a transcript is a heuristic: it surfaces candidates for a
+person or the sweeping session to judge; it decides nothing.
 
 --format text (default) prints terminal-friendly blocks; --format md renders a
 markdown overview table plus per-session detail sections (what the
@@ -32,7 +41,9 @@ Resume a listed session with:  claude --resume <session-uuid>
 
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -75,6 +86,11 @@ def project_dirs(repo: Path) -> list[Path]:
     return dirs
 
 
+# Board items name the session that parked them — `(session <first-8-of-uuid> on <host>)`,
+# the Format line of docs/user_attention.md. A parity pair with that line (cadence.md §7
+# Parity pairs; tests/test_parity.sh runs the Format line's example through this).
+SESSION_RE = re.compile(r"session (\w{8})")
+
 RECAP_BOILERPLATE = re.compile(
     r"^.{0,40}(This session is being continued from a previous conversation[^:]*:|"
     r"The conversation is summarized below:?)\s*", re.DOTALL)
@@ -108,7 +124,7 @@ def scan_session(path: Path, chars: int) -> dict | None:
     info = {
         "id": path.stem,
         "file": path,
-        "last": datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc),
+        "last": None,
         "start": None,
         "branch": None,
         "slug": None,
@@ -117,6 +133,10 @@ def scan_session(path: Path, chars: int) -> dict | None:
         "summary": "",
         "recap": "",
     }
+    try:
+        info["last"] = datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc)
+    except OSError:
+        return None  # gone between the glob and now (a session exiting): not an error
     last_assistant_line = None
     last_recap_line = None
     head_budget = 200  # head fields live in the first lines; don't full-parse huge slug-less files
@@ -179,13 +199,32 @@ def _try_json(line: str):
 
 
 def active_sessions() -> dict[str, str]:
-    """sessionId -> cwd for currently-running sessions (live registry)."""
+    """sessionId -> cwd for currently-running sessions (live registry).
+
+    Liveness is check_anchor.live_sessions()'s, not a second test of its own: bare
+    /proc/<pid> existence manufactures false liveness under a bind-mounted
+    ~/.claude (a reused low pid), and the index then said "already running" for a
+    dead session nobody resumed (TD-043). The naive test below is only the
+    fallback for an install without check_anchor.py beside this script.
+    """
+    try:
+        here = str(Path(__file__).resolve().parent)
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        from check_anchor import live_sessions
+    except ImportError:
+        live_sessions = None
+    if live_sessions is not None:
+        return {s["sessionId"]: s.get("cwd", "") for s in live_sessions()}
     reg = Path.home() / ".claude" / "sessions"
     live = {}
     if not reg.is_dir():
         return live
     for f in reg.glob("*.json"):
-        obj = _try_json(f.read_text(encoding="utf-8", errors="replace") or "")
+        try:
+            obj = _try_json(f.read_text(encoding="utf-8", errors="replace") or "")
+        except OSError:
+            continue  # the session exited and removed its entry since the glob
         if not obj or "sessionId" not in obj:
             continue
         pid = obj.get("pid")
@@ -201,11 +240,15 @@ def board_items(repo: Path) -> dict[str, list[str]]:
     if not board.is_file():
         return {}
     items: dict[str, list[str]] = {}
-    for line in board.read_text(encoding="utf-8").splitlines():
+    try:
+        board_text = board.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return {}
+    for line in board_text.splitlines():
         if not re.match(r"\s*-\s*\[ \]", line):
             continue  # only unchecked (still-open) board entries
         text = re.sub(r"^\s*-\s*\[ \]\s*", "", " ".join(line.split()))
-        for sid in re.findall(r"session (\w{8})", line):
+        for sid in SESSION_RE.findall(line):
             items.setdefault(sid, []).append(text)
     return items
 
@@ -308,11 +351,91 @@ def print_md(sessions: list[dict], live: dict, parked: dict) -> None:
         print()
 
 
+def default_repo() -> str:
+    """No --repo: the MAIN checkout of the repo the cwd is in (TD-053). "." from a worktree
+    indexed that worktree's dir only, and from a subdirectory found no project dirs at all —
+    and §1 puts nearly every session in a worktree."""
+    try:
+        r = subprocess.run(["git", "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                           capture_output=True, text=True, timeout=5, check=False)
+        if r.returncode == 0 and r.stdout.strip():
+            return str(Path(r.stdout.strip()).parent)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return "."
+
+
+def roster_repos() -> list[Path]:
+    """The machine roster's repos (cadence.md §9 path spec: canonicalized, deduped at
+    read time; a missing roster is an empty list, a gone path is skipped)."""
+    # the machine-scope dir as nudge_user_attention.machine_dir() resolves it (TD-029)
+    reg = (Path(os.environ["DEV_CADENCE_REG_DIR"]) if os.environ.get("DEV_CADENCE_REG_DIR")
+           else Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "dev-cadence") / "repos.txt"
+    try:
+        lines = reg.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    out: list[Path] = []
+    for line in lines:
+        line = line.split("#", 1)[0].strip()   # comments as nudge's read_registry() takes them
+        if not line:
+            continue
+        p = Path(line).resolve()
+        if p.is_dir() and p not in out:
+            out.append(p)
+    return out
+
+
+def mention_needles(spec: str) -> list[bytes]:
+    """The spellings a transcript may use for a repo: the path as given and resolved
+    (a symlinked checkout), each also ~/-relative, and — when the path is inside a git
+    worktree — its main checkout's root, which is how other sessions usually name it."""
+    given = Path(spec).expanduser().absolute()
+    paths = [given, given.resolve()]
+    try:
+        r = subprocess.run(["git", "-C", str(given), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+                           capture_output=True, text=True, timeout=5, check=False)
+        if r.returncode == 0 and r.stdout.strip():
+            paths.append(Path(r.stdout.strip()).parent)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    out: list[bytes] = []
+    for p in paths:
+        for form in (str(p), short_path(p)):
+            b = form.encode()
+            if (form == str(p) or form.startswith("~/")) and b not in out:
+                out.append(b)
+    return out
+
+
+def mentions(path: Path, needles: list[bytes]) -> bool:
+    """Does the transcript name any needle AS A PATH — not as the prefix of a longer name
+    (/a/repo must not match /a/repo2 or /a/repo.old, but "…in /a/repo." is a mention)?
+    Read in chunks; transcripts are large."""
+    pats = [re.compile(re.escape(n) + rb"(?![A-Za-z0-9_\-]|\.[A-Za-z0-9_\-])") for n in needles]
+    keep = max(len(n) for n in needles)
+    tail = b""
+    try:
+        with open(path, "rb") as f:
+            while chunk := f.read(1 << 20):
+                buf = tail + chunk
+                if any(p.search(buf) for p in pats):
+                    return True
+                tail = buf[-keep:]
+    except OSError:
+        return False
+    return False
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--repo", action="append", dest="repos", metavar="PATH",
                     help="Repo path; repeatable — pass each repo running sessions on this machine "
                          "for one combined index (default: cwd)")
+    ap.add_argument("--roster", action="store_true",
+                    help="Also scan every repo on this machine's roster (cadence.md §9)")
+    ap.add_argument("--mentioning", action="append", default=[], metavar="PATH",
+                    help="Keep only sessions whose transcript names this repo's path; repeatable (TD-28)")
     ap.add_argument("--limit", type=int, default=20, help="Max sessions to show (default 20)")
     ap.add_argument("--days", type=int, default=0, help="Only sessions active in the last N days (0 = all)")
     ap.add_argument("--chars", type=int, default=160, help="Blurb length (default 160)")
@@ -320,9 +443,19 @@ def main() -> int:
                     help="Output format: text for terminals (default), md for a markdown index file")
     args = ap.parse_args()
 
-    repos = [Path(r).resolve() for r in (args.repos or ["."])]
+    repos = [Path(r).resolve() for r in (args.repos or ([] if args.roster else [default_repo()]))]
+    if args.roster:
+        repos += [r for r in roster_repos() if r not in repos]
+        if not repos:
+            print("No repos: the machine roster is empty or missing, and no --repo was given.")
+            return 1
+    needles: list[bytes] = []
+    for m in args.mentioning:
+        needles += [n for n in mention_needles(m) if n not in needles]
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=args.days) if args.days else None
 
     sessions = []
+    scanned = 0  # transcript files read, for the TD-050 canary below
     parked: dict[str, list[str]] = {}
     missing = []
     marker = "--claude-worktrees-"
@@ -337,6 +470,16 @@ def main() -> int:
             # name display as dashes — display-only, and the path still names the repo.
             run_dir = repo / ".claude" / "worktrees" / wt_name if wt_name else repo
             for f in d.glob("*.jsonl"):
+                # --days by mtime BEFORE reading anything: across a roster, reading every
+                # transcript in full only to drop most of them is the expensive part
+                try:
+                    if cutoff and datetime.fromtimestamp(f.stat().st_mtime, tz=timezone.utc) < cutoff:
+                        continue
+                except OSError:
+                    continue  # gone since the glob (a session exiting) — TD-053's race, here too
+                if needles and not mentions(f, needles):
+                    continue
+                scanned += 1
                 s = scan_session(f, args.chars)
                 if s:
                     s["where"] = short_path(run_dir)
@@ -351,9 +494,15 @@ def main() -> int:
         print(f"note: no Claude Code project dirs found for {repo} under ~/.claude/projects/ — skipped.",
               file=sys.stderr)
 
+    if scanned and not sessions:
+        # TD-050 canary: transcripts are an undocumented Claude Code format (verified
+        # against 2.1.280); files present and none readable is a format change more often
+        # than an empty history — say so rather than print an empty index
+        print(f"note: {scanned} transcript file(s) found and none had a readable user or assistant "
+              "message — they hold only commands, or Claude Code's transcript format has changed "
+              "(verified against 2.1.280).", file=sys.stderr)
     sessions.sort(key=lambda s: s["last"], reverse=True)
-    if args.days:
-        cutoff = datetime.now(tz=timezone.utc) - timedelta(days=args.days)
+    if cutoff:
         sessions = [s for s in sessions if s["last"] >= cutoff]
     sessions = sessions[: args.limit]
 

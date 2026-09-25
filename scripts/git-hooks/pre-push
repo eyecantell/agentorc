@@ -7,16 +7,41 @@
 # plan, so this client-side hook is the seatbelt on the machine all pushes
 # originate from. Enabled per-clone via:
 #     git config core.hooksPath scripts/git-hooks
-# (config is shared across git worktrees, so one setting covers all concurrent
-# Claude Code sessions). PR merges happen server-side via `gh pr merge` and are
-# unaffected.
+# The SETTING is shared across git worktrees, but a relative path resolves
+# against each worktree's own working tree, so each worktree runs the copy of
+# this hook on ITS branch: a worktree on a branch without scripts/git-hooks/
+# (pre-adoption, or a --detach of an old commit) pushes with no guard at all,
+# and a branch that edits this file runs its edit (TD-055). PR merges happen
+# server-side via `gh pr merge` and are unaffected.
+#
+# Guarded: the repo's default branch (the §9 rule below, TD-042) AND `main` always —
+# a gate errs toward blocking, and a clone whose origin/HEAD is unset must not lose
+# the guard on main because init.defaultBranch says something else.
 #
 # Deliberate override (rare, human-decided):  ALLOW_MAIN_PUSH=1 git push ...
 set -u
 
+# Default branch — cadence.md §9 "Default-branch rule". Parity: this function is copied
+# verbatim into pre-push, reap_worktrees.sh, open_worktree.sh and hydrate_worktree.sh,
+# and default_branch() in the Python scripts follows the same rule; tests/test_default_branch.sh
+# runs every copy against the same fixtures. Prints a branch NAME, never empty.
+default_branch() {
+    local repo="$1" b
+    b="$(git -C "$repo" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)"
+    for b in "${b#origin/}" "$(git -C "$repo" config init.defaultBranch 2>/dev/null)" main master; do
+        if [[ -n "$b" ]] && git -C "$repo" rev-parse --verify -q "refs/remotes/origin/$b" >/dev/null; then
+            echo "$b"; return 0
+        fi
+    done
+    echo main
+}
+
+DEFAULT="$(default_branch .)"
+
 while read -r _local_ref _local_sha remote_ref _remote_sha; do
-    if [ "$remote_ref" = "refs/heads/main" ] && [ "${ALLOW_MAIN_PUSH:-0}" != "1" ]; then
-        echo "pre-push: BLOCKED — direct push to main (docs/cadence.md §4: use a PR)." >&2
+    if { [ "$remote_ref" = "refs/heads/main" ] || [ "$remote_ref" = "refs/heads/$DEFAULT" ]; } \
+        && [ "${ALLOW_MAIN_PUSH:-0}" != "1" ]; then
+        echo "pre-push: BLOCKED — direct push to ${remote_ref#refs/heads/} (the default branch; docs/cadence.md §4: use a PR)." >&2
         echo "pre-push: deliberate override: ALLOW_MAIN_PUSH=1 git push ..." >&2
         exit 1
     fi
