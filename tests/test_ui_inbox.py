@@ -1194,7 +1194,8 @@ def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
     for tpl in (UI / "templates").glob("*.html"):
         for tag in re.findall(r"<details[^>]*>", tpl.read_text(encoding="utf-8")):
             menu = 'class="more"' in tag
-            section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox"))
+            # …or a Focus side card (TD-156): a fold the Focus page remembers, never closed by a press
+            section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox")) or "data-side=" in tag
             assert menu != section, f"{tpl.name}: {tag} is neither a menu the handler folds nor a known section"
 
 

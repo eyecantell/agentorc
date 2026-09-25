@@ -154,7 +154,7 @@
   .warn { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: #fff7ed; border: 1px solid #fdba74; border-radius: 4px; color: #7c2d12; font-size: 12px; }
 </style>
 </helmet>
-<div style="width: 1440px; min-height: 980px; background: #f4f5f7; display: flex; flex-direction: column;">
+<div style="width: 1440px; min-height: 1080px; background: #f4f5f7; display: flex; flex-direction: column;">
 <div class="topbar">
   <span class="wordmark">Shift<b>Lead</b></span>
   <div style="display: flex; gap: 2px;"><span class="tab on">Org</span><span class="tab">Inbox 4 · 2</span></div>
@@ -166,50 +166,52 @@
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
-      <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / orc-1</span>
-      <span class="pill s-idle"><span class="dot"></span>idle</span><span class="badge">stops 06:00</span>
-      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">round 41: reading four members, two claims to re-check · says · 2m ago</span>
+      <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / agentorc / designer-ao-1</span>
+      <span class="pill s-idle"><span class="dot"></span>idle</span><span class="meta" title="the session's name as its tool holds it">TD-154 transcript</span>
+      <span class="badge ready" title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>
+      <span class="badge" title="declared by the session: TD-154 designed and handed to the anchor">out of work · 6m</span>
+      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">wrapped up · says · 6m ago</span>
     </div>
     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-      <span class="btn sm next">Take over</span><span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span>
+      <span class="btn sm next">Close session</span><span class="btn sm link">Take over</span><span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span>
       <span style="flex-grow: 1;"></span>
       <span class="btn sm link">more ▾</span>
       <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · <span style="color: #991b1b;">Kill</span></span>
     </div>
-    <div class="term" style="height: 520px;"><span class="d">● orc-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/orc-1</span>
+    <div class="term" style="height: 420px;"><span class="d">● designer-ao-1 · claude-code · /home/kmaster/agentorc/.claude/worktrees/designer-ao-1</span>
 
-<span class="p">&gt;</span> Tick: check every member, nudge what is stalled, wrap up what is done.
+<span class="p">&gt;</span> Wrap up: finish what you hold, push, report, and say what is left.
 
-<span class="d">⏺</span> Bash(ao status -v --json)
-  <span class="g">4 sessions · tdgrind-1 working · tdgrind-2 stalled? · tdgrind-3 limited</span>
-<span class="d">⏺</span> Bash(ao send --wait tdgrind-2 "no output for 47m — say where you are")
-  <span class="g">idle · answered in 31s</span>
-<span class="d">⏺</span> Bash(scripts/check_cadence.py --pr 811)
-  <span class="g">review ✓ · squash ✓ · CI ✓ · ledger ✓ · worktree ✓ · pushed ✓</span>
-<span class="d">▌</span></div>
-    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
-      <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
-      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.5 5.5L6 10a1.6 1.6 0 002.3 2.3l5-5a3 3 0 00-4.3-4.3L3.7 8.3a4.2 4.2 0 006 6l3.5-3.5"></path></svg>Attach</span><span style="flex-grow: 1;"></span><span class="btn primary"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 8h10M8.5 3.5L13 8l-4.5 4.5"></path></svg>Send</span></div>
-    </div>
+<span class="d">⏺</span> Bash(git push -u origin td154-transcript)
+  <span class="g">branch pushed · PR #556 opened</span>
+<span class="d">⏺</span> Bash(ao progress done TD-154 --pr 556)
+<span class="d">⏺</span> Bash(ao progress none --why "TD-154 designed and handed to the anchor; nothing else on my list")
+  <span class="g">recorded · out of work</span>
+
+Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
+
+<span class="p">&gt;</span> <span class="d">▌</span></div>
+    <div class="note">The composer is closed: this session is unattended and Focus watches (§4.5 <i>Focus watches</i>). <b>Take over</b> opens it. After a <b>Wrap up</b> the toast reads <i>wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes</i>, and when the checklist passes <b>Close session</b> appears here, outlined, where Kill used to be the only stop in sight. Kill is under more ▾, for the case where the worktree must be kept.</div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Git</span><span style="flex-grow: 1;"></span><span class="mono muted" style="font-size: 12px;">td154-transcript · pushed</span></div><div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div></div>
     <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Members</span><span style="flex-grow: 1;"></span><span class="meta">3 members · 1 needs you</span></div>
-      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px;">
-        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-1</a><span class="pill s-working"><span class="dot"></span>working</span><span class="meta">TD-301 → #811 · 1/3</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-2</a><span class="pill s-stalled"><span class="dot"></span>stalled?</span><span class="meta">TD-296 → #437 · 2/2</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><a href="#" class="mono">tdgrind-3</a><span class="pill s-limited"><span class="dot"></span>limited</span><span class="meta">TD-290 · 0/2</span></div>
-      </div>
-      <div class="note" style="margin-top: 8px;">Every session whose <span class="mono">controllers</span> name this one, derived from the records on each tick and never cached.</div>
-    </div>
-    <div class="card" style="padding: 12px;">
-      <div style="display: flex; align-items: center; margin-bottom: 8px;"><span style="font-weight: 600;">Reports</span><span style="flex-grow: 1;"></span><span class="meta">last tick 20:10</span></div>
-      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px;">
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">#811</span><span class="pill plain s-done">done</span><span class="meta">merged · cadence ✓</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
-        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-404</span><span class="badge">filed · medium</span><span class="meta">tdgrind-2 stood down</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
+      <div class="side-h"><span class="chev">▾</span><span>Reports</span><span style="flex-grow: 1;"></span><span class="meta">1 progress</span></div>
+      <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12px; margin-top: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px;"><span class="mono">TD-154</span><span class="pill plain s-done">done</span><a href="#">#556</a><span class="meta">18:41</span><span style="flex-grow: 1;"></span><span class="badge">declared</span></div>
       </div>
     </div>
-    <div class="note">A lead's own channels read like anyone's: what it claimed, what it filed. Its members are the panel above, derived from their <span class="mono">controllers</span> on each tick and never cached (§4.8). Nothing keys on the <span class="mono">lead</span> role — the panel is there because the session holds the <span class="mono">control</span> grant (§9 invariant 9).</div>
+    <div class="card" style="padding: 12px;">
+      <div class="side-h"><span class="chev">▾</span><span>Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm">Close</span></div>
+      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; margin-top: 8px;">
+        <div><span style="color: #065f46;">✓</span> tree clean</div>
+        <div><span style="color: #065f46;">✓</span> branch pushed</div>
+        <div><span style="color: #065f46;">✓</span> no subagents running</div>
+        <div><span style="color: #065f46;">✓</span> outcomes reported</div>
+      </div>
+      <div class="note" style="margin-top: 8px;">Closing is your act; the checklist only says when it is ready.</div>
+    </div>
+    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Session</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">claude-code · paul · fable-5-1</span></div></div>
   </div>
 </div>
 </div>

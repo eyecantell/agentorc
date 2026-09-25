@@ -737,7 +737,7 @@ def test_the_membership_controls(client, tmp_path):
     orc_id = r.headers["location"].rsplit("/", 1)[-1]
 
     page = client.get(f"/focus/{worker}").text
-    assert 'id="fcontrollers"' in page and "no controller — nobody may act on this session" in page
+    assert 'id="fcontrollers"' in page and "none — nobody may act on this session" in page
     assert 'id="members"' not in page  # not a lead: no member list
 
     # the chip adds one, and the agent is what actually decides
@@ -1578,7 +1578,11 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     four lines, the title was squeezed to nothing and the doing line never appeared.
 
     The rule is *the name and its state must never be the things that shrink*, so it is pinned
-    here: the row wraps, those two do not shrink, and the two long derived strings do."""
+    here: the row wraps, those two do not shrink, and the two long derived strings do.
+
+    TD-156 (2026-09-25) split the header in two — the identity line (`#fhead`) and the acts line
+    (`#facts`) — and moved the grants and controllers chips to the Session card; the pieces are
+    pinned where they now live."""
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     from agentorc.ui.app import templates, view
 
@@ -1607,9 +1611,17 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
         "team": "ao-grind", "role": "grinder",
     })  # fmt: skip
     html = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")
-    head_html = html[html.index('id="fhead"') : html.index('id="fbanner"')]
-    for piece in ("Error Checker", "rebasing #269", "out of work", "fstop", "fgrants", "fcontrollers"):
+    head_html = html[html.index('id="fhead"') : html.index('id="facts"')]
+    for piece in ("Error Checker", "rebasing #269", "out of work", "fstop"):
         assert piece in head_html, piece
+    acts_html = html[html.index('id="facts"') : html.index('id="fbanner"')]
+    for piece in ("fclose", "fmodeact", "wrapup", "shell-here", 'class="more"', "tcopy", "tpaste", '"kill"'):
+        assert piece in acts_html, piece  # the acts line: the next act, the plain ones, more ▾ with Kill last
+    assert acts_html.rindex('"kill"') > acts_html.rindex("tpaste")
+    session_html = html[html.index('data-side="session"') :]
+    for piece in ("fgrants", "fcontrollers", "fstopset"):
+        assert piece in session_html, piece  # read at a session's start, rarely pressed after: the folded card
+    assert 'data-side="session">' in html and 'data-side="ready" open>' in html  # Session folded, the rest open
     # the doing line reads as it does on a card and in an Inbox row — it read "· says · 10m ago"
     # here, which nobody had seen, because the line never fitted (TD-085)
     # the age is measured against now, so the shape is what is pinned, not the number

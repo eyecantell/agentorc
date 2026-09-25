@@ -19,12 +19,9 @@
 {% if not g.members and g.projects %}<span class="meta">· {{ g.projects | join(', ') }}</span>{% endif %}
 {% if g.counts %}<span class="meta counts">· {{ g.counts | join(' · ') }}</span>{% endif %}
 {% endif %}
-{# the fold (design §4.5a **team groups**): only a team with nothing live folds; the client keeps
-   the choice per team and sets the word #}
-{% if g.team and g.stopped and g.members %}<button class="btn sm ghost fold" data-fold="{{ g.team }}" data-n="{{ g.members | length }}" title="{% if g.concluded %}a concluded team's cards are folded away: every session still there is idle and has said its run is over{% else %}a stopped team's cards are folded away: its sessions have exited and are waiting for Forget{% endif %}">{{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</button>{% endif %}
 {# design §4.5a team header **✉ n** (TD-071 item 2): the sum of the cards' unread chips, which the
    fold hides — so drawn only while folded (CSS), display only; the mail stays where it is (§4.10) #}
-{% if g.team and g.stopped and g.unread %}<span class="badge unread foldmail" title="{{ g.unread }} unread message{{ '' if g.unread == 1 else 's' }} in this team's folded sessions — it stays there, and a start under the same name hands it to the new run (design §4.10); unfold to read it">✉ {{ g.unread }}</span>{% endif %}
+{% if g.team and not g.live and g.unread %}<span class="badge unread foldmail" title="{{ g.unread }} unread message{{ '' if g.unread == 1 else 's' }} in this team's folded sessions — it stays there, and a start under the same name hands it to the new run (design §4.10); unfold to read it">✉ {{ g.unread }}</span>{% endif %}
 {# design §4.5a team card **Forget all** (TD-071 item 1): on a team with nothing live, one confirm,
    then each card's own Forget — never a card with the dirty / unpushed flag, which the confirm
    names apart, since forgetting the record loses unpushed work's only pointer #}
@@ -38,6 +35,10 @@
 {% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="each member finishes what it holds and exits, then the manager (`ao team stop`)">Wind down</button>
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="kill every session carrying this badge (`ao team stop --now`)">Stop now</button>
 {% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="the same sequence as `ao team start`: every check before any session is created"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead."{% endif %}>Start</button>{% endif %}{% endif %}
+{# the fold (design §4.5a **team groups**, TD-156 (f)): only a team with nothing live folds — a
+   concluded team's idle cards wait for a person's Close and stay in view — and the control sits
+   beside Start, a chevron and the count; the client keeps the choice per team and sets the glyph #}
+{% if g.team and not g.live and g.members %}<button class="btn sm ghost fold" data-fold="{{ g.team }}" data-n="{{ g.members | length }}" title="a stopped team's cards are folded away: its sessions have exited and are waiting for Forget — click to show or hide them">▸ {{ g.members | length }} session{{ '' if g.members | length == 1 else 's' }}</button>{% endif %}
 {# design §4.5a **team header** → *answered for you* count (§4.9b, TD-075): how many answers this
    team's sessions gave from the record since this browser last opened the Inbox's group — a
    **mark**, never pressable; the group is reached from the Inbox. The page's poll fills it in,

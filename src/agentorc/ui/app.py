@@ -1241,6 +1241,7 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
         # delta between the two reads) is not drawn concluded — Wind down is the safe offer then
         concluded = c if live and isinstance(c, dict) and len(c.get("names") or ()) == live else None
         dead = [m for m in members if not m.get("seat")] if team != NO_TEAM and not live else []
+        ready = sum(1 for m in members if m.get("next_act") == "close")
         groups.append(
             {
                 "team": team,
@@ -1260,7 +1261,9 @@ def team_groups(views: list[dict[str, Any]], rows: Collection[dict[str, Any]] = 
                 # team's sessions are, once, and how many are in each state — never its manager's
                 # name, state or line, which are on the manager's card, the first in the group
                 "place": group_place(members),
-                "counts": state_counts(members),
+                # …and, on any team, how many wait for a person's Close (TD-156 (b): a concluded
+                # team's idle cards were folded away and read as already closed)
+                "counts": state_counts(members) + ([f"{ready} ready to close"] if ready else []),
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),
@@ -2041,7 +2044,7 @@ def create_app() -> FastAPI:
             {
                 "team": g["team"],
                 "manager": (g["manager"] or {}).get("id", ""),
-                "live": 0 if g["stopped"] else g["live"],  # what the fold keys on: a concluded team folds
+                "live": g["live"],  # what the fold keys on: only a team with nothing live folds (TD-156)
                 "ids": g["ids"],
                 "html": head.render(g=g),
             }
