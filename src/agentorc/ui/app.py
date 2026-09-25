@@ -1583,6 +1583,23 @@ def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
     return argv, ""
 
 
+def board_choices(roots: Collection[str | Path] | None = None) -> list[dict[str, str]]:
+    """The boards *Put on the board* may write to (design §4.5a *Inbox row: FYI*, TD-140): each
+    checkout this host's repos registry names that carries a board, as `{label, root, board}` with
+    both paths resolved — the paths `board_edit` resolves against the same registry. On a node the
+    org is the home's (§4.4a), so a node offers none."""
+    if roots is None:
+        if hosts.is_node():
+            return []
+        roots = hosts.local_host().repos()
+    out: list[dict[str, str]] = []
+    for r in roots:
+        root = Path(r).expanduser().resolve()
+        if (root / BOARD_FILE).is_file():
+            out.append({"label": root.name, "root": str(root), "board": str(root / BOARD_FILE)})
+    return out
+
+
 def repo_teams(org: orgmod.Org, host: str) -> dict[str, str]:
     """Each checkout on `host` → the team whose projects hold it (§4.5 screen 6: *a board item
     carries its repo, which `org.yml`'s projects map to teams*). A repo two teams share is the
@@ -2320,10 +2337,22 @@ def create_app() -> FastAPI:
         got = await call("inbox")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
         records = {o.get("id"): o for o in fleet}
+        # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board is the sender's
+        # repo's, when this host knows that repo and it carries one; else the person picks
+        boards_of = {c["root"]: c["board"] for c in board_choices()}
+
+        def board_of(sid: Any) -> str:
+            repo = str((records.get(sid) or {}).get("repo") or "")
+            return boards_of.get(str(Path(repo).expanduser().resolve()), "") if repo else ""
+
+        for t in got.get("trail") or ():
+            if isinstance(t, dict):
+                t["board_default"] = board_of(t.get("sid"))
         at = datetime.now(UTC)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
+            e["board_default"] = board_of(e["from"])
             if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
                 sender = records.get(e["from"]) or {}
                 e["pr_url"] = reviewmod.pr_url(sender.get("repo") or sender.get("dir"), e["pr"])
@@ -3002,6 +3031,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "rail": rail_counts(rail_rows(sections), picks),
                 "origin": page_origin(request),
                 "board_note": board_note,
+                "board_choices": board_choices(),
                 "person_needs": sections["count"],
                 "person_fyi": sections["fyi_n"],
                 "host": host_name(),
@@ -3032,6 +3062,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "back_url": f"/inbox{back}#{mid}",
             "origin": page_origin(request),
             "fold_open": True,
+            "board_choices": board_choices(),
             "entry": None,
             "section": "",
             "thread": [],
@@ -3182,6 +3213,17 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # it in the repo's main checkout. The row hands back what the reader gave it — the board,
             # the line and its text — and the agent refuses the edit when that line has moved on.
             what = str(body.get("action") or "")
+            if what == "add":
+                # §4.5a *Inbox row: FYI* → **Put on the board** (TD-140): the form's board, text and
+                # Due, and the entry it comes from; the agent writes the one line, commits it, and
+                # only then dismisses the entry — its refusal is the form's, drawn in place
+                ref, board, text = (str(body.get(k) or "").strip() for k in ("msg", "board", "text"))
+                due = str(body.get("due") or "").strip()
+                if not ref or not board or not text or not due:
+                    raise HTTPException(400, "Put on the board names the entry, the board, the text and a Due date")
+                got = await call("board_edit", board=board, action="add", text=text, due=due, entry=ref)
+                await board_items(fresh=True)
+                return JSONResponse({"ok": True, **(got if isinstance(got, dict) else {})})
             if what not in BOARD_ACTS:
                 raise HTTPException(400, f"a board row's act is {' or '.join(BOARD_ACTS)}, not {what!r}")
             try:
