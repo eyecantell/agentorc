@@ -121,22 +121,30 @@ misled. The round makes **`settings.yml` home-owned**, one file for the org, and
 that follow are decided here, not left to the build: (1) **the replica is new work**, not
 continuous with anything today — `write_node_config` copies `profiles.yml` into a container's
 bind-mounted home only at `ao host up` and a promote, a local write that never crosses the link,
-and the link (§4.4a *Frames*) carries records, not files; the round adds a **`settings` frame**
-the home sends a node on `hello` (every dial) and after every `set_settings` write, from which the
-node rewrites its own `settings.yml`; (2) **`set_settings` becomes a home-owned edit**: served at
+and the link (§4.4a *Frames*) carries records, not files; the round adds a **`settings` frame** — a
+notification, no reply (§4.4a *Frames*) — that the home sends **to every node whose link is up
+after every `set_settings` write, and to a node on its `hello` at every dial**, from which the node
+rewrites its own `settings.yml`; a write may originate at the home with no node involved, so the
+send is a broadcast, never a reply to the caller; (2) **`set_settings` becomes a home-owned edit**: served at
 the home, forwarded from a node while the link is up, refused at an offline node in the words
 `set_controllers` uses — the offline table's row changes from *served* to *forwarded / refused* —
 while **the node's gate keeps reading its replica offline**, so the last reserves it was sent stay
-in force and a node still acts only on its own files (§9); a reserve moved while a node is offline
+in force — the pattern §4.4a already names for the stop time and the gate, *policies that stop run
+on the node, from its replica, offline included*, so a node still acts only on its own files; a reserve moved while a node is offline
 reaches it on the next dial, and the page says *nodes offline: <n> — takes effect when it dials*;
-(3) **the page never reads the file from disk**: it reads through the agent (`gate` today; the
-round adds a `settings` read RPC beside `set_settings`) and writes through `set_settings`, so a UI
-started on a node — §4.4a allows one — shows the home's settings through the link and says *set at
-<home>* when the link is down, exactly as `ao team` does on a node; the §3 sentence that the UI
+(3) **the page never reads the file from disk**: it reads through the agent — `gate` today, which
+already returns each profile's reserves, windows and labels; the round adds a `settings` read RPC
+beside it for `person:`, `schedules:` and the budgets — and writes through `set_settings`. On a node
+both reads **serve the node's replica**, as `gate` does today, never a forward, and the page
+discloses *set at <home>* on every editable value rather than treating the link as a state; only
+the write forwards, and is refused offline. This is unlike `ao team` on a node, which has no replica
+and names the home instead of reading a file; the §3 sentence that the UI
 reads the file *as it reads `hosts.yml`* is withdrawn; (4) **the person's own follows the home**:
 folding `open_in` and the terminal font into the home-owned file retires §5's *read on the machine
 the UI runs on* — one person, one org, one place, and a UI on a node shows them through the link.
-This is a scope change named as such, and it is the reason Open decision 1 is a decision.
+This is a scope change named as such, and it is the reason Open decision 1 is a decision. A
+reserve changed while a node holds a paused session needs no new rule: the gate reloads the file
+every tick and resumes under `RESUME_MIN` as for any change.
 **Until the replica lands**, a profile with a live session on a node (a record lookup by host and
 profile — every profile is copied to every node at provision, so nothing static says where a
 profile runs) carries the node's name and *set at <node>* on its row, display only. Edits
@@ -156,3 +164,5 @@ it before the press lands.
 **Round 1 (Sonnet, 2026-09-25): NOT READY — 1 BLOCK, 3 FIX, 4 NOTE, all adopted.** BLOCK: the outline said a node's settings are the home's; §5 says the opposite, and the gate reads each host's own file, so a reserve set on the home would not reach a node's sessions — the round now designs the replica and the page marks node-run profiles until it lands. FIX: the default profile was listed as editable with no writer (dropped); `local.person` is parsed, not absent from the code; `ui.yml` is also outside `BACKUP_MEMBERS`. NOTE: the fold's safety argued rather than asserted; Schedules drawn disabled until TD-133; the terminal face from monospace faces with ligatures off (goal 12); `AGENTORC_TICK`'s framing. Verified correct by the round: the six-scope table, `set_settings`'s person-only rule and next-tick effect, `promote:` refused today (executed), the org `roles:` overlay unvalidated, no `/settings` route, the localStorage keys, the TOML facts, the TD quotes, screen 7 free since TD-123.
 
 **Round 2 (Sonnet, 2026-09-25): NOT READY — 3 BLOCK, 2 FIX, 2 NOTE, all adopted; the blocks forced decisions.** BLOCK: the replica was described as continuous with `profiles.yml`'s provision-time copy, which is a local bind-mount write at `ao host up`, never over the link — the replica is now named as new work, a `settings` frame on `hello` and after each write; once the file is home-owned, `set_settings` at a node can no longer be *served link or no link* — decided: forwarded while linked, refused offline, the node's gate reading its replica; the UI is not guaranteed to run on the home (§5 allows a laptop, §4.4a a node) and the chip already reads through the `gate` RPC, so the page reads and writes through RPCs, never the file. FIX: folding `person:` into a replicated file retires *read on the machine the UI runs on* — named as a scope change and made Open decision 1; the You section split by write path with **Reset this browser** a new control. NOTE: the font is a typed or picked family name with CSS fallback, no enumeration (`AO.termFont` already refits without a reload); display-only marks named; *runs on a node* is a record lookup by host and profile; Repos one card per checkout; **Open file** a new use of `open_in`. Verified correct: `set_settings`'s guard covers the whole RPC so no session can write `person:`; a `person:` stanza is inert to the gate; `save()` loses nothing on a machine-owned file; goal 12 permits a chosen face; TD-082's layout fits the outline.
+
+**Round 3 (Sonnet, 2026-09-25): NOT READY — 2 FIX, 1 NOTE, all adopted; both fixes were follow-ons of round 2's decisions.** FIX: the read side on a node was unpinned — decided: reads serve the node's replica as `gate` does, *set at <home>* is a disclosure, only the write forwards; the frame's scope was *a node* — decided: a broadcast to every linked node after each write, and to a node on its `hello`. NOTE: the precedent for a node acting on a replica offline is §4.4a's own *policies that stop run on the node, from its replica* line, now cited. Verified: adding `set_settings` to `modes.HOME_EDITS` yields exactly `set_controllers`'s words and touches nothing on the home, so TD-100's built behaviour stands; the paused-session race is covered by the gate's per-tick reload and `RESUME_MIN`; `rpc_gate` already returns the reserves, so the new read RPC is for the other keys only; no stale sentence remained.
