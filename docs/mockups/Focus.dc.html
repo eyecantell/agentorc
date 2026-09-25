@@ -166,17 +166,16 @@
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
     <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
-      <span class="mono" style="font-size: 15px; font-weight: 500;">kmaster / samscrape / tdgrind-1</span>
+      <span class="mono" style="font-size: 15px; font-weight: 500;">tdgrind-1</span>
       <span class="pill s-needs"><span class="dot"></span>needs you</span><span class="meta" title="the session's name as its tool holds it — set in the tool, not in agentorc">DIU fetcher</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="input" style="height: 26px; width: 150px; font-size: 12px; color: #9ca3af;">why? (optional)</span><span class="meta">Bash · git push -u origin td301-fix · 9m 12s</span>
       <span class="badge">stops 06:00</span>
-      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review · says · 14s ago</span>
     </div>
     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
       <span class="btn sm next">Take over</span><span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="10" rx="1.5"></rect><path d="M5 7l2 1.5L5 10M8.5 10.5H11"></path></svg>Open shell here</span><span class="btn sm link"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4L2 8l4 4"></path><path d="M10 4l4 4-4 4"></path></svg>VS Code</span>
       <span style="flex-grow: 1;"></span>
       <span class="btn sm link">more ▾</span>
-      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · <span style="color: #991b1b;">Kill</span></span>
+      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · Close · <span style="color: #991b1b;">Kill</span></span>
     </div>
     <div class="term" style="height: 560px;"><span class="d">● tdgrind-1 · claude-code · /home/kmaster/samscrape/.claude/worktrees/tdgrind-1</span>
 
@@ -201,6 +200,7 @@
     </div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Working</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">says · 14s ago</span></div><div style="font-size: 12px; margin-top: 8px;" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review</div></div>
     <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▾</span><span>Git</span><span style="flex-grow: 1;"></span><span class="mono muted" style="font-size: 12px;">td301-fix · 2 ahead of origin/main</span></div>
       <div class="mono" style="font-size: 12px; line-height: 1.7; margin-top: 8px;">
         <div><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>
@@ -219,17 +219,7 @@
       </div>
       <div class="note" style="margin-top: 8px;">Both channels, as the session declared them or the agent derived them from the branch and its PRs (dashed). <b>Drop</b> records the person's decision as a declaration, so the next tick cannot put the claim back.</div>
     </div>
-    <div class="card" style="padding: 12px;">
-      <div class="side-h"><span class="chev">▾</span><span>Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm" style="opacity: .5;">Close</span></div>
-      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; margin-top: 8px;">
-        <div><span style="color: #065f46;">✓</span> tree clean</div>
-        <div><span style="color: #991b1b;">✗</span> branch pushed</div>
-        <div><span style="color: #991b1b;">✗</span> PR merged</div>
-        <div><span style="color: #065f46;">✓</span> no subagents running</div>
-        <div><span style="color: #991b1b;">✗</span> ledger / attention board updated</div>
-      </div>
-      <div class="note" style="margin-top: 8px;">Closing is your act; the checklist only says when it is ready.</div>
-    </div>
+    <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm" style="opacity: .5;">Close</span></div></div>
     <div class="card" style="padding: 12px;"><div class="side-h"><span class="chev">▸</span><span>Session</span><span style="flex-grow: 1;"></span><span class="meta" style="font-size: 12px;">claude-code · grind (pro) · sonnet</span></div></div>
   </div>
 </div>

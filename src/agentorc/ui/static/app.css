@@ -326,10 +326,10 @@ body.popped .page { padding: 10px 12px; } body.popped .termbox { height: calc(10
    not this. */
 .focus #fhead { flex-wrap: wrap; row-gap: 6px; }
 .focus #fhead > .title, .focus #fhead > #fstate { flex: 0 0 auto; }
-/* the two long ones the row may take back instead: both are a session's own words or its tool's,
-   both are shown and never acted on, and both keep the whole of it on hover */
-.focus #fhead > .tool-title, .focus #fhead > .doing { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.focus #fhead > .doing { max-width: 32em; }
+/* the one long thing the row may take back instead: the tool's title, shown and never acted on,
+   the whole of it on hover (the doing line left the header for the Working card, TD-156) */
+.focus #fhead > .tool-title { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.side .doing { margin-top: 8px; font-size: 12px; line-height: 1.55; overflow-wrap: anywhere; }
 /* design §4.5 *The Focus screen's anatomy* (TD-156): the header is two lines — the identity line
    above, this acts line below it — with the card's foot rule: the next act outlined at normal
    strength, the rest plain, more ▾ at the right. The buttons had been spread over the tail of the

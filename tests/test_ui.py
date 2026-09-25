@@ -1598,22 +1598,26 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     assert "flex-wrap: wrap" in rule(".focus #fhead {")
     keep = rule(".focus #fhead > .title,")
     assert "#fstate" in keep and "flex: 0 0 auto" in keep  # the name and the state: never shrunk
-    give = rule(".focus #fhead > .tool-title,")
-    assert "flex: 0 1 auto" in give and "text-overflow: ellipsis" in give  # these give way instead
+    give = rule(".focus #fhead > .tool-title {")
+    assert "flex: 0 1 auto" in give and "text-overflow: ellipsis" in give  # this gives way instead
 
     # …and every one of the things that crowded it is still in the row it now wraps
-    v = view({
+    v_src = {
         "id": "ao-x-9", "name": "w", "kind": "agent", "adapter": "claude-code", "dir": str(tmp_path),
         "state": "idle", "since": "2026-09-19T16:00:00Z", "confidence": "hook", "pane": True, "tail": ["…"],
         "created": "2026-09-19T15:00:00Z", "title": "Error Checker", "unattended": True,
         "doing": {"text": "rebasing #269", "at": "2026-09-19T15:50:00Z"},
         "out_of_work": {"why": "the lane is done", "at": "2026-09-19T15:55:00Z"},
         "team": "ao-grind", "role": "grinder",
-    })  # fmt: skip
+    }  # fmt: skip
+    v = view(v_src)
     html = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": []}, host="h", active="Org")
     head_html = html[html.index('id="fhead"') : html.index('id="facts"')]
-    for piece in ("Error Checker", "rebasing #269", "out of work", "fstop"):
+    for piece in ("Error Checker", "out of work", "fstop"):
         assert piece in head_html, piece
+    assert str(tmp_path) not in head_html  # the name alone: host, repo and directory are the Session card's
+    working_html = html[html.index('data-side="working"') : html.index('data-side="git"')]
+    assert "rebasing #269" in working_html and "says · " in working_html  # the doing line is the Working card
     acts_html = html[html.index('id="facts"') : html.index('id="fbanner"')]
     for piece in ("fclose", "fmodeact", "wrapup", "shell-here", 'class="more"', "tcopy", "tpaste", '"kill"'):
         assert piece in acts_html, piece  # the acts line: the next act, the plain ones, more ▾ with Kill last
@@ -1621,11 +1625,18 @@ def test_the_focus_header_wraps_and_the_name_is_never_what_shrinks(tmp_path, mon
     session_html = html[html.index('data-side="session"') :]
     for piece in ("fgrants", "fcontrollers", "fstopset"):
         assert piece in session_html, piece  # read at a session's start, rarely pressed after: the folded card
-    assert 'data-side="session">' in html and 'data-side="ready" open>' in html  # Session folded, the rest open
-    # the doing line reads as it does on a card and in an Inbox row — it read "· says · 10m ago"
-    # here, which nobody had seen, because the line never fitted (TD-085)
+    # Session folded; Ready to close folded too on this unattended team member, and Close session
+    # not offered — its team closes it (§4.5 *Whose session it is*); an own session has both open
+    assert 'data-side="session">' in html and 'data-side="ready">' in html and 'id="fclose"' in html
+    assert "hidden" in html[html.index('id="fready"') - 80 : html.index('id="fready"')] and not v["own"]
+    own = view({**v_src, "unattended": False})
+    html = templates.get_template("focus.html").render(
+        s={**own, "grants_all": [], "ready": [], "ready_ok": True}, host="h", active="Org"
+    )
+    assert own["own"] and 'data-side="ready" open>' in html
+    # the Working card's heading reads *says · <age> ago*, the words alone in its body (TD-156) —
     # the age is measured against now, so the shape is what is pinned, not the number
-    assert "rebasing #269 · says " in head_html and " ago" in head_html and "· says ·" not in head_html
+    assert ">says · " in working_html and " ago</span>" in working_html and "· says ·" not in working_html
 
 
 def test_the_focus_reports_panel_shows_a_reference_once():

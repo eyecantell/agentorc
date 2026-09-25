@@ -598,23 +598,24 @@ def team_phone():
 </div>
 ''' + TAIL
 
-def focus_head(path, state, identity, next_act="", editor=True):
+def focus_head(name, state, identity, next_act="", editor=True, member=False):
     """The two-line Focus header (§4.5 *The Focus screen's anatomy*, TD-156): the identity line —
-    path, state, marks, the doing line, nothing pressable but a permission's answer — then the acts
+    the name alone, state, marks, nothing pressable but a permission's answer (the doing line is
+    the Working card, host and repo the Session card's: Paul, *the top line is very crowded*) — then the acts
     line: the next act outlined first (Close session, Take over, or none), the plain ones, more ▾
     at the right with Kill last. Until 2026-09-25 this was one wrapping row, the buttons at its
     tail, which broke over three lines on Paul's screen with the buttons split between two."""
     vs = f'<span class="btn sm link">{ICON["code"]}VS Code</span>' if editor else ""
     return f'''<div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <a href="#" class="muted">← Org</a>
-      <span class="mono" style="font-size: 15px; font-weight: 500;">{path}</span>
+      <span class="mono" style="font-size: 15px; font-weight: 500;">{name}</span>
       {state}{identity}
     </div>
     <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
       {next_act}<span class="btn sm link">✉ Message</span><span class="btn sm link" title="asks it to finish, push and report — the same prompt the policy sends; you close it when Ready to close passes">Wrap up</span><span class="btn sm link">{ICON["term"]}Open shell here</span>{vs}
       <span style="flex-grow: 1;"></span>
       <span class="btn sm link">more ▾</span>
-      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · <span style="color: #991b1b;">Kill</span></span>
+      <span class="meta" style="font-size: 12px;">more ▾ holds Pop out · Copy · Paste · Hand back · Copy tmux command · {"Close · " if member else ""}<span style="color: #991b1b;">Kill</span></span>
     </div>'''
 
 def side_card(title, meta="", body="", open_=True):
@@ -659,12 +660,11 @@ def focus():
 {topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    {focus_head("kmaster / samscrape / tdgrind-1", pill("needs"),
+    {focus_head("tdgrind-1", pill("needs"),
                 f'''<span class="meta" title="the session\'s name as its tool holds it — set in the tool, not in agentorc">DIU fetcher</span>
       <span class="btn sm primary">Allow</span><span class="btn sm">Deny</span><span class="input" style="height: 26px; width: 150px; font-size: 12px; color: #9ca3af;">why? (optional)</span><span class="meta">Bash · git push -u origin td301-fix · 9m 12s</span>
-      <span class="badge">stops 06:00</span>
-      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review · says · 14s ago</span>''',
-                next_act='<span class="btn sm next">Take over</span>')}
+      <span class="badge">stops 06:00</span>''',
+                next_act='<span class="btn sm next">Take over</span>', member=True)}
     <div class="term" style="height: 560px;">{term}</div>
     <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
       <div class="input" style="height: 64px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt… multi-line, paste-friendly. Drop files or paste a screenshot here; the terminal above takes keys directly for menus and questions.</div>
@@ -677,6 +677,7 @@ def focus():
     </div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 14s ago</span>', '<div style="font-size: 12px; margin-top: 8px;" title="what this session says it is doing (design §4.8): its own words">TD-301: pushing the branch for review</div>')}
     {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td301-fix · 2 ahead of origin/main</span>', '''
       <div class="mono" style="font-size: 12px; line-height: 1.7; margin-top: 8px;">
         <div><span style="color: #065f46;">M</span> scripts/recover_stuck_notices.py</div>
@@ -695,17 +696,7 @@ def focus():
       </div>
       <div class="note" style="margin-top: 8px;">Both channels, as the session declared them or the agent derived them from the branch and its PRs (dashed). <b>Drop</b> records the person's decision as a declaration, so the next tick cannot put the claim back.</div>
     </div>
-    <div class="card" style="padding: 12px;">
-      <div class="side-h"><span class="chev">▾</span><span>Ready to close</span><span style="flex-grow: 1;"></span><span class="btn sm" style="opacity: .5;">Close</span></div>
-      <div style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; margin-top: 8px;">
-        <div><span style="color: #065f46;">✓</span> tree clean</div>
-        <div><span style="color: #991b1b;">✗</span> branch pushed</div>
-        <div><span style="color: #991b1b;">✗</span> PR merged</div>
-        <div><span style="color: #065f46;">✓</span> no subagents running</div>
-        <div><span style="color: #991b1b;">✗</span> ledger / attention board updated</div>
-      </div>
-      <div class="note" style="margin-top: 8px;">Closing is your act; the checklist only says when it is ready.</div>
-    </div>
+    {side_card("Ready to close", '<span class="btn sm" style="opacity: .5;">Close</span>', "", open_=False)}
     {focus_session_card("claude-code · grind (pro) · sonnet", "1c8e0b2f…f42a", "ao-samscrape-tdgrind-1", "2026-09-04 20:02 MDT · 3h 14m", "14 s ago", "unattended", "stops 06:00", "tdgrind-1-20260904.log · 1.2 MB", "none", "under orc-1 ×")}
   </div>
 </div>
@@ -714,9 +705,11 @@ def focus():
 
 def focus_ready():
     """Focus after a person's Wrap up, once Ready to close passes (TD-156, the case Paul could not
-    find a Close for): *ready to close ✓* on the identity line in the card's words, **Close
-    session** the outlined next act on the acts line, Kill one menu away; the side panel in reading
-    order with Session folded to one line."""
+    find a Close for), on a session that is the person's own — here a member taken over, so
+    `interactive`: *ready to close ✓* on the identity line in the card's words, **Close session**
+    the outlined next act on the acts line, Kill one menu away; the side panel in reading order,
+    Ready to close open because the close is the person's, Session folded to one line. An
+    unattended team member shows none of this: its team closes it, and its checklist is folded."""
     term = '''<span class="d">● designer-ao-1 · claude-code · /home/kmaster/agentorc/.claude/worktrees/designer-ao-1</span>
 
 <span class="p">&gt;</span> Wrap up: finish what you hold, push, report, and say what is left.
@@ -734,16 +727,20 @@ Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
 {topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    {focus_head("kmaster / agentorc / designer-ao-1", pill("idle"),
+    {focus_head("designer-ao-1", pill("idle"),
                 '''<span class="meta" title="the session\'s name as its tool holds it">TD-154 transcript</span>
       <span class="badge ready" title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>
-      <span class="badge" title="declared by the session: TD-154 designed and handed to the anchor">out of work · 6m</span>
-      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">wrapped up · says · 6m ago</span>''',
-                next_act='<span class="btn sm next">Close session</span><span class="btn sm link">Take over</span>')}
+      <span class="badge" title="declared by the session: TD-154 designed and handed to the anchor">out of work · 6m</span>''',
+                next_act='<span class="btn sm next">Close session</span>')}
     <div class="term" style="height: 420px;">{term}</div>
-    <div class="note">The composer is closed: this session is unattended and Focus watches (§4.5 <i>Focus watches</i>). <b>Take over</b> opens it. After a <b>Wrap up</b> the toast reads <i>wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes</i>, and when the checklist passes <b>Close session</b> appears here, outlined, where Kill used to be the only stop in sight. Kill is under more ▾, for the case where the worktree must be kept.</div>
+    <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+      <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>
+      <div style="display: flex; align-items: center; gap: 8px;"><span class="btn">{ICON["clip"]}Attach</span><span style="flex-grow: 1;"></span><span class="btn primary">{ICON["send"]}Send</span></div>
+    </div>
+    <div class="note">Paul took this member over, so it is <b>interactive</b> — his to close. After a <b>Wrap up</b> the toast reads <i>wrap-up sent — it finishes, pushes and reports; you close it when Ready to close passes</i>, and when the checklist passes <b>Close session</b> appears here, outlined, where Kill used to be the only stop in sight; Kill is under more ▾. An unattended team member shows none of this: its team's Wind down or Start closes it, its Ready to close is folded, and its Close is the more ▾ entry.</div>
   </div>
   <div style="width: 320px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+    {side_card("Working", '<span class="meta" style="font-size: 12px;">says · 6m ago</span>', '<div style="font-size: 12px; margin-top: 8px;">wrapped up: TD-154 designed and handed to the anchor</div>')}
     {side_card("Git", '<span class="mono muted" style="font-size: 12px;">td154-transcript · pushed</span>', '<div class="mono muted" style="font-size: 12px; margin-top: 8px;">clean</div>')}
     <div class="card" style="padding: 12px;">
       <div class="side-h"><span class="chev">▾</span><span>Reports</span><span style="flex-grow: 1;"></span><span class="meta">1 progress</span></div>
@@ -761,7 +758,7 @@ Done. TD-154 is designed (PR #556); the build is TD-150's. Nothing else is mine.
       </div>
       <div class="note" style="margin-top: 8px;">Closing is your act; the checklist only says when it is ready.</div>
     </div>
-    {focus_session_card("claude-code · paul · fable-5-1", "111132eb…c01c3", "ao-agentorc-designer-ao-1", "2026-09-25 18:27 MDT · 3h 02m", "6 m ago", "unattended", "none — set", "ao-agentorc-designer-ao-1-20260925.log", "none", "under manager-ao-1 ×")}
+    {focus_session_card("claude-code · paul · fable-5-1", "111132eb…c01c3", "ao-agentorc-designer-ao-1", "2026-09-25 18:27 MDT · 3h 02m", "6 m ago", "interactive", "—", "ao-agentorc-designer-ao-1-20260925.log", "none", "under manager-ao-1 ×")}
   </div>
 </div>
 </div>
@@ -786,10 +783,8 @@ def focus_orchestrator():
 {topbar("Org")}
 <div style="padding: 12px 20px; display: flex; gap: 14px; align-items: flex-start;">
   <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 10px; min-width: 0;">
-    {focus_head("kmaster / samscrape / orc-1", pill("idle"),
-                '''<span class="badge">stops 06:00</span>
-      <span class="meta doing" title="what this session says it is doing (design §4.8): its own words">round 41: reading four members, two claims to re-check · says · 2m ago</span>''',
-                next_act='<span class="btn sm next">Take over</span>')}
+    {focus_head("orc-1", pill("idle"), '''<span class="badge">stops 06:00</span>''',
+                next_act='<span class="btn sm next">Take over</span>', member=True)}
     <div class="term" style="height: 520px;">{term}</div>
     <div class="card" style="padding: 10px; display: flex; flex-direction: column; gap: 8px;">
       <div class="input" style="height: 56px; align-items: flex-start; padding: 8px 10px; color: #9ca3af;">Compose a prompt…</div>

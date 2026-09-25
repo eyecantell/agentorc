@@ -12,17 +12,20 @@
        which broke over three lines at 1440 with the buttons split between two of them. #}
     <div class="row gap" id="fhead">
       {% if not popped %}<a class="muted" href="/">← Org</a>{% endif %}
-      <span class="mono title">{{ s.place }} / {{ s.name }}</span>
+      {# the name alone (TD-156, Paul: *the top line is very crowded*): host and repo are the Org's
+         and the Session card's, and the directory is there too #}
+      <span class="mono title">{{ s.name }}</span>
       {# design §4.5a Focus header **title** (§4.3 `title()`, TD-074): the session's name as its tool
-         holds it, beside agentorc's own name for it. Display only — it is set in the tool, and
-         agentorc has no rename of its own — so it carries no control. #}
-      {% if s.title %}<span class="meta tool-title"
-            title="the session's name as its tool holds it (design §4.5a) — set in the tool, not in agentorc">{{ s.title }}</span>{% endif %}
+         holds it, beside agentorc's own name for it — and, as on the card, only when it differs
+         from the name (TD-156: the same word twice is noise). Display only — it is set in the
+         tool, and agentorc has no rename of its own — so it carries no control. #}
+      {% if s.title_shown %}<span class="meta tool-title"
+            title="the session's name as its tool holds it (design §4.5a) — set in the tool, not in agentorc">{{ s.title_shown }}</span>{% endif %}
       <span id="fstate"></span>
       {# design §4.5a Focus header **Close session** (TD-156): the card's caption in the card's words,
          the moment the checklist passes on an idle or exited session; the act is on the line below.
          Always in the page and hidden until true, kept current from the pushed delta as the marks are. #}
-      <span class="badge readymark{% if not (s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fready"
+      <span class="badge readymark{% if not (s.own and s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fready"
             title="every Ready to close check passes — closing is your act (design §4.2): Close session, below">ready to close ✓</span>
       {# §4.8a (TD-077 a2): the **suspended** mark, beside the state and never inside it — a
          suspension is not a state, and only a person's Resume or Forget lifts it. #}
@@ -53,17 +56,13 @@
          the page and hidden until true, kept current from the pushed delta as the two above are. #}
       <span class="badge gated{% if not s.gated %} hidden{% endif %}" id="fgated"
             title="{{ (s.gated or {}).full }}">{{ (s.gated or {}).text or 'paused · usage' }}</span>
-      {# design §4.8 `doing` (TD-074): what the session says it is doing, beside the other things it
-         said about itself, always with its age. Its own words: shown, never acted on. #}
-      {% if s.doing %}<span class="meta doing"
-            title="what this session says it is doing (design §4.8): its own words">{{ s.doing.text }}{% if s.doing.age %} · says {{ s.doing.age }} ago{% endif %}</span>{% endif %}
     </div>
     {# **The acts line** (design §4.5 *The Focus screen's anatomy*, TD-156): the next act first,
        outlined, by state — Close session when the checklist passes, Take over on an unattended
        session, else nothing (the composer's Send is it); then the plain ones; **more ▾** at the
        right holds what is rarely pressed, Kill last and red, as the card's foot does (§4.5a). #}
     <div class="row gap" id="facts">
-      <button class="btn sm next{% if not (s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fclose" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped."
+      <button class="btn sm next{% if not (s.own and s.ready_ok and s.state in ('idle', 'exited')) %} hidden{% endif %}" id="fclose" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped."
               title="the checklist passes: kill it and reap its worktree (design §4.2) — the same Close as the card's">Close session</button>
       {# design §4.5a Focus header **mode toggle** (TD-096, *Focus watches*): named for what it does —
          Take over an unattended session (read-only until then) is the next act here; Hand back and
@@ -89,6 +88,10 @@
           <button id="fmodemenu" data-act="mode" data-id="{{ s.id }}" data-unattended="{{ 1 if s.unattended else 0 }}"{% if s.unattended %} hidden{% endif %}
                   title="{{ s.mode_title }}">{{ s.mode_act }}</button>
           <button data-copy="tmux attach -t {{ s.id }}">Copy tmux command</button>
+          {# Close for a team member (TD-156, Paul): its team's Wind down or Start closes it, so the
+             act is here and not on the acts line; enabled only when Ready to close passes #}
+          <button id="fclosemenu" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped."{% if not (s.ready_ok and s.state in ('idle', 'exited')) %} disabled{% endif %}
+                  title="kill it and reap its worktree once Ready to close passes — a team member is normally closed by its team's Wind down or Start">Close</button>
           <button class="danger" data-act="kill" data-id="{{ s.id }}" data-confirm="Kill {{ s.name }}? The worktree is kept." title="kills the tmux session and keeps the worktree — Close, when the checklist passes, reaps it too">✕ Kill</button>
         </div>
       </details>
@@ -110,6 +113,14 @@
      Reports, Inbox, Members, Ready to close, then Session, which starts folded. `open` here is the
      first paint's default; `AO.focus` applies what this browser remembers. #}
   <div class="side">
+    {# **Working** (TD-156, Paul: *drop the current work to a card on the right*): what the session
+       says it is doing (§4.8 `doing`), with its age — its own words, shown, never acted on; drawn
+       only while it says something, beside Reports, which is what it has finished. Always in the
+       page and hidden until true, kept current from the pushed delta as the marks are. #}
+    <details class="card pad side{% if not s.doing %} hidden{% endif %}" data-side="working" id="workingcard" open>
+      <summary class="row gap"><span class="h2">Working</span><span class="meta" id="workingage">{% if s.doing and s.doing.age %}says · {{ s.doing.age }} ago{% endif %}</span></summary>
+      <div class="doing" id="workingtext" title="what this session says it is doing (design §4.8): its own words">{{ (s.doing or {}).text }}</div>
+    </details>
     <details class="card pad side" data-side="git" id="gitcard" open>
       <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
       <div class="mono small gitfiles" id="gitfiles">{% if s.git %}{% for f in s.git.files %}<div>{{ f }}</div>{% endfor %}{% if not s.git.files %}<div class="muted">clean</div>{% endif %}{% endif %}</div>
@@ -144,10 +155,12 @@
       <div class="note">The sessions this one may act on. It needs both the grant and a place in each session's controllers (design §4.8).</div>
       </div>
     </details>{% endif %}
-    <details class="card pad side" data-side="ready" open>
+    {# open on the person's own session, folded on a team member (TD-156, Paul: *a user will presume
+       the team members behave correctly and close when they are supposed to*) #}
+    <details class="card pad side" data-side="ready"{% if s.own %} open{% endif %}>
       <summary class="row gap"><span class="h2">Ready to close</span><span class="grow"></span><button class="btn sm" id="closebtn" data-act="close" data-id="{{ s.id }}" data-confirm="Close {{ s.name }}? It is killed and its worktree reaped." disabled>Close</button></summary>
       <div class="checks" id="checks"></div>
-      <div class="note">Closing is your act; the checklist only says when it is ready.</div>
+      <div class="note">{% if s.own %}Closing is your act; the checklist only says when it is ready.{% else %}A team member is closed by its team's Wind down or Start once these pass; Close this one alone is under more ▾.{% endif %}</div>
     </details>
     {# **Session**, last and folded (TD-156): what is read at a session's start and rarely after —
        the grants and controllers chips included, which the header carried until this review #}

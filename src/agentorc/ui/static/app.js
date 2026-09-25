@@ -1517,7 +1517,15 @@
       const ma = $("#fmodeact"); if (ma) ma.classList.toggle("hidden", !v.unattended);
       // one outlined act (§4.5 *The card's anatomy*, row 6): Close session outranks Take over,
       // which is drawn plain beside it while the checklist passes
-      if (ma) { ma.classList.toggle("next", !readyNow); ma.classList.toggle("link", readyNow); }
+      if (ma) { ma.classList.toggle("next", !(readyNow && v.own)); ma.classList.toggle("link", !!(readyNow && v.own)); }
+      // the **Working** card (TD-156): the session's own words, and their age, from the delta
+      const wc = $("#workingcard");
+      if (wc) {
+        const dg = v.doing;
+        wc.classList.toggle("hidden", !dg);
+        $("#workingtext").textContent = (dg && dg.text) || "";
+        $("#workingage").textContent = dg && dg.age ? `says · ${dg.age} ago` : "";
+      }
       const mm = $("#fmodemenu"); if (mm) mm.hidden = !!v.unattended;
       const fm = $("#fmode"); if (fm) fm.textContent = v.unattended ? "unattended" : "interactive";
       const cp = $("#composer"); if (cp) cp.classList.toggle("hidden", !!v.unattended);
@@ -1603,8 +1611,10 @@
       // outlined Close session on the acts line; the side card's small Close is the same act.
       const ready = !!(checks.length && checks.every(([, ok]) => ok) && ["idle", "exited"].includes(v.state));
       $("#closebtn").disabled = !ready;
-      $("#fready").classList.toggle("hidden", !ready);
-      $("#fclose").classList.toggle("hidden", !ready);
+      const cm = $("#fclosemenu"); if (cm) cm.disabled = !ready;
+      // …and the next act only on the person's own session (`own`): a team member runs itself
+      $("#fready").classList.toggle("hidden", !(ready && v.own));
+      $("#fclose").classList.toggle("hidden", !(ready && v.own));
     }
     // design §4.5a **Reports** / **grants** chip (§4.8, TD-028 step 4). The lists come from the
     // pushed record, so a `progress` or `finding` call from anywhere shows up here without a reload.

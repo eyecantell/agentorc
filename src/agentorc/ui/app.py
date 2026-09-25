@@ -833,6 +833,11 @@ def view(
     # on a card only when it says something the name does not (TD-095): a team's members are
     # titled by their names, and the same word twice is noise. Focus shows it as before.
     d["title_shown"] = d["title"] if d["title"] != s.get("name") else ""
+    # design §4.5 *The Focus screen's anatomy* (TD-156, Paul): a session is the person's **own** —
+    # theirs to close — when it is interactive or carries no team badge; an unattended team member
+    # runs itself and its team's Wind down or Start closes it, so Focus offers Close session as
+    # the next act, and *ready to close ✓*, only on an own session, and folds its checklist away
+    d["own"] = not s.get("team") or not s.get("unattended")
     # The role's icon (design §4.8 *Role presets*): resolved here from the role's *name* — nothing in
     # the core keys on a role (§9 invariant 9) and no icon is stored on the record. Without a map
     # (a caller that did not resolve one) the badge draws its word alone, as it always has.
