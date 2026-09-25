@@ -2797,6 +2797,17 @@ class HostAgent:
                 f"{word} — {', '.join(owed)} (design §4.9a, §4.10 *Outcomes*)",
                 owed=owed,
             )
+        if unread := s.unread():
+            # Design §4.9a (TD-072, TD-141): winding down is the last moment anyone reads this inbox,
+            # and what is unread at it is a `note` nobody triaged or an `ask` whose sender waits on a
+            # run about to end. Reading is the triage — `ao inbox` marks mail read (§4.10) — and a
+            # restart is refused alike: the next run holds nothing of this inbox it did not read.
+            # After the owed check, so a session with both is told the one it clears first.
+            raise RpcError(
+                f"{s.id} has {unread} unread message{'s' if unread != 1 else ''}: read them with `ao inbox` and "
+                f"answer what needs answering before declaring {word} (design §4.9a)",
+                unread=unread,
+            )
         other = "restart_wanted" if status == "none" else "out_of_work"
         if getattr(s, other):
             said = "wants a restart" if other == "restart_wanted" else "is out of work"
@@ -4090,7 +4101,8 @@ class HostAgent:
             self.person_inbox = kept
             self.person_store.save(kept)
         for r in self._graph().values():
-            inbox = [e for e in r.inbox if self._keep(e, now, inbox=True)]
+            dead_since = r.since if r.state in ("exited", "closed") else None
+            inbox = [e for e in r.inbox if self._keep(e, now, inbox=True, dead_since=dead_since)]
             outbox = [e for e in r.outbox if self._keep(e, now, inbox=False)]
             if len(inbox) != len(r.inbox) or len(outbox) != len(r.outbox):
                 r.inbox, r.outbox = inbox, outbox
@@ -4109,12 +4121,20 @@ class HostAgent:
             self._close_entry(e.id, "expired", stamp)
 
     @staticmethod
-    def _keep(e: MailEntry, now: datetime, *, inbox: bool, person: bool = False) -> bool:
+    def _keep(
+        e: MailEntry, now: datetime, *, inbox: bool, person: bool = False, dead_since: str | None = None
+    ) -> bool:
         """Lifecycle stage 3 (design §4.10): a read entry is kept for the retention window from
         `read_at` — or, for an `ask`, from when it closed or expired — and an open `ask` is never
-        pruned. An unread inbox entry never ages out. The sender's copy runs from `at`, and a sent
-        reply carrying a `source` is kept `SOURCED_RETENTION` whatever else is pruned. `person`:
-        the copy is the person inbox's, where a question the person answered is listed as owed."""
+        pruned. The sender's copy runs from `at`, and a sent reply carrying a `source` is kept
+        `SOURCED_RETENTION` whatever else is pruned. `person`: the copy is the person inbox's,
+        where a question the person answered is listed as owed.
+
+        An unread inbox entry never ages out **while the record lives**. `dead_since` is when its
+        record became `exited` or `closed`: the run it was addressed to is over, and an unread
+        `note` or `reply` ages out on the same window from then (TD-072, TD-141) — the window, not
+        the exit itself, because a resume carries mail forward and a worker resumed inside it still
+        gets the note. An open `ask`, `steer` or `conflict` is untouched (`e.open`, above)."""
         if e.open or e.owes_for(session_inbox=inbox and not person) or mail.MAIL_RETENTION is None:
             # `owes`: a question that was answered and not reported back is kept until it is
             # (design §4.10 *Outcomes*) — the follow-up `--thread` names it, and the person's
@@ -4122,7 +4142,7 @@ class HostAgent:
             return True
         if not inbox and e.source and _parse(e.at) + mail.SOURCED_RETENTION > now:
             return True  # a sourced reply, in its sender's outbox (§4.9b): what `inbox --sent` reads
-        since = e.expired_at or e.closed_at or (e.read_at if inbox else e.at)
+        since = e.expired_at or e.closed_at or (e.read_at if inbox else e.at) or (dead_since if inbox else None)
         if since is None:
             return True
         return _parse(since) + mail.MAIL_RETENTION > now

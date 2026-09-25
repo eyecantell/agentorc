@@ -1147,6 +1147,10 @@ def ready_to_close(s: dict[str, Any], members: list[dict[str, Any]] | None = ())
     # for a session that exits some other way and never declares anything.
     owed = (s.get("mail") or {}).get("owed") or []
     checks.append((f"outcomes reported ({len(owed)} owed)" if owed else "outcomes reported", not owed))
+    # Design §4.2, §4.9a (TD-072, TD-141): mail nobody read is mail nobody triaged. `ao progress
+    # none` refuses on the same fact; this row is for a session that exits some other way.
+    unread = s.get("unread") or 0
+    checks.append((f"mail read ({unread} unread — `ao inbox`)" if unread else "mail read", not unread))
     if members is None:
         checks.append(("members unknown — the host agent did not list the sessions; reload", False))
     elif members:

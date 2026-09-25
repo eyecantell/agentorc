@@ -437,6 +437,98 @@ async def test_addresses_are_qualified_on_the_way_in_and_identity_comes_from_the
             await person.call("kill", id=sid)
 
 
+async def test_a_session_cannot_wind_down_or_restart_with_unread_mail(agent, tmp_path):
+    """TD-141, design §4.9a: winding down is the last moment anyone reads that inbox. `ao progress
+    none` and `ao progress restart` are refused while anything is unread, naming the count and the
+    command; reading is the whole of the triage — a `note` may be read and left at that. An owed
+    outcome is said first, so a session with both is told the one it clears first."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        lead, worker = await mk("lead", unattended=True), await mk("w", unattended=True)
+        await person.call("set_controllers", id=worker, add=[lead])
+        async with LocalClient(caller=lead) as ld, LocalClient(caller=worker) as w:
+            await ld.call("msg", to=worker, text="claimed: TD-900")
+            await ld.call("msg", to=worker, text="and another")
+            for status in ("none", "restart"):
+                with pytest.raises(AgentError, match="has 2 unread messages") as refused:
+                    await w.call("progress", id=worker, status=status, why="nothing open")
+                assert refused.value.data["unread"] == 2 and "ao inbox" in str(refused.value)
+            # owed first: the person answered a question, and a note is unread besides
+            asked = (await w.call("msg", to="person", text="merge?", kind="ask"))["entry"]
+            await person.call("msg", to=worker, text="yes", kind="reply", reply_to=asked["id"])
+            with pytest.raises(AgentError, match="owes 1 outcome"):
+                await w.call("progress", id=worker, status="none", why="nothing open")
+            await w.call("msg", to="person", text="done: merged", outcome="done", for_=asked["id"])
+            await w.call("inbox")  # reading is the triage; a note needs nothing more
+            got = await w.call("progress", id=worker, status="none", why="nothing open")
+            assert got["out_of_work"]["why"] == "nothing open"
+        for sid in (lead, worker):
+            await person.call("kill", id=sid)
+
+
+async def test_an_unread_note_ages_out_with_the_run_it_was_sent_to(agent, tmp_path, monkeypatch):
+    """TD-141, design §4.10 lifecycle: an unread entry never ages out *while the record lives*;
+    once the record is `exited` its unread `note` ages out on the retention window from the exit —
+    the window, not the exit itself, so inside it the note is still there for a resume to carry.
+    An open `ask` keeps the lifecycle it has: pending while the record is only exited."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        lead, dead, live = [await mk(n, unattended=True) for n in ("lead", "dead", "live")]
+        for sid in (dead, live):
+            await person.call("set_controllers", id=sid, add=[lead])
+        async with LocalClient(caller=lead) as ld:
+            stale = (await ld.call("msg", to=dead, text="claimed: TD-900"))["entry"]
+            asked = (await ld.call("msg", to=dead, text="status?", kind="ask"))["entry"]
+            kept = (await ld.call("msg", to=live, text="claimed: TD-901"))["entry"]
+        await person.call("kill", id=dead)
+        await wait_state(person, dead, "exited")
+        # inside the window: the note is still there
+        await agent._sweep_mail(datetime.now(UTC))
+        assert stale["id"] in [e["id"] for e in (await person.call("inbox", id=dead))["entries"]]
+        # past it: the unread note went with the run; the open ask did not
+        monkeypatch.setattr(mail, "MAIL_RETENTION", timedelta(seconds=0))
+        await agent._sweep_mail(datetime.now(UTC) + timedelta(seconds=1))
+        assert [e["id"] for e in (await person.call("inbox", id=dead))["entries"]] == [asked["id"]]
+        # the live record's unread note is untouched: it never ages out while the session lives
+        assert [e["id"] for e in (await person.call("inbox", id=live))["entries"]] == [kept["id"]]
+        for sid in (lead, live):
+            await person.call("kill", id=sid)
+
+
+async def test_a_resume_inside_the_window_carries_an_unread_note(agent, hookstub, tmp_path):
+    """TD-141: the sweep after an exit leaves an unread `note` for the retention window, and a
+    resume inside it moves the note to the new record, still unread."""
+    async with LocalClient() as person:
+        for d in ("l", "w", "w2"):
+            (tmp_path / d).mkdir()
+        lead = (await person.call("create", name="lead", dir=str(tmp_path / "l"), adapter="shell", argv=["bash"]))["id"]
+        w = (await person.call("create", name="w", dir=str(tmp_path / "w"), adapter=hookstub.name, unattended=True))[
+            "id"
+        ]
+        await person.call("hook", session=w, adapter_id="conv-7", state="idle")
+        await person.call("set_controllers", id=w, add=[lead])
+        async with LocalClient(caller=lead) as ld:
+            note = (await ld.call("msg", to=w, text="rebase before you push"))["entry"]
+        await person.call("kill", id=w)
+        await wait_state(person, w, "exited")
+        await agent._sweep_mail(datetime.now(UTC))
+        w2 = (
+            await person.call(
+                "create",
+                name="w2",
+                dir=str(tmp_path / "w2"),
+                adapter=hookstub.name,
+                unattended=True,
+                resume="conv-7",
+                controllers=[lead],
+            )
+        )["id"]
+        moved = (await person.call("inbox", id=w2))["entries"]
+        assert [(e["id"], e["read_at"]) for e in moved] == [(note["id"], None)]
+        for sid in (lead, w2):
+            await person.call("kill", id=sid)
+
+
 async def test_read_entries_are_pruned_after_retention_and_open_asks_never(agent, tmp_path, monkeypatch):
     """Lifecycle stage 3 (design §4.10): a read entry is kept for the retention window and then
     removed; an unread entry never ages out; an open `ask` is never pruned, and becomes prunable

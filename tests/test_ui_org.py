@@ -260,12 +260,15 @@ def test_ready_to_close_needs_no_live_member_and_reads_it_from_the_control_graph
     assert "ready to close ✓" not in templates.get_template("card.html").render(s=v)
     # a plain worker's checklist is what it always was
     assert [n for n, _ in view(worker, fleet)["ready"]] == [
-        "tree clean", "branch pushed", "no subagents running", "outcomes reported",
+        "tree clean", "branch pushed", "no subagents running", "outcomes reported", "mail read",
     ]  # fmt: skip
     # design §4.2, §4.10 *Outcomes* (TD-079): the person answered and has not been told what came
     # of it — the same fact `ao progress none` is refused on, for a session that never declares
     owing = view({**worker, "mail": {"owed": ["m-1", "m-2"]}}, fleet)["ready"]
-    assert owing[-1] == ("outcomes reported (2 owed)", False)
+    assert owing[-2] == ("outcomes reported (2 owed)", False)
+    # design §4.2, §4.9a (TD-141): mail nobody read — the fact `ao progress none` is refused on
+    unread = view({**worker, "unread": 3}, fleet)["ready"]
+    assert unread[-1] == ("mail read (3 unread — `ao inbox`)", False)
     # the member gone: the item passes, and the card says so
     worker["state"] = "closed"
     v = view(lead, fleet)
