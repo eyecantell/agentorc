@@ -318,6 +318,10 @@ def read_when(
             " — the card's unread chip shows it" + tail
         )
     state = s.state if s is not None else "exited"
+    if state == "unreachable" or unreachable:
+        # before the seat and exited rows: a down host's record reads *unreachable* on its card
+        # whatever its last state, so the sentence under that card must too (techlead, PR #583)
+        return "lands at the home; its host cannot be reached, so it is delivered when the link is back" + tail
     on_call = (seat or (s is not None and bool(s.seat))) and state in ("exited", "closed")
     if on_call:
         if ask:
@@ -327,8 +331,6 @@ def read_when(
         )
     if s is None or state in ("exited", "closed"):
         return "read when this session is resumed, or started again under this name" + tail
-    if state == "unreachable" or unreachable:
-        return "lands at the home; its host cannot be reached, so it is delivered when the link is back" + tail
     stop = s.wrapup_sent_at or s.wrapup_at
     if not stop and s.run_until:
         try:

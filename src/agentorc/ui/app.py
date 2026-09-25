@@ -2392,6 +2392,8 @@ def create_app() -> FastAPI:
             asker = str(_answered_of(e).get("asker") or "")
             if asker:
                 e["asker_name"] = names.get(asker, asker)
+                # Overrule writes to the asker, so its dialog's line is the asker's (TD-168)
+                e["asker_when"] = str(((records.get(asker) or {}).get("read_when") or {}).get("note") or "")
                 e["asker_open"] = asker if asker in names else ""
         return got
 
@@ -2887,9 +2889,12 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         got = await call("inbox", id=sid)
         fleet = await call("list")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        records = {o.get("id"): o for o in fleet}
         origin = page_origin(request)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does
+            e["reply_when"] = str(((records.get(e["from"]) or {}).get("read_when") or {}).get("note") or "")
             s = shaped(e.get("text"), origin)
             e["lead_html"], e["rest_html"] = str(s["lead"]), str(s["rest"])
         return got

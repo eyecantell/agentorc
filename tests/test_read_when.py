@@ -44,6 +44,9 @@ def test_each_case_of_the_table_in_the_doorbells_order():
         assert rw(rec(st), "note", NOW) == "read when this session is resumed, or started again under this name"
     assert rw(rec("unreachable"), "note", NOW).startswith("lands at the home; its host cannot be reached")
     assert rw(rec("idle"), "note", NOW, unreachable=True).startswith("lands at the home")
+    # a down host's exited record reads *unreachable* on its card, so here too (techlead, PR #583)
+    assert rw(rec("exited"), "note", NOW, unreachable=True).startswith("lands at the home")
+    assert rw(seat, "ask", NOW, unreachable=True).startswith("lands at the home")
     assert "it is wrapping up" in rw(rec("idle", wrapup_sent_at="2026-09-25T11:00:00Z"), "note", NOW)
     assert "it is wrapping up" in rw(rec("working", run_until="2026-09-25T11:00:00Z"), "note", NOW)
     assert "it is wrapping up" not in rw(rec("working", run_until="2026-09-25T13:00:00Z"), "note", NOW)
@@ -184,3 +187,43 @@ def test_the_composers_line_swaps_with_the_kind_and_a_reply_reads_as_a_note():
     js = (UI / "static" / "app.js").read_text()
     assert '$("#mailkind").onchange = show' in js and "when: { ask: b.dataset.whenAsk" in js
     assert 'id="mailwhen"' in (UI / "templates" / "base.html").read_text()
+
+
+@pytest.mark.unit
+def test_every_reply_dialog_carries_its_addressees_line(tmp_path, monkeypatch):
+    """§4.5a **Message**: *the Reply dialog shows the same line for its kind* — the Inbox page's and
+    the Focus panel's Reply the sender's, **Overrule** the asker's (techlead, PR #583)."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from test_ui_inbox import entry, rows
+
+    answered = entry(
+        "m-5", "note", answered={"question": "q?", "asker": "ao-w2", "source": "x"}, asker_when="read when resumed"
+    )
+    assert 'data-when-note="read when resumed"' in rows("answered", [answered])
+    js = (UI / "static" / "app.js").read_text()
+    assert 'data-when-note="${esc(e.reply_when || "")}">Reply</button>' in js  # the Focus panel's
+    from agentorc.ui import app as uiapp
+
+    class Fake:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def call(self, method, **kw):
+            if method == "inbox":
+                return {"entries": [{"id": "m-1", "from": "ao-w", "kind": "note", "text": "hi"}]}
+            if method == "list":
+                return [{"id": "ao-w", "name": "w", "read_when": {"ask": "a", "note": "read at its Stop"}}]
+            return {}
+
+    monkeypatch.setattr(uiapp, "LocalClient", Fake)
+    from fastapi.testclient import TestClient
+
+    with TestClient(uiapp.create_app()) as c:
+        got = c.get("/api/sessions/ao-x/inbox").json()
+    assert got["entries"][0]["reply_when"] == "read at its Stop"
