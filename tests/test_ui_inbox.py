@@ -134,6 +134,69 @@ def rows(section, es):
 
 
 @pytest.mark.unit
+def test_a_shaped_message_draws_its_verdict_and_folds_the_reading():
+    """§4.5a **Inbox row: details** (§4.10 *How a message to a person is written*, TD-138): the first
+    paragraph drawn, the rest under a closed `<details>` whose summary reads *details*, rendered
+    from the closed subset; the row's controls sit outside the fold, so a row is answered folded,
+    and the find still holds the whole text."""
+    text = "merged #517 — one gap left, not a blocker\n\n- read against **§4.2a**\n- the gate is green"
+    html = rows("needs", [entry("m-1", "ask", text=text)])
+    assert '<div class="body md"><p>merged #517 — one gap left, not a blocker</p></div>' in html
+    assert '<details class="fold" data-fold="m-1"><summary>details</summary>' in html
+    assert "<ul><li>read against <strong>§4.2a</strong></li><li>the gate is green</li></ul>" in html
+    assert '<details class="fold" data-fold="m-1" open' not in html  # closed by default
+    fold_at, reply_at = html.index('class="fold"'), html.index('data-act="reply"')
+    assert fold_at < html.index("</details>", fold_at) < reply_at  # the controls follow the fold, outside it
+    assert 'data-find="w1 merged #517' in html and "the gate is green" in html.split('data-find="')[1].split('"')[0]
+
+
+@pytest.mark.unit
+def test_a_short_message_has_no_disclosure_and_an_old_long_one_folds_at_a_sentence():
+    """A 200-character text draws whole; an old one-paragraph entry from before the rule folds at
+    the last sentence end before `FOLD_CHARS` (§4.5a *Inbox row: details*, the backstop)."""
+    short = rows("fyi", [entry("m-1", "note", text="a" * 200)])
+    assert 'class="fold"' not in short and "a" * 200 in short
+    old = ("A worker said something at length here. " * 40).strip()
+    html = rows("fyi", [entry("m-2", "note", text=old)])
+    lead = html.split('<div class="body md"><p>')[1].split("</p>")[0]
+    assert lead.endswith(".") and len(lead) <= 300 and '<details class="fold" data-fold="m-2">' in html
+
+
+@pytest.mark.unit
+def test_a_message_never_draws_markup_or_a_link_to_the_page_itself():
+    """§4.10: raw HTML is its characters, and a link is drawn only when absolute, `http(s)` and not
+    the page's own origin — which the row knows from the page it is rendered into."""
+    from agentorc.ui.app import templates
+
+    text = "<script>x</script> [Allow](/api/x) [kill](http://ui:8765/api/k) [docs](https://example.com/p)"
+    html = templates.get_template("inbox_rows.html").render(
+        rows=[entry("m-1", "note", text=text)], section="fyi", origin="http://ui:8765"
+    )
+    body = html.split('<div class="body md">')[1].split("</div>")[0]
+    assert "<script>" not in body and "&lt;script&gt;" in body
+    assert "[Allow](/api/x)" in body and "[kill](http://ui:8765/api/k)" in body
+    assert body.count("<a ") == 1 and '<small class="lhost">example.com</small>' in body
+
+
+@pytest.mark.unit
+def test_answered_for_you_quotes_the_questions_first_paragraph():
+    """§4.5a *Inbox row: details*: the *answered for you* row's quotation is the question's first
+    paragraph, and the answer below it folds as any row does."""
+    e = entry(
+        "m-1",
+        "reply",
+        text="merged #517\n\nthe reading",
+        answered={"asker": "ao-w2", "question": "merge #517?\n\nwhy I ask", "source": "design §4.2a"},
+    )
+    html = rows("answered", [e])
+    assert (
+        '<div class="body md quoted"><p>merge #517?</p></div>' in html
+        and "why I ask" not in html.split("quoted")[1].split("</div>")[0]
+    )
+    assert '<details class="fold" data-fold="m-1">' in html
+
+
+@pytest.mark.unit
 def test_an_ask_row_carries_reply_delete_and_snooze_and_no_countdown():
     """§4.5a **Inbox row: `ask`**: Reply, Delete (which confirms, and declines), Snooze with its
     three times — and no countdown, because an `ask` to the person does not expire (§4.10)."""
@@ -318,13 +381,19 @@ global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const may = window.AO.maySwapSection;
 const quiet = el();
-const menu = el({ querySelector: (s) => (s === "details[open]" ? el() : null) });
+const menu = el({ querySelector: (s) => (s === "details[open]:not(.fold)" ? el() : null) });
+// only a *details* fold is open (TD-138): the selector above does not see it, and the swap goes on
+const folded = el({ querySelector: (s) => (s === "details[open]" ? el() : null) });
 const button = el();
 const busy = el({ contains: (x) => x === button });
 console.log(JSON.stringify({
   quiet: may(quiet, document.body),
   missing: may(null, null),
   menu_open: may(menu, null),
+  fold_open: may(folded, null),
+  fold_body: window.AO.foldBody({ id: "m-1", lead_html: "<p>lead</p>", rest_html: "<p>rest</p>" }),
+  bare_body: window.AO.foldBody({ id: "m-2", lead_html: "<p>all</p>", rest_html: "" }),
+  old_body: window.AO.foldBody({ id: "m-3", text: "<b>x</b>" }),
   focus_inside: may(busy, button),
   focus_elsewhere: may(quiet, button),
 }));
@@ -348,6 +417,12 @@ def test_a_poll_never_swaps_rows_out_from_under_the_person():
         "quiet": True,  # nobody is in it: swap
         "missing": False,  # no such section on this page
         "menu_open": False,  # a Snooze menu the person opened
+        "fold_open": True,  # an open *details* fold is put back after the swap (TD-138)
+        # the Focus panel's entry, from the halves the server rendered (§4.5a *Inbox row: details*)
+        "fold_body": '<div class="body md"><p>lead</p></div><details class="fold" data-fold="m-1">'
+        '<summary>details</summary><div class="body md"><p>rest</p></div></details>',
+        "bare_body": '<div class="body md"><p>all</p></div>',
+        "old_body": '<div class="body">&lt;b&gt;x&lt;/b&gt;</div>',  # an older UI's entry: escaped, whole
         "focus_inside": False,  # tabbing through this section's controls
         "focus_elsewhere": True,  # the focus is in another section, or the filter box
     }
@@ -1188,14 +1263,16 @@ async def _inbox_of(sid):
 def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
     """Paul, 2026-09-20 (TD-079): dismissing an FYI entry closed the FYI list. The click handler
     closed the nearest `<details>` of any kind, and a control that sits in no menu has the *section*
-    as its nearest one. It closes a `details.more` and nothing else — and every menu is one."""
+    as its nearest one. It closes a `details.more` and nothing else — and every menu is one. The
+    third kind is a message's *details* fold (TD-138), which holds text and never a control."""
     js = (UI / "static" / "app.js").read_text(encoding="utf-8")
     assert 'b.closest("details.more")' in js and 'b.closest("details")' not in js
     for tpl in (UI / "templates").glob("*.html"):
         for tag in re.findall(r"<details[^>]*>", tpl.read_text(encoding="utf-8")):
             menu = 'class="more"' in tag
             section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox"))
-            assert menu != section, f"{tpl.name}: {tag} is neither a menu the handler folds nor a known section"
+            fold = 'class="fold"' in tag
+            assert menu + section + fold == 1, f"{tpl.name}: {tag} is not one of a menu, a known section or a fold"
 
 
 # -- design round 2: one centred column, sections as headings, rows as cards (TD-082) -------------

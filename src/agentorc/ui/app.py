@@ -25,6 +25,7 @@ from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketD
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 
 from agentorc import org as orgmod
 from agentorc import profiles as profiles_mod
@@ -38,6 +39,7 @@ from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
 from sessionorc.models import GRANTS, STATE_RANK, has_control, report_head, report_line, stop_note
 
+from . import render as rendermod
 from . import uiconf
 from .icons import role_svg
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
@@ -72,6 +74,30 @@ def suggested_answers(e: Any) -> list[str]:
 
 
 templates.env.globals["suggested_answers"] = suggested_answers
+
+
+def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
+    """A mail row's text as the row draws it (design §4.5a **Inbox row: details**, §4.10 *How a
+    message to a person is written*; TD-138): `lead`, the first paragraph, and `rest`, what goes
+    under *details* — empty when there is nothing to fold — each rendered from the closed markdown
+    subset by `agentorc.ui.render`, whose output is escaped text and its own few tags and nothing
+    else. `origin` is the page's own, so a link back to it is drawn as characters.
+
+    A template global like `suggested_answers`, so the page, the poll and a test rendering the
+    template directly shape a row the same way; the Focus Inbox panel gets the same two halves on
+    each entry of its fetch (`api_inbox`)."""
+    lead, rest = rendermod.fold(str(text or ""))
+    o = str(origin) if origin else None
+    return {"lead": Markup(rendermod.render(lead, o)), "rest": Markup(rendermod.render(rest, o) if rest else "")}
+
+
+templates.env.globals["shaped"] = shaped
+
+
+def page_origin(request: Request) -> str:
+    """`scheme://host:port` of the page being served: the one origin a rendered link may not name."""
+    return str(request.base_url).rstrip("/")
+
 
 # Why a profile's last usage poll gave no reading (design §4.2, §4.5a **usage** chip; TD-087): the
 # adapter's `reason` word, put into words for the chip's hover. The page keys on the word and
@@ -2141,13 +2167,14 @@ def create_app() -> FastAPI:
                 e["asker_open"] = asker if asker in names else ""
         return got
 
-    def inbox_html(sections: dict[str, Any]) -> dict[str, str]:
+    def inbox_html(sections: dict[str, Any], origin: str = "") -> dict[str, str]:
         """Each section's rows, rendered by the one template the page itself renders them with, so
         a poll replaces a section without the client composing any markup — the shape the events
-        stream already uses for team headers. Jinja escapes every field, which is what keeps what a
-        session wrote text and nothing else (TD-071 item 8)."""
+        stream already uses for team headers. Jinja escapes every field, and a mail row's text goes
+        through the closed-subset renderer (`shaped`), which is what keeps what a session wrote
+        text and nothing else (TD-071 item 8, TD-138)."""
         rows = templates.get_template("inbox_rows.html")
-        return {k: rows.render(rows=sections[k], section=k) for k in INBOX_SECTIONS}
+        return {k: rows.render(rows=sections[k], section=k, origin=origin) for k in INBOX_SECTIONS}
 
     h = SimpleNamespace(
         call=call,
@@ -2621,15 +2648,20 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return JSONResponse({"ok": True})
 
     @app.get("/api/sessions/{sid}/inbox")
-    async def api_inbox(sid: str):
+    async def api_inbox(sid: str, request: Request):
         """design §4.5a Focus side panel **Inbox** (§4.10 "A bounded body"): bodies never ride the
         pushed record, so the panel fetches them here. No caller — a person's read, which sets no
-        `read_at`, because a person is not the session. Each sender gets its name beside its id."""
+        `read_at`, because a person is not the session. Each sender gets its name beside its id,
+        and its text the two halves the Inbox row draws (`shaped`, TD-138): the panel folds the
+        same way, from the same renderer, and composes no markup of its own from a session's text."""
         got = await call("inbox", id=sid)
         fleet = await call("list")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        origin = page_origin(request)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            s = shaped(e.get("text"), origin)
+            e["lead_html"], e["rest_html"] = str(s["lead"]), str(s["rest"])
         return got
 
     @app.get("/api/sessions")
@@ -2785,6 +2817,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             "inbox.html",
             {
                 "sections": sections,
+                "origin": page_origin(request),
                 "board_note": board_note,
                 "person_needs": sections["count"],
                 "person_fyi": sections["fyi_n"],
@@ -2797,7 +2830,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
 
     @app.get("/api/person/inbox")
-    async def api_person_inbox():
+    async def api_person_inbox(request: Request):
         """design §4.5a Org top bar **Inbox** and the **Inbox page** (§4.10): the entries, which
         section each is in, their rendered rows, and `needs` — the count, computed in the one place
         (`inbox_sections`) the page renders from, so the top bar's number and the page cannot
@@ -2852,7 +2885,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # time, and nothing it says — the browser counts those newer than it last opened the group
         # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
         got["answered_marks"] = [{"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]]
-        got["html"] = inbox_html(sections)
+        got["html"] = inbox_html(sections, page_origin(request))
         return got
 
     # design §4.5a **Inbox row** controls (§4.10): each is a person's own act on their own inbox,

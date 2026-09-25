@@ -389,6 +389,29 @@
     }
   });
 
+  // design §4.5a **Inbox row: details** (§4.10 *How a message to a person is written*; TD-138):
+  // which rows' *details* the person has opened, by entry id. The poll replaces rows, so the set is
+  // put back after each swap (`reopenFolds`); it lives as long as the page and is never stored —
+  // a fold is not state. `toggle` does not bubble, hence the capture.
+  const foldsOpen = new Set();
+  document.addEventListener?.("toggle", (ev) => {
+    const d = ev.target;
+    if (!d || !d.matches || !d.matches("details.fold") || !d.dataset.fold) return;
+    if (d.open) foldsOpen.add(d.dataset.fold); else foldsOpen.delete(d.dataset.fold);
+  }, true);
+  AO.reopenFolds = function (root) {
+    (root ? $$("details.fold", root) : []).forEach((d) => { if (foldsOpen.has(d.dataset.fold)) d.open = true; });
+  };
+  // The Focus panel's entry, folded as the Inbox row is: both halves were rendered by the server's
+  // closed-subset renderer (`api_inbox`, `shaped`) — escaped text and its own few tags — so nothing
+  // here composes markup from what a session wrote. An entry from an older UI without them is the
+  // escaped text, whole, as before.
+  AO.foldBody = function (e) {
+    if (typeof e.lead_html !== "string") return `<div class="body">${esc(e.text)}</div>`;
+    return `<div class="body md">${e.lead_html}</div>`
+      + (e.rest_html ? `<details class="fold" data-fold="${esc(e.id)}"><summary>details</summary><div class="body md">${e.rest_html}</div></details>` : "");
+  };
+
   // One mail entry, as the Focus Inbox panel shows it (design §4.5a **Focus Inbox**, §4.10):
   // sender (name, id on hover), kind, `about`, read/unread, age, an `ask`'s state, Reply and
   // delete. `owner` is the session whose inbox it sits in — the person inbox has the Inbox page's
@@ -422,7 +445,7 @@
       + `<span class="grow"></span><span class="st">${e.read_at ? "read" : "unread"}</span>`
       + `<span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
       + (e.reply_to ? `<div class="st">reply to ${esc(e.reply_to)}</div>` : "")
-      + `<div class="body">${esc(e.text)}</div>`
+      + AO.foldBody(e)
       + (e.default ? `<div class="st">unless you say otherwise: ${esc(e.default)}</div>` : "")
       + `<div class="row gap">${st ? `<span class="st${e.expired_at ? " expired" : ""}">${st}</span>` : ""}<span class="grow"></span>${reply}`
       + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-confirm="${confirmText}">Delete</button></div></div>`;
@@ -1026,7 +1049,8 @@
   // is one readable line rather than conditions spread through the swap.
   AO.maySwapSection = function (el, focused) {
     if (!el) return false;
-    if (el.querySelector("details[open]")) return false;  // a menu the person has opened
+    // a menu the person has opened; an open *details* fold is not one — it is put back after the swap
+    if (el.querySelector("details[open]:not(.fold)")) return false;
     return !(focused && focused !== document.body && el.contains(focused));
   };
 
@@ -1068,6 +1092,7 @@
         const kept = AO.denyWhys(el), at = ring ? $$(".mailrow", el).indexOf(ring) : -1;
         el.innerHTML = got.html[k] || "";
         AO.restoreDenyWhys(el, kept);
+        AO.reopenFolds(el);
         if (ring) {
           const rows = $$(".mailrow", el), back = rows.find((r) => r.dataset.msg === ring.dataset.msg) || rows[at] || rows[rows.length - 1];
           if (back) back.focus({ preventScroll: true });
@@ -1632,6 +1657,7 @@
         $("#inboxcard").classList.toggle("hidden", !es.length);
         $("#inboxcount").textContent = es.length ? `${got.unread} unread · ${es.length}` : "";
         $("#inboxlist").innerHTML = es.slice().reverse().map((e) => AO.mailEntry(e, id)).join("");
+        AO.reopenFolds($("#inboxlist"));
         if (inboxFirst && location.hash === "#inbox" && es.length) $("#inboxcard").scrollIntoView({ block: "nearest" });
         inboxFirst = false;
       }, 150);
