@@ -1646,4 +1646,4 @@ def test_the_focus_reports_panel_shows_a_reference_once():
     `#359 → #359` — on the Focus Reports panel as on the card. The panel is drawn inside `AO.focus`'s
     closure, which the node probe cannot reach, so the rule is pinned where it is written."""
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
-    assert "const pr = p.pr && String(p.ref) !== `#${p.pr}` ?" in js
+    assert "(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class=\"st\">→ ${prLink(p.pr)}</span>` : \"\")" in js

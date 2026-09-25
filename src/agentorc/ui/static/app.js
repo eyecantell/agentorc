@@ -185,6 +185,30 @@
 
   // design §4.5a **Message** / Focus Inbox **Reply** (§4.10): one composer for both, a <dialog>.
   // Resolves to what to mail, or null on Cancel / an empty body.
+  // design §4.5a Focus side panel **Reports** (TD-143, built by TD-150): a record's `progress` as
+  // the panel's four groups. A claim is *in review* when it has a PR — its own `pr`, else a derived
+  // entry's on the same reference, which is then folded into it rather than listed twice — and *in
+  // progress* otherwise; anything not done or dropped is in progress. Pure, so a test can call it.
+  AO.reportGroups = function (progress) {
+    const all = progress || [];
+    const declared = (p) => (p.source || "declared") === "declared";
+    const claimedRefs = new Set(all.filter((p) => declared(p) && p.status === "claimed").map((p) => String(p.ref)));
+    const derivedPr = {};
+    all.forEach((p) => { if (!declared(p) && p.pr && derivedPr[p.ref] == null) derivedPr[p.ref] = p.pr; });
+    const g = { progress: [], review: [], done: [], dropped: [] };
+    all.forEach((p) => {
+      if (!declared(p) && p.status === "claimed" && claimedRefs.has(String(p.ref))) return;  // folded
+      if (p.status === "done") g.done.push(p);
+      else if (p.status === "dropped") g.dropped.push(p);
+      else {
+        const pr = p.pr || (declared(p) ? derivedPr[p.ref] : null);
+        if (p.status === "claimed" && pr) g.review.push({ ...p, review_pr: pr });
+        else g.progress.push(p);
+      }
+    });
+    return g;
+  };
+
   AO.compose = function (o) {
     const dlg = $("#mailbox");
     $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
@@ -1629,6 +1653,13 @@
   AO.focus = function (s, popped) {
     const id = s.id;
     document.title = AO.focusTitle(s);
+    // §4.5a **Reports** (TD-150): the heading's **i** mark opens its paragraph in place, as the
+    // Inbox's do; it sits in the panel's `<summary>`, so the press must not also fold the panel
+    const imark = $("#i-reports"), info = $("#info-reports");
+    if (imark && info) imark.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      info.hidden = !info.hidden; imark.setAttribute("aria-expanded", info.hidden ? "false" : "true");
+    });
     if (popped) {
       // design §4.5 *Pop out* (TD-046): say so to this browser's other tabs, and keep the size and
       // position the person gives the window, per session, as a team's fold is kept.
@@ -1915,19 +1946,38 @@
     // pushed record, so a `progress` or `finding` call from anywhere shows up here without a reload.
     function renderReports(v) {
       const progress = v.progress || [], findings = v.findings || [];
-      $("#reportscard").classList.toggle("hidden", !(progress.length || findings.length));
+      const card = $("#reportscard");
+      card.classList.toggle("hidden", !(progress.length || findings.length));
       $("#reportscount").textContent = [progress.length ? `${progress.length} progress` : "", findings.length ? `${findings.length} filed` : ""].filter(Boolean).join(" · ");
-      $("#progresslist").innerHTML = progress.map((p) => {
+      const base = card.dataset.prBase || "", name = card.dataset.name || v.name || "this session";
+      // the PR number as a link from a structured field — never from text a session wrote
+      const prLink = (n) => (base ? `<a class="ref" href="${esc(base)}/pull/${encodeURIComponent(n)}" target="_blank" rel="noopener">#${esc(n)}</a>` : `#${esc(n)}`);
+      const row = (p) => {
         const derived = (p.source || "declared") !== "declared";
         // a reference is shown once (§4.5a **report line**, TD-095): an entry whose reference is
         // its PR never reads `#359 → #359` — the rule `report_line` follows for the card
-        const pr = p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ #${esc(p.pr)}</span>` : "";
+        const st = p.review_pr
+          ? `<span class="st claimed">claimed · in review ${prLink(p.review_pr)}</span>`
+          : `<span class="st ${esc(p.status)}">${esc(p.status)}</span>`
+            + (p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "");
         const why = p.why ? ` <span class="st">${esc(p.why)}</span>` : "";
-        const drop = p.status === "claimed"
-          ? ` <button class="btn sm ghost" data-act="drop" data-id="${id}" data-ref="${esc(p.ref)}" data-confirm="Drop ${esc(p.ref)}? It is recorded as dropped by you.">Drop</button>` : "";
         return `<div class="rep${derived ? " derived" : ""}"><span class="ref" title="${derived ? "derived by the agent" : "declared by the session"}">${esc(p.ref)}</span>`
-          + `<span class="st ${esc(p.status)}">${esc(p.status)}</span>${pr}${why}<span class="grow"></span><span class="st age" data-since="${esc(p.at || "")}">${fmtAge(p.at)}</span>${drop}</div>`;
+          + `${st}${why}<span class="grow"></span><span class="st age" data-since="${esc(p.at || "")}">${fmtAge(p.at)}</span></div>`;
+      };
+      const g = AO.reportGroups(progress);
+      const heads = { progress: "in progress", review: "in review", done: "done", dropped: "dropped" };
+      $("#progresslist").innerHTML = Object.keys(heads).filter((k) => g[k].length)
+        .map((k) => `<div class="st repgroup">${heads[k]}</div>` + g[k].map(row).join("")).join("");
+      // Drop, behind more ▾, on a declared in-progress claim only: a claim with a PR is in review,
+      // and letting go of it is not what a person reading the panel means (TD-143)
+      const drops = g.progress.filter((p) => p.status === "claimed" && (p.source || "declared") === "declared");
+      const branch = (p) => p.branch || (v.git && v.git.branch) || "";
+      $("#reportsmenu").innerHTML = drops.map((p) => {
+        const confirmText = `Let go of ${p.ref}'s claim? The lease ends and another session may take it; `
+          + (branch(p) ? `the branch ${branch(p)} stays; ` : "") + `only ${name} can claim it again.`;
+        return `<button data-act="drop" data-id="${id}" data-ref="${esc(p.ref)}" data-confirm="${esc(confirmText)}">Drop ${esc(p.ref)}…</button>`;
       }).join("");
+      $("#reportsmore").hidden = !drops.length;
       $("#findinglist").innerHTML = findings.map((f) => {
         const derived = (f.source || "declared") !== "declared";
         const pri = f.priority ? ` <span class="st">${esc(f.priority)}</span>` : "";

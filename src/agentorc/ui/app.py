@@ -2513,6 +2513,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Org",
                 # design §4.5a **Pop out** (TD-046): the same Focus, without the nav and the top bar
                 "popped": window == "1",
+                # §4.5a **Reports** (TD-150): the base a claim in review's PR number links from
+                "pr_base": await asyncio.to_thread(reviewmod.repo_web, s.get("repo") or s.get("dir")),
             },
         )
 

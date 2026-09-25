@@ -124,6 +124,12 @@ def _github(directory: str) -> str:
     return f"https://github.com/{m.group('slug')}" if m else ""
 
 
+def repo_web(directory: str | None) -> str:
+    """The web address of the checkout at `directory` — its `origin` on GitHub — or "" when that
+    cannot be said; `pr_url`'s base, for a page that links PR numbers it learns later (TD-150)."""
+    return _github(str(directory)) if directory else ""
+
+
 def pr_url(directory: str | None, pr: int) -> str:
     """The web link of PR `pr` in the checkout at `directory` — its `origin` on GitHub — or "" when
     that cannot be said (no directory, no origin, another forge): the Inbox then draws `#<n>` bare

@@ -126,11 +126,18 @@
       <summary class="row gap"><span class="h2">Git</span><span class="mono muted small" id="gitline">{% if s.git %}{{ s.git.branch }}{% if s.git.unpushed %} · {{ s.git.unpushed }} unpushed{% if s.git.pushed_against %} vs {{ s.git.pushed_against }}{% endif %}{% endif %}{% if s.git.ahead %} · {{ s.git.ahead }} ahead{% endif %}{% if s.git.behind %} · {{ s.git.behind }} behind{% endif %}{% else %}not a git directory{% endif %}</span></summary>
       <div class="mono small gitfiles" id="gitfiles">{% if s.git %}{% for f in s.git.files %}<div>{{ f }}</div>{% endfor %}{% if not s.git.files %}<div class="muted">clean</div>{% endif %}{% endif %}</div>
     </details>
-    <details class="card pad side reports hidden" data-side="reports" id="reportscard" open>
-      <summary class="row gap"><span class="h2">Reports</span><span class="meta" id="reportscount"></span></summary>
+    {# design §4.5a Focus side panel **Reports** (TD-143's design, built by TD-150): grouped by state —
+       in progress, in review (a claim with a PR), done, dropped — so a claim in review never reads as
+       one not started. The explanation is the heading's **i** mark, read before a press; **Drop**
+       sits behind the panel's **more ▾**, on in-progress claims only, its confirm naming the cost. #}
+    <details class="card pad side reports hidden" data-side="reports" id="reportscard" data-pr-base="{{ pr_base or '' }}" data-name="{{ s.name }}" open>
+      <summary class="row gap"><span class="h2">Reports</span><span class="meta" id="reportscount"></span>
+        <button class="imark" type="button" id="i-reports" aria-controls="info-reports" aria-expanded="false" aria-describedby="info-reports" aria-label="About Reports" title="What the session declared, and what the agent derived from its branch and PRs (dashed), grouped by state. A claim with a PR is in review, not in progress. Drop, under more ▾, lets go of a claim that has no PR yet.">i</button>
+      </summary>
+      <p class="note secinfo" id="info-reports" hidden>What the session declared, and what the agent derived from its branch and PRs (dashed), grouped by state. A claim with a PR is <b>in review</b>, not in progress. <b>Drop</b>, under <b>more ▾</b>, lets go of a claim that has no PR yet: the lease ends and the session is told.</p>
       <div id="progresslist"></div>
       <div id="findinglist"></div>
-      <div class="note">What the session declared, plus what the agent derived from its branch and PRs (dashed). Drop records that a claim was let go.</div>
+      <details class="more" id="reportsmore" hidden><summary class="btn sm link" title="more">more ▾</summary><div class="menu" id="reportsmenu"></div></details>
     </details>
     {# design §4.5a Focus side panel **Inbox** (§4.10): what others addressed to this session,
        beside Reports (what it declared). Bodies are fetched through the `inbox` RPC as a person's
