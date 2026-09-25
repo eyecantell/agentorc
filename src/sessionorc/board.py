@@ -172,6 +172,24 @@ def item_line(text: str, due: str, today: str, session: str | None, host: str | 
     return f"- [ ] {today} ({who}) — {words}. Context: {ctx}. Due: {due}.\n"
 
 
+def _top_of_needs(lines: list[str]) -> int:
+    """Where the add goes: above the first item **of the *Needs the user* section** — another
+    section's items (a board's parked in-flight work) are never where a person's line lands — or,
+    when that section holds none, right under its heading and blank line. A board with no such
+    heading takes it above its first item, else at the end."""
+    head = next((i for i, ln in enumerate(lines) if NEEDS_RE.match(ln)), None)
+    if head is None:
+        return next((i for i, ln in enumerate(lines) if ANY_ITEM_RE.match(ln)), len(lines))
+    end = next((i for i in range(head + 1, len(lines)) if lines[i].startswith("#")), len(lines))
+    first = next((i for i in range(head + 1, end) if ANY_ITEM_RE.match(lines[i])), None)
+    if first is not None:
+        return first
+    at = head + 1
+    while at < end and not lines[at].strip():
+        at += 1
+    return at
+
+
 def add(
     root: str | Path,
     text: str,
@@ -196,15 +214,9 @@ def add(
             lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
         except OSError as e:
             raise Refused(f"cannot read {path}: {e}") from None
-        at = next((i for i, ln in enumerate(lines) if ANY_ITEM_RE.match(ln)), None)
-        if at is None:  # no item yet: under the *Needs the user* heading and its blank, else at the end
-            head = next((i for i, ln in enumerate(lines) if NEEDS_RE.match(ln)), None)
-            at = len(lines) if head is None else head + 1
-            if head is not None:
-                while at < len(lines) and not lines[at].strip():
-                    at += 1
-            if lines and not lines[-1].endswith("\n") and at == len(lines):
-                lines[-1] += "\n"
+        at = _top_of_needs(lines)
+        if lines and not lines[-1].endswith("\n") and at == len(lines):
+            lines[-1] += "\n"
         was = "".join(lines)
         lines.insert(at, line)
         head = " ".join(str(text).split()).rstrip(".")

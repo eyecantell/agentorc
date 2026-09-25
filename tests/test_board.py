@@ -214,3 +214,56 @@ async def test_put_on_the_board_is_the_persons_from_an_fyi_row_and_dismisses_it(
         assert line.startswith("- [ ] ") and "(session `w` on " in line and "Context: TD-900. Due: 2026-10-02." in line
         assert note["id"] not in [e["id"] for e in (await me.call("inbox"))["entries"]]
         await me.call("kill", id=w)
+
+
+def test_the_add_lands_in_needs_the_user_never_above_another_sections_items(repo):
+    """Review of PR #578: with *Needs the user* empty and a parked in-flight item below it, the
+    line goes under *Needs the user*, not above the parked item."""
+    (repo / board.BOARD).write_text(
+        "# User attention\n\n## Needs the user\n\n## In-flight (parked by a session)\n\n- [ ] 2026-09-20 parked.\n"
+    )
+    git(repo, "commit", "-qam", "parked only")
+    got = board.add(repo, "First", "2026-10-02", entry="m-1", today="2026-09-25")
+    lines = (repo / board.BOARD).read_text().splitlines()
+    assert got["line"] == 5 and lines[4].startswith("- [ ] 2026-09-25 (n/a) — First.")
+    assert lines[5] == "## In-flight (parked by a session)"
+
+
+async def test_put_on_the_board_twice_at_once_writes_one_line_and_a_refused_dismiss_is_said(
+    agent, repo, tmp_path, monkeypatch
+):
+    """Review of PR #578: two presses on one entry at once write one line, the second refused; and
+    a dismiss refused after the commit landed is reported beside the commit, not raised."""
+    import asyncio
+
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    (home / "repos.txt").write_text(f"{repo}\n")
+    (home / "hosts.yml").write_text(f"local:\n  repos_registry: {home / 'repos.txt'}\n")
+    path = str(repo / board.BOARD)
+    async with LocalClient() as me:
+        w = (await me.call("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"]))["id"]
+        async with LocalClient(caller=w) as worker:
+            one = (await worker.call("msg", to="person", text="one"))["entry"]
+            two = (await worker.call("msg", to="person", text="two"))["entry"]
+        args = dict(board=path, action="add", text="Check it", due="2026-10-02")
+        async with LocalClient() as a, LocalClient() as b:
+            got = await asyncio.gather(
+                a.call("board_edit", **args, entry=one["id"]), b.call("board_edit", **args, entry=one["id"]),
+                return_exceptions=True,
+            )  # fmt: skip
+        assert sum(isinstance(g, dict) for g in got) == 1
+        # refused while the first is under way — or, had it already finished, because the row is gone
+        refused = str(next(g for g in got if not isinstance(g, dict)))
+        assert "already being put on the board" in refused or "holds no entry" in refused
+        assert (repo / board.BOARD).read_text().count("Check it") == 1
+
+        async def refuse(**_):
+            from sessionorc.agent import RpcError
+
+            raise RpcError("refused for the test")
+
+        monkeypatch.setattr(agent, "rpc_inbox_dismiss", refuse)
+        got = await me.call("board_edit", **args, entry=two["id"])
+        assert got["dismissed"] == [] and got["dismiss_refused"] == "refused for the test" and got["commit"]
+        await me.call("kill", id=w)

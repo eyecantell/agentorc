@@ -467,6 +467,8 @@ class HostAgent:
         # When a hook event last reached a record **live**, in epoch seconds (TD-169): a queued
         # event stamped before it is older than the state it would set, so its state is skipped.
         self._live_hook_at: dict[str, float] = {}
+        # entries whose *Put on the board* is under way (TD-140): one press per entry at a time
+        self._board_adding: set[str] = set()
         # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
         # The last good reading per profile, kept across a restart (TD-087) — with, beside the
         # windows, why the *last poll* failed, which the page draws as a stale chip rather than
@@ -4033,6 +4035,19 @@ class HostAgent:
         by name and host, `n/a` for the person or a `system` note."""
         if not entry:
             raise RpcError("Put on the board names the Inbox entry it comes from (design §4.5a)")
+        # One press per entry at a time: a retried request must not write the line twice. Taken
+        # before the first await, so the check and the mark are one step on the loop.
+        if entry in self._board_adding:
+            raise RpcError(f"{entry} is already being put on the board")
+        self._board_adding.add(entry)
+        try:
+            return await self._board_add_one(root, board, text, due, entry, caller)
+        finally:
+            self._board_adding.discard(entry)
+
+    async def _board_add_one(
+        self, root: Path, board: Path, text: str, due: str | None, entry: str, caller: Any
+    ) -> dict[str, Any]:
         mail_entry = next((e for e in self.person_inbox if e.id == entry), None)
         trail_row = next((t for t in self.trail if t.get("id") == entry), None)
         if mail_entry is None and trail_row is None:
@@ -4056,9 +4071,15 @@ class HostAgent:
         except board_mod.Refused as e:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
-        dismissed = await self.rpc_inbox_dismiss(msg=[entry], caller=caller)
+        out: dict[str, Any] = {"board": str(board), "action": "add", "due": due, **done}
+        try:
+            out["dismissed"] = (await self.rpc_inbox_dismiss(msg=[entry], caller=caller))["dismissed"]
+        except RpcError as e:
+            # The line is committed, so the press succeeded; the row staying is said, not raised, so
+            # a second press is not taken for a first (review of PR #578).
+            out["dismissed"], out["dismiss_refused"] = [], str(e)
         await self._push_changes()
-        return {"board": str(board), "action": "add", "due": due, "dismissed": dismissed["dismissed"], **done}
+        return out
 
     async def rpc_inbox_pause(self, msg: str, caller: Any = None) -> dict[str, Any]:
         """**Pause** (design §4.10, TD-069): on a `steer` in the person inbox — *I want to answer
