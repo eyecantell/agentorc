@@ -1519,7 +1519,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-24 (TD-129's design)
 **Owner:** grinder
 **Kind:** build
-**Pickable:** yes — TD-135 landed (PR #567)
+**Pickable:** yes
 **Status:** Open — designed, nothing built. Design: §4.5 screen 6 *Narrow*, §4.5a *Inbox page: the rail* (its last sentence), mockup `InboxPhone.dc.html`.
 
 **Location:** `src/agentorc/ui/templates/inbox.html` (the chip row — the rail's Teams list, picked first — and the sheet, drawn from the same counts as the rail), `app.css` (the 720 px breakpoint Focus already uses), `app.js` (the sheet's open and close; the toggle code is TD-135's).
