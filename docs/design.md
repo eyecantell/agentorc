@@ -426,13 +426,17 @@ A metered profile is **never polled** for a quota — the usage endpoint would a
 **spend per turn** instead (§4.3), and the home sums it **per account**, as every reading is the
 account's (TD-122): a key is one bill however many profiles run on it, and two profiles that each
 summed their own would each spend the whole amount. The sum runs over three fixed windows in the
-home's own clock, `day`, `week` and `month`, into a reading of the **same shape as a usage
+home's own clock — the host agent's local time zone: `day` rolls at its midnight, `week` on its
+Monday, `month` on its first, and `resets` carries the instant with its offset, so a browser in
+another zone draws it in its own — `day`, `week` and `month`, into a reading of the **same shape as a usage
 reading** (§4.3 `Usage`): a `Window` per label whose `resets` is the boundary and whose `pct` is the
 account's spend over **this profile's** amount when one is set (§6 *Usage gate*) — the reading the
 account's, the amount the profile's, exactly as a reserve is — so the chip, the gate and `ao status
 -v` read one kind of thing and know neither billing by name. A metered window **never makes
 `limited`** (§4.2): that state is the tool's cap, and a key at its amount still answers — the gate
-pauses the unattended sessions, the chip goes red, and an interactive session is untouched.
+pauses the unattended sessions, the chip goes red, and an interactive session is untouched. The
+exception is keyed on the profile's `billing`, which the host agent reads before the cap rule
+(§4.4 *Usage*), never on anything in the reading, whose shape stays blind to billing.
 Rejected: a budget scoped to a team or a project (Paperclip's generic row, ADR 2026-09-24 item 3)
 — nothing keys on a team or a project (§9 invariant 9), and a reserve stays the profile's as every
 reserve is; a team that must not overspend runs on a profile with an amount, or carries a reserve
@@ -604,8 +608,13 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   account**, `spend.json` beside `usage.json`: one row per account per day holding tokens by kind
   and cost, `since` the last turn's `at`, kept thirteen months. The three windows are summed from
   it on the tick, the ledger is what survives a restart as the held reading does, and a turn is
-  counted once, because the cursor moves only after the row is written. The reading is served,
-  streamed and held as a polled one is, and it is never `stale`: a sum has no failed poll. A
+  counted once, because the cursor moves only after the row is written. `since` starts at the
+  first tick that finds the profile metered, so a key that ran unmetered for months does not bill
+  its history to the first day; a row's `cost` is written once, at that tick's prices, and a later
+  change to `prices:` applies from then on and rewrites nothing — the ledger is a record of what
+  was charged, as the bill is. The reading is served, streamed and held as a polled one is, and it
+  is never `stale`: a sum has no failed poll; and the cap rule below is skipped for it by the
+  profile's `billing`, read before the windows are, so `limited` is never marked from an amount. A
   **node's turns** (§4.4a): the node reads its own transcripts and sends them home as `spend
   {account, turns}`, a link method with a reply, the node's cursor advancing on the reply, so a
   link down loses nothing and a turn is never counted twice; the home ledgers them and sends the
@@ -4981,7 +4990,8 @@ teams:
   for the profile's plain sessions, nine tenths of it for a team carrying a reserve priority of 10,
   so a team's priority means one thing on both billings. The pause is the same pause, sent when the
   account's spend reaches the line, and lifted when the window rolls (`next` is the boundary;
-  nothing else moves a spent window back). At eight tenths of an amount the home files one
+  nothing else moves a spent window back, and the resume keeps `RESUME_MIN` as any does — a pause
+  that began minutes before the roll resumes ten minutes after it began). At eight tenths of an amount the home files one
   `system` note to the person inbox — *grind-api · day $4.10 of $5* — an FYI, uncounted, once per
   window; the fraction is fixed, not a setting. A metered profile with no reserve has no line and
   pauses nothing, as a subscription window without one does; the chip still shows its spend,
