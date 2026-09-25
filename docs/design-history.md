@@ -244,6 +244,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-24 (TD-069 step 4, the designer): **Put on the board** designed on FYI rows only — a `note`, a closed question, a trail row — never on an open `ask` or `steer`, whose *later* is Snooze; a small form (board, text, Due) then the write-back's one add and the entry deleted. TD-069 had said *on a mail row … deletes the mail*; narrowed because deleting an open question declines it (§4.10), which is not what parking it means. Steered to Paul as a default. The build is TD-140.
 - 2026-09-24 (TD-126): **Due strip / Inbox board row → Reply** and the row's **standing** designed; a reply is not Done.
 - 2026-09-25 (TD-100 (4)): the **Settings page** rows — Usage, Teams, Repos, You, Open file, the read-only *i* marks — and the top bar's **Settings** tab designed; the editor button's row points at `person.open_in`.
+- 2026-09-25 (TD-143, the designer; the cloud session's recommendation confirmed): the Focus **Reports** panel grouped by state with the PR beside a claim in review, Drop behind *more ▾* on an in-progress row only with a confirm naming the consequence, the explanation as the heading's *i* mark, the session told by a `system` note. Cause: on 2026-09-24 Paul read claimed rows with open PRs as a to-do list and dropped two. An Undo on the trail row was asked of Paul, not designed. The build is TD-150.
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
@@ -427,6 +428,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-19 (TD-069): Dismiss removes an entry outright "as `inbox_delete` does today"; Delete on an open `ask`/`steer` became a decline instead of a strip.
 - 2026-09-19 (TD-069): the advice line (*you have n open asks to the person: is this one needed, or a steer?*) added as a line from the home, not a gate; the reason given: a worker that marks every preference *needed* brings the old (pre-TD-069) inbox back, with no timer to clear it.
 - 2026-09-20 (TD-070; Sonnet design review the same day): suggested answers designed — `answers` up to `ANSWERS_MAX` (4), `ANSWER_CAP` (80), `Cf` stripping, shape check on raw JSON, `answer` index checked against `text`, `--pick <n>` between sessions, no confirm on a press. The observation that a wrong press is "true of a mistyped Reply today" was the argument for no confirm.
+- 2026-09-25 (TD-143, the designer): a person's Drop from Focus tells the session by a `system` note, as Go with it and Pause do.
 
 ## §4.10 Messages between sessions (tail: the Inbox queue, outcomes, kinds, bounds, lifecycle, surface)
 
