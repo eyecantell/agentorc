@@ -237,7 +237,7 @@ one SessionStart line** — every adapter's launch does, §4.3 *A repo's start h
 first entry of `git worktree list --porcelain`, computed live, so it holds in a container as on the host; dev-cadence's
 runner finds its children beside itself, and a consumer's copy is what its last sync carried — and falls back to the directory's own copy outside a git repo (dev-cadence
 TD-055 (b), 2026-09-25): a worktree on an older branch runs the current hook set against itself, where
-`$CLAUDE_PROJECT_DIR` alone ran that branch's copy. An unattended launch's layer also refuses the tool's own peer
+`$CLAUDE_PROJECT_DIR` alone ran that branch's copy. One known limit, recorded and not fixed since the bytes are the pair: a consumer that is itself a git submodule gets its parent's `.git/modules` gitdir as the first entry, so the set silently does not run there. An unattended launch's layer also refuses the tool's own peer
 messages (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064). It uses the cadence line when
 the session directory's own `.claude/settings.json` — the worktree's copy, the file the tool loads
 — does not already run those hooks (either shape of the line counts as wired, so nothing runs twice); a directory
