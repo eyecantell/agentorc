@@ -449,3 +449,5 @@ For a §6 policy: nothing new beyond what's already carried forward — the long
 19:19Z  grinder-ao-2: TD-135 done → PR #567 merged (Inbox rail). Cadence check pass (review SHIP, ci green, ledger named, worktree clean). No src/sessionorc/docs/briefs/org.yml — not held.
 19:20–19:29  quiet stretch: designer-ao-1 finished (idle + out_of_work) — grinder-ao-1/2 still working (grinder-ao-1: TD-136; grinder-ao-2: TD-137), so not every member finished. Techlead seat filled once more (19:20Z, host tick) then exited.
 19:29Z  grinder-ao-2: TD-137 done → PR #575 merged (Inbox below 720px). Cadence check pass (review FIXED 1 finding, ci green, ledger named, worktree clean). No held paths.
+19:29–19:35  quiet stretch: techlead seat filled once more (19:29Z, host tick) and stayed working. grinder-ao-1 dropped TD-136 (split: slice 1 held as PR #576 for the seat, slice 2 grinder-ao-2's), grinder-ao-2 claimed TD-136.
+19:35Z  grinder-ao-1: TD-134 done → PR #569 merged (TD-039 archived with it). Cadence check pass (review FIXED 2 findings, ci green, ledger named, worktree clean). No held paths.
