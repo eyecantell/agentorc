@@ -125,15 +125,17 @@ def test_every_key_names_a_control_the_page_draws(monkeypatch, tmp_path):
     org = _org_html(monkeypatch, tmp_path)
     parts = ("base.html", "inbox.html", "inbox_rail.html", "inbox_row.html")
     inbox = "".join((UI / "templates" / f).read_text() for f in parts)
+    # the message page (TD-136): its own head and the entry's row, drawn by the row's macros
+    msg = "".join((UI / "templates" / f).read_text() for f in ("base.html", "inbox_entry.html", "inbox_row.html"))
     # the overlay, and its ? for the mouse
     assert 'id="keyhelp"' in org and 'id="keyrows"' in org and 'id="keyhelpbtn"' in org
     assert 'class="card sc' in org and 'tabindex="0"' in org  # a card is a tab stop: the ring is its focus ring
     for k in got["keys"]:
         assert k["control"], k
         if not k.get("sel"):
-            assert any(k.get(f) for f in ("move", "g", "help")), k  # the few keys that press nothing
+            assert any(k.get(f) for f in ("move", "g", "help", "step")), k  # the few keys that press nothing
             continue
-        pages = {"all": [org, inbox], "org": [org], "inbox": [inbox]}[k["page"]]
+        pages = {"all": [org, inbox], "org": [org], "inbox": [inbox], "msg": [msg]}[k["page"]]
         # `/` focuses whichever filter box the page has: the Org's or the Inbox's
         needles = [_needle(s) for s in k["sel"].split(",")]
         for html in pages:
@@ -145,7 +147,7 @@ def test_every_key_names_a_control_the_page_draws(monkeypatch, tmp_path):
 @pytest.mark.unit
 def test_no_key_means_two_things_on_one_page():
     got = _probe()
-    for page in ("org", "inbox", "focus", "other"):
+    for page in ("org", "inbox", "msg", "focus", "other"):
         seen = {}
         for k in got["keys"]:
             if k["page"] not in ("all", page):

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Inbox · ShiftLead{% endblock %}
+{# design §4.5 screen 6 *The message page*, §4.5a **Inbox message page** (TD-129, built by TD-136;
+   mockup `InboxMessage.dc.html`). Three parts, in Paul's order: **the entry** — its row, drawn by
+   the row's own macro in the section the list has it in, so the head, the text (*details* open: a
+   page is for reading) and **the answer** (the row's own controls, the same RPCs and confirms,
+   the suggested answers in their group) are the list's own; then **the thread**, under its heading
+   with its count, oldest first, each entry a quiet card with no control at all — a thread is read,
+   and what is answered is the entry above it (TD-071 item 8). **Back** at the head (and `Esc`)
+   returns to the list the page was opened from, at this row. #}
+{% import "inbox_row.html" as r with context %}
+
+{#- a thread entry: who, what kind, about what, when, and its text in its shape — nothing pressable
+    but a link the text itself makes (§4.10) -#}
+{% macro thread_row(t) -%}
+<div class="mailrow threadrow" tabindex="0" data-msg="{{ t.id }}">
+  <div class="row gap wrap mhead">
+    <span class="ref" title="{{ t['from'] }}">{{ t.from_name or t['from'] }}</span>
+    <span class="badge kindmark k-{{ t.kind }}">{{ t.kind }}</span>
+    {%- if t.about %} <span class="st">re {{ t.about }}</span>{% endif %}
+    {%- if t.passed_up %} <span class="st">passed up by {{ t.passed_up }}</span>{% endif %}
+    <span class="grow"></span>
+    <span class="st age" data-since="{{ t.at or '' }}">{{ t.age or '' }}</span>
+  </div>
+  {%- set s = shaped(t.text, origin) %}
+  <div class="body md">{{ s.lead }}</div>
+  {%- if s.rest %}<details class="fold" data-fold="{{ t.id }}" open><summary>details</summary><div class="body md">{{ s.rest }}</div></details>{% endif %}
+  {%- if t.recommend and t.recommend.text %}<div class="st dflt">{{ t.recommend.by }} recommends: {{ t.recommend.text }}</div>{% endif %}
+  {%- if t.outcome and t.outcome.state %}<div class="row gap wrap"><span class="badge kindmark k-outcome o-{{ t.outcome.state }}">outcome · {{ t.outcome.state }}</span><span class="st">{{ t.outcome.text or '—' }}</span></div>{% endif %}
+</div>
+{%- endmacro %}
+
+{% block body %}
+<div class="page inboxpage msgpage" data-back="{{ back_url }}" data-msg="{{ mid }}">
+  <div class="row gap wrap">
+    <a class="btn sm" id="msgback" href="{{ back_url }}" title="back to the list, at this entry (Esc)">‹ Back</a>
+    <span class="h1">Inbox</span>
+    <span class="grow"></span>
+    <span class="meta" id="msgpos"></span>
+  </div>
+  {%- if gone %}
+  <p class="note msggone">{{ gone }}</p>
+  {%- else %}
+  <div class="msgentry">{{ r.row(entry, section) }}</div>
+  <section class="isec msgthread">
+    <div class="row gap wrap sechead"><span class="h2">Thread</span><span class="meta">{{ thread | length }}</span></div>
+    {%- if pruned %}<p class="note">earlier entries pruned</p>{% endif %}
+    {%- if thread_error %}<p class="note warn">the thread could not be read: {{ thread_error }}</p>{% endif %}
+    {%- for t in thread %}{{ thread_row(t) }}{% endfor %}
+    {%- if not thread and not pruned and not thread_error %}<p class="note">Nothing else in its thread.</p>{% endif %}
+  </section>
+  {%- endif %}
+</div>
+{% endblock %}
+{% block scripts %}<script>AO.inboxEntry();</script>{% endblock %}
