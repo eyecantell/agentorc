@@ -156,11 +156,11 @@ def test_a_board_row_is_text_and_its_two_answers_carry_what_the_reader_gave(tmp_
     assert ">samscrape<" in html and "2d overdue" in html and ">board<" in html
     assert "Open board" in html and "user_attention.md:9" in html
     acts = html.count('data-act="board"')
-    assert acts == 4  # +1 day, +1 week, a date, Done — and nothing else acts
-    assert html.count('data-act="') == acts
+    assert acts == 4  # +1 day, +1 week, a date, Done — and Reply (TD-142) the one other act
+    assert html.count('data-act="') == acts + 1 and html.count('data-act="board_reply"') == 1
     assert html.count('data-board-act="snooze"') == 3 and html.count('data-board-act="done"') == 1
-    assert html.count('data-line="9"') == 4 and html.count(f'data-board="{root}/docs/user_attention.md"') == 4
-    assert html.count('data-text="&lt;b&gt;Allow&lt;/b&gt; the &#34;rm&#34;. Due: 2026-09-20."') == 4
+    assert html.count('data-line="9"') == 5 and html.count(f'data-board="{root}/docs/user_attention.md"') == 5
+    assert html.count('data-text="&lt;b&gt;Allow&lt;/b&gt; the &#34;rm&#34;. Due: 2026-09-20."') == 5
     assert 'data-when="1d"' in html and 'data-when="1w"' in html and 'data-when="pick"' in html
     done = html[html.index('data-board-act="done"') :]
     assert "data-confirm=" in done.split(">")[0]
@@ -174,7 +174,7 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
     host(tmp_path, monkeypatch)
     from agentorc.ui import app as uiapp
 
-    reads, calls = [], []
+    reads, calls, replies = [], [], []
     monkeypatch.setattr(uiapp, "read_boards", lambda run=None: (reads.append(1), ([], ""))[1])
 
     class Fake:
@@ -191,6 +191,9 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
             if method == "board_edit":
                 calls.append((self.kw.get("caller"), kw))
                 return {"commit": "abc123", "message": "agentorc: done x (session n/a)"}
+            if method == "board_reply":
+                replies.append(kw)
+                return {"commit": "def456", "sent": [], "note": "written on the board"}
             return {"list": [], "inbox": {"entries": [], "trail": []}}.get(method, {})
 
     monkeypatch.setattr(uiapp, "LocalClient", Fake)
@@ -211,6 +214,19 @@ def test_snooze_and_done_go_to_the_host_agents_write_back_and_the_row_is_read_ag
             {"board": board, "line": 4, "text": "x", "action": "snooze", "due": "2026-09-30"},
         ]
         assert all(caller is None for caller, _ in calls)  # a person is not a session
+        # TD-142: Reply goes to `board_reply` with the reader's refs, and the boards are read again
+        r = c.post(
+            "/api/person/board",
+            json={"action": "reply", "board": board, "line": 4, "text": "x", "reply": " rebase it ", "refs": ["TD-9"]},
+        )
+        assert r.status_code == 200 and replies == [
+            {"board": board, "line": 4, "text": "x", "reply": "rebase it", "refs": ["TD-9"]}
+        ]
+        assert len(reads) == 4
+        for bad in ({"reply": ""}, {"line": "four"}, {"board": ""}):
+            body = {"action": "reply", "board": board, "line": 4, "text": "x", "reply": "y", **bad}
+            assert c.post("/api/person/board", json=body).status_code == 400
+        assert len(replies) == 1
         for bad in (
             {"action": "delete", "board": board, "line": 4, "text": "x"},
             {"action": "done", "board": board, "line": "four", "text": "x"},

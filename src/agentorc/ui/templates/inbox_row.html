@@ -492,7 +492,8 @@
    write-back, made by the host agent in the repo's main checkout and committed there: **Snooze ▾**
    (+1 day · +1 week · a date) moves the item's `Due:` date, **Done** checks it off (confirms). Each
    hands back the board, the line and the text the reader gave, and the agent refuses the edit when
-   that line no longer holds this item. #}
+   that line no longer holds this item. **Reply** (TD-142) opens the mail composer with the line
+   quoted and appends the person's words to the line itself — one commit, the line still due. #}
 {% macro board(e, section) -%}
 <div class="row gap wrap mhead">
   <span class="ref" title="{{ e.board }}">{{ e.repo }}</span>
@@ -503,9 +504,10 @@
 </div>
 <div class="body">{{ e.text }}</div>
 <div class="row gap wrap mfoot">
-  <span class="st">on the board — Snooze moves its <code>Due:</code> date and Done checks it off, each one commit in {{ e.repo }}'s checkout, never pushed</span>
+  <span class="st">on the board — Reply writes on its line, Snooze moves its <code>Due:</code> date and Done checks it off, each one commit in {{ e.repo }}'s checkout, never pushed</span>
   <span class="grow"></span>
   {%- if e.editor %}<a class="btn sm ghost" href="{{ e.editor }}" title="open {{ e.board }} at line {{ e.line }}">Open board</a>{% endif %}
+  <button class="btn sm ghost" data-act="board_reply" data-id="person" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}" data-name="{{ e.repo }}'s board" title="your words appended to this line of the board — one commit, never pushed; the line stays due">Reply</button>
   <details class="more"><summary class="btn sm ghost" title="move its Due: date on the board">Snooze</summary>
     <div class="menu">
       <button data-act="board" data-id="person" data-board-act="snooze" data-when="1d" data-board="{{ e.board }}" data-line="{{ e.line }}" data-text="{{ e.text }}">+1 day</button>

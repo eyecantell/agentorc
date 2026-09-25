@@ -117,6 +117,9 @@ PRUNE_EVERY = timedelta(hours=1)  # run-log retention sweep (design §4.6, `runs
 ID_RECHECK = 30.0  # seconds between re-reads of the tmux server's pid (design §4.8a, TD-077)
 TRAIL_KEEP = 100  # attention-trail entries kept, newest first (design §4.10, TD-079)
 TRAIL_FLOOR = timedelta(seconds=5)  # a row this short leaves no trail unless a person ended it
+# What **Reply** on a board row says it did until dev-cadence's reader carries each item's `session` and
+# `refs` (TD-142 slice 2): the file half alone, and nobody mailed.
+BOARD_REPLY_NOTE = "written on the board — no session standing is known: the board reader carries no session fields yet"
 # A session past its `run_until` is asked to wrap up and then killed (design §6, TD-026): this is how
 # long it is given to finish after the ask. It is a grace, not a deadline the session can see — a
 # session that settles sooner is killed sooner, and one that is still working when it runs out is
@@ -4011,11 +4014,9 @@ class HostAgent:
         does, so a refused or failed commit leaves the row where it was."""
         if not mail.is_person(caller):
             raise RpcError(f"{caller} cannot edit the board: Snooze and Done are the person's own (design §4.4)")
-        want = Path(board).resolve()
-        roots = [Path(r) for r in hosts.local_host().repos()]
-        root = next((r for r in roots if (r / board_mod.BOARD).resolve() == want), None)
-        if root is None:
-            raise RpcError(f"{board} is not the board of a repo this host knows (its repos registry)")
+        root, want = self._board_root(board)
+        if action == "reply":
+            raise RpcError("a reply on a board line is board_reply, which says where it went (design §4.4)")
         if action == "add":
             return await self._board_add(root, want, text, due, entry, caller)
         if line is None:
@@ -4026,6 +4027,53 @@ class HostAgent:
             raise RpcError(str(e)) from None
         log.info("board %s: %s", root, done["message"])
         return {"board": str(want), "line": line, "action": action, "due": due, **done}
+
+    @staticmethod
+    def _board_root(board: str) -> tuple[Path, Path]:
+        """The checkout whose board `board` is, among those this host's repos registry names, and
+        the board's resolved path; refused for any other file."""
+        want = Path(board).resolve()
+        roots = [Path(r) for r in hosts.local_host().repos()]
+        root = next((r for r in roots if (r / board_mod.BOARD).resolve() == want), None)
+        if root is None:
+            raise RpcError(f"{board} is not the board of a repo this host knows (its repos registry)")
+        return root, want
+
+    async def rpc_board_reply(
+        self,
+        board: str,
+        line: int,
+        text: str,
+        reply: str,
+        refs: list[str] | None = None,
+        caller: Any = None,
+    ) -> dict[str, Any]:
+        """**Reply** on a board row (design §4.4 *Board write-back*, §4.5a *Due strip / Inbox board
+        row → Reply*; TD-142 slice 1): the person's words appended to the item's own line as
+        ` — <name>, <date>: <reply>` and committed as `agentorc: reply on <head> (session <name>)`,
+        refused as `board_edit` refuses. The line stays open and counted: a reply is not Done.
+
+        The file half only. The mail half — a `handed` note to each live session holding a lease
+        on one of the line's `refs` — waits on dev-cadence's reader carrying `session`, `host` and
+        `refs` per item (TD-142 slice 2); until then `sent` is empty and `note` says why."""
+        if not mail.is_person(caller):
+            raise RpcError(f"{caller} cannot reply on the board: a board reply is the person's own (design §4.4)")
+        root, want = self._board_root(board)
+        try:
+            done = await asyncio.to_thread(board_mod.write_back, root, int(line), text, "reply", None, reply=reply)
+        except (TypeError, ValueError):
+            raise RpcError("a board reply names the item's line (design §4.4)") from None
+        except board_mod.Refused as e:
+            raise RpcError(str(e)) from None
+        log.info("board %s: %s", root, done["message"])
+        return {
+            "board": str(want),
+            "line": int(line),
+            "action": "reply",
+            **done,
+            "sent": [],
+            "note": BOARD_REPLY_NOTE,
+        }
 
     async def _board_add(
         self, root: Path, board: Path, text: str, due: str | None, entry: str | None, caller: Any
