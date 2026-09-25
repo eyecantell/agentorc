@@ -230,7 +230,7 @@ launch, as a settings layer** (Claude Code: `claude --settings ~/.agentorc/claud
 generated at launch), never by editing the person's own `settings.json` and never per repo:
 sessions run in plain directories too, hand-started sessions stay untouched, and a repo's own hooks
 (dev-cadence's SessionStart guards) keep running alongside. **The layer also carries dev-cadence's
-one SessionStart line** (`scripts/cadence_hooks.sh --session-start`, guarded by `[ -x ]`; cadence
+one SessionStart line** — every adapter's launch does, §4.3 *A repo's start hooks are every adapter's to run* — (`scripts/cadence_hooks.sh --session-start`, guarded by `[ -x ]`; cadence
 §3), byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`); an unattended launch's layer also refuses the tool's own peer
 messages (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064). It uses the cadence line when
 the session directory's own `.claude/settings.json` — the worktree's copy, the file the tool loads
@@ -490,6 +490,25 @@ Adapter status (verify before building each):
 | Gemini CLI | hooks since v0.26 + OSC 9 "action required / complete" notifications | hook-fed (verify) |
 | Codex CLI | experimental hooks (Pre/PostToolUse); a "waiting" event unconfirmed | scraped until verified |
 | `shell` (ad-hoc shell, Aider, a cmdorc command session) | none | scraped: foreground process vs prompt vs pane gone, exit code from the marker — **phase 1** |
+
+**A repo's start hooks are every adapter's to run** (TD-035; decided with Paul 2026-09-12, written
+here 2026-09-24; built for Claude Code, and the rule for the next adapter). dev-cadence's
+conventions are tool-neutral in their rules and scripts, and only their wiring is Claude Code's:
+the one SessionStart line (`scripts/cadence_hooks.sh --session-start`, cadence §3) that prints the
+due board items, the unseen cadence-changes entries and the anchor warning into a session's first
+turn. The repo does not know which tool will work it, so **the wiring is the adapter's launch
+layer's, never the repo's and never a per-repo agent's** (§4.2: hooks reach a session *per
+launch, as a settings layer*): every agent
+adapter's `launch` runs that line for the session directory when the script is executable there —
+through the tool's own start hook where it has one (Gemini CLI's hooks, above), otherwise by
+running the runner at launch with the payload the hook would have carried and prepending its
+stdout to the first prompt — and a hand-started session of that tool is untouched, as a
+hand-started Claude Code session is. The runner reads the repo root from `CLAUDE_PROJECT_DIR`,
+else `git rev-parse --show-toplevel`, else `pwd` — enough for a launch made in the session
+directory (an argument form would be dev-cadence's, if a tool ever needs one). The anchor check
+(cadence §1) reads Claude Code's live-session registry; for another tool it reads agentorc's own records when agentorc
+launched the session, and the tool's equivalent where one exists — decided when that adapter
+lands (TD-112). `shell` runs no hooks: it is not an agent.
 
 ### 4.4 Host agent
 
