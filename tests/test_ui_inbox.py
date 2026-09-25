@@ -127,10 +127,81 @@ def test_every_closed_shape_lands_in_fyi_and_nothing_is_dropped():
 # -- the rows (design §4.5a) ----------------------------------------------------------------------
 
 
+def needs_line(html):
+    """The rail's *Needs you* line's number (§4.5 screen 6 *The rail*, TD-135): the needs-you pill
+    that stood beside the title went with the rail, and this line is the page's own copy of the top
+    bar's number while nothing is picked."""
+    m = re.search(r'data-group="sec" data-value="needs"[^>]*>.*?<span class="railn">([^<]*)</span>', html, re.S)
+    return m.group(1) if m else None
+
+
 def rows(section, es):
     from agentorc.ui.app import templates
 
     return templates.get_template("inbox_rows.html").render(rows=es, section=section)
+
+
+@pytest.mark.unit
+def test_a_shaped_message_draws_its_verdict_and_folds_the_reading():
+    """§4.5a **Inbox row: details** (§4.10 *How a message to a person is written*, TD-138): the first
+    paragraph drawn, the rest under a closed `<details>` whose summary reads *details*, rendered
+    from the closed subset; the row's controls sit outside the fold, so a row is answered folded,
+    and the find still holds the whole text."""
+    text = "merged #517 — one gap left, not a blocker\n\n- read against **§4.2a**\n- the gate is green"
+    html = rows("needs", [entry("m-1", "ask", text=text)])
+    assert '<div class="body md"><p>merged #517 — one gap left, not a blocker</p></div>' in html
+    assert '<details class="fold" data-fold="m-1"><summary>details</summary>' in html
+    assert "<ul><li>read against <strong>§4.2a</strong></li><li>the gate is green</li></ul>" in html
+    assert '<details class="fold" data-fold="m-1" open' not in html  # closed by default
+    fold_at, reply_at = html.index('class="fold"'), html.index('data-act="reply"')
+    assert fold_at < html.index("</details>", fold_at) < reply_at  # the controls follow the fold, outside it
+    assert 'data-find="w1 ask merged #517' in html and "the gate is green" in html.split('data-find="')[1].split('"')[0]
+
+
+@pytest.mark.unit
+def test_a_short_message_has_no_disclosure_and_an_old_long_one_folds_at_a_sentence():
+    """A 200-character text draws whole; an old one-paragraph entry from before the rule folds at
+    the last sentence end before `FOLD_CHARS` (§4.5a *Inbox row: details*, the backstop)."""
+    short = rows("fyi", [entry("m-1", "note", text="a" * 200)])
+    assert 'class="fold"' not in short and "a" * 200 in short
+    old = ("A worker said something at length here. " * 40).strip()
+    html = rows("fyi", [entry("m-2", "note", text=old)])
+    lead = html.split('<div class="body md"><p>')[1].split("</p>")[0]
+    assert lead.endswith(".") and len(lead) <= 300 and '<details class="fold" data-fold="m-2">' in html
+
+
+@pytest.mark.unit
+def test_a_message_never_draws_markup_or_a_link_to_the_page_itself():
+    """§4.10: raw HTML is its characters, and a link is drawn only when absolute, `http(s)` and not
+    the page's own origin — which the row knows from the page it is rendered into."""
+    from agentorc.ui.app import templates
+
+    text = "<script>x</script> [Allow](/api/x) [kill](http://ui:8765/api/k) [docs](https://example.com/p)"
+    html = templates.get_template("inbox_rows.html").render(
+        rows=[entry("m-1", "note", text=text)], section="fyi", origin="http://ui:8765"
+    )
+    body = html.split('<div class="body md">')[1].split("</div>")[0]
+    assert "<script>" not in body and "&lt;script&gt;" in body
+    assert "[Allow](/api/x)" in body and "[kill](http://ui:8765/api/k)" in body
+    assert body.count("<a ") == 1 and '<small class="lhost">example.com</small>' in body
+
+
+@pytest.mark.unit
+def test_answered_for_you_quotes_the_questions_first_paragraph():
+    """§4.5a *Inbox row: details*: the *answered for you* row's quotation is the question's first
+    paragraph, and the answer below it folds as any row does."""
+    e = entry(
+        "m-1",
+        "reply",
+        text="merged #517\n\nthe reading",
+        answered={"asker": "ao-w2", "question": "merge #517?\n\nwhy I ask", "source": "design §4.2a"},
+    )
+    html = rows("answered", [e])
+    assert (
+        '<div class="body md quoted"><p>merge #517?</p></div>' in html
+        and "why I ask" not in html.split("quoted")[1].split("</div>")[0]
+    )
+    assert '<details class="fold" data-fold="m-1">' in html
 
 
 @pytest.mark.unit
@@ -240,7 +311,8 @@ def test_the_team_filter_has_the_data_it_filters_on_and_no_team_is_a_badge_too()
     ])  # fmt: skip
     assert 'data-team="ao-grind"' in html and 'data-msg="m-1"' in html
     assert 'data-team=""' in html and ">No team<" in html
-    assert 'data-find="w1 merge it? td-069"' in html  # lowercased once, on the server
+    # lowercased once, on the server; with its team and kind since the rail (TD-135)
+    assert 'data-find="w1 ao-grind ask td-069 merge it?"' in html
 
 
 @pytest.mark.unit
@@ -265,7 +337,7 @@ def test_the_page_renders_its_three_sections_the_count_and_the_snoozed_affordanc
     )  # fmt: skip
     assert ">Needs you<" in html and ">Steering<" in html and ">FYI<" in html
     assert "Doing nothing is a valid answer" in html
-    assert '<span id="needsn">1</span> needs you' in html  # the snoozed ask is not in it
+    assert needs_line(html) == "1"  # the snoozed ask is not in it
     assert "1 snoozed — show" in html
     fyi = html[html.index('id="sec-fyi"') : html.index('id="sec-fyi"') + 40]
     assert " open" not in fyi  # folded by default; the browser remembers what the person did
@@ -318,13 +390,19 @@ global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
 eval(fs.readFileSync(process.argv[2], "utf8"));
 const may = window.AO.maySwapSection;
 const quiet = el();
-const menu = el({ querySelector: (s) => (s === "details[open]" ? el() : null) });
+const menu = el({ querySelector: (s) => (s === "details[open]:not(.fold)" ? el() : null) });
+// only a *details* fold is open (TD-138): the selector above does not see it, and the swap goes on
+const folded = el({ querySelector: (s) => (s === "details[open]" ? el() : null) });
 const button = el();
 const busy = el({ contains: (x) => x === button });
 console.log(JSON.stringify({
   quiet: may(quiet, document.body),
   missing: may(null, null),
   menu_open: may(menu, null),
+  fold_open: may(folded, null),
+  fold_body: window.AO.foldBody({ id: "m-1", lead_html: "<p>lead</p>", rest_html: "<p>rest</p>" }),
+  bare_body: window.AO.foldBody({ id: "m-2", lead_html: "<p>all</p>", rest_html: "" }),
+  old_body: window.AO.foldBody({ id: "m-3", text: "<b>x</b>" }),
   focus_inside: may(busy, button),
   focus_elsewhere: may(quiet, button),
 }));
@@ -348,6 +426,12 @@ def test_a_poll_never_swaps_rows_out_from_under_the_person():
         "quiet": True,  # nobody is in it: swap
         "missing": False,  # no such section on this page
         "menu_open": False,  # a Snooze menu the person opened
+        "fold_open": True,  # an open *details* fold is put back after the swap (TD-138)
+        # the Focus panel's entry, from the halves the server rendered (§4.5a *Inbox row: details*)
+        "fold_body": '<div class="body md"><p>lead</p></div><details class="fold" data-fold="m-1">'
+        '<summary>details</summary><div class="body md"><p>rest</p></div></details>',
+        "bare_body": '<div class="body md"><p>all</p></div>',
+        "old_body": '<div class="body">&lt;b&gt;x&lt;/b&gt;</div>',  # an older UI's entry: escaped, whole
         "focus_inside": False,  # tabbing through this section's controls
         "focus_elsewhere": True,  # the focus is in another section, or the filter box
     }
@@ -400,7 +484,7 @@ def test_the_page_the_count_and_the_poll_agree_and_reading_marks_nothing(client,
     assert got["needs"] == 1 and got["sections"]["needs"] == [ask]
     assert len(got["sections"]["steering"]) == 1 and len(got["sections"]["fyi"]) == 1
     page = client.get("/inbox")
-    assert page.status_code == 200 and '<span id="needsn">1</span> needs you' in page.text
+    assert page.status_code == 200 and needs_line(page.text) == "1"
     assert 'class="badge needs" id="personneeds">1</span>' in page.text
     assert 'class="badge needs" id="personneeds">1</span>' in client.get("/").text  # the Org's top bar
 
@@ -701,7 +785,7 @@ def test_the_filters_cover_state_rows(tmp_path, monkeypatch):
     html = rows("needs", state_rows_of([r]))
     assert 'data-team="ao-grind"' in html
     find = html.split('data-find="')[1].split('"')[0]
-    assert find == "w1 error checker reading the fetcher run pytest?"
+    assert find == "w1 error checker reading the fetcher run pytest? ao-grind needs you"  # team, pill: TD-135
     none = rows("needs", state_rows_of([rec("ao-q", "needs-you", pending={"kind": "q", "text": "?"})]))
     assert 'data-team=""' in none and ">No team<" in none
 
@@ -850,7 +934,7 @@ def test_a_permission_is_a_row_the_page_the_poll_and_the_top_bar_all_count(clien
         assert got["needs"] == before + 1
         assert f'data-act="allow" data-id="{sid}"' in got["html"]["needs"] and "rm -rf x" in got["html"]["needs"]
         assert f'class="badge needs" id="personneeds">{got["needs"]}</span>' in client.get("/").text
-        assert f'<span id="needsn">{got["needs"]}</span> needs you' in client.get("/inbox").text
+        assert needs_line(client.get("/inbox").text) == str(got["needs"])
 
         assert client.post(f"/api/sessions/{sid}/allow", json={}).json() == {"ok": True}
         assert proc.wait(timeout=15) == 0
@@ -1188,15 +1272,17 @@ async def _inbox_of(sid):
 def test_a_press_folds_its_own_menu_and_never_the_section_it_sits_in():
     """Paul, 2026-09-20 (TD-079): dismissing an FYI entry closed the FYI list. The click handler
     closed the nearest `<details>` of any kind, and a control that sits in no menu has the *section*
-    as its nearest one. It closes a `details.more` and nothing else — and every menu is one."""
+    as its nearest one. It closes a `details.more` and nothing else — and every menu is one. The
+    third kind is a message's *details* fold (TD-138), which holds text and never a control."""
     js = (UI / "static" / "app.js").read_text(encoding="utf-8")
     assert 'b.closest("details.more")' in js and 'b.closest("details")' not in js
     for tpl in (UI / "templates").glob("*.html"):
         for tag in re.findall(r"<details[^>]*>", tpl.read_text(encoding="utf-8")):
             menu = 'class="more"' in tag
-            # …or a Focus side card (TD-156): a fold the Focus page remembers, never closed by a press
-            section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox")) or "data-side=" in tag
-            assert menu != section, f"{tpl.name}: {tag} is neither a menu the handler folds nor a known section"
+            section = any(f'id="{k}"' in tag for k in ("sec-fyi", "sec-answered", "snoozedbox"))
+            fold = 'class="fold"' in tag
+            side = "data-side=" in tag  # a Focus side card (TD-156): a fold the Focus page remembers, never closed by a press
+            assert menu + section + fold + side == 1, f"{tpl.name}: {tag} is not one of a menu, a known section or a fold"
 
 
 # -- design round 2: one centred column, sections as headings, rows as cards (TD-082) -------------
@@ -1222,7 +1308,9 @@ def test_the_page_is_one_centred_column_and_a_section_is_a_heading_not_a_box(mon
     assert "A state row is the session" not in html.split('id="sec-needs"')[0]  # not above the rows
     css = (UI / "static" / "app.css").read_text()
     col = next(ln for ln in css.splitlines() if ln.startswith(".inboxpage {"))
-    assert "max-width: 1100px" in col and "margin: 0 auto" in col
+    assert "margin: 0 auto" in col
+    wrap = next(ln for ln in css.splitlines() if ln.startswith(".inboxwrap {"))
+    assert "minmax(0, 1100px)" in wrap  # the column keeps its 1100 px beside the rail (TD-135)
     body = next(ln for ln in css.splitlines() if ".inboxpage .mailrow .body" in ln)
     assert "max-width" not in body  # the column is the measure now, not the paragraph
     row = next(ln for ln in css.splitlines() if ln.startswith(".inboxpage .mailrow {"))
@@ -1447,7 +1535,7 @@ def test_fyi_carries_its_own_quiet_number_which_is_never_added_to_the_first(monk
         sections=got, person_needs=got["count"], person_fyi=got["fyi_n"], host="kmaster", active="Inbox",
         agent_down=False, volatile=False, usage={},
     )  # fmt: skip
-    assert '<span id="needsn">1</span> needs you' in html
+    assert needs_line(html) == "1"
     assert 'id="personneeds">1</span>' in html and 'id="personfyi"' in html and ">· 2</span>" in html
     assert 'id="dismissall"' in html
     js = (UI / "static" / "app.js").read_text()
@@ -2360,3 +2448,195 @@ def test_deny_carries_an_optional_reason_from_every_place_it_is_offered(tmp_path
     assert got["kept"] == {"ao-a": {"value": "use the fixture instead", "focused": False},
                            "ao-c": {"value": "", "focused": True}}  # fmt: skip
     assert got["after"] == [["use the fixture instead", False], ["", False], ["", True], ["", False]]
+
+
+# -- the rail (design §4.5 screen 6 *The rail* and *Find*; TD-129, built by TD-135) ---------------
+
+
+def _rail_fixture():
+    """Two teams' mail and states in every section — the case TD-135's *Done when* is written for."""
+    from agentorc.ui.app import inbox_sections
+
+    es = [
+        entry("m-1", "ask", team="grind", text="merge #517?", from_name="jeffrey"),
+        entry("m-2", "ask", team="cm", text="which branch?"),
+        entry("m-3", "steer", team="grind", text="off main", default="off main", bound="2026-09-20T09:00:00Z"),
+        entry("m-4", "note", team="grind", text="merged #517, one gap"),
+        entry("m-5", "note", team="cm", text="a note"),
+        entry("m-6", "note", team=None, text="from the home", from_="system", from_name="system"),
+    ]
+    states = [{"row": "permission", "id": "ao-x:permission", "sid": "ao-x", "name": "w9", "team": "cm",
+               "find": "w9 run pytest?", "at": "2026-09-19T09:00:00Z", "text": "run pytest?"}]  # fmt: skip
+    return inbox_sections(es, states=states, now=datetime(2026, 9, 19, 12, tzinfo=UTC))
+
+
+@pytest.mark.unit
+def test_every_row_kind_has_its_rail_kind():
+    """§4.5 screen 6 *The rail*: *questions*, *steering*, *session states*, *board items*, *notes*,
+    *trail* — one per row, from the row's own fields."""
+    from agentorc.ui.app import rail_kind
+
+    assert rail_kind({"kind": "ask"}) == rail_kind({"kind": "conflict"}) == "questions"
+    assert rail_kind({"kind": "note", "passed_up": "ao-t"}) == "questions"
+    assert rail_kind({"kind": "steer"}) == "steering"
+    for k in ("note", "reply"):
+        assert rail_kind({"kind": k}) == "notes"
+    assert rail_kind({"row": "permission"}) == rail_kind({"row": "alarm_host"}) == "states"
+    assert rail_kind({"row": "board"}) == "board" and rail_kind({"row": "trail"}) == "trail"
+
+
+@pytest.mark.unit
+def test_the_picks_come_from_the_url_and_unknown_lines_are_dropped():
+    from agentorc.ui.app import rail_picks
+
+    got = rail_picks({"team": "grind,none", "sec": "needs,bogus", "kind": "questions", "find": "  jeff  "})
+    assert got == {"team": ["grind", "none"], "sec": ["needs"], "kind": ["questions"], "find": "jeff"}
+    assert rail_picks({}) == {"team": [], "sec": [], "kind": [], "find": ""}
+
+
+@pytest.mark.unit
+def test_the_rail_counts_rows_on_the_page_under_the_picks():
+    """TD-135 *Done when* (1) and (3): one team pressed shows its rows in every section and the team
+    line reads what it needs from the person; a second team adds its rows; *FYI* alone shows both
+    teams' FYI; an unpicked team reads 0 of n; every count reads *n of all*; nothing picked is the
+    whole, as a plain number."""
+    from agentorc.ui.app import rail_counts, rail_picks, rail_rows
+
+    rows = rail_rows(_rail_fixture())
+    whole = rail_counts(rows, rail_picks({}))
+    assert not whole["filtered"] and whole["team_order"] == ["cm", "grind", "none"]
+    assert {t: c["all"] for t, c in whole["teams"].items()} == {"cm": 2, "grind": 1, "none": 0}
+    assert whole["sections"]["needs"] == {"shown": 3, "all": 3} and whole["sections"]["fyi"] == {"shown": 3, "all": 3}
+    one = rail_counts(rows, rail_picks({"team": "grind"}))
+    assert one["filtered"] and one["teams"]["grind"] == {"shown": 1, "all": 1}
+    assert one["teams"]["cm"] == {"shown": 0, "all": 2}  # unpicked in a group with a pick: 0 of n
+    assert one["heads"]["needs"] == {"shown": 1, "all": 3} and one["heads"]["fyi"] == {"shown": 1, "all": 3}
+    assert one["sections"]["steering"] == {"shown": 1, "all": 1}  # its share, under the team pick
+    two = rail_counts(rows, rail_picks({"team": "grind,cm"}))
+    assert two["heads"]["needs"] == {"shown": 3, "all": 3}
+    fyi = rail_counts(rows, rail_picks({"sec": "fyi"}))
+    assert fyi["heads"]["fyi"] == {"shown": 3, "all": 3} and fyi["sections"]["needs"] == {"shown": 0, "all": 3}
+    assert fyi["kinds"]["notes"] == {"shown": 3, "all": 3} and fyi["kinds"]["questions"] == {"shown": 0, "all": 2}
+    for r in (one, two, fyi):  # no count ever exceeds the rows on the page
+        for group in ("sections", "teams", "kinds", "heads"):
+            assert all(c["shown"] <= c["all"] for c in r[group].values())
+
+
+@pytest.mark.unit
+def test_the_find_matches_every_word_in_any_order_and_numbers_with_or_without_their_mark():
+    """TD-135 *Done when* (4): two words from a body in the other order, `#517`, `517,`, and *jeff*
+    finding *jeffrey*; a team pressed and a word typed shows only that team's matching rows, and
+    the team counts change with the word."""
+    from agentorc.ui.app import rail_counts, rail_picks, rail_rows
+
+    rows = rail_rows(_rail_fixture())
+
+    def shown(q):
+        return sum(c["shown"] for c in rail_counts(rows, rail_picks(q))["heads"].values())
+
+    assert shown({"find": "#517"}) == shown({"find": "517,"}) == shown({"find": "517"}) == 2
+    assert shown({"find": "gap merged"}) == 1  # the other order
+    assert shown({"find": "jeff"}) == 1  # a substring: *jeffrey*
+    both = rail_counts(rows, rail_picks({"team": "grind", "find": "517"}))
+    assert both["heads"]["needs"]["shown"] == 1 and both["heads"]["fyi"]["shown"] == 1
+    assert rail_counts(rows, rail_picks({"find": "branch"}))["teams"]["grind"]["shown"] == 0
+
+
+@pytest.mark.unit
+def test_the_page_draws_the_rail_pressed_from_the_url(monkeypatch, tmp_path):
+    """§4.5 screen 6: the picks are the page's URL, so the first paint is the filtered page — its
+    lines pressed, **Clear filters** drawn, the counts *n of all*, the find box holding the words —
+    and the title row is *Inbox* alone."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import rail_counts, rail_picks, rail_rows, templates
+
+    sections = _rail_fixture()
+    picks = rail_picks({"team": "grind", "find": "517"})
+    html = templates.get_template("inbox.html").render(
+        sections=sections, picks=picks, rail=rail_counts(rail_rows(sections), picks), host="kmaster",
+        active="Inbox", agent_down=False, volatile=False, usage={},
+    )  # fmt: skip
+    assert 'data-group="team" data-value="grind" aria-pressed="true"' in html
+    assert 'data-group="team" data-value="cm" aria-pressed="false"' in html
+    assert 'id="railclear"' in html and 'class="btn sm railclear hidden"' not in html
+    assert 'value="517"' in html and 'id="needspill"' not in html and "team:name" not in html
+    assert '<span id="n-needs">1 of 3</span>' in html.replace('class="meta" ', "")
+
+
+RAIL_PROBE = """
+const fs = require("fs");
+const noop = () => {};
+const el = (o) => Object.assign({ dataset: {}, style: {}, addEventListener: noop, appendChild: noop,
+  classList: { toggle: noop, add: noop, remove: noop, contains: () => false },
+  querySelector: () => null, querySelectorAll: () => [], contains: () => false }, o);
+const document = { documentElement: el(), body: el(), activeElement: null,
+  querySelector: () => null, querySelectorAll: () => [], addEventListener: noop, createElement: () => el() };
+global.window = {}; global.document = document;
+global.localStorage = { getItem: () => null, setItem: noop };
+global.matchMedia = () => ({ matches: false });
+global.setInterval = noop; global.setTimeout = noop; global.clearTimeout = noop;
+global.location = { pathname: "/inbox", protocol: "http:", host: "x" };
+global.fetch = () => Promise.reject(new Error("the probe makes no calls"));
+eval(fs.readFileSync(process.argv[2], "utf8"));
+const AO = window.AO, cases = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+console.log(JSON.stringify({
+  counts: cases.picks.map((q) => AO.railCounts(cases.rows, AO.railPicks(q))),
+  queries: cases.picks.map((q) => AO.railQuery(AO.railPicks(q))),
+  words: AO.findWords("  Merge, #517 (jeff) "),
+}));
+"""
+
+
+@pytest.mark.unit
+def test_the_script_counts_the_rail_as_the_server_does():
+    """`AO.railCounts` is `rail_counts` again, over the rows in the DOM (the page recounts on every
+    press and every poll): the same rows and picks give the same counts, the picks survive their
+    own URL, and the find's words are cut the same way."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is not installed: the rule is JavaScript, and nothing else runs it")
+    from agentorc.ui.app import find_words, rail_counts, rail_picks, rail_rows
+
+    rows = rail_rows(_rail_fixture())
+    queries = ["", "?team=grind", "?team=grind,cm&sec=needs", "?sec=fyi&kind=notes", "?team=none&find=home",
+               "?kind=questions&find=517%2C", "?team=gone"]  # fmt: skip
+    tmp = pathlib.Path(tempfile.mkdtemp())
+    (tmp / "probe.js").write_text(RAIL_PROBE)
+    (tmp / "cases.json").write_text(json.dumps({"rows": rows, "picks": queries}))
+    out = subprocess.run(
+        [node, str(tmp / "probe.js"), str(UI / "static" / "app.js"), str(tmp / "cases.json")],
+        capture_output=True, text=True, timeout=30,
+    )  # fmt: skip
+    assert out.returncode == 0, out.stderr
+    got = json.loads(out.stdout)
+    from urllib.parse import parse_qsl
+
+    for q, js, query in zip(queries, got["counts"], got["queries"], strict=True):
+        picks = rail_picks(dict(parse_qsl(q.lstrip("?"))))
+        assert js == rail_counts(rows, picks), q
+        assert rail_picks(dict(parse_qsl(query.lstrip("?")))) == picks, (q, query)  # round trip
+    assert got["words"] == find_words("  Merge, #517 (jeff) ") == ["merge", "#517", "jeff"]
+
+
+@pytest.mark.unit
+def test_below_720_the_rail_is_a_chip_row_and_a_sheet_holding_the_same_toggles(monkeypatch, tmp_path):
+    """§4.5 screen 6 *Narrow* (TD-137): the page carries a chip row — **Filters ▾** first, the team
+    chips after it — and a native `<dialog>` the rail itself moves into, so the chips and the sheet
+    are the rail's toggles and never a second list; below 720 px the rail beside the column is not
+    drawn, and a row's controls are 44 px high."""
+    monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
+    from agentorc.ui.app import templates
+
+    html = templates.get_template("inbox.html").render(
+        sections=_rail_fixture(), host="kmaster", active="Inbox", agent_down=False, volatile=False, usage={}
+    )
+    chips, sheet = html.index('id="railchips"'), html.index('<dialog class="railsheet" id="railsheet"')
+    assert chips < sheet < html.index('id="rail"')  # the sheet is empty until the rail moves in
+    assert 'id="railsheetbtn" aria-haspopup="dialog"' in html and 'id="railsheetdone"' in html
+    assert html.count('data-group="team"') == 3  # the rail's own team lines, once: the chips are the script's
+    js = (UI / "static" / "app.js").read_text()
+    assert '$("#railsheetbody").appendChild(railEl)' in js and "home.insertBefore(railEl" in js
+    css = (UI / "static" / "app.css").read_text()
+    narrow = css[css.index("@media (max-width: 720px)") :]
+    assert ".inboxwrap > .rail { display: none; }" in narrow and ".railchips { display: flex;" in narrow
+    assert ".inboxpage .mailrow .btn, .inboxpage .mailrow input.denywhy { height: 44px; }" in narrow

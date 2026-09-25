@@ -97,6 +97,35 @@ async def test_offline_hook_events_are_drained(agent, hookstub, tmp_path):
         assert await wait_for(applied)
 
 
+async def test_a_queued_event_older_than_a_live_one_does_not_overwrite_its_state(agent, hookstub, tmp_path):
+    """TD-169: a hook whose call timed out queues its event, stamped `at`; the next hook got through
+    live, and the drain comes after it. The queued state is older than the live one, so it is
+    skipped — its adapter id still counts — and a queued event newer than the last live one, or
+    one queued before the stamp existed, still applies."""
+    async with LocalClient() as c:
+        s = await c.call("create", name="q2", dir=str(tmp_path), adapter="hookstub")
+        before = time.time()
+        await c.call("hook", session=s["id"], state="working")  # the UserPromptSubmit that got through
+        agent.events.append(s["id"], {"state": "idle", "pending": None, "adapter_id": "uuid-2", "at": before})
+
+        async def drained():
+            return (await c.call("get", id=s["id"]))["adapter_id"] == "uuid-2"
+
+        assert await wait_for(drained)
+        assert (await c.call("get", id=s["id"]))["state"] == "working"
+        # newer than the last live event: applied
+        agent.events.append(s["id"], {"state": "idle", "pending": None, "at": time.time()})
+        assert await wait_for(lambda: _state(c, s["id"], "idle"))
+        # no stamp (queued by an older hook): applied as it always was
+        await c.call("hook", session=s["id"], state="working")
+        agent.events.append(s["id"], {"state": "idle", "pending": None})
+        assert await wait_for(lambda: _state(c, s["id"], "idle"))
+
+
+async def _state(c, sid, want):
+    return (await c.call("get", id=sid))["state"] == want
+
+
 async def test_fresh_session_not_judged_by_old_snapshot(agent, tmp_path):
     """A pane snapshot taken before a session existed must not flip it to exited."""
     from sessionorc.models import Session

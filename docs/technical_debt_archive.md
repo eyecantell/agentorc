@@ -1200,3 +1200,169 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Resolved:** 2026-09-24 (PR #543, the anchor session) — `resume_create` carries `repo` when the record has one, so the create checks the name in the record's scope and takes its id back; `resume_form_url` lands a worktree record on the form as Where = new worktree, the worktree's name and the repo in the directory field, which is what the form's own Start sends; the `/new` form prefills `where` and `worktree`. Design §4.5a *Focus (exited / closed)* says both. The live team was put right by hand: the seat filled from its launch record (`create` with `keep_mail` and `supervised`, the tick's own replay), the stray record forgotten.
 
 **Related:** TD-081 (the one-press Resume), §4.1 (the scope rule), §6 rule 3 (the seat fill that a superseded record blocks).
+
+## TD-138: Build the message shape on the Inbox — the markdown renderer, the *details* fold, the backstop
+
+**Priority:** Medium
+**Added:** 2026-09-24 (TD-127's design, a cloud session with Paul)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25. Was: open — designed, nothing built. Design: §4.10 *How a message to a person is written*, §4.5a *Inbox row: details* and the four mail rows, §4.5 screen 6 (*no scroll box*), mockups `Inbox.dc.html` and `InboxMessage.dc.html`.
+
+**Location:** `src/agentorc/ui/render.py` (new: the closed-subset renderer — paragraphs, `*em*` / `**strong**`, inline code, fenced code blocks, `-` and `1.` lists, `[text](url)` — emitting escaped HTML only, with the link rule: absolute `http(s)`, not the request's own origin, `target=_blank rel=noopener`, the host in a `<small>` after the text; anything else is its characters), `src/agentorc/ui/app.py` (`fold(text) -> (lead, rest)`: up to the first blank line, else the backstop at the last sentence end before `FOLD_CHARS` = 300; both halves rendered once per row in `inbox_sections`' output as `lead_html` / `rest_html`; the *answered for you* quotation from the question's lead), `src/agentorc/ui/templates/inbox_row.html` (the `body` macro: the lead, then `<details><summary>details</summary>` holding the rest when there is one; every mail macro through it; controls stay outside), `src/agentorc/ui/static/app.js` (the set of row ids whose *details* is open, re-applied after each poll, since the poll replaces rows; nothing stored; and `AO.mailEntry`, the Focus Inbox panel's entry, drawn through the same lead and fold — taken from the designer's PR #532, 2026-09-25), `app.css` (the summary as a quiet unbordered line; `.body` loses `white-space: pre-wrap`, paragraphs are elements now), `tests/test_screen.py` or a new `tests/test_render.py`.
+
+**Why:** a person reading the Inbox reads the verdict first or not at all; today the row is one run of text and a two-hundred-word reply hides *merged* in its first word and *one gap* in the middle.
+
+**Resolved:** 2026-09-25 (PR #557, `grinder-ao-2`) — `agentorc.ui.render` (the closed subset and `fold`), the `shaped` template global every mail row's text goes through, the *details* fold kept open across the poll (`app.js` `foldsOpen`, `AO.reopenFolds`), the Focus panel's halves from `/api/sessions/<id>/inbox`. Tests: `tests/test_render.py`, the TD-138 rows in `tests/test_ui_inbox.py`. Design §4.5a *Inbox row: details* carries the lasting content; the live look at a real `--source` reply is the anchor's after the promote.
+
+**Done when** (1) techlead-ao-1's #517-style reply (a verdict line, a blank line, a list) reads as its verdict with *details* closed, and open shows the list rendered; (2) the six refusals above and the one allowed link behave as listed, in tests and in a browser; (3) an old one-paragraph entry from before the rule folds at a sentence and answers folded; (4) the page's find (TD-135, if landed) still matches words inside a closed *details*; (5) `pdm run test` and `pdm run lint` pass; (6) TD-127 is marked built for the page half; (7) the Focus Inbox panel's entries fold the same way.
+
+**Related:** TD-127 (the design), TD-139 (the senders' half), TD-136 (the message page renders the same row open), TD-135 (the find over the whole text), TD-071 item 8 (nothing pressable from text — the link rule is its one exception).
+
+## TD-155: A resumed session that starts no turn reads `working` until it stalls: `SessionStart` with source `resume` lands at the composer and fires no `Stop`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (seen on the designer's record after Paul's one-press Resume)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25
+
+**Location:** `src/agentorc/adapters/claude_code/hook.py` (`STATE_EVENTS` maps every `SessionStart` to `working`; `SESSION_START_NOT_A_START` exempts `compact` only, TD-090), `src/sessionorc/agent.py` (`STALL_AFTER`, `_bell_blocked` — *not hook-confirmed idle*), design §4.2.
+
+**Why:** `claude --resume <id>` prints the old conversation and waits at the composer. Its `SessionStart` (source `resume`) is reported as `working` with confidence `hook`, and no turn follows, so no `Stop` ever reports `idle`. Seen 2026-09-25 14:06Z: the designer resumed by Paul reads `working (hook)` with an empty composer (`ao explain`: *no screen rule matched*), and at `STALL_AFTER` (20 minutes) it will read `stalled?` — an alert on a session that is simply idle. Two things follow from the wrong state: the doorbell never rings it (it rings hook-confirmed idle only), so mail for a resumed session waits until someone types; and a manager's `wait` sees a member `working` that is doing nothing. A fresh `SessionStart` (source `startup`) is a different case — `ao new` types the prompt at once, so `working` is right there — and `clear` is already handled as a continuation.
+
+**Resolved:** 2026-09-25 (PR #556, `grinder-ao-1`) — `SESSION_START_AT_THE_COMPOSER = {"resume"}` in `hook.py` reports `idle` at confidence hook; a prompt given with the resume reports `working` through its own `UserPromptSubmit`. Held by `test_a_resume_lands_at_the_composer`; design §4.2's state table carries the row. The live check (a one-press Resume reads `idle (hook)` within a tick) is on `docs/user_attention.md`.
+
+**Done when** a one-press Resume with no prompt shows `idle` within a tick, never `stalled?`, and the doorbell rings it for mail that lands after the resume.
+
+**Related:** TD-090 (the `compact` exemption, the same shape), TD-081 / TD-145 (Resume), TD-153 (the doorbell needs a hook-confirmed idle), §4.2.
+
+## TD-139: The shape asked of the senders — the presets' paragraph, the designer brief, the composer placeholder, `ao msg`'s warning
+
+**Priority:** Medium
+**Added:** 2026-09-24 (TD-127's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25 — the three presets, the warning and the placeholder in PR #561, the designer's brief in PR #563.
+
+**Location:** `src/agentorc/briefs/techlead.md`, `manager.md`, `grinder.md` (the paragraph, in the same words, beside each brief's *ao msg person* line; the techlead's beside *An `ask`: only when the answer is already written down*, with *a `--source` reply's first line is its verdict*), `docs/briefs/designer-ao-1.md` (the same paragraph under *How much Paul sees* — `docs/briefs/**` is held, so the techlead reads this PR, §4.9b; split it from the rest if that wait is long), `src/agentorc/cli.py` (`ao msg`: when the addressee is `person`, or the message is a `--source` reply, and the first paragraph is over `FIRST_PARA_WORDS` = 60 words or the text has no blank line and is over `FOLD_CHARS` = 300 characters, print *the person reads the first paragraph: n words — say what it is about, what you decided or ask, what they must do* to stderr and send anyway), `src/agentorc/ui/templates/base.html` (the Message / Reply dialog's `#mailtext` placeholder: *first what you want, then why — …*), `tests/test_cli.py`, `tests/test_primer.py` (the pointers, if the briefs' headings move).
+
+**Why:** the row can only fold what the sender shaped; the rule lives with the writers, and a warning at send is the one moment the writer can still fix it.
+
+**Resolved:** 2026-09-25 (PRs #561 and #563, `grinder-ao-2`) — the paragraph in `techlead.md`, `manager.md`, `grinder.md` and `docs/briefs/designer-ao-1.md`; `ao msg`'s `shape_warning` on `render.paragraph_break` (fence- and CRLF-aware, the Inbox row's own blank line); the Message / Reply dialog's placeholder. Tests in `tests/test_cli.py`. Design §4.10 *How a message to a person is written* carries the lasting content.
+
+**Done when** (1) each of the four briefs carries the paragraph in those words; (2) `ao msg person` with a 90-word first paragraph prints the warning and the mail arrives; a shaped message prints nothing; a `--source` reply is checked the same way; (3) the Message / Reply dialog's placeholder reads the line; (4) the designer-brief change waited for the techlead's read or was split out; (5) `pdm run test` passes; (6) TD-127 is marked built for the senders' half.
+
+**Related:** TD-127 (the design), TD-138 (the page half), TD-125 (the wind-down report, the same rule applied once), TD-114 (the briefs' template — the paragraph goes where the mechanics live, not in a repo's supplement).
+
+## TD-135: Build the Inbox rail — sections, teams and kinds as toggles, the URL, and the find box
+
+**Priority:** Medium
+**Added:** 2026-09-24 (TD-129's design, a cloud session with Paul)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25. Was: open — designed, nothing built. Design: §4.5 screen 6 *The rail* and *Find*, §4.5a *Inbox page: the rail*, *Inbox page: find*, the **keys** row (`/`), glossary *rail*, mockups `Inbox.dc.html` and `InboxRail.dc.html`.
+
+**Location:** `src/agentorc/ui/templates/inbox.html` (the rail beside `.inboxcol`; the `#ifilter` box moves into it), `inbox_row.html` (the team badge's press; `data-find` on every row kind; `data-team` and `data-kind` for the filter), `src/agentorc/ui/app.py` (`inbox_sections` gains each row's coarse `kind` and the counts per section, team and kind under the current picks; the route reads the query and the poll echoes it), `src/agentorc/ui/static/app.js` (`AO.inbox`: the toggles, the URL, the browser's memory, the find), `app.css`, `tests/`.
+
+**Why:** the page's one filter is a typed syntax and team and kind are not visible controls; Paul's way of working the Inbox is one team's *Needs you* rows, then the next team's — a press per team, with a count that says where to go next.
+
+**Resolved:** 2026-09-25 (PR #567, `grinder-ao-2`) — `inbox_rail.html`, `rail_counts` / `rail_picks` / `rail_kind` / `row_find` in `app.py`, `AO.railCounts` and the toggles, URL and find in `app.js`, held to one answer by `test_the_script_counts_the_rail_as_the_server_does`. The design row §4.5a *Inbox page: the rail* carries the lasting content, and design-history §4.5a the four calls made in the build (counts twice, a team line's *Needs you* count, push on a press and replace on typing, Dismiss all on the rows on screen). The live look is on the board line for TD-144/TD-138's promote.
+
+**Done when** (1) with two teams' mail in the inbox, pressing one team shows that team's rows in every section and the number beside the team reads what it needs from the person; pressing a second team adds its rows; pressing *FYI* alone then shows both teams' FYI and nothing else; **All** shows everything; (2) the URL after those presses, opened in a fresh tab, is the same page, and a bare `/inbox` in the first browser remembers the last picks; (3) the top bar's number does not change under any pick, every count reads *n of all* while one is on, an unpicked team reads *0 of n* while another team is picked, and no count ever exceeds the rows on the page; (4) typing two words from a body in the other order, `#517`, and `517,` each find the row, *jeff* finds *jeffrey*, a team pressed and a word typed shows only that team's matching rows and the team counts change with the word, a word from a folded FYI entry unfolds FYI, and the count reads *n of all*; (5) `pdm run test` covers `inbox_sections`' counts under picks and the `kind` of each row kind; (6) TD-129 (2) and (3) are marked built; (7) TD-137's `Pickable` is flipped to yes in the same PR, since nothing else flips it. (7) TD-137's Pickable flipped to yes in the same PR
+
+**Related:** TD-129 (the design), TD-136 (the page, reached from this filtered list), TD-137 (narrow), TD-069 (the filter this replaces), TD-124 (`/`, `Esc`), TD-131 (the size at which the counts move into a store).
+
+## TD-137: Build the Inbox's narrow layout — the rail as a chip row and a filter sheet, the page as the page
+
+**Priority:** Low
+**Added:** 2026-09-24 (TD-129's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25. Was: open — designed, nothing built. Design: §4.5 screen 6 *Narrow*, §4.5a *Inbox page: the rail* (its last sentence), mockup `InboxPhone.dc.html`.
+
+**Location:** `src/agentorc/ui/templates/inbox.html` (the chip row — the rail's Teams list, picked first — and the sheet, drawn from the same counts as the rail), `app.css` (the 720 px breakpoint Focus already uses), `app.js` (the sheet's open and close; the toggle code is TD-135's).
+
+**Why:** the pages are used from a phone (§4.5 *Phone layout*), and a 200 px rail beside a 390 px column is neither a rail nor a column.
+
+**Resolved:** 2026-09-25 (PR #575, `grinder-ao-2`) — the chip row and the `<dialog>` sheet in `inbox.html`, the sheet taking the rail's own node while open (`app.js`, `AO.inbox`), the team chips from `AO.railCounts`, the 720 px rules in `app.css`; `test_below_720_the_rail_is_a_chip_row_and_a_sheet_holding_the_same_toggles`. *A mail row's text opens its page* is the page's own (TD-136). Design §4.5 screen 6 *Narrow* carries the lasting content.
+
+**Done when** at 390 px wide the Inbox shows the chip row, a team chip filters as the rail's line does, the sheet opens and its toggles work, the URL is the desktop's for the same picks, and a mail row's text opens its page; back at 1100 px the rail is drawn with the picks kept.
+
+**Related:** TD-129, TD-135 (the toggles this re-renders), TD-136 (the page), §4.5 *Phone layout*.
+
+## TD-134: A test drives two controllers to contradict one worker, and the grinder preset says what a worker does with a contradiction
+
+**Priority:** Low
+**Added:** 2026-09-24 (the designer; TD-039's design round, PR #527)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25. Was: Open — designed, nothing built. Design: §4.10 *A conflict, worked* and *A bounded exchange, counted by thread* (the escalation is an `ask` to the person, not a board line).
+
+**Location:** `tests/test_mail.py` (beside `test_sends_are_recorded_with_who_typed_and_a_conflict_cites_them` and `test_a_conflicts_answers_reach_every_controllers_copy`), `src/agentorc/briefs/grinder.md` (one line under the mail rules), nothing in `src/agentorc/cli.py`: the escalation names the conflict's id in the text of a plain `ask` to the person, and the asker writes the ruling as a `reply` on the conflict's thread (`--thread` takes only the caller's own question to the person and is not the road).
+
+**Why:** TD-039's *done when* — a test that drives two controllers to contradict one worker and ends in a recorded resolution or a question to the person, never a stalled worker — has no test, and the grinder preset does not say what a worker does when two `send`s contradict each other. The mechanics exist (the `conflict` kind, `sends`, the first reply closing every copy, `bound_hit`); the path through them is untested end to end.
+
+**Resolved:** 2026-09-25 (PR #569, `grinder-ao-1`) — `tests/test_mail.py`'s `test_two_controllers_contradict_a_worker_and_the_first_reply_is_the_ruling` and `test_a_conflict_nobody_answers_goes_to_the_person_and_is_never_a_stalled_worker`; the grinder preset's *Two controllers telling you opposite things* rule, held by `test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction`. Step (2) as written — the worker writes the person's ruling *as a `reply` on the conflict's thread* — is not possible (a worker holds no copy of its own conflict); §4.10 *A conflict, worked* now says one `note` to both controllers, and *ends its turn in `ao wait`* became *ends its turn, to be rung by the reply* (TD-153).
+
+**Done when** the two tests pass on the suite, the grinder preset carries the line and its test, and TD-039 is archived with a pointer at §4.10 *A conflict, worked*.
+
+**Related:** TD-039 (the design), TD-052 (the mail this rides on), TD-032 (the stalled worker this must not reproduce), TD-125 (the brief-test pattern).
+
+## TD-039: Two controllers of one session can contradict each other and nothing lets them talk: design the conflict report, the controller-to-controller exchange, and the escalation
+
+**Priority:** Medium
+**Added:** 2026-09-13
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25. Was: Open — **the conflict-specific half designed 2026-09-24 (the designer, PR #527):** §4.10 *A conflict, worked* — the worker stops on the contested step and waits in `ao wait`, never guessing; the first `reply` from either controller is the ruling and the worker is never the arbiter; a resolved conflict is a thread, not a `finding` (what it reveals is the manager's ledger entry); nobody writes a board line — the escalation on a `bound_hit` or an expired bound is an `ask` to the person carrying the thread, which also changes the bounded-exchange rule's *the refused sender writes the board line itself* (steered to Paul as a default, bound one night). The worker asks the person only when its bound expires with no reply at all. Left to build: the test and the grinder preset's one line — TD-134. Was: design task, raised by Paul 2026-09-13 with the TD-036 go. **Its general half was answered 2026-09-14 by design §4.10** (TD-052): the gap was not a conflict feature but a missing concept — sessions could act on each other and never message each other — so the conflict report is a `conflict` message to both controllers, the exchange is `reply` traffic in one thread, the escalation is §4.10's exchange bound, and "not double-nudging" stops being a matter for briefs, since a controller's message about a session is copied to that session's other controllers. What stays here: the conflict-specific judgement — what a worker does *while* it waits, whether a resolved conflict becomes a `finding`, and who writes the board line. Not to be coded before TD-052 step 6 sets the bounds
+**Location:** design §4.8 (membership, report channels), §10 (the 2026-09-13 question); later `src/sessionorc/agent.py` (`_gate`, a new report kind), `src/agentorc/cli.py`, the orchestrator brief
+
+**Why:** TD-036 deliberately allows several controllers per session with no privileged member, and says keeping them from double-nudging "is a matter for their briefs". That is fine for nudges and useless for contradictions: a ui orc says "ship the chip now", a backend orc says "wait for the RPC", and the worker has no move but to pick one or stall. Paul's rule is the one a team would use — the worker puts it to both leads, they settle it between themselves, and a person hears about it only if they cannot. Nothing in agentorc supports that today. Upward, a worker has `ao progress` and `ao finding`, which declare claims on references and are read by whoever looks at the card, not delivered to a controller. Sideways, an orchestrator may `ao send` to another only because the `orchestrate` grant is not yet narrowed by membership; once TD-036's gate lands, two peers over a shared worker control neither each other nor anything but their own members, so even that accidental path closes. There is no conflict object, no delivery, no bound, and no escalation.
+
+**Resolved:** 2026-09-25 (PR #569, with TD-134) — the design is §4.10 *A conflict, worked* and *A bounded exchange, counted by thread*; the end-to-end tests its *done when* asked for are TD-134's.
+
+**Related:** design §4.8, §9 invariant 11, §10 (2026-09-12 and 2026-09-13 entries); TD-036 (the gate this extends), TD-028 (the report channels this adds a kind to), TD-032 (a stalled worker nobody noticed — the failure this must not reproduce).
+
+## TD-169: A hook event queued while the host agent was slow is applied at the next tick after the events that followed it, so a stale state can overwrite a fresh one
+
+**Priority:** Low
+**Added:** 2026-09-25 (the Sonnet review of PR #556, TD-155; `grinder-ao-1`)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25
+
+**Location:** `src/agentorc/adapters/claude_code/hook.py` (`main`: any exception but `Refused` appends the event to `events/<session>.jsonl`), `src/sessionorc/agent.py` (`_reconcile` drains the queue and `_apply_event` sets the state unconditionally).
+
+**Why:** each hook is its own process with a 3 s call. If one call times out (the host agent busy, not down) and the next one succeeds, the second is applied at once and the first is applied at the next tick, **after** it — so the record ends on the older state. A queued `Stop` (`idle`) behind a live `UserPromptSubmit` (`working`) is the old case; TD-155 (PR #556) added one more, a queued `SessionStart` from a resume (`idle`) behind the argv prompt's `UserPromptSubmit`. Either way a working session reads `idle` until its next hook (usually seconds), and in that window the doorbell may ring it. Rare and self-healing, which is why it is Low; but a queued event is a record of the past and is applied as if it were the present.
+
+**Resolved:** 2026-09-25 (PR #573, `grinder-ao-1`) — `hook.py` stamps a queued event `at`; `_apply_event(queued=True)` skips a queued state stamped before the last live hook (`_live_hook_at`), applying its adapter id, model and subagent delta. Held by `test_a_queued_event_older_than_a_live_one_does_not_overwrite_its_state`; design §4.2 carries the rule.
+
+**Related:** TD-115 (the queue is for an agent that is down, never for a refusal), TD-155 (the resume case), §4.2.
+
+## TD-153: Sessions poll for mail in foreground loops instead of going idle to be rung: the doorbell is built, and nothing tells a session it will be woken
+
+**Priority:** High
+**Added:** 2026-09-25 (raised by Paul, watching the designer loop on its inbox)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25
+
+**Location:** `src/agentorc/skill.md` (the *Mail* section — the doorbell is named there as a thing that happens, never as the reason to end a turn), `docs/briefs/designer-ao-1.md` (*"never wait for input, never end a turn to ask a question"*, which a session reads as *never be idle*; `grinder-ao-1.md` and `manager-ao-1.md` carry no such phrase, and say nothing about waiting either), design §4.8 (the role presets the briefs are cut from) and §4.10 (*How a Claude Code session is told it has mail*), `src/agentorc/cli.py` (`ao wait`'s and `ao inbox --unread`'s reply when there is nothing), `src/sessionorc/agent.py` (`_ring_doorbells`, `_bell_blocked` — the mechanism, already right).
+
+**Why:** the mechanism that makes waiting free exists and was never used. The doorbell (§4.10, TD-052 step 7) rings a hook-confirmed `idle` session when unread mail lands, within its wake budget; a `steer`'s bound running out mails its sender a `system` note that wakes it **uncharged** (`_lapse_or_expire`); `ao wait` blocked in the host agent returns on mail. So a session waiting on a reply has nothing to do but end its turn. The designer did the opposite for a whole run: from 2026-09-24 20:28Z to 2026-09-25 13:56Z its transcript holds **110** foreground calls of `for i in 1..9; do ao wait --timeout 60; ao inbox --unread; done` (nine minutes each, the Bash tool's ten-minute ceiling), plus background copies (three were still running when the run ended). Each return is a turn on the strongest model with the full context re-read, to learn *unread=0*; and because the session was `working` throughout, the doorbell — which rings only a hook-confirmed idle — never rang once (zero `[agentorc] you have N unread` lines in the transcript). The loop is the one thing that defeats the doorbell, and the brief pushed it into the loop: *never wait for input* was written against asking a person in the pane, and reads as *never be idle*. Nothing the session could read said *end the turn; you will be rung*.
+
+**Resolved:** 2026-09-25 (PR #560, `grinder-ao-1`) — design §4.10 *Waiting on mail is ending the turn*; `ao --skill`'s *Mail* bullet; the five role presets and `docs/briefs/designer-ao-1.md` say *mail it, then end the turn* (the repo supplements inherit it from the templates, TD-114, so `grinder-ao-1.md` and `manager-ao-1.md` are unchanged); `ao wait` with nothing and `ao inbox --unread` with nothing end with `cli.END_THE_TURN` for a session. Held by `test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn` and `test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn`. The *done when* — the designer's next run shows no loop — is a live check on `docs/user_attention.md`.
+
+**Done when** a session that has sent a `steer` or an `ask` and has nothing else to do ends its turn, the record reads `idle`, and the reply rings it; the designer's next run shows no `ao wait`/`ao inbox` loop in its transcript; and a grinder asked in review why it is idle can point at the skill sentence.
+
+**Related:** TD-052 (step 7, the doorbell; step 3, `wait` in the host agent), §4.10 (*How a Claude Code session is told it has mail*, the wake budget), TD-120 (the designer role and its brief), TD-072 / TD-141 (mail before wind-down: the other place a session is told what mail does to its turn).

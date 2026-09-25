@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import heapq
 import inspect
 import json
 import logging
@@ -164,6 +165,40 @@ HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"}
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
 # read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
 NODE_READS = frozenset({"tail", "explain"})
+
+
+def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[MailEntry]:
+    """A thread's entries oldest first (TD-136). `at` is whole seconds, so a reply and the next
+    question can share one; each mailbox, though, holds its entries in the order they landed, and a
+    reply comes after what it answers, and whatever settled a question (its outcome, or asking
+    again on the thread) after the reply that answered it. So the order is a merge all of those
+    agree with — taking the earliest `at` (then id) among the entries free to go next."""
+    succ: dict[str, set[str]] = {i: set() for i in found}
+    indeg = dict.fromkeys(found, 0)
+    answers = [[e.reply_to, e.id] for e in found.values() if e.reply_to in found]
+    settled = [
+        [e.closed_by, e.outcome.get("by")]
+        for e in found.values()
+        if e.outcome and e.closed_by in found and e.outcome.get("by") in found
+    ]
+    for chain in [*chains, *answers, *settled]:
+        for a, b in zip(chain, chain[1:], strict=False):
+            if b not in succ[a]:
+                succ[a].add(b)
+                indeg[b] += 1
+    ready = [(found[i].at, i) for i, n in indeg.items() if n == 0]
+    heapq.heapify(ready)
+    out: list[MailEntry] = []
+    while ready:
+        _, i = heapq.heappop(ready)
+        out.append(found[i])
+        for b in succ[i]:
+            indeg[b] -= 1
+            if indeg[b] == 0:
+                heapq.heappush(ready, (found[b].at, b))
+    placed = {e.id for e in out}
+    left = sorted((e for e in found.values() if e.id not in placed), key=lambda e: (e.at, e.id))
+    return out + left  # boxes that disagree (never expected) still lose nothing
 # What the home pushes a node about each of its records (§4.4a "The home pushes each node its
 # records' policy fields as they change", step 4b.2): the home-owned fields, less the mailbox — the
 # inbox, outbox, threads, wakes and `mail_decided` stay the home's, and no message body ever reaches
@@ -429,6 +464,9 @@ class HostAgent:
         self._last_hook: dict[str, datetime] = {
             sid: datetime.now(UTC) for sid, s in self.sessions.items() if s.confidence == "hook"
         }
+        # When a hook event last reached a record **live**, in epoch seconds (TD-169): a queued
+        # event stamped before it is older than the state it would set, so its state is skipped.
+        self._live_hook_at: dict[str, float] = {}
         # profile → last usage dict from its adapter (`usage_for`), and when it was last asked
         # The last good reading per profile, kept across a restart (TD-087) — with, beside the
         # windows, why the *last poll* failed, which the page draws as a stale chip rather than
@@ -1412,7 +1450,7 @@ class HostAgent:
 
     def _reconcile(self, panes: dict[str, PaneInfo], tails: dict[str, list[str]], snapshot_at: datetime) -> None:
         for sid, event in self.events.drain():
-            self._apply_event(sid, event)
+            self._apply_event(sid, event, queued=True)
         now = datetime.now(UTC)
         mono = time.monotonic()
         self._removed = {k: v for k, v in self._removed.items() if mono - v[1] < REMOVED_GUARD_SECONDS}
@@ -1510,11 +1548,20 @@ class HostAgent:
             return None
         return explain(s.tail)
 
-    def _apply_event(self, sid: str, event: dict[str, Any]) -> None:
-        """A hook-fed state transition (design §4.2 table). Adapters map hook names to these."""
+    def _apply_event(self, sid: str, event: dict[str, Any], queued: bool = False) -> None:
+        """A hook-fed state transition (design §4.2 table). Adapters map hook names to these.
+
+        A **queued** event (the hook's call failed and it wrote `events/<session>.jsonl`, drained
+        at the tick) carries `at`, when it happened. One stamped before an event that reached the
+        record live is older than the state that event set, so its state is skipped; its adapter
+        id, model and subagent count still apply (TD-169)."""
         s = self.sessions.get(sid)
         if s is None:
             return
+        at = event.get("at") if queued else None  # a queue written before the stamp is applied as it was
+        stale = isinstance(at, int | float) and at < self._live_hook_at.get(sid, 0.0)
+        if not queued:
+            self._live_hook_at[sid] = time.time()
         self._last_hook[sid] = datetime.now(UTC)  # apply time, also for events drained from the offline queue
         if aid := event.get("adapter_id"):
             s.adapter_id = aid
@@ -1522,7 +1569,7 @@ class HostAgent:
             s.model = str(model)  # SessionStart's `model`, or a `/model` switch (TD-031)
         if delta := event.get("subagent_delta"):
             s.subagents = max(0, s.subagents + int(delta))
-        state = event.get("state")
+        state = None if stale else event.get("state")
         if state:
             pending = Pending.from_dict(event["pending"]) if event.get("pending") else None
             if state == "needs-you" and self._permission_waiting(sid):
@@ -1546,6 +1593,7 @@ class HostAgent:
             self._model_checked,
             self._pre_limited,
             self._last_hook,
+            self._live_hook_at,
             self._killed_at,
             self._mail_hints,
             self._asks_hints,
@@ -3724,6 +3772,44 @@ class HostAgent:
             "unread": s.unread(),
         }
 
+    async def rpc_thread(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """`ao inbox --thread <id>` and the Inbox's message page (design §4.7, §4.5 screen 6,
+        TD-136): the whole thread of one entry in the person inbox — every entry sharing its
+        `root`, gathered across the person inbox and every record's inbox and outbox, one per id
+        (the person inbox's copy first, then the first found), oldest first. The person's own
+        replies are in it though the person inbox keeps no sent list: they live in the askers'
+        inboxes. `pruned` says the root itself is held nowhere any more, so the thread starts
+        after a gap. A read, marking nothing; **a person's only** — a thread spans other
+        sessions' mailboxes, which no session reads (§4.10)."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot read a thread: it is gathered across every session's mailbox, and nobody "
+                "reads another session's inbox (design §4.10)"
+            )
+        held = [e for e in self.person_inbox if e.id == msg]
+        if not held:
+            raise RpcError(f"the person inbox holds no entry {msg}")
+        root = held[0].root
+        boxes = [self.person_inbox, *(box for s in self.sessions.values() for box in (s.inbox, s.outbox))]
+        found: dict[str, MailEntry] = {}
+        chains: list[list[str]] = []  # each mailbox's thread entries in the order they landed there
+        for box in boxes:
+            chain = [e.id for e in box if e.root == root]
+            for e in box:
+                if e.root == root:
+                    found.setdefault(e.id, e)
+            chains.append(chain)
+        graph = self._graph()
+        return {
+            "id": msg,
+            "root": root,
+            "entries": [
+                {**e.to_dict(), "from_role": mail.from_role(graph, PERSON, e.from_, controllers=self._ctl)}
+                for e in _oldest_first(found, chains)
+            ],
+            "pruned": root not in found,
+        }
+
     async def rpc_inbox_delete(self, msg: str, id: str | None = None, caller: Any = None) -> dict[str, Any]:
         """The Inbox panel's delete (design §4.10 lifecycle, §4.5a): a person removes one entry
         from one session's inbox — that record's copy only, so the sender's and any other
@@ -4289,6 +4375,7 @@ class HostAgent:
         if s is None:
             return None
         self._last_hook[session] = datetime.now(UTC)
+        self._live_hook_at[session] = time.time()
         wait = float(event.get("wait_seconds") or 600)
         deadline = (datetime.now(UTC) + timedelta(seconds=wait)).replace(microsecond=0)
         tool_use_id = event.get("tool_use_id") or f"{session}:{now_iso()}"

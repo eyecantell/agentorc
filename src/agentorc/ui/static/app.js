@@ -390,6 +390,29 @@
     }
   });
 
+  // design §4.5a **Inbox row: details** (§4.10 *How a message to a person is written*; TD-138):
+  // which rows' *details* the person has opened, by entry id. The poll replaces rows, so the set is
+  // put back after each swap (`reopenFolds`); it lives as long as the page and is never stored —
+  // a fold is not state. `toggle` does not bubble, hence the capture.
+  const foldsOpen = new Set();
+  document.addEventListener?.("toggle", (ev) => {
+    const d = ev.target;
+    if (!d || !d.matches || !d.matches("details.fold") || !d.dataset.fold) return;
+    if (d.open) foldsOpen.add(d.dataset.fold); else foldsOpen.delete(d.dataset.fold);
+  }, true);
+  AO.reopenFolds = function (root) {
+    (root ? $$("details.fold", root) : []).forEach((d) => { if (foldsOpen.has(d.dataset.fold)) d.open = true; });
+  };
+  // The Focus panel's entry, folded as the Inbox row is: both halves were rendered by the server's
+  // closed-subset renderer (`api_inbox`, `shaped`) — escaped text and its own few tags — so nothing
+  // here composes markup from what a session wrote. An entry from an older UI without them is the
+  // escaped text, whole, as before.
+  AO.foldBody = function (e) {
+    if (typeof e.lead_html !== "string") return `<div class="body">${esc(e.text)}</div>`;
+    return `<div class="body md">${e.lead_html}</div>`
+      + (e.rest_html ? `<details class="fold" data-fold="${esc(e.id)}"><summary>details</summary><div class="body md">${e.rest_html}</div></details>` : "");
+  };
+
   // One mail entry, as the Focus Inbox panel shows it (design §4.5a **Focus Inbox**, §4.10):
   // sender (name, id on hover), kind, `about`, read/unread, age, an `ask`'s state, Reply and
   // delete. `owner` is the session whose inbox it sits in — the person inbox has the Inbox page's
@@ -423,7 +446,7 @@
       + `<span class="grow"></span><span class="st">${e.read_at ? "read" : "unread"}</span>`
       + `<span class="st age" data-since="${esc(e.at || "")}">${fmtAge(e.at)}</span></div>`
       + (e.reply_to ? `<div class="st">reply to ${esc(e.reply_to)}</div>` : "")
-      + `<div class="body">${esc(e.text)}</div>`
+      + AO.foldBody(e)
       + (e.default ? `<div class="st">unless you say otherwise: ${esc(e.default)}</div>` : "")
       + `<div class="row gap">${st ? `<span class="st${e.expired_at ? " expired" : ""}">${st}</span>` : ""}<span class="grow"></span>${reply}`
       + ` <button class="btn sm ghost" data-act="unmail" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-confirm="${confirmText}">Delete</button></div></div>`;
@@ -915,24 +938,60 @@
   AO.inbox = function () {
     const f = $("#ifilter");
     setupInfoMarks();
-    f.value = store.get("inboxfilter", "");
     $("#sec-fyi").open = store.get("inboxfyi", false);  // folded by default, remembered here
-    $("#sec-fyi").addEventListener("toggle", () => store.set("inboxfyi", $("#sec-fyi").open));
+    // …but a fold the find opened is the find's, not the person's (§4.5 screen 6 *Find*)
+    $("#sec-fyi").addEventListener("toggle", () => {
+      if (findOpened.has("sec-fyi")) { if (!$("#sec-fyi").open) findOpened.delete("sec-fyi"); return; }
+      store.set("inboxfyi", $("#sec-fyi").open);
+    });
     // §4.9b *Answered for you*: open until the person folds it, and remembered here as FYI's is
     const ans = $("#sec-answered");
     if (ans) {
       ans.open = store.get("inboxanswered", true);
       ans.addEventListener("toggle", () => { store.set("inboxanswered", ans.open); markAnsweredSeen(); });
     }
-    f.addEventListener("input", () => { store.set("inboxfilter", f.value.trim()); inboxFilter(); });
-    // the row's team badge filters to that team; pressing it again clears the box (as on the Org)
+    // design §4.5 screen 6 *The rail* (TD-135): the picks are the page's URL. A bare `/inbox` takes
+    // the browser's last picks and writes them back into the URL, so a link copied from the bar is
+    // always the page as seen; a press is a history entry, so Back undoes it; typing is not.
+    const fromUrl = AO.railPicks(location.search);
+    const any = (p) => !!(p.team.length || p.sec.length || p.kind.length || p.find);
+    rail = any(fromUrl) ? fromUrl : AO.railPicks(store.get("inboxpicks", ""));
+    const save = (push) => {
+      const q = AO.railQuery(rail);
+      store.set("inboxpicks", q);
+      const url = location.pathname + q;
+      if (url !== location.pathname + location.search) history[push ? "pushState" : "replaceState"](null, "", url);
+    };
+    save(false);
+    f.value = rail.find;
+    f.addEventListener("input", () => { rail.find = f.value.trim(); save(false); inboxFilter(); });
+    window.addEventListener("popstate", () => { rail = AO.railPicks(location.search); f.value = rail.find; store.set("inboxpicks", AO.railQuery(rail)); inboxFilter(); });
+    const toggle = (group, value) => {
+      const on = rail[group].includes(value);
+      rail[group] = on ? rail[group].filter((v) => v !== value) : [...rail[group], value];
+      save(true); inboxFilter();
+    };
     document.addEventListener("click", (e) => {
-      const b = e.target.closest(".mailrow .badge.team"); if (!b) return;
-      e.preventDefault();
-      const q = "team:" + b.dataset.team;
-      f.value = f.value.trim().toLowerCase() === q.toLowerCase() ? "" : q;
-      store.set("inboxfilter", f.value); inboxFilter();
+      const line = e.target.closest(".rail .railline, .railchips .railline");
+      if (line) { e.preventDefault(); return toggle(line.dataset.group, line.dataset.value); }
+      // the row's team badge is the same press as the rail's line for its team
+      const b = e.target.closest(".mailrow .badge.team");
+      if (b) { e.preventDefault(); return toggle("team", b.dataset.team || "none"); }
     });
+    $("#railclear").addEventListener("click", () => {
+      rail = AO.railPicks(""); f.value = ""; save(true); inboxFilter();
+    });
+    // §4.5 screen 6 *Narrow* (TD-137): **Filters ▾** opens the sheet, and the sheet holds the rail
+    // itself — moved in while it is open and back when it closes, so there is one set of toggles.
+    const sheet = $("#railsheet"), railEl = $("#rail"), home = railEl && railEl.parentElement;
+    if (sheet && railEl && home) {
+      $("#railsheetbtn").addEventListener("click", () => { $("#railsheetbody").appendChild(railEl); sheet.showModal(); });
+      $("#railsheetdone").addEventListener("click", () => sheet.close());
+      sheet.addEventListener("close", () => { home.insertBefore(railEl, home.firstChild); });
+      // widened past the breakpoint with the sheet open: the rail belongs beside the column again
+      const wide = window.matchMedia ? window.matchMedia("(min-width: 721px)") : null;
+      if (wide && wide.addEventListener) wide.addEventListener("change", (m) => { if (m.matches && sheet.open) sheet.close(); });
+    }
     // §4.10: **Dismiss all** — the entries this browser has **on screen**, by id, never
     // *everything FYI holds now*: mail that arrived after the page was drawn is what must not go
     // unseen. The confirm says the number it is about, and the ids come off the DOM for that
@@ -940,7 +999,7 @@
     const all = $("#dismissall");
     if (all) all.addEventListener("click", async (e) => {
       e.preventDefault(); e.stopPropagation();
-      const ids = [...$$("#rows-fyi .mailrow")].map((r) => r.dataset.msg).filter(Boolean);
+      const ids = [...$$("#rows-fyi .mailrow")].filter((r) => !r.hidden).map((r) => r.dataset.msg).filter(Boolean);  // on screen: a row the rail hides is not
       if (!ids.length) return AO.toast("nothing in FYI to dismiss", true);
       if (!confirm(`Dismiss ${ids.length} FYI ${ids.length === 1 ? "entry" : "entries"}? Only the ones on screen now — anything that arrives after this is untouched.`)) return;
       try {
@@ -1027,7 +1086,8 @@
   // is one readable line rather than conditions spread through the swap.
   AO.maySwapSection = function (el, focused) {
     if (!el) return false;
-    if (el.querySelector("details[open]")) return false;  // a menu the person has opened
+    // a menu the person has opened; an open *details* fold is not one — it is put back after the swap
+    if (el.querySelector("details[open]:not(.fold)")) return false;
     return !(focused && focused !== document.body && el.contains(focused));
   };
 
@@ -1069,6 +1129,7 @@
         const kept = AO.denyWhys(el), at = ring ? $$(".mailrow", el).indexOf(ring) : -1;
         el.innerHTML = got.html[k] || "";
         AO.restoreDenyWhys(el, kept);
+        AO.reopenFolds(el);
         if (ring) {
           const rows = $$(".mailrow", el), back = rows.find((r) => r.dataset.msg === ring.dataset.msg) || rows[at] || rows[rows.length - 1];
           if (back) back.focus({ preventScroll: true });
@@ -1078,11 +1139,14 @@
     // *Waiting on them* is empty for most people most of the time, so it draws only when it has
     // something — like the snoozed box (§4.5a **Inbox section: Waiting on them**).
     const w = $("#sec-waiting");
-    if (w) w.classList.toggle("hidden", !(got.sections && (got.sections.waiting || []).length));
+    if (w) w.classList.toggle("hidden", !(got.sections && (got.sections.waiting || []).length) && !rail.sec.includes("waiting"));
     // *Answered for you* (§4.9b) the same way: most teams have no techlead, and an empty heading
     // there would be a section that is never anything
     const a = $("#sec-answered");
-    if (a) a.classList.toggle("hidden", !(got.sections && (got.sections.answered || []).length));
+    if (a) a.classList.toggle("hidden", !(got.sections && (got.sections.answered || []).length) && !rail.sec.includes("answered"));
+    // the rail's *Teams* lines come with the rows: a team appears or goes with its mail
+    const rt = $("#railteams");
+    if (rt && typeof got.html.rail_teams === "string" && !rt.contains(document.activeElement)) rt.innerHTML = got.html.rail_teams;
     markAnsweredSeen();
     // §4.10: **FYI opens itself when its count is higher than this browser last saw it**, and is
     // otherwise as the person left it. That comparison is the browser's own — nothing on an entry
@@ -1105,31 +1169,134 @@
       if (newest) store.set("inboxfyiseenat", newest);
     }
     showLocalTimes();
-    $("#needsn").textContent = got.needs || 0;
-    $("#needspill").classList.toggle("hidden", !got.needs);
     const sn = got.snoozed_n || 0;
     $("#snoozedbox").hidden = !sn;
     $("#snoozedlabel").textContent = `${sn} snoozed — show`;
     inboxFilter();
   }
 
-  // `team:<name>` is an exact match on the row's badge, `team:` alone is what carries none; any
-  // other text matches the sender, the message and its `about` — the fields a person searches by.
+  // design §4.5 screen 6 *The rail* and *Find* (TD-129, built by TD-135). Within a group the picks
+  // are OR'd, across groups AND'd, a group with nothing picked means all of it, and the find is a
+  // fourth group: every word typed must match, in any order, as a substring of the row's
+  // `data-find`. `railCounts` is `app.py`'s `rail_counts` again, over the rows in the DOM — every
+  // count is a count of rows on the page now — and a test holds the two to one answer.
+  const RAIL_SECS = ["needs", "steering", "waiting", "answered", "fyi"];
+  const RAIL_KINDS = ["questions", "steering", "states", "board", "notes", "trail"];
+  const FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>";
+  let rail = { team: [], sec: [], kind: [], find: "" };
+  const findOpened = new Set();
+  AO.railPicks = function (search) {
+    const q = new URLSearchParams(search || "");
+    const lst = (k) => (q.get(k) || "").split(",").map((x) => x.trim()).filter(Boolean);
+    return {
+      team: lst("team"),
+      sec: lst("sec").filter((x) => RAIL_SECS.includes(x)),
+      kind: lst("kind").filter((x) => RAIL_KINDS.includes(x)),
+      find: (q.get("find") || "").trim(),
+    };
+  };
+  AO.railQuery = function (p) {
+    const parts = [];
+    ["team", "sec", "kind"].forEach((k) => { if (p[k].length) parts.push(`${k}=${p[k].map(encodeURIComponent).join(",")}`); });
+    if (p.find) parts.push(`find=${encodeURIComponent(p.find)}`);
+    return parts.length ? "?" + parts.join("&") : "";
+  };
+  AO.findWords = function (find) {
+    const trim = (w) => { let a = 0, b = w.length; while (a < b && FIND_EDGE.includes(w[a])) a++; while (b > a && FIND_EDGE.includes(w[b - 1])) b--; return w.slice(a, b); };
+    return String(find || "").toLowerCase().split(/\s+/).map(trim).filter(Boolean);
+  };
+  const railKey = { team: "team", sec: "section", kind: "kind" };
+  function railPasses(r, picks, words, skip) {
+    for (const g of ["team", "sec", "kind"]) {
+      if (g !== skip && picks[g].length && !picks[g].includes(r[railKey[g]])) return false;
+    }
+    return words.every((w) => r.find.includes(w));
+  }
+  AO.railCounts = function (rows, picks) {
+    const words = AO.findWords(picks.find);
+    const teams = [...new Set(rows.map((r) => r.team).filter((t) => t !== "none"))].sort();
+    if (rows.some((r) => r.team === "none")) teams.push("none");
+    (picks.team || []).forEach((t) => { if (!teams.includes(t)) teams.push(t); });
+    const line = (group, value, among) => {
+      const mine = among.filter((r) => r[railKey[group]] === value);
+      const shown = picks[group].length && !picks[group].includes(value) ? 0 : mine.filter((r) => railPasses(r, picks, words, group)).length;
+      return { shown, all: mine.length };
+    };
+    const needs = rows.filter((r) => r.section === "needs");
+    const out = { filtered: !!(picks.team.length || picks.sec.length || picks.kind.length || words.length), sections: {}, teams: {}, team_order: teams, kinds: {}, heads: {} };
+    RAIL_SECS.forEach((s) => {
+      out.sections[s] = line("sec", s, rows);
+      out.heads[s] = { shown: rows.filter((r) => r.section === s && railPasses(r, picks, words)).length, all: rows.filter((r) => r.section === s).length };
+    });
+    teams.forEach((t) => { out.teams[t] = line("team", t, needs); });
+    RAIL_KINDS.forEach((k) => { out.kinds[k] = line("kind", k, rows); });
+    return out;
+  };
+  const railRow = (el) => ({ section: el.dataset.section || "", team: el.dataset.team || "none", kind: el.dataset.rkind || "", find: el.dataset.find || "" });
+
   function inboxFilter() {
     const box = $("#ifilter"); if (!box) return;
-    const raw = box.value.trim();
-    const team = /^team:/i.test(raw) ? raw.slice(5).trim().toLowerCase() : null;
-    const q = team === null ? raw.toLowerCase() : "";
-    $$(".mailrow").forEach((r) => {
-      const has = (r.dataset.team || "").toLowerCase();
-      r.hidden = team !== null ? has !== team : !!q && !(r.dataset.find || "").includes(q);
+    const words = AO.findWords(rail.find);
+    const num = (c, filtered) => (filtered ? `${c.shown} of ${c.all}` : `${c.all}`);
+    // every row on the page, the snoozed list included (its box is not a section: a section pick
+    // hides it whole, below), shown or hidden by the same rule
+    $$(".inboxpage .mailrow").forEach((el) => {
+      const r = railRow(el);
+      el.hidden = !railPasses(r, rail, words, r.section === "snoozed" ? "sec" : "");
     });
-    IN_SECS.forEach((k) => {
+    const rows = $$(RAIL_SECS.map((k) => `#rows-${k} .mailrow`).join(", ")).map(railRow);
+    const c = AO.railCounts(rows, rail);
+    // a team line for a picked team the poll no longer carries, so the pick can be undone
+    const rt = $("#railteams");
+    if (rt) c.team_order.forEach((t) => {
+      if (!$$(".railline", rt).some((b) => b.dataset.value === t)) {
+        rt.insertAdjacentHTML("beforeend", `<button type="button" class="railline" data-group="team" data-value="${esc(t)}" aria-pressed="false"><span class="raillabel">${esc(t === "none" ? "no team" : t)}</span><span class="railn"></span></button>`);
+      }
+    });
+    $$(".rail .railline").forEach((b) => {
+      const g = b.dataset.group, v = b.dataset.value;
+      const cnt = g === "sec" ? c.sections[v] : g === "kind" ? c.kinds[v] : c.teams[v] || { shown: 0, all: 0 };
+      b.setAttribute("aria-pressed", rail[g].includes(v) ? "true" : "false");
+      $(".railn", b).textContent = num(cnt, c.filtered);
+      b.classList.toggle("dim", c.filtered && !cnt.shown);
+    });
+    $("#railclear").classList.toggle("hidden", !c.filtered);
+    // the narrow chip row (TD-137): the number of picks on **Filters ▾**, then the team chips from
+    // the same counts, picked first so a pick never scrolls out of sight
+    const pn = rail.team.length + rail.sec.length + rail.kind.length + (words.length ? 1 : 0);
+    const pe = $("#picksn"); if (pe) pe.textContent = pn ? `${pn}` : "";
+    const ct = $("#chipteams");
+    if (ct) {
+      const order = [...c.team_order.filter((t) => rail.team.includes(t)), ...c.team_order.filter((t) => !rail.team.includes(t))];
+      const html = order.map((t) => {
+        const cnt = c.teams[t] || { shown: 0, all: 0 }, on = rail.team.includes(t);
+        return `<button type="button" class="btn sm chip railline${c.filtered && !cnt.shown ? " dim" : ""}" data-group="team" data-value="${esc(t)}" aria-pressed="${on}"><span class="raillabel">${esc(t === "none" ? "no team" : t)}</span> <span class="railn">${num(cnt, c.filtered)}</span></button>`;
+      }).join("");
+      if (ct.innerHTML !== html) {
+        const had = document.activeElement && ct.contains(document.activeElement) ? document.activeElement.dataset.value : null;
+        ct.innerHTML = html;
+        if (had !== null) { const back = $$(".railline", ct).find((b) => b.dataset.value === had); if (back) back.focus({ preventScroll: true }); }
+      }
+    }
+    // a section not picked is not drawn; one picked and emptied draws its heading and its empty line
+    RAIL_SECS.forEach((k) => {
       const sec = $("#sec-" + k); if (!sec) return;
-      const n = $$(`#rows-${k} .mailrow`).filter((r) => !r.hidden).length;
-      const all = $$(`#rows-${k} .mailrow`).length;
-      $("#n-" + k).textContent = raw && n !== all ? `${n} of ${all}` : all ? `${all}` : "";
-      const empty = $(".note.empty", sec); if (empty) empty.hidden = n > 0;
+      sec.classList.toggle("railout", rail.sec.length > 0 && !rail.sec.includes(k));
+      const h = c.heads[k];
+      $("#n-" + k).textContent = c.filtered ? num(h, true) : h.all ? `${h.all}` : "";
+      const empty = $(".note.empty", sec); if (empty) empty.hidden = h.shown > 0;
+    });
+    const sz = $("#snoozedbox"); if (sz) sz.classList.toggle("railout", rail.sec.length > 0);
+    // the find's own count, and the folds it opens (§4.5 screen 6 *Find*): a match inside FYI or
+    // the snoozed list unfolds it while the box holds words, and folds it back when the box empties
+    // — unless the person had it open, whose fold memory is theirs
+    const all = rows.length, shown = rows.filter((r) => railPasses(r, rail, words)).length;
+    $("#findn").textContent = words.length ? `${shown} of ${all}` : "";
+    ["sec-fyi", "snoozedbox"].forEach((id) => {
+      const d = document.getElementById(id); if (!d) return;
+      const hit = words.length && $$(".mailrow", d).some((el) => !el.hidden);
+      if (hit && !d.open) { findOpened.add(id); d.open = true; }
+      else if (!words.length && findOpened.has(id)) { d.open = false; if (id !== "sec-fyi") findOpened.delete(id); }  // FYI's own toggle clears it
     });
   }
 
@@ -1663,6 +1830,7 @@
         $("#inboxcard").classList.toggle("hidden", !es.length);
         $("#inboxcount").textContent = es.length ? `${got.unread} unread · ${es.length}` : "";
         $("#inboxlist").innerHTML = es.slice().reverse().map((e) => AO.mailEntry(e, id)).join("");
+        AO.reopenFolds($("#inboxlist"));
         if (inboxFirst && location.hash === "#inbox" && es.length) $("#inboxcard").scrollIntoView({ block: "nearest" });
         inboxFirst = false;
       }, 150);

@@ -735,7 +735,30 @@ def test_wait_returns_at_the_timeout_when_nothing_changes(subprocess_agent, caps
     t0 = time.monotonic()
     assert cli.main(["wait", "--timeout", "1.2", "--scope", "all"]) == 0
     assert 1.0 <= time.monotonic() - t0 < 12.0
-    assert "nothing changed" in capsys.readouterr().out
+    assert "nothing changed" in (out := capsys.readouterr().out)
+    assert cli.END_THE_TURN not in out  # no session: a person at a terminal is never rung
+
+
+def test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-153 (design §4.10 *Waiting on mail is ending the turn*): a session looping on `ao wait` or
+    `ao inbox --unread` stays `working` and is never rung, so the reply that found nothing says so —
+    on stdout in prose, on stderr under `--json` so the JSON still parses — and a person at a
+    terminal, who is never rung, is not told it."""
+    sid = call_sync("create", name="poller", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    assert cli.main(["inbox", "--unread"]) == 0  # the person inbox: no line
+    assert cli.END_THE_TURN not in capsys.readouterr().out
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["inbox", "--unread"]) == 0
+    assert cli.END_THE_TURN in capsys.readouterr().out
+    assert cli.main(["--json", "inbox", "--unread"]) == 0
+    got = capsys.readouterr()
+    assert json.loads(got.out)["entries"] == [] and cli.END_THE_TURN in got.err
+    assert cli.main(["wait", "--timeout", "1.2"]) == 0
+    assert cli.END_THE_TURN in (out := capsys.readouterr().out) and "nothing changed" in out
+    call_sync("msg", to=sid, text="from the person")
+    assert cli.main(["inbox", "--unread"]) == 0  # found something: no line
+    assert cli.END_THE_TURN not in capsys.readouterr().out
+    call_sync("kill", id=sid)
 
 
 def test_a_worker_marking_done_wakes_a_waiting_lead_within_seconds(subprocess_agent, tmp_path, capsys):
@@ -875,6 +898,34 @@ def test_the_skill_tells_a_session_that_ao_wait_exists():
     assert "silence is not an event" in skill.lower()  # the limit, where the reader will act on it
 
 
+def test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction():
+    """TD-134 (design §4.10 *A conflict, worked*): the kind and its citations are named, the worker
+    never picks one, and the unanswered case goes to the person — never a stalled worker."""
+    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    line = next(ln for ln in text.splitlines() if "--kind conflict" in ln)
+    example = re.search(r"`(ao msg [^`]*)`", line).group(1)
+    # the example parses as written: a worker that types it raises the conflict, not a usage error
+    argv = example.split()[1:]
+    args = cli.build_parser().parse_args([a.replace("<", "").replace(">", "") for a in argv])
+    assert args.kind == "conflict" and len(cli._refs(args.cites)) == 2
+    assert "never pick one" in text and "the first reply is the ruling" in text
+    assert "ask the person yourself" in text
+
+
+def test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn():
+    """TD-153 (design §4.10): the doorbell rings only a hook-confirmed idle, so a session that
+    polls for mail in a loop is never rung. Where a session reads how to wait, it reads that."""
+    root = pathlib.Path(__file__).parents[1]
+    skill = (root / "src" / "agentorc" / "skill.md").read_text()
+    assert "Waiting on mail is ending the turn" in skill and "never a loop" in skill
+    briefs = sorted((root / "src" / "agentorc" / "briefs").glob("*.md")) + [root / "docs/briefs/designer-ao-1.md"]
+    for p in briefs:
+        text = p.read_text()
+        assert "never wait for input" not in text, p.name  # read as *never be idle*
+        if "Nobody is driving you" in text:
+            assert "mail it, then end the turn" in text, p.name
+
+
 def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
     """TD-079 step 3 (design §4.10 *Outcomes*): a command a session is never told to run is
     half-shipped. Every brief a session is started from — the package's role templates and this
@@ -908,6 +959,61 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
         assert "finished member is never sent to" in text or "finished worker is still never sent to" in text, rel
         assert "not ready to close" in text, rel  # what keeps a finished member's debt from vanishing
         assert "tell me if you want less" in text, rel  # the same kind rule as the workers', not a second one
+
+
+SHAPE = (
+    "A message to the person is read cold. Its first paragraph is the whole of what they need — what it is about, "
+    "what was decided or is being asked, and what they must do — in one to three plain sentences. A blank line, "
+    "then the reading, for the record. A reply with `--source` begins with its verdict."
+)
+
+
+def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
+    """TD-139 (design §4.10 *How a message to a person is written*): the rule lives with the writers,
+    in the same words in every preset whose session writes to the person, and in the designer's."""
+    root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
+    for name in ("techlead.md", "manager.md", "grinder.md"):
+        assert SHAPE in (root / name).read_text(encoding="utf-8"), name
+    designer = pathlib.Path(__file__).parents[1] / "docs" / "briefs" / "designer-ao-1.md"
+    assert SHAPE in designer.read_text(encoding="utf-8")  # the fourth writer, whose brief is the repo's
+
+
+@pytest.mark.unit
+def test_the_shape_warning_counts_the_first_paragraph():
+    """design §4.10: past `FIRST_PARA_WORDS` in the first paragraph, or no blank line and past the
+    Inbox's `FOLD_CHARS`, `ao msg` says what the person reads; a shaped message says nothing."""
+    ninety = " ".join(["word"] * 90)
+    assert cli.shape_warning(ninety + "\n\nthe reading").startswith("the person reads the first paragraph: 90 words")
+    assert cli.shape_warning("merged #517 — one gap left\n\n" + ninety) is None  # shaped: a long reading is fine
+    assert cli.shape_warning("merge #517?") is None
+    unbroken = ("a sentence of eight words said at length. " * 10).strip()  # 80 words, over 300 characters
+    assert "80 words" in (cli.shape_warning(unbroken) or "")
+    assert cli.shape_warning("x" * 250) is None  # one long word under the backstop: nothing to fold
+    # the blank line is the Inbox row's own: `\r\n` counts, and one inside a code block does not
+    assert cli.shape_warning("merged #9\r\n\r\n" + ninety) is None
+    fenced = "```\na\n\nb\n```\n" + unbroken
+    assert "words" in (cli.shape_warning(fenced) or "")
+
+
+def test_msg_to_the_person_warns_on_an_unshaped_message_and_sends_it(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-139 (design §4.10 *The home warns, never refuses*): `ao msg person` with a 90-word first
+    paragraph prints the warning and the mail arrives; a shaped one prints nothing; a message to a
+    session is not checked."""
+    sid = call_sync("create", name="shaper", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    (tmp_path / "o").mkdir()
+    other = call_sync("create", name="other", dir=str(tmp_path / "o"), adapter="shell", argv=["bash", "--norc"])["id"]
+    call_sync("set_controllers", id=other, add=[sid])
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    long = " ".join(["word"] * 90)
+    assert cli.main(["msg", "person", long, "--kind", "note"]) == 0
+    got = capsys.readouterr()
+    assert "note → person" in got.out and "the person reads the first paragraph: 90 words" in got.err
+    assert cli.main(["msg", "person", "merged #9 — nothing to do\n\n" + long, "--kind", "note"]) == 0
+    assert "the person reads" not in capsys.readouterr().err
+    assert cli.main(["msg", other, long]) == 0
+    assert "the person reads" not in capsys.readouterr().err
+    for x in (sid, other):
+        call_sync("kill", id=x)
 
 
 def test_the_manager_brief_leaves_the_seat_the_wanted_restart_and_the_nudge_to_the_tick():
@@ -997,6 +1103,30 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
     assert f"reply → {peer}" in capsys.readouterr().out
     for sid in (lead, worker, peer):
         call_sync("kill", id=sid)
+
+
+def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-136 slice 1 (design §4.7): `ao inbox --thread <id>` prints the thread oldest first, the
+    person's own reply in it and the named entry marked; `--json` is the RPC result; a session is
+    refused in the host agent's words; `--unread` does not combine with it."""
+    worker = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", worker)
+    assert cli.main(["--json", "msg", "person", "rebase or merge?", "--kind", "ask"]) == 0
+    asked = json.loads(capsys.readouterr().out)["entry"]["id"]
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["msg", "--reply-to", asked, "merge it"]) == 0
+    capsys.readouterr()
+    assert cli.main(["inbox", "--thread", asked]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(f"thread of {asked}: 2 entries, oldest first")
+    assert out.index("rebase or merge?") < out.index("merge it") and "← this one" in out
+    assert cli.main(["--json", "inbox", "--thread", asked]) == 0
+    assert [e["from"] for e in json.loads(capsys.readouterr().out)["entries"]] == [worker, "person"]
+    assert cli.main(["inbox", "--thread", asked, "--unread"]) == 2
+    monkeypatch.setenv("AGENTORC_SESSION", worker)
+    assert cli.main(["inbox", "--thread", asked]) == 1
+    assert "cannot read a thread" in capsys.readouterr().err
+    call_sync("kill", id=worker)
 
 
 def test_msg_steer_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, capsys, monkeypatch):

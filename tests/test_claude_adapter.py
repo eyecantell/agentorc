@@ -54,8 +54,18 @@ def test_a_compaction_is_not_a_start():
     assert translate(ev) == {"adapter_id": "u1"}  # no state: it stays what it was
     assert translate({**ev, "model": "claude-opus-5"}) == {"adapter_id": "u1", "model": "claude-opus-5"}
     assert translate({"hook_event_name": "SessionStart", "source": "compact"}) is None
-    for source in ("startup", "resume", "clear"):
+    for source in ("startup", "clear"):
         assert translate({**ev, "source": source})["state"] == "working"
+
+
+def test_a_resume_lands_at_the_composer():
+    """TD-155: `claude --resume` prints the conversation and waits at the composer, and no Stop
+    follows, so `working` read `stalled?` at STALL_AFTER and the doorbell never rang it."""
+    ev = {"hook_event_name": "SessionStart", "session_id": "u1", "source": "resume"}
+    assert translate(ev) == {"adapter_id": "u1", "state": "idle", "pending": None}
+    # a prompt given with the resume is its own turn, reported by UserPromptSubmit after it
+    assert translate({"hook_event_name": "UserPromptSubmit", "session_id": "u1"})["state"] == "working"
+    assert translate({**ev, "source": "startup"})["state"] == "working"  # `ao new` types its prompt at once
 
 
 def test_translate_permission_and_questions():
@@ -365,7 +375,9 @@ def test_hook_script_queues_when_agent_down(tmp_path, monkeypatch):
     cp = run_hook("ao-x-y", {"hook_event_name": "Stop", "session_id": "u"})
     assert cp.returncode == 0
     q = (tmp_path / "home" / "events" / "ao-x-y.jsonl").read_text().strip()
-    assert json.loads(q) == {"adapter_id": "u", "state": "idle", "pending": None}
+    got = json.loads(q)
+    assert isinstance(got.pop("at"), float)  # when it happened, for the drain's order (TD-169)
+    assert got == {"adapter_id": "u", "state": "idle", "pending": None}
 
 
 async def test_a_refused_hook_is_never_queued(agent, tmp_path):

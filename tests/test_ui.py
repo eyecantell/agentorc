@@ -1027,6 +1027,8 @@ def test_the_inbox_panel_the_unread_chip_message_reply_and_delete(client, tmp_pa
     [e] = got["entries"]
     assert (e["id"], e["from"], e["from_name"], e["kind"], e["about"]) == (ask, lead, "mlead", "ask", "TD-052")
     assert e["read_at"] is None and e["bound"] and e["closed_by"] is None
+    # the row's two halves, server-rendered (TD-138)
+    assert (e["lead_html"], e["rest_html"]) == ("<p>are you done?</p>", "")
     assert rec(worker)["unread"] == 1  # the panel's read marked nothing: a person is not the session
 
     # **Message**: a note from the person, into this session's inbox

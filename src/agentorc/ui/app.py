@@ -25,6 +25,7 @@ from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketD
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 
 from agentorc import org as orgmod
 from agentorc import profiles as profiles_mod
@@ -38,6 +39,7 @@ from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
 from sessionorc.models import GRANTS, STATE_RANK, has_control, report_head, report_line, stop_note
 
+from . import render as rendermod
 from . import uiconf
 from .icons import role_svg
 from .pty_bridge import PtySession, attach_argv, pump, scroll_argv
@@ -72,6 +74,30 @@ def suggested_answers(e: Any) -> list[str]:
 
 
 templates.env.globals["suggested_answers"] = suggested_answers
+
+
+def shaped(text: Any, origin: Any = None) -> dict[str, Markup]:
+    """A mail row's text as the row draws it (design §4.5a **Inbox row: details**, §4.10 *How a
+    message to a person is written*; TD-138): `lead`, the first paragraph, and `rest`, what goes
+    under *details* — empty when there is nothing to fold — each rendered from the closed markdown
+    subset by `agentorc.ui.render`, whose output is escaped text and its own few tags and nothing
+    else. `origin` is the page's own, so a link back to it is drawn as characters.
+
+    A template global like `suggested_answers`, so the page, the poll and a test rendering the
+    template directly shape a row the same way; the Focus Inbox panel gets the same two halves on
+    each entry of its fetch (`api_inbox`)."""
+    lead, rest = rendermod.fold(str(text or ""))
+    o = str(origin) if origin else None
+    return {"lead": Markup(rendermod.render(lead, o)), "rest": Markup(rendermod.render(rest, o) if rest else "")}
+
+
+templates.env.globals["shaped"] = shaped
+
+
+def page_origin(request: Request) -> str:
+    """`scheme://host:port` of the page being served: the one origin a rendered link may not name."""
+    return str(request.base_url).rstrip("/")
+
 
 # Why a profile's last usage poll gave no reading (design §4.2, §4.5a **usage** chip; TD-087): the
 # adapter's `reason` word, put into words for the chip's hover. The page keys on the word and
@@ -1843,6 +1869,182 @@ def inbox_sections(
     return {**out, "count": len(out["needs"]), "fyi_n": len(out["fyi"])}
 
 
+# -- the rail (design §4.5 screen 6 *The rail* and *Find*, §4.5a **Inbox page: the rail**; TD-129,
+# built by TD-135) ----------------------------------------------------------------------------------
+
+# *Urgency*: the page's own sections in the page's order. The snoozed list is not one of them: it
+# is in no section and no count (§4.10 *Snooze*).
+RAIL_SECTIONS = ("needs", "steering", "waiting", "answered", "fyi")
+RAIL_SECTION_NAMES = {
+    "needs": "Needs you",
+    "steering": "Steering",
+    "waiting": "Waiting on them",
+    "answered": "Answered for you",
+    "fyi": "FYI",
+}
+# *Kinds*: a row's coarse kind, one per line (§4.5 screen 6 *The rail*)
+RAIL_KINDS = ("questions", "steering", "states", "board", "notes", "trail")
+RAIL_KIND_NAMES = {
+    "questions": "questions",
+    "steering": "steering",
+    "states": "session states",
+    "board": "board items",
+    "notes": "notes",
+    "trail": "trail",
+}
+RAIL_NO_TEAM = "none"  # a row that carries no team, in the URL and on the rail's *no team* line
+_FIND_EDGE = ",.;:!?()[]{}\"'“”‘’<>"
+
+
+def rail_kind(e: Mapping[str, Any]) -> str:
+    """A row's coarse kind (§4.5 screen 6 *The rail*): *questions* (an `ask`, a `conflict`, a
+    passed-up question), *steering* (a `steer`), *session states* (every state row, alarms
+    included), *board items*, *notes* (a `note`, a `system` note, a reply, answered-for-you, an
+    outcome), *trail*."""
+    row = e.get("row")
+    if row == "board":
+        return "board"
+    if row == "trail":
+        return "trail"
+    if row:
+        return "states"
+    if e.get("kind") in PERSON_ASK_KINDS or e.get("passed_up"):
+        return "questions"
+    if e.get("kind") == "steer":
+        return "steering"
+    return "notes"
+
+
+def row_find(e: Mapping[str, Any], section: str = "") -> str:
+    """The row's whole visible text, lowercased once, which the find matches every word against
+    (§4.5 screen 6 *Find*): a mail row's sender, team, kind, `about`, PR and text; the rows the
+    home builds carry their own (`find` on a state, alarm or board row); a trail row its name,
+    kind, `how` and text. `data-find` on every row kind is this."""
+    row = e.get("row")
+    if row == "trail":
+        return _find_text(e.get("name"), e.get("team"), e.get("kind"), "trail", e.get("how"), e.get("text"))
+    if row:  # the home's own text for the row, and its team and pill, which the row draws too
+        return _find_text(e.get("find"), e.get("team"), e.get("state_label"))
+    answered = e.get("answered") if section == "answered" and isinstance(e.get("answered"), dict) else {}
+    pr = e.get("pr")
+    return _find_text(
+        e.get("from_name") or e.get("from"),
+        e.get("team"),
+        e.get("kind"),
+        e.get("about"),
+        f"#{pr}" if isinstance(pr, int) and not isinstance(pr, bool) else "",
+        e.get("text"),
+        e.get("asker_name") if answered else "",
+        answered.get("question") if answered else "",
+        answered.get("source") if answered else "",
+    )
+
+
+templates.env.globals["rail_kind"] = rail_kind
+templates.env.globals["row_find"] = row_find
+templates.env.globals["rail_sections"] = RAIL_SECTIONS
+templates.env.globals["rail_section_names"] = RAIL_SECTION_NAMES
+templates.env.globals["rail_kinds"] = RAIL_KINDS
+templates.env.globals["rail_kind_names"] = RAIL_KIND_NAMES
+
+
+def find_words(find: str) -> list[str]:
+    """The find's words (§4.5 screen 6 *Find*): lowercased, and a word's edge punctuation dropped,
+    so *517,* finds what *517* does; a `#` is kept, and a bare number finds *#517* as a substring
+    of it anyway."""
+    return [w for w in (x.strip(_FIND_EDGE) for x in str(find or "").lower().split()) if w]
+
+
+def find_matches(text: str, words: Collection[str]) -> bool:
+    """Every word must match, in any order, as a substring of the row's text."""
+    return all(w in text for w in words)
+
+
+def rail_picks(query: Mapping[str, Any]) -> dict[str, Any]:
+    """The picks a page's URL carries (§4.5 screen 6 *The rail*): `team`, `sec` and `kind` as comma
+    lists — `none` is *no team* — and `find`. An unknown section or kind is dropped, never an error:
+    a link survives a renamed line by showing a little more."""
+
+    def lst(key: str) -> list[str]:
+        return [x.strip() for x in str(query.get(key) or "").split(",") if x.strip()]
+
+    return {
+        "team": lst("team"),
+        "sec": [x for x in lst("sec") if x in RAIL_SECTIONS],
+        "kind": [x for x in lst("kind") if x in RAIL_KINDS],
+        "find": str(query.get("find") or "").strip(),
+    }
+
+
+def rail_rows(sections: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Every row on the page that the rail counts, as the four things a pick reads: its section,
+    team (`none` for no team), coarse kind and find text. The snoozed list is in no count."""
+    return [
+        {
+            "section": sec,
+            "team": str(e.get("team") or "") or RAIL_NO_TEAM,
+            "kind": rail_kind(e),
+            "find": row_find(e, sec),
+        }
+        for sec in RAIL_SECTIONS
+        for e in sections.get(sec) or ()
+    ]
+
+
+def rail_counts(rows: Collection[Mapping[str, str]], picks: Mapping[str, Any]) -> dict[str, Any]:
+    """The rail's counts and the section headings' (§4.5 screen 6 *The rail*): **every count is a
+    count of rows on the page now**. Within a group the picks are OR'd, across groups AND'd, and a
+    group with nothing picked means all of it; the find is a fourth group. For a line: a picked line
+    reads its share of the page; an unpicked line in a group with a pick reads 0; an unpicked line
+    in a group without one reads its share under the other groups' picks. `all` is the line's count
+    with no filter at all. A **team** line counts that team's *Needs you* rows — *which team needs
+    me* (TD-135's steer to the techlead, 2026-09-25). `app.js`'s `AO.railCounts` is this function
+    again, over the rows in the DOM, and a test holds the two to one answer."""
+    words = find_words(picks.get("find") or "")
+    pick = {g: set(picks.get(g) or ()) for g in ("team", "sec", "kind")}
+    key = {"team": "team", "sec": "section", "kind": "kind"}
+
+    def passes(r: Mapping[str, str], skip: str = "") -> bool:
+        for g, want in pick.items():
+            if g != skip and want and r[key[g]] not in want:
+                return False
+        return find_matches(r["find"], words)
+
+    teams = sorted({r["team"] for r in rows if r["team"] != RAIL_NO_TEAM})
+    if any(r["team"] == RAIL_NO_TEAM for r in rows):
+        teams.append(RAIL_NO_TEAM)
+    # a picked team no row carries still gets its line, so the pick can be undone
+    teams += [t for t in picks.get("team") or () if t not in teams]
+
+    def line(group: str, value: str, among: Collection[Mapping[str, str]]) -> dict[str, int]:
+        mine = [r for r in among if r[key[group]] == value]
+        shown = 0 if pick[group] and value not in pick[group] else sum(1 for r in mine if passes(r, group))
+        return {"shown": shown, "all": len(mine)}
+
+    needs = [r for r in rows if r["section"] == "needs"]
+    return {
+        "filtered": bool(pick["team"] or pick["sec"] or pick["kind"] or words),
+        "sections": {s: line("sec", s, rows) for s in RAIL_SECTIONS},
+        "teams": {t: line("team", t, needs) for t in teams},
+        "team_order": teams,
+        "kinds": {k: line("kind", k, rows) for k in RAIL_KINDS},
+        "heads": {
+            s: {
+                "shown": sum(1 for r in rows if r["section"] == s and passes(r)),
+                "all": sum(1 for r in rows if r["section"] == s),
+            }
+            for s in RAIL_SECTIONS
+        },
+    }
+
+
+# the page computes its rail from its sections when a caller did not (a test rendering the template
+# directly, as the rows are shaped by `shaped` and `suggested_answers` whoever renders them)
+templates.env.globals["rail_picks"] = rail_picks
+templates.env.globals["rail_rows"] = rail_rows
+templates.env.globals["rail_counts"] = rail_counts
+
+
 # -- app -------------------------------------------------------------------------------------------
 
 
@@ -2151,13 +2353,14 @@ def create_app() -> FastAPI:
                 e["asker_open"] = asker if asker in names else ""
         return got
 
-    def inbox_html(sections: dict[str, Any]) -> dict[str, str]:
+    def inbox_html(sections: dict[str, Any], origin: str = "") -> dict[str, str]:
         """Each section's rows, rendered by the one template the page itself renders them with, so
         a poll replaces a section without the client composing any markup — the shape the events
-        stream already uses for team headers. Jinja escapes every field, which is what keeps what a
-        session wrote text and nothing else (TD-071 item 8)."""
+        stream already uses for team headers. Jinja escapes every field, and a mail row's text goes
+        through the closed-subset renderer (`shaped`), which is what keeps what a session wrote
+        text and nothing else (TD-071 item 8, TD-138)."""
         rows = templates.get_template("inbox_rows.html")
-        return {k: rows.render(rows=sections[k], section=k) for k in INBOX_SECTIONS}
+        return {k: rows.render(rows=sections[k], section=k, origin=origin) for k in INBOX_SECTIONS}
 
     h = SimpleNamespace(
         call=call,
@@ -2631,15 +2834,20 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         return JSONResponse({"ok": True})
 
     @app.get("/api/sessions/{sid}/inbox")
-    async def api_inbox(sid: str):
+    async def api_inbox(sid: str, request: Request):
         """design §4.5a Focus side panel **Inbox** (§4.10 "A bounded body"): bodies never ride the
         pushed record, so the panel fetches them here. No caller — a person's read, which sets no
-        `read_at`, because a person is not the session. Each sender gets its name beside its id."""
+        `read_at`, because a person is not the session. Each sender gets its name beside its id,
+        and its text the two halves the Inbox row draws (`shaped`, TD-138): the panel folds the
+        same way, from the same renderer, and composes no markup of its own from a session's text."""
         got = await call("inbox", id=sid)
         fleet = await call("list")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        origin = page_origin(request)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            s = shaped(e.get("text"), origin)
+            e["lead_html"], e["rest_html"] = str(s["lead"]), str(s["rest"])
         return got
 
     @app.get("/api/sessions")
@@ -2790,11 +2998,15 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
             attention_snoozed=got.get("attention_snoozed"),
             boards=boards,
         )
+        picks = rail_picks(request.query_params)
         return templates.TemplateResponse(
             request,
             "inbox.html",
             {
                 "sections": sections,
+                "picks": picks,
+                "rail": rail_counts(rail_rows(sections), picks),
+                "origin": page_origin(request),
                 "board_note": board_note,
                 "person_needs": sections["count"],
                 "person_fyi": sections["fyi_n"],
@@ -2807,7 +3019,7 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         )
 
     @app.get("/api/person/inbox")
-    async def api_person_inbox():
+    async def api_person_inbox(request: Request):
         """design §4.5a Org top bar **Inbox** and the **Inbox page** (§4.10): the entries, which
         section each is in, their rendered rows, and `needs` — the count, computed in the one place
         (`inbox_sections`) the page renders from, so the top bar's number and the page cannot
@@ -2862,7 +3074,14 @@ def _inbox_routes(app: FastAPI, h: SimpleNamespace) -> None:
         # time, and nothing it says — the browser counts those newer than it last opened the group
         # (that memory is the browser's, as FYI's *new* mark is), so the home keeps no read state
         got["answered_marks"] = [{"team": e.get("team") or "", "at": e.get("at") or ""} for e in sections["answered"]]
-        got["html"] = inbox_html(sections)
+        got["html"] = inbox_html(sections, page_origin(request))
+        # the rail's *Teams* lines (§4.5 screen 6 *The rail*): a team appears or goes with its rows,
+        # so the poll brings the group's markup as it brings the rows'; the script presses the lines
+        # the URL picks and recounts every line from the rows on the page
+        rail = rail_counts(rail_rows(sections), rail_picks({}))
+        got["html"]["rail_teams"] = str(
+            templates.get_template("inbox_rail.html").module.teams_group(rail, rail_picks({}))  # type: ignore[attr-defined]
+        )
         return got
 
     # design §4.5a **Inbox row** controls (§4.10): each is a person's own act on their own inbox,
