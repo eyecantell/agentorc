@@ -1900,7 +1900,11 @@ Screens:
 
    **The repo strip (team card).** Under a team's header and above its cards, one quiet line per
    repo the team services (the repos of its projects, §4.9; a team a repo's own `.agentorc.yml`
-   defines has that one repo), in the header's style, each number a link:
+   defines has that one repo), in the header's style, each number a link. **A repo two teams
+   share is drawn on one card**: the first team's in definition order, the convention the Inbox
+   already follows for a board row's team badge (`repo_teams`, §4.5 screen 6), so the strip's *for
+   you* and the Inbox it links to count the same rows; the Repo page names every team that
+   services the repo. The other team's card does not repeat the line.
 
    > `agentorc` · **4 open PRs** · oldest 2d · **7 pickable** · **3 design-first** · **2 for you**
    > · 1 overdue · **on now** TD-168 (grinder-ao-1, #574 in review) · TD-164 (designer-ao-1)
@@ -1924,9 +1928,13 @@ Screens:
    and its *i* mark, a row is a card; the sections are the strip's numbers, in the strip's order:
    1. **Open PRs** — one row per open PR on the repo's remote, newest last: number, title, its
       author (the session whose branch it is, by name and a link to its Focus, else the GitHub
-      login), age, *draft* when it is, and its standing with the team's reader — *held by the
-      reader · 40m* when an `ask` carrying it waits (§4.9b), *read* once answered, nothing when the
-      team has no reader. A PR is GitHub's: the row links to it and carries no control.
+      login), age, *draft* when it is, and beside it its standing with the team's reader,
+      matched by number against the reader seat's inbox entries carrying `pr` — the entries
+      `prs_waiting` counts (§4.9b), read through the `inbox` RPC as a person's read, which marks
+      nothing (§4.10): *held by the reader · 40m* while the `ask` is unanswered, *read* once it
+      carries a reply, and nothing when no entry names the PR — a PR outside the reader's `held:`
+      globs, one asked of nobody, or a team with no reader all read the same blank. A PR is
+      GitHub's: the row links to it and carries no control.
    2. **Technical debt** — the ledger's entries that are **pickable** and the ones that are
       **design-first**, two lists under one heading, each row the entry's id, title, priority,
       owner and, when a member's `progress` claims its reference, *held by <name>*; sorted by
