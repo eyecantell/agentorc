@@ -1888,6 +1888,8 @@ Two things are missing, and the design round chooses between them or takes both:
 **Kind:** design-first
 **Pickable:** no — Paul's interactive UI review, likely a cloud session (board line, due 2026-09-30); the design changes it yields go to the designer or a grinder afterwards
 
+**Why:** the end of a session is the one moment the person must act (only the person closes it, §2), and the screen they are on when the moment comes does not show them the act: Focus leads with Kill, Close is below the fold, and a concluded team hides the card. A session left open costs nothing in tokens but stays live, holds its worktree and its name, and is one more thing the team's next Start has to close first.
+
 **Status:** Open — nothing designed. What happened, as the seed for the review, 2026-09-25 15:15Z on the designer resumed by Paul (TD-155's record):
 
 1. Paul pressed **Wrap up** on Focus. The session declared *out of work* (`ao progress none`, the wrap-up's words), the record reads `idle` with every Ready-to-close check passing (*tree clean*, *branch pushed*, *no subagents running*, *outcomes reported*). Nothing closes it: a person's Wrap up is only the prompt (§4.5a *Focus: Wrap up*); the policy's `run_until` path is what kills after a wrap-up, and it applies to a stop time, never a press (`_enforce_stop_times`). *Closing is your act; the checklist only says when it is ready* (the side panel's own note). That is the design (§2, goal *only the person closes it*) and this entry does not question it.
