@@ -1200,3 +1200,22 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Resolved:** 2026-09-24 (PR #543, the anchor session) — `resume_create` carries `repo` when the record has one, so the create checks the name in the record's scope and takes its id back; `resume_form_url` lands a worktree record on the form as Where = new worktree, the worktree's name and the repo in the directory field, which is what the form's own Start sends; the `/new` form prefills `where` and `worktree`. Design §4.5a *Focus (exited / closed)* says both. The live team was put right by hand: the seat filled from its launch record (`create` with `keep_mail` and `supervised`, the tick's own replay), the stray record forgotten.
 
 **Related:** TD-081 (the one-press Resume), §4.1 (the scope rule), §6 rule 3 (the seat fill that a superseded record blocks).
+
+## TD-138: Build the message shape on the Inbox — the markdown renderer, the *details* fold, the backstop
+
+**Priority:** Medium
+**Added:** 2026-09-24 (TD-127's design, a cloud session with Paul)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25. Was: open — designed, nothing built. Design: §4.10 *How a message to a person is written*, §4.5a *Inbox row: details* and the four mail rows, §4.5 screen 6 (*no scroll box*), mockups `Inbox.dc.html` and `InboxMessage.dc.html`.
+
+**Location:** `src/agentorc/ui/render.py` (new: the closed-subset renderer — paragraphs, `*em*` / `**strong**`, inline code, fenced code blocks, `-` and `1.` lists, `[text](url)` — emitting escaped HTML only, with the link rule: absolute `http(s)`, not the request's own origin, `target=_blank rel=noopener`, the host in a `<small>` after the text; anything else is its characters), `src/agentorc/ui/app.py` (`fold(text) -> (lead, rest)`: up to the first blank line, else the backstop at the last sentence end before `FOLD_CHARS` = 300; both halves rendered once per row in `inbox_sections`' output as `lead_html` / `rest_html`; the *answered for you* quotation from the question's lead), `src/agentorc/ui/templates/inbox_row.html` (the `body` macro: the lead, then `<details><summary>details</summary>` holding the rest when there is one; every mail macro through it; controls stay outside), `src/agentorc/ui/static/app.js` (the set of row ids whose *details* is open, re-applied after each poll, since the poll replaces rows; nothing stored; and `AO.mailEntry`, the Focus Inbox panel's entry, drawn through the same lead and fold — taken from the designer's PR #532, 2026-09-25), `app.css` (the summary as a quiet unbordered line; `.body` loses `white-space: pre-wrap`, paragraphs are elements now), `tests/test_screen.py` or a new `tests/test_render.py`.
+
+**Why:** a person reading the Inbox reads the verdict first or not at all; today the row is one run of text and a two-hundred-word reply hides *merged* in its first word and *one gap* in the middle.
+
+**Resolved:** 2026-09-25 (PR #557, `grinder-ao-2`) — `agentorc.ui.render` (the closed subset and `fold`), the `shaped` template global every mail row's text goes through, the *details* fold kept open across the poll (`app.js` `foldsOpen`, `AO.reopenFolds`), the Focus panel's halves from `/api/sessions/<id>/inbox`. Tests: `tests/test_render.py`, the TD-138 rows in `tests/test_ui_inbox.py`. Design §4.5a *Inbox row: details* carries the lasting content; the live look at a real `--source` reply is the anchor's after the promote.
+
+**Done when** (1) techlead-ao-1's #517-style reply (a verdict line, a blank line, a list) reads as its verdict with *details* closed, and open shows the list rendered; (2) the six refusals above and the one allowed link behave as listed, in tests and in a browser; (3) an old one-paragraph entry from before the rule folds at a sentence and answers folded; (4) the page's find (TD-135, if landed) still matches words inside a closed *details*; (5) `pdm run test` and `pdm run lint` pass; (6) TD-127 is marked built for the page half; (7) the Focus Inbox panel's entries fold the same way.
+
+**Related:** TD-127 (the design), TD-139 (the senders' half), TD-136 (the message page renders the same row open), TD-135 (the find over the whole text), TD-071 item 8 (nothing pressable from text — the link rule is its one exception).
