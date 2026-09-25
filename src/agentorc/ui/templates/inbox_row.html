@@ -27,9 +27,21 @@
 {%- endmacro %}
 
 {# The whole text, no scroll box: a 2,000-character message reads in full (§4.5 *Done when*), and a
-   long unbroken token wraps rather than widening the page. #}
+   long unbroken token wraps rather than widening the page.
+
+   design §4.5a **Inbox row: details** (§4.10 *How a message to a person is written*; TD-138): the
+   first paragraph drawn, the rest under a native disclosure — closed by default, a tab stop, and
+   kept open across the poll by the script (`data-fold`, the row's id). Both halves come from
+   `shaped`, the UI's own closed-subset renderer, which emits escaped text and its own few tags and
+   nothing else; the one pressable thing it can make is an off-origin `http(s)` link with its host
+   after it. The row's controls stay outside the fold, so a row is answered folded, and the
+   `data-find` on the row still holds the whole text. #}
 {% macro body(e) -%}
-<div class="body">{{ e.text }}</div>
+{%- set s = shaped(e.text, origin) %}
+<div class="body md">{{ s.lead }}</div>
+{%- if s.rest %}
+<details class="fold" data-fold="{{ e.id }}"><summary>details</summary><div class="body md">{{ s.rest }}</div></details>
+{%- endif %}
 {%- endmacro %}
 
 {% macro reply_btn(e) -%}
@@ -264,7 +276,8 @@
   <span class="st age" data-since="{{ e.at or '' }}">{{ e.age or '' }}</span>
 </div>
 <div class="st asked"><span title="{{ a.asker or '' }}">{{ asker }}</span> asked{% if e.asker_open %} <a class="btn sm ghost" href="/focus/{{ e.asker_open }}" title="Focus on {{ asker }}">Open</a>{% endif %}</div>
-<div class="body quoted">{{ a.question or '—' }}</div>
+{#- the question's first paragraph (§4.5a *Inbox row: details*): the answer is what this row is for #}
+<div class="body md quoted">{% if a.question %}{{ shaped(a.question, origin).lead }}{% else %}—{% endif %}</div>
 <div class="st asked">{{ e.from_name or e['from'] }} answered</div>
 {{ body(e) }}
 <div class="st dflt">source: {{ a.source or '—' }}</div>

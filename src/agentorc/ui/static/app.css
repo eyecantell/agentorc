@@ -103,6 +103,7 @@ input.denywhy { height: 24px; font-size: 11px; padding: 0 6px; border: 1px solid
 .inbox .mail.unread .ref { font-weight: 600; }
 .inbox .mail .st { font-size: 10.5px; color: var(--muted); } .inbox .mail .st.expired { color: var(--stalled-fg); }
 .inbox .mail .body { font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 12em; overflow: auto; }
+.inbox .mail .body.md { white-space: normal; }
 .badge.unread { color: var(--new-fg); background: var(--new-bg); border-color: var(--new); text-decoration: none; }
 /* the top bar's Inbox number: what is waiting on a person, not unread mail (§4.5a, TD-069) */
 .badge.needs { color: var(--needs-fg); background: var(--needs-bg); border-color: var(--needs); text-decoration: none; }
@@ -164,6 +165,21 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: 11px; padding: 1px 5p
 .inboxpage .mailrow .st { font-size: 10.5px; color: var(--muted); } .inboxpage .mailrow .st.dflt { color: var(--strong); }
 /* the whole text, no scroll box: a 2,000-character message reads in full, and an unbroken token wraps */
 .inboxpage .mailrow .body { font-size: 12.5px; white-space: pre-wrap; overflow-wrap: anywhere; }
+/* design §4.5a **Inbox row: details** (§4.10, TD-138): a message's text is rendered from the closed
+   markdown subset, so its paragraphs are elements and `pre-wrap` would double every break. The fold
+   is a quiet, unbordered *details* line — a disclosure, not one of the row's bordered controls. A
+   link carries its host in small print after it (§4.10), so its text never passes for a control. */
+.body.md { white-space: normal; }
+.body.md > :first-child { margin-top: 0; } .body.md > :last-child { margin-bottom: 0; }
+.body.md p, .body.md ul, .body.md ol, .body.md pre { margin: 0 0 .5em; }
+.body.md ul, .body.md ol { padding-left: 1.4em; }
+.body.md code { font-family: "JetBrains Mono", monospace; font-size: .92em; background: var(--line2); border-radius: 3px; padding: 0 3px; }
+.body.md pre { white-space: pre-wrap; background: var(--line2); border-radius: 3px; padding: 6px 8px; }
+.body.md pre code { background: none; padding: 0; }
+.body.md .lhost { color: var(--muted); font-size: .85em; }
+details.fold > summary { cursor: pointer; font-size: 10.5px; color: var(--muted); width: max-content; border: 0; padding: 1px 0; }
+details.fold > summary:hover { color: var(--fg); }
+details.fold[open] > summary { margin-bottom: 3px; }
 /* a kind mark says what a row is and is never pressable (TD-071 item 8): no cursor, no hover */
 .inboxpage .badge.kindmark { cursor: default; text-transform: lowercase; }
 /* §4.5 screen 6 *Layout* (Paul's rule, 2026-09-19): what says **what a row is** — the kind mark,
