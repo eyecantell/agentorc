@@ -735,7 +735,30 @@ def test_wait_returns_at_the_timeout_when_nothing_changes(subprocess_agent, caps
     t0 = time.monotonic()
     assert cli.main(["wait", "--timeout", "1.2", "--scope", "all"]) == 0
     assert 1.0 <= time.monotonic() - t0 < 12.0
-    assert "nothing changed" in capsys.readouterr().out
+    assert "nothing changed" in (out := capsys.readouterr().out)
+    assert cli.END_THE_TURN not in out  # no session: a person at a terminal is never rung
+
+
+def test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-153 (design §4.10 *Waiting on mail is ending the turn*): a session looping on `ao wait` or
+    `ao inbox --unread` stays `working` and is never rung, so the reply that found nothing says so —
+    on stdout in prose, on stderr under `--json` so the JSON still parses — and a person at a
+    terminal, who is never rung, is not told it."""
+    sid = call_sync("create", name="poller", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    assert cli.main(["inbox", "--unread"]) == 0  # the person inbox: no line
+    assert cli.END_THE_TURN not in capsys.readouterr().out
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    assert cli.main(["inbox", "--unread"]) == 0
+    assert cli.END_THE_TURN in capsys.readouterr().out
+    assert cli.main(["--json", "inbox", "--unread"]) == 0
+    got = capsys.readouterr()
+    assert json.loads(got.out)["entries"] == [] and cli.END_THE_TURN in got.err
+    assert cli.main(["wait", "--timeout", "1.2"]) == 0
+    assert cli.END_THE_TURN in (out := capsys.readouterr().out) and "nothing changed" in out
+    call_sync("msg", to=sid, text="from the person")
+    assert cli.main(["inbox", "--unread"]) == 0  # found something: no line
+    assert cli.END_THE_TURN not in capsys.readouterr().out
+    call_sync("kill", id=sid)
 
 
 def test_a_worker_marking_done_wakes_a_waiting_lead_within_seconds(subprocess_agent, tmp_path, capsys):
@@ -887,6 +910,20 @@ def test_the_grinder_preset_says_what_a_worker_does_with_a_contradiction():
     assert args.kind == "conflict" and len(cli._refs(args.cites)) == 2
     assert "never pick one" in text and "the first reply is the ruling" in text
     assert "ask the person yourself" in text
+
+
+def test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn():
+    """TD-153 (design §4.10): the doorbell rings only a hook-confirmed idle, so a session that
+    polls for mail in a loop is never rung. Where a session reads how to wait, it reads that."""
+    root = pathlib.Path(__file__).parents[1]
+    skill = (root / "src" / "agentorc" / "skill.md").read_text()
+    assert "Waiting on mail is ending the turn" in skill and "never a loop" in skill
+    briefs = sorted((root / "src" / "agentorc" / "briefs").glob("*.md")) + [root / "docs/briefs/designer-ao-1.md"]
+    for p in briefs:
+        text = p.read_text()
+        assert "never wait for input" not in text, p.name  # read as *never be idle*
+        if "Nobody is driving you" in text:
+            assert "mail it, then end the turn" in text, p.name
 
 
 def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):

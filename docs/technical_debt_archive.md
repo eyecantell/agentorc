@@ -1347,3 +1347,22 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Resolved:** 2026-09-25 (PR #573, `grinder-ao-1`) — `hook.py` stamps a queued event `at`; `_apply_event(queued=True)` skips a queued state stamped before the last live hook (`_live_hook_at`), applying its adapter id, model and subagent delta. Held by `test_a_queued_event_older_than_a_live_one_does_not_overwrite_its_state`; design §4.2 carries the rule.
 
 **Related:** TD-115 (the queue is for an agent that is down, never for a refusal), TD-155 (the resume case), §4.2.
+
+## TD-153: Sessions poll for mail in foreground loops instead of going idle to be rung: the doorbell is built, and nothing tells a session it will be woken
+
+**Priority:** High
+**Added:** 2026-09-25 (raised by Paul, watching the designer loop on its inbox)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — resolved
+**Status:** Resolved 2026-09-25
+
+**Location:** `src/agentorc/skill.md` (the *Mail* section — the doorbell is named there as a thing that happens, never as the reason to end a turn), `docs/briefs/designer-ao-1.md` (*"never wait for input, never end a turn to ask a question"*, which a session reads as *never be idle*; `grinder-ao-1.md` and `manager-ao-1.md` carry no such phrase, and say nothing about waiting either), design §4.8 (the role presets the briefs are cut from) and §4.10 (*How a Claude Code session is told it has mail*), `src/agentorc/cli.py` (`ao wait`'s and `ao inbox --unread`'s reply when there is nothing), `src/sessionorc/agent.py` (`_ring_doorbells`, `_bell_blocked` — the mechanism, already right).
+
+**Why:** the mechanism that makes waiting free exists and was never used. The doorbell (§4.10, TD-052 step 7) rings a hook-confirmed `idle` session when unread mail lands, within its wake budget; a `steer`'s bound running out mails its sender a `system` note that wakes it **uncharged** (`_lapse_or_expire`); `ao wait` blocked in the host agent returns on mail. So a session waiting on a reply has nothing to do but end its turn. The designer did the opposite for a whole run: from 2026-09-24 20:28Z to 2026-09-25 13:56Z its transcript holds **110** foreground calls of `for i in 1..9; do ao wait --timeout 60; ao inbox --unread; done` (nine minutes each, the Bash tool's ten-minute ceiling), plus background copies (three were still running when the run ended). Each return is a turn on the strongest model with the full context re-read, to learn *unread=0*; and because the session was `working` throughout, the doorbell — which rings only a hook-confirmed idle — never rang once (zero `[agentorc] you have N unread` lines in the transcript). The loop is the one thing that defeats the doorbell, and the brief pushed it into the loop: *never wait for input* was written against asking a person in the pane, and reads as *never be idle*. Nothing the session could read said *end the turn; you will be rung*.
+
+**Resolved:** 2026-09-25 (PR #560, `grinder-ao-1`) — design §4.10 *Waiting on mail is ending the turn*; `ao --skill`'s *Mail* bullet; the five role presets and `docs/briefs/designer-ao-1.md` say *mail it, then end the turn* (the repo supplements inherit it from the templates, TD-114, so `grinder-ao-1.md` and `manager-ao-1.md` are unchanged); `ao wait` with nothing and `ao inbox --unread` with nothing end with `cli.END_THE_TURN` for a session. Held by `test_a_poll_that_finds_nothing_tells_a_session_to_end_its_turn` and `test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn`. The *done when* — the designer's next run shows no loop — is a live check on `docs/user_attention.md`.
+
+**Done when** a session that has sent a `steer` or an `ask` and has nothing else to do ends its turn, the record reads `idle`, and the reply rings it; the designer's next run shows no `ao wait`/`ao inbox` loop in its transcript; and a grinder asked in review why it is idle can point at the skill sentence.
+
+**Related:** TD-052 (step 7, the doorbell; step 3, `wait` in the host agent), §4.10 (*How a Claude Code session is told it has mail*, the wake budget), TD-120 (the designer role and its brief), TD-072 / TD-141 (mail before wind-down: the other place a session is told what mail does to its turn).
