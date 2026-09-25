@@ -310,6 +310,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-100 (4)): `ao team until`, `ao team reserve` and `ao settings` designed; `ao schedule` writes `teams.<team>.schedule`.
 - 2026-09-25 (TD-026, the designer): `ao new --at`, `ao at <session> <when> | now`, cancel by `ao close`; parsed as `--until` is, gated as `set_stop` is.
 - 2026-09-25 (TD-158, the designer): `ao msg`'s reply ends with when each addressee will read it (`read_when` under `--json`).
+- 2026-09-25 (TD-136 slice 1, grinder-ao-1): the `thread` read and `ao inbox --thread` built. *Oldest first* became a merge of each mailbox's own order with the reply and settle links, because `at` is whole seconds and the test's reply and its next question landed in one — a sort on `at` and id put them in either order.
 
 ## 4.8 Capabilities, report channels, and role presets
 

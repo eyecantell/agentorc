@@ -2212,10 +2212,14 @@ permits it — the caller's controllers, its members, or a session sharing its t
 target. An `ask` to the person takes no `--bound` (TD-069). A message to the person whose first paragraph is long, or which has no paragraph break, sends with a one-line warning (§4.10 *How a message to a person is written*, TD-127). `--outcome` and `--thread` are TD-079;
 `--answer` and `--pick` are TD-070. `--pr` puts a PR in front of its reader and rides only on an `ask` (§4.9b *The reader*, TD-093). `ao msg person "…"` addresses the org's person inbox,
 ungated. **Every `ao msg` reply ends with when each addressee will read it** (§4.10 *When it is read*, TD-158; not built — TD-168): the same sentence the composer shows, one per addressee, `read_when` under `--json`; from a session it also says when the addressee's wake budget is spent, since a session's message refills nothing. ungated. `ao inbox [--unread] [--json]` reads the calling session's own mailbox, ungated because
-it is its own. **`ao inbox --thread <id>`** (TD-129; not built — TD-136) is the person's read of one
+it is its own. **`ao inbox --thread <id>`** (TD-129; built — TD-136 slice 1) is the person's read of one
 thread whole: the `thread` RPC, person-only, gathers every entry sharing the named entry's `root`
 across the person inbox and every record's inbox and outbox, one per id, oldest first, marking
-nothing — the person's own replies included, which the person inbox does not keep (§4.10). The
+nothing — the person's own replies included, which the person inbox does not keep (§4.10).
+*Oldest first* is a merge every mailbox's own order agrees with, each reply after what it answers
+and whatever settled a question after the reply that answered it, then by time: `at` is whole
+seconds, and a reply and the next question can share one. A node forwards `thread` to the home
+with the rest of the mailbox (§4.4a). The
 Inbox's message page draws it (§4.5 screen 6 *The message page*). `ao wait` is a thin call to the host agent's `wait` RPC: it blocks on a member's
 state change (§4.8 "Waking a manager") and returns on new mail as a second thing, so one wait
 covers both and the host agent knows who is blocked and decides mail wakes (§4.10). The person's

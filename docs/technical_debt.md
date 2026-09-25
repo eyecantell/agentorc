@@ -79,7 +79,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
 | TD-132 | Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row | Medium | Open — designed, pickable |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
-| TD-136 | Build the Inbox message page — `/inbox/<id>`, the thread, the row's controls at the foot | Medium | Open — designed, pickable |
+| TD-136 | Build the Inbox message page — `/inbox/<id>`, the thread, the row's controls at the foot | Medium | Partly done — slice 1 (the `thread` read) built; the page remains |
 | TD-140 | Build *Put on the board* — the write-back's one add and the FYI row's form | Low | Open — designed, pickable |
 | TD-141 | Build mail before wind-down — the refusal on unread, the *mail read* row, an unread note ages out with its run | Medium | Open — designed, pickable; a parked build exists |
 | TD-142 | Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder | Medium | Open — designed; slice 1 pickable, slice 2 waits on dev-cadence's reader fields |
@@ -1459,7 +1459,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open — designed, nothing built. Design: §4.5 screen 6 *The message page*, §4.5a *Inbox message page*, the **keys** row (`Enter`, `Esc`, `j` / `k` on the page), mockup `InboxMessage.dc.html`.
+**Status:** Slice 1 built 2026-09-25 (PR #576, grinder-ao-1: the `thread` read, `ao inbox --thread`); slice 2, the page, remains (grinder-ao-2 is on it). Design: §4.5 screen 6 *The message page*, §4.5a *Inbox message page*, the **keys** row (`Enter`, `Esc`, `j` / `k` on the page), mockup `InboxMessage.dc.html`.
 
 **Location:** `src/sessionorc/agent.py` (a new person-only read, `thread {id}`: every entry whose `root` is the named entry's root, gathered across the person inbox and every record's `inbox` and `outbox`, one per id, oldest first, marking nothing — `src/sessionorc/**`, so the techlead reads that slice, §4.9b), `src/agentorc/cli.py` (`ao inbox --thread <id>`, the same read printed), `src/agentorc/ui/app.py` (the `/inbox/<id>` route: the entry from the `inbox` read by id, the thread from `thread`, the *gone* and refusal cases), a new template `inbox_entry.html` reusing `inbox_row.html`'s macros for the head, the thread rows and the controls, `inbox_row.html` (a mail row's text becomes the link to its page; `data-page` for the key), `src/agentorc/ui/static/app.js` (`Enter` on a mail row; `Esc` on the page; `j` / `k` across the list's order; the return to the ringed row), `tests/`.
 

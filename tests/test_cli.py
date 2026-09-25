@@ -1068,6 +1068,30 @@ def test_msg_and_inbox(subprocess_agent, tmp_path, capsys, monkeypatch):
         call_sync("kill", id=sid)
 
 
+def test_inbox_thread_prints_one_thread_whole_for_the_person(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-136 slice 1 (design §4.7): `ao inbox --thread <id>` prints the thread oldest first, the
+    person's own reply in it and the named entry marked; `--json` is the RPC result; a session is
+    refused in the host agent's words; `--unread` does not combine with it."""
+    worker = call_sync("create", name="w", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    monkeypatch.setenv("AGENTORC_SESSION", worker)
+    assert cli.main(["--json", "msg", "person", "rebase or merge?", "--kind", "ask"]) == 0
+    asked = json.loads(capsys.readouterr().out)["entry"]["id"]
+    monkeypatch.delenv("AGENTORC_SESSION")
+    assert cli.main(["msg", "--reply-to", asked, "merge it"]) == 0
+    capsys.readouterr()
+    assert cli.main(["inbox", "--thread", asked]) == 0
+    out = capsys.readouterr().out
+    assert out.startswith(f"thread of {asked}: 2 entries, oldest first")
+    assert out.index("rebase or merge?") < out.index("merge it") and "← this one" in out
+    assert cli.main(["--json", "inbox", "--thread", asked]) == 0
+    assert [e["from"] for e in json.loads(capsys.readouterr().out)["entries"]] == [worker, "person"]
+    assert cli.main(["inbox", "--thread", asked, "--unread"]) == 2
+    monkeypatch.setenv("AGENTORC_SESSION", worker)
+    assert cli.main(["inbox", "--thread", asked]) == 1
+    assert "cannot read a thread" in capsys.readouterr().err
+    call_sync("kill", id=worker)
+
+
 def test_msg_steer_and_the_inbox_line_that_shows_it(subprocess_agent, tmp_path, capsys, monkeypatch):
     """TD-069 step 0 (design §4.10 *What a person is asked*): `ao msg --kind steer --default` sends
     the line the session will go with; `ao msg person --kind ask --bound` is refused and the

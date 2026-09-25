@@ -1898,6 +1898,54 @@ async def test_asking_again_on_the_thread_settles_the_first_and_owes_its_own(age
         await person.call("kill", id=worker)
 
 
+async def test_a_thread_is_read_whole_across_mailboxes_by_the_person_only(agent, tmp_path):
+    """TD-136 slice 1 (design §4.7 `ao inbox --thread`, §4.5 screen 6): the `thread` read gathers
+    every entry sharing the named entry's `root` across the person inbox and every record's inbox
+    and outbox — the person's own replies included, which the person inbox does not keep — one
+    per id, oldest first, marking nothing; `pruned` when the root is held nowhere; a person's
+    read only, and an id the person inbox does not hold is refused in words."""
+    async with LocalClient() as person:
+        mk = _mk(person, tmp_path)
+        worker, other = await mk("w", unattended=True), await mk("o", unattended=True)
+        long = ("rebase or merge? " + "context " * 248).strip()  # a 2,000-character question
+        async with LocalClient(caller=worker) as w, LocalClient(caller=other) as o:
+            first = (await w.call("msg", to="person", text=long, kind="ask"))["entry"]
+            unrelated = (await o.call("msg", to="person", text="another thread", kind="ask"))["entry"]
+            r1 = (await person.call("msg", to=worker, text="merge it", kind="reply", reply_to=first["id"]))["entry"]
+            again = (await w.call("msg", to="person", text="into what?", kind="ask", thread=first["id"]))["entry"]
+            r2 = (await person.call("msg", to=worker, text="main", kind="reply", reply_to=again["id"]))["entry"]
+            done = (await w.call("msg", to="person", text="done: #1", outcome="done", for_=again["id"]))["entry"]
+            got = await person.call("thread", msg=again["id"])
+            assert got["root"] == first["id"] and got["pruned"] is False
+            ids = [e["id"] for e in got["entries"]]
+            assert sorted(ids) == sorted([first["id"], r1["id"], again["id"], r2["id"], done["id"]])  # one each
+            # oldest first: `at` is whole seconds, so within one the order is what every mailbox and
+            # every reply agree with
+            assert ids == [first["id"], r1["id"], again["id"], r2["id"], done["id"]]
+            assert [e["at"] for e in got["entries"]] == sorted(e["at"] for e in got["entries"])
+            assert unrelated["id"] not in ids
+            assert got["entries"][0]["text"] == long  # whole
+            assert [e["from"] for e in got["entries"]][1::2] == ["person", "person"]  # from the asker's inbox
+            assert all(e["from_role"] for e in got["entries"])
+            # a read marks nothing
+            assert not [e for e in (await person.call("inbox", id=worker))["entries"] if e["read_at"]]
+            # a session reads no thread, its own included
+            with pytest.raises(AgentError, match="cannot read a thread"):
+                await w.call("thread", msg=first["id"])
+        with pytest.raises(AgentError, match="the person inbox holds no entry m-nope"):
+            await person.call("thread", msg="m-nope")
+        # retention took the root from every mailbox: the thread starts after a gap, and says so
+        agent.person_inbox[:] = [e for e in agent.person_inbox if e.id != first["id"]]
+        for s in agent.sessions.values():
+            s.inbox[:] = [e for e in s.inbox if e.id != first["id"]]
+            s.outbox[:] = [e for e in s.outbox if e.id != first["id"]]
+        got = await person.call("thread", msg=again["id"])
+        assert got["pruned"] is True and first["id"] not in [e["id"] for e in got["entries"]]
+        assert len(got["entries"]) == 4
+        for sid in (worker, other):
+            await person.call("kill", id=sid)
+
+
 async def test_the_debt_has_a_bound_of_its_own_and_is_never_pruned(agent, tmp_path, monkeypatch):
     """Design §4.10 *Outcomes*: an owing question is not pruned while it owes — the follow-up names
     it and the person's Inbox lists it — and a sender that owes `OUTCOMES_OWED_MAX` is refused its
