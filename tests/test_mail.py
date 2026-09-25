@@ -1697,7 +1697,8 @@ async def test_a_conflict_nobody_answers_goes_to_the_person_and_is_never_a_stall
             assert (await person.call("get", id=worker))["mail"]["owed"] == []
         for sid in (lead, lead2):
             async with LocalClient(caller=sid) as c:
-                assert any("keep it on its branch" in e["text"] for e in (await c.call("inbox", unread=True))["entries"])
+                entries = (await c.call("inbox", unread=True))["entries"]
+                assert any("keep it on its branch" in e["text"] for e in entries)
         for sid in (lead, lead2, worker):
             await person.call("kill", id=sid)
 
