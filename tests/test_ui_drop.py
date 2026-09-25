@@ -14,15 +14,13 @@ def test_review_pr_is_the_panels_rule():
     claimed = {"ref": "TD-127", "status": "claimed", "source": "declared"}
     assert review_pr([claimed], "TD-127") is None
     assert review_pr([{**claimed, "pr": 532}], "td-127") == 532
-    derived = {"ref": "TD-127", "status": "claimed", "source": "derived", "pr": 533}
-    assert review_pr([claimed, derived], "TD-127") == 533
-    assert review_pr([claimed, {**derived, "status": "done"}], "TD-127") is None  # merged: no claim held
-    assert review_pr([derived], "TD-127") is None  # nothing declared to let go
+    assert review_pr([{**claimed, "review_pr": 533}], "TD-127") == 533  # its branch's (slice 3)
+    assert review_pr([{**claimed, "source": "derived", "pr": 534}], "TD-127") is None  # nothing declared
     assert review_pr([{**claimed, "status": "done", "pr": 532}], "TD-127") is None
 
 
 @pytest.mark.unit
-def test_the_route_refuses_a_drop_in_review_and_names_a_pr_no_longer_open(tmp_path, monkeypatch):
+def test_the_route_refuses_a_drop_in_review_and_lets_one_in_progress_go(tmp_path, monkeypatch):
     monkeypatch.setenv("AGENTORC_HOME", str(tmp_path))
     from agentorc.ui import app as uiapp
 
@@ -48,15 +46,9 @@ def test_the_route_refuses_a_drop_in_review_and_names_a_pr_no_longer_open(tmp_pa
 
     monkeypatch.setattr(uiapp, "LocalClient", Fake)
     with TestClient(uiapp.create_app()) as c:
-        record["progress"] = [
-            {"ref": "TD-127", "status": "claimed", "source": "declared"},
-            {"ref": "TD-127", "status": "claimed", "source": "derived", "pr": 532},
-        ]
+        record["progress"] = [{"ref": "TD-127", "status": "claimed", "source": "declared", "pr": 532}]
         r = c.post("/api/sessions/ao-w/drop", json={"ref": "TD-127"})
         assert r.status_code == 409 and "in review as PR #532" in r.json()["detail"] and not calls
-        record["progress"][1]["status"] = "done"  # merged
-        assert c.post("/api/sessions/ao-w/drop", json={"ref": "TD-127"}).status_code == 200
-        assert calls[-1]["why"] == "dropped from Focus (its PR #532 no longer open)"
         record["progress"] = [{"ref": "TD-128", "status": "claimed", "source": "declared"}]
         assert c.post("/api/sessions/ao-w/drop", json={"ref": "TD-128"}).status_code == 200
         assert calls[-1]["why"] == "dropped from Focus" and calls[-1]["status"] == "dropped"

@@ -1606,24 +1606,18 @@ def _same_ref(a: Any, b: Any) -> bool:
 
 def review_pr(progress: Collection[dict[str, Any]], ref: str) -> int | None:
     """The PR a claim on `ref` is in review as (design §4.5a *Focus side panel → Reports*, TD-150),
-    or None: a declared `claimed` entry's own `pr`, else a derived `claimed` entry's on the same
-    reference — the rule `AO.reportGroups` draws the panel by, so the panel and the refusal agree.
-    A derived entry that is `done` is a merged PR, which holds no claim."""
-    mine = [p for p in progress if isinstance(p, dict) and _same_ref(p.get("ref"), ref)]
-    declared = [p for p in mine if (p.get("source") or "declared") == "declared" and p.get("status") == "claimed"]
-    if not declared:
-        return None
-    own = next((p.get("pr") for p in declared if p.get("pr")), None)
-    derived = next(
-        (
-            p.get("pr")
-            for p in mine
-            if (p.get("source") or "declared") != "declared" and p.get("status") == "claimed" and p.get("pr")
-        ),
-        None,
-    )
-    got = own or derived
-    return int(got) if isinstance(got, int) or str(got or "").isdigit() else None
+    or None: a declared `claimed` entry's own `pr`, else the `review_pr` its record carries for its
+    branch — the rule `AO.reportGroups` draws the panel by, so the panel and the refusal agree. No
+    derived entry shares a declared one's reference (§9 invariant 10), so there is no third."""
+    for p in progress:
+        if not isinstance(p, dict) or not _same_ref(p.get("ref"), ref) or p.get("status") != "claimed":
+            continue
+        if (p.get("source") or "declared") != "declared":
+            continue
+        got = p.get("review_pr") or p.get("pr")
+        if isinstance(got, int) or str(got or "").isdigit():
+            return int(got)
+    return None
 
 
 def board_choices(roots: Collection[str | Path] | None = None) -> list[dict[str, str]]:
@@ -2837,15 +2831,14 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             s = await call("get", id=sid)
             pr = review_pr(s.get("progress") or [], ref)
             if pr:
+                # the record cannot yet say whether that PR is still open (slice 3 brings its state),
+                # so the refusal says what ends it either way
                 raise HTTPException(
                     409,
-                    f"{ref} is in review as PR #{pr}: its claim holds while the PR is open — merge or close it first",
+                    f"{ref} is in review as PR #{pr}: a claim with a PR is not dropped — it ends when the "
+                    "session reports it done or dropped, once the PR is merged or closed",
                 )
-            last = next(
-                (p.get("pr") for p in s.get("progress") or [] if _same_ref(p.get("ref"), ref) and p.get("pr")), None
-            )
-            why = body.get("why") or ("dropped from Focus" + (f" (its PR #{last} no longer open)" if last else ""))
-            await call("progress", id=sid, ref=ref, status="dropped", why=why)
+            await call("progress", id=sid, ref=ref, status="dropped", why=body.get("why") or "dropped from Focus")
         elif action == "stop":
             # design §4.5a Focus header **stops** badge → click to edit (§6, TD-026). The stop time
             # was settable at New session and from `ao until` and nowhere else, so a person who set
