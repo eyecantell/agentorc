@@ -3892,6 +3892,15 @@ sender's:
   with `(wake budget spent)` appended while it is, which is how a session learns that mail is
   landing without waking it. It types nothing, starts nothing, needs no counter, and reaches a
   session at exactly the moment it is reading agentorc's output.
+- **Waiting on mail is ending the turn.** A session with nothing to do but wait for a reply ends
+  its turn: the reply, a `steer`'s lapse at its bound (the `system` note, uncharged) and any other
+  mail ring it once it is hook-confirmed `idle`. A loop on `ao wait` or `ao inbox --unread` keeps it
+  `working`, so the doorbell never rings it and each pass is a turn spent to learn *unread 0*.
+  `ao --skill` says so, every role preset says *mail it, then end the turn* where it says never to
+  ask in the pane, and the poll that found nothing — `ao wait` returning with nothing changed, `ao
+  inbox --unread` with no entries — ends with one fixed line to a session (stderr under `--json`):
+  `[agentorc] nothing unread — end your turn; you are rung when mail lands` (TD-153). `ao wait` is
+  one call ending a manager's round (§4.8 *Waking a manager*), never a loop.
 
 The rules that bound both:
 
