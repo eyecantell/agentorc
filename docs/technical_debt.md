@@ -104,6 +104,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-156 | UI review of the end of a session: after a person's Wrap up, Focus offers Kill in the header and Close only in the side panel, and a concluded team folds the card that is ready to close | Medium | Open — design-first, Paul's interactive review |
 | TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Open — design-first |
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Open — design-first |
+| TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
 
 
 ---
@@ -1944,3 +1945,24 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a person opening Message on an on-call seat reads, before typing, that a note will not fill it and an ask will, and switching the kind changes the line.
 
 **Related:** §4.5a **Message** (the row this extends), §4.9b (the seat's trigger), §4.10 (delivery, the doorbell, the budget, invariant 5), TD-157 (the *i* marks — this line is the same idea at the moment of sending), TD-153 (what a session is told about being woken; this is what a person is told).
+
+## TD-159: Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *are there things that live here that should actually live in dev-cadence or vice-versa?*)
+**Owner:** anchor
+**Kind:** evaluation
+**Pickable:** yes
+
+**Status:** Open — nothing reviewed. The output is a short ADR under `docs/decisions/` naming each item and where it belongs, then one TD per move; not the moves themselves.
+
+**Location:** the nineteen SYNCED FILE copies in this repo (`scripts/*.py`, `scripts/*.sh`, `scripts/git-hooks/*`, `docs/cadence.md`, `.claude/skills/{attention,cadence,stranded-work}/SKILL.md`), `.claude/settings.json` (the SessionStart wiring), and the dev-cadence checkout on kmaster; on the ledger's side every entry with a "dev-cadence's" clause — TD-035 (the runner reads the repo from `CLAUDE_PROJECT_DIR`), TD-070 (an answers field on a board entry), TD-118 (3) (the out-of-work triage), TD-125 (telling the other repos), TD-126 / TD-142 (the board reader's fields), the TD-055 rename's three synced files — and design §4.2 (the launch layer carries the SessionStart line), §4.8 (the relay), §8 (lessons carried in).
+
+**Why:** the two repos were split by origin, not by rule: dev-cadence is what tdgrind and the per-repo conventions had before agentorc existed, and agentorc took the session substrate and the org. Since then agentorc has grown things that are really per-repo conventions (the board's `Format:` line and its `Due:` dates are read by agentorc's Inbox but defined by dev-cadence; the attention report is dev-cadence's script and agentorc's page), and dev-cadence has gained fields that only agentorc reads (the reader's fields TD-142 waits on; the answers field of TD-070). Six open entries each say "that part is dev-cadence's" and stop, so a move that is nobody's owner stays undone, and a worker that could build a slice cannot tell whether the next slice is in this repo at all. Nothing states the rule: *what makes a thing dev-cadence's rather than agentorc's*. A candidate rule to test the inventory against: **dev-cadence is what a repo needs with no agentorc on the machine** (the ledger and board formats, the cadence check, the hooks, the skills that read a checkout); **agentorc is what needs a host agent, a record, or a second session** (the Inbox, mail, teams, the tick); a file that only agentorc's code reads, or only agentorc's page renders, is on the wrong side wherever it sits.
+
+**Fix:** (1) inventory: every synced file and every `.claude/` wiring here, with who reads it (a person, a hook, `ao`, the host agent, the UI) and whether it would still be needed with agentorc uninstalled; the same for dev-cadence's files that name agentorc, `ao`, or a record field; (2) test each against the rule above and list the misfits both ways, with the six ledger clauses resolved to *stays / moves / splits*; (3) the ADR, and a TD per move, each naming the repo whose session makes the change (a dev-cadence change is a dev-cadence session's, cadence §3 *who makes the change*); (4) the rule itself into design §8, one paragraph, so the next new thing lands on the right side without a review.
+
+**Done when** the ADR exists, every "dev-cadence's" clause in an open entry points at a TD in the repo that owns it, and the design states the rule in one paragraph.
+
+**Related:** design §4.2, §4.8, §8; `docs/decisions/2026-09-06-adopt-dev-cadence.md` (why it was adopted, what it changed); TD-035, TD-055, TD-070, TD-118, TD-125, TD-126, TD-142 (the clauses); dev-cadence cadence.md §3 (who makes a change to a synced file).
+
