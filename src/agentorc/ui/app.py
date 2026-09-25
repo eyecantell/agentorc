@@ -1600,6 +1600,32 @@ def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
     return argv, ""
 
 
+def _same_ref(a: Any, b: Any) -> bool:
+    return str(a or "").strip().upper() == str(b or "").strip().upper()
+
+
+def review_pr(progress: Collection[dict[str, Any]], ref: str) -> int | None:
+    """The PR a claim on `ref` is in review as (design §4.5a *Focus side panel → Reports*, TD-150),
+    or None: a declared `claimed` entry's own `pr`, else a derived `claimed` entry's on the same
+    reference — the rule `AO.reportGroups` draws the panel by, so the panel and the refusal agree.
+    A derived entry that is `done` is a merged PR, which holds no claim."""
+    mine = [p for p in progress if isinstance(p, dict) and _same_ref(p.get("ref"), ref)]
+    declared = [p for p in mine if (p.get("source") or "declared") == "declared" and p.get("status") == "claimed"]
+    if not declared:
+        return None
+    own = next((p.get("pr") for p in declared if p.get("pr")), None)
+    derived = next(
+        (
+            p.get("pr")
+            for p in mine
+            if (p.get("source") or "declared") != "declared" and p.get("status") == "claimed" and p.get("pr")
+        ),
+        None,
+    )
+    got = own or derived
+    return int(got) if isinstance(got, int) or str(got or "").isdigit() else None
+
+
 def board_choices(roots: Collection[str | Path] | None = None) -> list[dict[str, str]]:
     """The boards *Put on the board* may write to (design §4.5a *Inbox row: FYI*, TD-140): each
     checkout this host's repos registry names that carries a board, as `{label, root, board}` with
@@ -2806,7 +2832,20 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ref = str(body.get("ref") or "").strip()
             if not ref:
                 raise HTTPException(400, "drop needs the reference to drop")
-            await call("progress", id=sid, ref=ref, status="dropped", why=body.get("why") or "dropped from Focus")
+            # TD-150 slice 2 (§4.5a *Reports*): not while a PR from that claim is open — the claim
+            # in review is the one a person reading the panel must not let go (TD-143)
+            s = await call("get", id=sid)
+            pr = review_pr(s.get("progress") or [], ref)
+            if pr:
+                raise HTTPException(
+                    409,
+                    f"{ref} is in review as PR #{pr}: its claim holds while the PR is open — merge or close it first",
+                )
+            last = next(
+                (p.get("pr") for p in s.get("progress") or [] if _same_ref(p.get("ref"), ref) and p.get("pr")), None
+            )
+            why = body.get("why") or ("dropped from Focus" + (f" (its PR #{last} no longer open)" if last else ""))
+            await call("progress", id=sid, ref=ref, status="dropped", why=why)
         elif action == "stop":
             # design §4.5a Focus header **stops** badge → click to edit (§6, TD-026). The stop time
             # was settable at New session and from `ao until` and nowhere else, so a person who set
