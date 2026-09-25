@@ -910,6 +910,55 @@ def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
         assert "tell me if you want less" in text, rel  # the same kind rule as the workers', not a second one
 
 
+SHAPE = (
+    "A message to the person is read cold. Its first paragraph is the whole of what they need — what it is about, "
+    "what was decided or is being asked, and what they must do — in one to three plain sentences. A blank line, "
+    "then the reading, for the record. A reply with `--source` begins with its verdict."
+)
+
+
+def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
+    """TD-139 (design §4.10 *How a message to a person is written*): the rule lives with the writers,
+    in the same words in every preset whose session writes to the person."""
+    root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
+    for name in ("techlead.md", "manager.md", "grinder.md"):
+        assert SHAPE in (root / name).read_text(encoding="utf-8"), name
+
+
+@pytest.mark.unit
+def test_the_shape_warning_counts_the_first_paragraph():
+    """design §4.10: past `FIRST_PARA_WORDS` in the first paragraph, or no blank line and past the
+    Inbox's `FOLD_CHARS`, `ao msg` says what the person reads; a shaped message says nothing."""
+    ninety = " ".join(["word"] * 90)
+    assert cli.shape_warning(ninety + "\n\nthe reading").startswith("the person reads the first paragraph: 90 words")
+    assert cli.shape_warning("merged #517 — one gap left\n\n" + ninety) is None  # shaped: a long reading is fine
+    assert cli.shape_warning("merge #517?") is None
+    unbroken = ("a sentence of eight words said at length. " * 10).strip()  # 80 words, over 300 characters
+    assert "80 words" in (cli.shape_warning(unbroken) or "")
+    assert cli.shape_warning("x" * 250) is None  # one long word under the backstop: nothing to fold
+
+
+def test_msg_to_the_person_warns_on_an_unshaped_message_and_sends_it(subprocess_agent, tmp_path, capsys, monkeypatch):
+    """TD-139 (design §4.10 *The home warns, never refuses*): `ao msg person` with a 90-word first
+    paragraph prints the warning and the mail arrives; a shaped one prints nothing; a message to a
+    session is not checked."""
+    sid = call_sync("create", name="shaper", dir=str(tmp_path), adapter="shell", argv=["bash", "--norc"])["id"]
+    (tmp_path / "o").mkdir()
+    other = call_sync("create", name="other", dir=str(tmp_path / "o"), adapter="shell", argv=["bash", "--norc"])["id"]
+    call_sync("set_controllers", id=other, add=[sid])
+    monkeypatch.setenv("AGENTORC_SESSION", sid)
+    long = " ".join(["word"] * 90)
+    assert cli.main(["msg", "person", long, "--kind", "note"]) == 0
+    got = capsys.readouterr()
+    assert "note → person" in got.out and "the person reads the first paragraph: 90 words" in got.err
+    assert cli.main(["msg", "person", "merged #9 — nothing to do\n\n" + long, "--kind", "note"]) == 0
+    assert "the person reads" not in capsys.readouterr().err
+    assert cli.main(["msg", other, long]) == 0
+    assert "the person reads" not in capsys.readouterr().err
+    for x in (sid, other):
+        call_sync("kill", id=x)
+
+
 def test_the_manager_brief_leaves_the_seat_the_wanted_restart_and_the_nudge_to_the_tick():
     """TD-103 slice (5), design §6 *Keeping a team running* rules 2–4: the tick fills and closes
     the techlead seat, carries out a wanted restart and sends the idle nudge, so the preset does
