@@ -145,10 +145,18 @@
       "h": 1560
     },
     {
+      "file": "MainTeamFirst.dc.html",
+      "title": "Org \u2014 team-first (compared 2026-09-25, not the design)",
+      "x": 3120,
+      "y": 4080,
+      "w": 1440,
+      "h": 1560
+    },
+    {
       "file": "Type.dc.html",
       "title": "Type scale",
       "x": 3120,
-      "y": 4080,
+      "y": 5740,
       "w": 1440,
       "h": 760
     },
@@ -156,7 +164,7 @@
       "file": "TypeDark.dc.html",
       "title": "Type scale \u2014 dark",
       "x": 3120,
-      "y": 4940,
+      "y": 6600,
       "w": 1440,
       "h": 760
     }

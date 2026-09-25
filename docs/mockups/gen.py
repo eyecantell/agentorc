@@ -374,8 +374,8 @@ def where_row(host, repo, name, where, in_team):
         parts.append(f"under <b>{e['under']}</b>")
     return " · ".join(parts)
 
-def team_desktop():
-    def card(host, repo, s, in_team):
+def team_desktop(team_first=False):
+    def card(host, repo, s, in_team, compact=False):
         name, tool, state, age, where, flag, conf, pending, tag = s
         e = EXTRA.get(name, {})
         unseen = state == "idle" and e.get("unseen")
@@ -459,6 +459,14 @@ def team_desktop():
         ring = (" ring" if state == "needs" else "") + (" kring" if e.get("kring") else "")
         off = " off" if state == "unreachable" else ""
         bar = BAR["idle"] if unseen else BAR[state]
+        if compact:
+            # the team-first shape compared 2026-09-25 (Paul): a member's card is its name, its
+            # state and its buttons — the team's summary block above carries the rest
+            return f'''<div class="card ac{ring}{off}" style="grid-template-rows: 26px 32px; min-height: 0;">
+  <div class="sbar" style="background: {bar};"></div>
+  <div class="r"><span class="name">{name}</span>{title_html}<span class="grow"></span>{state_pill}</div>
+  <div class="foot">{first}{rest}{editor}<span class="grow"></span><span class="lk" style="padding: 0 2px; flex-shrink: 0; overflow: visible;">{ICON["more"]}</span></div>
+</div>'''
         return f'''<div class="card ac{ring}{off}">
   <div class="sbar" style="background: {bar};"></div>
   <div class="r"><span class="name">{name}</span>{title_html}<span class="grow"></span>{state_pill}</div>
@@ -517,6 +525,24 @@ def team_desktop():
     STRIPS = {"samscrape-grind": strip("samscrape", 4, "3d", 7, 3, 2, 1,
                                        ["TD-301 (tdgrind-1, #811)", "TD-296 (tdgrind-2, #437)", "TD-290 (tdgrind-3, #812)"])}
 
+    # the team-first shape (compared 2026-09-25): the team card carries a **summary block** — the
+    # repo strip, the whole *on now* list, the reader's queue, the manager's word — and its members
+    # shrink to name, state and buttons. Not the design; one of two shapes Paul is choosing between.
+    def summary(team):
+        if team != "samscrape-grind":
+            return ""
+        row = lambda k, v: (f'<div style="display: flex; gap: 10px; align-items: baseline;"><span class="kind" style="width: 92px; flex-shrink: 0;">{k}</span>'
+                            f'<span style="font-size: 13px; min-width: 0;">{v}</span></div>')
+        return (f'<div style="display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; background: #fff; border: 1px solid #dfe3e8; border-radius: 6px;">'
+                + STRIPS[team]
+                + row("on now", '<span class="mono">TD-301</span> tdgrind-1 → <a href="#">#811</a> <span class="meta">pushing the branch for review · 14s</span> &nbsp;·&nbsp; '
+                                '<span class="mono">TD-296</span> tdgrind-2 → <a href="#">#437</a> <span class="meta">no output 47m</span> &nbsp;·&nbsp; '
+                                '<span class="mono">TD-290</span> tdgrind-3 <span class="meta">limited · resets 02:00</span>')
+                + row("reader", '<a href="#">2 PRs waiting</a> <span class="meta">· oldest 40m · techlead-1 on call, last came 2h ago</span>')
+                + row("manager", 'round 41: reading four members, two claims to re-check <span class="meta">· says 2m ago</span>')
+                + row("needs you", 'tdgrind-1 · permission · Bash git push -u origin td301-fix <span class="meta">· 9m 12s left</span> — <a href="#">Allow</a> · <a href="#">Deny</a>')
+                + '</div>')
+
     grid = ""
     for team, source, lead, live, repo in TEAMS:
         members = [t for t in ordered if EXTRA.get(t[2][0], {}).get("team") == team]
@@ -536,8 +562,8 @@ def team_desktop():
             if x[2] != "needs":
                 counts[w] = counts.get(w, 0) + 1
         tally = " · ".join(f"{n} {w}" for w, n in counts.items())
-        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True) for h, r, x in members), needs, team=True,
-                      strip=STRIPS.get(team, ""))
+        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True, compact=team_first) for h, r, x in members), needs, team=True,
+                      strip=summary(team) if team_first else STRIPS.get(team, ""))
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
     grid += group("No team", f"{len(rest)} sessions", "".join(card(h, r, x, False) for h, r, x in rest))
     for team, source, lead, live, repo in TEAMS:
@@ -1532,6 +1558,7 @@ def darken(html):
 
 files = {
     "Main.dc.html": team_desktop(),
+    "MainTeamFirst.dc.html": team_desktop(team_first=True),
     "MainDark.dc.html": darken(team_desktop()),
     "Phone.dc.html": team_phone(),
     "Focus.dc.html": focus(),
@@ -1579,6 +1606,7 @@ LAYOUT = [
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),
     ("MainDark.dc.html", "Org — dark", 2),
+    ("MainTeamFirst.dc.html", "Org — team-first (compared 2026-09-25, not the design)", 2),
     ("Type.dc.html", "Type scale", 2),
     ("TypeDark.dc.html", "Type scale — dark", 2),
 ]
