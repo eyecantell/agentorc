@@ -440,3 +440,5 @@ For a §6 policy: nothing new beyond what's already carried forward — the long
 18:54Z  designer-ao-1: TD-158 done → PR #564 merged (docs-only, Message mockup). Cadence check: pr/review/ledger/worktree pass, ci still running (unknown, not called a pass) at check time — no held paths regardless.
 19:00Z  quiet stretch: all three grind members kept working (designer-ao-1 picked up TD-161; grinder-ao-2 tree busier mid-edit). techlead seat exited, nothing due.
 19:00Z  grinder-ao-1: TD-155 done → PR #556 merged (resumed-session idle fix). Cadence check pass (review SHIP 2 findings, ci green, ledger named, worktree clean). No src/sessionorc/docs/briefs/org.yml — not held.
+19:03–19:07  quiet stretch: all three grind members kept working (designer-ao-1: TD-162, TD-163; grinder-ao-1: TD-134). techlead seat exited, nothing due.
+19:07Z  grinder-ao-2: TD-139 done → PR #561 merged (sender-shape guidance). Cadence check pass (review FIXED 2 findings, ci green, ledger named, worktree clean). Touches src/agentorc/briefs/*.md, not docs/briefs/ — not the held-path rule (that's docs/briefs, sessionorc, org.yml).
