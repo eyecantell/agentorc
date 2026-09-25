@@ -1138,6 +1138,35 @@ def _offered(reply_to: str) -> list[str] | None:
     return None
 
 
+# design §4.10 *How a message to a person is written* (TD-127, built by TD-139): past this many words
+# the first paragraph is more than the person reads before deciding, and `ao msg` says so.
+FIRST_PARA_WORDS = 60
+
+
+def shape_warning(text: str) -> str | None:
+    """The one line `ao msg` prints when a message the person will read is not shaped for them
+    (design §4.10): its first paragraph runs past `FIRST_PARA_WORDS`, or it has no blank line and
+    runs past the Inbox's `FOLD_CHARS`, where the row cuts it at a sentence for them. It warns and
+    never refuses: mail is never lost to a style rule. The blank line is the Inbox row's own
+    (`paragraph_break`, which `fold` uses), so what is counted here is what the row draws."""
+    from agentorc.ui.render import FOLD_CHARS, paragraph_break
+
+    split = paragraph_break(text)
+    if split is None:  # no blank line: the whole text is its first paragraph
+        t = text.strip()
+        words = len(t.split())
+        if words <= FIRST_PARA_WORDS and len(t) <= FOLD_CHARS:
+            return None
+    else:
+        words = len(split[0].split())
+        if words <= FIRST_PARA_WORDS:
+            return None
+    return (
+        f"the person reads the first paragraph: {words} words — say what it is about, what you decided or ask, "
+        "what they must do"
+    )
+
+
 def cmd_msg(args: argparse.Namespace) -> int:
     """`ao msg <to>… "<text>"` (design §4.10): an attributed entry in each addressee's inbox, nothing
     typed anywhere. `person` is the org's person inbox. With `--reply-to` the addressee may be left
@@ -1194,6 +1223,12 @@ def cmd_msg(args: argparse.Namespace) -> int:
         "pr": args.pr,
     }
     got = call_sync("msg", **params)  # unset parameters are dropped by the client (TD-062 fix (a))
+    # design §4.10: a message the person reads — to `person`, or a `--source` reply, which the home
+    # files to the person as *answered for you* — is checked for its shape once it has been sent
+    if "person" in params["to"] or args.source:
+        warn = shape_warning(text)
+        if warn:
+            print(warn, file=sys.stderr)
 
     def prose() -> None:
         e = got["entry"]
