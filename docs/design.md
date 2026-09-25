@@ -1582,7 +1582,9 @@ Screens:
    2. **The acts line** — what a person may do: the **next act first, outlined**, by state —
       **Close session** on an own session when the checklist passes (the same kill and reap as
       the card's, §4.2), **Take over** on an unattended session, else nothing, since a working
-      or idle session's next act is the composer's Send; then **Message**, **Wrap up**, **Open
+      or idle session's next act is the composer's Send — and on an own session that is both
+      (unattended, no team, the checklist passing) Close session is the outlined one and Take
+      over stands plain beside it, since closing is the likelier press; then **Message**, **Wrap up**, **Open
       shell here** and the editor button, plain; and at the right **more ▾** — Pop out, Copy and
       Paste (each naming its keys), Hand back / Switch to unattended when the toggle is not the
       next act, Copy tmux command, **Close** (the one place a team member offers it, enabled once
@@ -1964,7 +1966,7 @@ noted). If a control is not in this table it does not exist.
 | card | **Allow / Deny** | answers a pending permission through the hook channel; shown with the time left. Beside Deny, one optional line — *why?* — never required and never a second button: what is typed goes back with the refusal as the hook decision's `reason`, which the session reads (the same `reason` `ao deny <id> [reason]` sends); an empty box is a bare Deny. A redraw from a pushed delta or a poll keeps what is typed in it |
 | card | **Switch profile…** | re-launches a `limited` session under another profile (resume id carried over) |
 | card | **Wait** | dismisses the limited slot until the reset time |
-| card | **Close session** (inline, only when Ready to close passes) | kill + reap worktree → `closed` |
+| card | **Close session** (inline, only when Ready to close passes, and only on the person's **own** session — interactive, or no team badge, §4.5 *Whose session it is*, TD-156) | kill + reap worktree → `closed`. A team member's card keeps the *ready to close ✓* caption as a fact, leads with Focus, and offers Close in *more ▾* only |
 | card | **Focus** | opens the Focus screen. A plain link, so the browser's modifiers do on it what they do on any link — a new tab, never a pop-out. Reads **Focus window**, and raises that window, while this browser holds a popped-out window for the session (row **Pop out**, TD-046) |
 | card **more ▾**, Focus header | **Pop out** | opens the session's Focus in its own browser window without the nav and top bar (`/focus/{sid}?window=1`), named `ao-focus-<id>` so a second press raises the first window; size and position remembered per session in the browser; the card's **Focus** reads *Focus window* while it is open in this browser. Client-side: nothing is written to the record (§4.5 screen 2 *Pop out*, TD-046) |
 | Focus | **title** | display only: the browser tab's or window's title is `<name> · <state>`, `▲ ` in front while the session needs you, kept current from the `/events` feed — the window switcher's one line (§4.5 screen 2 *Pop out*, TD-046). Every other page is titled by the app's name |
