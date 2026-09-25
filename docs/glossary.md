@@ -206,6 +206,8 @@ not mix:
   *Not:* attention list. — *proposed*.
 - **ledger** — `docs/technical_debt.md`: known issues and deferred work as `TD-NNN` entries. —
   *proposed*.
+- **repo strip** — the line under a team's header that says what each repo the team services holds: open PRs, pickable and design-first ledger entries, board items for the person, and what the members are on now (design §4.5 screen 9). — *proposed 2026-09-25*.
+- **Repo page** — `/repo/<name>`: the strip's numbers as lists, one repo at a time (design §4.5 screen 9). *Not:* dashboard — no charts, no history. — *proposed 2026-09-25*.
 - **run log** — a session's recorded pane output from its first byte (invariant 3). — *proposed*.
 - **run window** — the hours unattended sessions may work (design §6). — *proposed*.
 - **setting** — a value the person turns without redefining anything: a reserve, a team's stop time or priority, a schedule, the promote's `auto`, the person's own editor and terminal. Every setting lives in the home's `settings.yml` (design §5), written only through `set_settings`, and the Settings page (§4.5 screen 8) is where it is turned. *Not:* definition, option, config. — *proposed* 2026-09-25 (Paul's line).

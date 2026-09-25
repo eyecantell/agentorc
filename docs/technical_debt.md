@@ -97,6 +97,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
 | TD-168 | Build *when it is read*: `mail.read_when`, the pair on the record's view, the composer's sentence that changes with the kind, `read_when` on every `ao msg` reply | Medium | Open |
+| TD-170 | Build the repo strip and the Repo page: the host agent's repo facts (open PRs by `gh`, the ledger's entries by `sessionorc.ledger`), the `repos` RPC and event, the strip on the team card, `/repo/<name>`, `ao repo` | Medium | Open — designed 2026-09-25 (cloud session with Paul); pickable in slices |
+| TD-171 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, after TD-170's numbers are visible |
 
 
 ---
@@ -1803,3 +1805,41 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** TD-158's *Done when*: a person opening Message on an on-call seat reads, before typing, that a note will not fill it and an ask will, and switching the kind changes the line; and `ao msg` to an exited member ends with *read when it is resumed, or started again under this name*.
 
 **Related:** TD-158 (the design), TD-153 (what a session is told about being woken), TD-157 / TD-167 (the *i* marks: the same idea at the button), TD-152 (the `scheduled` sentence), §4.9b (the seat's trigger), §4.10 (the doorbell's order, the budget's refill).
+
+## TD-170: Build the repo strip and the Repo page — repo facts on the host agent, the `repos` RPC and event, the strip on the team card, `/repo/<name>`, `ao repo`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (designed with Paul in a cloud session, after TD-156's Focus review: *a quick view of what is outstanding, what is in progress, and what is waiting on me, per repo a team services — and whether the team is balanced*)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+
+**Status:** Open — pick it slice by slice, each a PR, slices 1 and 2 first since the page has nothing to show without them. Designed: §4.5 screen 9 (the strip and the page), §4.4 *Repo facts* (the two readings, `repos.json`, the `repos` RPC and event), §4.7 `ao repo`, §4.5a rows *team card: repo strip*, *Repo page: Open ledger*, *board rows*, *section heading*, *links*; the mockups `Repo.dc.html` and the strip on `Main.dc.html`; glossary *repo strip*, *Repo page*. Nothing built.
+
+**Location:** `src/sessionorc/agent.py` (the tick: a `_read_repos` beside `_count_seats`, the `repos` RPC, the `repos` event), a new `src/sessionorc/ledger.py`, `src/sessionorc/reports.py` (`_prs` already runs `gh pr list`; the open-PR read is its sibling), `src/agentorc/ui/app.py` (`team_groups` — the strip's data per group; a `/repo/{name}` route; the board rows filtered to a repo, from `board_items`), `src/agentorc/ui/templates/group_head.html` / `org.html` (the strip row), a new `templates/repo.html`, `static/app.js` (the `repos` event re-rendering the strip), `src/agentorc/cli.py` (`ao repo`).
+
+**Why:** nothing on the Org says what a repo holds — the team header counts sessions, the reader's queue and the needs-you mark, and the Inbox is the person's queue, not the repo's state. Paul wants to see, per repo, the open PRs (and whether they are piling up ahead of the reader), the pickable and design-first ledger entries (what a grinder could take next), the board items due (what waits on him), and what each member is on, in one glance from the Org, with the lists a click away — and, once those numbers are visible, a rule a manager can apply to them (TD-171).
+
+**Fix — the slices, each its own PR:**
+1. **Repo facts on the host agent** (§4.4): `sessionorc.ledger` (the entry-header reader — id, title, priority, owner, kind, pickable — with `tests/test_ledger.py`'s regex moved in, so the test reads the reader); the open-PR read (`gh pr list --state open --json …` per remote, in a thread, every `USAGE_EVERY`, an outage keeping the last reading with `error` and `failed_at`); `repos.json`; the `repos` RPC; the `repos` event on change. Done when `ao repo --json` (slice 4 may land its bare form here) prints both readings for every registered checkout and a `gh` outage reads as *could not look*, never zero.
+2. **The strip** (§4.5a *team card: repo strip*): `team_groups` gains `repos: [...]` per team from `Org.team_repos` and the host's registry paths; `group_head.html` or a sibling partial draws the line; `app.js` re-renders it on the `repos` event; the *for you* number from `board_items` grouped by team; *on now* from the members' `progress` and `doing`. Done when Paul's Org shows the line under ao-grind with live numbers and each number is a link.
+3. **The Repo page** (§4.5 screen 9): `/repo/{name}`, four sections, the Inbox's board-row partial reused for *Waiting on you*, the *i* marks, narrow layout; `Repo.dc.html` regenerated from the built page's shape. Done when every strip link lands on its section and Snooze / Done / Reply on the page write the board as the Inbox does.
+4. **`ao repo`** (§4.7): the same facts as text and `--json`, `--all`. Done when a manager can read them without the page.
+
+**Related:** §4.5 screen 9, §4.4 *Repo facts*, §4.7, §4.9b (the reader's queue, which stays on the header), §4.5 screen 6 (the board reader the Inbox runs; the rail's URL the *for you* link uses — TD-135), TD-159 (whether the ledger reader belongs to dev-cadence), TD-171 (the balance rule), TD-146–148 (the Settings page's Repos cards, a sibling of this page), TD-156 (the Focus review this followed).
+
+## TD-171: A manager's balance check on the repo's numbers — open PRs above n, the oldest past d, the reader's queue past its bound → no new claims, and a word to the techlead
+
+**Priority:** Medium
+**Added:** 2026-09-25 (Paul: *this may lead to automatic checks by the manager for us, like the PR count*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — after TD-170 slice 1 or 2 lands, so the rule keys on numbers a person has watched first
+
+**Why:** the repo's numbers (TD-170) make a growing PR count visible; nothing acts on it. A manager keeps handing out claims while the reader's queue grows, and the person finds out from the strip. Paul asked that the numbers come first and a rule after, so that the rule keys on numbers he has watched.
+
+**Fix:** design the rule, then build it as a policy of the manager's round. The question is §10 (2026-09-25): a per-team **balance** line — open PRs above `n`, the oldest past `d`, or the reader's queue past its `bound` (§4.9b) — on which the manager hands out no new claim and asks the techlead to read, in its log line; never a kill, never a wind-down. To settle: setting or definition (the settings audit's rule, ADR 2026-09-25 §5); whether the manager reads `ao repo` each round or the tick pushes a breach as a `system` note (§4.10); what the manager's brief says (`src/agentorc/briefs/manager.md`, *A round*); and the numbers' defaults.
+
+**Status:** Open — nothing designed beyond the §10 question.
+
+**Related:** TD-170, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.

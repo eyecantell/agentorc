@@ -489,7 +489,7 @@ def team_desktop():
     GRID = "display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start;"
     WORDS = {"needs": "needs you", "stalled": "stalled?", "done": "closed"}
 
-    def group(title, sub, cards_html, needs=0, team=False):
+    def group(title, sub, cards_html, needs=0, team=False, strip=""):
         flag = pill("needs", f"{needs} needs you") if needs else ""
         acts = ('<span style="flex-grow: 1;"></span><span class="btn sm">Wind down</span><span class="btn sm danger">Stop now</span>'
                 if team else "")
@@ -497,8 +497,25 @@ def team_desktop():
         return (f'<div style="display: flex; flex-direction: column; gap: 12px; {box}">'
                 f'<div style="display: flex; align-items: center; gap: 10px;">'
                 f'<span style="font-weight: 600; font-size: 15px;">{title}</span>'
-                f'<span class="meta">{sub}</span>{flag}{acts}</div>'
+                f'<span class="meta">{sub}</span>{flag}{acts}</div>{strip}'
                 f'<div style="{GRID}">{cards_html}</div></div>')
+
+    # design §4.5 screen 9 / §4.5a **team card: repo strip** (TD-170): one quiet line per repo the
+    # team services, between the header and the cards — the repo's numbers, every one a link; the
+    # header keeps the sessions' counts. A reading that failed reads *could not look*, dimmed.
+    def strip(repo, prs, oldest, pickable, design_first, for_you, overdue, on_now, failed=False):
+        n = lambda k, v: f'<a href="#" style="font-weight: 600;">{v} {k}</a>'
+        prs_part = ('<span class="meta" style="opacity: .6;" title="gh could not be asked at 20:05 — the last reading is 3 open PRs, 14:40">PRs: could not look</span>'
+                    if failed else f'{n("open PRs", prs)} <span class="meta">· oldest {oldest}</span>')
+        fy = f'{n("for you", for_you)}' + (f' <span class="meta">· {overdue} overdue</span>' if overdue else "")
+        now = " · ".join(on_now[:3]) + (f' <span class="meta">+{len(on_now) - 3}</span>' if len(on_now) > 3 else "")
+        return (f'<div class="meta" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; white-space: normal;">'
+                f'<a href="#" class="mono" style="color: #1c2128; font-weight: 500;">{repo}</a><span>·</span>{prs_part}<span>·</span>'
+                f'{n("pickable", pickable)}<span>·</span>{n("design-first", design_first)}<span>·</span>{fy}<span>·</span>'
+                f'<a href="#" style="font-weight: 600;">on now</a> <span class="mono" style="font-size: 12px;">{now}</span></div>')
+
+    STRIPS = {"samscrape-grind": strip("samscrape", 4, "2d", 7, 3, 2, 1,
+                                       ["TD-301 (tdgrind-1, #811)", "TD-296 (tdgrind-2, #437)", "TD-290 (tdgrind-3)"])}
 
     grid = ""
     for team, source, lead, live, repo in TEAMS:
@@ -519,7 +536,8 @@ def team_desktop():
             if x[2] != "needs":
                 counts[w] = counts.get(w, 0) + 1
         tally = " · ".join(f"{n} {w}" for w, n in counts.items())
-        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True) for h, r, x in members), needs, team=True)
+        grid += group(team, f"{place} · {tally}", "".join(card(h, r, x, True) for h, r, x in members), needs, team=True,
+                      strip=STRIPS.get(team, ""))
     rest = [t for t in ordered if not EXTRA.get(t[2][0], {}).get("team")]
     grid += group("No team", f"{len(rest)} sessions", "".join(card(h, r, x, False) for h, r, x in rest))
     for team, source, lead, live, repo in TEAMS:
@@ -810,6 +828,61 @@ def focus_orchestrator():
     </div>
     <div class="note">A lead's own channels read like anyone's: what it claimed, what it filed. Its members are the panel above, derived from their <span class="mono">controllers</span> on each tick and never cached (§4.8). Nothing keys on the <span class="mono">lead</span> role — the panel is there because the session holds the <span class="mono">control</span> grant (§9 invariant 9).</div>
   </div>
+</div>
+</div>
+''' + TAIL
+
+def repo_page():
+    """§4.5 screen 9 (TD-170): the strip's numbers as lists, one repo at a time — one centred column
+    as the Inbox, a section per number in the strip's order, a row a card; the board rows are the
+    Inbox's own with their controls. No chart, no history: the numbers are today's and the lists
+    are the things themselves."""
+    def sec(title, count, rows, blurb):
+        return (f'<div style="display: flex; flex-direction: column; gap: 8px;">'
+                f'<div style="display: flex; align-items: baseline; gap: 10px;"><span style="font-size: 16px; font-weight: 600;">{title}</span>'
+                f'<span class="meta">{count}</span><span class="btn sm ghost" style="height: 22px; padding: 0 6px;" title="{blurb}">i</span></div>{rows}</div>')
+    def row(inner, hover=False):
+        bg = "#f7f8fa" if hover else "#fff"
+        return f'<div class="card" style="padding: 10px 12px; display: flex; align-items: center; gap: 10px; background: {bg};">{inner}</div>'
+    m = lambda t: f'<span class="meta">{t}</span>'
+    prs = "".join([
+        row(f'<a href="#" class="mono">#811</a><span>TD-301: recover stuck notices without a restart</span><span style="flex-grow: 1;"></span>{m("tdgrind-1 · 2d")}<span class="badge">held by the reader · 40m</span>'),
+        row(f'<a href="#" class="mono">#437</a><span>TD-296: the sweep reads worktrees too</span><span style="flex-grow: 1;"></span>{m("tdgrind-2 · 1d")}<span class="badge">read</span>'),
+        row(f'<a href="#" class="mono">#812</a><span>TD-290: one measure of pushed</span><span style="flex-grow: 1;"></span>{m("tdgrind-3 · 6h")}<span class="badge">draft</span>'),
+        row(f'<a href="#" class="mono">#805</a><span>docs: the cadence week</span><span style="flex-grow: 1;"></span>{m("eyecantell · 3d")}'),
+    ])
+    tds = "".join([
+        f'<div class="kind" style="margin-top: 4px;">pickable · 7</div>',
+        row(f'<span class="mono">TD-302</span><span>The reaper keeps a worktree with ignored files and says nothing</span><span style="flex-grow: 1;"></span>{m("High · grinder")}'),
+        row(f'<span class="mono">TD-301</span><span>Recover stuck notices without a restart</span><span style="flex-grow: 1;"></span>{m("Medium · grinder")}<span class="badge">held by tdgrind-1</span>'),
+        row(f'<span class="mono">TD-299</span><span>Snooze on the state rows the tool\'s clock does not own</span><span style="flex-grow: 1;"></span>{m("Medium · grinder")}'),
+        f'<div class="meta">+4 more</div>',
+        f'<div class="kind" style="margin-top: 8px;">design-first · 3</div>',
+        row(f'<span class="mono">TD-310</span><span>What the composer says about when a message is read</span><span style="flex-grow: 1;"></span>{m("Medium · designer")}'),
+        row(f'<span class="mono">TD-308</span><span>Add or remove a member from the team card</span><span style="flex-grow: 1;"></span>{m("Medium · designer")}'),
+        row(f'<span class="mono">TD-297</span><span>An i mark on every control</span><span style="flex-grow: 1;"></span>{m("Low · designer")}'),
+    ])
+    board = "".join([
+        row(f'<span class="pill plain s-needs">3d overdue</span><span>Merged, live look pending: the Org\'s new card (TD-095) — every card the same height…</span><span style="flex-grow: 1;"></span><span class="btn sm">Reply</span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span>', hover=True),
+        row(f'<span class="pill plain s-idle">due today</span><span>Decide: two trail rows or one for a permission answered twice (TD-079)</span><span style="flex-grow: 1;"></span><span class="btn sm">Reply</span><span class="btn sm">Snooze ▾</span><span class="btn sm">Done</span>'),
+    ])
+    now = "".join([
+        row(f'<a href="#" class="mono">tdgrind-1</a>{pill("working")}<span class="mono">TD-301 → #811</span><span style="flex-grow: 1;"></span>{m("pushing the branch for review · says 14s ago")}'),
+        row(f'<a href="#" class="mono">tdgrind-2</a>{pill("stalled")}<span class="mono">TD-296 → #437</span><span style="flex-grow: 1;"></span>{m("waiting on the reader · says 47m ago")}'),
+        row(f'<a href="#" class="mono">tdgrind-3</a>{pill("limited")}<span class="mono">TD-290</span><span style="flex-grow: 1;"></span>{m("says nothing")}'),
+    ])
+    return head("Repo") + f'''<div style="width: 1440px; min-height: 1320px; background: #f4f5f7; display: flex; flex-direction: column;">
+{topbar("Org")}
+<div style="padding: 20px 24px; display: flex; flex-direction: column; gap: 22px; max-width: 1100px; margin: 0 auto; width: 100%; box-sizing: border-box;">
+  <div style="display: flex; flex-direction: column; gap: 4px;">
+    <div style="display: flex; align-items: baseline; gap: 12px;"><a href="#" class="muted">← Org</a><span class="mono" style="font-size: 20px; font-weight: 600;">samscrape</span><span class="meta">kmaster · /home/kmaster/samscrape</span></div>
+    <div class="meta">serviced by <a href="#">samscrape-grind</a> · PRs read 2m ago · ledger read at its last commit, 14m ago · board read 30s ago</div>
+  </div>
+  {sec("Open PRs", "4 · oldest 3d", prs, "open PRs on the repo's remote, read every five minutes; the badge says whether the team's reader has been asked and has answered")}
+  {sec("Technical debt", "7 pickable · 3 design-first", tds, "the ledger's entries whose header reads Pickable: yes, and the ones whose Kind is design-first; held by — a member's progress claims the reference")}
+  {sec("Waiting on you", "2 due · 1 overdue", board, "the repo's board items that are due — the Inbox's own rows; Snooze, Done and Reply write the board as they do there")}
+  {sec("On now", "3 members", now, "every member of the servicing team that holds a claim or says what it is doing, from the records")}
+  <div class="note">Design §4.5 screen 9 (TD-170): <b>not a dashboard</b> — no chart, no history; the numbers are today's and the lists are the things themselves. The heading counts are the strip's numbers; <b>Open ledger</b> on the Technical debt heading opens the file through <span class="mono">open_in</span> and is drawn only when one is set. Reached from the strip on the team card, no tab (TD-123). Narrow: the same column, as the Inbox.</div>
 </div>
 </div>
 ''' + TAIL
@@ -1463,6 +1536,7 @@ files = {
     "FocusOrc.dc.html": focus_orchestrator(),
     "FocusReady.dc.html": focus_ready(),
     "NewSession.dc.html": new_session(),
+    "Repo.dc.html": repo_page(),
     "Legend.dc.html": legend(),
     "Resumable.dc.html": resumable(),
     "Message.dc.html": message_dialogs(),
@@ -1498,6 +1572,7 @@ LAYOUT = [
     ("Phone.dc.html", "Org — phone", 1),
     ("InboxPhone.dc.html", "Inbox — phone", 1),
     ("NewSession.dc.html", "New session", 1),
+    ("Repo.dc.html", "Repo", 1),
     ("Commands.dc.html", "Commands", 1),
     ("Settings.dc.html", "Settings", 1),
     ("SettingsDark.dc.html", "Settings — dark", 2),

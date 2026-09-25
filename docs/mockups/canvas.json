@@ -105,10 +105,18 @@
       "h": 1180
     },
     {
+      "file": "Repo.dc.html",
+      "title": "Repo",
+      "x": 1540,
+      "y": 4040,
+      "w": 1440,
+      "h": 1320
+    },
+    {
       "file": "Commands.dc.html",
       "title": "Commands",
       "x": 1540,
-      "y": 4040,
+      "y": 5460,
       "w": 1440,
       "h": 820
     },
@@ -116,7 +124,7 @@
       "file": "Settings.dc.html",
       "title": "Settings",
       "x": 1540,
-      "y": 4960,
+      "y": 6380,
       "w": 1440,
       "h": 2320
     },
