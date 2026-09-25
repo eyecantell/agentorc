@@ -27,3 +27,4 @@
 - [Scratch-worktree tests import the main checkout](scratch-worktree-tests-import-main-checkout.md) — pull main before running a branch's tests from a scratch worktree
 - [Retarget a stacked PR with the API](retarget-a-stacked-pr-with-the-api.md) — `gh pr edit --base` fails on projectCards; PATCH pulls/N, rebase --onto, delete the base last
 - [Summary-table conflicts resolve row-wise](summary-table-conflicts-resolve-row-wise.md) — one row per id after a rebase, never both sides; `ao --json` goes before the subcommand
+- [Designer run lessons 2026-09-25](designer-run-lessons-2026-09-25.md) — a steer is refused when the person inbox is full (board line instead); reviewer agents need explicit refs in a shared worktree; re-read main for the next TD number before a design PR

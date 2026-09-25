@@ -233,11 +233,15 @@ generated at launch), never by editing the person's own `settings.json` and neve
 sessions run in plain directories too, hand-started sessions stay untouched, and a repo's own hooks
 (dev-cadence's SessionStart guards) keep running alongside. **The layer also carries dev-cadence's
 one SessionStart line** — every adapter's launch does, §4.3 *A repo's start hooks are every adapter's to run* — (`scripts/cadence_hooks.sh --session-start`, guarded by `[ -x ]`; cadence
-§3), byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`); an unattended launch's layer also refuses the tool's own peer
+§3), byte-identical to dev-cadence's seed (a parity pair; `CADENCE_HOOK_LINE`). The line runs the **main checkout's** runner — the
+first entry of `git worktree list --porcelain`, computed live, so it holds in a container as on the host; dev-cadence's
+runner finds its children beside itself, and a consumer's copy is what its last sync carried — and falls back to the directory's own copy outside a git repo (dev-cadence
+TD-055 (b), 2026-09-25): a worktree on an older branch runs the current hook set against itself, where
+`$CLAUDE_PROJECT_DIR` alone ran that branch's copy. One known limit, recorded and not fixed since the bytes are the pair: a consumer that is itself a git submodule gets its parent's `.git/modules` gitdir as the first entry, so the set silently does not run there. An unattended launch's layer also refuses the tool's own peer
 messages (`crossSessionInbound: refuse`, §4.10 *The tool's own peer channel*, TD-064). It uses the cadence line when
 the session directory's own `.claude/settings.json` — the worktree's copy, the file the tool loads
-— does not already run those hooks: a worktree whose settings predate a hook change still runs the
-current set, and the line is a no-op outside a dev-cadence consumer. A directory that wires them
+— does not already run those hooks (either shape of the line counts as wired, so nothing runs twice); a directory
+that wires nothing gets the current set, and the line is a no-op outside a dev-cadence consumer. A directory that wires them
 itself gets the plain layer, or each hook would run twice; an older per-hook block counts as wiring
 them, so that worktree runs only the hooks its block names until its branch carries the runner
 line. Rules and tools stay in the repo, where a hand-started session, a human or a clone elsewhere

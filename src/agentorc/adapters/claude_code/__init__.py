@@ -137,10 +137,18 @@ def pretrust(cwd: Path, profile: Profile) -> bool:
 
 # dev-cadence's one SessionStart line (design §4.2; cadence §3, 2026-09-11). Byte-identical to the
 # line in dev-cadence `files/.claude/settings.json` — a parity pair: the repo's own settings carry
-# it for hand-started sessions, this layer carries it for the sessions agentorc starts, so a
-# worktree whose settings predate a hook change still runs the current set. The `[ -x ]` guard
-# makes it a no-op in a directory that is not a dev-cadence consumer.
-CADENCE_HOOK_LINE = 'f="$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi'
+# it for hand-started sessions, this layer carries it for the sessions agentorc starts. Since
+# 2026-09-25 (dev-cadence TD-055 (b)) the line runs the MAIN checkout's runner — the first entry of
+# `git worktree list --porcelain`, computed live, so it is right in a container as on the host — and
+# dev-cadence's runner finds its children beside itself (its PR #101, 2026-09-22; a consumer's copy
+# under scripts/ is what its last sync carried), so a worktree on an older branch runs the current
+# hook set against itself; `$CLAUDE_PROJECT_DIR` alone resolved to that branch's own copy. In the
+# main checkout the two are the same directory; outside a git repo `r` is empty and the old path
+# plus the `[ -x ]` guard keep it a no-op, as in a directory that is not a dev-cadence consumer.
+CADENCE_HOOK_LINE = (
+    "r=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p'); "
+    'f="${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh"; if [ -x "$f" ]; then "$f" --session-start; fi'
+)
 CADENCE_HOOK_TIMEOUT = 150  # > 5 children × the runner's 25 s child timeout
 # A session directory whose own SessionStart already runs dev-cadence's hooks — the one runner
 # line, or the pre-2026-09-11 per-hook block — gets the plain layer, or each hook would run twice.
