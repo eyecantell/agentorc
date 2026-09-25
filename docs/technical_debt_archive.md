@@ -1238,3 +1238,22 @@ Done when two agents can be open in two OS windows at once, alt-tab moves betwee
 **Done when** a one-press Resume with no prompt shows `idle` within a tick, never `stalled?`, and the doorbell rings it for mail that lands after the resume.
 
 **Related:** TD-090 (the `compact` exemption, the same shape), TD-081 / TD-145 (Resume), TD-153 (the doorbell needs a hook-confirmed idle), §4.2.
+
+## TD-139: The shape asked of the senders — the presets' paragraph, the designer brief, the composer placeholder, `ao msg`'s warning
+
+**Priority:** Medium
+**Added:** 2026-09-24 (TD-127's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-25 — the three presets, the warning and the placeholder in PR #561, the designer's brief in PR #563.
+
+**Location:** `src/agentorc/briefs/techlead.md`, `manager.md`, `grinder.md` (the paragraph, in the same words, beside each brief's *ao msg person* line; the techlead's beside *An `ask`: only when the answer is already written down*, with *a `--source` reply's first line is its verdict*), `docs/briefs/designer-ao-1.md` (the same paragraph under *How much Paul sees* — `docs/briefs/**` is held, so the techlead reads this PR, §4.9b; split it from the rest if that wait is long), `src/agentorc/cli.py` (`ao msg`: when the addressee is `person`, or the message is a `--source` reply, and the first paragraph is over `FIRST_PARA_WORDS` = 60 words or the text has no blank line and is over `FOLD_CHARS` = 300 characters, print *the person reads the first paragraph: n words — say what it is about, what you decided or ask, what they must do* to stderr and send anyway), `src/agentorc/ui/templates/base.html` (the Message / Reply dialog's `#mailtext` placeholder: *first what you want, then why — …*), `tests/test_cli.py`, `tests/test_primer.py` (the pointers, if the briefs' headings move).
+
+**Why:** the row can only fold what the sender shaped; the rule lives with the writers, and a warning at send is the one moment the writer can still fix it.
+
+**Resolved:** 2026-09-25 (PRs #561 and #563, `grinder-ao-2`) — the paragraph in `techlead.md`, `manager.md`, `grinder.md` and `docs/briefs/designer-ao-1.md`; `ao msg`'s `shape_warning` on `render.paragraph_break` (fence- and CRLF-aware, the Inbox row's own blank line); the Message / Reply dialog's placeholder. Tests in `tests/test_cli.py`. Design §4.10 *How a message to a person is written* carries the lasting content.
+
+**Done when** (1) each of the four briefs carries the paragraph in those words; (2) `ao msg person` with a 90-word first paragraph prints the warning and the mail arrives; a shaped message prints nothing; a `--source` reply is checked the same way; (3) the Message / Reply dialog's placeholder reads the line; (4) the designer-brief change waited for the techlead's read or was split out; (5) `pdm run test` passes; (6) TD-127 is marked built for the senders' half.
+
+**Related:** TD-127 (the design), TD-138 (the page half), TD-125 (the wind-down report, the same rule applied once), TD-114 (the briefs' template — the paragraph goes where the mechanics live, not in a repo's supplement).

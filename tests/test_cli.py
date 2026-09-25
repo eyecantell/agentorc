@@ -919,10 +919,12 @@ SHAPE = (
 
 def test_the_presets_ask_for_the_shape_of_a_message_to_the_person():
     """TD-139 (design §4.10 *How a message to a person is written*): the rule lives with the writers,
-    in the same words in every preset whose session writes to the person."""
+    in the same words in every preset whose session writes to the person, and in the designer's."""
     root = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "briefs"
     for name in ("techlead.md", "manager.md", "grinder.md"):
         assert SHAPE in (root / name).read_text(encoding="utf-8"), name
+    designer = pathlib.Path(__file__).parents[1] / "docs" / "briefs" / "designer-ao-1.md"
+    assert SHAPE in designer.read_text(encoding="utf-8")  # the fourth writer, whose brief is the repo's
 
 
 @pytest.mark.unit
