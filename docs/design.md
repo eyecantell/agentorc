@@ -547,9 +547,9 @@ lands (TD-112). `shell` runs no hooks: it is not an agent.
 
 **Spend per turn** (TD-128; designed 2026-09-25, reconciled the same day; not built — TD-151). For
 a `metered` profile (§4.2a) an adapter reports `spend(profile, cursors) -> (turns, cursors)` — `cursors` a byte offset
-per transcript path, `turns` a list of `Turn(at, source, offset, model, input, output,
-cache_read, cache_write, cost)`, `source` and `offset` naming the transcript and the entry's
-position in it — from the tool's own records: Claude Code: the `usage` on each `assistant` entry of
+per transcript path, `turns` a list of `Turn(at, id, source, offset, model, input, output,
+cache_read, cache_write, cost)`, `id` the entry's own (Claude Code's `uuid`), `source` and `offset`
+naming the transcript and the entry's position in it — from the tool's own records: Claude Code: the `usage` on each `assistant` entry of
 every transcript under the profile's config directory past its cursor, sessions agentorc did not
 start included (a plain `claude` in a shell on the same key spends the same money) and subagent
 turns included (they are billed), never the whole file each tick and never a grep — a cursor past
@@ -614,9 +614,11 @@ Python, one process per host, started by the same systemd user unit. Responsibil
   held reading does, and a turn is counted once, because a cursor moves only after the row is
   written and a turn at or before its transcript's cursor is dropped: the test is per transcript,
   never a time, since two profiles on one account read from two directories whose turns do not
-  interleave by `at`. Beside each cursor the ledger keeps that transcript's last ledgered `at`,
-  which is monotonic within one file: a transcript read from 0 again after a rewrite (§4.3) has
-  its turns at or before that `at` dropped, so a rewrite neither re-bills nor loses a turn. On the
+  interleave by `at`. Beside each cursor the ledger keeps the last ledgered entry's `at` and `id`
+  for that transcript: `at` never decreases within one file but two entries may share it, so a
+  transcript read from 0 again after a rewrite (§4.3) has every entry before that `at` dropped,
+  and at that `at` the entries in file order up to and including the one with that `id`, and a
+  rewrite neither re-bills nor loses a turn. On the
   first tick that finds a profile metered the cursors start at each transcript's end, so a key that
   ran unmetered for months does not bill its history to the first day; a transcript that first
   appears on a later tick starts at offset 0; a row's `cost` is written once, at that tick's prices, and a later
