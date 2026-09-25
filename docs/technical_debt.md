@@ -98,6 +98,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-150 | Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session | Medium | Open — designed, pickable |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed, pickable |
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Open — designed, pickable |
+| TD-153 | Sessions poll for mail in foreground loops instead of going idle to be rung: the doorbell is built, and nothing tells a session it will be woken | High | Open |
+| TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Open — design-first |
+| TD-155 | A resumed session that starts no turn reads `working` until it stalls: `SessionStart` with source `resume` lands at the composer and fires no `Stop` | Medium | Open |
 
 
 ---
@@ -1813,3 +1816,65 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** `ao new --unattended --at +2m -d <repo> --worktree w1 w1` shows a ◷ *scheduled · starts <t>* card at once, refuses a second session in that directory meanwhile, becomes a `working` session within a tick of the instant with `restarts` carrying `why: start`; `ao at w1 now` starts one early; Cancel on a scheduled card forgets it and frees the slot; `--at` without `--unattended` is refused; the At field on the New session form does the same; TD-026 is archived once TD-133 is built or Paul closes it.
 
 **Related:** TD-026 (the design), TD-133 (the team's reset start, the other start rule), TD-103 (the launch record and the replay this reuses), TD-081 (Resume, the other create-from-record), §9 invariants 2 and 5.
+
+## TD-153: Sessions poll for mail in foreground loops instead of going idle to be rung: the doorbell is built, and nothing tells a session it will be woken
+
+**Priority:** High
+**Added:** 2026-09-25 (raised by Paul, watching the designer loop on its inbox)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built.
+
+**Location:** `src/agentorc/skill.md` (the *Mail* section — the doorbell is named there as a thing that happens, never as the reason to end a turn), `docs/briefs/designer-ao-1.md` and `docs/briefs/grinder-ao-1.md` (*"never wait for input, never end a turn to ask a question"*, which a session reads as *never be idle*), design §4.8 (the role presets the briefs are cut from) and §4.10 (*How a Claude Code session is told it has mail*), `src/agentorc/cli.py` (`ao wait`'s and `ao inbox --unread`'s reply when there is nothing), `src/sessionorc/agent.py` (`_ring_doorbells`, `_bell_blocked` — the mechanism, already right).
+
+**Why:** the mechanism that makes waiting free exists and was never used. The doorbell (§4.10, TD-052 step 7) rings a hook-confirmed `idle` session when unread mail lands, within its wake budget; a `steer`'s bound running out mails its sender a `system` note that wakes it **uncharged** (`_lapse_or_expire`); `ao wait` blocked in the host agent returns on mail. So a session waiting on a reply has nothing to do but end its turn. The designer did the opposite for a whole run: from 2026-09-24 20:28Z to 2026-09-25 13:56Z its transcript holds **110** foreground calls of `for i in 1..9; do ao wait --timeout 60; ao inbox --unread; done` (nine minutes each, the Bash tool's ten-minute ceiling), plus background copies (three were still running when the run ended). Each return is a turn on the strongest model with the full context re-read, to learn *unread=0*; and because the session was `working` throughout, the doorbell — which rings only a hook-confirmed idle — never rang once (zero `[agentorc] you have N unread` lines in the transcript). The loop is the one thing that defeats the doorbell, and the brief pushed it into the loop: *never wait for input* was written against asking a person in the pane, and reads as *never be idle*. Nothing the session could read said *end the turn; you will be rung*.
+
+**Fix:** one slice, no `src/sessionorc/**` change (no techlead hold).
+
+1. **Say it where every session reads.** `ao --skill`'s *Mail* section gains, above the doorbell line: **waiting on mail is ending the turn** — a reply, a `steer`'s lapse at its bound and any other mail rings you (the doorbell) when you are idle, within your wake budget; a foreground or background loop on `ao wait` or `ao inbox` keeps you `working`, and a working session is never rung, so the loop costs a turn per pass and delays the mail it waits for. `ao wait` is for a **manager's** round (members' state changes); one call with its timeout, never a loop. The file stays at its line budget by cutting words elsewhere in the section.
+2. **The briefs and the presets.** *Never wait for input, never end a turn to ask a question* becomes *never end a turn to ask a person a question in the pane — mail it, then end the turn: you are woken when the answer lands*. Same edit in `docs/briefs/designer-ao-1.md`, `grinder-ao-1.md`, the archived copies left alone, and design §4.8's preset text they are cut from (a design edit: one sentence, the history line dated).
+3. **The reply that says it.** `ao wait` returning on its timeout and `ao inbox --unread` finding nothing both end with one fixed line: *nothing unread — end your turn; you are rung when mail lands*. It is the same typing-free channel as *you owe 1 outcome* (§4.10), and it is what a session in a loop actually reads.
+4. **A test** that the skill file carries the sentence, and one on the CLI line.
+
+**Done when** a session that has sent a `steer` or an `ask` and has nothing else to do ends its turn, the record reads `idle`, and the reply rings it; the designer's next run shows no `ao wait`/`ao inbox` loop in its transcript; and a grinder asked in review why it is idle can point at the skill sentence.
+
+**Related:** TD-052 (step 7, the doorbell; step 3, `wait` in the host agent), §4.10 (*How a Claude Code session is told it has mail*, the wake budget), TD-120 (the designer role and its brief), TD-072 / TD-141 (mail before wind-down: the other place a session is told what mail does to its turn).
+
+## TD-154: Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: he resumed the designer to read what it had done)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open — nothing designed. §4.5a has no control that opens a transcript: an exited record offers **Resume**, **Resume with changes…**, **New session here** and **Forget** (*Focus (exited / closed)*), and the Resumable list is a list of things to resume.
+
+**Location:** design §4.5a (*Focus (exited / closed)*, *Resumable*, the Focus header), §4.3 (`transcript_path` on the adapter contract — Claude Code's answer is the JSONL under `~/.claude/projects/`, already read for the model and the resume id), `src/agentorc/adapters/claude_code/__init__.py` (`transcript_path`), `src/agentorc/ui/` (a page or panel), `src/agentorc/cli.py` (`ao transcript <id>`).
+
+**Why:** the only way a person can read what a finished session did is to resume it, which is the wrong tool three times over: it creates a live session and a record (and today leaves the record reading `working`, TD-155), it is a lifecycle event a manager may act on, and it has to be closed again. Resuming a Claude Code session spends no tokens until a prompt is sent, so the cost is not money; it is a live thing the person did not want. The transcript is a file on the host that the adapter already locates; a read of it is a read, gated by nobody (§9 invariant 11). The raw file is one JSON object per line, so *open in VS Code* on the file alone (the §2 jump-out, `vscode://file/<path>`) is not a reading surface — it is the escape hatch beside one.
+
+**What the design round has to settle:** (a) **the surface** — a read-only **Transcript** page in the UI (turns folded: prompt, assistant text, tool calls collapsed to their first line, the way the pane shows them) reached from the Focus header on any state and from each Resumable row, with *open in VS Code* beside it for the raw file; or the raw file only; (b) **`ao transcript <id> [--raw] [-n N]`**, the same rendering on the CLI, which is what a lead reading a quiet worker (TD-091's moment) would use; (c) **which record** — an exited record holds `adapter_id`; a `closed` and a superseded one (Resume replaces in place, TD-081) should still reach the transcript they came from; (d) **the multi-host case** — the file is on the record's host, read through the node as `tail` is (§4.4a), never copied to the home; (e) the mockup.
+
+**Done when** Paul can read the designer's last run from its exited card without a session starting, and `ao transcript designer-ao-1` prints it.
+
+**Related:** TD-081 (Resume, what this is not), TD-145 (a Resume's record), TD-155 (why a resume misleads today), TD-091 (context near its limit: the other reader of the transcript), §4.5a *Resumable*, §4.3 `transcript_path`.
+
+## TD-155: A resumed session that starts no turn reads `working` until it stalls: `SessionStart` with source `resume` lands at the composer and fires no `Stop`
+
+**Priority:** Medium
+**Added:** 2026-09-25 (seen on the designer's record after Paul's one-press Resume)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built.
+
+**Location:** `src/agentorc/adapters/claude_code/hook.py` (`STATE_EVENTS` maps every `SessionStart` to `working`; `SESSION_START_NOT_A_START` exempts `compact` only, TD-090), `src/sessionorc/agent.py` (`STALL_AFTER`, `_bell_blocked` — *not hook-confirmed idle*), design §4.2.
+
+**Why:** `claude --resume <id>` prints the old conversation and waits at the composer. Its `SessionStart` (source `resume`) is reported as `working` with confidence `hook`, and no turn follows, so no `Stop` ever reports `idle`. Seen 2026-09-25 14:06Z: the designer resumed by Paul reads `working (hook)` with an empty composer (`ao explain`: *no screen rule matched*), and at `STALL_AFTER` (20 minutes) it will read `stalled?` — an alert on a session that is simply idle. Two things follow from the wrong state: the doorbell never rings it (it rings hook-confirmed idle only), so mail for a resumed session waits until someone types; and a manager's `wait` sees a member `working` that is doing nothing. A fresh `SessionStart` (source `startup`) is a different case — `ao new` types the prompt at once, so `working` is right there — and `clear` is already handled as a continuation.
+
+**Fix:** one slice in the adapter (no techlead hold): `SessionStart` with source `resume` reports `idle` at confidence `hook` (Claude Code's resume brings the session to its composer and nothing else); a `--prompt` given with the resume is typed by the host agent afterwards and reports `working` through `UserPromptSubmit` as any send does. A test on the hook mapping per source: `startup` → working, `resume` → idle, `compact` → unchanged, `clear` → continuation. Check on the live designer record after the promote: `ao explain` reads `idle (hook)` within a tick of the resume.
+
+**Done when** a one-press Resume with no prompt shows `idle` within a tick, never `stalled?`, and the doorbell rings it for mail that lands after the resume.
+
+**Related:** TD-090 (the `compact` exemption, the same shape), TD-081 / TD-145 (Resume), TD-153 (the doorbell needs a hook-confirmed idle), §4.2.
