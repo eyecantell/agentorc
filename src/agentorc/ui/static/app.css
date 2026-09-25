@@ -143,7 +143,7 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage.msgpage { max-width: 1100px; }
 .msgpage .msgthread .threadrow { background: transparent; }
 .inboxpage .pagelink { color: var(--link); }
-.inboxpage .mailrow[data-page] > .body { cursor: pointer; }
+.inboxpage:not(.msgpage) .mailrow[data-page] > .body { cursor: pointer; }  /* the list only: on the page it is the page */
 .inboxwrap { display: grid; grid-template-columns: 200px minmax(0, 1100px); gap: 24px; align-items: start; }
 .inboxcol { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .rail { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 12px; }

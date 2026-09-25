@@ -1344,13 +1344,18 @@
       location.href = `/inbox?team=${encodeURIComponent(b.dataset.team || "none")}`;
     });
     // an answer here is the answer (the row's own controls and RPCs); when it takes the entry out
-    // of the section it was in, the page returns to the list, and otherwise shows what it is now
+    // of the section it was in, the page returns to the list, and otherwise shows what it is now.
+    // Only after a press of the entry's own: the top bar's 20 s poll calls this hook too, and a page
+    // being read is never reloaded under the reader — nor while the composer is open over it.
     const sec = $(".msgentry .mailrow") && $(".msgentry .mailrow").dataset.section;
+    let answered = false;
+    document.addEventListener("click", (e) => { if (e.target.closest(".msgentry [data-act]")) answered = true; }, true);
     AO.refreshInboxPage = async () => {
-      let got = null;
-      try { const r = await fetch("/api/person/inbox"); if (r.ok) got = await r.json(); } catch (e) { /* stay */ }
+      const got = await AO.refreshInboxCount();
+      if (!answered || document.querySelector("dialog[open]")) return;
+      answered = false;
       const still = got && got.sections && (got.sections[sec] || []).includes(page.dataset.msg);
-      if (got && !still) location.href = page.dataset.back; else location.reload();
+      if (got && !got.agent_down && !still) location.href = page.dataset.back; else location.reload();
     };
   };
 
