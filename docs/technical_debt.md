@@ -1358,7 +1358,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Kind:** build
 **Pickable:** no — designed; the build is TD-151, and this entry archives with it
 
-**Status:** Open — **designed 2026-09-25 (the designer, PR #TBD-128), the four points of the Fix as written:** §4.2a *How a profile is billed* (`billing: subscription | metered {input, output}`; spend summed per profile over `day` / `week` / `month` into a reading of the usage shape; a team or project budget rejected by §9 invariant 9), §4.3 *Spend per turn* (`spend(profile)` from the tool's own records, *spend unknown* said rather than nothing), §6 *Usage gate* (an amount per window — money or tokens — as the line, the same pause, one FYI note at eight tenths), §4.5a the chip's metered form, §5 `usage_gate:` amounts. Steered to Paul. Build: TD-151. Was: Open. The Settings page (TD-100 (4), 2026-09-25) reserves a budget row per metered profile under Usage, drawn disabled until this entry designs what it holds. Every profile today is a subscription login, whose binding budget is the adapter's usage windows (§4.2a, §6 *Usage gate*, TD-100). A profile on an API key (`ANTHROPIC_API_KEY`), on a hosted open-weights model behind an OpenAI-compatible endpoint, or on a second adapter (TD-112) billed the same way reports no window: the chip draws nothing, the gate never trips, and a night's unattended run has no bound but the card on file.
+**Status:** Open — **designed 2026-09-25 (the designer, PR #547), the four points of the Fix as written:** §4.2a *How a profile is billed* (`billing: subscription | metered {input, output}`; spend summed per profile over `day` / `week` / `month` into a reading of the usage shape; a team or project budget rejected by §9 invariant 9), §4.3 *Spend per turn* (`spend(profile)` from the tool's own records, *spend unknown* said rather than nothing), §6 *Usage gate* (an amount per window — money or tokens — as the line, the same pause, one FYI note at eight tenths), §4.5a the chip's metered form, §5 `usage_gate:` amounts. Steered to Paul. Build: TD-151. Was: Open. The Settings page (TD-100 (4), 2026-09-25) reserves a budget row per metered profile under Usage, drawn disabled until this entry designs what it holds. Every profile today is a subscription login, whose binding budget is the adapter's usage windows (§4.2a, §6 *Usage gate*, TD-100). A profile on an API key (`ANTHROPIC_API_KEY`), on a hosted open-weights model behind an OpenAI-compatible endpoint, or on a second adapter (TD-112) billed the same way reports no window: the chip draws nothing, the gate never trips, and a night's unattended run has no bound but the card on file.
 **Location:** design §4.2a (profiles), §4.3 (the adapter's `usage()`), §6 *Usage gate*, §4.5a (the usage chip)
 
 **Why:** open models and API billing are where a second tool is most likely to come from, and an unattended team on a metered profile is the case where a runaway costs real money rather than a window.
@@ -1777,7 +1777,7 @@ Two things are missing, and the design round chooses between them or takes both:
 ## TD-151: Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip
 
 **Priority:** Low
-**Added:** 2026-09-25 (the designer; TD-128's design round, PR #TBD-128)
+**Added:** 2026-09-25 (the designer; TD-128's design round, PR #547)
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
