@@ -339,7 +339,7 @@ the pane's limit message is the scraped fallback.
   over working members orphans them; the way to end a team is its Stop (§4.9).
 - **Outcomes reported** (§4.10 *Outcomes*, TD-079; built): nothing the person answered is still
   owed an outcome.
-- **Mail read** (TD-072; designed 2026-09-24, not built — TD-141): no unread entry in the
+- **Mail read** (TD-072; designed 2026-09-24, built — TD-141): no unread entry in the
   session's inbox — the same fact `ao progress none` is refused on (§4.9a), carried here for a
   session that exits some other way and never declares at all.
 - The ledger/attention board touched since the session started (dev-cadence repos).
@@ -3207,7 +3207,7 @@ as unseen idle (§4.2, TD-017); a ninth state for *idle with nothing to be idle 
 to be derived by the core, which is what the core cannot do.
 
 **The declaration is refused while the session has unread mail** (TD-072; designed 2026-09-24,
-not built — TD-141; the parts were proposed on 2026-09-18 and designed beside TD-079 as built, as
+built by TD-141; the parts were proposed on 2026-09-18 and designed beside TD-079 as built, as
 the person asked). Winding down is the last moment anyone reads that inbox, and what is unread at
 it is a `note` nobody triaged — noise on a dead card for as long as the record lives — or an `ask`
 whose sender is waiting on a run that is about to end. The refusal names the count and the
@@ -4481,7 +4481,7 @@ The evidence to re-read is the same: the records of a night's team.
 1. **Unread** from the moment it lands. It never ages out *while the record lives*: an unread
    `note` or `reply` waits as long as the session it was addressed to does, and once that session
    is `exited` or `closed` it ages out as a read one does (stage 3; TD-072, designed 2026-09-24,
-   not built — TD-141). An `ask`'s bound runs from when it was sent, and expiry does not wait
+   built by TD-141). An `ask`'s bound runs from when it was sent, and expiry does not wait
    for it to be read. Unread entries are what the mailbox bound counts.
 2. **Read** when, and only when, `ao inbox` prints the entry to its caller — in any form,
    `--unread` and `--json` included. That is all `read_at` means: delivered into a turn. `ao wait`

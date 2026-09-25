@@ -926,6 +926,15 @@ def test_the_skill_and_the_presets_say_waiting_on_mail_is_ending_the_turn():
             assert "mail it, then end the turn" in text, p.name
 
 
+def test_the_grinder_preset_reads_the_inbox_before_a_claim_and_before_the_declaration():
+    """TD-141 (design §4.9a): the briefs say it twice — before a claim and before the declaration —
+    and the refusal is what holds when they are not read."""
+    text = (pathlib.Path(__file__).parents[1] / "src/agentorc/briefs/grinder.md").read_text()
+    claim, declare = text.index("Read your inbox before claiming"), text.index("read your inbox once more")
+    assert claim < declare < text.index('ao progress none --why "<what you searched')
+    assert "refused while mail is unread" in text
+
+
 def test_the_briefs_and_the_skill_say_to_report_an_outcome(tmp_path):
     """TD-079 step 3 (design §4.10 *Outcomes*): a command a session is never told to run is
     half-shipped. Every brief a session is started from — the package's role templates and this
