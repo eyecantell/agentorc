@@ -74,7 +74,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-125 | A team's wind-down report is a counted board line for the person, most of it a diagnostic and a pointer at a PR that waits on the reader, not on the person | Medium | Preset done (PR #518); telling samscrape and dev-cadence is the anchor's |
 | TD-126 | A board line has Open board, Done and Snooze but no Reply: an instruction back to the sender means editing the file and waiting for a session to read it | Medium | Designed 2026-09-24 (a cloud session with Paul) — the build is TD-142; the reader's fields are dev-cadence's |
 | TD-127 | Inbox entries to the person are written for another agent: dense, dry, the decision buried under the reading; the row draws the whole text as one block | Medium | Designed 2026-09-24 (a cloud session with Paul) — the build is TD-138, TD-139 |
-| TD-128 | A profile billed per token (an API key, a hosted open model) has no usage window, so the usage gate and the chip have nothing to read and nothing bounds its spend | Low | Open — design first |
+| TD-128 | A profile billed per token (an API key, a hosted open model) has no usage window, so the usage gate and the chip have nothing to read and nothing bounds its spend | Low | Open — designed; the build is TD-151, and this entry archives with it |
 | TD-129 | The Inbox has no page for one message, and its filters are one typed box: a row is read where it is listed, and team and kind are not visible controls | Medium | Designed 2026-09-24 (a cloud session with Paul) — the build is TD-135, TD-136, TD-137 |
 | TD-130 | The pages set 13 px body text, 12 px mail bodies and 11 px small print: small for comfortable reading | Medium | Designed 2026-09-25 (a cloud session with Paul) — the build is TD-144; the Done when is Paul's read of the live page |
 | TD-131 | Mail, the board and the records are JSON and Markdown files read whole: fine at today's size, and no answer to search over history, counts per filter, or a retention longer than twelve hours | Low | Decision (Paul) — not yet; the trigger is written down |
@@ -96,6 +96,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-148 | Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab | Medium | Open — designed, pickable after TD-146 |
 | TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Open — pickable |
 | TD-150 | Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session | Medium | Open — designed, pickable |
+| TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed, pickable |
 
 
 ---
@@ -1353,18 +1354,18 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Priority:** Low
 **Added:** 2026-09-24 (numbered TD-126 until the rebase found main's TD-126; Paul, reading the Paperclip survey: *make a note to handle API (pay per token) budgets at some point, especially as open source models gain traction*; session `research_paperclip`)
-**Owner:** designer
-**Kind:** design-first
-**Pickable:** no — design first; nothing runs on a metered profile today
+**Owner:** grinder
+**Kind:** build
+**Pickable:** no — designed; the build is TD-151, and this entry archives with it
 
-**Status:** Open. The Settings page (TD-100 (4), 2026-09-25) reserves a budget row per metered profile under Usage, drawn disabled until this entry designs what it holds. Every profile today is a subscription login, whose binding budget is the adapter's usage windows (§4.2a, §6 *Usage gate*, TD-100). A profile on an API key (`ANTHROPIC_API_KEY`), on a hosted open-weights model behind an OpenAI-compatible endpoint, or on a second adapter (TD-112) billed the same way reports no window: the chip draws nothing, the gate never trips, and a night's unattended run has no bound but the card on file.
+**Status:** Open — **designed 2026-09-25 (the designer, PR #547), the four points of the Fix as written:** §4.2a *How a profile is billed* (`billing: subscription | metered {input, output}`; spend summed per profile over `day` / `week` / `month` into a reading of the usage shape; a team or project budget rejected by §9 invariant 9), §4.3 *Spend per turn* (`spend(profile)` from the tool's own records, *spend unknown* said rather than nothing), §6 *Usage gate* (an amount per window — money or tokens — as the line, the same pause, one FYI note at eight tenths), §4.5a the chip's metered form, §5 `usage_gate:` amounts. Steered to Paul. Build: TD-151. Was: Open. The Settings page (TD-100 (4), 2026-09-25) reserves a budget row per metered profile under Usage, drawn disabled until this entry designs what it holds. Every profile today is a subscription login, whose binding budget is the adapter's usage windows (§4.2a, §6 *Usage gate*, TD-100). A profile on an API key (`ANTHROPIC_API_KEY`), on a hosted open-weights model behind an OpenAI-compatible endpoint, or on a second adapter (TD-112) billed the same way reports no window: the chip draws nothing, the gate never trips, and a night's unattended run has no bound but the card on file.
 **Location:** design §4.2a (profiles), §4.3 (the adapter's `usage()`), §6 *Usage gate*, §4.5a (the usage chip)
 
 **Why:** open models and API billing are where a second tool is most likely to come from, and an unattended team on a metered profile is the case where a runaway costs real money rather than a window.
 
-**Fix, design first:** (1) a profile says how it is billed — `subscription` (today's windows) or `metered`, with a price per million tokens in and out where the adapter cannot report cost itself. (2) The adapter reports spend per turn where it can (Claude Code's transcript `usage` records; the endpoint's own response for others). The home sums spend per profile per window (day, week, month), in the same shape as a usage reading, so the chip and the gate read one kind of thing. (3) A reserve on a metered profile is an amount per window, with a warning line and a hard stop, the same pause the usage gate sends today. Paperclip's generic budget row (`scope, metric, window, amount, warnPercent, hardStop`; ADR 2026-09-24 item 3) is the shape to weigh, keyed on the profile and optionally the team. (4) A self-hosted model has no price. Its limit is throughput or GPU time, so `metered` with a zero price must still show tokens, and a reserve may be in tokens rather than money.
+**Fix, design first:** (1) a profile says how it is billed — `subscription` (today's windows) or `metered`, with a price per million tokens in and out where the adapter cannot report cost itself. (2) The adapter reports spend per turn where it can (Claude Code's transcript `usage` records; the endpoint's own response for others). The home sums spend per profile per window (day, week, month), in the same shape as a usage reading, so the chip and the gate read one kind of thing. (3) A reserve on a metered profile is an amount per window, with a warning line and a hard stop, the same pause the usage gate sends today. Paperclip's generic budget row (`scope, metric, window, amount, warnPercent, hardStop`; ADR 2026-09-24 item 3) is the shape to weigh, keyed on the profile and optionally the team (the team scope was rejected in the design round, 2026-09-25: §9 invariant 9). (4) A self-hosted model has no price. Its limit is throughput or GPU time, so `metered` with a zero price must still show tokens, and a reserve may be in tokens rather than money.
 
-**Related:** TD-100 (the usage gate), TD-122 (one reading per account), TD-112 (the second adapter), [ADR 2026-09-24](decisions/2026-09-24-paperclip.md) item 3, [ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md) (dollars at list price were not wanted *on a subscription*; this is the case where they are the bill).
+**Related:** TD-151 (the build), TD-100 (the usage gate), TD-122 (one reading per account), TD-112 (the second adapter), [ADR 2026-09-24](decisions/2026-09-24-paperclip.md) item 3, [ADR 2026-09-20](decisions/2026-09-20-session-desk-neighbours.md) (dollars at list price were not wanted *on a subscription*; this is the case where they are the bill).
 
 ## TD-129: The Inbox has no page for one message, and its filters are one typed box: a row is read where it is listed, and team and kind are not visible controls
 
@@ -1772,3 +1773,22 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** a session with a claimed reference and an open PR on its `tdNNN-*` branch shows *claimed · in review #n* under *in review* with no Drop on its face; Drop on an in-progress row sits under `more ▾`, its confirm names the lease, the branch and who can claim again, and the session's inbox holds the note after the press; the panel's heading carries the *i* mark and the note under the list is gone; TD-143 is archived.
 
 **Related:** TD-143 (the design), TD-056 (a claim is a lease), TD-028 (declared and derived), TD-045 (a derived claim's PR), TD-124 (keys: none on this panel yet).
+
+## TD-151: Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip
+
+**Priority:** Low
+**Added:** 2026-09-25 (the designer; TD-128's design round, PR #547)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — designed, nothing built; no metered profile runs today, so the build is proven on the test adapter and on a Claude Code profile with an API key when Paul declares one. Design: §4.2a *How a profile is billed*, §4.3 *Spend per turn*, §6 *Usage gate* (the amount reserve), §4.5a *usage chip*, §5 `usage_gate:`.
+
+**Location:** `src/agentorc/profiles.py` and `~/.agentorc/profiles.yml` (`billing`, the prices, validation), `src/agentorc/adapters/claude_code/` (`spend()` from the transcript's top-level `assistant` entries' `usage`, read on the tick beside the model in use), `src/agentorc/adapters/__init__.py` (the contract: `spend`, `Turn`), `src/sessionorc/agent.py` (the sum per profile per window into `Usage(windows=[…])`, the `pct` from the reserve's amount, the pause at the amount, the note at eight tenths, `next` at the boundary), `src/sessionorc/settings.py` (an amount reserve: `$n`, `n tok`, `nM tok`; refused against a subscription profile and a percent against a metered one), `src/agentorc/cli.py` (`ao gate` takes the same values; `ao status -v` prints spend), `src/agentorc/ui/app.py` and the top bar (the chip's metered form, *spend unknown*), the Settings page's budget row (TD-148), `tests/`.
+
+**Why:** an unattended team on an API key or a hosted open model has no window to trip the gate, so a night's run is bounded by nothing but the card on file (TD-128); open models and API billing are where a second tool is most likely to come from.
+
+**Fix:** four slices; the ones in `src/sessionorc/**` are read by the techlead (§4.9b). (1) The profile: `billing` parsed and validated, `metered` with optional prices; `ao roles` / the profile line say *metered*. (2) The adapter: `spend()` for Claude Code from the transcript (`usage.input_tokens`, `output_tokens`, cache reads counted as input at the adapter's discretion, said in a comment), `reason` when the transcript is unreadable; a test adapter that reports turns. (3) The home: the sum per profile per window, the reading in the usage shape with `resets` at the boundary and `pct` from the amount, the gate's pause and resume at the roll, the eight-tenths note once per window, `ao status -v`'s line. (4) The chip, `ao gate`, `settings.yml`'s amounts, the Settings page's row enabled.
+
+**Done when** a profile declared `metered` with prices and a `{day: "$5"}` reserve, on the test adapter emitting turns, shows *day $4.10 / $5* on the chip, files the FYI note at $4, pauses its unattended sessions at $5 with the gate's pause prompt and resumes them at midnight; a priceless metered profile shows tokens; a percent reserve on it is refused by `ao gate` naming the billing; a subscription profile is untouched by all of it; TD-128 is archived.
+
+**Related:** TD-128 (the design), TD-100 (the usage gate and the Settings page), TD-122 (one reading per account — a metered reading is per profile), TD-112 (the second adapter), TD-148 (the Settings page's build), [ADR 2026-09-24](decisions/2026-09-24-paperclip.md) item 3.
