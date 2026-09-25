@@ -39,6 +39,7 @@ from typing import Any
 
 import yaml
 
+from agentorc import repoconfig
 from sessionorc import hosts, paths
 from sessionorc.models import GRANTS
 
@@ -183,7 +184,9 @@ def load(path: Path | None = None) -> Org:
     for tname, raw in _mapping(data.get("teams"), f"{label}: teams").items():
         org.teams[str(tname)] = _team(str(tname), raw, f"{label}: teams.{tname}", source=path)
     for rname, raw in _mapping(data.get("roles"), f"{label}: roles").items():
-        org.roles[str(rname)] = dict(_mapping(raw, f"{label}: roles.{rname}"))
+        # checked per key as a repo's `roles:` is (TD-149 (4)): a typo is a line naming the key when
+        # the file is read, never a preset that silently gains a key nothing reads
+        org.roles[str(rname)] = repoconfig._role_block(str(rname), raw, f"{label}: roles")
     _validate(org, label)
     return org
 

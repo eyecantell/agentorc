@@ -509,6 +509,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-100 (4), Paul: *agreed on the first 3*): §5 became one file for the settings a person moves — `settings.yml`, home-owned, four keys `usage_gate`, `teams`, `repos`, `person` — and `ui.yml` was retired into `person:`; the person's own now follows the home rather than the machine the UI runs on, a scope change Paul confirmed. YAML stays until the TD-060 rename (Python has a TOML reader in the standard library and no writer). The promote's `auto` left `.agentorc.yml` for `repos.<repo>.promote.auto`: the one part of the block a person flips, by the same reasoning TD-100 used for the wind-down figure.
 - 2026-09-25 (TD-128, the designer): `usage_gate:` takes an amount per window for a metered profile, the unit saying which kind; a value that does not fit the profile's billing is refused.
 - 2026-09-25 (TD-128 reconciled, with Paul): the amount is read against the account's spend, not the profile's; `profiles.yml` carries `prices:` by token kind.
+- 2026-09-25 (TD-149 (2), (4), (6), grinder-ao-1): `promote:` accepted in `.agentorc.yml` ahead of TD-132 (it was refused as an unknown key, so writing the designed block broke `ao new` in that repo); the org `roles:` overlay checked key by key as a repo's is (it was taken raw); `AGENTORC_TICK` named as the one test knob.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 

@@ -392,3 +392,17 @@ def test_a_team_may_carry_seats_with_a_trigger(tmp_path):
         f.write_text(base + f"    seats: {bad}\n")
         with pytest.raises(ValueError, match=why):
             org.load(f)
+
+
+def test_the_org_roles_overlay_is_checked_key_by_key_as_a_repos_is(tmp_path):
+    """TD-149 (4): an org `roles:` preset used to be taken as it stood — a typo was a key nothing
+    reads. It is checked by `repoconfig._role_block` now, so it fails when read, naming the key."""
+    good = org.load(write(tmp_path, {"roles": {"grinder": {"profile": "grind", "review": {"reader": "techlead"}}}}))
+    assert good.roles["grinder"]["profile"] == "grind" and good.roles["grinder"]["review"]["reader"] == "techlead"
+    for bad, names in (
+        ({"grinder": {"profil": "grind"}}, "roles.grinder.profil is not a role key"),
+        ({"grinder": {"icon": "rocket"}}, "unknown icon 'rocket'"),
+        ({"grinder": "grind"}, "roles.grinder must be a mapping"),
+    ):
+        with pytest.raises(ValueError, match=names):
+            org.load(write(tmp_path, {"roles": bad}))
