@@ -330,6 +330,11 @@ the pane's limit message is the scraped fallback.
   live — read from the control graph, so it covers a manager, a director and a hand-attached
   controller alike, and a session that controls nothing never sees the item. Closing a manager
   over working members orphans them; the way to end a team is its Stop (§4.9).
+- **Outcomes reported** (§4.10 *Outcomes*, TD-079; built): nothing the person answered is still
+  owed an outcome.
+- **Mail read** (TD-072; designed 2026-09-24, not built — TD-141): no unread entry in the
+  session's inbox — the same fact `ao progress none` is refused on (§4.9a), carried here for a
+  session that exits some other way and never declares at all.
 - The ledger/attention board touched since the session started (dev-cadence repos).
 
 Each item is a named check in `.agentorc.yml` so other repos can pick their own subset. The Focus
@@ -2954,6 +2959,23 @@ the record, not a state**: the session stays `idle` or `exited` in every payload
 as unseen idle (§4.2, TD-017); a ninth state for *idle with nothing to be idle about* would have
 to be derived by the core, which is what the core cannot do.
 
+**The declaration is refused while the session has unread mail** (TD-072; designed 2026-09-24,
+not built — TD-141; the parts were proposed on 2026-09-18 and designed beside TD-079 as built, as
+the person asked). Winding down is the last moment anyone reads that inbox, and what is unread at
+it is a `note` nobody triaged — noise on a dead card for as long as the record lives — or an `ask`
+whose sender is waiting on a run that is about to end. The refusal names the count and the
+command, as the refusal on an owed outcome does (§4.10 *Outcomes*), because a brief is skimmed
+and a refusal is not; reading is the whole of the triage, since `ao inbox` is what marks mail
+read (§4.10) and a `note` may be read and left at that. Nothing else changes: the session reads,
+answers what needs answering, and declares again; `ao progress restart` is refused on the same
+fact, since the next run holds nothing of this one's inbox that it did not read. Ready to close
+(§4.2) carries the same fact as a row, *mail read*, for a session that exits some other way. The
+briefs say it twice — before a claim, and before the declaration — and the refusal is what holds
+when they are not read. Considered and not taken: refusing the *end of every turn* while mail is
+unread, the adapter's Stop hook feeding the mail back in (multi-agent-shogun, TD-059): it would
+make a session that ignores a sibling's `note` un-endable, and mail is read at the session's own
+pace by design — a wake is bounded (§4.10), and the doorbell rings once.
+
 **One member's exhaustion is not the team's.** A grinder out of work sits beside a hunter with
 plenty. The manager winds the team down when **every** member is finished; until then an
 out-of-work member is simply not sent to and not restarted. The wind-down itself is `ao team
@@ -4155,8 +4177,10 @@ The evidence to re-read is the same: the records of a night's team.
 
 **The lifecycle of an entry.** Reading does not delete. An entry passes through three stages:
 
-1. **Unread** from the moment it lands. It never ages out: an unread `note` or `reply` waits as
-   long as the record lives. An `ask`'s bound runs from when it was sent, and expiry does not wait
+1. **Unread** from the moment it lands. It never ages out *while the record lives*: an unread
+   `note` or `reply` waits as long as the session it was addressed to does, and once that session
+   is `exited` or `closed` it ages out as a read one does (stage 3; TD-072, designed 2026-09-24,
+   not built — TD-141). An `ask`'s bound runs from when it was sent, and expiry does not wait
    for it to be read. Unread entries are what the mailbox bound counts.
 2. **Read** when, and only when, `ao inbox` prints the entry to its caller — in any form,
    `--unread` and `--json` included. That is all `read_at` means: delivered into a turn. `ao wait`
@@ -4168,7 +4192,15 @@ The evidence to re-read is the same: the records of a night's team.
    to the person in the Inbox panel — and then removed. **An open `ask`, `steer` or `conflict` is
    never pruned**: its bound and the retention window are independent, and a read `ask` pruned
    before its bound ran out could never be answered. It becomes prunable when it closes or expires,
-   and its retention runs from then. The per-thread exchange count is kept as its own tally on the
+   and its retention runs from then. An **unread** `note` or `reply` on a record that has `exited`
+   or `closed` becomes prunable too, its retention running from that transition (TD-072): the run
+   it was addressed to is over, and a claim note that was stale within the hour should not sit on
+   a dead card until somebody forgets the session — which is what the Org page showed on
+   2026-09-18, nineteen entries on one card. The window rather than the exit itself, because
+   **resume carries mail forward** (below): a worker that crashed and is resumed inside the window
+   still receives the note its manager sent. An open `ask`, `steer` or `conflict` is untouched — it
+   keeps the lifecycle it has, pending while the record is only exited and expired when it closes.
+   The per-thread exchange count is kept as its own tally on the
    record, never recounted from the entries that survive, so pruning cannot reset the deadlock
    bound.
 
