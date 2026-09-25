@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import heapq
 import inspect
 import json
 import logging
@@ -164,6 +165,39 @@ HOME_EDITS = frozenset({"set_mode", "set_stop", "set_grants", "set_controllers"}
 # their own set and cross as their own link method, `read`, whose allowlist is this set alone — a
 # read can never reach an acting method through it, and `act`'s allowlist never grows by a read.
 NODE_READS = frozenset({"tail", "explain"})
+
+
+def _oldest_first(found: dict[str, MailEntry], chains: list[list[str]]) -> list[MailEntry]:
+    """A thread's entries oldest first (TD-136). `at` is whole seconds, so a reply and the next
+    question can share one; each mailbox, though, holds its entries in the order they landed, and a
+    reply comes after what it answers, and whatever settled a question (its outcome, or asking
+    again on the thread) after the reply that answered it. So the order is a merge all of those
+    agree with — taking the earliest `at` (then id) among the entries free to go next."""
+    succ: dict[str, set[str]] = {i: set() for i in found}
+    indeg = dict.fromkeys(found, 0)
+    answers = [[e.reply_to, e.id] for e in found.values() if e.reply_to in found]
+    settled = [
+        [e.closed_by, e.outcome.get("by")]
+        for e in found.values()
+        if e.outcome and e.closed_by in found and e.outcome.get("by") in found
+    ]
+    for chain in [*chains, *answers, *settled]:
+        for a, b in zip(chain, chain[1:], strict=False):
+            if b not in succ[a]:
+                succ[a].add(b)
+                indeg[b] += 1
+    ready = [(found[i].at, i) for i, n in indeg.items() if n == 0]
+    heapq.heapify(ready)
+    out: list[MailEntry] = []
+    while ready:
+        _, i = heapq.heappop(ready)
+        out.append(found[i])
+        for b in succ[i]:
+            indeg[b] -= 1
+            if indeg[b] == 0:
+                heapq.heappush(ready, (found[b].at, b))
+    left = sorted((e for e in found.values() if e not in out), key=lambda e: (e.at, e.id))
+    return out + left  # boxes that disagree (never expected) still lose nothing
 # What the home pushes a node about each of its records (§4.4a "The home pushes each node its
 # records' policy fields as they change", step 4b.2): the home-owned fields, less the mailbox — the
 # inbox, outbox, threads, wakes and `mail_decided` stay the home's, and no message body ever reaches
@@ -3722,6 +3756,44 @@ class HostAgent:
             "sent": True,
             "entries": [e.to_dict() for e in s.outbox],
             "unread": s.unread(),
+        }
+
+    async def rpc_thread(self, msg: str, caller: Any = None) -> dict[str, Any]:
+        """`ao inbox --thread <id>` and the Inbox's message page (design §4.7, §4.5 screen 6,
+        TD-136): the whole thread of one entry in the person inbox — every entry sharing its
+        `root`, gathered across the person inbox and every record's inbox and outbox, one per id
+        (the person inbox's copy first, then the first found), oldest first. The person's own
+        replies are in it though the person inbox keeps no sent list: they live in the askers'
+        inboxes. `pruned` says the root itself is held nowhere any more, so the thread starts
+        after a gap. A read, marking nothing; **a person's only** — a thread spans other
+        sessions' mailboxes, which no session reads (§4.10)."""
+        if not mail.is_person(caller):
+            raise RpcError(
+                f"{caller} cannot read a thread: it is gathered across every session's mailbox, and nobody "
+                "reads another session's inbox (design §4.10)"
+            )
+        held = [e for e in self.person_inbox if e.id == msg]
+        if not held:
+            raise RpcError(f"the person inbox holds no entry {msg}")
+        root = held[0].root
+        boxes = [self.person_inbox, *(box for s in self.sessions.values() for box in (s.inbox, s.outbox))]
+        found: dict[str, MailEntry] = {}
+        chains: list[list[str]] = []  # each mailbox's thread entries in the order they landed there
+        for box in boxes:
+            chain = [e.id for e in box if e.root == root]
+            for e in box:
+                if e.root == root:
+                    found.setdefault(e.id, e)
+            chains.append(chain)
+        graph = self._graph()
+        return {
+            "id": msg,
+            "root": root,
+            "entries": [
+                {**e.to_dict(), "from_role": mail.from_role(graph, PERSON, e.from_, controllers=self._ctl)}
+                for e in _oldest_first(found, chains)
+            ],
+            "pruned": root not in found,
         }
 
     async def rpc_inbox_delete(self, msg: str, id: str | None = None, caller: Any = None) -> dict[str, Any]:

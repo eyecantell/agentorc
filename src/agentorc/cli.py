@@ -1337,6 +1337,33 @@ def _sent(args: argparse.Namespace) -> int:
     return emit(args, got, prose)
 
 
+def _thread(args: argparse.Namespace) -> int:
+    """`ao inbox --thread <id>` (design §4.7, TD-136): one entry of the person inbox and its whole
+    thread, oldest first — the person's own replies included, which the person inbox does not
+    keep. The person's read: a session is refused by the host agent, and nothing is marked."""
+    if args.unread or args.sent:
+        return fail(args, "--thread reads one thread whole: leave out --unread and --sent", 2)
+    got = call_sync("thread", msg=args.thread)
+
+    def prose() -> None:
+        n = len(got["entries"])
+        print(f"thread of {got['root']}: {n} entr{'y' if n == 1 else 'ies'}, oldest first")
+        if got.get("pruned"):
+            print("  earlier entries pruned")
+        for e in got["entries"]:
+            to = f" → {', '.join(e.get('to') or [])}" if e.get("to") else ""
+            reply = f" re {e['reply_to']}" if e.get("reply_to") else ""
+            about = f" about {e['about']}" if e.get("about") else ""
+            mark = "  ← this one" if e["id"] == got["id"] else ""
+            print(f"\n[{e['from_role']}] {e['from']}{to} · {e['id']} · {e['kind']}{reply} · {e['at']}{about}{mark}")
+            for line in str(e["text"]).splitlines() or [""]:
+                print(f"  {line}")
+            if o := e.get("outcome"):
+                print(f"  outcome: {o.get('state')}")
+
+    return emit(args, got, prose)
+
+
 def _pass_up(args: argparse.Namespace, words: list[str]) -> int:
     """`ao msg --pass-up <id> --recommend "<line>" [--answer …]` (design §4.9b): a question you
     were asked goes to the person as the asker's, with your recommendation first among its
@@ -1362,6 +1389,8 @@ def cmd_inbox(args: argparse.Namespace) -> int:
     an entry read, and the host agent does that, never this command. With no `AGENTORC_SESSION`
     (a person at a terminal) it reads the org's person inbox, and a person's read sets nothing.
     Output opens with the fixed header, and every entry names its sender's role for the reader."""
+    if args.thread:
+        return _thread(args)
     if args.sent:
         return _sent(args)
     got = call_sync("inbox", unread=args.unread)
@@ -1884,6 +1913,7 @@ def build_parser() -> argparse.ArgumentParser:
     p = add("inbox", help="read your inbox; with no session, the person inbox (design §4.10)")
     p.add_argument("--unread", action="store_true", help="only entries not yet read")
     p.add_argument("--sent", action="store_true", help="your own sent mail instead (design §4.9b)")
+    p.add_argument("--thread", metavar="ID", help="a person's read of one entry's whole thread (design §4.7)")
     p.set_defaults(fn=cmd_inbox)
 
     p = add("ui", help="serve the web UI (localhost by default; design §4.5 security)")
