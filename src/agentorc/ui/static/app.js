@@ -940,7 +940,7 @@
       const n = $("#personneeds"), into = $("[data-inbox-needs]", ro);
       if (n && into) into.textContent = n.textContent.trim() || "0";
     }
-    $$("#groups .tsum").forEach((sum) => {
+    $$(".tsum").forEach((sum) => {
       const st = summaryState(sum);
       $$(".lv", sum).forEach((el) => (el.hidden = el.dataset.lv !== st.led));
       $$(".wv", sum).forEach((el) => (el.hidden = el.dataset.wv !== st.win));
@@ -1524,6 +1524,9 @@
   };
 
   AO.org = function () {
+    // the Repo page's team link lands here filtered to that team (§4.5a *Repo page: links*)
+    const wantTeam = new URLSearchParams(location.search).get("team");
+    if (wantTeam) $("#filter").value = "team:" + wantTeam;
     $("#filter").addEventListener("input", layout);
     // *mine* (§4.5a, TD-095): a toggle this browser remembers, as it remembers a team's fold
     const mineBtn = $("#mine");
@@ -1605,6 +1608,62 @@
     });
   };
 
+
+  // ---- the Repo page (design §4.5 screen 11, TD-176 slice 5) ----
+  // The page is `repo_part.html`, re-read on a poll and on every `repos` or `doing` event; the
+  // facets' selectors are the team card's (`syncSummaries`), the doing chips are remembered per
+  // browser, and a typed Deny reason survives a re-read.
+  AO.repo = function () {
+    const box = $("#repopage"); if (!box) return;
+    const repo = box.dataset.repo, whoKey = "doingwho:" + repo;
+    function apply() {
+      syncSummaries();
+      const who = store.get(whoKey, "");
+      $$(".dchips .chip", box).forEach((c) => c.setAttribute("aria-pressed", c.dataset.who === who ? "true" : "false"));
+      $$("#doing .drow", box).forEach((r) => (r.hidden = !!who && r.dataset.who !== who));
+    }
+    let busy = false;
+    async function reread() {
+      if (busy) return; busy = true;
+      try {
+        const res = await fetch(`/repo/${encodeURIComponent(repo)}?part=1`);
+        if (res.ok) {
+          const kept = AO.denyWhys(box), open = $$(".secinfo:not([hidden])", box).map((el) => el.id);
+          const unfolded = $$("[data-unfolded]", box).map((el) => el.dataset.unfolded);
+          box.innerHTML = await res.text();
+          AO.restoreDenyWhys(box, kept);
+          open.forEach((id) => { const el = document.getElementById(id); if (el) el.hidden = false; });
+          unfolded.forEach((k) => unfold(k));
+          apply();
+        }
+      } finally { busy = false; }
+    }
+    function unfold(key) {
+      $$(`.rrow.folded[data-list="${CSS.escape(key)}"]`, box).forEach((r) => r.classList.remove("folded"));
+      const b = $(`[data-unfold="${CSS.escape(key)}"]`, box); if (b) { b.hidden = true; b.dataset.unfolded = key; }
+    }
+    box.addEventListener("click", (e) => {
+      const p = e.target.closest(".tsum .seg[data-pick] button");
+      if (p && !p.disabled) return pickSummary(p);
+      const chip = e.target.closest(".dchips .chip");
+      if (chip) { store.set(whoKey, chip.dataset.who); return apply(); }
+      const more = e.target.closest("[data-unfold]");
+      if (more) return unfold(more.dataset.unfold);
+      // a board row's team badge: here it opens the Org filtered to that team (in the Inbox it picks the rail)
+      const badge = e.target.closest(".mailrow .badge.team[data-team]");
+      if (badge && badge.dataset.team) { location.href = "/?team=" + encodeURIComponent(badge.dataset.team); return; }
+      const i = e.target.closest(".imark");
+      if (i) { const panel = document.getElementById(i.getAttribute("aria-controls")); if (panel) { panel.hidden = !panel.hidden; i.setAttribute("aria-expanded", panel.hidden ? "false" : "true"); } }
+    });
+    apply();
+    setInterval(reread, 30000);  // the Inbox's poll; the events below are the fast path
+    // a burst of deltas is one re-read, a second and a half after the last
+    let soon = null;
+    connectEvents((ev) => {
+      if (!["repos", "doing", "session", "gone"].includes(ev.event)) return;
+      clearTimeout(soon); soon = setTimeout(reread, 1500);
+    });
+  };
 
   // ---- New session: the anchor rule, shown before you press Start ----
   AO.newSession = function () {

@@ -2029,7 +2029,8 @@ Screens:
    last line.
 
 11. **Repo** (`/repo/<name>`; designed 2026-09-25 with Paul, reshaped 2026-09-26 on the canvas —
-   TD-176 builds it; the artboard is `docs/mockups/RepoPage.dc.html`, rendered as
+   built by TD-176 slice 5, which re-reads the page's content (`?part=1`) on a 30 s poll and a
+   second and a half after a burst of events; the artboard is `docs/mockups/RepoPage.dc.html`, rendered as
    `docs/mockups/reviews/2026-09-26-repo-page-design.png`): **what a repo holds** — what is
    outstanding, what is in motion, what waits on the person — so a person can see whether a team
    is balanced (Paul: *the grinders are outpacing the techlead*) before a policy is asked to act

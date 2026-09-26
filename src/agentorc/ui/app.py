@@ -1527,6 +1527,83 @@ def compact_line(v: dict[str, Any]) -> str:
     return " · ".join(x for x in (role, what) if x)
 
 
+# -- the Repo page (design §4.5 screen 11, TD-176 slice 5) -------------------------------------------
+
+LEDGER_LISTS = (("pickable", "pickable"), ("design-first", "design-first"), ("for-you", "for you"), ("other", "other"))
+LEDGER_FOLD = 4  # a list folds past this many rows, with *+n more*
+PRIORITY_RANK = {"high": 0, "medium": 1, "low": 2}
+
+
+def pr_rows(
+    r: Mapping[str, Any], members: Collection[dict[str, Any]], standing: Mapping[int, dict[str, Any]], now: datetime
+) -> list[dict[str, Any]]:
+    """**Open PRs** (§4.5 screen 11): every open PR, newest last, with its author — the member whose
+    branch it is, else the GitHub login — its age, *draft*, and its standing with the techlead
+    (`standing`, by number; nothing when no entry names it)."""
+    by_branch = {str((m.get("git") or {}).get("branch") or ""): m for m in members if isinstance(m.get("git"), dict)}
+    rows = []
+    for p in (r.get("prs") or {}).get("open") or []:
+        if not isinstance(p, dict) or not isinstance(p.get("number"), int):
+            continue
+        who = by_branch.get(str(p.get("branch") or ""))
+        rows.append(
+            {
+                "number": p["number"],
+                "title": str(p.get("title") or ""),
+                "url": str(p.get("url") or ""),
+                "author": {"id": who["id"], "name": who.get("name") or who["id"]} if who else None,
+                "login": str(p.get("author") or ""),
+                "age": _age(p.get("created"), now),
+                "draft": bool(p.get("draft")),
+                "standing": standing.get(p["number"]),
+            }
+        )
+    return rows
+
+
+def pr_standing(entries: Collection[dict[str, Any]], now: datetime) -> dict[int, dict[str, Any]]:
+    """Each PR's standing with the techlead (§4.9b *The reader*), from the seat's inbox entries that
+    carry a `pr`: *waiting on review · <age>* while the `ask` is open, *reviewed* once it carries a
+    reply. The latest entry for a number wins."""
+    out: dict[int, dict[str, Any]] = {}
+    for e in sorted((e for e in entries if isinstance(e, dict)), key=lambda e: str(e.get("at") or "")):
+        pr = e.get("pr")
+        if not isinstance(pr, int) or e.get("kind") != "ask":
+            continue
+        if e.get("closed_by"):
+            out[pr] = {"word": "reviewed", "cls": "done"}
+        elif not e.get("closed_reason"):
+            out[pr] = {"word": f"waiting on review · {_age(e.get('at'), now)}", "cls": "wait"}
+    return out
+
+
+def ledger_lists(r: Mapping[str, Any], motion: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
+    """**Technical debt** (§4.5 screen 11): the open entries in four lists by the page's kind, each
+    row id, title, priority and owner, *held by <name>* when a member claims it, sorted by priority
+    then id; `shown` the rows before the fold."""
+    held = {x["ref"]: ", ".join(w["name"] for w in x["members"]) for x in motion}
+    entries = [e for e in ((r.get("ledger") or {}).get("entries") or []) if isinstance(e, dict)]
+    out = []
+    for key, label in LEDGER_LISTS:
+        rows = sorted(
+            ({**e, "held": held.get(e["id"], "")} for e in entries if e.get("for_page") == key),
+            key=lambda e: (PRIORITY_RANK.get(e.get("priority") or "", 9), e["id"]),
+        )
+        out.append({"key": key, "label": label, "rows": rows, "fold": max(0, len(rows) - LEDGER_FOLD)})
+    return out
+
+
+def doing_chips(rows: Collection[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The Doing section's filter chips (§4.5a *Repo page: doing filters*): *all (n)* and one per
+    doer in the feed, the busiest first."""
+    tally: dict[str, int] = {}
+    for d in rows:
+        tally[d["name"]] = tally.get(d["name"], 0) + 1
+    return [{"who": "", "label": "all", "n": len(rows)}] + [
+        {"who": w, "label": w, "n": n} for w, n in sorted(tally.items(), key=lambda kv: (-kv[1], kv[0]))
+    ]
+
+
 def team_live(team: str, fleet: Collection[dict[str, Any]]) -> bool:
     """Whether any session of `team` in `fleet` is neither exited nor closed."""
     return bool(team) and any(f.get("team") == team and f.get("state") not in DEAD for f in fleet)
@@ -2885,6 +2962,80 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "editor_note": uiconf.open_in().error,
             },
         )
+
+    @app.get("/repo/{name}", response_class=HTMLResponse)
+    async def repo_page(request: Request, name: str, part: str = ""):
+        """The **Repo** page (design §4.5 screen 11, TD-176 slice 5): the servicing team's three
+        facets, then the lists behind the numbers — Open PRs, Technical debt, Waiting on you, Doing.
+        A registered repo no team services has a page too, its Repo facet alone. `part=1` is the
+        page's own refresh: the content without the chrome."""
+        now = datetime.now(UTC)
+        repos, doing = await repo_facts()
+        r = next((v for v in repos.values() if isinstance(v, dict) and v.get("name") == name), None)
+        if r is None:
+            raise HTTPException(404, f"no registered repo is named {name!r} — ao repo --all lists them")
+        sessions = await call("list")
+        icons = await role_icons(sessions)
+        seats = await seats_of(sessions)
+        vs = [view(s, sessions, icons=icons, seats=seats) for s in sessions]
+        groups = team_groups(vs, (), {str(r.get("root") or ""): r}, doing) or []
+        serving = [g for g in groups if g.get("summary") and (g["summary"].get("repo") or {}).get("name") == name]
+        org, _ = await asyncio.to_thread(org_here)
+        named = repo_teams(org, host_name()).get(str(Path(str(r.get("root") or "")).resolve()), "")
+        teams = list(dict.fromkeys([*(g["team"] for g in serving), *([named] if named else [])]))
+        first = serving[0] if serving else None
+        if first:
+            summary = first["summary"]
+            members = first["members"]
+        elif named:
+            # a team the definitions give this repo, with nothing live now (between runs, stopped):
+            # its facets still stand — its members' claims, its doing log — with the repo's own
+            # numbers, since no live member points the summary at the repo (review of slice 5)
+            members = [v for v in vs if v.get("team") == named]
+            summary = team_summary(named, members, {}, doing, prs_waiting(members), now)
+            summary["repo"] = repo_facet(r, now, prs_waiting(members))
+            summary["motion"] = motion_rows(members, r)
+            summary["phases"] = {ph: sum(1 for x in summary["motion"] if x["phase"] == ph) for ph in PHASES}
+        else:
+            summary = {
+                "team": "",
+                "repo": repo_facet(r, now),
+                "motion": [],
+                "phases": {},
+                "answers": [],
+                "doing": [],
+                "face": "doing",
+                "answer_key": "",
+                "noteam": True,
+            }
+            members = []
+        standing: dict[int, dict[str, Any]] = {}
+        for m in members:
+            if m.get("seat") or str(m.get("role") or "") == "techlead":
+                with contextlib.suppress(Exception):
+                    standing.update(pr_standing((await call("inbox", id=m["id"])).get("entries") or [], now))
+        rel = (r.get("ledger") or {}).get("path") or ""
+        ledger_file = str(Path(str(r.get("root") or "")) / rel) if rel else ""
+        boards = [
+            b
+            for b in (await board_items())[0]
+            if str(Path(str(b.get("root") or "")).resolve()) == str(Path(str(r.get("root") or "")).resolve())
+        ]
+        ctx = {
+            "r": r,
+            "name": name,
+            "g": {"team": summary["team"], "summary": summary},
+            "teams": teams,
+            "prs": pr_rows(r, members, standing, now),
+            "lists": ledger_lists(r, summary["motion"]),
+            "boards": boards,
+            "doing": summary["doing"],
+            "chips": doing_chips(summary["doing"]),
+            "ledger_editor": editor_link(ledger_file) if ledger_file else None,
+            "host": host_name(),
+            "active": "",
+        }
+        return templates.TemplateResponse(request, "repo_part.html" if part else "repo.html", ctx)
 
     @app.get("/focus/{sid}", response_class=HTMLResponse)
     async def focus(request: Request, sid: str, window: str = ""):

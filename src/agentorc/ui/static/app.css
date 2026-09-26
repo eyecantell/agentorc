@@ -486,3 +486,24 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
 .rollup .big { font-size: var(--t-title); color: var(--needs-fg); }
 .bseg.phase { border-radius: 2px; } .legend .ph-add { background: var(--ph-add); } .legend .ph-design { background: var(--ph-design); }
 .legend .ph-grind { background: var(--ph-grind); } .legend .ph-review { background: var(--ph-review); }
+/* the Repo page (design §4.5 screen 11, TD-176 slice 5) */
+.repopage .rhead { margin-bottom: 14px; align-items: baseline; }
+.repopage .rsec { margin-top: 22px; }
+.repopage .rsh { align-items: center; margin-bottom: 8px; }
+.repopage .rlist { background: var(--card); border: 1px solid var(--line); border-radius: 6px; display: flex; flex-direction: column; }
+.repopage .rrow { display: flex; gap: 12px; align-items: baseline; padding: 9px 14px; border-top: 1px solid var(--line2); min-width: 0; }
+.repopage .rrow:first-child { border-top: 0; }
+.repopage .rrow[hidden], .repopage .rrow.folded { display: none; }
+.repopage button.rrow { background: transparent; border: 0; border-top: 1px solid var(--line2); text-align: left; cursor: pointer; font: inherit; color: var(--muted); }
+.repopage .rtitle { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.repopage .rlh { padding: 8px 14px 4px; font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); border-top: 1px solid var(--line); }
+.repopage .rlh:first-child { border-top: 0; }
+.repopage .tag { font-size: var(--t-small); padding: 1px 7px; border: 1px solid var(--border); border-radius: 3px; color: var(--muted); white-space: nowrap; }
+.repopage .tag.wait { border-color: var(--needs); color: var(--needs-fg); background: var(--needs-bg); }
+.repopage .rrow .p-high { color: var(--stalled-fg); }
+.repopage .imark { width: 16px; height: 16px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; }
+.repopage .secinfo { margin: -4px 0 8px; }
+.repopage .dchips { margin-bottom: 8px; }
+.repopage .dchips .chip { border: 1px solid var(--border); border-radius: 4px; background: var(--card); color: var(--fg); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
+.repopage .dchips .chip[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); border-color: var(--primary); }
+@media (max-width: 720px) { .repopage .rrow { flex-wrap: wrap; } }
