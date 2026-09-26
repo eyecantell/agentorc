@@ -591,24 +591,29 @@ Python, one process per host, started by the same systemd user unit. Responsibil
 - Create / kill / send / resume sessions (the only writer).
 - Per-repo `git status --porcelain=v2 --branch` for every checkout and worktree the registry
   lists, cached with a short TTL.
-- **Repo facts** (§4.5 screens 1 and 11, TD-176): for every checkout the registry lists, at the
+- **Repo facts** (§4.5 screens 1 and 11, TD-176; the readings built by slice 1, the doing log and
+  the page not yet): for every checkout the registry lists, at the
   home, readings kept in `repos.json` beside `usage.json`, served by the `repos` RPC and pushed as
-  a `repos` event when any changes, the shape `usage` has. **Pull requests**: `gh pr list --state
-  all --json number,title,url,state,createdAt,closedAt,mergedAt,headRefName,author,isDraft
-  --limit 200` in the checkout, **every five minutes** in a thread, never per tick, once per
-  remote (two checkouts of one repo are one read); kept as the open list plus, per window (day,
-  week, month, in the home's clock), the counts *opened* (`createdAt` in the window) and *closed*
-  (`closedAt` or `mergedAt` in it, a merge being a close); a read that failed keeps the last
+  a `repos` event when any changes (`repo: null` for a checkout the registry dropped; a node
+  forwards the RPC and refuses it offline, §4.4a), the shape `usage` has. **Pull requests**: two
+  `gh pr list --json number,title,url,state,createdAt,closedAt,mergedAt,headRefName,author,isDraft`
+  reads in the checkout — `--state open` for the open list, and `--state all --search
+  updated:>=<a month ago> --limit 1000` for the windows, since a busy repo opens more than a page
+  of PRs in a month (the reading says `truncated` when the second fills its limit) — **every five
+  minutes** in a thread, never per tick, once per
+  remote (two checkouts of one repo are one read); kept as the open list plus, per window (the
+  last day, 7 days and 30 days, rolling), the counts *opened* (`createdAt` in the window) and *closed*
+  (`closedAt` or `mergedAt` in it, a merge being a close) and the month's PRs as `recent`; a read that failed keeps the last
   reading and records `error` and `failed_at`, so the page can say *could not look* — an outage
   is never zero PRs, the rule `_count_seats` already follows for merges (`merged_prs` answers
   `None`, never `[]`). **The ledger**: the repo's `ledger:` file (`.agentorc.yml`, default
-  `docs/technical_debt.md`) read when its mtime moves, by `sessionorc.ledger` — the one reader of
+  `docs/technical_debt.md`) read when its mtime moves, its history every five minutes, by `sessionorc.ledger` — the one reader of
   the entry's header fields (`## TD-NNN: title`, `**Priority:**`, `**Owner:**`, `**Kind:**`,
   `**Pickable:**`), kept as `{entries: [...], by_priority, by_kind, at}`; an entry counts while
   its section is in the file, and its kind for the page is *pickable* (`Pickable: yes`),
   *design-first* (`Kind: design-first`), *for you* (`Owner: paul` or `Kind: decision`), else
   *other*. **Opened and closed in a window** come from the ledger file's git history in the same
-  checkout (`git log --format=%H,%cI -- <ledger>` and the section headings of each version): an
+  checkout (one `git log --first-parent -p --unified=0 -- <ledger>`, the headings its diffs add and remove): an
   entry is *opened* at the first commit whose file holds its section and *closed* at the first
   commit whose file no longer does (archived, or done and removed); a file rewritten without a
   history reads as opened at its first commit. The reader is agentorc's because nothing in
@@ -2603,7 +2608,7 @@ covers both and the host agent knows who is blocked and decides mail wakes (§4.
 own inbox RPCs: `inbox_snooze`, `inbox_pause`, `inbox_resume`, `inbox_go_with_it` (TD-069),
 `attention_snooze` and `inbox_dismiss` (TD-079).
 
-**`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25, not built — TD-176):
+**`ao repo [name]`** (§4.5 screen 11, §4.4 *Repo facts*; designed 2026-09-25; TD-176 slice 1 built its first form — the open PRs with their ages, the week's counts and the ledger by kind, *could not look* where a read failed — and slice 6 adds the reader standing, the board items and the members):
 the rollup's and the team card's numbers for one registered repo — the current one without a name — as text or
 `--json`: open PRs with their ages and reader standing, the pickable and design-first ledger
 entries, the board items due, and what the servicing team's members hold; `--all` prints every

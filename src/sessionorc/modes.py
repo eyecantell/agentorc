@@ -47,6 +47,10 @@ MAILBOX = frozenset(
 # the third channel (§4.8, TD-074) and is home-owned like the other two, so it travels the same way:
 # refused while the link is down, forwarded to the home while it is up.
 REPORTS = frozenset({"progress", "finding", "doing"})
+# The readings the home takes (§4.4 *Repo facts*, TD-176): a node holds none of them, so while the
+# link is down a read of one is refused rather than answered with nothing — an empty answer would
+# say *no PRs*, and the truth is *not known from here*.
+HOME_READS = frozenset({"repos"})
 # What a session may do to itself offline, and a person to any session on this host: the node is
 # the single tmux writer for its host, whether or not home can be reached.
 NODE_ACTS = frozenset({"send", "keys", "kill", "close", "remove", "create", "seen", "decide", "hook"})
@@ -73,14 +77,17 @@ HOME_ONLY = frozenset({"host_files"})
 def offline_refusal(method: str, caller: Any, params: Mapping[str, Any], *, host: str, home: str) -> str | None:
     """Why a node that cannot reach `home` refuses this call, or None when it serves it (design
     §4.4a, the call-by-call table). `caller` is None for a person. Reads are never listed and never
-    refused. Every refusal names the home and says nothing was queued: a refusal the caller can
-    see, never a delivery that is not coming. With the link up the agent forwards what this
-    refuses instead of asking (`HostAgent._forward`, step 5), so the table has one answer."""
+    refused, but for `HOME_READS`, the readings only the home takes. Every refusal names the home
+    and says nothing was queued: a refusal the caller can see, never a delivery that is not coming.
+    With the link up the agent forwards what this refuses instead of asking (`HostAgent._forward`,
+    step 5), so the table has one answer."""
     tail = f"{home} (home) is unreachable from {host}; refused, not queued (design §4.4a)"
     if method in MAILBOX:
         return f"the mailbox is at the home: {tail}"
     if method in REPORTS:
         return f"reports are written at the home, and a claim is checked against sessions this host cannot see: {tail}"
+    if method in HOME_READS:
+        return f"the repo facts are read at the home, and this host holds none: {tail}"
     if method in HOME_EDITS:
         return f"{method} edits what the home owns, so it waits for the link: {tail}"
     if caller is None or method not in NODE_ACTS:

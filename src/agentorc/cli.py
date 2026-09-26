@@ -898,6 +898,82 @@ def _gate_line(prof: str, windows: list[dict[str, Any]]) -> str:
     return " · ".join(parts)
 
 
+def _main_checkout(start: str) -> str | None:
+    """The main checkout of the repo `start` is in — a worktree's too — or None outside a repo."""
+    try:
+        cp = subprocess.run(
+            ["git", "-C", start, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True, text=True, timeout=10,
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    common = cp.stdout.strip() if cp.returncode == 0 else ""
+    return str(pathlib.Path(common).resolve().parent) if common else None
+
+
+def _repo_line(r: dict[str, Any]) -> str:
+    """One repo's numbers on a line (design §4.7 `ao repo`): its PRs and its ledger, each *could not
+    look* when its last read failed, with the reading's age."""
+    prs, led = r.get("prs") or {}, r.get("ledger") or {}
+    if prs.get("open") is None:
+        pr_part = f"PRs: could not look ({prs.get('error') or 'not read yet'})"
+    else:
+        open_ = prs["open"]
+        oldest = f", oldest {_age(open_[0]['created'])}" if open_ and open_[0].get("created") else ""
+        week = (prs.get("windows") or {}).get("week") or {}
+        opened, closed = week.get("opened", 0), week.get("closed", 0)
+        pr_part = f"{len(open_)} open PRs{oldest} · this week {opened} opened, {closed} closed"
+        if prs.get("error"):
+            pr_part += f" (could not look {_age(prs.get('failed_at') or '')} ago: {prs['error']})"
+    if led.get("entries") is None:
+        led_part = f"ledger: could not look ({led.get('error') or 'not read yet'})"
+    else:
+        k = led.get("by_kind") or {}
+        led_part = (
+            f"{len(led['entries'])} open entries: {k.get('pickable', 0)} pickable, {k.get('design-first', 0)}"
+            f" design-first, {k.get('for-you', 0)} for you, {k.get('other', 0)} other"
+        )
+        if led.get("error"):
+            led_part += f" (could not look: {led['error']})"
+    return f"{r.get('name') or r.get('root')}  {pr_part} · {led_part} · read {_age(str(r.get('at') or ''))} ago"
+
+
+def cmd_repo(args: argparse.Namespace) -> int:
+    """`ao repo [name] [--all]` (design §4.7, §4.4 *Repo facts*, TD-176): the home's readings of a
+    registered repo — the current one without a name — as text or `--json`: its open PRs, the
+    window counts, and the ledger's entries by kind. A read, never a write."""
+    got: dict[str, dict[str, Any]] = call_sync("repos")
+    if args.all:
+        picked = list(got.values())
+    elif args.name:
+        picked = [r for r in got.values() if args.name in (r.get("name"), r.get("root"))]
+        if not picked:
+            raise AgentError(f"no registered repo is named {args.name!r}; ao repo --all lists them")
+    else:
+        here = _main_checkout(os.getcwd())
+        picked = [r for r in got.values() if here and str(pathlib.Path(r.get("root") or "").resolve()) == here]
+        if not picked:
+            raise AgentError("this directory is not in a registered repo; name one, or ao repo --all")
+
+    def prose() -> None:
+        if not picked:
+            print("no registered repos: the host's repos registry lists none (design §4.4)")
+        for r in picked:
+            print(_repo_line(r))
+            if args.all:
+                continue
+            for p in (r.get("prs") or {}).get("open") or []:
+                draft = " (draft)" if p.get("draft") else ""
+                age = _age(p.get("created") or "")
+                print(f"  #{p['number']:<5} {age:>4}  {p.get('author') or '?'}  {p['title']}{draft}")
+            for kind in ("pickable", "design-first"):
+                ids = [e for e in (r.get("ledger") or {}).get("entries") or [] if e.get("for_page") == kind]
+                for e in ids:
+                    print(f"  {kind:<12} {e['id']}  {e['title']}")
+
+    return emit(args, picked, prose)
+
+
 def cmd_gate(args: argparse.Namespace) -> int:
     """`ao gate` / `ao gate <profile> <label>=<reserve>…` (design §4.7, §6 *Usage gate*, TD-100):
     print every profile's reserves and the lines they make now, or set them through `set_settings` —
@@ -1819,6 +1895,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("when", nargs="?", help="06:00 (the next one, local), +8h, or an ISO time")
     p.add_argument("--clear", action="store_true", help="remove the stop time: nothing will stop it")
     p.set_defaults(fn=cmd_until)
+
+    p = add("repo", help="a registered repo's numbers: open PRs, the window counts, the ledger by kind (design §4.7)")
+    p.add_argument("name", nargs="?", help="the repo's name or its checkout's path. None: the repo of this directory")
+    p.add_argument("--all", action="store_true", help="every registered repo, one line each")
+    p.set_defaults(fn=cmd_repo)
 
     p = add("gate", help="show or set the usage gate's reserves per profile (design §6, TD-100)")
     p.add_argument("profile", nargs="?", help="the profile; `-` for the unnamed default. None: show every profile")

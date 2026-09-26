@@ -130,6 +130,26 @@ class UsageStore:
         _atomic_write(self.path, json.dumps(keep, indent=1))
 
 
+class RepoStore:
+    """The repo facts per checkout (design §4.4 *Repo facts*, TD-176), `{root: reading}`, written
+    whole each time a reading changes. A missing or unreadable file is no readings, never a crash:
+    the next read, five minutes on, fills it."""
+
+    def __init__(self, path: Path | None = None):
+        self.path = path or paths.repos_file()
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def load(self) -> dict[str, dict[str, Any]]:
+        try:
+            raw = json.loads(self.path.read_text(encoding="utf-8"))
+            return {str(k): v for k, v in raw.items() if isinstance(v, dict)}
+        except (OSError, ValueError, AttributeError):
+            return {}
+
+    def save(self, readings: dict[str, dict[str, Any]]) -> None:
+        _atomic_write(self.path, json.dumps(readings, indent=1))
+
+
 class IdentityAlarmStore:
     """The host's **own** identity alarms (design §4.8a, TD-077 step 2): the ones about no record —
     a claim from outside every pane, an unreadable peer — which have nowhere else to live, since a

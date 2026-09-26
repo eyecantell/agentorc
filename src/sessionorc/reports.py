@@ -19,6 +19,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from sessionorc import ledger
 from sessionorc.models import PR_CLOSED, FindingEntry, ProgressEntry, normalize_ref
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -255,6 +256,90 @@ def merged_prs(directory: Path | str, limit: int = 100, timeout: float = 20.0) -
         except ValueError:
             continue
     return times
+
+
+PR_WINDOWS = ledger.WINDOWS  # one set of windows for the ledger and the PRs
+
+
+def _when(v: Any) -> datetime | None:
+    try:
+        return datetime.fromisoformat(str(v).replace("Z", "+00:00")) if v else None
+    except ValueError:
+        return None
+
+
+PR_FIELDS = "number,title,url,state,createdAt,closedAt,mergedAt,headRefName,author,isDraft"
+
+
+def _gh_prs(directory: Path | str, args: list[str], timeout: float) -> list[dict[str, Any]] | str:
+    """One `gh pr list` read as the PR rows `pr_reading` keeps, or why it could not be made."""
+    try:
+        cp = subprocess.run(
+            ["gh", "pr", "list", *args, "--json", PR_FIELDS],
+            capture_output=True, text=True, timeout=timeout, cwd=str(directory),
+        )  # fmt: skip
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"gh could not be asked: {type(e).__name__}"
+    if cp.returncode != 0:
+        return ((cp.stderr or "").strip().splitlines() or ["gh pr list failed"])[-1][:200]
+    try:
+        out = json.loads(cp.stdout or "[]")
+    except json.JSONDecodeError:
+        return "gh pr list printed something that is not JSON"
+    if not isinstance(out, list):
+        return "gh pr list printed something that is not a list"
+    prs: list[dict[str, Any]] = []
+    for p in out:
+        if not isinstance(p, dict) or not isinstance(p.get("number"), int):
+            continue
+        author = p.get("author")
+        prs.append(
+            {
+                "number": p["number"],
+                "title": str(p.get("title") or ""),
+                "url": str(p.get("url") or ""),
+                "state": str(p.get("state") or "").lower(),  # open · closed · merged
+                "branch": str(p.get("headRefName") or ""),
+                "author": str(author.get("login") or "") if isinstance(author, dict) else "",
+                "draft": bool(p.get("isDraft")),
+                "created": p.get("createdAt") or None,
+                "closed": p.get("mergedAt") or p.get("closedAt") or None,
+            }
+        )
+    return prs
+
+
+def pr_reading(directory: Path | str, now: datetime, limit: int = 1000, timeout: float = 30.0) -> dict[str, Any]:
+    """The repo's pull requests as the Repo facet counts them (design §4.4 *Repo facts*, TD-176): two
+    `gh` reads — the open PRs, and every PR updated in the longest window — kept as `open` (oldest
+    first), `windows` (`{day|week|month: {opened, closed}}`: `createdAt` in the window is an
+    opening, `closedAt` or `mergedAt` a close, a merge being one) and `recent` (every PR opened or
+    closed in the longest window, newest first); `truncated` when the second read filled its
+    `limit`, so the month's counts are a floor. **A read that could not be made is `{"error":
+    why}`**, never an empty reading: for a count, *no PRs* and *could not look* must not read the
+    same — `merged_prs`'s rule, not `_prs`'s."""
+    if not Path(directory).is_dir():
+        return {"error": f"{directory} is not a directory here"}
+    since = now - PR_WINDOWS["month"]
+    open_ = _gh_prs(directory, ["--state", "open", "--limit", "200"], timeout)
+    if isinstance(open_, str):
+        return {"error": open_}
+    day = since.date().isoformat()
+    prs = _gh_prs(directory, ["--state", "all", "--search", f"updated:>={day}", "--limit", str(limit)], timeout)
+    if isinstance(prs, str):
+        return {"error": prs}
+    windows: dict[str, dict[str, int]] = {}
+    for w, span in PR_WINDOWS.items():
+        start = now - span
+        windows[w] = {
+            "opened": sum(1 for p in prs if (t := _when(p["created"])) and t > start),
+            "closed": sum(1 for p in prs if (t := _when(p["closed"])) and t > start),
+        }
+    recent = [p for p in prs if ((t := _when(p["created"])) and t > since) or ((c := _when(p["closed"])) and c > since)]
+    recent.sort(key=lambda p: max(filter(None, (_when(p["created"]), _when(p["closed"])))), reverse=True)
+    open_.sort(key=lambda p: p["created"] or "")
+    out = {"open": open_, "windows": windows, "recent": recent, "at": now.isoformat()}
+    return {**out, "truncated": True} if len(prs) >= limit else out
 
 
 def _prs_for_head(directory: Path | str, branch: str, timeout: float = 10.0) -> list[dict[str, Any]] | None:
