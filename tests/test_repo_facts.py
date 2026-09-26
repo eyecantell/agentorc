@@ -472,3 +472,13 @@ async def test_a_team_members_doing_calls_are_logged_pushed_and_read(agent, tmp_
         assert [e["entry"]["text"] for e in events] == ["reading the ledger", "pushing the branch"]
         assert events[0]["team"] == "grind"
         listener.cancel()
+
+
+def test_a_doing_log_cut_short_mid_character_loads_without_it(tmp_path):
+    """Review of PR #596: a crash mid-append can leave a truncated UTF-8 sequence at the file's end;
+    the log loads, the cut line skipped."""
+    from sessionorc.store import DoingLogStore
+
+    f = tmp_path / "doing.jsonl"
+    f.write_bytes(b'{"team": "a", "id": "g", "text": "ok", "at": "1"}\n{"team": "a", "text": "caf\xc3')
+    assert [e["text"] for e in DoingLogStore(f).rings["a"]] == ["ok"]

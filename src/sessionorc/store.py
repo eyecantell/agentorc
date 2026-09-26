@@ -163,7 +163,8 @@ class DoingLogStore:
         self.rings: dict[str, list[dict[str, Any]]] = {}
         self._lines = 0
         try:
-            lines = self.path.read_text(encoding="utf-8").splitlines()
+            # a line cut short mid-character by a crash decodes as garbage and is skipped below, never a crash
+            lines = self.path.read_text(encoding="utf-8", errors="replace").splitlines()
         except OSError:
             lines = []
         for line in lines:
