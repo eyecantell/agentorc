@@ -1783,7 +1783,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Kind:** design-first
 **Pickable:** no — after TD-170 slice 1 or 2 lands, so the rule keys on numbers a person has watched first
 
-**Why:** the repo's numbers (TD-170) make a growing PR count visible; nothing acts on it. A manager keeps handing out claims while the reader's queue grows, and the person finds out from the strip. Paul asked that the numbers come first and a rule after, so that the rule keys on numbers he has watched.
+**Why:** the repo's numbers (TD-170) make a growing PR count visible; nothing acts on it. A manager keeps handing out claims while the reader's queue grows, and the person finds out from the team card, once it is already large. Paul asked that the numbers come first and a rule after, so that the rule keys on numbers he has watched.
 
 **Fix:** design the rule, then build it as a policy of the manager's round. The question is §10 (2026-09-25): a per-team **balance** line — open PRs above `n`, the oldest past `d`, or the reader's queue past its `bound` (§4.9b) — on which the manager hands out no new claim and asks the techlead to read, in its log line; never a kill, never a wind-down. To settle: setting or definition (the settings audit's rule, ADR 2026-09-25 §5); whether the manager reads `ao repo` each round or the tick pushes a breach as a `system` note (§4.10); what the manager's brief says (`src/agentorc/briefs/manager.md`, *A round*); and the numbers' defaults.
 
