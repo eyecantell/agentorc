@@ -408,6 +408,21 @@ def test_the_terminal_font_and_renderer_are_bundled_and_served(client):
     assert r.status_code == 200 and r.headers["content-type"] == "font/woff2"
 
 
+def test_the_page_links_its_stylesheet_and_script_by_their_content(client):
+    """2026-09-26: after a promote the browser drew the new markup with its cached old `app.css`.
+    The page's two links carry a hash of the file, so a changed file is a new link, and each link
+    serves the file it names."""
+    import hashlib
+
+    static = pathlib.Path(__file__).parents[1] / "src" / "agentorc" / "ui" / "static"
+    html = client.get("/").text
+    for name in ("app.css", "app.js"):
+        digest = hashlib.sha256((static / name).read_bytes()).hexdigest()[:12]
+        link = f"/static/{name}?v={digest}"
+        assert link in html and f'"/static/{name}"' not in html
+        assert client.get(link).content == (static / name).read_bytes()
+
+
 def test_a_card_says_when_the_session_stops_and_only_then(tmp_path, monkeypatch):
     """design §4.5a **stops** note (§6, TD-026): a session with a stop time says so on its card and
     in its Focus header, in the host's local clock; every session without one says nothing, which is

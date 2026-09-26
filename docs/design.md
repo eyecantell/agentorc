@@ -1395,6 +1395,9 @@ to xterm.js over a websocket; resize is a `TIOCSWINSZ` on that pty, which ssh fo
 terminal daemon on the hosts. Adding a host is `agentorc host add vps user@vps` + installing the
 agent there.
 
+The page links its own stylesheet and script with a hash of each file (`/static/app.css?v=…`), so
+the first page after a promote fetches the new files instead of a copy the browser still holds.
+
 Screens:
 
 1. **Org** (home): a **card grid**, grouped by team when any live session carries a team badge
