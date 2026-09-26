@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"$CLAUDE_PROJECT_DIR/scripts/cadence_hooks.sh\"; if [ -x \"$f\" ]; then \"$f\" --session-start; fi",
+            "command": "r=$(git -C \"${CLAUDE_PROJECT_DIR:-.}\" worktree list --porcelain 2>/dev/null | sed -n '1s/^worktree //p'); f=\"${r:-$CLAUDE_PROJECT_DIR}/scripts/cadence_hooks.sh\"; if [ -x \"$f\" ]; then \"$f\" --session-start; fi",
             "timeout": 150
           }
         ]

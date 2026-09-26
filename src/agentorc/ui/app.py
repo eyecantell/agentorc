@@ -37,7 +37,7 @@ from sessionorc.adapters import short_model
 from sessionorc.client import AgentError, AgentUnavailable, LocalClient
 from sessionorc.client import call_sync as _call_sync
 from sessionorc.containers import attach_argv_in
-from sessionorc.models import GRANTS, STATE_RANK, has_control, report_head, report_line, stop_note
+from sessionorc.models import GRANTS, STATE_RANK, has_control, normalize_ref, report_head, report_line, stop_note
 
 from . import render as rendermod
 from . import uiconf
@@ -716,6 +716,13 @@ def view(
         d["seat_when"] += f" · {counted} of {trig.get('after')}"
     if d["seat"]:
         d["state_class"], d["state_label"] = "oncall", "on call"
+    # §4.10 *When it is read* (TD-168): the composer's sentence for each kind, the host agent's; a
+    # seat the definition names reads as one whatever the record's own `seat` says, so the pair is
+    # the seat's from here (`mail.read_when` is the one function either way)
+    rw = s.get("read_when") if isinstance(s.get("read_when"), dict) else {}
+    if d["seat"]:
+        rw = {k: mail.read_when(None, k, now, seat=True) for k in ("ask", "note")}
+    d["read_when"] = {k: str(rw.get(k) or "") for k in ("ask", "note")}
     d["age"] = _age(s.get("since"), now)
     d["scraped"] = s.get("confidence") != "hook"
     # Another host's record, as the home shows it (design §4.4a): its own host on the card, and a
@@ -1593,6 +1600,30 @@ def board_argv(roots: Collection[str | Path]) -> tuple[list[str] | None, str]:
     return argv, ""
 
 
+def _same_ref(a: Any, b: Any) -> bool:
+    """One reference, as the host agent stores it (`normalize_ref`: `td-27` is `TD-027`)."""
+    try:
+        return normalize_ref(str(a or "")) == normalize_ref(str(b or ""))
+    except ValueError:  # an empty reference names nothing
+        return False
+
+
+def review_pr(progress: Collection[dict[str, Any]], ref: str) -> int | None:
+    """The PR a claim on `ref` is in review as (design §4.5a *Focus side panel → Reports*, TD-150),
+    or None: a declared `claimed` entry's own `pr`, else the `review_pr` its record carries for its
+    branch — the rule `AO.reportGroups` draws the panel by, so the panel and the refusal agree. No
+    derived entry shares a declared one's reference (§9 invariant 10), so there is no third."""
+    for p in progress:
+        if not isinstance(p, dict) or not _same_ref(p.get("ref"), ref) or p.get("status") != "claimed":
+            continue
+        if (p.get("source") or "declared") != "declared":
+            continue
+        got = p.get("review_pr") or p.get("pr")
+        if isinstance(got, int) or str(got or "").isdigit():
+            return int(got)
+    return None
+
+
 def board_choices(roots: Collection[str | Path] | None = None) -> list[dict[str, str]]:
     """The boards *Put on the board* may write to (design §4.5a *Inbox row: FYI*, TD-140): each
     checkout this host's repos registry names that carries a board, as `{label, root, board}` with
@@ -2362,6 +2393,8 @@ def create_app() -> FastAPI:
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
             e["from_open"] = e["from"] if e["from"] in names else ""
+            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does
+            e["reply_when"] = str(((records.get(e["from"]) or {}).get("read_when") or {}).get("note") or "")
             e["board_default"] = board_of(e["from"])
             if isinstance(e.get("pr"), int):  # §4.9b *The reader*: a held PR asked of the person (TD-093)
                 sender = records.get(e["from"]) or {}
@@ -2383,6 +2416,8 @@ def create_app() -> FastAPI:
             asker = str(_answered_of(e).get("asker") or "")
             if asker:
                 e["asker_name"] = names.get(asker, asker)
+                # Overrule writes to the asker, so its dialog's line is the asker's (TD-168)
+                e["asker_when"] = str(((records.get(asker) or {}).get("read_when") or {}).get("note") or "")
                 e["asker_open"] = asker if asker in names else ""
         return got
 
@@ -2513,6 +2548,8 @@ def _pages_routes(app: FastAPI, h: SimpleNamespace) -> None:
                 "active": "Org",
                 # design §4.5a **Pop out** (TD-046): the same Focus, without the nav and the top bar
                 "popped": window == "1",
+                # §4.5a **Reports** (TD-150): the base a claim in review's PR number links from
+                "pr_base": await asyncio.to_thread(reviewmod.repo_web, s.get("repo") or s.get("dir")),
             },
         )
 
@@ -2793,6 +2830,18 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
             ref = str(body.get("ref") or "").strip()
             if not ref:
                 raise HTTPException(400, "drop needs the reference to drop")
+            # TD-150 slice 2 (§4.5a *Reports*): not while a PR from that claim is open — the claim
+            # in review is the one a person reading the panel must not let go (TD-143)
+            s = await call("get", id=sid)
+            pr = review_pr(s.get("progress") or [], ref)
+            if pr:
+                # the record cannot yet say whether that PR is still open (slice 3 brings its state),
+                # so the refusal says what ends it either way
+                raise HTTPException(
+                    409,
+                    f"{ref} is in review as PR #{pr}: a claim with a PR is not dropped — it ends when the "
+                    "session reports it done or dropped, once the PR is merged or closed",
+                )
             await call("progress", id=sid, ref=ref, status="dropped", why=body.get("why") or "dropped from Focus")
         elif action == "stop":
             # design §4.5a Focus header **stops** badge → click to edit (§6, TD-026). The stop time
@@ -2876,9 +2925,12 @@ def _sessions_routes(app: FastAPI, h: SimpleNamespace) -> None:
         got = await call("inbox", id=sid)
         fleet = await call("list")
         names = {o.get("id"): o.get("name") or o.get("id") for o in fleet}
+        records = {o.get("id"): o for o in fleet}
         origin = page_origin(request)
         for e in got["entries"]:
             e["from_name"] = "person" if e["from"] == "person" else names.get(e["from"], e["from"])
+            # the Reply dialog's line (§4.10 *When it is read*, TD-168): a reply reads as a note does
+            e["reply_when"] = str(((records.get(e["from"]) or {}).get("read_when") or {}).get("note") or "")
             s = shaped(e.get("text"), origin)
             e["lead_html"], e["rest_html"] = str(s["lead"]), str(s["rest"])
         return got

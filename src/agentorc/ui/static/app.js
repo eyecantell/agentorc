@@ -185,12 +185,48 @@
 
   // design §4.5a **Message** / Focus Inbox **Reply** (§4.10): one composer for both, a <dialog>.
   // Resolves to what to mail, or null on Cancel / an empty body.
+  // design §4.5a Focus side panel **Reports** (TD-143, built by TD-150): a record's `progress` as
+  // the panel's four groups. A declared claim is *in review* when it has a PR — its own `pr`, or
+  // `review_pr` where the record carries its branch's (slice 3) — and *in progress* otherwise; a
+  // derived entry never shares a declared one's reference (§9 invariant 10: the upsert refuses it),
+  // so there is nothing to fold. Anything not done or dropped is in progress. Pure, for a test.
+  AO.reportGroups = function (progress) {
+    const g = { progress: [], review: [], done: [], dropped: [] };
+    (progress || []).forEach((p) => {
+      if (p.status === "done") g.done.push(p);
+      else if (p.status === "dropped") g.dropped.push(p);
+      else {
+        const pr = p.status === "claimed" ? p.review_pr || p.pr : null;
+        if (pr) g.review.push({ ...p, review_pr: pr });
+        else g.progress.push(p);
+      }
+    });
+    return g;
+  };
+
+  // §4.10 *When it is read* (TD-168): the composer's line for a kind, from the addressee's pair
+  // (`read_when` on its record's view). Pure, so a test can call it: a reply reads as a note does,
+  // and a pair the record did not carry (an older host agent) draws no line at all.
+  AO.whenLine = function (pair, kind, reply) {
+    const t = (pair || {})[reply || kind === "note" ? "note" : "ask"] || "";
+    return t ? `When it is read: ${t}.` : "";
+  };
+
   AO.compose = function (o) {
     const dlg = $("#mailbox");
     $("#mailtitle").textContent = o.reply ? `Reply to ${o.to}` : `Message ${o.to}`;
     $("#mailkindrow").hidden = !!o.reply;
     $("#mailquote").textContent = o.quote ? `re: “${o.quote.length > 160 ? o.quote.slice(0, 160) + "…" : o.quote}”` : "";
     $("#mailkind").value = "ask"; $("#mailabout").value = ""; $("#mailtext").value = "";  // an ask by default (§4.5a **Message**, 2026-09-25)
+    // §4.10 *When it is read* (TD-168): the addressee's pair, from its record's view, never a
+    // request; a reply reads as a note does, and switching the kind swaps the sentence
+    const when = $("#mailwhen");
+    if (when) {
+      const show = () => {
+        when.textContent = AO.whenLine(o.when, $("#mailkind").value, o.reply); when.hidden = !when.textContent;
+      };
+      $("#mailkind").onchange = show; show();
+    }
     return new Promise((resolve) => {
       dlg.addEventListener("close", () => {
         const text = $("#mailtext").value;
@@ -294,7 +330,10 @@
       }
       // design §4.5a **Message**, Focus Inbox **Reply** and delete (§4.10): mail, never a send
       if (action === "message" || action === "reply") {
-        const m = await AO.compose({ to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote });
+        const m = await AO.compose({
+          to: b.dataset.name || id, reply: action === "reply", quote: b.dataset.quote,
+          when: { ask: b.dataset.whenAsk || "", note: b.dataset.whenNote || "" },
+        });
         if (!m) return;
         body = action === "reply" ? { reply_to: b.dataset.msg, text: m.text } : m;
       }
@@ -505,7 +544,7 @@
         : "open · no bound";
     }
     const reply = (e.from === "person" || e.from === "system") ? ""
-      : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}">Reply</button>`;
+      : ` <button class="btn sm ghost" data-act="reply" data-id="${esc(owner)}" data-msg="${esc(e.id)}" data-name="${esc(e.from_name || e.from)}" data-quote="${esc(e.text)}" data-when-note="${esc(e.reply_when || "")}">Reply</button>`;
     const confirmText = "Delete this entry from this session's inbox? The sender keeps its copy.";
     return `<div class="mail${e.read_at ? "" : " unread"}" data-msg="${esc(e.id)}">`
       + `<div class="row gap"><span class="ref" title="${esc(e.from)} · ${esc(e.from_role || "")}">${esc(e.from_name || e.from)}</span>`
@@ -1629,6 +1668,13 @@
   AO.focus = function (s, popped) {
     const id = s.id;
     document.title = AO.focusTitle(s);
+    // §4.5a **Reports** (TD-150): the heading's **i** mark opens its paragraph in place, as the
+    // Inbox's do; it sits in the panel's `<summary>`, so the press must not also fold the panel
+    const imark = $("#i-reports"), info = $("#info-reports");
+    if (imark && info) imark.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      info.hidden = !info.hidden; imark.setAttribute("aria-expanded", info.hidden ? "false" : "true");
+    });
     if (popped) {
       // design §4.5 *Pop out* (TD-046): say so to this browser's other tabs, and keep the size and
       // position the person gives the window, per session, as a team's fold is kept.
@@ -1915,19 +1961,39 @@
     // pushed record, so a `progress` or `finding` call from anywhere shows up here without a reload.
     function renderReports(v) {
       const progress = v.progress || [], findings = v.findings || [];
-      $("#reportscard").classList.toggle("hidden", !(progress.length || findings.length));
+      const card = $("#reportscard");
+      card.classList.toggle("hidden", !(progress.length || findings.length));
       $("#reportscount").textContent = [progress.length ? `${progress.length} progress` : "", findings.length ? `${findings.length} filed` : ""].filter(Boolean).join(" · ");
-      $("#progresslist").innerHTML = progress.map((p) => {
+      const base = card.dataset.prBase || "", name = card.dataset.name || v.name || "this session";
+      // the PR number as a link from a structured field — never from text a session wrote
+      const prLink = (n) => (base ? `<a class="ref" href="${esc(base)}/pull/${encodeURIComponent(n)}" target="_blank" rel="noopener">#${esc(n)}</a>` : `#${esc(n)}`);
+      const row = (p) => {
         const derived = (p.source || "declared") !== "declared";
         // a reference is shown once (§4.5a **report line**, TD-095): an entry whose reference is
         // its PR never reads `#359 → #359` — the rule `report_line` follows for the card
-        const pr = p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ #${esc(p.pr)}</span>` : "";
+        const st = p.review_pr
+          ? `<span class="st claimed">claimed · in review ${prLink(p.review_pr)}</span>`
+          : `<span class="st ${esc(p.status)}">${esc(p.status)}</span>`
+            + (p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "");
         const why = p.why ? ` <span class="st">${esc(p.why)}</span>` : "";
-        const drop = p.status === "claimed"
-          ? ` <button class="btn sm ghost" data-act="drop" data-id="${id}" data-ref="${esc(p.ref)}" data-confirm="Drop ${esc(p.ref)}? It is recorded as dropped by you.">Drop</button>` : "";
         return `<div class="rep${derived ? " derived" : ""}"><span class="ref" title="${derived ? "derived by the agent" : "declared by the session"}">${esc(p.ref)}</span>`
-          + `<span class="st ${esc(p.status)}">${esc(p.status)}</span>${pr}${why}<span class="grow"></span><span class="st age" data-since="${esc(p.at || "")}">${fmtAge(p.at)}</span>${drop}</div>`;
+          + `${st}${why}<span class="grow"></span><span class="st age" data-since="${esc(p.at || "")}">${fmtAge(p.at)}</span></div>`;
+      };
+      const g = AO.reportGroups(progress);
+      const heads = { progress: "in progress", review: "in review", done: "done", dropped: "dropped" };
+      $("#progresslist").innerHTML = Object.keys(heads).filter((k) => g[k].length)
+        .map((k) => `<div class="st repgroup">${heads[k]}</div>` + g[k].map(row).join("")).join("");
+      // Drop, behind more ▾, on a declared in-progress claim only: a claim with a PR is in review,
+      // and letting go of it is not what a person reading the panel means (TD-143)
+      const drops = g.progress.filter((p) => p.status === "claimed" && (p.source || "declared") === "declared");
+      // a declared entry carries no branch, and the session's checked-out one may be another
+      // claim's (review of PR #586), so the confirm names none
+      $("#reportsmenu").innerHTML = drops.map((p) => {
+        const confirmText = `Let go of ${p.ref}'s claim? The lease ends and another session may take it; `
+          + `its branch and any work on it stay; only ${name} can claim it again.`;
+        return `<button data-act="drop" data-id="${id}" data-ref="${esc(p.ref)}" data-confirm="${esc(confirmText)}">Drop ${esc(p.ref)}…</button>`;
       }).join("");
+      $("#reportsmore").hidden = !drops.length;
       $("#findinglist").innerHTML = findings.map((f) => {
         const derived = (f.source || "declared") !== "declared";
         const pri = f.priority ? ` <span class="st">${esc(f.priority)}</span>` : "";

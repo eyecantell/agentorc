@@ -32,7 +32,7 @@ With `/attention remote`, add `--remote` instead (it implies `--fetch`): after t
 sections, a labeled remote tier lists boards discovered on GitHub (gh CLI) in repos no
 local row covers — repos living only on other machines. Pushed state only; archived
 repos are skipped; discovery scans the authenticated user + orgs unless
-`${XDG_CONFIG_HOME:-~/.config}/dev-cadence/remote_repos.txt` narrows it (one `owner` or
+`remote_repos.txt` in the machine-scope directory (`$DEV_CADENCE_REG_DIR`, else `${XDG_CONFIG_HOME:-~/.config}/dev-cadence`) narrows it (one `owner` or
 `owner/repo` per line; empty/missing = scan all). Every failure mode (gh missing,
 unauthenticated, per-repo 403/5xx, truncated listing, budget exhaustion) degrades to a
 ⚠ note in the tier — surface those notes; absence of a note is the coverage claim.
@@ -40,15 +40,22 @@ unauthenticated, per-repo 403/5xx, truncated listing, budget exhaustion) degrade
 ## Present
 
 Lead with the report's own header line (N boards, M open items, K due/overdue) as the
-TL;DR, then the per-repo sections. The report is already ordered (overdue-most-first, then
-dated soonest-first, then undated) — do not re-sort or re-derive tags. Surface any ⚠ lines
+TL;DR, then the per-repo sections. The report is already ordered (decided items first —
+they wait on a session, not the user — then overdue-most-first, dated soonest-first,
+undated) — do not re-sort or re-derive tags.
+
+When the user answers, snoozes or closes an item here, make the edit with
+`scripts/board_edit.py decide|snooze|done --board <board> --line <N> --expect "<item text>"`
+(the line and text from `--report --json`), never by hand-editing the line — it refuses a
+board that moved and commits under cadence.md §4's tool-made-edit carve-out. An item's
+`Answers:` are the choices to offer; the user may answer in their own words. Surface any ⚠ lines
 (unreadable/missing boards, fetch skips) rather than smoothing
 them over.
 
 ## No registry on this machine
 
 The report degrades to the current repo's board by itself; say that's what happened.
-Offer — never do unasked — to create `${XDG_CONFIG_HOME:-~/.config}/dev-cadence/repos.txt`.
+Offer — never do unasked — to create `repos.txt` in the machine-scope directory: `$DEV_CADENCE_REG_DIR` when it is set (an isolated run — never the real one then), else `${XDG_CONFIG_HOME:-~/.config}/dev-cadence` (cadence.md §9).
 The registry is append-only and nothing auto-cleans it, so the seed algorithm is pinned
 and conservative:
 

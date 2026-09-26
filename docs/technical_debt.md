@@ -77,13 +77,11 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-132 | Build the promote — the `promote:` block, the home's policy, `ao promote`, the Inbox row | Medium | Open — designed, pickable |
 | TD-133 | Build the team start at the reset — `schedules:` in `settings.yml`, the tick's replay, `ao schedule`, the card's *starts* note | Low | Open — designed; not scheduled until Paul says |
 | TD-142 | Build Reply on a board row — the `reply` edit, `board_reply`, the standing, the `handed` note to the lease holder | Medium | Partly done — slice 1 (the file half) built; the mail half waits on the reader |
-| TD-143 | The Focus Reports panel reads as a to-do list: a `claimed` row with its PR open looks like an unstarted claim, and Drop beside it lets a person let go of work in review | Medium | Open — designed; the build is TD-150, and this entry archives with it |
 | TD-144 | Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em` | Medium | Built 2026-09-25 (PR #559) — Paul's live look pending |
 | TD-146 | Build the one settings file — `settings.yml` home-owned with `teams`, `repos` and `person`, `ui.yml` retired, the `settings` read, the team stop time and reserve priority in the tick, `ao team until` | Medium | Open — designed, pickable |
 | TD-147 | Build the settings replica — the `settings` link frame, the node's copy, `set_settings` forwarded and refused offline | Medium | Open — designed, pickable after TD-146 |
 | TD-148 | Build the Settings page — screen 8, its sections and controls, the *i* marks, Open file, the terminal face and size, the tab | Medium | Open — designed, pickable after TD-146 |
-| TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Open — pickable |
-| TD-150 | Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session | Medium | Open — designed, pickable |
+| TD-149 | Settings housekeeping the audit found — dead `.agentorc.yml` keys, `promote:` refused, backups, the org `roles:` overlay unvalidated, start-only host fields, `AGENTORC_TICK`, bind and port | Low | Partly done — (2), (4), (6) done; five remain |
 | TD-151 | Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip | Low | Open — designed and reconciled 2026-09-25; pickable |
 | TD-152 | Build the start time — `start_at`, the `scheduled` state, the tick's create at the instant, `ao new --at` / `ao at`, the starts note and the At field | Medium | Open — designed, pickable |
 | TD-154 | Read a session's transcript without resuming it: a **Transcript** control on Focus and the Resumable list, and `ao transcript` | Medium | Open — design-first |
@@ -96,9 +94,9 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Open — design-first |
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
 | TD-164 | Terminal selection in Focus: plain drag selects in the browser and Shift+drag still does, the wheel scrolls tmux through the bridge, and copy-on-select is the one toggle | Medium | Open — design-first |
-| TD-168 | Build *when it is read*: `mail.read_when`, the pair on the record's view, the composer's sentence that changes with the kind, `read_when` on every `ao msg` reply | Medium | Open |
 | TD-170 | Build the repo strip and the Repo page: the host agent's repo facts (open PRs by `gh`, the ledger's entries by `sessionorc.ledger`), the `repos` RPC and event, the strip on the team card, `/repo/<name>`, `ao repo` | Medium | Open — designed 2026-09-25 (cloud session with Paul); pickable in slices |
 | TD-171 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, after TD-170's numbers are visible |
+| TD-175 | The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work | Medium | Open — design-first |
 
 
 ---
@@ -1391,24 +1389,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** TD-126 (the design), TD-069 step 3 (`board_edit`, the pattern), TD-077 b (`handed`), TD-079 (outcomes), TD-056 (the lease).
 
-## TD-143: The Focus Reports panel reads as a to-do list: a `claimed` row with its PR open looks like an unstarted claim, and Drop beside it lets a person let go of work in review
-
-**Priority:** Medium
-**Added:** 2026-09-25 (Paul, on designer-ao-1's Focus page: *I was confused by it and hit "Drop" on 126 and 127 thinking they were todo, but apparently they were done (already had a PR) — lets add a TD to make this more clear*; a cloud session)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** no — designed; the build is TD-150, and this entry archives with it
-
-**Status:** Open — **designed 2026-09-25 (the designer, PR #546), the recommendation (a)–(f) confirmed as written:** §4.5a *Focus side panel → Reports* (grouped by state, the PR beside a claim in review from the entry, the derived entry or the branch's PR; Drop behind *more ▾* on an in-progress row only, its confirm naming the consequence; the *i* mark; the trail row names the PR) and §4.10 (the `system` note on a person's drop). **Undo** on the trail row: **none** (Paul, 2026-09-25 — the session claims again on its own, told by the note). Build: TD-150. Was: **asked 2026-09-25.** What happened: the designer's Reports panel listed `TD-069 claimed 5h 51m Drop`, `TD-072 claimed`, `TD-035 claimed`, `TD-126 claimed`, `TD-127 claimed`, each with a **Drop** button, above `TD-120 done → #525` and two more; TD-126 and TD-127 each had an open PR (#531, #532) waiting in a stack, which the panel did not say — a declared claim carries no `pr` until `done --pr`, and the derived channel's PR for the same reference is not drawn beside the declared entry. Paul read the claimed rows as a to-do list and pressed Drop on two; the confirm (*Drop TD-127? It is recorded as dropped by you.*) says what is recorded, not what it means: the lease ends, the record reads *dropped — dropped from Focus*, the designer's inbox is not told, and its PRs stay open with no claim pointing at them. The panel's one explanation (*What the session declared, plus what the agent derived from its branch and PRs (dashed). Drop records that a claim was let go.*) is a note under the list, read after the press. Three faults: **(1)** a claim in review is drawn like a claim not started; **(2)** Drop is a first-class button on every claimed row, though letting go of another session's work is rare and consequential — the rest of the pages put such acts behind a confirm that says the consequence, or behind `more ▾`; **(3)** nothing says who a drop affects (the lease another session may now take; the session, which is not told) or how it is undone (the session claims again; a person cannot).
-
-**The recommendation for the round:** (a) a claimed row shows its PR when one exists — the entry's own `pr`, else the derived entry on the same reference, else a PR from the record's `tdNNN-*` branch (`sessionorc.reports` already asks `gh` for it) — as *claimed · in review #532*, and the panel groups its rows *in progress*, *in review*, *done*, *dropped*, so the states read at a glance; (b) Drop leaves the row's face — behind the panel's `more ▾`, never a primary button — and is not offered while a PR from that claim is open; (c) its confirm names the consequence: *let go of TD-127's claim: the lease ends and another session may take it; the branch and PR #532 stay; only designer-ao-1 can claim it again*; (d) a person's drop is told to the session by a `system` note, as every act on its work is (§4.10), so a worker learns its lease is gone before it pushes into a reference somebody else has taken; (e) the explanation becomes the panel's *i* mark at its heading (§4.5 screen 6's pattern); (f) the trail row names the PR too. **Open for Paul:** an **Undo** on the trail row (the person re-declares the claim on the session's behalf — a declaration by the person, as Drop is; §9 invariant 14 says only the session writes its own word, so this is a new exception) or none, since the session can claim again and (d) tells it to.
-
-**Location:** design §4.5a *Focus side panel → Reports*, §4.8 (report channels; the lease), §4.10 (`system` notes), `src/agentorc/ui/static/app.js` (the Reports panel, `data-act="drop"`, its confirm), `src/agentorc/ui/templates/focus.html` (the note under the list), `src/agentorc/ui/app.py` (the drop route, *dropped from Focus*), `src/sessionorc/reports.py` (the derived PR beside a declared claim), `src/sessionorc/agent.py` (`rpc_progress`: the note to the session on a person's drop).
-
-**Why:** one confused minute let go of two design PRs' claims; the Reports panel is the one place a person sees a session's work, and it must say what state each piece is in and what a press does to it before the press.
-
-**Related:** TD-056 (a claim is a lease), TD-028 (declared and derived), TD-045 (a derived claim's PR), TD-126 and TD-127 (the two claims dropped), TD-124 (keys: none on this panel yet).
-
 ## TD-144: Build the type scale — six tokens on `:root`, every size literal in `app.css` replaced, heights in `em`
 
 **Priority:** Medium
@@ -1499,7 +1479,7 @@ Two things are missing, and the design round chooses between them or takes both:
 **Owner:** grinder
 **Kind:** build
 **Pickable:** yes
-**Status:** Open. Eight findings, each small, none design: (1) `.agentorc.yml`'s `adapter`, `worktrees`, `anchor`, `unattended`, `ready_when` and `commands` are parsed and read by nothing — implement or remove each, and say which in §5; (2) `promote:` is refused as an unknown key by `repoconfig._apply`, so writing the designed block breaks `ao new` in that repo — accept it now, ahead of TD-132; (3) `BACKUP_MEMBERS` lacks `settings.yml` (TD-146 adds it; remove this item when it lands); (4) the org-level `roles:` overlay skips `_role_block`'s validation — validate it the same way; (5) a hand edit of `hosts.yml`'s `local.name`, `home:` or `local.identity` leaves the agent (start-only) and the UI (per request) disagreeing until a restart — the UI should read the agent's snapshot for those three, or say *restart pending*; (6) `AGENTORC_TICK` is an override §5 does not name — document it as a test knob in §5 or remove it; (7) bind and port live in `ao ui`, `agentorc-ui` and the unit — one source; (8) `AGENTORC_PROFILE` is exported to every pane and read by nothing, and `hosts.yml`'s `transport`/`ssh` are in §5 and not the code — reconcile each way.
+**Status:** Partly done — **(2), (4) and (6) done 2026-09-25 (grinder-ao-1, PR #592)**: `promote:` accepted and checked (`repoconfig._promote`: `run` and `check` required, `auto` refused as `settings.yml`'s); the org `roles:` overlay checked by `_role_block` (the live `org.yml`'s six presets pass unchanged, `review` gaining its default `bound: 2h` as the record already shows); `AGENTORC_TICK` named in §5 as a test knob. The other five remain. Eight findings, each small, none design: (1) `.agentorc.yml`'s `adapter`, `worktrees`, `anchor`, `unattended`, `ready_when` and `commands` are parsed and read by nothing — implement or remove each, and say which in §5; (2) `promote:` is refused as an unknown key by `repoconfig._apply`, so writing the designed block breaks `ao new` in that repo — accept it now, ahead of TD-132; (3) `BACKUP_MEMBERS` lacks `settings.yml` (TD-146 adds it; remove this item when it lands); (4) the org-level `roles:` overlay skips `_role_block`'s validation — validate it the same way; (5) a hand edit of `hosts.yml`'s `local.name`, `home:` or `local.identity` leaves the agent (start-only) and the UI (per request) disagreeing until a restart — the UI should read the agent's snapshot for those three, or say *restart pending*; (6) `AGENTORC_TICK` is an override §5 does not name — document it as a test knob in §5 or remove it; (7) bind and port live in `ao ui`, `agentorc-ui` and the unit — one source; (8) `AGENTORC_PROFILE` is exported to every pane and read by nothing, and `hosts.yml`'s `transport`/`ssh` are in §5 and not the code — reconcile each way.
 
 **Location:** `src/agentorc/repoconfig.py`, `src/sessionorc/agent.py`, `src/agentorc/org.py`, `src/sessionorc/hosts.py`, `src/agentorc/ui/app.py`, `src/agentorc/service.py`, design §5.
 
@@ -1508,25 +1488,6 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** each of the eight is done or struck with a reason, §5 names only keys the code reads, and `pdm run test` covers (2) and (4).
 
 **Related:** TD-100, TD-132, TD-004, TD-060.
-
-## TD-150: Build the Reports panel by state — the PR beside a claim in review, Drop behind more with its consequence, the note to the session
-
-**Priority:** Medium
-**Added:** 2026-09-25 (the designer; TD-143's design round, PR #546)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — designed, nothing built. Design: §4.5a *Focus side panel → Reports*, §4.10 (the `system` note on a person's drop).
-
-**Location:** `src/agentorc/ui/static/app.js` (the Reports panel: the four groups, *claimed · in review #n* with the PR as a link from the entry's `pr`, the derived entry on the same reference, or the branch's PR; Drop moved under the panel's `more ▾`, drawn only on an in-progress row, `data-confirm` naming the consequence with the reference, the PR and the session's name), `src/agentorc/ui/templates/focus.html` (the note under the list becomes the heading's **i** mark), `src/agentorc/ui/app.py` (the drop route: refuse while a PR from that claim is open, saying which; the trail row names the PR), `src/sessionorc/reports.py` (the PR for a record's `tdNNN-*` branch exposed beside the declared entry — it already asks `gh`), `src/sessionorc/agent.py` (`rpc_progress`: a person's `dropped` sends the session the `system` note, waking it as a person's act does), `tests/test_ui.py`, `tests/test_agent.py`.
-
-**Why:** on 2026-09-24 Paul read the designer's claimed rows as a to-do list and pressed Drop on two claims whose PRs were open in a stack; the panel said neither that they were in review nor what Drop would do, and the session was not told (TD-143).
-
-**Fix:** three slices; the last touches `src/sessionorc/**`, so the techlead reads it (§4.9b). (1) The panel: groups, the PR beside a claim in review from the three sources in that order, the *i* mark, Drop under `more ▾` on in-progress rows only, the consequence confirm; a test that a claimed entry with a derived PR on the same reference is drawn *in review* with the number. (2) The route: refuse a drop while a PR from that claim is open (the same three sources), the trail row with the PR. (3) The note: `rpc_progress` with a person caller and `status: dropped` files the `system` note to the session (§4.10's words), one per drop; a test that the session's inbox holds it and its wake fires.
-
-**Done when** a session with a claimed reference and an open PR on its `tdNNN-*` branch shows *claimed · in review #n* under *in review* with no Drop on its face; Drop on an in-progress row sits under `more ▾`, its confirm names the lease, the branch and who can claim again, and the session's inbox holds the note after the press; the panel's heading carries the *i* mark and the note under the list is gone; TD-143 is archived.
-
-**Related:** TD-143 (the design), TD-056 (a claim is a lease), TD-028 (declared and derived), TD-045 (a derived claim's PR), TD-124 (keys: none on this panel yet).
 
 ## TD-151: Build metered profiles — `billing` on the profile, `spend()` in the adapter, the summed reading, the amount reserve, the chip
 
@@ -1782,30 +1743,6 @@ Two things are missing, and the design round chooses between them or takes both:
 
 **Related:** §4.5a *Focus: Copy / Paste*, §4.6 *Scrollback is tmux's* (TD-022), TD-096 (the read-only attach), TD-157 (an *i* mark for the control), ADR 2026-09-25 (where a person's preference lives).
 
-## TD-168: Build *when it is read*: `mail.read_when`, the pair on the record's view, the composer's sentence that changes with the kind, `read_when` on every `ao msg` reply
-
-**Priority:** Medium
-**Added:** 2026-09-25 (the designer, from TD-158's design)
-**Owner:** grinder
-**Kind:** build
-**Pickable:** yes
-**Status:** Open — nothing built. Design §4.10 *When it is read: the sentence the sender sees*, §4.5a **Message** (the last sentences), §4.7 *Mail* (the reply's last line); mockup `Message.dc.html`.
-
-**Location:** `src/sessionorc/mail.py` (`wake_budget_spent` is beside where `read_when` goes; the seat's `asks_waiting`), `src/sessionorc/agent.py` (`rpc_msg`'s reply dict — `wake_budget_spent`, `unreachable` already there; `_view` / the pushed record), `src/agentorc/ui/app.py` (`view`: `seat`, `seat_when`, `scraped`, the wrap-up and gate notes — the same facts the sentence reads), `src/agentorc/ui/templates/base.html` (the `#mailbox` dialog: a line under `#mailkindrow`), `src/agentorc/ui/static/app.js` (`AO.compose`: takes the record's `read_when` pair and swaps the line on the kind's `change`), `src/agentorc/cli.py` (`cmd_msg`: print `read_when` after `advice`), `src/agentorc/skill.md` (one clause: the reply says when it is read).
-
-**Why:** TD-158's *Why*: nothing on the screen said the seat comes on a question.
-
-**Fix:**
-1. **`read_when(record, kind, now) -> str`** in `sessionorc.mail`: the table's cases in its order, the page's words for states, the seat's two sentences by kind (`reply` as `note`), the bound clause on an `ask`, the budget clause only when the sender is a session (a parameter, `person: bool`). `src/sessionorc/**` is a held path: the techlead reads this PR.
-2. **On the record's view**: `read_when: {ask, note}` computed at `_view` time for every record the UI receives — two short strings, no request at open; a seat with nobody in it (the placeholder card) gets its pair from the seat's definition.
-3. **The composer**: the sentence under the kind selector, from the pair; swapped on the kind's `change`; the Reply dialog shows the `note` one. Text only.
-4. **`rpc_msg`** returns `read_when: {id: sentence}` per addressee, computed after delivery with `person=(sender == PERSON)`; **`ao msg`** prints each after the `advice` line, `read_when` under `--json`.
-5. **Tests:** `read_when` on a record per case (twelve cases, both kinds where they differ, the session's budget clause); the composer's swap under node as `test_ui_keys.py` runs `app.js`; the CLI's printed line on a fixture reply.
-
-**Done when** TD-158's *Done when*: a person opening Message on an on-call seat reads, before typing, that a note will not fill it and an ask will, and switching the kind changes the line; and `ao msg` to an exited member ends with *read when it is resumed, or started again under this name*.
-
-**Related:** TD-158 (the design), TD-153 (what a session is told about being woken), TD-157 / TD-167 (the *i* marks: the same idea at the button), TD-152 (the `scheduled` sentence), §4.9b (the seat's trigger), §4.10 (the doorbell's order, the budget's refill).
-
 ## TD-170: Build the repo strip and the Repo page — repo facts on the host agent, the `repos` RPC and event, the strip on the team card, `/repo/<name>`, `ao repo`
 
 **Priority:** Medium
@@ -1851,3 +1788,21 @@ Two things are missing, and the design round chooses between them or takes both:
 **Status:** Open — nothing designed beyond the §10 question.
 
 **Related:** TD-170, §10, §4.9b *The reader* (the `bound`), §6 (where a team's policies live), `docs/decisions/2026-09-25-settings-audit.md`.
+
+## TD-175: The manager's round log is a save-point branch: one commit per round on its launch branch, never merged, read by nobody from git, and the card counts it as unpushed work
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *Is making round-by-round commits on the manager's branch the right design for it?* — after the ao-grind manager's card read *18 unpushed*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+
+**Status:** Open — nothing designed. Step 5 of the package's manager template (`src/agentorc/briefs/manager.md`) says *append one line per round to your log on your launch branch*, and `docs/briefs/manager-ao-1.md` names the file, `docs/briefs/manager-ao-1.log`, as *the one thing you commit to it … never a PR*; the wind-down sequence's step (4) is *push your log*. The design never mentions the log: §4.6 keeps a session's run log itself (`~/.agentorc/runs/<session>-<created>.log`, the pane piped continuously), §4.8 carries what a session holds as `progress`, the board carries what waits on the person, and the wind-down note (§4.9a) is mail. On 2026-09-25 `manager-ao-1`'s branch was 196 commits ahead of `main`, 18 of them today's rounds not pushed, and the card read *unpushed* for a file no one reads from git.
+
+**Why:** the log is a save-point branch by another name — the grinder brief says *a branch exists only to carry a PR, never as a save-point* — and it duplicates what the run log already captures, since every logged line is also printed in the turn. It trips Ready to close's unpushed signal, which exists for work at risk, and costs a git write into the checkout's shared object store on every round. The one thing it gives that the run log does not is a one-line-per-round narrative that survives a restart, which starts a fresh run log; that need is real and has no git-free home yet.
+
+**What the design round has to settle:** (a) **whether the round line is kept at all** — as a printed line in the turn it is already in the run log, and `ao progress` is the declared record; (b) **where a restart-surviving narrative lives** if it is wanted — the record's own trail (§4.5a's trail rows), a home-owned per-session notes file under `~/.agentorc/` beside the run logs and pruned with them (`runs_keep_days`, §4.6), or a `note` to itself; never a git branch; (c) **the launch branch's role** — a launch artefact the manager never commits to, as the grinder's is, and what becomes of the 196 commits on `manager-ao-1` (left; §4.1 supersedes the record at the next start under its name, and the branch is the launch's artefact); (d) the template's step 5 and the wind-down's step (4), and the supplement's *the one thing you commit to it* line, which is dev-cadence's shape of a supplement (§4.8, TD-114) and changes with the template; (e) whether Ready to close should ever read a launch branch's own commits as unpushed work, or that is exactly right and the log is what is wrong — the round decides.
+
+**Done when** the manager template's round step commits nothing, a restarted manager can read what its previous run did in the place the round chose, and a manager's card shows no unpushed count from its own log.
+
+**Related:** §4.6 (run logs, `runs_keep_days`), §4.8 (`progress`, the template and its supplements — TD-114), §4.9a (the wind-down note), §4.5a *Ready to close*; `src/agentorc/briefs/manager.md` step 5; `docs/briefs/manager-ao-1.md`; TD-103 (the tick took the manager's mechanical rounds, which is why its rounds are short enough that the log is most of what it writes).

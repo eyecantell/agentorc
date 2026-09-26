@@ -1240,6 +1240,13 @@ class HostAgent:
                 continue
             branch = (s.git or {}).get("branch") if s.id in holders else None
             pending = [e for e in s.progress if e.source != "declared" and e.status == "claimed" and e.pr]
+            # …and a declared claim's `review_pr` (TD-150), re-checked by number, so a merge or a close
+            # clears it after the session has moved to its next branch
+            reviews = [
+                (e.ref, e.review_pr)
+                for e in s.progress
+                if e.source == "declared" and e.status == "claimed" and e.review_pr and not e.pr
+            ]
             # Branch-only claims from a branch this record is no longer on (TD-045). Only for a
             # record that still holds its directory: what is checked out elsewhere says nothing
             # about this one, and an exited worker's claims are its history, not a live question.
@@ -1248,21 +1255,23 @@ class HostAgent:
                 if s.id in holders
                 else []
             )
-            if not branch and not pending and not left:
+            if not branch and not pending and not left and not reviews:
                 continue
-            due.append((s, branch, [(e.ref, e.pr) for e in pending if e.pr], left))
+            due.append((s, branch, [(e.ref, e.pr) for e in pending if e.pr], left, reviews))
         if not due:
             return
         results = await asyncio.gather(
             *(
                 # the ledger path the client read from the repo's config at create (design §5
                 # `ledger:`), else the default — this package never reads `.agentorc.yml` itself
-                asyncio.to_thread(reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT, left)
-                for s, branch, pend, left in due
+                asyncio.to_thread(
+                    reports.derive, s.dir, branch, pend, s.ledger or reports.LEDGER_DEFAULT, left, reviews
+                )
+                for s, branch, pend, left, reviews in due
             ),
             return_exceptions=True,
         )
-        for (s, _branch, _pending, _left), result in zip(due, results, strict=True):
+        for (s, _branch, _pending, _left, _reviews), result in zip(due, results, strict=True):
             self._derived_at[s.id] = now
             live = self.sessions.get(s.id)
             if live is None:
@@ -1278,6 +1287,8 @@ class HostAgent:
             # Lists, not generators: these upserts are the write, and `any()` over a generator
             # would stop at the first change and silently drop every later entry (review 2026-09-11).
             applied = [live.report_progress(e) for e in progress] + [live.report_finding(e) for e in findings]
+            # a refused derived entry still leaves its PR beside a declared claim (TD-150)
+            applied += [live.note_review(e) for e in progress]
             changed = any(applied) | live.retire_branch_claims(retire)
             if changed:
                 self.store.save(live)
@@ -2747,6 +2758,15 @@ class HostAgent:
             # a session that claims something went on after all — both endings are taken back
             # (§4.9a; `restart_wanted` since TD-083), and a controller must not act on a stale one
             s.out_of_work = s.restart_wanted = None
+        if applied and status == "dropped" and entry.source == "declared" and mail.is_person(caller):
+            # §4.5a *Reports* → Drop, §4.10 (TD-150 slice 3): the session is told its lease went, by a
+            # `system` note that wakes it as a person's act does — else it works on, holding nothing
+            self._system_note(
+                self._address(s),
+                f"your claim on {entry.ref} was dropped by the person — the lease is gone; claim again if you "
+                "still hold the work",
+                wake="person",
+            )
         out = await self._report(s, applied, entry)
         if holder is not None and applied:
             out["lease_overridden"] = holder
@@ -3441,6 +3461,31 @@ class HostAgent:
             self._save(r)
         await self._push_changes()
         now = datetime.now(UTC)
+        away = {
+            sid
+            for sid in (*named, *landed)
+            if sid != PERSON
+            and records[sid].host != self.host
+            and not (self.links.get(records[sid].host) or {}).get("up")
+        }
+        # §4.10 *When it is read* (TD-168): one sentence per addressee, after delivery — the kind a
+        # reply reads as a note does, an ask's own bound, a session's sender told of a spent budget
+        span = None
+        with contextlib.suppress(TypeError, ValueError):
+            span = _parse(entry.bound) - _parse(entry.at) if entry.bound else None
+        read_when = {
+            sid: mail.read_when(
+                records[sid],
+                entry.kind,
+                now,
+                person=sender == PERSON,
+                bound=span,
+                unreachable=sid in away,
+                rings=getattr(adapters.get(records[sid].adapter), "composer", None) is not None,
+            )
+            for sid in named
+            if sid != PERSON and sid in records
+        }
         return {
             # exhaustion is visible to the sender (design §4.10): the mail landed, and it wakes nobody
             "wake_budget_spent": [
@@ -3448,13 +3493,8 @@ class HostAgent:
             ],
             # landed at the home while its host's link is down (§4.4a "When the recipient's host is
             # unreachable"): nothing waits anywhere but the mailbox, and the sender is told
-            "unreachable": [
-                sid
-                for sid in (*named, *landed)
-                if sid != PERSON
-                and records[sid].host != self.host
-                and not (self.links.get(records[sid].host) or {}).get("up")
-            ],
+            "unreachable": [sid for sid in (*named, *landed) if sid in away],
+            "read_when": read_when,
             "entry": entry.to_dict(),
             "delivered": list(named),
             "copies": landed,
@@ -3607,8 +3647,8 @@ class HostAgent:
         `wake` is which of the section's three rules applies:
 
         - `person` — a decline, a *Go with it* or a **pause**, the three by which a person releases
-          a sender that may be blocked in `ao wait`: they wake as a person's `reply` does and
-          **refill** the budget;
+          a sender that may be blocked in `ao wait`, and a person's **drop** of its claim (TD-150),
+          news it must act on: they wake as a person's `reply` does and **refill** the budget;
         - `note` — a **resume**, ordinary: it wakes within the budget like any `note`;
         - `uncharged` — a **lapse**: outside the budget, neither spending nor refilling it, so a
           spent budget cannot hold a sender past the bound it set itself. It is carried on the note
@@ -5438,6 +5478,7 @@ class HostAgent:
         if any(e.source == "declared" for e in (*progress, *findings)):
             raise link.LinkError("a derived report is never declared: a session declares through its own `ao`")
         applied = [s.report_progress(e) for e in progress] + [s.report_finding(e) for e in findings]
+        applied += [s.note_review(e) for e in progress]  # as the home's own tick does (TD-150)
         changed = any(applied) | s.retire_branch_claims(str(r) for r in params.get("retire") or [])
         if changed:
             self._save(s)
@@ -6100,6 +6141,12 @@ class HostAgent:
         # for this one* where it is, which it can only do if it knows before it draws; and the
         # RPC reads the same function, so drawn-or-not and refused-or-not cannot disagree.
         v["alarm_to"] = self._answers_for(s, graph)
+        # §4.10 *When it is read* (TD-168): the composer's sentence for each kind, as a person reads
+        # it — computed here so the dialog opens with it and asks nothing; a `reply` reads as a note
+        now = datetime.now(UTC)
+        down = s.host != self.host and not (self.links.get(s.host) or {}).get("up")
+        rings = getattr(adapters.get(s.adapter), "composer", None) is not None
+        v["read_when"] = {k: mail.read_when(s, k, now, unreachable=down, rings=rings) for k in ("ask", "note")}
         if s.host == self.host:
             if self.mode == "node":
                 v["asks_waiting"] = self._asks_hints.get(s.id, 0)  # the mailbox is the home's (§4.4a)

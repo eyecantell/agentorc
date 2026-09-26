@@ -1117,6 +1117,7 @@ def test_the_recipes_list_of_repo_file_keys_is_the_loaders(tmp_path):
         "ready_when": [],
         "commands": [],
         "teams": {},
+        "promote": {"run": "scripts/promote.sh", "check": "scripts/live_sha.sh"},
     }
     assert named == set(accepted)
     for key, value in accepted.items():

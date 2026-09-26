@@ -8,8 +8,9 @@
 #      → Claude silently falls back to ~/.claude/projects/<encoded-cwd>/memory/
 #        and writes memory THERE (outside the repo, never committed → lost).
 #   2. New memory written to the repo dir but not yet committed/pushed (not backed up).
-#   3. core.hooksPath not set in this clone → the pre-push main guard is silently
-#      OFF (both are per-clone/per-machine settings that a fresh machine lacks).
+#   3. The git hooks not installed in this clone → the pre-push main guard is silently
+#      OFF (a per-clone setting a fresh clone lacks), or installed the old way, as a
+#      relative core.hooksPath, which each worktree resolves on its own branch (TD-055).
 #   4. The memory directory isn't version-controlled at all (autoMemoryDirectory
 #      points outside any git repo) → memory is machine-local and dies with it.
 #
@@ -233,25 +234,52 @@ elif [ -d "$MEM_DIR" ]; then
 fi
 
 # 4) Pre-push main guard enabled in this clone? (per-machine — a fresh clone lacks it)
-# core.hooksPath is clone-wide, so from a worktree it may legitimately hold the main
-# checkout's absolute path — accept any configured path that actually contains the
-# pre-push hook instead of string-matching against $REPO_ROOT.
-if [ -f "$REPO_ROOT/scripts/git-hooks/pre-push" ]; then
+# The shipped way (TD-055) is install_git_hooks.sh: shims in the clone's shared hooks
+# directory ($(git rev-parse --git-common-dir)/hooks) that run the main checkout's hooks,
+# with core.hooksPath unset. A relative core.hooksPath naming our hooks directory is the
+# old way and is reported: each worktree resolves it on its own branch, so a worktree on
+# a branch without the hooks pushes unguarded. Any other configured path that contains a
+# pre-push hook (an absolute path to the main checkout's hooks, a repo's own hooks
+# directory with the guard copied in) is accepted.
+# Where the shipped hook lives: scripts/git-hooks in a consumer; beside this script
+# when it runs from inside the repo, which is files/scripts/git-hooks in dev-cadence
+# itself (TD-038). A copy run from outside the repo keeps the consumer path.
+HOOKS_REL="scripts/git-hooks"
+here_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+root_dir="$(cd "$REPO_ROOT" 2>/dev/null && pwd -P)"
+case "$here_dir/" in
+  "$root_dir"/*) [ -f "$here_dir/git-hooks/pre-push" ] && HOOKS_REL="${here_dir#"$root_dir"/}/git-hooks" ;;
+esac
+if [ -f "$REPO_ROOT/$HOOKS_REL/pre-push" ]; then
+  installer="${HOOKS_REL%/git-hooks}/install_git_hooks.sh"
   hookspath=$(git -C "$REPO_ROOT" config core.hooksPath 2>/dev/null || true)
   if [ -z "$hookspath" ]; then
-    warns+=("core.hooksPath is not set in this clone — the pre-push main guard is OFF on this machine. Fix: git config core.hooksPath scripts/git-hooks")
+    common="$(cd "$REPO_ROOT" 2>/dev/null && d="$(git rev-parse --git-common-dir 2>/dev/null)" && cd "$d" && pwd -P)"
+    shared="${common:-.git}/hooks/pre-push"
+    if [ -x "$shared" ] && grep -qE 'dev-cadence hook shim \(TD-055\)|ALLOW_MAIN_PUSH' "$shared" 2>/dev/null; then
+      :  # the shim, or a copy of the guard itself
+    elif [ -e "$shared" ]; then
+      warns+=("$shared is a pre-push hook of this clone's own, not the cadence main guard — the guard is OFF on this machine. Fix: fold $HOOKS_REL/pre-push into it, or move it aside and run $installer")
+    else
+      warns+=("the git hooks are not installed in this clone — the pre-push main guard is OFF on this machine. Fix: $installer")
+    fi
   else
     case "$hookspath" in
-      /*) resolved="$hookspath" ;;
-      *)  resolved="$REPO_ROOT/$hookspath" ;;
+      "$HOOKS_REL"|"$HOOKS_REL/")
+        warns+=("core.hooksPath ($hookspath) is relative, so each worktree runs the hooks of its own branch — a worktree on a branch without $HOOKS_REL pushes to main unguarded (TD-055). Fix: $installer (shims that run the main checkout's hooks in every worktree)") ;;
+      *)
+        case "$hookspath" in
+          /*) resolved="$hookspath" ;;
+          *)  resolved="$REPO_ROOT/$hookspath" ;;
+        esac
+        if [ ! -f "$resolved/pre-push" ]; then
+          # A configured-but-pre-push-less hooksPath means the repo has its OWN hooks
+          # there. Never tell the user to repoint it — git honors one hooks directory,
+          # so that trades the main guard for whatever lint/stamp hooks they already
+          # run, and the loss is silent. Copying the hook in keeps both.
+          warns+=("core.hooksPath ($hookspath) has no pre-push hook — the pre-push main guard is OFF on this machine. git honors only ONE hooks directory, so do NOT repoint core.hooksPath — any hooks already in $hookspath would be silently disabled. Fix: mkdir -p \"$resolved\" && cp \"$REPO_ROOT/$HOOKS_REL/pre-push\" \"$resolved/\"")
+        fi ;;
     esac
-    if [ ! -f "$resolved/pre-push" ]; then
-      # A configured-but-pre-push-less hooksPath means the repo has its OWN hooks
-      # there. Never tell the user to repoint it — git honors one hooks directory,
-      # so that trades the main guard for whatever lint/stamp hooks they already
-      # run, and the loss is silent. Copying the hook in keeps both.
-      warns+=("core.hooksPath ($hookspath) has no pre-push hook — the pre-push main guard is OFF on this machine. git honors only ONE hooks directory, so do NOT repoint core.hooksPath — any hooks already in $hookspath would be silently disabled. Fix: mkdir -p \"$resolved\" && cp \"$REPO_ROOT/scripts/git-hooks/pre-push\" \"$resolved/\"")
-    fi
   fi
 fi
 
@@ -266,7 +294,8 @@ fi
 BOARD="$REPO_ROOT/docs/user_attention.md"
 
 # 6) Machine roster coverage (plan 2026-08-10 P1): does this machine's registry
-#    (~/.config/dev-cadence/repos.txt) know about this repo's board? Soft warn.
+#    ($DEV_CADENCE_REG_DIR, else ${XDG_CONFIG_HOME:-~/.config}/dev-cadence, /repos.txt)
+#    know about this repo's board? Soft warn.
 #    ORDER IS A PERFORMANCE INVARIANT — the conditions short-circuit as written:
 #    registry existence, then open board items, then coverage — so a clean board
 #    or an unregistered machine (fresh laptop, CI, ephemeral container) never
@@ -276,7 +305,7 @@ BOARD="$REPO_ROOT/docs/user_attention.md"
 #    is covered *somewhere*, which is all this check exists to establish).
 #    Degradation is silence, never a false warning. Path-resolution spec:
 #    cadence.md §Machine scope (parity: sync.sh, sync-all.sh, --report).
-REGISTRY="${XDG_CONFIG_HOME:-$HOME/.config}/dev-cadence/repos.txt"
+REGISTRY="${DEV_CADENCE_REG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/dev-cadence}/repos.txt"   # TD-029
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
 if [ -f "$REGISTRY" ] \
    && [ -f "$BOARD" ] && grep -Eq '^[[:space:]]*-[[:space:]]*\[ \]' "$BOARD" \

@@ -103,6 +103,8 @@ input.denywhy { height: 26px; font-size: var(--t-small); padding: 0 6px; border:
 .reports .rep { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
 .reports .rep .ref { font-family: "JetBrains Mono", monospace; font-size: var(--t-mono-s); }
 .reports .rep.derived .ref { border-bottom: 1px dashed var(--scraped); }
+.reports .repgroup { margin-top: 6px; text-transform: none; font-weight: 600; } .reports .repgroup:first-child { margin-top: 0; }
+.reports .imark { margin-left: auto; }
 .reports .rep .st { font-size: var(--t-mono-s); color: var(--muted); }
 .reports .rep .st.done { color: var(--done); }
 .reports .rep .st.dropped { text-decoration: line-through; }
@@ -179,9 +181,9 @@ kbd { font-family: "JetBrains Mono", monospace; font-size: var(--t-small); paddi
 .inboxpage .snoozedbox > summary::-webkit-details-marker { display: none; }
 /* the **i** mark: a real button (Enter and Space press it), small and quiet, and the one bordered
    thing in a heading — everything bordered is a control, and this is one (§4.5a) */
-.inboxpage .imark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
-.inboxpage .imark:hover { background: var(--hover); color: var(--fg); }
-.inboxpage .imark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
+.inboxpage .imark, .reports .imark { width: 16px; height: 16px; padding: 0; flex: none; border: 1px solid var(--border); border-radius: 50%; background: transparent; color: var(--muted); font: 600 var(--t-cap)/1 "JetBrains Mono", monospace; cursor: pointer; align-self: center; }
+.inboxpage .imark:hover, .reports .imark:hover { background: var(--hover); color: var(--fg); }
+.inboxpage .imark[aria-expanded="true"], .reports .imark[aria-expanded="true"] { background: var(--hover); color: var(--fg); border-color: var(--muted); }
 /* the paragraph it holds: always in the page (a description may point at a hidden node, never at a
    missing one), opened **in place** under the heading so it pushes the rows down, never covers one */
 .inboxpage .isec { position: relative; }

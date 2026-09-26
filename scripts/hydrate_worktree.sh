@@ -373,14 +373,25 @@ TOPIC="$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null)"
 # one branch dehydration must never delete. A constellation's siblings are
 # independent clones and nothing guarantees they all call it `main`, so ask the
 # remote rather than assume.
+# Default branch — cadence.md §9 "Default-branch rule". Parity: this function is copied
+# verbatim into pre-push, reap_worktrees.sh, open_worktree.sh and hydrate_worktree.sh,
+# and default_branch() in the Python scripts follows the same rule; tests/test_default_branch.sh
+# runs every copy against the same fixtures. Prints a branch NAME, never empty.
+default_branch() {
+    local repo="$1" b
+    b="$(git -C "$repo" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)"
+    for b in "${b#origin/}" "$(git -C "$repo" config init.defaultBranch 2>/dev/null)" main master; do
+        if [[ -n "$b" ]] && git -C "$repo" rev-parse --verify -q "refs/remotes/origin/$b" >/dev/null; then
+            echo "$b"; return 0
+        fi
+    done
+    echo main
+}
 nested_base() {
-    local repo="$1" ref
-    ref="$(git -C "$repo" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null)"
-    if [[ -n "$ref" ]] && git -C "$repo" rev-parse --verify -q "$ref" >/dev/null; then
+    local ref
+    ref="origin/$(default_branch "$1")"
+    if git -C "$1" rev-parse --verify -q "$ref" >/dev/null; then
         echo "$ref"; return 0
-    fi
-    if git -C "$repo" rev-parse --verify -q origin/main >/dev/null; then
-        echo "origin/main"; return 0
     fi
     return 1
 }
@@ -401,8 +412,24 @@ nested_base() {
 # checked out as a worktree of some unrelated repo has a `.git` FILE, and this
 # list feeds `git worktree remove` — so an unpruned walk could delete a worktree
 # belonging to a project that has nothing to do with this one.
+# Nested-worktree scan depth (TD-058) — a §7 parity pair: hydrate_worktree.sh's
+# find_nested_worktrees and reap_worktrees.sh's ignored_blockers() must agree on how deep
+# a nested worktree can sit, or one sibling is invisible to hydrate yet exempt in the
+# reaper. The deepest path configured in docs/nested-repos.txt, never less than 3. This
+# function is copied verbatim into both scripts; tests/test_reap_worktrees.sh pins that.
+nested_depth() {
+    local d
+    # the path is every word but the last (the mode), as hydrate's read_config() reads it,
+    # so a directory name with a space counts at its real depth
+    d="$(awk '{sub(/#.*/, "")} NF >= 2 {p = $0; sub(/[ \t]+[^ \t]+[ \t]*$/, "", p)
+              sub(/^[ \t]+/, "", p); sub(/^\.\//, "", p); sub(/\/+$/, "", p)
+              n = split(p, a, "/"); if (n > m) m = n}
+              END {print (m > 3 ? m : 3)}' "$1" 2>/dev/null)"
+    echo "${d:-3}"
+}
+
 find_nested_worktrees() {
-    find "$WT" -maxdepth 4 \
+    find "$WT" -maxdepth "$(( $(nested_depth "$CONFIG") + 1 ))" \
         \( -name node_modules -o -path "$WT/.git" -o -name .git -type d \) -prune -o \
         -name .git -type f -print 2>/dev/null | sed 's:/\.git$::' | sort
 }
@@ -449,7 +476,7 @@ nested_unsaved() {
     if ! base="$(nested_base "$w")"; then
         # Cannot compare, so cannot claim it is saved. "I don't know" routes to
         # "keep", the same way reap's __UNKNOWN__ registry does.
-        echo "cannot tell what it holds (no origin/HEAD and no origin/main to compare against)"
+        echo "cannot tell what it holds (no default branch on origin to compare against — cadence.md §9 rule)"
         return 0
     fi
     mb="$(git -C "$w" merge-base "$base" HEAD 2>/dev/null)"
@@ -473,7 +500,8 @@ dehydrate_nested() {
         any=1
         if reason="$(nested_unsaved "$w")"; then
             warn "  REFUSE    ${w#"$WT"/} — $reason"
-            warn "            commit and push it, or remove it by hand once you are sure"
+            warn "            land it on the base (merge its PR) — pushing is not enough, removal needs"
+            warn "            its content on the base — or remove it by hand once you are sure"
             rc=1
             continue
         fi
@@ -588,7 +616,7 @@ hydrate_nested() {
                         rc=1; continue
                     fi
                 else
-                    warn "  WARN      $path has no origin/HEAD and no origin/main to branch from — skipped"
+                    warn "  WARN      $path has no default branch on origin to branch from (cadence.md §9 rule) — skipped"
                     rc=1; continue
                 fi
             fi

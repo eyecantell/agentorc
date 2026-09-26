@@ -859,6 +859,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
                     "at": s["progress"][0]["at"],
                     "source": "declared",
                     "branch": None,  # TD-045: only a derived claim records the branch it came from
+                    "review_pr": None,  # TD-150: only the tick sets it, beside a declared claim
                 }
             ]
             s = await worker.call("progress", id=sid, ref="TD-027", status="done", pr="#60")
@@ -892,6 +893,7 @@ async def test_report_channels_are_ungated_and_declared_wins(agent, tmp_path):
                 "at": later["progress"][1]["at"],
                 "source": "declared",
                 "branch": None,
+                "review_pr": None,  # TD-150: only the tick sets it, beside a declared claim
             }
         # a foreign session may write a record's channels: reports are not an acting RPC (§4.8)
         async with LocalClient(caller="ao-stranger") as stranger:
@@ -1222,7 +1224,7 @@ async def test_the_tick_derives_report_entries_and_never_overwrites_a_declaratio
         monkeypatch.setattr(
             reports,
             "derive",
-            lambda directory, branch, pending=None, ledger=None, left=None: (
+            lambda directory, branch, pending=None, ledger=None, left=None, reviews=None: (
                 (ledgers.append(ledger) or [])
                 or (
                     [ProgressEntry(ref="TD-080", source="derived"), ProgressEntry(ref="TD-081", source="derived")],
@@ -1619,7 +1621,8 @@ async def test_a_view_past_the_line_limit_is_dropped_from_the_stream_not_the_str
         big = await c.call("create", name="wide", dir=str(tmp_path), adapter="shell")
         await c.call("progress", id=big["id"], ref="TD-1", status="claimed", why="x" * 4_000)
         small = await c.call("create", name="thin", dir=str(tmp_path), adapter="shell")
-        monkeypatch.setattr(link, "FRAME_LIMIT", 2_048)
+        # between the two: the thin card is ~2.1 KB since the view carries `read_when` (TD-168), the wide ~6 KB
+        monkeypatch.setattr(link, "FRAME_LIMIT", 3_072)
         await sub.call("subscribe")
         seen = set()
         while small["id"] not in seen:
