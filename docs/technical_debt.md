@@ -89,7 +89,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-157 | What does this button do? An *i* mark or a help page for every control on Org and Focus, from §4.5a — Forget, Start, Wind down and the fold first | Medium | Designed 2026-09-25 (the designer) — the build is TD-167; archives with it |
 | TD-158 | The Message composer says when the message will be read: on call, exited, budget spent, a person's session — and a `note` to an on-call seat is not refused | Medium | Designed 2026-09-25 (the designer) — the build is TD-168; archives with it |
 | TD-159 | Review the split between agentorc and dev-cadence: what lives here that is a per-repo convention, what lives there that only agentorc uses, and the ledger's growing list of "dev-cadence's" clauses | Medium | Open — evaluation |
-| TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Open — design-first |
+| TD-160 | A person's own session inside a team: no role a person would pick carries a `review:` reader, the New session form has no Team field, and `--team` is a badge nothing keys on | Medium | Designed 2026-09-25 (the designer) — the build is TD-173; archives with it |
 | TD-161 | Saved prompts as chips beside Send: fixed text from the role preset's `prompts:`, typed by a press, for the jobs a person starts by hand today | Medium | Open — design-first |
 | TD-162 | When to message whom: a `message:` line per role, read on the Message control's *i* mark and in the composer, so a person knows the manager from the techlead from a grinder | Medium | Open — design-first |
 | TD-163 | Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it | Medium | Open — design-first |
@@ -98,6 +98,7 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-165 | Build the transcript read: `read_transcript` on the adapter contract with the neutral entry shape, the `transcript` RPC on the record's host, `transcript` in `NODE_READS`, `ao transcript` | Medium | Open |
 | TD-166 | Build the Transcript page: `/transcript/<id>`, the Focus header's **Transcript** button, the folds and *earlier turns*, VS Code on the raw file | Medium | Open |
 | TD-167 | Build the help: `help.py` as the one table, the *i* marks on the team card, the Focus header and the exited banner, the `title` tooltips from it, the Help page, the overlay's link, and the test that holds it to §4.5a | Medium | Open |
+| TD-173 | Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line | Medium | Open |
 
 
 ---
@@ -1652,9 +1653,9 @@ Two things are missing, and the design round chooses between them or takes both:
 **Added:** 2026-09-25 (raised by Paul: *I should probably start having interactive sessions on the team itself to prove the project and get the benefits — tmux so stays alive, and PRs get routed automatically through the techlead*)
 **Owner:** designer
 **Kind:** design-first
-**Pickable:** yes
+**Pickable:** no — designed; the build is TD-173
 
-**Status:** Open — nothing designed. The mechanism exists in the design; what is missing is the role and the form.
+**Status:** Designed 2026-09-25 (the designer): design §4.9 *A person in the team* (the four points), the *live* rule over unattended sessions, §4.9b's sentence, §4.5 screen 3's Team pick, §4.5a the **Team** picker row and the Start / Wind down / Stop now row's last sentences, §4.7 *A person in the team*, mockup `NewSession.dc.html` (the Team field). Settled: (a) no new role and no `org.yml` edit — a `--team` session whose role carries no `review:` takes the team's: reader techlead when the definition holds that seat, held the union of the member roles' held lists; a role's own `review:` wins; (b) the Team picker, with the reader it brings written under it; (c) `team` keys on nothing new — live, concluded, wound down, the fold and Forget all read over unattended sessions, and Wind down / Stop now name a person's session apart and leave it alone (invariant 5 already refuses); (d) the help line. The design is PR #566; the team-derived reader against a `person` role went to Paul as a steer, and #566 merges at its bound (12 h from 2026-09-25 19:40 MDT) unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-173; this entry archives with it. **What was:** nothing designed. The mechanism exists in the design; what is missing is the role and the form.
 
 **Location:** design §4.9b (the `plain: {review: {reader: techlead}}` example, *a person's own interactive session inside a team*), §4.5a *New session* rows (Role, Controllers, Where, Project, Until, At — no Team), §4.7 `ao new --team`; `src/agentorc/cli.py` (`--team`, whose help reads *a badge, nothing keys on it*); `~/.agentorc/org.yml` `roles:` (only `grinder` and `designer` carry `review:`); the New session form's template.
 
@@ -1831,3 +1832,28 @@ Two things are missing, and the design round chooses between them or takes both:
 **Done when** the manager template's round step commits nothing, a restarted manager can read what its previous run did in the place the round chose, and a manager's card shows no unpushed count from its own log.
 
 **Related:** §4.6 (run logs, `runs_keep_days`), §4.8 (`progress`, the template and its supplements — TD-114), §4.9a (the wind-down note), §4.5a *Ready to close*; `src/agentorc/briefs/manager.md` step 5; `docs/briefs/manager-ao-1.md`; TD-103 (the tick took the manager's mechanical rounds, which is why its rounds are short enough that the log is most of what it writes).
+**Related:** TD-115 (the queue is for an agent that is down, never for a refusal), TD-155 (the resume case), §4.2.
+
+## TD-173: Build a person in the team: the team's default `review` at start, the New session Team picker with its reader line, team derivations over unattended sessions, the confirm that names a person's session apart, the `--team` help line
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-160's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Open — nothing built. Design §4.9 *A person in the team*, the *live* sentence above *The Org page*, §4.9b *The reader* (the person's-own-session sentence), §4.5 screen 3, §4.5a **Team** picker and the Start / Wind down / Stop now row, §4.7 *A person in the team*; mockup `NewSession.dc.html`.
+
+**Location:** `src/agentorc/cli.py` (`cmd_new`: `team=` at line ~484 — resolve the definition, fill `controllers` from the live manager and `review` from the role's else the team's; the `--team` help line), `src/agentorc/teams.py` (`_trigger`, the member specs' `review` — the union of the member roles' `held`; a helper `team_review(team, roles)` both the CLI and the form call), `src/sessionorc/models.py` (`normalize_review`), `src/agentorc/ui/app.py` (the New session route: the teams list and the reader line; `team_groups` ~line 1264: `live`, `stopped`, `concluded`, `wound_down`, `forget` over `unattended` members), `src/agentorc/ui/templates/new.html` (the Team `<select>` before Role; the reader line), `group_head.html` (the confirm text), `src/agentorc/ui/static/app.js` (the Team pick's narrowing and prefills, as the Role pick's).
+
+**Why:** TD-160's *Why*: the safety net exists in the design and no person can reach it from the page.
+
+**Fix:**
+1. **`team_review(team, roles)`** in `teams.py`: `{reader: "techlead", held: sorted(union of member roles' held), bound: default}` when the definition holds a techlead seat, else None; a test per shape (no seat, one role, two roles with overlapping globs).
+2. **`ao new --team`**: the badge as today, plus `controllers` prefilled with the team's live manager (when the record is not given one) and `review` from the role's else `team_review`; the help line reads *the team this session joins (design §4.9): its badge and group, its manager as a controller, the team's reader for its held PRs*.
+3. **The form**: a Team `<select>` (`none` first) before Role; on change: Host and the Directory list narrowed to the team's host and projects, Role filtered to the team's roles plus `plain`, Controllers ticked for the live manager, Unattended left off, and one line under the picker with the reader `team_review` gives (`/api/team_review?team=`), or *no reader: this team has no techlead seat*. Start sends `team`; the route fills `review` as the CLI does.
+4. **Derivations over unattended sessions**: `team_groups`'s `live`, `stopped`, `concluded`, `wound_down`, the fold's `members` count and `forget` read `unattended` members only; an interactive member is listed in the group and counted by state. Wind down's and Stop now's `data-confirm` name the team's interactive sessions: *your session <name> stays: a team act never stops an interactive session*; `ao team stop` prints the same line and skips them (invariant 5 refuses them anyway — the skip is so the stop does not end on a refusal).
+5. **Tests:** the CLI's `review` on the record for a role with and without `review:`; the form's route with a team picked (the reader line, the narrowed lists); `team_groups` on a team whose only live session is interactive (stopped, Start offered); the confirm text; `ao team stop` skipping an interactive member.
+
+**Done when** TD-160's *Done when*: Paul starts a session on ao-grind from the New session form, its card sits in the team's group, and a PR it opens on a held path waits on the techlead seat (`ao pr held <n>` says so); and Wind down on ao-grind with his session live names it as staying.
+
+**Related:** TD-160 (the design), TD-093 (the reader), TD-036 (controllers prefill), TD-040 (the Role pick's rebuild), TD-053 (wound down), TD-161 / TD-162 (what a person in the team presses and whom they message).
