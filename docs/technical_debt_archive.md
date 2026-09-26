@@ -1741,3 +1741,44 @@ Order: what is on a clock first (a permission's countdown, an `ask`'s bound), th
 **Related:** §4.5a *Focus composer*, *Inbox row: state* (Reopen and push), §4.8, TD-123 (Commands, the other button), TD-160 (the session the chips are for), TD-157 (an *i* mark per chip is the same mechanism).
 
 **Resolved:** 2026-09-26 — built by TD-170 (PR #607); design §4.8 *A role has saved prompts* carries the lasting content.
+
+## TD-172: Build Members… on the team card: the one-line text edit of `org.yml` with re-parse and restore, the live create of one member and the wind-down of one, the dialog, the exited banner's line and `ao team --skill`'s *one member back*
+
+**Priority:** Medium
+**Added:** 2026-09-25 (the designer, from TD-163's design)
+**Owner:** grinder
+**Kind:** build
+**Pickable:** yes
+**Status:** Resolved 2026-09-26. Was: Open — nothing built. Design §4.9 *Add or remove a member from the team card*, §4.9a *One member back, today*, §4.5a *team card: Members…* and *Members dialog*, ADR 2026-09-25 (the addendum); mockups `Members.dc.html`, `Main.dc.html`.
+
+**Location:** `src/agentorc/org.py` (`load`; a new `edit_members(path, team, add=…|remove=…) -> str` that edits the text, re-parses, restores on failure — the one writer of `org.yml`), `src/agentorc/teams.py` (`plan`; a `plan_member(org, team, name, host)` that returns the one spec), `src/agentorc/ui/app.py` (`/api/teams/<t>/members` GET and POST; the create of one member as the start route creates one; the wind-down of one as Wrap up does; `team_groups`: the button's presence, the repo-defined note), `src/agentorc/ui/templates/group_head.html` (**Members…**), `base.html` (the dialog), `src/agentorc/ui/static/app.js`, `focus.html` / `app.js` (the exited banner's line: *to bring it back into the team unattended: Resume with changes… and tick Unattended*), `src/agentorc/team_skill.md` (§6 *Stop it*: one member back).
+
+**Why:** TD-163's *Why*: a third grinder or a second designer is a hand edit and a restart today, with nothing on the page saying the definition and the run differ.
+
+**Resolved:** 2026-09-26 (PR #608, `grinder-ao-2`) — `org.edit_members` (with `_set_count`, the field and never text that looks like it), `teamrun.members_view` / `add_member` / `remove_member`, `/api/teams/<t>/members`, the card's **Members…** and its dialog, the exited banner's line, `ao team --skill` §6; tests in `test_org.py`, `test_cli_teams.py`, `test_ui_org.py`. Design §4.9 *Add or remove a member from the team card* carries the lasting content.
+
+**Done when** TD-163's *Done when*: Paul adds a grinder to ao-grind from its card while it runs, the member appears under the manager without a restart, and `org.yml` shows the member with the comment block above it intact.
+
+**Related:** TD-163 (the design), ADR 2026-09-25 §5, TD-146–148 (the Settings page keeps to settings), TD-157 / TD-167 (Forget on a defined member), TD-160 / TD-169 (a person as a member), TD-081 (Resume in place), §4.9a (Start on a concluded team).
+
+## TD-163: Add or remove a member from the team card: a control that edits the team's definition, beside the Settings page's Teams section or apart from it
+
+**Priority:** Medium
+**Added:** 2026-09-25 (raised by Paul: *a button on the team card to add/remove a member, e.g. a grinder, that would change the team definition*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** no — designed; the build is TD-172
+
+**Status:** Resolved 2026-09-26. Was: Designed 2026-09-25 (the designer): design §4.9 *Add or remove a member from the team card* (the four points), §4.9a *One member back, today* (f), §4.5a *team card: Members…* and the *Members dialog* rows, the settings audit ADR's dated addendum before its open decisions, mockup `Members.dc.html` and the headers of `Main.dc.html`. Settled: (a) `org.yml`'s `members` edited as text in place — a `count:` bumped or one line added or removed, comments kept, re-parsed, refused when not one line; a repo-defined team is a PR's; (b) at once on a live team — one member's create under the manager, one member's wind-down — and the definition only on a stopped one; (c) **Members…** on the team card, not the Settings page; (d) the record stays until Forget; (e) the mockup; (f) written in §4.9a, and the build puts it on the exited banner and in `ao team --skill`. The design is PR #572; the card-against-Settings-page choice is on the board for Paul (the designer's line of 2026-09-25, extended here — the person inbox is full), and #572 merges after 2026-09-26 08:30 MDT unless he says otherwise — the next designer run merges it if this one has ended. The build is TD-172; this entry archives with it. **What was:** nothing designed. It crosses a line drawn today: the settings audit (ADR 2026-09-25 §5) says *a definition says what a team is and belongs in its file, by hand or by PR; a setting is a number a person turns* — and its §2 calls the org file *a team editor in waiting*. This is the first control that edits a definition from the page, and the round has to say so in the ADR's terms.
+
+**Location:** ADR `docs/decisions/2026-09-25-settings-audit.md` §5 and its open decisions, design §4.5 screen 8 (Settings: **Teams** — schedule, until, reserve; no members), §4.5a *Org: team card* (Start / Wind down / Stop now, Forget all), §4.9 (a team definition: manager, techlead, members with role, name, lane, brief), §5 (`org.yml` `teams:`; a repo's `.agentorc.yml` `teams:`), §4.4a (the org file is read per call, clients only, never the agent); `~/.agentorc/org.yml`; TD-146–148 (the settings file, replica and page).
+
+**Why:** growing or shrinking a running team is the one change a person makes by watching it — a third grinder contends on the ledger, a second designer is needed for a review week — and today it is a hand edit of `org.yml`, then `ao team start` to pick it up, with nothing on the page that says the definition and the run now differ. A member is a definition, not a setting, so the Settings page as designed does not hold it; but the act is a person's, one press, on the team's own card, which is where every other team control lives.
+
+**What the design round has to settle:** (a) **what is edited** — `org.yml`'s `teams.<team>.members` (add: role, name, lane, brief from the role's defaults; remove: by name), written by the client that serves the page as `ao` would, with the file's comments preserved or the edit refused when they cannot be; a repo-defined team (`.agentorc.yml`) is a PR's and the control says so; (b) **when it takes effect** — on a running team, add creates the member at once under the manager (the same create `ao team start` does for one member) and remove is a Wind down of that one member; on a stopped team, the definition only; (c) **the surface** — **Members…** on the team card's header beside Start, a dialog listing the definition's members with add and remove, the same shape as the Focus **Members** view; or the Settings **Teams** section gaining a members table — the ADR's line argues for the card; (d) **what a removed member's record does** — it stays a card until Forget, as any exited member's does; (e) the mockup and the §4.5a rows; (f) **the docs on bringing one member back today** — Paul asked 2026-09-25 whether an `ask` to the exited designer or manager would start it without the grinders. It does not: mail to an exited record is delivered and waits (§4.9b), and only a *seat* is filled on an ask; a member comes back by a person's **Resume with changes…** on its own card with *Unattended* ticked (Resume alone starts it attended, §4.5a), which supersedes the record in place and keeps its mail, or by the team's Start, which brings the whole definition. Nothing on the page or in §4.9 says this beside the team's Start, and the round writes it where the person looks — the team card's *i* mark (TD-157) or the exited member's banner — and the `README`'s *Run it*.
+
+**Done when** Paul adds a grinder to ao-grind from its card while it runs, the member appears under the manager without a restart, and `org.yml` shows the member with the comment block above it intact.
+
+**Related:** ADR 2026-09-25 §5 (definition versus setting), TD-146–148 (the Settings page), §4.5a *Org: team card*, §4.9, TD-157 (Forget on a defined member — the same question from the other side), TD-160 (a person as a member).
+
+**Resolved:** 2026-09-26 — built by TD-172 (PR #608); design §4.9 and the §4.5a *Members* rows carry the lasting content.
