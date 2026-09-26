@@ -105,6 +105,8 @@ Three header lines follow **Added:** so a worker can filter the file instead of 
 | TD-174 | Build the mouse as the browser's: no `mouse on` on the attach, the wheel as a scroll message with a line count through the bridge, the wheel-only carve-out removed, the copy-on-select toggle and `person.terminal.copy_on_select`, the tooltip and toast texts | Medium | Open |
 | TD-177 | A manager's balance check on the repo's numbers: open PRs above n, the oldest past d, the reader's queue past its bound → no new claims and a word to the techlead | Medium | Open — design-first, TD-176's numbers visible since 2026-09-26 |
 | TD-178 | The Org rollup's overdue count beside *in the Inbox* (Needs you facet) | Low | Open — pickable, the one piece of TD-176's rollup not built |
+| TD-179 | Two temp-dir test fixtures sit in the machine's repos roster, so the live host agent reads repo facts for `/tmp/…/fixture2/consumer` and `fixture3/consumer` | Low | Open — the anchor removes two lines; the leak is dev-cadence's |
+| TD-180 | Add a TD from the UI: the person types a line, an agent asks what it needs and writes the entry | Medium | Open — design-first |
 
 
 ---
@@ -1983,3 +1985,38 @@ Two things are missing, and the design round chooses between them or takes both:
 **Fix:** count the Needs you items past their date (a board item overdue, as the Inbox's board rows word it) and draw it beside *in the Inbox*, kept live the way the Inbox count is; drop the *not drawn yet* clause from §4.5a's row. Done when the rollup reads *n in the Inbox · m overdue* and a test covers a board item overdue and one due today.
 
 **Related:** TD-176 (archived), design §4.5 screen 1 *The Org, team-first*, §4.5a **Org: rollup**.
+
+## TD-179: Two temp-dir test fixtures sit in the machine's repos roster, so the live host agent reads repo facts for them
+
+**Priority:** Low
+**Added:** 2026-09-26 (found at the promote of #600: `~/.agentorc/repos.json` named them beside the real repos)
+**Owner:** anchor
+**Kind:** build
+**Pickable:** no — the roster is a machine file outside the repo; the anchor edits it, and the leak is dev-cadence's to fix
+**Status:** Open
+**Location:** `~/.config/dev-cadence/repos.txt` (the `repos_registry` default, `src/sessionorc/hosts.py`); `Agent._refresh_repos` in `src/sessionorc/agent.py`
+
+**Why:** the host's repos registry is dev-cadence's machine roster, and it ends with `/tmp/tmp.4dWahA9hY9/fixture2/consumer` and `/tmp/tmp.4dWahA9hY9/fixture3/consumer`, written 2026-09-23 00:29 (the file's mtime). The temp dir holds a copy of dev-cadence (`c/`) beside the two fixtures, each a `consumer` checkout with a `src.git` origin: a sync run under a temp root that wrote to the real roster because `DEV_CADENCE_REG_DIR` / `XDG_CONFIG_HOME` were not pointed at the temp dir. No checked-in dev-cadence test names `fixture2`, so it was likely an ad-hoc run by a session that night. Since TD-176 slice 1 (#595) the host agent reads PRs and the ledger for every roster line, so it now runs `gh` in those fixtures every five minutes, keeps their readings in `repos.json`, and `_board_root` accepts their boards as boards of a known repo. Once `/tmp` is cleaned, the registry still lists them as checkouts that fail every read.
+
+**Fix:** (1) delete the two lines from `~/.config/dev-cadence/repos.txt`; the next tick drops them from `repos.json` with `repo: null`. (2) Tell dev-cadence (its board or `ao msg` to its lead) that a sync run under a temp root can write the real roster, so a test or ad-hoc run must set `DEV_CADENCE_REG_DIR`; `sync.sh` could also refuse a roster write for a consumer under `$TMPDIR` unless the roster is under it too. (3) Optional here: have the reader skip, and log once, a roster line that is not a directory, so a stale line reads as *gone* rather than *could not look* on every tick. Done when the roster and `repos.json` list only the real repos.
+
+**Related:** TD-176 (the repo facts), design §4.4 *Repo facts*; `docs/claude-memory/scratch-worktree-tests-import-main-checkout.md` (the same pattern: test state reaching the live machine).
+
+## TD-180: Add a TD from the UI — the person types a line, an agent asks what it needs and writes the entry
+
+**Priority:** Medium
+**Added:** 2026-09-26 (Paul: *it will look like the user giving short info, then an agent fleshing it out — asking questions as needed, then generating the TD*)
+**Owner:** designer
+**Kind:** design-first
+**Pickable:** yes
+**Status:** Open — nothing designed.
+
+**Why:** a TD reaches the ledger today only through a session. The person tells a session in its terminal, which writes the entry on a branch and opens a PR. The UI has no way in: §4.5a's **Open ledger** row says *an entry is edited in its file, never on the page*, and the Repo page's Technical debt lists are read-only. A thought the person has while looking at the Org or the Repo page has to wait until they open a session and explain it there. Most of what makes an entry good is work the person should not have to do: the next number, the Owner/Kind/Pickable lines, the evidence, the file locations, and the link to the design section and its neighbours. An agent can do all of that, and it only needs the person for the *why* and the choice between options.
+
+**The shape Paul gave:** the person writes a short line (a title, maybe a sentence) → an agent takes it, reads the repo and asks what it cannot find out itself (priority, what "done" means, which of two readings is meant) → it writes the entry in the ledger's template and it lands the way every ledger change does.
+
+**What the design round has to settle:** (a) **the door**: where the press lives (the Repo page's Technical debt heading beside **Open ledger**, the team card, the Org rollup, a Focus header), and what the first form asks: one line, the repo, and maybe a priority. (b) **who fleshes it out**: a new one-shot session started from a role (the *hunter*'s filing, whose **add** phase §4.5 screen 1 already reserves), the repo team's designer or manager taking it as mail, or a short-lived agent with no tmux session. Also what it may read and run, and its profile and spend (§4.9b reserve). (c) **where the questions appear**: as an `ask` in the Inbox (§4.10), the session's own Focus, or a dialog on the page that stays open. How the person answers each one, and what happens if they walk away (the draft is kept, parked, or dropped). (d) **how it lands**: a branch and PR per entry, reviewed as a doc-only PR, or the board write-back's committed **add** (§4.4: on the default branch, never pushed) extended to the ledger. What the next-TD-number race needs (open PRs can hold a number, per the TD-grind memory), and the Summary row that goes with the entry. (e) **the person's check**: whether they see the entry before it is filed, and whether an agent-written entry is marked as such. (f) what §4.5a and the *never on the page* clause become, and the `ao` verb beside it (`ao td add "<line>"` or similar), so an agent and the CLI reach the same path.
+
+**Done when** the design has the door, the drafter, the question channel and the landing path in §4.5a and the relevant sections. The build is a separate TD.
+
+**Related:** design §4.5 screen 11 (the Repo page) and §4.5a **Open ledger**; §4.5 screen 1 (the *add* phase, the hunter); §4.10 (`ask`); §4.4 (the board write-back's **add**, the one precedent for the UI writing a repo file); §4.5a **Put on the board** (a UI form that writes a repo file); TD-126 (a reply back from the board); TD-160 (the hunter role named as *later*).
