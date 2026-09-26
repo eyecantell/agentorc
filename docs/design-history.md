@@ -282,6 +282,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-154, the designer): **Transcript** on the Focus header and on each Resumable row; the Transcript page's three controls — *earlier turns*, the folds, VS Code.
 - 2026-09-25 (TD-157, the designer): the ***i*** mark on the team card's header, the Focus header and the exited banner — the Inbox's shape, one paragraph per control of the group — and **The help text**, the list under the table that is the one source of what the marks, the `title` tooltips and the Help page say, held equal to `help.py` by a test. Chosen over a fourth *help* column (the rows are a specification, the paragraphs are for the person) and over the confirm's first line alone (a confirm comes after the press). Paul's (f) — should a named member be forgettable? — answered: Forget drops a run's record, never the seat; the definition names the seat and Start fills it again, so a member's Forget stays and an on-call seat's absence stays.
 - 2026-09-25 (TD-160, the designer): the New session **Team** picker; Wind down's and Stop now's confirm name a person's session apart; live / stopped / concluded / wound down read over unattended sessions only.
+- 2026-09-25 (TD-161, the designer; Paul: *lets talk about adding on-demand buttons for interactive sessions*): **prompt chips** beside Send on an interactive session's composer — a press is a Send of the role's saved prompt, Shift+press fills the composer — and beside the Opening prompt on New session, where a press fills. Rejected: a chip that only fills (two presses where Paul asked for one, and on a phone the second is the hard one) and per-chip schedules or grants (a chip is a Send and nothing more).
 
 ## 4.5b Reachability, and the shape of a hosted service
 - (undated, original draft): the section opened with "Why this is not 'install Tailscale'": for one person the private network is fine, but the deciding question is how someone who has never opened a port would use this.
@@ -367,6 +368,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-23 (TD-120, the anchor; Paul): *Role names* gained the `designer` — the person's interactive design seat, an org- or repo-defined role with its own brief, not a preset.
 - 2026-09-23 (TD-119, grinder-ao-1): a session may no longer answer its own permission prompt. TD-116 had gated `decide` "exactly as `send`", and `send` onto oneself passes the gate, so a session blocked on the hook could `ao allow $AGENTORC_SESSION` from a background task or a subagent and approve its own tool call. The anchor decided the same day to refuse it, whatever the session holds, at the gate and in a node's offline table alike — the same class as `set_grants` on oneself.
 - 2026-09-25 (TD-150 slice 3, grinder-ao-1): a derived entry refused over a declared claim now leaves its PR beside it as `review_pr` (`Session.note_review`, called by the tick and by a node's derived report — never by an RPC, whose refused entry still says `refused`), set while that PR is open, cleared at its merge or its close unmerged (`reports.derive`'s `reviews`, by number, and the checked-out branch's closed PR marked `PR_CLOSED`); a re-claim keeps it, a done or dropped carries none. Invariant 10 is unchanged in substance: the session's own fields never move — this is the one derived annotation a declared entry carries.
+- 2026-09-25 (TD-161, the designer): `prompts:` on a preset — `{label, text}`, layered as every key is, replaced whole per layer, verbatim text with no substitution; `ao roles` prints the labels.
 
 ## 4.8a Who is calling: identity on one host
 
@@ -522,6 +524,7 @@ decisions; this file points at them rather than repeating them.
 - 2026-09-25 (TD-128, the designer): `usage_gate:` takes an amount per window for a metered profile, the unit saying which kind; a value that does not fit the profile's billing is refused.
 - 2026-09-25 (TD-128 reconciled, with Paul): the amount is read against the account's spend, not the profile's; `profiles.yml` carries `prices:` by token kind.
 - 2026-09-25 (TD-149 (2), (4), (6), grinder-ao-1): `promote:` accepted in `.agentorc.yml` ahead of TD-132 (it was refused as an unknown key, so writing the designed block broke `ao new` in that repo); the org `roles:` overlay checked key by key as a repo's is (it was taken raw); `AGENTORC_TICK` named as the one test knob.
+- 2026-09-25 (TD-161, the designer): the `roles:` example gains `plain: {prompts: […]}`, the person's own chips.
 
 ## 6. Policies (the tdgrind supervisor, generalized)
 

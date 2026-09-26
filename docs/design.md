@@ -1958,8 +1958,9 @@ then the UI is reachable only over `ssh -L`): the Org view collapses to cards so
 first with Allow / Deny on a pending permission (hook channel) and a Focus button, the Due strip
 on top. Focus gets a **narrow mode** below 720px: header, pending text, the terminal full-width
 with a soft-key row (`↑ ↓ ← → Enter Esc Tab 1–9`) so menus and questions are still answered
-*through the terminal*, the composer under it, side panel collapsed. The git panel and the
-New-session form stay desktop-width.
+*through the terminal*, the composer under it with its prompt chips in one wrapping row above it
+(§4.5a **prompt chips**, TD-161: a turn steered without a keyboard), side panel collapsed. The git
+panel and the New-session form stay desktop-width.
 
 **Type scale (TD-130, 2026-09-25, built by TD-144; mockups `Type.dc.html`, `TypeDark.dc.html`, and every artboard
 regenerated at the scale).** The pages set their sizes as **six tokens on `:root`**, theme-
@@ -2067,6 +2068,8 @@ noted). If a control is not in this table it does not exist.
 | Focus | **Copy / Paste** | in the header's *more ▾*, each naming its keys (TD-156). Paste is inert on an `unattended` session's read-only Focus (TD-096, *Focus watches*: it goes through the terminal as keys do; Copy only reads, and works). Terminal clipboard: Copy takes the terminal selection (also Ctrl+Shift+C, or Ctrl+C with a selection — no interrupt is sent then); Paste sends the clipboard through the terminal (also Ctrl+V — Claude Code would otherwise read a raw ^V as an image paste — Ctrl+Shift+V, Shift+Insert, right-click). Needs a secure context: https or localhost |
 | Focus composer | **Attach** / drop / paste | uploads to `~/.agentorc/attachments/<session>/`, inserts the path |
 | Focus composer | **Send** | pastes the composer text and presses Enter, confirmed by the tool's composer emptying (one `C-m` retry, then `prompt-stuck`; §4.2, TD-027). Reads **Steer** ("steers the turn in flight") while the session is `working` and **Send** ("starts a new turn") when idle (§4.3) — one control, labelled for the job it is doing. `stalled?` steers too — a `working` session that stopped producing output (§4.2) is a turn in flight; `limited` says the cap holds what you send, since nothing the person does clears a cap (§4.2; its controls are **Switch profile** and **Wait**). Closed, composer and all, on an `unattended` session (TD-096, *Focus watches*: typing is the disruption; Take over opens it). Disabled with a reason on `exited`, `closed` and `unreachable`, where there is no turn (TD-047), and the host agent refuses `send` and `keys` to an `exited` or `closed` record the same, in words with the exit code, whoever sends (TD-078) — the record's own state, not a screen rule |
+| Focus composer | **prompt chips** | (TD-161; designed 2026-09-25, not built — TD-170) one chip per entry of the session's role `prompts:` (§4.8), beside Send, drawn only where the composer is open — an interactive session — and in the same order as the file. A press is **Send** with that text: it pastes the prompt and presses Enter through `send`'s own path, confirmed as Send is, and reads as Send reads — a chip steers while a turn is in flight, since it is a Send; Shift+press fills the composer with the text instead, for editing, and focuses it. The chip's `title` is its text. Hidden when the role has none, and on `exited`, `closed`, `limited` and `unreachable` with the composer. Fixed text from the definition (§4.2): never a session's words, no substitution, nothing on the record. On the phone (§4.5 *Phone layout*) the chips wrap in one row above the composer — the point of them: a turn steered without a keyboard |
+| New session | **prompt chips** | the picked role's `prompts:` beside the Opening prompt (TD-161; not built — TD-170), rebuilt with the Role pick (`/api/roles` carries them): a press fills the Opening prompt with the text — nothing runs yet, so nothing is sent — and a second press of another replaces it; the brief a preset fills is left as it is (the chip is a first prompt, the brief is the job) |
 | Focus side panel | **diff / log / PRs**, run-log link, **Close** | git views; download; Close as above. Every side card is a fold remembered per browser, in reading order — Working, Git, Reports, Inbox, Members, Ready to close (open on an own session, **folded on a team member**, whose note says its team closes it), then **Session**, which starts folded and holds the profile, ids, directory, times, mode, run log, the stops control, and the grants and controllers chips (TD-156) |
 | New session | **Unattended** switch | tags the session `unattended` (policies apply); disabled without an `unattended:` block, hidden for directory sessions |
 | New session | **Team** picker | (TD-160; designed 2026-09-25, not built — TD-173) *none*, or a team of `org.yml` and the repos' `.agentorc.yml` (`ao team list`'s set). Picking one narrows Host and the Directory list to the team's host and projects, filters Role to the team's roles plus `plain`, prefills Controllers with the team's live manager, leaves Unattended off, sets the `team` badge, and fills the record's `review` from the role's or else the team's (§4.9 *A person in the team*) — with one line under the picker saying what that is: *held PRs read by techlead-ao-1 on src/sessionorc/**, docs/briefs/**, or *no reader: this team has no techlead seat*. The terminal's form is `ao new --team` |
@@ -2862,6 +2865,19 @@ thing: its name is a key into a fixed set and is never drawn). **It is resolved 
 is, with the icon's limit**: the page reads roles from this host's disk, so a label a repo on
 *another* host gives its role is not seen and the badge falls back to the default — the role's
 name, raised — never to nothing.
+
+**A role has saved prompts (TD-161; designed 2026-09-25, not built — TD-170).** A preset or a
+`roles:` entry may carry **`prompts:`**, a list of `{label, text}` — *review PR* → *Review PR $n
+as the cadence says …*, *sweep* → `/stranded-work`, *waiting on me* → *What is waiting on me
+across this repo's board and my inbox?* — the jobs a person types into their own session by hand,
+again and again. Layered as every preset key is (the package's built-ins, `org.yml`, the repo's
+`.agentorc.yml`; the key replaced whole at each layer, never merged, so a repo's list is the list),
+so a grinder's chips differ from a plain session's and `plain`'s are the person's own. `label` is
+one line, 24 characters at most, drawn as text; `text` is the prompt, verbatim, with no
+substitution — what is typed is what the file says (§4.2's rule: fixed text in the source, never
+anything a session said, the rule *Reopen and push* already keeps). A chip is a **Send** and
+nothing more: no grant, no schedule, no state on the record, and `ao roles` prints each role's
+labels. The surfaces are §4.5a *Focus composer* **prompt chips** and *New session* **prompt chips**.
 
 Each preset also carries the test for when it has **run out of work**, which is the role's and
 never the core's; the tests and what a manager does with them are §4.9a.
@@ -4963,6 +4979,9 @@ roles:                                # §4.8 presets; every key optional, built
             review: {reader: techlead}}   # §4.9b *The reader*: its PRs wait for the techlead; `held:` defaults to every PR
   hunter: {brief: docs/briefs/hunter.md, icon: search}   # icon: §4.8, one name from the fixed set
   manager: {brief: docs/briefs/manager.md, grants: [control]}
+  plain: {prompts: [{label: review PR, text: "Review the PR I name next as the cadence says, then report."},
+                    {label: sweep, text: /stranded-work},
+                    {label: waiting on me, text: "What is waiting on me across this repo's board and my inbox?"}]}   # prompts: §4.8, the chips beside Send (TD-161)
 controllers: [manager-ao-1]           # §4.8: who may act on a session started here (a preset may
                                       # override it with its own `controllers:`); omitted = nobody
 ledger: docs/technical_debt.md        # what a TD-NNN reference resolves to
