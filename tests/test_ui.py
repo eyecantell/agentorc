@@ -1297,7 +1297,8 @@ def test_a_teams_header_does_not_repeat_its_managers_card(tmp_path, monkeypatch)
     (g,) = team_groups([view(r, records) for r in records])
     head = templates.get_template("group_head.html").render(g=g)
     assert "round 3: reviewing PR 236" not in head and ">orc<" not in head and "s-idle" not in head
-    assert g["counts"] == ["1 working", "1 unseen"] and "· 1 working · 1 unseen" in head
+    # the counts stay in the group (a stopped team's row draws them), not on a live team's header (TD-176)
+    assert g["counts"] == ["1 working", "1 unseen"] and "· 2 sessions" in head and "1 working" not in head
     assert g["place"].endswith(f" / {tmp_path}") and g["place"] in head  # no repo: host / directory
     card = templates.get_template("card.html").render(s=g["members"][0])
     assert "round 3: reviewing PR 236" in card  # the manager's line is on its own card
@@ -1417,7 +1418,9 @@ def test_the_card_and_the_focus_git_line_read_one_measure_of_pushed(tmp_path, mo
     v = view(base)
     assert v["flag"] == "", "308 ahead of origin/main is unmerged, not unpushed (TD-080)"
     assert ("branch pushed", True) in v["ready"]
-    html = templates.get_template("focus.html").render(s={**v, "grants_all": [], "ready": v["ready"]}, host="h", active="Org")  # noqa: E501
+    html = templates.get_template("focus.html").render(
+        s={**v, "grants_all": [], "ready": v["ready"]}, host="h", active="Org"
+    )  # noqa: E501
     assert "308 ahead" in html and "unpushed" not in html.split('id="gitline"')[1].split("</span>")[0]
 
     only_here = view({**base, "git": {**base["git"], "unpushed": 2}})
@@ -1646,4 +1649,4 @@ def test_the_focus_reports_panel_shows_a_reference_once():
     `#359 → #359` — on the Focus Reports panel as on the card. The panel is drawn inside `AO.focus`'s
     closure, which the node probe cannot reach, so the rule is pinned where it is written."""
     js = (pathlib.Path(__file__).parents[1] / "src/agentorc/ui/static/app.js").read_text()
-    assert "(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class=\"st\">→ ${prLink(p.pr)}</span>` : \"\")" in js
+    assert '(p.pr && String(p.ref) !== `#${p.pr}` ? ` <span class="st">→ ${prLink(p.pr)}</span>` : "")' in js

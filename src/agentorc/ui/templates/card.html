@@ -5,10 +5,24 @@
    and hidden inside that group by the stylesheet — the card cannot know where it is drawn. #}
 {# `tabindex="0"`: a card is a tab stop, and the keyboard's ring is the browser's focus ring on it
    (§4.5a Org **keys**: the ring, TD-124) — apart from the amber *needs you* ring #}
-<div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}" id="card-{{ s.id }}" tabindex="0"
+<div class="card sc s-{{ s.state_class }}{% if s.state == 'unreachable' %} off{% endif %}{% if s.compact %} compact{% endif %}" id="card-{{ s.id }}" tabindex="0"
      data-id="{{ s.id }}" data-rank="{{ s.rank }}" data-state="{{ s.state }}" data-name="{{ s.name }}"
      data-kind="{{ s.kind }}" data-deadline="{{ s.deadline }}" data-team="{{ s.team or '' }}"{% if s.unseen %} data-unseen="1"{% endif %}{% if not s.unattended %} data-mine="1"{% endif %}>
   <div class="sbar"></div>
+  {% if s.compact %}
+  {# the **compact** card (design §4.5a *card: compact*, TD-176 slice 3): a member of a live team —
+     the name, the person glyph on the person's own session, the pill as word and colour only (no
+     state glyph), one line of its own, and the foot below. The team's summary says the rest. #}
+  <div class="sc-body">
+    <div class="row r1">
+      <a class="name" href="/focus/{{ s.id }}">{{ s.name }}</a>{% if not s.unattended %}<span class="mine" title="yours: an interactive session — no policy acts on it">{{ role_svg('person') }}</span>{% endif %}
+      <span class="grow"></span>
+      <span class="pill nog s-{{ s.state_class }}{% if s.scraped %} scraped{% endif %}"
+            title="{{ s.host_note or ('guessed from the screen' if s.scraped else 'reported by the tool') }}">{{ s.state_label }}</span>
+    </div>
+    <div class="row r2"><span class="meta cline" title="{{ s.slot.full or s.slot.text }}">{{ s.compact_line }}</span><span class="grow"></span>{% if s.unread %}<a class="badge unread" href="/focus/{{ s.id }}#inbox" title="{{ s.unread }} unread message{{ '' if s.unread == 1 else 's' }} in this session's inbox — open the Inbox panel">✉ {{ s.unread }}</a>{% endif %}{% if s.flag %}<span class="flag">⚠ {{ s.flag }}</span>{% endif %}</div>
+  </div>
+  {% else %}
   <div class="sc-body">
     {# (1) name and state: the name once, the tool's title only when it differs (§4.5a **title**,
        TD-074: display only, set in the tool), and the pill — the state and nothing else — at the right #}
@@ -71,6 +85,7 @@
     <div class="status {{ s.slot.kind }}" title="{{ s.slot.full }}">{{ s.slot.text }}</div>
     <div class="caption meta {{ s.slot.ccls }}"{% if s.slot.ccls == 'countdown' %} data-deadline="{{ s.deadline }}"{% endif %}>{{ s.slot.caption }}</div>
   </div>
+  {% endif %}
   {# (6) the foot: the next act first, by state (`next_act`), then Focus or Details where it was
      not first, the editor button, and more. **Quiet, and quiet never looks disabled** (TD-095,
      second pass): the next act is an outlined button at the text's normal strength, the rest are
@@ -78,24 +93,26 @@
      button a card ever carries is Allow. #}
   <div class="sc-foot">
     {% set nopane = s.state == 'closed' or s.pane is sameas false %}
-    {% if s.next_act == 'allow' %}
+    {# a compact needs-you card leads with Focus: the answer is given in the team's facet (§4.5a) #}
+    {% set next_act = 'focus' if s.compact and s.next_act == 'allow' else s.next_act %}
+    {% if next_act == 'allow' %}
       {# Allow / Deny only when the hook gave something to answer (`tool_use_id`): the route 409s
          without it (review of PR #251) #}
       <button class="btn sm primary" data-act="allow" data-id="{{ s.id }}">Allow</button>
       <button class="btn sm next" data-act="deny" data-id="{{ s.id }}">Deny</button>
       {# Deny's optional reason (§4.5a, TD-117): one line the session reads with the refusal #}
       <input class="denywhy" type="text" maxlength="200" data-id="{{ s.id }}" placeholder="why? (optional)" aria-label="reason for Deny, optional: the session reads it">
-    {% elif s.next_act == 'forget' %}
+    {% elif next_act == 'forget' %}
       <button class="btn sm next" data-act="remove" data-id="{{ s.id }}">Forget</button>
-    {% elif s.next_act == 'message' %}
+    {% elif next_act == 'message' %}
       {# a seat on call (TD-097): asking it is how it comes — the same control as *more*'s #}
       <button class="btn sm next" data-act="message" data-id="{{ s.id }}" data-name="{{ s.name }}" data-when-ask="{{ s.read_when.ask if s.read_when else '' }}" data-when-note="{{ s.read_when.note if s.read_when else '' }}" title="mail a question into its inbox — that is what fills the seat (design §4.9b)">Message…</button>
-    {% elif s.next_act == 'close' %}
+    {% elif next_act == 'close' %}
       <button class="btn sm next" data-act="close" data-id="{{ s.id }}">Close session</button>
     {% endif %}
     {# `data-focus`: while this browser holds the session popped out, it reads *Focus window* and
        raises that window (§4.5a **Focus**, TD-046) — a plain click only; a modifier is the browser's #}
-    <a class="btn sm {{ 'next' if s.next_act in ('focus', 'details') else 'link' }}" href="/focus/{{ s.id }}" data-focus="{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
+    <a class="btn sm {{ 'next' if next_act in ('focus', 'details') else 'link' }}" href="/focus/{{ s.id }}" data-focus="{{ s.id }}" title="{{ 'the pane is gone: details only, no terminal' if nopane else 'open the terminal' }}">▣ {{ 'Details' if nopane else 'Focus' }}</a>
     {# the editor button: the person's `open_in:` (design §5 *The person's own*) — its label is the person's text, escaped #}
     {% if s.editor %}<a class="btn sm link editor" href="{{ s.editor.url }}" data-label="{{ s.editor.label }}">‹› {{ s.editor.label }}</a>{% endif %}
     <span class="grow"></span>

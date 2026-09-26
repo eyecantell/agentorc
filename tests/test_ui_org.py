@@ -191,8 +191,8 @@ def test_the_page_renders_its_groups_and_team_badges(monkeypatch, tmp_path):
     assert 'class="tab off"' not in html
     assert not any(f">{dead}<" in html for dead in ("Resumable", "Commands", "Attention"))
     assert 'data-team="ao-grind"' in html and "No team" in html
-    # the card's team badge: drawn, and marked for the stylesheet to hide inside its own group (TD-095)
-    assert 'class="badge team ingroup"' in html
+    # a live team's members are compact cards, which carry no team badge (TD-176, §4.5a *card: compact*)
+    assert ' compact"' in html and 'class="badge team ingroup"' not in html
     assert "orchestrator-ao-1" in html and 'id="card-ao-g1"' in html
     assert html.index('data-team="ao-grind"') < html.index('id="card-ao-sh"')  # No team last
 
@@ -773,7 +773,8 @@ def test_the_header_says_where_once_and_counts_by_state_and_no_team_says_its_cou
     groups = team_groups([*same, v("n1", "idle", "kmaster / wg"), v("n2", "exited", "kmaster / wg")])
     team, none = groups
     head = templates.get_template("group_head.html").render(g=team)
-    assert "kmaster / agentorc" in head and "· 1 working · 1 idle" in head and " live<" not in head
+    # a live team's header carries no state chips since TD-176: its compact cards say it
+    assert "kmaster / agentorc" in head and "· 2 sessions" in head and "1 working" not in head and " live<" not in head
     nohead = templates.get_template("group_head.html").render(g=none)
     assert ">No team</span>" in nohead and ">2 sessions</span>" in nohead and "kmaster / wg" not in nohead
 

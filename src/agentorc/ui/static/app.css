@@ -33,6 +33,12 @@
      large or too small, `--t-body` is the one number to move. The card's heights follow the scale
      so a card stays six rows of one height (§4.5 *The card's anatomy*). */
   --t-body: 14px; --t-small: 12px; --t-cap: 11px; --t-title: 16px; --t-mono: 13px; --t-mono-s: 12.5px; --t-btn: 13px;
+  /* the team card's summary (design §4.5a *team card: summary*, TD-176): priority is one hue
+     darkened by rank; the kinds and the phases each their own; *opened* and *closed* blocks */
+  --p-high: #1e3a8a; --p-medium: #2563eb; --p-low: #93c5fd;
+  --k-pickable: #2563eb; --k-design: #4f46e5; --k-foryou: #d97706; --k-other: #e5e7eb; --k-other-fg: #374151;
+  --ph-add: #db2777; --ph-design: #4f46e5; --ph-grind: #2563eb; --ph-review: #d97706;
+  --blk-opened: #2563eb; --blk-closed: #059669; --seg-fg: #fff;
   --lh: 1.5; --lh-mono: 1.55;
   --row: 22px; --row1: 26px; --slot: 72px; --foot: 26px;
 }
@@ -48,6 +54,10 @@ html[data-theme="dark"] {
   --warn-bg: #3a2410; --warn-line: #9a5b1c; --warn-fg: #fdba74;
   --alarm: #d97706; --alarm-bg: #3f2a0c; --alarm-fg: #fcd34d;
   --primary: #e6e9ee; --primary-fg: #0f1216;
+  --p-high: #93c5fd; --p-medium: #3b82f6; --p-low: #1e3a8a;
+  --k-pickable: #3b82f6; --k-design: #6366f1; --k-foryou: #d97706; --k-other: #2a313a; --k-other-fg: #c9d1db;
+  --ph-add: #ec4899; --ph-design: #6366f1; --ph-grind: #3b82f6; --ph-review: #d97706;
+  --blk-opened: #1d4ed8; --blk-closed: #047857;
 }
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--fg); font: var(--t-body)/var(--lh) "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
@@ -424,3 +434,45 @@ details.side .kv { margin-top: 10px; } details.side .kv dd .grants, details.side
   .page.focus { flex-direction: column; } .focus .side { width: 100%; } .termbox { height: 50vh; } .topbar { gap: 8px; padding: 0 10px; } #hostchip { display: none; }
   .grid { grid-template-columns: 1fr; }
 }
+
+/* ---- the team-first Org (design §4.5 screen 1, §4.5a *team card: summary*, TD-176 slice 3) ---- */
+.tsum { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+@media (max-width: 1100px) { .tsum { grid-template-columns: minmax(0, 1fr); } }
+.facet { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.facet .fhead { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.facet .kind { font-size: var(--t-cap); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--strong); }
+.facet .dim { opacity: .7; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: var(--t-small); padding: 2px 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-fg); }
+.seg button:disabled { opacity: .45; cursor: default; }
+.bar, .blocks { display: flex; gap: 2px; min-height: 22px; }
+.bseg, .blk { display: flex; align-items: center; justify-content: center; min-width: 22px; padding: 0 4px; border-radius: 2px; color: var(--seg-fg); font-size: var(--t-small); font-weight: 600; text-decoration: none; white-space: nowrap; overflow: hidden; }
+.blk { min-height: 30px; font-weight: 500; gap: 4px; } .blk b { font-weight: 700; }
+.bseg.p-high { background: var(--p-high); } .bseg.p-medium { background: var(--p-medium); } .bseg.p-low { background: var(--p-low); color: var(--p-high); }
+.bseg.k-pickable, .legend .k-pickable { background: var(--k-pickable); } .bseg.k-design-first, .legend .k-design-first { background: var(--k-design); }
+.bseg.k-for-you, .legend .k-for-you { background: var(--k-foryou); } .bseg.k-other, .legend .k-other { background: var(--k-other); color: var(--k-other-fg); }
+.blk.opened { background: var(--blk-opened); } .blk.closed { background: var(--blk-closed); }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: var(--t-small); color: var(--muted); }
+.legend i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 4px; vertical-align: 0; }
+.mrow { display: flex; gap: 8px; align-items: baseline; min-width: 0; font-size: var(--t-small); }
+.mrow .mtitle { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--strong); }
+.mrow .mwho { flex: none; font-family: "JetBrains Mono", monospace; }
+.mrow .mwho .name { color: var(--fg); text-decoration: none; }
+.phase { flex: none; font-size: var(--t-cap); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 1px 6px; border-radius: 3px; color: var(--seg-fg); }
+.phase.ph-add { background: var(--ph-add); } .phase.ph-design { background: var(--ph-design); } .phase.ph-grind { background: var(--ph-grind); } .phase.ph-review { background: var(--ph-review); }
+.facet.fface.answering { background: var(--warn-bg); border-color: var(--warn-line); }
+.ablock { display: flex; flex-direction: column; gap: 5px; padding-bottom: 8px; border-bottom: 1px solid var(--line2); }
+.ablock:last-child { border-bottom: 0; }
+.ablock .atext { font-size: var(--t-mono-s); overflow-wrap: anywhere; }
+.dfeed { display: flex; flex-direction: column; gap: 3px; max-height: 12em; overflow: auto; }
+.drow { display: flex; gap: 8px; font-size: var(--t-small); min-width: 0; white-space: nowrap; }
+.drow .name { font-family: "JetBrains Mono", monospace; color: var(--fg); text-decoration: none; flex: none; max-width: 12ch; overflow: hidden; text-overflow: ellipsis; }
+.drow .dtext { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+/* the compact card (§4.5a *card: compact*): name and pill, one line, the foot — and no state glyph */
+.sc.compact { gap: 10px; padding: 12px 14px; }
+.sc.compact .pill.nog::before { content: none; }
+.sc.compact .r1 .mine .ricon { vertical-align: -2px; margin-left: 4px; }
+.sc.compact .cline { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tsum .lv, .tsum .wv, .tsum .fv { display: flex; flex-direction: column; gap: 5px; }
+.tsum .lv[hidden], .tsum .wv[hidden], .tsum .fv[hidden] { display: none; }

@@ -49,6 +49,7 @@
     {% else %}{% for g in groups %}
     <section class="tgroup" data-team="{{ g.team }}" data-manager="{{ g.manager.id if g.manager else '' }}" data-live="{{ g.live }}">
       <div class="row gap wrap ghead">{% include "group_head.html" %}</div>
+      {% if g.summary %}{% include "team_summary.html" %}{% endif %}
       <div class="grid">{% for s in g.members %}{% include "card.html" %}{% endfor %}</div>
     </section>
     {% endfor %}{% endif %}

@@ -2433,7 +2433,8 @@ def test_deny_carries_an_optional_reason_from_every_place_it_is_offered(tmp_path
     # the Focus header draws the same box, and every press and every redraw goes through the helpers
     assert 'data-act="deny" data-id="${id}">Deny</button> <input class="denywhy"' in js
     assert "body = AO.denyBody(w && w.value)" in js
-    assert js.count("AO.restoreDenyWhys(") == 3  # the card's delta, the Focus header, the Inbox poll
+    # the card's delta, the Focus header, the Inbox poll, a team summary's Answer needed facet (TD-176)
+    assert js.count("AO.restoreDenyWhys(") == 4
 
     node = shutil.which("node")
     if not node:
