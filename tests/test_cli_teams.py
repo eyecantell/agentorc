@@ -12,6 +12,7 @@ import pytest
 import yaml
 
 from agentorc import cli, teamrun, teams
+from agentorc import org as orgmod
 
 pytestmark = pytest.mark.unit
 
@@ -1354,3 +1355,58 @@ def test_every_unattended_member_carries_the_usage_gates_two_texts(world):
         want = teams.gate_prompts(p["unattended"])
         assert {k: p.get(k) for k in want} == want and ("pause_prompt" in p) == bool(p["unattended"])
     assert any(p["unattended"] for p in creates(state))
+
+
+# ── Members… (design §4.9 *Add or remove a member from the team card*, TD-163, built by TD-172) ──
+
+
+def _flow_org(tmp_path):
+    """The world's org, its member entries one line each — the shape the card can edit."""
+    (tmp_path / "home" / "org.yml").write_text(yaml.safe_dump(org_doc(tmp_path), default_flow_style=None))
+    return tmp_path / "home" / "org.yml"
+
+
+def test_members_on_a_stopped_team_edit_the_definition_only(world):
+    tmp_path, state = world
+    path = _flow_org(tmp_path)
+    v = teamrun.members_view(orgmod.load(path), "ao-grind", [])
+    assert v["editable"] and not v["live"] and [e["role"] for e in v["members"]] == ["grinder", "hunter"]
+    assert v["members"][0]["sessions"][1] == {"name": "grind-2", "id": "", "state": "not live"}
+    got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder")
+    assert got["did"] == "grind count: 2 → 3" and got["created"] == [] and "next Start" in got["text"]
+    assert not creates(state)
+    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=1, role="hunter")
+    assert got["did"] == "removed hunt" and got["wound_down"] is None
+    assert [m.role for m in orgmod.load(path).teams["ao-grind"].members] == ["grinder"]
+
+
+def test_members_on_a_live_team_start_one_under_the_manager_and_wind_one_down(world):
+    tmp_path, state = world
+    path = _flow_org(tmp_path)
+    started(state)
+    got = teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder")
+    (made,) = got["created"]
+    assert made["name"] == "grind-3" and made["controllers"] == ["ao-agentorc-orc-ao"] and made["team"] == "ao-grind"
+    assert [p["name"] for p in creates(state)] == ["grind-3"]  # the one member, not the team again
+    state["calls"].clear()
+    got = teamrun.remove_member(cli.call_sync, path, "ao-grind", index=0, role="grinder")
+    assert got["did"] == "grind count: 3 → 2" and got["wound_down"]["name"] == "grind-3"
+    sent = [p for m, p in state["calls"] if m == "send"]
+    assert [p["id"] for p in sent] == ["ao-agentorc-grind-3"] and sent[0]["wrapup"] is True  # never a kill
+    assert not [m for m, _ in state["calls"] if m == "kill"]
+
+
+def test_members_refuse_a_repo_defined_team_and_a_held_name(world):
+    tmp_path, state = world
+    path = _flow_org(tmp_path)
+    started(state)
+    state["verdicts"]["grind-3"] = {"name": "grind-3", "verdict": "live", "holder": "ao-x"}
+    with pytest.raises(teams.TeamError, match="grind-3 is held by a live session, so nothing was created"):
+        teamrun.add_member(cli.call_sync, path, "ao-grind", HOST, role="grinder")
+    org = orgmod.merge_repo_teams(
+        orgmod.load(path),
+        tmp_path / "agentorc",
+        {"repo-team": {"manager": {"role": "manager"}, "members": [{"role": "grinder"}]}},
+    )
+    v = teamrun.members_view(org, "repo-team", [])
+    assert not v["editable"] and "edit it by PR" in v["note"]

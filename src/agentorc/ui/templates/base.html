@@ -67,6 +67,24 @@
    that sessions wrote paragraphs into. It is retired with the Inbox page (§4.5a, TD-069 step 1). #}
 {# design §4.5a **?** overlay (TD-124): every key of this page beside the control it presses,
    filled by `app.js` from the one table its `keydown` handler reads — never written here #}
+{#- design §4.5a *Members dialog* (§4.9, TD-163, built by TD-172): the definition's manager, techlead seat
+    and member entries, each with the sessions holding it; **Add member** and **Remove** — `org.yml`
+    edited as text in place, a person's act through this page's process. Filled by the script from
+    `/api/teams/<t>/members`; every name in it is drawn as text. -#}
+<dialog id="membersdlg" class="card pad maildlg" aria-labelledby="membershead">
+  <form method="dialog" class="col gap">
+    <div class="row gap"><span class="h2" id="membershead">Members</span><span class="grow"></span><button class="btn sm ghost" value="close">Close</button></div>
+    <div class="note" id="membersnote"></div>
+    <div id="memberslist" class="col gap"></div>
+    <div class="row gap wrap" id="membersadd">
+      <label class="field">role <select class="input" id="maddrole"></select></label>
+      <label class="field">name <input class="input" id="maddname" placeholder="grinder-ao"></label>
+      <label class="field">lane <input class="input" id="maddlane" placeholder="free-pick"></label>
+      <button class="btn sm primary" type="button" id="maddgo">Add member</button>
+    </div>
+    <div class="note warn hidden" id="memberserr"></div>
+  </form>
+</dialog>
 <dialog id="keyhelp" class="card pad keydlg" aria-labelledby="keyhelptitle">
   <form method="dialog" class="col gap">
     <div class="row gap"><span class="h2" id="keyhelptitle">Keys</span><span class="grow"></span><button class="btn sm ghost" value="close">Close</button></div>

@@ -1535,6 +1535,69 @@
     };
   };
 
+  // design §4.5a *team card: Members…* and the *Members dialog* (§4.9, TD-163, built by TD-172). The
+  // listing is the definition as `org.yml` writes it, with the sessions holding each entry; Add and
+  // Remove edit the file through the UI process and, on a live team, start or wind down the one
+  // member. Every name here is text (`esc`); a refusal is said in the dialog, which stays open.
+  AO.membersConfirm = function (e, team) {
+    const last = (e.sessions || [])[e.sessions.length - 1] || {};
+    const edit = e.count > 1 ? `count: ${e.count} → ${e.count - 1}` : `removes the ${e.name || e.role} line`;
+    const live = last.id && !["exited", "closed", "not live"].includes(last.state);
+    return `Remove from ${team}? It edits org.yml (${edit})` + (live ? ` and winds down ${last.name} — Wrap up's prompt, never a kill; its card stays until Forget.` : ".");
+  };
+  async function openMembers(team) {
+    const dlg = $("#membersdlg"); if (!dlg) return;
+    const err = $("#memberserr");
+    const say = (m) => { err.textContent = m || ""; err.classList.toggle("hidden", !m); };
+    let v;
+    async function load() {
+      const r = await fetch(`/api/teams/${encodeURIComponent(team)}/members`);
+      v = await r.json();
+      if (!r.ok) { say(v.detail || "the definition could not be read"); return; }
+      $("#membershead").textContent = `Members of ${team}`;
+      $("#membersnote").textContent = v.note || (v.live ? "live: Add starts the member under the manager, Remove winds it down" : "stopped: an edit is the definition only — the next Start brings it");
+      const who = (h) => h ? `${esc(h.name)} · ${esc(h.state)}` : "";
+      const rows = [];
+      if (v.manager) rows.push(`<div class="row gap"><span class="meta">manager</span> ${who(v.manager)}</div>`);
+      if (v.techlead) rows.push(`<div class="row gap"><span class="meta">techlead seat</span> ${who(v.techlead)}</div>`);
+      v.members.forEach((e) => {
+        if (e.nested) { rows.push(`<div class="row gap"><span class="meta">team</span> ${esc(e.nested)} <span class="meta">— nested, edited by hand</span></div>`); return; }
+        const held = (e.sessions || []).map(who).join(", ");
+        const rm = v.editable ? ` <span class="grow"></span><button class="btn sm ghost" type="button" data-mremove="${e.index}">Remove</button>` : "";
+        rows.push(`<div class="row gap wrap"><span>${esc(e.role)} · ${esc(e.name || e.role)} · ${esc((e.lane || []).join(", ") || "—")} · ${e.count}</span><span class="meta">${held}</span>${rm}</div>`);
+      });
+      $("#memberslist").innerHTML = rows.join("");
+      $("#membersadd").hidden = !v.editable;
+      const sel = $("#maddrole");
+      sel.innerHTML = (v.roles || []).filter((x) => x !== "plain").map((x) => `<option value="${esc(x)}">${esc(x)}</option>`).join("");
+      if ([...sel.options].some((o) => o.value === "grinder")) sel.value = "grinder";
+      const fill = () => { const e = v.members.find((m) => m.role === sel.value); $("#maddname").value = e ? e.name : sel.value; };
+      sel.onchange = fill; fill();
+    }
+    say(""); await load();
+    $("#memberslist").onclick = async (ev) => {
+      const b = ev.target.closest("[data-mremove]"); if (!b) return;
+      const e = v.members.find((m) => String(m.index) === b.dataset.mremove); if (!e) return;
+      if (!confirm(AO.membersConfirm(e, team))) return;
+      const r = await fetch(`/api/teams/${encodeURIComponent(team)}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "remove", index: e.index, role: e.role }) });
+      const got = await r.json();
+      if (!r.ok) return say(got.detail || "refused");
+      say(""); AO.toast(got.text, true); await load();
+    };
+    $("#maddgo").onclick = async () => {
+      const body = { action: "add", role: $("#maddrole").value, name: $("#maddname").value, lane: $("#maddlane").value };
+      const r = await fetch(`/api/teams/${encodeURIComponent(team)}/members`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const got = await r.json();
+      if (!r.ok) return say(got.detail || "refused");
+      say(""); AO.toast(got.text, true); await load();
+    };
+    if (!dlg.open) dlg.showModal();
+  }
+  document.addEventListener?.("click", (e) => {
+    const b = e.target.closest && e.target.closest("[data-members]"); if (!b) return;
+    e.preventDefault(); openMembers(b.dataset.members);
+  });
+
   AO.org = function () {
     // the Repo page's team link lands here filtered to that team (§4.5a *Repo page: links*)
     const wantTeam = new URLSearchParams(location.search).get("team");
@@ -2107,6 +2170,9 @@
           $$('[data-act="resume"]', ex).forEach((b) => { b.title = hp.dataset.titleResume || ""; });
           $$('[data-act="remove"]', ex).forEach((b) => { b.title = hp.dataset.titleForget || ""; });
         }
+        // design §4.9a *One member back, today* (TD-172): a team's member comes back unattended by
+        // Resume with changes… — Resume alone starts it attended — so the banner says so
+        if (v.team) ex.insertAdjacentHTML("beforeend", `<div class="note memberback">To bring it back into ${esc(v.team)} unattended: <b>Resume with changes…</b> and tick <b>Unattended</b> — Resume alone starts it attended.</div>`);
         const mk = $("#exitedmark");
         if (mk) { ex.appendChild(mk.content.cloneNode(true)); AO.applyHelpMarks(ex); }
         ex.classList.remove("hidden");

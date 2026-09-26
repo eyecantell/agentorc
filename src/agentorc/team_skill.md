@@ -277,6 +277,13 @@ ao team stop cm-grind --close         # also close each member that settled clea
 `--close` is what lets `ao team start` run again under the same names without superseding anything.
 `--timeout` bounds the wait for the members (default 300 s).
 
+**One member back** (design §4.9a *One member back, today*). Mail to an exited member waits in its
+inbox and starts nothing: only a seat is filled by a question. To bring one member back into a
+running team: **Resume with changes…** on its card with *Unattended* ticked — **Resume** alone
+starts it attended — which supersedes the record in place and keeps its mail; or the team's
+**Start**, which brings the whole definition; or **Members…** on the team card → **Add member** of
+the same role, which edits `org.yml` and creates it fresh under the manager.
+
 ---
 
 ## For a Claude session told to do this

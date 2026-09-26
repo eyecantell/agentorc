@@ -1790,6 +1790,7 @@ def team_groups(
                 # a definition exists, so the group's card carries Start, or Stop / Stop now (§4.5a)
                 "defined": team in defs,
                 "source": row.get("source"),
+                "in_org": bool(row.get("in_org")),  # Members… edits org.yml's teams only (TD-172)
                 "def_manager": row.get("manager"),  # the definition's word, for a card with no sessions yet
                 "def_members": row.get("members"),
                 "def_techlead": row.get("techlead"),  # the seat's name (§4.9b), when the definition has one
@@ -3621,6 +3622,53 @@ def _teams_routes(app: FastAPI, h: SimpleNamespace) -> None:
             # A failed pre-flight check created nothing (§4.9): the toast is the whole outcome.
             raise _team_http(e) from None
         return JSONResponse({"ok": True, **result})
+
+    # design §4.9 *Add or remove a member from the team card*, §4.5a *team card: Members…* and the
+    # *Members dialog* (TD-163, built by TD-172): the one control that edits a definition from the
+    # page — `org.yml`, as text, through the UI process, never the host agent (§4.4a: the org file
+    # is the clients'). A repo-defined team is read here and edited by PR.
+    @app.get("/api/teams/{name}/members")
+    async def api_team_members(name: str):
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
+        org, _notes = org_here()
+        try:
+            v = teamrun.members_view(org, name, await call("list"))
+        except (teams.TeamError, ValueError) as e:
+            raise _team_http(e) from None
+        v["roles"] = [r.name for r in repoconfig.roles(repoconfig.RepoConfig(), org.roles)]
+        return v
+
+    @app.post("/api/teams/{name}/members")
+    async def api_team_members_edit(name: str, request: Request):
+        body = await request.json()
+        if hosts.is_node():
+            raise HTTPException(409, node_org_note())
+        org, _notes = org_here()
+        try:
+            view_ = teamrun.members_view(org, name, await call("list"))
+            if not view_["editable"] or org.path is None:
+                raise teams.TeamError(f"team {name} is {view_['note'] or 'not in org.yml'}")
+            if body.get("action") == "add":
+                lane = [x.strip() for x in str(body.get("lane") or "").split(",") if x.strip()]
+                got = await asyncio.to_thread(
+                    teamrun.add_member, rpc, org.path, name, host_name(),
+                    role=str(body.get("role") or ""), member=str(body.get("name") or "").strip(), lane=lane,
+                )  # fmt: skip
+            elif body.get("action") == "remove":
+                got = await asyncio.to_thread(
+                    teamrun.remove_member,
+                    rpc,
+                    org.path,
+                    name,
+                    index=int(body.get("index")),
+                    role=str(body.get("role") or ""),
+                )
+            else:
+                raise HTTPException(400, "action is add or remove")
+        except (teams.TeamError, ValueError, TypeError, AgentError, AgentUnavailable) as e:
+            raise _team_http(e) from None
+        return JSONResponse({"ok": True, **got})
 
     @app.post("/api/teams/{name}/stop")
     async def api_team_stop(name: str, request: Request):

@@ -262,6 +262,8 @@ def rows(org: orgmod.Org, sessions: list[dict[str, Any]]) -> list[dict[str, Any]
             {
                 "name": t.name,
                 "source": str(t.source) if t.source else None,
+                # the org file's own definition, which the card's Members… may edit (TD-172); a repo's is read
+                "in_org": bool(t.source and org.path and Path(t.source) == Path(org.path)),
                 "projects": list(t.projects),
                 "manager": t.manager.name if t.manager.role != orgmod.PERSON else "person",
                 "techlead": t.techlead.name if t.techlead else None,  # the seat (§4.9b), if any
@@ -542,3 +544,102 @@ def wait_settled(call: Call, ids: list[str], timeout: float) -> dict[str, str]:
         if all(st in SETTLED for st in states.values()) or time.monotonic() >= end:
             return states
         time.sleep(min(WRAPUP_POLL, max(end - time.monotonic(), 0.0)) or WRAPUP_POLL)
+
+
+# ── Members… (design §4.9 *Add or remove a member from the team card*, TD-163, built by TD-172) ──
+
+
+def members_view(org: orgmod.Org, name: str, sessions: list[dict[str, Any]]) -> dict[str, Any]:
+    """The Members dialog's listing: the manager, the techlead seat, and each member entry as the
+    definition writes it — role · name · lane · count — with the sessions holding it and their
+    states. `editable` is whether the page may edit it: a team `org.yml` defines, never one a
+    repo's `.agentorc.yml` does (*edit it in the repo; this card only reads it*)."""
+    team = teams.find(org, name)
+    by_name = {str(s.get("name") or ""): s for s in badged(name, sessions)}
+
+    def held(n: str) -> dict[str, Any]:
+        s = by_name.get(n)
+        return {"name": n, "id": s["id"] if s else "", "state": s.get("state") if s else "not live"}
+
+    editable = bool(team.source and org.path and Path(team.source) == Path(org.path))
+    entries = []
+    for i, m in enumerate(team.members):
+        if m.team is not None:
+            entries.append({"index": i, "nested": m.team, "sessions": []})
+            continue
+        entries.append(
+            {
+                "index": i,
+                "role": m.role,
+                "name": m.name,
+                "lane": list(m.lane),
+                "count": m.count,
+                "sessions": [held(n) for n in m.names()],
+            }
+        )
+    out: dict[str, Any] = {
+        "team": team.name,
+        "source": str(team.source) if team.source else None,
+        "editable": editable,
+        "note": "" if editable else "defined in the repo — edit it by PR; this card only reads it",
+        "live": bool(live(badged(name, sessions))),
+        "manager": held(team.manager.name) if team.manager.role != orgmod.PERSON else None,
+        "techlead": held(team.techlead.name) if team.techlead else None,
+        "members": entries,
+    }
+    return out
+
+
+def _names(org: orgmod.Org, name: str) -> list[str]:
+    team = teams.find(org, name)
+    return [n for m in team.members if m.team is None for n in m.names()]
+
+
+def add_member(
+    call: Call, path: Path, name: str, host: str, *, role: str, member: str = "", lane: list[str] | None = None
+) -> dict[str, Any]:
+    """**Add member** (design §4.9): the definition edited as text (`orgmod.edit_members`); on a
+    live team, the one new member created under the manager as `ao team start` creates one — the
+    plan's own launch, the name check first — so its card appears without a restart. On a stopped
+    team, the definition only: the next Start brings the new shape."""
+    before = _names(orgmod.load(path), name)
+    did = orgmod.edit_members(path, name, add={"role": role, "name": member, "lane": lane or []})
+    org = orgmod.load(path)
+    new = [n for n in _names(org, name) if n not in before]
+    up = live(badged(name, call("list")))
+    out: dict[str, Any] = {"team": name, "did": did, "created": [], "text": f"org.yml: {did}"}
+    if not up or not new:
+        out["text"] += " — the team is stopped: its next Start brings the member" if not up else ""
+        return out
+    plan = teams.plan(org, name, host, files=files_via(call))
+    lead = next((s for s in up if s.get("name") == plan.manager_id or s.get("id") == plan.manager_id), None)
+    lead_id = str(lead["id"]) if lead else ""
+    for x in [m for m in plan.members if m.name in new]:
+        verdict = call("name_check", dir=str(x.dir), name=x.name, repo=str(x.dir))
+        if verdict.get("verdict") in ("live", "suspended"):
+            raise teams.TeamError(
+                f"org.yml: {did}, but {x.name} is held by a live session, so nothing was created — "
+                "the definition names it for the next Start"
+            )
+        out["created"].append(call("create", **x.create_params([lead_id] if lead_id else [])))
+    out["text"] += (
+        f" — started {', '.join(str(r.get('name') or r.get('id')) for r in out['created'])} under {lead_id or 'you'}"
+    )
+    return out
+
+
+def remove_member(call: Call, path: Path, name: str, *, index: int, role: str) -> dict[str, Any]:
+    """**Remove** (design §4.9): the entry's `count:` decremented — the highest-numbered member goes
+    — or its line deleted; a live member so removed is sent Wrap up's wind-down, never a kill, and
+    its record stays a card until Forget. A member not live: the definition only."""
+    team = teams.find(orgmod.load(path), name)
+    if not 0 <= index < len(team.members):
+        raise teams.TeamError(f"team {name} has no member entry {index + 1} — reload and try again")
+    gone = team.members[index].names()[-1] if team.members[index].team is None else ""
+    did = orgmod.edit_members(path, name, remove=index, role=role)
+    out: dict[str, Any] = {"team": name, "did": did, "wound_down": None, "text": f"org.yml: {did}"}
+    s = next((s for s in live(badged(name, call("list"))) if s.get("name") == gone), None)
+    if s is not None:
+        out["wound_down"] = _stop_one(call, s, "member", now=False)
+        out["text"] += f" — {gone} is sent the wrap-up; its card stays until Forget"
+    return out

@@ -406,3 +406,110 @@ def test_the_org_roles_overlay_is_checked_key_by_key_as_a_repos_is(tmp_path):
     ):
         with pytest.raises(ValueError, match=names):
             org.load(write(tmp_path, {"roles": bad}))
+
+
+# -- Members… (design §4.9 *Add or remove a member from the team card*, TD-163, built by TD-172) ---
+
+MEMBERS_YML = """\
+# the org, by hand
+projects:
+  agentorc: {repos: {agentorc: {kmaster: ~/agentorc}}}
+
+teams:
+  # the grind team
+  ao-grind:
+    projects: [agentorc]   # one repo
+    manager: {role: manager, name: manager-ao-1}
+    members:
+      # two grinders, numbered
+      - {role: grinder, count: 2, name: grinder-ao, lane: [free-pick]}   # the lane
+      - {role: hunter, name: hunter-ao, lane: [ui]}
+    # after the members
+  other:
+    projects: [agentorc]
+    manager: {role: manager}
+    members:
+      - role: grinder
+        name: long-one
+roles: {}
+"""
+
+
+def _members(tmp_path: Path) -> Path:
+    p = tmp_path / "org.yml"
+    p.write_text(MEMBERS_YML)
+    return p
+
+
+def test_add_bumps_a_counted_members_count_in_place_and_keeps_every_other_byte(tmp_path):
+    p = _members(tmp_path)
+    did = org.edit_members(p, "ao-grind", add={"role": "grinder", "name": "grinder-ao"})
+    after = p.read_text()
+    assert did == "grinder-ao count: 2 → 3"
+    assert after == MEMBERS_YML.replace("count: 2, name: grinder-ao", "count: 3, name: grinder-ao")
+    assert org.load(p).teams["ao-grind"].members[0].names()[-1] == "grinder-ao-3"
+
+
+def test_add_of_another_role_appends_one_line_after_the_last_item(tmp_path):
+    p = _members(tmp_path)
+    org.edit_members(p, "ao-grind", add={"role": "auditor", "name": "audit-ao", "lane": ["docs"]})
+    after = p.read_text()
+    want = MEMBERS_YML.replace(
+        "      - {role: hunter, name: hunter-ao, lane: [ui]}\n",
+        "      - {role: hunter, name: hunter-ao, lane: [ui]}\n      - {role: auditor, name: audit-ao, lane: [docs]}\n",
+    )
+    assert after == want  # comments above, beside and after the block stand
+    assert [m.role for m in org.load(p).teams["ao-grind"].members] == ["grinder", "hunter", "auditor"]
+
+
+def test_remove_decrements_a_count_or_deletes_the_one_line(tmp_path):
+    p = _members(tmp_path)
+    assert org.edit_members(p, "ao-grind", remove=0, role="grinder") == "grinder-ao count: 2 → 1"
+    assert "count: 1, name: grinder-ao" in p.read_text()
+    assert org.edit_members(p, "ao-grind", remove=1, role="hunter") == "removed hunter-ao"
+    after = p.read_text()
+    assert "hunter-ao" not in after and "# the lane" in after and "# after the members" in after
+    assert len(after.splitlines()) == len(MEMBERS_YML.splitlines()) - 1
+
+
+def test_an_edit_that_cannot_be_one_line_is_refused_and_the_file_untouched(tmp_path):
+    p = _members(tmp_path)
+    for kw, why in (
+        ({"remove": 0, "role": "grinder"}, "spans several lines"),
+        ({"remove": 5}, "no member entry 6"),
+        ({"remove": 0, "role": "hunter"}, "not a hunter any more"),
+    ):
+        team = "other" if why == "spans several lines" else "ao-grind"
+        with pytest.raises(ValueError, match=why):
+            org.edit_members(p, team, **kw)
+    with pytest.raises(ValueError, match="does not define a team nope"):
+        org.edit_members(p, "nope", add={"role": "grinder"})
+    assert p.read_text() == MEMBERS_YML
+
+
+def test_an_edit_that_would_not_parse_restores_the_bytes(tmp_path, monkeypatch):
+    p = _members(tmp_path)
+
+    def broken(path=None):
+        raise ValueError("org.yml: teams.ao-grind.members[2]: nonsense")
+
+    monkeypatch.setattr(org, "load", broken)
+    with pytest.raises(ValueError, match="would not parse, so org.yml is as it was"):
+        org.edit_members(p, "ao-grind", add={"role": "auditor", "name": "x"})
+    assert p.read_text() == MEMBERS_YML
+
+
+def test_a_count_is_edited_as_the_field_never_as_text_that_looks_like_it(tmp_path):
+    """Review of PR #608: a name holding the characters `count: 9` before the real `count:` must not
+    be the one edited — the entry's own field is, and nothing else in the line changes."""
+    p = tmp_path / "org.yml"
+    p.write_text(
+        MEMBERS_YML.replace(
+            "{role: grinder, count: 2, name: grinder-ao,", '{role: grinder, name: "prod count: 9 today", count: 2,'
+        )
+    )
+    before = p.read_text()
+    assert org.edit_members(p, "ao-grind", add={"role": "grinder"}) == "prod count: 9 today count: 2 → 3"
+    assert p.read_text() == before.replace('"prod count: 9 today", count: 2,', '"prod count: 9 today", count: 3,')
+    org.edit_members(p, "ao-grind", remove=0, role="grinder")
+    assert p.read_text() == before

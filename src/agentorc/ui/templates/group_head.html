@@ -33,6 +33,11 @@
 {% if g.team and g.defined %}{% if not g.stopped %}<button class="btn sm stop" data-team-act="stop" data-team="{{ g.team }}" title="{{ help_title('wind-down') }}">Wind down</button>
 <button class="btn sm ghost stop" data-team-act="stopnow" data-team="{{ g.team }}" title="{{ help_title('stop-now') }}">Stop now</button>
 {% else %}<button class="btn sm start" data-team-act="start" data-team="{{ g.team }}" title="{{ help_title('start') }}"{% if g.concluded %} data-confirm="Start {{ g.team }}? It first closes {{ g.concluded.names | join(', ') }} — each idle and declared — and a session holding uncommitted or unpushed work refuses the start instead."{% endif %}>Start</button>{% endif %}{% endif %}
+{# design §4.5a *team card: **Members…*** (§4.9, TD-163, built by TD-172): beside Start on a stopped
+   team and beside Wind down on a live one; on a team a repo defines, a note instead — its file is
+   edited by PR #}
+{% if g.team and g.defined %}{% if g.in_org %}<button class="btn sm ghost" data-members="{{ g.team }}" title="the team's definition: add a member or remove one — org.yml is edited in place, and on a live team the member is started or wound down">Members…</button>
+{% else %}<span class="meta" title="this team is defined in {{ g.source or 'a repo' }}">defined in the repo — edit it by PR</span>{% endif %}{% endif %}
 {# the fold (design §4.5a **team groups**, TD-156 (f)): only a team with nothing live folds — a
    concluded team's idle cards wait for a person's Close and stay in view — and the control sits
    beside Start, a chevron and the count; the client keeps the choice per team and sets the glyph #}
