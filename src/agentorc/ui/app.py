@@ -700,7 +700,7 @@ def view(
     fleet: list[dict[str, Any]] | None = None,
     *,
     fleet_known: bool = True,
-    icons: dict[tuple[str, str], tuple[str, str]] | None = None,
+    icons: dict[tuple[str, str], tuple[str, str, str]] | None = None,
     seats: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Everything a card or the Focus header needs, computed once. `fleet` is the other records,
