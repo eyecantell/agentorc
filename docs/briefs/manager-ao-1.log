@@ -475,3 +475,4 @@ For a §6 policy: nothing new beyond what's already carried forward — the long
 02:09–06:41  quiet stretch: grinder-ao-1 stayed idle/restart_wanted the whole stretch (already escalated, PR #593). designer-ao-1 resumed working at 06:41:45Z despite its earlier out_of_work declaration — no longer finished, no action needed. techlead seat cycled fill/exited on its own.
 06:51Z  designer-ao-1: TD-154 done → PR #558 merged (Transcript screen, docs). Cadence check pass (review SHIP, ci green, ledger named, worktree clean). No held paths.
 06:53Z  designer-ao-1: TD-157 done → PR #562 merged (Help screen, docs). Cadence check: pr/review/ledger/worktree pass, ci still running (unknown, not called a pass) at check time. No held paths.
+06:58Z  designer-ao-1: TD-160 done → PR #566 merged (person in the team, docs). Cadence check pass (review FIXED 2 findings, ci green, ledger named). No held paths.
